@@ -1,7 +1,7 @@
 You are developing CKC, a proof-carrying clinical knowledge compiler. Read the
 following files to load context, then determine your session type.
 
-## Step 1: Orient
+## Step 1: Load context
 
 Read `SPEC.md`, `.agent/memory.md`, `.agent/roadmap.md`, and `git log --oneline -20`.
 
