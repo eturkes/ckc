@@ -16,7 +16,7 @@ technically derivable but easily forgotten under token pressure.
   highest-risk locations for redundancy with SPEC.md and config files. Default
   assumption: if a fact lives in a file, it belongs only in that file.
 
-- [2026-05-27] Before committing prose/doc changes, self-audit the balance of
+- [2026-05-27] Before committing any change, self-audit the balance of
   token-efficiency against LLM-readability. Do this proactively; the user
   expects it done before they see the result.
 
