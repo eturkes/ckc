@@ -7,6 +7,11 @@ technically derivable but easily forgotten under token pressure.
 
 ## Decisions
 
+## User Preferences
+
+- [2026-05-27] Skip end-of-session summaries; they burn tokens without adding
+  value.
+
 ## Lessons
 
 - [2026-05-27] Every piece of natural language in the project (docs, comments,
@@ -28,5 +33,9 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
   silently miss case variants. Always read the result or verify match count
   covers all intended occurrences.
+- [2026-05-27] User gave a directive (skip end-of-session summaries) and the
+  agent acknowledged it verbally but failed to persist it to memory. Any
+  user directive meant for future sessions must be written to memory
+  immediately, in the same turn.
 
 ## Open Questions
