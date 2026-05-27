@@ -27,7 +27,3 @@ dedicated to writing the next Phase's top-level tasks (with no subtasks).
 Derive them from SPEC.md Section 20. Commit the updated roadmap and end the
 session.
 
-## Step 3: Execute
-
-Perform exactly the session type identified above. Each session produces
-exactly one commit (or a small coherent set) and then ends.

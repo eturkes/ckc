@@ -1,10 +1,7 @@
 # CKC Roadmap
 
-Work is organized into Phases (from SPEC.md Section 20), each containing
-top-level tasks. A Type C session creates the next Phase's top-level tasks
-once the current Phase is complete. A Type A session decomposes the next
-incomplete top-level task into indented subtasks. A Type B session completes
-exactly one subtask. See `.agent/prompt.md` for the full session state machine.
+Phases contain top-level tasks; top-level tasks may contain indented subtasks.
+See `.agent/prompt.md` for the session workflow that governs progression.
 
 ## Phase 0: Proof-Carrying Research Kernel
 
