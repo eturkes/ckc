@@ -668,7 +668,7 @@ Every command emits structured diagnostics and immutable artifacts.
 │   └── terminology/
 ├── schemas/
 ├── dsl/ckc-syntax/
-├── lean/Crl/
+├── lean/Ckc/
 ├── logic/{smt,asp,prolog,datalog,egglog,tla,alloy,dmn}/
 ├── ontologies/{alignments,terminology}/
 ├── certs/
