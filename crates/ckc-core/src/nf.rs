@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::artifact::{
@@ -136,6 +137,35 @@ impl NfContext {
             *value = sorted;
         }
     }
+
+    /// Pass 6: lowercase an action_type string for canonical casing.
+    pub fn normalize_action_type(&mut self, value: &mut String) {
+        let lower = value.to_ascii_lowercase();
+        if *value != lower {
+            self.rewrites.push(NfRewrite {
+                pass: 6,
+                field: "action_type".into(),
+                before: std::mem::take(value),
+                after: lower.clone(),
+            });
+            *value = lower;
+        }
+    }
+
+    /// Pass 7: normalize unit strings in a JSON `Value` field.
+    /// Walks the value tree and replaces known unit aliases with
+    /// UCUM canonical forms. Records a rewrite when any change occurs.
+    pub fn normalize_units(&mut self, field: &str, value: &mut Value) {
+        let before = to_canonical_bytes(value);
+        if normalize_json_units(value) {
+            self.rewrites.push(NfRewrite {
+                pass: 7,
+                field: field.into(),
+                before: String::from_utf8_lossy(&before).into_owned(),
+                after: String::from_utf8_lossy(&to_canonical_bytes(value)).into_owned(),
+            });
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +269,55 @@ fn split_at_depth_0<'a>(s: &'a str, op: &str) -> Vec<&'a str> {
 }
 
 // ---------------------------------------------------------------------------
+// Pass 7: unit string normalization (quantity constraints)
+// ---------------------------------------------------------------------------
+
+/// Map a string to its UCUM canonical form when it matches a known unit alias.
+/// Returns `None` for strings that are already canonical or unrecognized.
+fn canonical_unit(s: &str) -> Option<&'static str> {
+    match s {
+        "ml" | "ML" => Some("mL"),
+        "l" => Some("L"),
+        "\u{2103}" | "\u{00B0}C" | "degC" | "degree_celsius" => Some("Cel"),
+        "mmHg" => Some("mm[Hg]"),
+        "bpm" | "beats/min" => Some("/min"),
+        "mcg" | "\u{03BC}g" => Some("ug"),
+        _ => None,
+    }
+}
+
+/// Walk a `serde_json::Value` tree and replace string values matching known
+/// unit aliases with their UCUM canonical form. Returns true when any value
+/// was changed.
+fn normalize_json_units(v: &mut Value) -> bool {
+    match v {
+        Value::String(s) => {
+            if let Some(canonical) = canonical_unit(s) {
+                *s = canonical.into();
+                true
+            } else {
+                false
+            }
+        }
+        Value::Object(map) => {
+            let mut changed = false;
+            for val in map.values_mut() {
+                changed |= normalize_json_units(val);
+            }
+            changed
+        }
+        Value::Array(arr) => {
+            let mut changed = false;
+            for val in arr.iter_mut() {
+                changed |= normalize_json_units(val);
+            }
+            changed
+        }
+        _ => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Normalize trait
 // ---------------------------------------------------------------------------
 
@@ -266,6 +345,23 @@ impl<T: Normalize> Normalize for Option<T> {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Pass 8: terminology normalization trait (identity stub)
+// ---------------------------------------------------------------------------
+
+/// Normalize through e-graph equivalence classes and terminology bindings.
+///
+/// Identity transform at schema v0. E-graph integration in task 0.6 will
+/// override implementations to canonicalize concepts, bindings, and action
+/// targets through their equivalence classes.
+pub trait TermNormalize {
+    fn term_normalize(&mut self, _ctx: &mut NfContext) {}
+}
+
+impl TermNormalize for Concept {}
+impl TermNormalize for TerminologyBinding {}
+impl TermNormalize for Action {}
 
 // ---------------------------------------------------------------------------
 // Pass 1-2 implementations: types with text fields or delegating children
@@ -300,12 +396,16 @@ impl Normalize for Concept {
         // Pass 4: sort unordered fields
         ctx.sort_by_canonical("terminology_bindings", &mut self.terminology_bindings);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 8: terminology normalization (identity stub)
+        self.term_normalize(ctx);
     }
 }
 
 impl Normalize for TerminologyBinding {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_field(2, "label", &mut self.label);
+        // Pass 8: terminology normalization (identity stub)
+        self.term_normalize(ctx);
     }
 }
 
@@ -521,7 +621,26 @@ macro_rules! normalize_noop {
     };
 }
 
-normalize_noop!(ExtractorVote, BBox, TableCellRef, ConfidenceInterval, Action);
+normalize_noop!(ExtractorVote, BBox, TableCellRef, ConfidenceInterval);
+
+// ---------------------------------------------------------------------------
+// Pass 6-8 implementation: Action domain normalization
+// ---------------------------------------------------------------------------
+
+impl Normalize for Action {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        // Pass 6: canonical action_type casing (lowercase ASCII)
+        ctx.normalize_action_type(&mut self.action_type);
+        // Pass 6: parameter keys are sorted by BTreeMap-backed serde_json::Map;
+        //         canonical serializer handles RFC 8785 UTF-16 key ordering.
+        // Pass 7: normalize unit strings in JSON value fields
+        ctx.normalize_units("parameters", &mut self.parameters);
+        ctx.normalize_units("temporal_constraints", &mut self.temporal_constraints);
+        ctx.normalize_units("quantity_constraints", &mut self.quantity_constraints);
+        // Pass 8: terminology normalization (identity stub)
+        self.term_normalize(ctx);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -1543,5 +1662,417 @@ mod tests {
             pc.source_span_ids,
             vec![SpanId::new("span_a"), SpanId::new("span_z")]
         );
+    }
+
+    // ===================================================================
+    // Pass 6-8 tests: domain normalization
+    // ===================================================================
+
+    fn make_action(action_type: &str, params: serde_json::Value, qty: serde_json::Value) -> Action {
+        Action {
+            action_type: action_type.into(),
+            target_concept: ConceptId::new("concept_test"),
+            parameters: params,
+            temporal_constraints: serde_json::json!({"onset": "immediate"}),
+            quantity_constraints: qty,
+        }
+    }
+
+    // -- Pass 6: action_type canonical casing --
+
+    #[test]
+    fn action_type_lowercased() {
+        let mut action = make_action(
+            "Administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+        let ctx = normalize_all(&mut action);
+
+        assert_eq!(action.action_type, "administer");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 6
+            && r.field == "action_type"
+            && r.before == "Administer"
+            && r.after == "administer"));
+    }
+
+    #[test]
+    fn action_type_uppercase_lowercased() {
+        let mut action = make_action(
+            "CONTRAINDICATE",
+            serde_json::Value::Null,
+            serde_json::Value::Null,
+        );
+        let ctx = normalize_all(&mut action);
+
+        assert_eq!(action.action_type, "contraindicate");
+        assert_eq!(
+            ctx.rewrites.iter().filter(|r| r.pass == 6).count(),
+            1,
+        );
+    }
+
+    #[test]
+    fn action_type_already_lowercase_no_rewrite() {
+        let mut action = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+        let ctx = normalize_all(&mut action);
+
+        assert_eq!(action.action_type, "administer");
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 6));
+    }
+
+    // -- Pass 7: unit normalization --
+
+    #[test]
+    fn canonical_unit_mappings() {
+        assert_eq!(canonical_unit("ml"), Some("mL"));
+        assert_eq!(canonical_unit("ML"), Some("mL"));
+        assert_eq!(canonical_unit("l"), Some("L"));
+        assert_eq!(canonical_unit("\u{2103}"), Some("Cel"));
+        assert_eq!(canonical_unit("\u{00B0}C"), Some("Cel"));
+        assert_eq!(canonical_unit("degC"), Some("Cel"));
+        assert_eq!(canonical_unit("degree_celsius"), Some("Cel"));
+        assert_eq!(canonical_unit("mmHg"), Some("mm[Hg]"));
+        assert_eq!(canonical_unit("bpm"), Some("/min"));
+        assert_eq!(canonical_unit("beats/min"), Some("/min"));
+        assert_eq!(canonical_unit("mcg"), Some("ug"));
+        assert_eq!(canonical_unit("\u{03BC}g"), Some("ug"));
+    }
+
+    #[test]
+    fn canonical_unit_already_canonical() {
+        assert_eq!(canonical_unit("mg"), None);
+        assert_eq!(canonical_unit("mL"), None);
+        assert_eq!(canonical_unit("L"), None);
+        assert_eq!(canonical_unit("Cel"), None);
+        assert_eq!(canonical_unit("kg"), None);
+    }
+
+    #[test]
+    fn canonical_unit_unrecognized() {
+        assert_eq!(canonical_unit("unknown_unit"), None);
+        assert_eq!(canonical_unit("foobar"), None);
+        assert_eq!(canonical_unit(""), None);
+    }
+
+    #[test]
+    fn normalize_json_units_flat_string() {
+        let mut v = serde_json::json!("ml");
+        assert!(normalize_json_units(&mut v));
+        assert_eq!(v, serde_json::json!("mL"));
+    }
+
+    #[test]
+    fn normalize_json_units_nested_object() {
+        let mut v = serde_json::json!({
+            "dose": {"value": 500, "unit": "ml"},
+            "temp": {"value": 38.5, "unit": "\u{2103}"}
+        });
+        assert!(normalize_json_units(&mut v));
+        assert_eq!(v["dose"]["unit"], "mL");
+        assert_eq!(v["temp"]["unit"], "Cel");
+    }
+
+    #[test]
+    fn normalize_json_units_array() {
+        let mut v = serde_json::json!([
+            {"unit": "bpm", "value": 80},
+            {"unit": "mmHg", "value": 120}
+        ]);
+        assert!(normalize_json_units(&mut v));
+        assert_eq!(v[0]["unit"], "/min");
+        assert_eq!(v[1]["unit"], "mm[Hg]");
+    }
+
+    #[test]
+    fn normalize_json_units_no_change() {
+        let mut v = serde_json::json!({"value": 1000, "unit": "mg"});
+        assert!(!normalize_json_units(&mut v));
+    }
+
+    #[test]
+    fn normalize_json_units_null_unchanged() {
+        let mut v = serde_json::Value::Null;
+        assert!(!normalize_json_units(&mut v));
+    }
+
+    #[test]
+    fn action_quantity_unit_normalized() {
+        let mut action = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"volume": {"value": 500, "unit": "ml"}}),
+        );
+        let ctx = normalize_all(&mut action);
+
+        assert_eq!(action.quantity_constraints["volume"]["unit"], "mL");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7
+            && r.field == "quantity_constraints"));
+    }
+
+    #[test]
+    fn action_quantity_already_canonical_no_rewrite() {
+        let mut action = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+        let ctx = normalize_all(&mut action);
+
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 7));
+    }
+
+    #[test]
+    fn action_temporal_unit_normalized() {
+        let mut action = Action {
+            action_type: "administer".into(),
+            target_concept: ConceptId::new("concept_test"),
+            parameters: serde_json::Value::Null,
+            temporal_constraints: serde_json::json!({"monitor_temp_unit": "degC"}),
+            quantity_constraints: serde_json::Value::Null,
+        };
+        let ctx = normalize_all(&mut action);
+
+        assert_eq!(action.temporal_constraints["monitor_temp_unit"], "Cel");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7
+            && r.field == "temporal_constraints"));
+    }
+
+    // -- Gate tests: domain normalization produces identical NF --
+
+    #[test]
+    fn gate_action_case_variants_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut a = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+        let mut b = make_action(
+            "ADMINISTER",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+
+        normalize_all(&mut a);
+        normalize_all(&mut b);
+
+        assert_eq!(
+            to_canonical_bytes(&a),
+            to_canonical_bytes(&b),
+            "Actions differing only in action_type casing must produce identical NF bytes"
+        );
+        assert_eq!(
+            content_hash(&a),
+            content_hash(&b),
+            "Actions differing only in action_type casing must produce identical NF digest"
+        );
+    }
+
+    #[test]
+    fn gate_action_unit_variants_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut a = make_action(
+            "administer",
+            serde_json::Value::Null,
+            serde_json::json!({"volume": {"value": 500, "unit": "mL"}}),
+        );
+        let mut b = make_action(
+            "administer",
+            serde_json::Value::Null,
+            serde_json::json!({"volume": {"value": 500, "unit": "ml"}}),
+        );
+
+        normalize_all(&mut a);
+        normalize_all(&mut b);
+
+        assert_eq!(
+            to_canonical_bytes(&a),
+            to_canonical_bytes(&b),
+            "Actions differing only in unit representation must produce identical NF bytes"
+        );
+        assert_eq!(
+            content_hash(&a),
+            content_hash(&b),
+            "Actions differing only in unit representation must produce identical NF digest"
+        );
+    }
+
+    #[test]
+    fn gate_action_mixed_variants_identical_nf() {
+        use crate::canonical::content_hash;
+
+        let mut a = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"temp_unit": "Cel", "bp_unit": "mm[Hg]"}),
+        );
+        let mut b = make_action(
+            "Administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"temp_unit": "\u{2103}", "bp_unit": "mmHg"}),
+        );
+
+        normalize_all(&mut a);
+        normalize_all(&mut b);
+
+        assert_eq!(
+            content_hash(&a),
+            content_hash(&b),
+            "Actions differing in casing and units must produce identical NF digest"
+        );
+    }
+
+    // -- Pass 6-7 through Norm and Rule delegation --
+
+    #[test]
+    fn norm_delegates_action_normalization() {
+        let mut norm = Norm {
+            context: "test".into(),
+            direction: RecommendationDirection::For,
+            action: Action {
+                action_type: "Administer".into(),
+                target_concept: ConceptId::new("concept_test"),
+                parameters: serde_json::Value::Null,
+                temporal_constraints: serde_json::Value::Null,
+                quantity_constraints: serde_json::json!({"unit": "ml"}),
+            },
+            recommendation_strength: RecommendationStrength::Strong,
+            evidence_certainty: EvidenceCertainty::Moderate,
+            original_modality_phrase_ja: "投与を推奨する".into(),
+            deontic_projection: DeonticProjection::Recommended,
+            exception_policy: "none".into(),
+            prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+        };
+
+        let ctx = normalize_all(&mut norm);
+
+        assert_eq!(norm.action.action_type, "administer");
+        assert_eq!(norm.action.quantity_constraints["unit"], "mL");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 6));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7));
+    }
+
+    #[test]
+    fn rule_delegates_action_normalization_through_norm() {
+        let mut rule = Rule {
+            rule_id: RuleId::new("rule_test"),
+            profiles: vec![SemanticProfile::Norm],
+            kind: RuleKind::Defeasible,
+            context: "test".into(),
+            antecedent: "test".into(),
+            consequent: "test".into(),
+            norm: Some(Norm {
+                context: "test".into(),
+                direction: RecommendationDirection::For,
+                action: Action {
+                    action_type: "ADMINISTER".into(),
+                    target_concept: ConceptId::new("concept_test"),
+                    parameters: serde_json::Value::Null,
+                    temporal_constraints: serde_json::Value::Null,
+                    quantity_constraints: serde_json::Value::Null,
+                },
+                recommendation_strength: RecommendationStrength::Strong,
+                evidence_certainty: EvidenceCertainty::Moderate,
+                original_modality_phrase_ja: "投与を推奨する".into(),
+                deontic_projection: DeonticProjection::Recommended,
+                exception_policy: "none".into(),
+                prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+            }),
+            priority_over: vec![],
+            exceptions: vec![],
+            temporal_scope: None,
+            population_scope: None,
+            source_span_ids: vec![],
+            provenance: "test".into(),
+            certificate_ids: vec![],
+        };
+
+        let ctx = normalize_all(&mut rule);
+
+        assert_eq!(rule.norm.as_ref().unwrap().action.action_type, "administer");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 6));
+    }
+
+    // -- Pass 8: terminology normalization identity --
+
+    #[test]
+    fn term_normalize_identity_on_concept() {
+        let mut concept = Concept {
+            concept_id: ConceptId::new("concept_test"),
+            label_ja: "敗血症".into(),
+            label_en: Some("sepsis".into()),
+            semantic_type: "diagnosis".into(),
+            terminology_bindings: vec![TerminologyBinding {
+                system: "MEDIS".into(),
+                code: Some("M001".into()),
+                version: Some("2024".into()),
+                label: "敗血症".into(),
+                status: BindingStatus::Exact,
+                mapping_relation: "equivalent".into(),
+                provenance: "test".into(),
+                confidence: 1.0,
+                license_status: "permitted".into(),
+                valid_from: None,
+                valid_to: None,
+            }],
+            egraph_class_id: Some(EGraphClassId::new("eclass_test")),
+            source_span_ids: vec![SpanId::new("span_s1")],
+        };
+
+        let before_hash = crate::canonical::content_hash(&concept);
+        let ctx = normalize_all(&mut concept);
+        let after_hash = crate::canonical::content_hash(&concept);
+
+        assert_eq!(before_hash, after_hash,
+            "terminology normalization identity must produce no content change");
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8),
+            "identity stub must record no rewrites");
+    }
+
+    #[test]
+    fn term_normalize_identity_on_binding() {
+        let mut binding = TerminologyBinding {
+            system: "HOT".into(),
+            code: Some("H001".into()),
+            version: None,
+            label: "テスト薬".into(),
+            status: BindingStatus::Exact,
+            mapping_relation: "equivalent".into(),
+            provenance: "test".into(),
+            confidence: 0.95,
+            license_status: "permitted".into(),
+            valid_from: None,
+            valid_to: None,
+        };
+
+        let before_hash = crate::canonical::content_hash(&binding);
+        let ctx = normalize_all(&mut binding);
+        let after_hash = crate::canonical::content_hash(&binding);
+
+        assert_eq!(before_hash, after_hash);
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8));
+    }
+
+    #[test]
+    fn term_normalize_identity_on_action() {
+        let mut action = make_action(
+            "administer",
+            serde_json::json!({"route": "iv"}),
+            serde_json::json!({"min_dose_mg": 1000}),
+        );
+
+        let before_hash = crate::canonical::content_hash(&action);
+        normalize_all(&mut action);
+        let after_hash = crate::canonical::content_hash(&action);
+
+        assert_eq!(before_hash, after_hash,
+            "canonical action must be unchanged by NF pipeline");
     }
 }
