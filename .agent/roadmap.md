@@ -1,8 +1,8 @@
 # CKC Roadmap
 
-Subtask detail is in SPEC.md Sections 20 and 25. The active task group is
-expanded into session-sized subtasks; completed and future groups stay as
-single lines.
+Session workflow is defined in `.agent/prompt.md`. Top-level tasks derive from
+SPEC.md Section 20. Subtasks appear indented under a top-level task after a
+Type A planning session creates them.
 
 ## Phase 0: Proof-Carrying Research Kernel
 
