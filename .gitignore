@@ -1,8 +1,4 @@
-# Rust
 target/
-**/*.rs.bk
-
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,28 +6,16 @@ __pycache__/
 .venv/
 dist/
 build/
-
-# Node/SvelteKit
 node_modules/
 .svelte-kit/
 .env
 .env.*
-
-# DuckDB
 *.duckdb
 *.duckdb.wal
-
-# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# CKC artifacts (tracked via content-addressed store, not git)
 runs/*/
 !runs/.gitkeep

@@ -9,6 +9,5 @@ name = "ckc"
 path = "src/main.rs"
 
 [dependencies]
-ckc-core = { path = "../ckc-core" }
 clap = { workspace = true }
 anyhow = { workspace = true }

@@ -1,12 +1,6 @@
 default:
     @just --list
 
-check:
-    cargo check --workspace
-
-build:
-    cargo build --workspace
-
 test:
     cargo test --workspace
 
