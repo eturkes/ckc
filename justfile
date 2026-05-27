@@ -1,0 +1,25 @@
+default:
+    @just --list
+
+check:
+    cargo check --workspace
+
+build:
+    cargo build --workspace
+
+test:
+    cargo test --workspace
+
+clippy:
+    cargo clippy --workspace -- -D warnings
+
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all -- --check
+
+ci: fmt-check clippy test
+
+demo:
+    cargo run --bin ckc -- demo toy-research-kernel --replay --out runs/toy

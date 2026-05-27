@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ckc-cli",
+    "crates/ckc-core",
+    "crates/ckc-store",
+    "crates/ckc-extract",
+    "crates/ckc-retrieve",
+    "crates/ckc-term",
+    "crates/ckc-datalog",
+    "crates/ckc-compile",
+    "crates/ckc-verify",
+    "crates/ckc-cert",
+    "crates/ckc-report",
+    "crates/ckc-assurance",
+    "crates/ckc-audit",
+]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0 WITH LLVM-exception"
+repository = "https://github.com/eturkes/ckc"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+sha2 = "0.10"
