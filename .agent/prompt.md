@@ -3,7 +3,7 @@ following files to load context, then determine your session type.
 
 ## Step 1: Load context
 
-Read `SPEC.md`, `.agent/memory.md`, `.agent/roadmap.md`, and `git log --oneline -20`.
+Read `SPEC.md`, `.agent/memory.md`, `.agent/roadmap.md`, and `git show HEAD`.
 
 ## Step 2: Determine session type
 
