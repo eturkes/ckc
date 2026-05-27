@@ -86,6 +86,45 @@ pub enum EvidenceCertainty {
     High,
 }
 
+/// SPEC §6.1: source document classification.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceType {
+    Guideline,
+    Textbook,
+    PackageInsert,
+    ReviewReport,
+    SafetyCommunication,
+    LocalPolicy,
+}
+
+/// SPEC §6.2: clinical concept semantic type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticType {
+    Disease,
+    Drug,
+    LabTest,
+    Procedure,
+    AdverseEvent,
+    Finding,
+    Anatomy,
+    Substance,
+    Pathway,
+    Qualifier,
+}
+
+/// SKOS-standard mapping relation for terminology bindings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MappingRelation {
+    ExactMatch,
+    CloseMatch,
+    BroadMatch,
+    NarrowMatch,
+    RelatedMatch,
+}
+
 /// SPEC §15.4: conflict classification for review triage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -156,5 +195,43 @@ mod tests {
         assert_eq!(json, "\"for\"");
         let json = serde_json::to_string(&RecommendationStrength::Conditional).unwrap();
         assert_eq!(json, "\"conditional\"");
+    }
+
+    #[test]
+    fn source_type_serde() {
+        assert_eq!(
+            serde_json::to_string(&SourceType::Guideline).unwrap(),
+            "\"guideline\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SourceType::PackageInsert).unwrap(),
+            "\"package_insert\""
+        );
+        let back: SourceType = serde_json::from_str("\"local_policy\"").unwrap();
+        assert_eq!(back, SourceType::LocalPolicy);
+    }
+
+    #[test]
+    fn semantic_type_serde() {
+        assert_eq!(
+            serde_json::to_string(&SemanticType::Disease).unwrap(),
+            "\"disease\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SemanticType::LabTest).unwrap(),
+            "\"lab_test\""
+        );
+        let back: SemanticType = serde_json::from_str("\"adverse_event\"").unwrap();
+        assert_eq!(back, SemanticType::AdverseEvent);
+    }
+
+    #[test]
+    fn mapping_relation_serde() {
+        assert_eq!(
+            serde_json::to_string(&MappingRelation::ExactMatch).unwrap(),
+            "\"exact_match\""
+        );
+        let back: MappingRelation = serde_json::from_str("\"broad_match\"").unwrap();
+        assert_eq!(back, MappingRelation::BroadMatch);
     }
 }
