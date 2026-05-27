@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArtifactKind",
+  "description": "Tag enum discriminating all storable CKC artifact types.",
+  "type": "string",
+  "enum": [
+    "corpus_document",
+    "source_span",
+    "extracted_table",
+    "concept",
+    "clinical_claim",
+    "rule",
+    "decision_table",
+    "workflow_fragment",
+    "event_narrative",
+    "patient_case",
+    "execution_witness",
+    "conflict",
+    "argument_graph",
+    "certificate",
+    "assurance_node",
+    "audit_trace"
+  ]
+}

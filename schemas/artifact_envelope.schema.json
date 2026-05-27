@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArtifactEnvelope",
+  "description": "Content-addressed envelope wrapping any CKC artifact with pipeline metadata.\n\nStore key: `sha256:<hex>` of the envelope's canonical JSON bytes.\nInner artifact hash: stored in `meta.content_hash`.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "$ref": "#/$defs/ArtifactKind"
+    },
+    "meta": {
+      "$ref": "#/$defs/ArtifactMeta"
+    },
+    "payload": true
+  },
+  "required": [
+    "kind",
+    "meta",
+    "payload"
+  ],
+  "$defs": {
+    "ArtifactKind": {
+      "description": "Tag enum discriminating all storable CKC artifact types.",
+      "type": "string",
+      "enum": [
+        "corpus_document",
+        "source_span",
+        "extracted_table",
+        "concept",
+        "clinical_claim",
+        "rule",
+        "decision_table",
+        "workflow_fragment",
+        "event_narrative",
+        "patient_case",
+        "execution_witness",
+        "conflict",
+        "argument_graph",
+        "certificate",
+        "assurance_node",
+        "audit_trace"
+      ]
+    },
+    "ArtifactMeta": {
+      "description": "Pipeline metadata for a stored artifact (SPEC 5.2).\n\n`content_hash` holds the SHA-256 of the inner artifact's canonical JSON.\nThe envelope's own hash (computed over kind + meta + payload) serves as\nthe content-addressed store key.",
+      "type": "object",
+      "properties": {
+        "certificate_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CertificateId"
+          }
+        },
+        "command_manifest": true,
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "parent_hashes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentHash"
+          }
+        },
+        "producer_version": {
+          "type": "string"
+        },
+        "replay_command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "semantic_profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SemanticProfile"
+          }
+        },
+        "source_input_hashes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentHash"
+          }
+        },
+        "stage": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "producer_version",
+        "command_manifest",
+        "source_input_hashes",
+        "parent_hashes",
+        "stage",
+        "semantic_profiles",
+        "content_hash",
+        "certificate_ids"
+      ]
+    },
+    "CertificateId": {
+      "description": "Primary key for `Certificate`.",
+      "type": "string"
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "SemanticProfile": {
+      "description": "CKC semantic profile (SPEC 9). Every CKC object declares which profiles\napply, determining allowed syntax, validators, compiler targets, and\ncertificate requirements.",
+      "type": "string",
+      "enum": [
+        "CKC-Text",
+        "CKC-Term",
+        "CKC-Evidence",
+        "CKC-Classical",
+        "CKC-Norm",
+        "CKC-Defeasible",
+        "CKC-Para",
+        "CKC-Temporal",
+        "CKC-Event",
+        "CKC-Quant",
+        "CKC-Decision",
+        "CKC-Workflow",
+        "CKC-Interop",
+        "CKC-Prob",
+        "CKC-Cert",
+        "CKC-Audit"
+      ]
+    }
+  }
+}

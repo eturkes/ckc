@@ -17,6 +17,7 @@ use ckc_core::source::{
     BBox, Concept, CorpusDocument, ExtractedTable, ExtractorVote, SourceSpan, TableCellRef,
     TerminologyBinding,
 };
+use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -496,6 +497,37 @@ fn golden_audit_trace() -> AuditTrace {
     }
 }
 
+fn golden_artifact_kind() -> ArtifactKind {
+    ArtifactKind::Rule
+}
+
+fn golden_artifact_meta() -> ArtifactMeta {
+    ArtifactMeta {
+        schema_version: "0.0.0".into(),
+        producer_version: "ckc-core/0.0.0".into(),
+        command_manifest: serde_json::json!({"command": "ckc", "args": ["normalize"]}),
+        source_input_hashes: vec![ContentHash(
+            "sha256:ee00000000000000000000000000000000000000000000000000000000000001".into(),
+        )],
+        parent_hashes: vec![],
+        stage: "normalize".into(),
+        semantic_profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
+        content_hash: ContentHash(
+            "sha256:ff00000000000000000000000000000000000000000000000000000000000001".into(),
+        ),
+        certificate_ids: vec![],
+        replay_command: Some("ckc normalize --bundle test".into()),
+    }
+}
+
+fn golden_artifact_envelope() -> ArtifactEnvelope {
+    ArtifactEnvelope::wrap(
+        ArtifactKind::Rule,
+        &golden_rule(),
+        golden_artifact_meta(),
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Test macro: for each type, verify canonical golden bytes, round-trip hash
 // determinism, and JSON Schema stability.
@@ -525,7 +557,7 @@ macro_rules! golden_suite {
 }
 
 // ---------------------------------------------------------------------------
-// Suite invocations (28 types = 84 tests)
+// Suite invocations (31 types = 93 tests)
 // ---------------------------------------------------------------------------
 
 golden_suite!(gs_content_hash, ContentHash, golden_content_hash, "content_hash");
@@ -556,9 +588,12 @@ golden_suite!(gs_argument_graph, ArgumentGraph, golden_argument_graph, "argument
 golden_suite!(gs_certificate, Certificate, golden_certificate, "certificate");
 golden_suite!(gs_assurance_node, AssuranceNode, golden_assurance_node, "assurance_node");
 golden_suite!(gs_audit_trace, AuditTrace, golden_audit_trace, "audit_trace");
+golden_suite!(gs_artifact_kind, ArtifactKind, golden_artifact_kind, "artifact_kind");
+golden_suite!(gs_artifact_meta, ArtifactMeta, golden_artifact_meta, "artifact_meta");
+golden_suite!(gs_artifact_envelope, ArtifactEnvelope, golden_artifact_envelope, "artifact_envelope");
 
 // ---------------------------------------------------------------------------
-// Cross-type: all 28 golden fixtures produce distinct content hashes
+// Cross-type: all 31 golden fixtures produce distinct content hashes
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -592,6 +627,9 @@ fn all_golden_fixtures_produce_distinct_hashes() {
         content_hash(&golden_certificate()),
         content_hash(&golden_assurance_node()),
         content_hash(&golden_audit_trace()),
+        content_hash(&golden_artifact_kind()),
+        content_hash(&golden_artifact_meta()),
+        content_hash(&golden_artifact_envelope()),
     ];
     for (i, a) in hashes.iter().enumerate() {
         for (j, b) in hashes.iter().enumerate().skip(i + 1) {
@@ -650,4 +688,7 @@ fn regenerate() {
     write_type(&golden_certificate(), "certificate");
     write_type(&golden_assurance_node(), "assurance_node");
     write_type(&golden_audit_trace(), "audit_trace");
+    write_type(&golden_artifact_kind(), "artifact_kind");
+    write_type(&golden_artifact_meta(), "artifact_meta");
+    write_type(&golden_artifact_envelope(), "artifact_envelope");
 }
