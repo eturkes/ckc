@@ -16,8 +16,9 @@ technically derivable but easily forgotten under token pressure.
   highest-risk locations for redundancy with SPEC.md and config files. Default
   assumption: if a fact lives in a file, it belongs only in that file.
 
-- [2026-05-27] Before committing any change, self-audit the balance of
-  token-efficiency against LLM-readability. Do this proactively; the user
-  expects it done before they see the result.
+- [2026-05-27] Spend freely on reasoning and iteration within a session, but
+  all content written to files must be token-efficient for future LLM readers.
+  Self-audit this balance before committing; the user expects it done
+  proactively.
 
 ## Open Questions
