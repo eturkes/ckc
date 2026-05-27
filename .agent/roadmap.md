@@ -1,8 +1,10 @@
 # CKC Roadmap
 
-Session workflow is defined in `.agent/prompt.md`. Top-level tasks derive from
-SPEC.md Section 20. Subtasks appear indented under a top-level task after a
-Type A planning session creates them.
+Work is organized into Phases (from SPEC.md Section 20), each containing
+top-level tasks. A Type C session creates the next Phase's top-level tasks
+once the current Phase is complete. A Type A session decomposes the next
+incomplete top-level task into indented subtasks. A Type B session completes
+exactly one subtask. See `.agent/prompt.md` for the full session state machine.
 
 ## Phase 0: Proof-Carrying Research Kernel
 
