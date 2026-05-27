@@ -9,9 +9,6 @@ technically derivable but easily forgotten under token pressure.
 
 ## User Preferences
 
-- [2026-05-27] Skip end-of-session summaries; they burn tokens without adding
-  value.
-
 ## Lessons
 
 - [2026-05-27] Every piece of natural language in the project (docs, comments,
@@ -33,17 +30,8 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
   silently miss case variants. Always read the result or verify match count
   covers all intended occurrences.
-- [2026-05-27] User gave a directive (skip end-of-session summaries) and the
-  agent acknowledged it verbally but failed to persist it to memory. Any
-  user directive meant for future sessions must be written to memory
-  immediately, in the same turn.
-- [2026-05-27] Emitted end-of-session summary despite the preference above
-  already being in memory. The preference was read at session start but
-  overridden by system-prompt habits. Final message after the last commit
-  must contain only the roadmap commit confirmation — nothing else.
-- [2026-05-27] Repeated the same end-of-session summary mistake a third
-  time. The system prompt's "end-of-turn summary" directive is strong
-  enough to override even explicit memory entries. The final tool call of
-  a session must be the roadmap commit; emit zero text after it.
+- [2026-05-27] User gave a directive and the agent acknowledged it verbally
+  but failed to persist it to memory. Any user directive meant for future
+  sessions must be written to memory immediately, in the same turn.
 
 ## Open Questions
