@@ -37,5 +37,9 @@ technically derivable but easily forgotten under token pressure.
   agent acknowledged it verbally but failed to persist it to memory. Any
   user directive meant for future sessions must be written to memory
   immediately, in the same turn.
+- [2026-05-27] Emitted end-of-session summary despite the preference above
+  already being in memory. The preference was read at session start but
+  overridden by system-prompt habits. Final message after the last commit
+  must contain only the roadmap commit confirmation — nothing else.
 
 ## Open Questions
