@@ -7,6 +7,12 @@ See `.agent/prompt.md` for the session workflow that governs progression.
 
 - [x] 0.1 Project scaffold
 - [ ] 0.2 CKC schema v0 (SPEC 10)
+  - [ ] 0.2.1 Foundation: ID newtypes, semantic profiles (SPEC 9), shared enums, RFC 8785 canonical JSON
+  - [ ] 0.2.2 Source + terminology types: CorpusDocument, SourceSpan, ExtractedTable, Concept, TerminologyBinding
+  - [ ] 0.2.3 Evidence + formalization types: PICOFrame, EtDFrame, EvidenceAtom, ClinicalClaim, Rule, Norm, Action
+  - [ ] 0.2.4 Structured artifact types: DecisionTable, DecisionRow, WorkflowFragment, EventNarrative, PatientCase, ExecutionWitness
+  - [ ] 0.2.5 Verification + assurance types: Conflict, ArgumentGraph, Certificate, AssuranceNode, AuditTrace
+  - [ ] 0.2.6 JSON Schema generation and golden byte tests
 - [ ] 0.3 Normal Form (SPEC 11)
 - [ ] 0.4 Content-addressed store
 - [ ] 0.5 Toy fixtures (SPEC 20 Phase 0 scenarios)
