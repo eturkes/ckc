@@ -1,0 +1,1 @@
+{"assessments":[],"outcomes":[{"id":"recovery"}],"source_span_ids":["span_wf_001"],"states":[{"id":"triage","label":"初期トリアージ"}],"tasks":[{"id":"blood_culture"}],"transitions":[{"from":"triage","to":"treatment"}],"variance_rules":[],"workflow_id":"wf_sepsis_pathway","workflow_type":"epath_oat"}

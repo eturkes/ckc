@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TableCellRef",
+  "description": "Reference to a cell within an extracted table.",
+  "type": "object",
+  "properties": {
+    "col": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "row": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "table_id": {
+      "$ref": "#/$defs/ExtractedTableId"
+    }
+  },
+  "required": [
+    "table_id",
+    "row",
+    "col"
+  ],
+  "$defs": {
+    "ExtractedTableId": {
+      "description": "Primary key for `ExtractedTable`.",
+      "type": "string"
+    }
+  }
+}

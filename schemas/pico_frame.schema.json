@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PICOFrame",
+  "description": "PICO frame for clinical question segmentation (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "comparator": {
+      "type": "string"
+    },
+    "cq_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CqId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "intervention": {
+      "type": "string"
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "population": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    }
+  },
+  "required": [
+    "population",
+    "intervention",
+    "comparator",
+    "outcomes",
+    "scope",
+    "exclusions",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "CqId": {
+      "description": "Clinical question identifier.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rule",
+  "description": "Formalized rule with profile admission, defeasible kind, optional norm,\nand certificate linkage (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "antecedent": {
+      "type": "string"
+    },
+    "certificate_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CertificateId"
+      }
+    },
+    "consequent": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string"
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kind": {
+      "$ref": "#/$defs/RuleKind"
+    },
+    "norm": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Norm"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "population_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "priority_over": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RuleId"
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SemanticProfile"
+      }
+    },
+    "provenance": {
+      "type": "string"
+    },
+    "rule_id": {
+      "$ref": "#/$defs/RuleId"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "temporal_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "rule_id",
+    "profiles",
+    "kind",
+    "context",
+    "antecedent",
+    "consequent",
+    "priority_over",
+    "exceptions",
+    "source_span_ids",
+    "provenance",
+    "certificate_ids"
+  ],
+  "$defs": {
+    "Action": {
+      "description": "Clinical action with concept target and constraints (SPEC 10).\nFields `parameters`, `temporal_constraints`, `quantity_constraints` use\nopen JSON values at schema v0; later phases refine these into typed ASTs.",
+      "type": "object",
+      "properties": {
+        "action_type": {
+          "type": "string"
+        },
+        "parameters": true,
+        "quantity_constraints": true,
+        "target_concept": {
+          "$ref": "#/$defs/ConceptId"
+        },
+        "temporal_constraints": true
+      },
+      "required": [
+        "action_type",
+        "target_concept",
+        "parameters",
+        "temporal_constraints",
+        "quantity_constraints"
+      ]
+    },
+    "CertificateId": {
+      "description": "Primary key for `Certificate`.",
+      "type": "string"
+    },
+    "ConceptId": {
+      "description": "Primary key for `Concept`.",
+      "type": "string"
+    },
+    "DeonticProjection": {
+      "description": "Deontic projection of a clinical norm (SPEC 10 Norm).",
+      "type": "string",
+      "enum": [
+        "obligatory",
+        "recommended",
+        "permitted",
+        "prohibited",
+        "optional"
+      ]
+    },
+    "EvidenceCertainty": {
+      "description": "GRADE evidence certainty (SPEC 10 Norm, EtDFrame, EvidenceAtom).\nVariant order matches certainty level: VeryLow < Low < Moderate < High.",
+      "type": "string",
+      "enum": [
+        "very_low",
+        "low",
+        "moderate",
+        "high"
+      ]
+    },
+    "Norm": {
+      "description": "Dyadic clinical norm: (context, direction, action) with strength,\ncertainty, deontic projection, and defeasibility metadata (SPEC 10).",
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "context": {
+          "type": "string"
+        },
+        "deontic_projection": {
+          "$ref": "#/$defs/DeonticProjection"
+        },
+        "direction": {
+          "$ref": "#/$defs/RecommendationDirection"
+        },
+        "evidence_certainty": {
+          "$ref": "#/$defs/EvidenceCertainty"
+        },
+        "exception_policy": {
+          "type": "string"
+        },
+        "original_modality_phrase_ja": {
+          "type": "string"
+        },
+        "prima_facie_or_all_things_considered": {
+          "$ref": "#/$defs/NormCommitment"
+        },
+        "recommendation_strength": {
+          "$ref": "#/$defs/RecommendationStrength"
+        }
+      },
+      "required": [
+        "context",
+        "direction",
+        "action",
+        "recommendation_strength",
+        "evidence_certainty",
+        "original_modality_phrase_ja",
+        "deontic_projection",
+        "exception_policy",
+        "prima_facie_or_all_things_considered"
+      ]
+    },
+    "NormCommitment": {
+      "description": "Whether a norm is prima-facie (defeasible) or all-things-considered\n(survived defeasible reasoning).",
+      "type": "string",
+      "enum": [
+        "prima_facie",
+        "all_things_considered"
+      ]
+    },
+    "RecommendationDirection": {
+      "description": "Recommendation direction (SPEC 10 EtDFrame, Norm).",
+      "type": "string",
+      "enum": [
+        "for",
+        "against"
+      ]
+    },
+    "RecommendationStrength": {
+      "description": "GRADE recommendation strength (SPEC 10 Norm).",
+      "type": "string",
+      "enum": [
+        "strong",
+        "weak",
+        "conditional"
+      ]
+    },
+    "RuleId": {
+      "description": "Primary key for `Rule`.",
+      "type": "string"
+    },
+    "RuleKind": {
+      "description": "Rule kind (SPEC 9 CKC-Defeasible).",
+      "type": "string",
+      "enum": [
+        "strict",
+        "defeasible",
+        "defeater"
+      ]
+    },
+    "SemanticProfile": {
+      "description": "CKC semantic profile (SPEC 9). Every CKC object declares which profiles\napply, determining allowed syntax, validators, compiler targets, and\ncertificate requirements.",
+      "type": "string",
+      "enum": [
+        "CKC-Text",
+        "CKC-Term",
+        "CKC-Evidence",
+        "CKC-Classical",
+        "CKC-Norm",
+        "CKC-Defeasible",
+        "CKC-Para",
+        "CKC-Temporal",
+        "CKC-Event",
+        "CKC-Quant",
+        "CKC-Decision",
+        "CKC-Workflow",
+        "CKC-Interop",
+        "CKC-Prob",
+        "CKC-Cert",
+        "CKC-Audit"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

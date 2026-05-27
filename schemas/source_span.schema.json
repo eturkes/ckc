@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourceSpan",
+  "description": "Addressable textual unit from a source document (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "bbox": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BBox"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "format": "double"
+    },
+    "cq_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CqId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "display_text": {
+      "type": "string"
+    },
+    "doc_id": {
+      "$ref": "#/$defs/DocId"
+    },
+    "extractor_votes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ExtractorVote"
+      }
+    },
+    "language": {
+      "$ref": "#/$defs/Language"
+    },
+    "next_span_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SpanId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nfkc_text": {
+      "type": "string"
+    },
+    "page": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "previous_span_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SpanId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "raw_text": {
+      "type": "string"
+    },
+    "search_text": {
+      "type": "string"
+    },
+    "section_path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "span_id": {
+      "$ref": "#/$defs/SpanId"
+    },
+    "table_cell": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TableCellRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "span_id",
+    "doc_id",
+    "section_path",
+    "raw_text",
+    "nfkc_text",
+    "search_text",
+    "display_text",
+    "language",
+    "extractor_votes",
+    "confidence"
+  ],
+  "$defs": {
+    "BBox": {
+      "description": "Page bounding box (PDF coordinates).",
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
+    },
+    "CqId": {
+      "description": "Clinical question identifier.",
+      "type": "string"
+    },
+    "DocId": {
+      "description": "Primary key for `CorpusDocument`.",
+      "type": "string"
+    },
+    "ExtractedTableId": {
+      "description": "Primary key for `ExtractedTable`.",
+      "type": "string"
+    },
+    "ExtractorVote": {
+      "description": "A single extractor's output for an extraction vote.",
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "format": "double"
+        },
+        "extractor": {
+          "type": "string"
+        },
+        "raw_text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extractor",
+        "raw_text",
+        "confidence"
+      ]
+    },
+    "Language": {
+      "description": "Document language tag.",
+      "type": "string",
+      "enum": [
+        "ja",
+        "en"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "TableCellRef": {
+      "description": "Reference to a cell within an extracted table.",
+      "type": "object",
+      "properties": {
+        "col": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "row": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "table_id": {
+          "$ref": "#/$defs/ExtractedTableId"
+        }
+      },
+      "required": [
+        "table_id",
+        "row",
+        "col"
+      ]
+    }
+  }
+}

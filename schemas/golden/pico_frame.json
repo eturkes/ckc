@@ -1,0 +1,1 @@
+{"comparator":"非βラクタム系抗菌薬","cq_id":"cq_sepsis_abx_001","exclusions":["βラクタムアレルギー"],"intervention":"βラクタム系抗菌薬投与","outcomes":["28日死亡率"],"population":"成人敗血症患者","scope":"inpatient_icu","source_span_ids":["span_gl_s1"]}

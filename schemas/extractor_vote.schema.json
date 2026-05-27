@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtractorVote",
+  "description": "A single extractor's output for an extraction vote.",
+  "type": "object",
+  "properties": {
+    "confidence": {
+      "type": "number",
+      "format": "double"
+    },
+    "extractor": {
+      "type": "string"
+    },
+    "raw_text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "extractor",
+    "raw_text",
+    "confidence"
+  ]
+}

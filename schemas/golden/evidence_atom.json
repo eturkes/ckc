@@ -1,0 +1,1 @@
+{"certainty":"moderate","confidence_interval":{"lower":0.45,"upper":0.82},"effect_measure":"odds_ratio","evidence_type":"outcome_effect","outcome_importance":"critical","pico_ref":"cq_sepsis_abx_001","source_span_ids":["span_ev_001"],"table_cell_refs":[],"value":0.62}

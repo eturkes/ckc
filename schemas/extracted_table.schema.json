@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtractedTable",
+  "description": "Table extracted from a source document with cell-level addressability (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "caption_span_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SpanId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cell_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "column_headers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "doc_id": {
+      "$ref": "#/$defs/DocId"
+    },
+    "extraction_votes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ExtractorVote"
+      }
+    },
+    "normalized_table_hash": {
+      "$ref": "#/$defs/ContentHash"
+    },
+    "reading_order": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "row_headers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "table_id": {
+      "$ref": "#/$defs/ExtractedTableId"
+    }
+  },
+  "required": [
+    "table_id",
+    "doc_id",
+    "cell_span_ids",
+    "row_headers",
+    "column_headers",
+    "reading_order",
+    "extraction_votes",
+    "normalized_table_hash"
+  ],
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "DocId": {
+      "description": "Primary key for `CorpusDocument`.",
+      "type": "string"
+    },
+    "ExtractedTableId": {
+      "description": "Primary key for `ExtractedTable`.",
+      "type": "string"
+    },
+    "ExtractorVote": {
+      "description": "A single extractor's output for an extraction vote.",
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "format": "double"
+        },
+        "extractor": {
+          "type": "string"
+        },
+        "raw_text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extractor",
+        "raw_text",
+        "confidence"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

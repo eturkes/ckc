@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConfidenceInterval",
+  "description": "Numeric confidence interval bounds for effect estimates.",
+  "type": "object",
+  "properties": {
+    "lower": {
+      "type": "number",
+      "format": "double"
+    },
+    "upper": {
+      "type": "number",
+      "format": "double"
+    }
+  },
+  "required": [
+    "lower",
+    "upper"
+  ]
+}

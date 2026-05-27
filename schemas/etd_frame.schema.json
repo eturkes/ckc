@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EtDFrame",
+  "description": "Evidence-to-Decision frame with GRADE dimensions (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "acceptability": {
+      "type": "string"
+    },
+    "benefits": {
+      "type": "string"
+    },
+    "certainty": {
+      "$ref": "#/$defs/EvidenceCertainty"
+    },
+    "equity": {
+      "type": "string"
+    },
+    "feasibility": {
+      "type": "string"
+    },
+    "harms": {
+      "type": "string"
+    },
+    "recommendation_direction": {
+      "$ref": "#/$defs/RecommendationDirection"
+    },
+    "recommendation_strength": {
+      "$ref": "#/$defs/RecommendationStrength"
+    },
+    "resources": {
+      "type": "string"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "values": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "benefits",
+    "harms",
+    "certainty",
+    "values",
+    "resources",
+    "equity",
+    "acceptability",
+    "feasibility",
+    "recommendation_direction",
+    "recommendation_strength",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "EvidenceCertainty": {
+      "description": "GRADE evidence certainty (SPEC 10 Norm, EtDFrame, EvidenceAtom).\nVariant order matches certainty level: VeryLow < Low < Moderate < High.",
+      "type": "string",
+      "enum": [
+        "very_low",
+        "low",
+        "moderate",
+        "high"
+      ]
+    },
+    "RecommendationDirection": {
+      "description": "Recommendation direction (SPEC 10 EtDFrame, Norm).",
+      "type": "string",
+      "enum": [
+        "for",
+        "against"
+      ]
+    },
+    "RecommendationStrength": {
+      "description": "GRADE recommendation strength (SPEC 10 Norm).",
+      "type": "string",
+      "enum": [
+        "strong",
+        "weak",
+        "conditional"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

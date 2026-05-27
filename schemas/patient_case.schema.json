@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PatientCase",
+  "description": "Synthetic or fixture patient case for execution and conflict testing\n(SPEC 10). Clinical data arrays use open JSON values at schema v0.\nPHI cases belong to later governed deployments; initial cases are\n`synthetic` or `fixture` only.",
+  "type": "object",
+  "properties": {
+    "allergies": {
+      "type": "array",
+      "items": true
+    },
+    "case_id": {
+      "$ref": "#/$defs/CaseId"
+    },
+    "case_type": {
+      "$ref": "#/$defs/CaseType"
+    },
+    "conditions": {
+      "type": "array",
+      "items": true
+    },
+    "events": {
+      "type": "array",
+      "items": true
+    },
+    "facts": {
+      "type": "array",
+      "items": true
+    },
+    "medications": {
+      "type": "array",
+      "items": true
+    },
+    "observations": {
+      "type": "array",
+      "items": true
+    },
+    "privacy_status": {
+      "type": "string"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "time_origin": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "case_id",
+    "case_type",
+    "facts",
+    "events",
+    "observations",
+    "medications",
+    "conditions",
+    "allergies",
+    "source_span_ids",
+    "privacy_status"
+  ],
+  "$defs": {
+    "CaseId": {
+      "description": "Primary key for `PatientCase`.",
+      "type": "string"
+    },
+    "CaseType": {
+      "description": "Patient case provenance (SPEC 10 PatientCase).",
+      "type": "string",
+      "enum": [
+        "synthetic",
+        "fixture",
+        "deidentified_later",
+        "live_later"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

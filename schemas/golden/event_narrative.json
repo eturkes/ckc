@@ -1,0 +1,1 @@
+{"event_types":["administer_drug","detect_allergy"],"fluent_types":["allergy_known"],"happens":[{"event":"detect_allergy","time":0}],"holds_queries":[{"expected":true,"fluent":"allergy_known","time":10}],"initially":[{"fluent":"allergy_known","value":false}],"initiates":[{"event":"detect_allergy","fluent":"allergy_known"}],"source_span_ids":["span_ec_001"],"terminates":[]}

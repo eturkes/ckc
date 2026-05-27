@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AssuranceNode",
+  "description": "GSN/SACM-style assurance-case node linking claims to evidence\nartifacts (SPEC 10, 17).",
+  "type": "object",
+  "properties": {
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AssuranceNodeId"
+      }
+    },
+    "claim": {
+      "type": "string"
+    },
+    "evidence_artifact_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "node_id": {
+      "$ref": "#/$defs/AssuranceNodeId"
+    },
+    "node_type": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "node_id",
+    "node_type",
+    "claim",
+    "evidence_artifact_ids",
+    "status",
+    "children"
+  ],
+  "$defs": {
+    "AssuranceNodeId": {
+      "description": "Primary key for `AssuranceNode`.",
+      "type": "string"
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    }
+  }
+}

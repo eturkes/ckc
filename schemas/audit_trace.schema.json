@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuditTrace",
+  "description": "Research observability trace covering pipeline stages, model\ninvocations, retrieval events, and verifier events (SPEC 10, 17).\nTrace arrays use open JSON values at schema v0 for\nOpenTelemetry-style span data.",
+  "type": "object",
+  "properties": {
+    "artifact_hashes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "audit_export_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_invocations": {
+      "type": "array",
+      "items": true
+    },
+    "redaction_status": {
+      "type": "string"
+    },
+    "retrieval_events": {
+      "type": "array",
+      "items": true
+    },
+    "stage_spans": {
+      "type": "array",
+      "items": true
+    },
+    "trace_id": {
+      "$ref": "#/$defs/AuditTraceId"
+    },
+    "verifier_events": {
+      "type": "array",
+      "items": true
+    }
+  },
+  "required": [
+    "trace_id",
+    "stage_spans",
+    "model_invocations",
+    "retrieval_events",
+    "verifier_events",
+    "artifact_hashes",
+    "redaction_status",
+    "audit_export_refs"
+  ],
+  "$defs": {
+    "AuditTraceId": {
+      "description": "Primary key for `AuditTrace`.",
+      "type": "string"
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    }
+  }
+}

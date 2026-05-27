@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Concept",
+  "description": "Domain concept with terminology bindings and e-graph membership (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "concept_id": {
+      "$ref": "#/$defs/ConceptId"
+    },
+    "egraph_class_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EGraphClassId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "label_en": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "label_ja": {
+      "type": "string"
+    },
+    "semantic_type": {
+      "type": "string"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "terminology_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TerminologyBinding"
+      }
+    }
+  },
+  "required": [
+    "concept_id",
+    "label_ja",
+    "semantic_type",
+    "terminology_bindings",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "BindingStatus": {
+      "description": "Terminology binding status (SPEC 6.2).",
+      "type": "string",
+      "enum": [
+        "exact",
+        "broad",
+        "narrow",
+        "related",
+        "unmapped",
+        "ambiguous",
+        "deprecated",
+        "incoherent"
+      ]
+    },
+    "ConceptId": {
+      "description": "Primary key for `Concept`.",
+      "type": "string"
+    },
+    "EGraphClassId": {
+      "description": "E-graph equivalence class identifier.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "TerminologyBinding": {
+      "description": "Binding from a concept to an external terminology system (SPEC 6.2, 10).",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "format": "double"
+        },
+        "label": {
+          "type": "string"
+        },
+        "license_status": {
+          "type": "string"
+        },
+        "mapping_relation": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/BindingStatus"
+        },
+        "system": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "system",
+        "label",
+        "status",
+        "mapping_relation",
+        "provenance",
+        "confidence",
+        "license_status"
+      ]
+    }
+  }
+}

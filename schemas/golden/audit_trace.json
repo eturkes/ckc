@@ -1,0 +1,1 @@
+{"artifact_hashes":["sha256:dd00000000000000000000000000000000000000000000000000000000000001"],"audit_export_refs":[],"model_invocations":[],"redaction_status":"none","retrieval_events":[],"stage_spans":[{"stage":"normalize","status":"ok"}],"trace_id":"trace_toy_001","verifier_events":[{"result":"sat","verifier":"z3"}]}

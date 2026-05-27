@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DecisionRow",
+  "description": "Decision table row with conditions, outputs, and source grounding (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "cell_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TableCellRef"
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": true
+    },
+    "outputs": {
+      "type": "array",
+      "items": true
+    },
+    "priority": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "row_id": {
+      "$ref": "#/$defs/DecisionRowId"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    }
+  },
+  "required": [
+    "row_id",
+    "conditions",
+    "outputs",
+    "source_span_ids",
+    "cell_refs"
+  ],
+  "$defs": {
+    "DecisionRowId": {
+      "description": "Primary key for `DecisionRow`.",
+      "type": "string"
+    },
+    "ExtractedTableId": {
+      "description": "Primary key for `ExtractedTable`.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "TableCellRef": {
+      "description": "Reference to a cell within an extracted table.",
+      "type": "object",
+      "properties": {
+        "col": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "row": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "table_id": {
+          "$ref": "#/$defs/ExtractedTableId"
+        }
+      },
+      "required": [
+        "table_id",
+        "row",
+        "col"
+      ]
+    }
+  }
+}

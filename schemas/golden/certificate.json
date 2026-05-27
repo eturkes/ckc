@@ -1,0 +1,1 @@
+{"certificate_class":"C4-Executable","certificate_id":"cert_z3_001","command_manifest":{"args":["-smt2"],"command":"z3"},"diagnostics":[],"input_artifact_hashes":["sha256:bb00000000000000000000000000000000000000000000000000000000000001"],"proof_artifact_hashes":[],"replay_status":"passed","result":"sat","solver_or_checker":"z3"}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CorpusDocument",
+  "description": "Registered source document with permission and version metadata (SPEC 10).",
+  "type": "object",
+  "properties": {
+    "access_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content_hash": {
+      "$ref": "#/$defs/ContentHash"
+    },
+    "doc_id": {
+      "$ref": "#/$defs/DocId"
+    },
+    "edition": {
+      "type": "string"
+    },
+    "extraction_manifest_id": {
+      "$ref": "#/$defs/ManifestId"
+    },
+    "license_status": {
+      "type": "string"
+    },
+    "publication_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "society": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string"
+    },
+    "superseded_by": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DocId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DocId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title_en": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title_ja": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "doc_id",
+    "title_ja",
+    "source_type",
+    "publisher",
+    "society",
+    "edition",
+    "license_status",
+    "content_hash",
+    "extraction_manifest_id"
+  ],
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "DocId": {
+      "description": "Primary key for `CorpusDocument`.",
+      "type": "string"
+    },
+    "ManifestId": {
+      "description": "Extraction or replay manifest identifier.",
+      "type": "string"
+    }
+  }
+}

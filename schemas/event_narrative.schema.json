@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventNarrative",
+  "description": "Event Calculus narrative with typed events, fluents, and axioms (SPEC 10).\nAxiom arrays (`happens`, `initiates`, `terminates`, `initially`,\n`holds_queries`) use open JSON values at schema v0.",
+  "type": "object",
+  "properties": {
+    "event_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fluent_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "happens": {
+      "type": "array",
+      "items": true
+    },
+    "holds_queries": {
+      "type": "array",
+      "items": true
+    },
+    "initially": {
+      "type": "array",
+      "items": true
+    },
+    "initiates": {
+      "type": "array",
+      "items": true
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "terminates": {
+      "type": "array",
+      "items": true
+    }
+  },
+  "required": [
+    "event_types",
+    "fluent_types",
+    "happens",
+    "initiates",
+    "terminates",
+    "initially",
+    "holds_queries",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

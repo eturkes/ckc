@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExecutionWitness",
+  "description": "Replayable execution witness from a target backend (SPEC 10).\nA CKC artifact is executable when at least one target can produce a\nreplayable witness, model, proof, or explicit unsat/core result.",
+  "type": "object",
+  "properties": {
+    "applicable_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RuleId"
+      }
+    },
+    "bundle_id": {
+      "$ref": "#/$defs/BundleId"
+    },
+    "case_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CaseId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "certificate_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CertificateId"
+      }
+    },
+    "context_facts": {
+      "type": "array",
+      "items": true
+    },
+    "defeated_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RuleId"
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": true
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "trace": {
+      "type": "array",
+      "items": true
+    },
+    "unsat_cores": {
+      "type": "array",
+      "items": true
+    },
+    "violated_constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "witness_id": {
+      "$ref": "#/$defs/WitnessId"
+    }
+  },
+  "required": [
+    "witness_id",
+    "bundle_id",
+    "context_facts",
+    "trace",
+    "applicable_rules",
+    "defeated_rules",
+    "violated_constraints",
+    "models",
+    "unsat_cores",
+    "source_span_ids",
+    "certificate_ids"
+  ],
+  "$defs": {
+    "BundleId": {
+      "description": "Artifact bundle identifier.",
+      "type": "string"
+    },
+    "CaseId": {
+      "description": "Primary key for `PatientCase`.",
+      "type": "string"
+    },
+    "CertificateId": {
+      "description": "Primary key for `Certificate`.",
+      "type": "string"
+    },
+    "RuleId": {
+      "description": "Primary key for `Rule`.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "WitnessId": {
+      "description": "Primary key for `ExecutionWitness`.",
+      "type": "string"
+    }
+  }
+}

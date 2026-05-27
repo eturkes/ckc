@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArgumentGraph",
+  "description": "Dung-style argumentation graph with typed edges and extension\nsummaries (SPEC 10, 13.3).\nArrays `arguments`, `attack_edges`, `support_edges`, `undercut_edges`,\n`defeat_edges`, and `extension_summaries` use open JSON values at\nschema v0.",
+  "type": "object",
+  "properties": {
+    "argument_graph_id": {
+      "$ref": "#/$defs/ArgumentGraphId"
+    },
+    "arguments": {
+      "type": "array",
+      "items": true
+    },
+    "attack_edges": {
+      "type": "array",
+      "items": true
+    },
+    "defeat_edges": {
+      "type": "array",
+      "items": true
+    },
+    "extension_summaries": {
+      "type": "array",
+      "items": true
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "support_edges": {
+      "type": "array",
+      "items": true
+    },
+    "undercut_edges": {
+      "type": "array",
+      "items": true
+    }
+  },
+  "required": [
+    "argument_graph_id",
+    "arguments",
+    "attack_edges",
+    "support_edges",
+    "undercut_edges",
+    "defeat_edges",
+    "extension_summaries",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "ArgumentGraphId": {
+      "description": "Primary key for `ArgumentGraph`.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

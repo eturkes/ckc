@@ -1,0 +1,1 @@
+{"argument_graph_id":"ag_bl_001","arguments":[{"id":"arg_recommend"}],"attack_edges":[{"from":"arg_contra","to":"arg_recommend"}],"defeat_edges":[],"extension_summaries":[{"semantics":"grounded"}],"source_span_ids":["span_gl_s1"],"support_edges":[],"undercut_edges":[]}

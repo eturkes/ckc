@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conflict",
+  "description": "Detected logical incompatibility or factual inconsistency with\nsource-grounded evidence and review prompts (SPEC 10, 15).",
+  "type": "object",
+  "properties": {
+    "argument_graph_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArgumentGraphId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "classification": {
+      "$ref": "#/$defs/ConflictClassification"
+    },
+    "confidence": {
+      "type": "number",
+      "format": "double"
+    },
+    "conflict_id": {
+      "$ref": "#/$defs/ConflictId"
+    },
+    "conflict_type": {
+      "type": "string"
+    },
+    "human_review_question_en": {
+      "type": "string"
+    },
+    "human_review_question_ja": {
+      "type": "string"
+    },
+    "minimal_artifact_set": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "normalized_view": true,
+    "repair_candidates": {
+      "type": "array",
+      "items": true
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity"
+    },
+    "solver_evidence": {
+      "type": "array",
+      "items": true
+    },
+    "source_spans": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "witness": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WitnessId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "conflict_id",
+    "conflict_type",
+    "severity",
+    "confidence",
+    "minimal_artifact_set",
+    "source_spans",
+    "normalized_view",
+    "repair_candidates",
+    "solver_evidence",
+    "human_review_question_ja",
+    "human_review_question_en",
+    "classification"
+  ],
+  "$defs": {
+    "ArgumentGraphId": {
+      "description": "Primary key for `ArgumentGraph`.",
+      "type": "string"
+    },
+    "ConflictClassification": {
+      "description": "Conflict classification (SPEC 15.4).",
+      "type": "string",
+      "enum": [
+        "true_conflict",
+        "likely_ambiguity",
+        "extraction_error",
+        "formalization_error",
+        "terminology_error",
+        "interop_compiler_error",
+        "stale_source",
+        "needs_clinician_adjudication"
+      ]
+    },
+    "ConflictId": {
+      "description": "Primary key for `Conflict`.",
+      "type": "string"
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "Severity": {
+      "description": "Conflict / diagnostic severity. Variant order matches escalation.",
+      "type": "string",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "WitnessId": {
+      "description": "Primary key for `ExecutionWitness`.",
+      "type": "string"
+    }
+  }
+}

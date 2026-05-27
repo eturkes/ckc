@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Action",
+  "description": "Clinical action with concept target and constraints (SPEC 10).\nFields `parameters`, `temporal_constraints`, `quantity_constraints` use\nopen JSON values at schema v0; later phases refine these into typed ASTs.",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string"
+    },
+    "parameters": true,
+    "quantity_constraints": true,
+    "target_concept": {
+      "$ref": "#/$defs/ConceptId"
+    },
+    "temporal_constraints": true
+  },
+  "required": [
+    "action_type",
+    "target_concept",
+    "parameters",
+    "temporal_constraints",
+    "quantity_constraints"
+  ],
+  "$defs": {
+    "ConceptId": {
+      "description": "Primary key for `Concept`.",
+      "type": "string"
+    }
+  }
+}

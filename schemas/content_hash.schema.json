@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentHash",
+  "description": "Content hash in the format `sha256:<hex>`.",
+  "type": "string"
+}

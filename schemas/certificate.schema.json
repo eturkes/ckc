@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Certificate",
+  "description": "Proof or verification certificate linking input artifacts to\nsolver/checker results and replay status (SPEC 10, 12.2).",
+  "type": "object",
+  "properties": {
+    "certificate_class": {
+      "$ref": "#/$defs/CertificateClass"
+    },
+    "certificate_id": {
+      "$ref": "#/$defs/CertificateId"
+    },
+    "command_manifest": true,
+    "compiler_hash": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ContentHash"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": true
+    },
+    "input_artifact_hashes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "proof_artifact_hashes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "replay_status": {
+      "$ref": "#/$defs/ReplayStatus"
+    },
+    "result": {
+      "type": "string"
+    },
+    "solver_or_checker": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "certificate_id",
+    "certificate_class",
+    "input_artifact_hashes",
+    "solver_or_checker",
+    "command_manifest",
+    "result",
+    "proof_artifact_hashes",
+    "replay_status",
+    "diagnostics"
+  ],
+  "$defs": {
+    "CertificateClass": {
+      "description": "Certificate depth class (SPEC 12.2). Higher classes imply lower.\nVariant order matches depth: C0 < C1 < … < C9.",
+      "type": "string",
+      "enum": [
+        "C0-Parsed",
+        "C1-Schema",
+        "C2-Normal",
+        "C3-Grounded",
+        "C4-Executable",
+        "C5-Portfolio",
+        "C6-ProofObject",
+        "C7-Kernel",
+        "C8-Adjudicated",
+        "C9-Assured"
+      ]
+    },
+    "CertificateId": {
+      "description": "Primary key for `Certificate`.",
+      "type": "string"
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "ReplayStatus": {
+      "description": "Certificate replay status.",
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "pending",
+        "skipped"
+      ]
+    }
+  }
+}

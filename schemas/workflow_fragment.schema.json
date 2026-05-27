@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkflowFragment",
+  "description": "Clinical pathway or workflow fragment with states, transitions, and\noutcome/assessment tracking (SPEC 10).\nFields `states`, `transitions`, `outcomes`, `assessments`, `tasks`, and\n`variance_rules` use open JSON values at schema v0; later phases refine\nthese into typed sub-element ASTs.",
+  "type": "object",
+  "properties": {
+    "assessments": {
+      "type": "array",
+      "items": true
+    },
+    "outcomes": {
+      "type": "array",
+      "items": true
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    },
+    "states": {
+      "type": "array",
+      "items": true
+    },
+    "tasks": {
+      "type": "array",
+      "items": true
+    },
+    "transitions": {
+      "type": "array",
+      "items": true
+    },
+    "variance_rules": {
+      "type": "array",
+      "items": true
+    },
+    "workflow_id": {
+      "$ref": "#/$defs/WorkflowId"
+    },
+    "workflow_type": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "workflow_type",
+    "states",
+    "transitions",
+    "outcomes",
+    "assessments",
+    "tasks",
+    "variance_rules",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "WorkflowId": {
+      "description": "Primary key for `WorkflowFragment`.",
+      "type": "string"
+    }
+  }
+}
