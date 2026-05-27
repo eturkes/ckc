@@ -1,7 +1,8 @@
 # Agent Memory
 
-Entries must not be derivable from SPEC.md, CLAUDE.md, the codebase, git
-history, config files, tool `--version` output, or the runtime environment.
+Every entry must provide value beyond what SPEC.md, CLAUDE.md, the codebase,
+git history, config files, tool `--version` output, and the runtime
+environment already provide.
 
 ## Decisions
 
