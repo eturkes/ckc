@@ -114,6 +114,105 @@ pub enum SemanticType {
     Qualifier,
 }
 
+/// Clinical claim type classification.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimType {
+    Factual,
+    Normative,
+    Definitional,
+    Eligibility,
+    Quantity,
+    Temporal,
+    Workflow,
+    DecisionTable,
+}
+
+/// Processing status of a CKC artifact through the semantic firewall.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimStatus {
+    Candidate,
+    Accepted,
+    Rejected,
+    Review,
+    Deprecated,
+}
+
+/// SPEC §9 CKC-Defeasible: rule classification.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleKind {
+    Strict,
+    Defeasible,
+    Defeater,
+}
+
+/// Deontic modality projection for clinical norms.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeonticProjection {
+    Obligation,
+    Prohibition,
+    Permission,
+    Recommendation,
+}
+
+/// Exception handling policy for norms.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExceptionPolicy {
+    Defeasible,
+    Absolute,
+}
+
+/// Prima facie vs. all-things-considered norm scope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NormScope {
+    PrimaFacie,
+    AllThingsConsidered,
+}
+
+/// Clinical action type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionType {
+    Administer,
+    Prescribe,
+    Monitor,
+    Assess,
+    Discontinue,
+    Refer,
+    Avoid,
+}
+
+/// Evidence type classification per GRADE methodology.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceType {
+    MetaAnalysis,
+    SystematicReview,
+    Rct,
+    Cohort,
+    CaseControl,
+    CrossSectional,
+    CaseSeries,
+    CaseReport,
+    ExpertOpinion,
+    GuidelineRecommendation,
+}
+
+/// GRADE outcome importance levels.
+/// Ord reflects NotImportant < Important < Critical.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutcomeImportance {
+    NotImportant,
+    Important,
+    Critical,
+}
+
 /// SKOS-standard mapping relation for terminology bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -233,5 +332,119 @@ mod tests {
         );
         let back: MappingRelation = serde_json::from_str("\"broad_match\"").unwrap();
         assert_eq!(back, MappingRelation::BroadMatch);
+    }
+
+    #[test]
+    fn claim_type_serde() {
+        assert_eq!(
+            serde_json::to_string(&ClaimType::Normative).unwrap(),
+            "\"normative\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ClaimType::DecisionTable).unwrap(),
+            "\"decision_table\""
+        );
+        let back: ClaimType = serde_json::from_str("\"factual\"").unwrap();
+        assert_eq!(back, ClaimType::Factual);
+    }
+
+    #[test]
+    fn claim_status_serde() {
+        assert_eq!(
+            serde_json::to_string(&ClaimStatus::Candidate).unwrap(),
+            "\"candidate\""
+        );
+        let back: ClaimStatus = serde_json::from_str("\"accepted\"").unwrap();
+        assert_eq!(back, ClaimStatus::Accepted);
+    }
+
+    #[test]
+    fn rule_kind_serde() {
+        assert_eq!(
+            serde_json::to_string(&RuleKind::Strict).unwrap(),
+            "\"strict\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RuleKind::Defeasible).unwrap(),
+            "\"defeasible\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RuleKind::Defeater).unwrap(),
+            "\"defeater\""
+        );
+    }
+
+    #[test]
+    fn deontic_projection_serde() {
+        assert_eq!(
+            serde_json::to_string(&DeonticProjection::Obligation).unwrap(),
+            "\"obligation\""
+        );
+        let back: DeonticProjection = serde_json::from_str("\"recommendation\"").unwrap();
+        assert_eq!(back, DeonticProjection::Recommendation);
+    }
+
+    #[test]
+    fn exception_policy_serde() {
+        assert_eq!(
+            serde_json::to_string(&ExceptionPolicy::Defeasible).unwrap(),
+            "\"defeasible\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExceptionPolicy::Absolute).unwrap(),
+            "\"absolute\""
+        );
+    }
+
+    #[test]
+    fn norm_scope_serde() {
+        assert_eq!(
+            serde_json::to_string(&NormScope::PrimaFacie).unwrap(),
+            "\"prima_facie\""
+        );
+        assert_eq!(
+            serde_json::to_string(&NormScope::AllThingsConsidered).unwrap(),
+            "\"all_things_considered\""
+        );
+    }
+
+    #[test]
+    fn action_type_serde() {
+        assert_eq!(
+            serde_json::to_string(&ActionType::Administer).unwrap(),
+            "\"administer\""
+        );
+        let back: ActionType = serde_json::from_str("\"discontinue\"").unwrap();
+        assert_eq!(back, ActionType::Discontinue);
+    }
+
+    #[test]
+    fn evidence_type_serde() {
+        assert_eq!(
+            serde_json::to_string(&EvidenceType::Rct).unwrap(),
+            "\"rct\""
+        );
+        assert_eq!(
+            serde_json::to_string(&EvidenceType::MetaAnalysis).unwrap(),
+            "\"meta_analysis\""
+        );
+        let back: EvidenceType = serde_json::from_str("\"systematic_review\"").unwrap();
+        assert_eq!(back, EvidenceType::SystematicReview);
+    }
+
+    #[test]
+    fn outcome_importance_ordering() {
+        assert!(OutcomeImportance::NotImportant < OutcomeImportance::Important);
+        assert!(OutcomeImportance::Important < OutcomeImportance::Critical);
+    }
+
+    #[test]
+    fn outcome_importance_serde() {
+        assert_eq!(
+            serde_json::to_string(&OutcomeImportance::Critical).unwrap(),
+            "\"critical\""
+        );
+        let back: OutcomeImportance = serde_json::from_str("\"not_important\"").unwrap();
+        assert_eq!(back, OutcomeImportance::NotImportant);
     }
 }
