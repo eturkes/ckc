@@ -15,7 +15,6 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] Memory entries, roadmap descriptions, and doc preambles are the
   highest-risk locations for redundancy with SPEC.md and config files. Default
   assumption: if a fact lives in a file, it belongs only in that file.
-
 - [2026-05-27] Spend freely on reasoning and iteration within a session, but
   all content written to files must be token-efficient for future LLM readers.
   Self-audit this balance before committing; the user expects it done
