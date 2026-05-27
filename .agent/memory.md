@@ -9,14 +9,7 @@ Prune entries when they become obsolete or newly derivable.
 
 ## Decisions
 
-- [2026-05-27] LLVM exception on the license: CKC is a compiler, so compiled
-  output should be redistributable without attribution burden.
-- [2026-05-27] `.agent/` directory is separate from `.claude/` to avoid coupling
-  the memory system to a specific agent tool.
-
 ## Lessons
-
-(empty — first session)
 
 ## Open Questions
 
