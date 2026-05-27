@@ -1,4 +1,5 @@
-You are developing CKC, a proof-carrying clinical knowledge compiler.
+You are developing CKC, a proof-carrying clinical knowledge compiler. Read the
+following files to orient, then determine your session type.
 
 ## Step 1: Orient
 
