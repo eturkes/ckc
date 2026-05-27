@@ -57,7 +57,7 @@ Future bridge code is demonstrative in this phase. Clinical deployment requires 
 
 ## 3. Distilled domain commitments
 
-This file is self-contained and immutable. You are to receive the designated commitments as the authoritative synthesis of the domain research. The underlying documents comprising this research are unavailable. Pivot from a commitment only if you identify a superior alternative during development, making note of it in a separate file and designating this file as a historical initial draft.
+The designated commitments are the authoritative synthesis of the domain research. The underlying documents comprising this research are unavailable. Pivot from a commitment only if you identify a superior alternative during development, and update this file accordingly.
 
 Core commitments:
 
