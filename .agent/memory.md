@@ -3,9 +3,7 @@
 Cross-session scratchpad for CKC development. Contains only information that
 future sessions and subagents require but cannot derive from SPEC.md, CLAUDE.md,
 the codebase, git history, config files, tool `--version` output, or the
-runtime environment. Versions, tool availability, conventions visible in
-existing files, and anything restatable by reading a config file belong
-elsewhere or nowhere.
+runtime environment.
 
 Prune entries when they become obsolete or newly derivable.
 
