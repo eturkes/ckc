@@ -26,4 +26,3 @@ Commit the roadmap update and end the session.
 dedicated to writing the next Phase's top-level tasks (with no subtasks).
 Derive them from SPEC.md Section 20. Commit the updated roadmap and end the
 session.
-
