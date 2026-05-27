@@ -11,7 +11,7 @@ See `.agent/prompt.md` for the session workflow that governs progression.
   - [x] 0.2.2 Source and terminology types: CorpusDocument, SourceSpan, ExtractedTable, Concept, TerminologyBinding (exact fields per SPEC 10). Gate: serde round-trip tests; canonical JSON byte stability for one fixture instance of each type.
   - [x] 0.2.3 Evidence and clinical formalization types: PICOFrame, EtDFrame, EvidenceAtom, Norm, Action, Rule, ClinicalClaim (exact fields per SPEC 10). Gate: serde round-trip; profiles field validates against SemanticProfile.
   - [x] 0.2.4 Structured artifact types: DecisionTable, DecisionRow, WorkflowFragment, EventNarrative, PatientCase, ExecutionWitness (exact fields per SPEC 10). Gate: serde round-trip tests.
-  - [ ] 0.2.5 Verification and assurance types: Conflict, ArgumentGraph, Certificate, AssuranceNode, AuditTrace (exact fields per SPEC 10). Gate: serde round-trip tests.
+  - [x] 0.2.5 Verification and assurance types: Conflict, ArgumentGraph, Certificate, AssuranceNode, AuditTrace (exact fields per SPEC 10). Gate: serde round-trip tests.
   - [ ] 0.2.6 JSON Schema generation and golden byte tests: generate JSON Schema from all Rust types (schemars), write golden canonical JSON fixtures covering every type, verify content hashes are deterministic across serialization round-trips. Gate: `cargo test -p ckc-core` passes; golden files committed; schema files committed.
 - [ ] 0.3 Normal Form (SPEC 11)
 - [ ] 0.4 Content-addressed store
