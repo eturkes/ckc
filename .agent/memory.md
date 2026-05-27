@@ -5,10 +5,6 @@ git history, config files, tool `--version` output, and the runtime
 environment already provide. Exception: high-value reminders that are
 technically derivable but easily forgotten under token pressure.
 
-## Decisions
-
-## User Preferences
-
 ## Lessons
 
 - [2026-05-27] Every piece of natural language in the project (docs, comments,
@@ -33,5 +29,3 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] User gave a directive and the agent acknowledged it verbally
   but failed to persist it to memory. Any user directive meant for future
   sessions must be written to memory immediately, in the same turn.
-
-## Open Questions
