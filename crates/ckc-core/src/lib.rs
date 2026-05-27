@@ -1,4 +1,5 @@
 pub mod canonical;
+pub mod clinical;
 pub mod enums;
 pub mod id;
 pub mod profile;
