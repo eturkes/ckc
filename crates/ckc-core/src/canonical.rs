@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 
 /// Content hash in the format `sha256:<hex>`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct ContentHash(pub String);

@@ -12,6 +12,8 @@ use crate::source::{
     BBox, Concept, CorpusDocument, ExtractedTable, ExtractorVote, SourceSpan, TableCellRef,
     TerminologyBinding,
 };
+use crate::canonical::to_canonical_bytes;
+use crate::enums::HitPolicy;
 use crate::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -76,6 +78,64 @@ impl NfContext {
             self.normalize_field(pass, &indexed, v);
         }
     }
+
+    /// Sort a `Vec<T: Ord>` in place. Record a rewrite when order changes.
+    pub fn sort_ord<T: Ord>(&mut self, field: &str, values: &mut Vec<T>) {
+        if values.len() <= 1 {
+            return;
+        }
+        if values.windows(2).all(|w| w[0] <= w[1]) {
+            return;
+        }
+        values.sort();
+        self.rewrites.push(NfRewrite {
+            pass: 4,
+            field: field.into(),
+            before: format!("{} items", values.len()),
+            after: "sorted".into(),
+        });
+    }
+
+    /// Sort a `Vec<T: Serialize>` by RFC 8785 canonical JSON byte comparison.
+    /// Record a rewrite when order changes.
+    pub fn sort_by_canonical<T: Serialize>(&mut self, field: &str, values: &mut Vec<T>) {
+        if values.len() <= 1 {
+            return;
+        }
+        let mut keyed: Vec<(Vec<u8>, T)> = values
+            .drain(..)
+            .map(|v| {
+                let key = to_canonical_bytes(&v);
+                (key, v)
+            })
+            .collect();
+        let already_sorted = keyed.windows(2).all(|w| w[0].0 <= w[1].0);
+        if !already_sorted {
+            keyed.sort_by(|a, b| a.0.cmp(&b.0));
+            self.rewrites.push(NfRewrite {
+                pass: 4,
+                field: field.into(),
+                before: format!("{} items", keyed.len()),
+                after: "sorted by canonical bytes".into(),
+            });
+        }
+        values.extend(keyed.into_iter().map(|(_, v)| v));
+    }
+
+    /// Sort commutative AND/OR operands in a string expression.
+    /// At schema v0, handles top-level operators in parenthesized expressions.
+    pub fn sort_commutative(&mut self, field: &str, value: &mut String) {
+        let sorted = sort_commutative_operands(value);
+        if *value != sorted {
+            self.rewrites.push(NfRewrite {
+                pass: 4,
+                field: field.into(),
+                before: std::mem::take(value),
+                after: sorted.clone(),
+            });
+            *value = sorted;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +179,66 @@ pub fn normalize_all<T: Normalize>(value: &mut T) -> NfContext {
 }
 
 // ---------------------------------------------------------------------------
+// Commutative operand sorting (Pass 4 — string expressions)
+// ---------------------------------------------------------------------------
+
+/// Sort commutative AND/OR operands at depth 0 (outside parentheses).
+/// Mixed AND/OR at depth 0 is left unchanged (ambiguous precedence).
+/// At schema v0, Rule antecedent/consequent/context are strings; this
+/// function provides text-level sorting until typed ASTs replace them.
+fn sort_commutative_operands(s: &str) -> String {
+    let and_parts = split_at_depth_0(s, " AND ");
+    let or_parts = split_at_depth_0(s, " OR ");
+    let and_splits = and_parts.len() > 1;
+    let or_splits = or_parts.len() > 1;
+
+    if and_splits && !or_splits {
+        let mut parts = and_parts;
+        parts.sort();
+        return parts.join(" AND ");
+    }
+    if or_splits && !and_splits {
+        let mut parts = or_parts;
+        parts.sort();
+        return parts.join(" OR ");
+    }
+    s.to_string()
+}
+
+/// Split `s` at depth-0 (outside parentheses) occurrences of `op`.
+/// Each resulting part is trimmed.
+fn split_at_depth_0<'a>(s: &'a str, op: &str) -> Vec<&'a str> {
+    let mut parts = Vec::new();
+    let mut depth: i32 = 0;
+    let mut start = 0;
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'(' => {
+                depth += 1;
+                i += 1;
+            }
+            b')' => {
+                depth -= 1;
+                i += 1;
+            }
+            _ => {
+                if depth == 0 && s[i..].starts_with(op) {
+                    parts.push(s[start..i].trim());
+                    i += op.len();
+                    start = i;
+                } else {
+                    i += 1;
+                }
+            }
+        }
+    }
+    parts.push(s[start..].trim());
+    parts
+}
+
+// ---------------------------------------------------------------------------
 // Normalize trait
 // ---------------------------------------------------------------------------
 
@@ -159,6 +279,9 @@ impl Normalize for SourceSpan {
         ctx.normalize_field(2, "search_text", &mut self.search_text);
         ctx.normalize_field(2, "display_text", &mut self.display_text);
         self.extractor_votes.normalize(ctx);
+        // Pass 4: sort unordered fields
+        ctx.sort_by_canonical("extractor_votes", &mut self.extractor_votes);
+        // Pass 5: section_path preserves document hierarchy order
     }
 }
 
@@ -174,6 +297,9 @@ impl Normalize for Concept {
         ctx.normalize_field(2, "label_ja", &mut self.label_ja);
         ctx.normalize_opt_field(2, "label_en", &mut self.label_en);
         self.terminology_bindings.normalize(ctx);
+        // Pass 4: sort unordered fields
+        ctx.sort_by_canonical("terminology_bindings", &mut self.terminology_bindings);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
     }
 }
 
@@ -188,6 +314,10 @@ impl Normalize for ExtractedTable {
         ctx.normalize_vec_field(2, "row_headers", &mut self.row_headers);
         ctx.normalize_vec_field(2, "column_headers", &mut self.column_headers);
         self.extraction_votes.normalize(ctx);
+        // Pass 4: sort unordered fields
+        ctx.sort_ord("cell_span_ids", &mut self.cell_span_ids);
+        ctx.sort_by_canonical("extraction_votes", &mut self.extraction_votes);
+        // Pass 5: row_headers, column_headers, reading_order preserve table structure
     }
 }
 
@@ -198,12 +328,29 @@ impl Normalize for ClinicalClaim {
         self.pico.normalize(ctx);
         self.etd.normalize(ctx);
         self.evidence_atoms.normalize(ctx);
+        // Pass 4: sort unordered fields
+        ctx.sort_ord("profiles", &mut self.profiles);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        ctx.sort_by_canonical("evidence_atoms", &mut self.evidence_atoms);
+        ctx.sort_ord("rule_ids", &mut self.rule_ids);
+        ctx.sort_ord("decision_table_ids", &mut self.decision_table_ids);
+        ctx.sort_ord("workflow_fragment_ids", &mut self.workflow_fragment_ids);
     }
 }
 
 impl Normalize for Rule {
     fn normalize(&mut self, ctx: &mut NfContext) {
         self.norm.normalize(ctx);
+        // Pass 4: sort commutative operands in string expressions
+        ctx.sort_commutative("context", &mut self.context);
+        ctx.sort_commutative("antecedent", &mut self.antecedent);
+        ctx.sort_commutative("consequent", &mut self.consequent);
+        // Pass 4: sort unordered fields
+        ctx.sort_ord("profiles", &mut self.profiles);
+        ctx.sort_ord("exceptions", &mut self.exceptions);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
+        // Pass 5: priority_over preserves priority chain order
     }
 }
 
@@ -219,6 +366,16 @@ impl Normalize for DecisionTable {
         ctx.normalize_vec_field(2, "input_columns", &mut self.input_columns);
         ctx.normalize_vec_field(2, "output_columns", &mut self.output_columns);
         self.rows.normalize(ctx);
+        // Pass 4: sort rows for commutative hit policies only
+        match self.hit_policy {
+            HitPolicy::Unique | HitPolicy::Any | HitPolicy::Collect => {
+                ctx.sort_by_canonical("rows", &mut self.rows);
+            }
+            // Pass 5: First, Priority, RuleOrder, OutputOrder preserve row order
+            _ => {}
+        }
+        ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
+        // Pass 5: input_columns, output_columns preserve column order
     }
 }
 
@@ -226,19 +383,134 @@ impl Normalize for Conflict {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_field(2, "human_review_question_ja", &mut self.human_review_question_ja);
         ctx.normalize_field(2, "human_review_question_en", &mut self.human_review_question_en);
+        // Pass 4: sort unordered fields
+        ctx.sort_ord("minimal_artifact_set", &mut self.minimal_artifact_set);
+        ctx.sort_ord("source_spans", &mut self.source_spans);
+        ctx.sort_by_canonical("repair_candidates", &mut self.repair_candidates);
+        ctx.sort_by_canonical("solver_evidence", &mut self.solver_evidence);
     }
 }
 
 impl Normalize for AssuranceNode {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_field(2, "claim", &mut self.claim);
+        // Pass 4: sort unordered fields
+        ctx.sort_ord("evidence_artifact_ids", &mut self.evidence_artifact_ids);
+        // Pass 5: children preserves assurance tree structure
     }
 }
 
 // ---------------------------------------------------------------------------
-// No-op implementations: types without text fields targeted in Pass 1-2.
-// Future passes will add behavior for structural, domain, and complex
-// normalization.
+// Pass 4 implementations: types with unordered Vec fields to sort
+// ---------------------------------------------------------------------------
+
+impl Normalize for PICOFrame {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("exclusions", &mut self.exclusions);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 5: outcomes preserves clinical importance order
+    }
+}
+
+impl Normalize for EtDFrame {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+    }
+}
+
+impl Normalize for EvidenceAtom {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        ctx.sort_ord("table_cell_refs", &mut self.table_cell_refs);
+    }
+}
+
+impl Normalize for DecisionRow {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        ctx.sort_ord("cell_refs", &mut self.cell_refs);
+        // Pass 5: conditions, outputs preserve column correspondence
+    }
+}
+
+impl Normalize for WorkflowFragment {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 5: states, transitions, outcomes, assessments, tasks,
+        //         variance_rules preserve workflow sequence
+    }
+}
+
+impl Normalize for EventNarrative {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("event_types", &mut self.event_types);
+        ctx.sort_ord("fluent_types", &mut self.fluent_types);
+        ctx.sort_by_canonical("initially", &mut self.initially);
+        ctx.sort_by_canonical("holds_queries", &mut self.holds_queries);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 5: happens, initiates, terminates preserve temporal order
+    }
+}
+
+impl Normalize for PatientCase {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_by_canonical("facts", &mut self.facts);
+        ctx.sort_by_canonical("observations", &mut self.observations);
+        ctx.sort_by_canonical("medications", &mut self.medications);
+        ctx.sort_by_canonical("conditions", &mut self.conditions);
+        ctx.sort_by_canonical("allergies", &mut self.allergies);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 5: events preserves temporal order
+    }
+}
+
+impl Normalize for ExecutionWitness {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_by_canonical("context_facts", &mut self.context_facts);
+        ctx.sort_ord("applicable_rules", &mut self.applicable_rules);
+        ctx.sort_ord("defeated_rules", &mut self.defeated_rules);
+        ctx.sort_ord("violated_constraints", &mut self.violated_constraints);
+        ctx.sort_by_canonical("models", &mut self.models);
+        ctx.sort_by_canonical("unsat_cores", &mut self.unsat_cores);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
+        // Pass 5: trace preserves temporal execution order
+    }
+}
+
+impl Normalize for ArgumentGraph {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_by_canonical("arguments", &mut self.arguments);
+        ctx.sort_by_canonical("attack_edges", &mut self.attack_edges);
+        ctx.sort_by_canonical("support_edges", &mut self.support_edges);
+        ctx.sort_by_canonical("undercut_edges", &mut self.undercut_edges);
+        ctx.sort_by_canonical("defeat_edges", &mut self.defeat_edges);
+        ctx.sort_by_canonical("extension_summaries", &mut self.extension_summaries);
+        ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+    }
+}
+
+impl Normalize for Certificate {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("input_artifact_hashes", &mut self.input_artifact_hashes);
+        ctx.sort_ord("proof_artifact_hashes", &mut self.proof_artifact_hashes);
+        // Pass 5: diagnostics preserves temporal/causal order
+    }
+}
+
+impl Normalize for AuditTrace {
+    fn normalize(&mut self, ctx: &mut NfContext) {
+        ctx.sort_ord("artifact_hashes", &mut self.artifact_hashes);
+        ctx.sort_ord("audit_export_refs", &mut self.audit_export_refs);
+        // Pass 5: stage_spans, model_invocations, retrieval_events,
+        //         verifier_events preserve temporal order
+    }
+}
+
+// ---------------------------------------------------------------------------
+// No-op implementations: types without normalizable fields in passes 1-5.
+// Pass 3 (alpha-normalization) is identity at schema v0 for types using
+// opaque String/Value fields; it activates when typed ASTs replace them.
 // ---------------------------------------------------------------------------
 
 macro_rules! normalize_noop {
@@ -249,24 +521,7 @@ macro_rules! normalize_noop {
     };
 }
 
-normalize_noop!(
-    ExtractorVote,
-    BBox,
-    TableCellRef,
-    ConfidenceInterval,
-    PICOFrame,
-    EtDFrame,
-    EvidenceAtom,
-    Action,
-    DecisionRow,
-    WorkflowFragment,
-    EventNarrative,
-    PatientCase,
-    ExecutionWitness,
-    ArgumentGraph,
-    Certificate,
-    AuditTrace,
-);
+normalize_noop!(ExtractorVote, BBox, TableCellRef, ConfidenceInterval, Action);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -699,5 +954,594 @@ mod tests {
         assert_eq!(ctx.rewrites.len(), 2);
         assert_eq!(ctx.rewrites[0].field, "cols[0]");
         assert_eq!(ctx.rewrites[1].field, "cols[2]");
+    }
+
+    // ===================================================================
+    // Pass 3-5 tests: structural normalization
+    // ===================================================================
+
+    // -- sort_commutative_operands unit tests --
+
+    #[test]
+    fn sort_and_operands() {
+        assert_eq!(
+            sort_commutative_operands("(dx sepsis) AND (adult patient)"),
+            "(adult patient) AND (dx sepsis)"
+        );
+    }
+
+    #[test]
+    fn sort_or_operands() {
+        assert_eq!(sort_commutative_operands("C OR B OR A"), "A OR B OR C");
+    }
+
+    #[test]
+    fn sort_nested_only_top_level() {
+        assert_eq!(
+            sort_commutative_operands("(D OR C) AND (B OR A)"),
+            "(B OR A) AND (D OR C)"
+        );
+    }
+
+    #[test]
+    fn sort_mixed_operators_unchanged() {
+        let expr = "A AND B OR C";
+        assert_eq!(sort_commutative_operands(expr), expr);
+    }
+
+    #[test]
+    fn sort_single_operand_unchanged() {
+        let expr = "(administer beta_lactam)";
+        assert_eq!(sort_commutative_operands(expr), expr);
+    }
+
+    #[test]
+    fn sort_already_sorted_unchanged() {
+        assert_eq!(
+            sort_commutative_operands("A AND B AND C"),
+            "A AND B AND C"
+        );
+    }
+
+    #[test]
+    fn sort_three_and_operands() {
+        assert_eq!(
+            sort_commutative_operands("Z AND A AND M"),
+            "A AND M AND Z"
+        );
+    }
+
+    // -- Gate test: commutative antecedent order → identical NF --
+
+    fn make_rule(antecedent: &str, context: &str, span_ids: Vec<SpanId>) -> Rule {
+        Rule {
+            rule_id: RuleId::new("rule_test"),
+            profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
+            kind: RuleKind::Defeasible,
+            context: context.into(),
+            antecedent: antecedent.into(),
+            consequent: "(administer beta_lactam)".into(),
+            norm: None,
+            priority_over: vec![],
+            exceptions: vec![],
+            temporal_scope: None,
+            population_scope: None,
+            source_span_ids: span_ids,
+            provenance: "test".into(),
+            certificate_ids: vec![],
+        }
+    }
+
+    #[test]
+    fn gate_commutative_antecedent_order_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut rule_a = make_rule(
+            "(adult patient) AND (dx sepsis)",
+            "adult_patient AND sepsis",
+            vec![SpanId::new("span_s1")],
+        );
+        let mut rule_b = make_rule(
+            "(dx sepsis) AND (adult patient)",
+            "sepsis AND adult_patient",
+            vec![SpanId::new("span_s1")],
+        );
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        let bytes_a = to_canonical_bytes(&rule_a);
+        let bytes_b = to_canonical_bytes(&rule_b);
+        assert_eq!(
+            bytes_a, bytes_b,
+            "Rules with swapped commutative antecedent order must produce identical NF bytes"
+        );
+
+        assert_eq!(
+            content_hash(&rule_a),
+            content_hash(&rule_b),
+            "Rules with swapped commutative antecedent order must produce identical NF digest"
+        );
+    }
+
+    #[test]
+    fn gate_swapped_span_ids_identical_nf() {
+        use crate::canonical::content_hash;
+
+        let mut rule_a = make_rule(
+            "test",
+            "test",
+            vec![SpanId::new("span_z"), SpanId::new("span_a")],
+        );
+        let mut rule_b = make_rule(
+            "test",
+            "test",
+            vec![SpanId::new("span_a"), SpanId::new("span_z")],
+        );
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        assert_eq!(
+            content_hash(&rule_a),
+            content_hash(&rule_b),
+            "Rules with swapped source_span_ids must produce identical NF digest"
+        );
+    }
+
+    // -- sort_ord tests --
+
+    #[test]
+    fn sort_ord_records_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut ids = vec![
+            SpanId::new("span_z"),
+            SpanId::new("span_a"),
+            SpanId::new("span_m"),
+        ];
+        ctx.sort_ord("source_span_ids", &mut ids);
+
+        assert_eq!(
+            ids,
+            vec![
+                SpanId::new("span_a"),
+                SpanId::new("span_m"),
+                SpanId::new("span_z"),
+            ]
+        );
+        assert_eq!(ctx.rewrites.len(), 1);
+        assert_eq!(ctx.rewrites[0].pass, 4);
+        assert_eq!(ctx.rewrites[0].field, "source_span_ids");
+    }
+
+    #[test]
+    fn sort_ord_already_sorted_no_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut ids = vec![SpanId::new("a"), SpanId::new("b"), SpanId::new("c")];
+        ctx.sort_ord("ids", &mut ids);
+        assert!(ctx.rewrites.is_empty());
+    }
+
+    #[test]
+    fn sort_ord_single_element_no_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut ids = vec![SpanId::new("only")];
+        ctx.sort_ord("ids", &mut ids);
+        assert!(ctx.rewrites.is_empty());
+    }
+
+    // -- sort_by_canonical tests --
+
+    #[test]
+    fn sort_by_canonical_values() {
+        let mut ctx = NfContext::new();
+        let mut vals = vec![
+            serde_json::json!({"z": 1}),
+            serde_json::json!({"a": 2}),
+        ];
+        ctx.sort_by_canonical("vals", &mut vals);
+
+        assert_eq!(vals[0], serde_json::json!({"a": 2}));
+        assert_eq!(vals[1], serde_json::json!({"z": 1}));
+        assert_eq!(ctx.rewrites.len(), 1);
+        assert_eq!(ctx.rewrites[0].pass, 4);
+    }
+
+    #[test]
+    fn sort_by_canonical_already_sorted_no_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut vals = vec![
+            serde_json::json!({"a": 1}),
+            serde_json::json!({"b": 2}),
+        ];
+        ctx.sort_by_canonical("vals", &mut vals);
+        assert!(ctx.rewrites.is_empty());
+    }
+
+    // -- sort_commutative on NfContext --
+
+    #[test]
+    fn sort_commutative_records_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut expr = "(B) AND (A)".to_string();
+        ctx.sort_commutative("antecedent", &mut expr);
+
+        assert_eq!(expr, "(A) AND (B)");
+        assert_eq!(ctx.rewrites.len(), 1);
+        assert_eq!(ctx.rewrites[0].pass, 4);
+        assert_eq!(ctx.rewrites[0].field, "antecedent");
+        assert_eq!(ctx.rewrites[0].before, "(B) AND (A)");
+        assert_eq!(ctx.rewrites[0].after, "(A) AND (B)");
+    }
+
+    #[test]
+    fn sort_commutative_no_rewrite_when_sorted() {
+        let mut ctx = NfContext::new();
+        let mut expr = "(A) AND (B)".to_string();
+        ctx.sort_commutative("antecedent", &mut expr);
+        assert!(ctx.rewrites.is_empty());
+    }
+
+    // -- Rule: profiles sorted --
+
+    #[test]
+    fn rule_profiles_sorted() {
+        let mut rule = make_rule("test", "test", vec![]);
+        rule.profiles = vec![SemanticProfile::Defeasible, SemanticProfile::Norm];
+
+        let ctx = normalize_all(&mut rule);
+
+        assert_eq!(
+            rule.profiles,
+            vec![SemanticProfile::Norm, SemanticProfile::Defeasible]
+        );
+        assert!(ctx.rewrites.iter().any(|r| r.field == "profiles"));
+    }
+
+    // -- Rule: exceptions sorted --
+
+    #[test]
+    fn rule_exceptions_sorted() {
+        let mut rule = make_rule("test", "test", vec![]);
+        rule.exceptions = vec!["z_exception".into(), "a_exception".into()];
+
+        let ctx = normalize_all(&mut rule);
+
+        assert_eq!(rule.exceptions, vec!["a_exception", "z_exception"]);
+        assert!(ctx.rewrites.iter().any(|r| r.field == "exceptions"));
+    }
+
+    // -- Rule: priority_over preserved (pass 5) --
+
+    #[test]
+    fn rule_priority_over_order_preserved() {
+        let mut rule = make_rule("test", "test", vec![]);
+        rule.priority_over = vec![RuleId::new("rule_z"), RuleId::new("rule_a")];
+
+        normalize_all(&mut rule);
+
+        assert_eq!(
+            rule.priority_over,
+            vec![RuleId::new("rule_z"), RuleId::new("rule_a")]
+        );
+    }
+
+    // -- DecisionTable: rows sorted for Unique, preserved for Priority --
+
+    fn make_decision_row(id: &str, cond_val: i64) -> DecisionRow {
+        DecisionRow {
+            row_id: DecisionRowId::new(id),
+            conditions: vec![serde_json::json!({"value": cond_val})],
+            outputs: vec![serde_json::json!({"action": id})],
+            priority: None,
+            source_span_ids: vec![],
+            cell_refs: vec![],
+        }
+    }
+
+    #[test]
+    fn decision_table_rows_sorted_for_unique() {
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        let ctx = normalize_all(&mut dt);
+
+        assert_eq!(dt.rows[0].row_id.as_str(), "row_a");
+        assert_eq!(dt.rows[1].row_id.as_str(), "row_z");
+        assert!(ctx.rewrites.iter().any(|r| r.field == "rows"));
+    }
+
+    #[test]
+    fn decision_table_rows_preserved_for_priority() {
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Priority,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        normalize_all(&mut dt);
+
+        assert_eq!(dt.rows[0].row_id.as_str(), "row_z");
+        assert_eq!(dt.rows[1].row_id.as_str(), "row_a");
+    }
+
+    #[test]
+    fn decision_table_rows_preserved_for_first() {
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::First,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        normalize_all(&mut dt);
+
+        assert_eq!(dt.rows[0].row_id.as_str(), "row_z");
+        assert_eq!(dt.rows[1].row_id.as_str(), "row_a");
+    }
+
+    // -- ArgumentGraph: edges sorted --
+
+    #[test]
+    fn argument_graph_edges_sorted() {
+        let mut ag = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_test"),
+            arguments: vec![
+                serde_json::json!({"id": "z_arg"}),
+                serde_json::json!({"id": "a_arg"}),
+            ],
+            attack_edges: vec![
+                serde_json::json!({"from": "z", "to": "a"}),
+                serde_json::json!({"from": "a", "to": "z"}),
+            ],
+            support_edges: vec![],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+        };
+
+        let ctx = normalize_all(&mut ag);
+
+        assert_eq!(ag.arguments[0], serde_json::json!({"id": "a_arg"}));
+        assert_eq!(ag.arguments[1], serde_json::json!({"id": "z_arg"}));
+        assert_eq!(
+            ag.source_span_ids,
+            vec![SpanId::new("span_a"), SpanId::new("span_z")]
+        );
+        assert!(ctx.rewrites.iter().any(|r| r.field == "arguments"));
+        assert!(ctx.rewrites.iter().any(|r| r.field == "source_span_ids"));
+    }
+
+    // -- EventNarrative: type sets sorted, temporal preserved --
+
+    #[test]
+    fn event_narrative_type_sets_sorted_temporal_preserved() {
+        let mut en = EventNarrative {
+            event_types: vec!["detect_allergy".into(), "administer_drug".into()],
+            fluent_types: vec!["drug_active".into(), "allergy_known".into()],
+            happens: vec![
+                serde_json::json!({"event": "detect_allergy", "time": 0}),
+                serde_json::json!({"event": "administer_drug", "time": 10}),
+            ],
+            initiates: vec![serde_json::json!({"time": 0})],
+            terminates: vec![],
+            initially: vec![
+                serde_json::json!({"fluent": "z_fluent"}),
+                serde_json::json!({"fluent": "a_fluent"}),
+            ],
+            holds_queries: vec![],
+            source_span_ids: vec![],
+        };
+
+        let ctx = normalize_all(&mut en);
+
+        assert_eq!(en.event_types, vec!["administer_drug", "detect_allergy"]);
+        assert_eq!(en.fluent_types, vec!["allergy_known", "drug_active"]);
+        // Temporal fields preserved
+        assert_eq!(en.happens[0]["event"], "detect_allergy");
+        assert_eq!(en.happens[1]["event"], "administer_drug");
+        // initially sorted by canonical bytes
+        assert_eq!(en.initially[0]["fluent"], "a_fluent");
+        assert!(ctx.rewrites.iter().any(|r| r.field == "event_types"));
+    }
+
+    // -- WorkflowFragment: source_span_ids sorted, workflow preserved --
+
+    #[test]
+    fn workflow_fragment_span_ids_sorted_workflow_preserved() {
+        let mut wf = WorkflowFragment {
+            workflow_id: WorkflowId::new("wf_test"),
+            workflow_type: "epath".into(),
+            states: vec![
+                serde_json::json!({"id": "b"}),
+                serde_json::json!({"id": "a"}),
+            ],
+            transitions: vec![serde_json::json!({"from": "b", "to": "a"})],
+            outcomes: vec![],
+            assessments: vec![],
+            tasks: vec![],
+            variance_rules: vec![],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+        };
+
+        normalize_all(&mut wf);
+
+        // States/transitions preserve workflow order
+        assert_eq!(wf.states[0]["id"], "b");
+        assert_eq!(wf.states[1]["id"], "a");
+        // source_span_ids sorted
+        assert_eq!(
+            wf.source_span_ids,
+            vec![SpanId::new("span_a"), SpanId::new("span_z")]
+        );
+    }
+
+    // -- ExecutionWitness: trace preserved, sets sorted --
+
+    #[test]
+    fn execution_witness_trace_preserved_sets_sorted() {
+        let mut ew = ExecutionWitness {
+            witness_id: WitnessId::new("w_test"),
+            bundle_id: BundleId::new("b_test"),
+            case_id: None,
+            context_facts: vec![
+                serde_json::json!({"fact": "z"}),
+                serde_json::json!({"fact": "a"}),
+            ],
+            trace: vec![
+                serde_json::json!({"step": 2}),
+                serde_json::json!({"step": 1}),
+            ],
+            applicable_rules: vec![RuleId::new("rule_z"), RuleId::new("rule_a")],
+            defeated_rules: vec![],
+            violated_constraints: vec!["z_constraint".into(), "a_constraint".into()],
+            models: vec![],
+            unsat_cores: vec![],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            certificate_ids: vec![],
+        };
+
+        normalize_all(&mut ew);
+
+        // Trace preserved (temporal)
+        assert_eq!(ew.trace[0]["step"], 2);
+        assert_eq!(ew.trace[1]["step"], 1);
+        // Sets sorted
+        assert_eq!(ew.context_facts[0]["fact"], "a");
+        assert_eq!(
+            ew.applicable_rules,
+            vec![RuleId::new("rule_a"), RuleId::new("rule_z")]
+        );
+        assert_eq!(
+            ew.violated_constraints,
+            vec!["a_constraint", "z_constraint"]
+        );
+        assert_eq!(
+            ew.source_span_ids,
+            vec![SpanId::new("span_a"), SpanId::new("span_z")]
+        );
+    }
+
+    // -- Certificate: hashes sorted, diagnostics preserved --
+
+    #[test]
+    fn certificate_hashes_sorted_diagnostics_preserved() {
+        let mut cert = Certificate {
+            certificate_id: CertificateId::new("cert_test"),
+            certificate_class: CertificateClass::C4Executable,
+            input_artifact_hashes: vec![
+                ContentHash("sha256:zzzz".into()),
+                ContentHash("sha256:aaaa".into()),
+            ],
+            compiler_hash: None,
+            solver_or_checker: "z3".into(),
+            command_manifest: serde_json::json!({}),
+            result: "sat".into(),
+            proof_artifact_hashes: vec![],
+            replay_status: ReplayStatus::Passed,
+            diagnostics: vec![
+                serde_json::json!({"order": 2}),
+                serde_json::json!({"order": 1}),
+            ],
+        };
+
+        normalize_all(&mut cert);
+
+        assert_eq!(cert.input_artifact_hashes[0].as_str(), "sha256:aaaa");
+        assert_eq!(cert.input_artifact_hashes[1].as_str(), "sha256:zzzz");
+        // Diagnostics preserve temporal order
+        assert_eq!(cert.diagnostics[0]["order"], 2);
+    }
+
+    // -- EvidenceAtom: inner fields sorted --
+
+    #[test]
+    fn evidence_atom_inner_fields_sorted() {
+        let mut atom = EvidenceAtom {
+            evidence_type: "test".into(),
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            pico_ref: None,
+            effect_measure: None,
+            value: None,
+            unit: None,
+            confidence_interval: None,
+            certainty: EvidenceCertainty::Moderate,
+            outcome_importance: None,
+            table_cell_refs: vec![
+                TableCellRef {
+                    table_id: ExtractedTableId::new("tbl_b"),
+                    row: 0,
+                    col: 0,
+                },
+                TableCellRef {
+                    table_id: ExtractedTableId::new("tbl_a"),
+                    row: 0,
+                    col: 0,
+                },
+            ],
+        };
+
+        normalize_all(&mut atom);
+
+        assert_eq!(
+            atom.source_span_ids,
+            vec![SpanId::new("span_a"), SpanId::new("span_z")]
+        );
+        assert_eq!(atom.table_cell_refs[0].table_id.as_str(), "tbl_a");
+        assert_eq!(atom.table_cell_refs[1].table_id.as_str(), "tbl_b");
+    }
+
+    // -- PatientCase: events preserved, sets sorted --
+
+    #[test]
+    fn patient_case_events_preserved_sets_sorted() {
+        let mut pc = PatientCase {
+            case_id: CaseId::new("case_test"),
+            case_type: CaseType::Synthetic,
+            facts: vec![
+                serde_json::json!({"type": "z_fact"}),
+                serde_json::json!({"type": "a_fact"}),
+            ],
+            events: vec![
+                serde_json::json!({"time": 2}),
+                serde_json::json!({"time": 1}),
+            ],
+            observations: vec![],
+            medications: vec![],
+            conditions: vec![],
+            allergies: vec![],
+            time_origin: None,
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            privacy_status: "synthetic".into(),
+        };
+
+        normalize_all(&mut pc);
+
+        // Events preserved (temporal)
+        assert_eq!(pc.events[0]["time"], 2);
+        // Facts sorted
+        assert_eq!(pc.facts[0]["type"], "a_fact");
+        assert_eq!(
+            pc.source_span_ids,
+            vec![SpanId::new("span_a"), SpanId::new("span_z")]
+        );
     }
 }

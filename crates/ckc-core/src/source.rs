@@ -19,7 +19,7 @@ pub struct BBox {
 }
 
 /// Reference to a cell within an extracted table.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 pub struct TableCellRef {
     pub table_id: ExtractedTableId,
     pub row: u32,
