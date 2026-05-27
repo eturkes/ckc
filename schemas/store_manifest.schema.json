@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StoreManifest",
+  "description": "Deterministic inventory of all artifacts in a `ContentStore`.\n\nEntries are sorted by `hash` for deterministic canonical JSON bytes.\nThe manifest is itself content-hashable and storable as an\n`ArtifactKind::StoreManifest` envelope.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ManifestEntry"
+      }
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "$defs": {
+    "ArtifactKind": {
+      "description": "Tag enum discriminating all storable CKC artifact types.",
+      "type": "string",
+      "enum": [
+        "corpus_document",
+        "source_span",
+        "extracted_table",
+        "concept",
+        "clinical_claim",
+        "rule",
+        "decision_table",
+        "workflow_fragment",
+        "event_narrative",
+        "patient_case",
+        "execution_witness",
+        "conflict",
+        "argument_graph",
+        "certificate",
+        "assurance_node",
+        "audit_trace",
+        "store_manifest"
+      ]
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "ManifestEntry": {
+      "description": "One entry in a `StoreManifest`, summarizing a stored artifact.",
+      "type": "object",
+      "properties": {
+        "hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "kind": {
+          "$ref": "#/$defs/ArtifactKind"
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SemanticProfile"
+          }
+        },
+        "stage": {
+          "type": "string"
+        },
+        "stored_at_epoch": {
+          "description": "File modification time as seconds since Unix epoch.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "hash",
+        "kind",
+        "stage",
+        "profiles",
+        "stored_at_epoch"
+      ]
+    },
+    "SemanticProfile": {
+      "description": "CKC semantic profile (SPEC 9). Every CKC object declares which profiles\napply, determining allowed syntax, validators, compiler targets, and\ncertificate requirements.",
+      "type": "string",
+      "enum": [
+        "CKC-Text",
+        "CKC-Term",
+        "CKC-Evidence",
+        "CKC-Classical",
+        "CKC-Norm",
+        "CKC-Defeasible",
+        "CKC-Para",
+        "CKC-Temporal",
+        "CKC-Event",
+        "CKC-Quant",
+        "CKC-Decision",
+        "CKC-Workflow",
+        "CKC-Interop",
+        "CKC-Prob",
+        "CKC-Cert",
+        "CKC-Audit"
+      ]
+    }
+  }
+}

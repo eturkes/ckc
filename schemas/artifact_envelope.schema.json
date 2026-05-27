@@ -37,7 +37,8 @@
         "argument_graph",
         "certificate",
         "assurance_node",
-        "audit_trace"
+        "audit_trace",
+        "store_manifest"
       ]
     },
     "ArtifactMeta": {

@@ -1,8 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use ckc_core::canonical::{to_canonical_bytes, ContentHash};
-use ckc_core::envelope::ArtifactEnvelope;
+use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind};
+use ckc_core::profile::SemanticProfile;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[derive(Debug)]
@@ -45,6 +49,27 @@ impl From<serde_json::Error> for StoreError {
     }
 }
 
+/// One entry in a `StoreManifest`, summarizing a stored artifact.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ManifestEntry {
+    pub hash: ContentHash,
+    pub kind: ArtifactKind,
+    pub stage: String,
+    pub profiles: Vec<SemanticProfile>,
+    /// File modification time as seconds since Unix epoch.
+    pub stored_at_epoch: u64,
+}
+
+/// Deterministic inventory of all artifacts in a `ContentStore`.
+///
+/// Entries are sorted by `hash` for deterministic canonical JSON bytes.
+/// The manifest is itself content-hashable and storable as an
+/// `ArtifactKind::StoreManifest` envelope.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StoreManifest {
+    pub entries: Vec<ManifestEntry>,
+}
+
 /// Filesystem content-addressed store for CKC artifact envelopes.
 ///
 /// Objects live at `<root>/objects/<hex[0:2]>/<hex[2:4]>/<hex>.json`
@@ -74,12 +99,20 @@ impl ContentStore {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            // Atomic write: temp file then rename prevents partial objects.
             let tmp = path.with_extension("json.tmp");
             fs::write(&tmp, &bytes)?;
             fs::rename(&tmp, &path)?;
         }
         Ok(hash)
+    }
+
+    /// Store multiple envelopes. Returns their content hashes in the
+    /// same order as the input slice.
+    pub fn put_batch(
+        &self,
+        envelopes: &[ArtifactEnvelope],
+    ) -> Result<Vec<ContentHash>, StoreError> {
+        envelopes.iter().map(|e| self.put(e)).collect()
     }
 
     /// Read an envelope by its content hash.
@@ -99,6 +132,50 @@ impl ContentStore {
         let path = self.object_path(hash)?;
         let bytes = fs::read(&path)?;
         Ok(sha256_of_bytes(&bytes) == *hash)
+    }
+
+    /// Walk the store and produce a deterministic manifest of all stored
+    /// artifacts, sorted by content hash.
+    pub fn generate_manifest(&self) -> Result<StoreManifest, StoreError> {
+        let objects_dir = self.root.join("objects");
+        let mut entries = Vec::new();
+
+        if objects_dir.is_dir() {
+            Self::walk_objects(&objects_dir, &mut entries)?;
+        }
+
+        entries.sort_by(|a, b| a.hash.cmp(&b.hash));
+        Ok(StoreManifest { entries })
+    }
+
+    fn walk_objects(
+        dir: &Path,
+        entries: &mut Vec<ManifestEntry>,
+    ) -> Result<(), StoreError> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                Self::walk_objects(&path, entries)?;
+            } else if path.extension().is_some_and(|e| e == "json") {
+                let bytes = fs::read(&path)?;
+                let envelope: ArtifactEnvelope = serde_json::from_slice(&bytes)?;
+                let hash = sha256_of_bytes(&bytes);
+                let mtime_epoch = fs::metadata(&path)?
+                    .modified()?
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                entries.push(ManifestEntry {
+                    hash,
+                    kind: envelope.kind,
+                    stage: envelope.meta.stage.clone(),
+                    profiles: envelope.meta.semantic_profiles.clone(),
+                    stored_at_epoch: mtime_epoch,
+                });
+            }
+        }
+        Ok(())
     }
 
     fn object_path(&self, hash: &ContentHash) -> Result<PathBuf, StoreError> {
@@ -138,9 +215,8 @@ mod tests {
     use ckc_core::canonical::content_hash;
     use ckc_core::clinical::{Action, Norm, Rule};
     use ckc_core::enums::*;
-    use ckc_core::envelope::{ArtifactKind, ArtifactMeta};
+    use ckc_core::envelope::ArtifactMeta;
     use ckc_core::id::*;
-    use ckc_core::profile::SemanticProfile;
     use ckc_core::source::CorpusDocument;
     use ckc_core::verify::Conflict;
     use serde_json::json;
@@ -166,6 +242,13 @@ mod tests {
             ),
             certificate_ids: vec![],
             replay_command: None,
+        }
+    }
+
+    fn meta_with_profiles(stage: &str, profiles: Vec<SemanticProfile>) -> ArtifactMeta {
+        ArtifactMeta {
+            semantic_profiles: profiles,
+            ..meta(stage)
         }
     }
 
@@ -202,7 +285,11 @@ mod tests {
             provenance: "test".into(),
             certificate_ids: vec![],
         };
-        ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta("normalize"))
+        ArtifactEnvelope::wrap(
+            ArtifactKind::Rule,
+            &rule,
+            meta_with_profiles("normalize", vec![SemanticProfile::Norm]),
+        )
     }
 
     fn document_envelope() -> ArtifactEnvelope {
@@ -225,7 +312,11 @@ mod tests {
             supersedes: None,
             superseded_by: None,
         };
-        ArtifactEnvelope::wrap(ArtifactKind::CorpusDocument, &doc, meta("ingest"))
+        ArtifactEnvelope::wrap(
+            ArtifactKind::CorpusDocument,
+            &doc,
+            meta_with_profiles("ingest", vec![SemanticProfile::Text]),
+        )
     }
 
     fn conflict_envelope() -> ArtifactEnvelope {
@@ -343,7 +434,6 @@ mod tests {
         let (store, _tmp) = test_store();
         let envelope = rule_envelope();
         let hash = store.put(&envelope).unwrap();
-        // Corrupt the stored file by flipping the last byte.
         let hex = extract_hex(&hash).unwrap();
         let path = store
             .root()
@@ -454,5 +544,169 @@ mod tests {
         let stored = fs::read(&path).unwrap();
         let canonical = to_canonical_bytes(&envelope);
         assert_eq!(stored, canonical);
+    }
+
+    // -- put_batch --
+
+    #[test]
+    fn put_batch_stores_all() {
+        let (store, _tmp) = test_store();
+        let envelopes = [rule_envelope(), document_envelope(), conflict_envelope()];
+        let hashes = store.put_batch(&envelopes).unwrap();
+        assert_eq!(hashes.len(), 3);
+        for (env, hash) in envelopes.iter().zip(&hashes) {
+            assert!(store.exists(hash));
+            assert_eq!(&store.get(hash).unwrap(), env);
+        }
+    }
+
+    #[test]
+    fn put_batch_returns_hashes_in_input_order() {
+        let (store, _tmp) = test_store();
+        let envelopes = [rule_envelope(), document_envelope(), conflict_envelope()];
+        let batch_hashes = store.put_batch(&envelopes).unwrap();
+        let individual_hashes: Vec<_> = envelopes.iter().map(|e| store.put(e).unwrap()).collect();
+        assert_eq!(batch_hashes, individual_hashes);
+    }
+
+    #[test]
+    fn put_batch_empty() {
+        let (store, _tmp) = test_store();
+        let hashes = store.put_batch(&[]).unwrap();
+        assert!(hashes.is_empty());
+    }
+
+    // -- generate_manifest --
+
+    #[test]
+    fn manifest_empty_store() {
+        let (store, _tmp) = test_store();
+        let manifest = store.generate_manifest().unwrap();
+        assert!(manifest.entries.is_empty());
+    }
+
+    #[test]
+    fn manifest_contains_all_stored_artifacts() {
+        let (store, _tmp) = test_store();
+        let envelopes = [rule_envelope(), document_envelope(), conflict_envelope()];
+        let hashes = store.put_batch(&envelopes).unwrap();
+        let manifest = store.generate_manifest().unwrap();
+        assert_eq!(manifest.entries.len(), 3);
+        let manifest_hashes: Vec<_> = manifest.entries.iter().map(|e| &e.hash).collect();
+        for h in &hashes {
+            assert!(manifest_hashes.contains(&h));
+        }
+    }
+
+    #[test]
+    fn manifest_entries_sorted_by_hash() {
+        let (store, _tmp) = test_store();
+        store
+            .put_batch(&[rule_envelope(), document_envelope(), conflict_envelope()])
+            .unwrap();
+        let manifest = store.generate_manifest().unwrap();
+        let hashes: Vec<_> = manifest.entries.iter().map(|e| &e.hash).collect();
+        let mut sorted = hashes.clone();
+        sorted.sort();
+        assert_eq!(hashes, sorted);
+    }
+
+    #[test]
+    fn manifest_entry_metadata_correct() {
+        let (store, _tmp) = test_store();
+        let envelope = rule_envelope();
+        let hash = store.put(&envelope).unwrap();
+        let manifest = store.generate_manifest().unwrap();
+        assert_eq!(manifest.entries.len(), 1);
+        let entry = &manifest.entries[0];
+        assert_eq!(entry.hash, hash);
+        assert_eq!(entry.kind, ArtifactKind::Rule);
+        assert_eq!(entry.stage, "normalize");
+        assert_eq!(entry.profiles, vec![SemanticProfile::Norm]);
+        assert!(entry.stored_at_epoch > 0);
+    }
+
+    #[test]
+    fn manifest_deterministic_across_regeneration() {
+        let (store, _tmp) = test_store();
+        store
+            .put_batch(&[rule_envelope(), document_envelope(), conflict_envelope()])
+            .unwrap();
+        let m1 = store.generate_manifest().unwrap();
+        let m2 = store.generate_manifest().unwrap();
+        assert_eq!(
+            to_canonical_bytes(&m1),
+            to_canonical_bytes(&m2),
+            "consecutive manifest generations must produce identical canonical bytes"
+        );
+        assert_eq!(
+            content_hash(&m1),
+            content_hash(&m2),
+            "consecutive manifest generations must produce identical content hashes"
+        );
+    }
+
+    #[test]
+    fn manifest_hash_changes_after_new_artifact() {
+        let (store, _tmp) = test_store();
+        store.put(&rule_envelope()).unwrap();
+        let m1 = store.generate_manifest().unwrap();
+        let h1 = content_hash(&m1);
+        store.put(&document_envelope()).unwrap();
+        let m2 = store.generate_manifest().unwrap();
+        let h2 = content_hash(&m2);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn manifest_is_storable_as_envelope() {
+        let (store, _tmp) = test_store();
+        store
+            .put_batch(&[rule_envelope(), document_envelope()])
+            .unwrap();
+        let manifest = store.generate_manifest().unwrap();
+        let envelope = ArtifactEnvelope::wrap(
+            ArtifactKind::StoreManifest,
+            &manifest,
+            meta("manifest"),
+        );
+        let hash = store.put(&envelope).unwrap();
+        let got = store.get(&hash).unwrap();
+        assert_eq!(envelope, got);
+        let extracted: StoreManifest = got.extract().unwrap();
+        assert_eq!(manifest, extracted);
+    }
+
+    #[test]
+    fn manifest_serde_roundtrip() {
+        let manifest = StoreManifest {
+            entries: vec![
+                ManifestEntry {
+                    hash: ContentHash(
+                        "sha256:aa00000000000000000000000000000000000000000000000000000000000001"
+                            .into(),
+                    ),
+                    kind: ArtifactKind::Rule,
+                    stage: "normalize".into(),
+                    profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
+                    stored_at_epoch: 1716854400,
+                },
+                ManifestEntry {
+                    hash: ContentHash(
+                        "sha256:bb00000000000000000000000000000000000000000000000000000000000002"
+                            .into(),
+                    ),
+                    kind: ArtifactKind::CorpusDocument,
+                    stage: "ingest".into(),
+                    profiles: vec![SemanticProfile::Text],
+                    stored_at_epoch: 1716854401,
+                },
+            ],
+        };
+        let bytes = to_canonical_bytes(&manifest);
+        let rt: StoreManifest = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(manifest, rt);
+        let bytes2 = to_canonical_bytes(&rt);
+        assert_eq!(bytes, bytes2);
     }
 }
