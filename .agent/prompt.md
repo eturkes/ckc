@@ -1,4 +1,4 @@
-# Reusable Prompt
+You are developing CKC, a proof-carrying clinical knowledge compiler.
 
 ## Step 1: Orient
 
