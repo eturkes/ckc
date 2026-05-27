@@ -1,0 +1,1 @@
+{"applicable_rules":["rule_a","rule_z"],"bundle_id":"bundle_test","certificate_ids":[],"context_facts":[{"fact":"a_fact"},{"fact":"z_fact"}],"defeated_rules":[],"models":[],"source_span_ids":["span_w1","span_w2"],"trace":[{"step":1}],"unsat_cores":[],"violated_constraints":["a_constraint","z_constraint"],"witness_id":"nf-d4767a42cc2595d37f19824bac7f02f2"}

@@ -1,6 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::artifact::{
@@ -15,6 +16,7 @@ use crate::source::{
 };
 use crate::canonical::to_canonical_bytes;
 use crate::enums::{DeonticProjection, HitPolicy};
+use crate::id::SpanId;
 use crate::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -182,6 +184,58 @@ impl NfContext {
             });
         }
     }
+
+    /// Pass 12: set a stable ID derived from normalized content (with ID
+    /// blanked) and sorted source anchors. `content_with_blanked_id` must
+    /// be the RFC 8785 canonical bytes of the object after replacing its
+    /// primary ID field with an empty string.
+    pub fn set_stable_id(
+        &mut self,
+        field: &str,
+        id: &mut String,
+        content_with_blanked_id: &[u8],
+        source_span_ids: &[SpanId],
+    ) {
+        let stable = compute_stable_id(content_with_blanked_id, source_span_ids);
+        if *id != stable {
+            self.rewrites.push(NfRewrite {
+                pass: 12,
+                field: field.into(),
+                before: std::mem::take(id),
+                after: stable.clone(),
+            });
+            *id = stable;
+        }
+    }
+
+    /// Pass 13: sort accumulated diagnostics by (stage, code, message).
+    pub fn sort_diagnostics(&mut self) {
+        self.diagnostics.sort_by(|a, b| {
+            a.stage
+                .cmp(&b.stage)
+                .then(a.code.cmp(&b.code))
+                .then(a.message.cmp(&b.message))
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 12: stable ID computation
+// ---------------------------------------------------------------------------
+
+/// Compute a deterministic stable ID from normalized content bytes (with
+/// the object's primary ID blanked) and sorted source anchor IDs.
+/// Format: `nf-{32_lowercase_hex_chars}` (128-bit prefix of SHA-256).
+fn compute_stable_id(content_with_blanked_id: &[u8], source_span_ids: &[SpanId]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content_with_blanked_id);
+    for span_id in source_span_ids {
+        hasher.update(b"\x00");
+        hasher.update(span_id.as_str().as_bytes());
+    }
+    let digest = hasher.finalize();
+    let prefix = u128::from_be_bytes(digest[..16].try_into().unwrap());
+    format!("nf-{prefix:032x}")
 }
 
 // ---------------------------------------------------------------------------
@@ -218,9 +272,11 @@ pub fn normalize_text(s: &str) -> String {
 }
 
 /// Convenience: normalize a value in place and return the accumulated context.
+/// Applies Pass 13 (diagnostic ordering) after all type-level passes.
 pub fn normalize_all<T: Normalize>(value: &mut T) -> NfContext {
     let mut ctx = NfContext::new();
     value.normalize(&mut ctx);
+    ctx.sort_diagnostics();
     ctx
 }
 
@@ -441,6 +497,11 @@ impl Normalize for Concept {
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 8: terminology normalization (identity stub)
         self.term_normalize(ctx);
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.concept_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.concept_id.0 = saved;
+        ctx.set_stable_id("concept_id", &mut self.concept_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -478,6 +539,11 @@ impl Normalize for ClinicalClaim {
         ctx.sort_ord("rule_ids", &mut self.rule_ids);
         ctx.sort_ord("decision_table_ids", &mut self.decision_table_ids);
         ctx.sort_ord("workflow_fragment_ids", &mut self.workflow_fragment_ids);
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.claim_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.claim_id.0 = saved;
+        ctx.set_stable_id("claim_id", &mut self.claim_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -494,6 +560,11 @@ impl Normalize for Rule {
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: priority_over preserves priority chain order
+        // Pass 12: stable ID from normalized content + source anchors
+        let saved = std::mem::replace(&mut self.rule_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.rule_id.0 = saved;
+        ctx.set_stable_id("rule_id", &mut self.rule_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -531,6 +602,11 @@ impl Normalize for DecisionTable {
         }
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: input_columns, output_columns preserve column order
+        // Pass 12: stable ID (no direct source_span_ids on DecisionTable)
+        let saved = std::mem::replace(&mut self.table_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.table_id.0 = saved;
+        ctx.set_stable_id("table_id", &mut self.table_id.0, &content, &[]);
     }
 }
 
@@ -543,6 +619,11 @@ impl Normalize for Conflict {
         ctx.sort_ord("source_spans", &mut self.source_spans);
         ctx.sort_by_canonical("repair_candidates", &mut self.repair_candidates);
         ctx.sort_by_canonical("solver_evidence", &mut self.solver_evidence);
+        // Pass 12: stable ID (Conflict uses source_spans, not source_span_ids)
+        let saved = std::mem::replace(&mut self.conflict_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.conflict_id.0 = saved;
+        ctx.set_stable_id("conflict_id", &mut self.conflict_id.0, &content, &self.source_spans);
     }
 }
 
@@ -605,6 +686,11 @@ impl Normalize for WorkflowFragment {
         ctx.sort_graph("tasks", &mut self.tasks);
         ctx.sort_graph("variance_rules", &mut self.variance_rules);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.workflow_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.workflow_id.0 = saved;
+        ctx.set_stable_id("workflow_id", &mut self.workflow_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -628,6 +714,11 @@ impl Normalize for PatientCase {
         ctx.sort_by_canonical("allergies", &mut self.allergies);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 5: events preserves temporal order
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.case_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.case_id.0 = saved;
+        ctx.set_stable_id("case_id", &mut self.case_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -642,6 +733,11 @@ impl Normalize for ExecutionWitness {
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: trace preserves temporal execution order
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.witness_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.witness_id.0 = saved;
+        ctx.set_stable_id("witness_id", &mut self.witness_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -655,6 +751,11 @@ impl Normalize for ArgumentGraph {
         ctx.sort_graph("defeat_edges", &mut self.defeat_edges);
         ctx.sort_graph("extension_summaries", &mut self.extension_summaries);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
+        // Pass 12: stable ID
+        let saved = std::mem::replace(&mut self.argument_graph_id.0, String::new());
+        let content = to_canonical_bytes(self);
+        self.argument_graph_id.0 = saved;
+        ctx.set_stable_id("argument_graph_id", &mut self.argument_graph_id.0, &content, &self.source_span_ids);
     }
 }
 
@@ -963,7 +1064,8 @@ mod tests {
         assert_eq!(concept.label_ja, "βラクタム系 抗菌薬");
         assert_eq!(concept.label_en, Some("Beta-Lactam Antibiotics".into()));
         assert_eq!(concept.terminology_bindings[0].label, "βラクタム系 抗菌薬");
-        assert_eq!(ctx.rewrites.len(), 3);
+        assert_eq!(ctx.rewrites.len(), 4);
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "concept_id"));
     }
 
     // -- ClinicalClaim: glosses normalized --
@@ -994,7 +1096,8 @@ mod tests {
             claim.gloss_en,
             "Beta-lactam antibiotics are strongly recommended"
         );
-        assert_eq!(ctx.rewrites.len(), 2);
+        assert_eq!(ctx.rewrites.len(), 3);
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "claim_id"));
     }
 
     // -- Norm: original_modality_phrase_ja preserved --
@@ -1048,7 +1151,8 @@ mod tests {
         assert_eq!(dt.input_columns[0], "体温 (\u{00B0}C)");
         assert_eq!(dt.input_columns[1], "心拍数");
         assert_eq!(dt.output_columns[0], "アラート レベル");
-        assert_eq!(ctx.rewrites.len(), 2);
+        assert_eq!(ctx.rewrites.len(), 3);
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "table_id"));
     }
 
     // -- ExtractedTable: headers normalized --
@@ -2109,14 +2213,15 @@ mod tests {
             source_span_ids: vec![SpanId::new("span_s1")],
         };
 
-        let before_hash = crate::canonical::content_hash(&concept);
         let ctx = normalize_all(&mut concept);
-        let after_hash = crate::canonical::content_hash(&concept);
 
-        assert_eq!(before_hash, after_hash,
-            "terminology normalization identity must produce no content change");
+        // Pass 8 (terminology normalization) is identity at schema v0
         assert!(!ctx.rewrites.iter().any(|r| r.pass == 8),
             "identity stub must record no rewrites");
+        // Pass 12 generates a stable ID (the only non-identity change
+        // for an already-canonical concept)
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "concept_id"));
+        assert!(concept.concept_id.as_str().starts_with("nf-"));
     }
 
     #[test]
@@ -2623,5 +2728,463 @@ mod tests {
             content_hash(&wf_b),
             "WorkflowFragments with shuffled states/transitions must produce identical NF digest"
         );
+    }
+
+    // ===================================================================
+    // Pass 12 tests: stable ID generation
+    // ===================================================================
+
+    #[test]
+    fn pass12_rule_gets_stable_id() {
+        let mut rule = make_rule(
+            "(dx sepsis) AND (adult patient)",
+            "sepsis AND adult_patient",
+            vec![SpanId::new("span_s1")],
+        );
+        let original_id = rule.rule_id.as_str().to_string();
+        let ctx = normalize_all(&mut rule);
+
+        assert!(rule.rule_id.as_str().starts_with("nf-"));
+        assert_ne!(rule.rule_id.as_str(), original_id);
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "rule_id"));
+    }
+
+    #[test]
+    fn pass12_stable_id_deterministic() {
+        let mut rule_a = make_rule("test", "test", vec![SpanId::new("span_1")]);
+        let mut rule_b = make_rule("test", "test", vec![SpanId::new("span_1")]);
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        assert_eq!(
+            rule_a.rule_id, rule_b.rule_id,
+            "identical rules must produce identical stable IDs"
+        );
+    }
+
+    #[test]
+    fn pass12_different_content_different_id() {
+        let mut rule_a = make_rule("A", "ctx_a", vec![SpanId::new("span_1")]);
+        let mut rule_b = make_rule("B", "ctx_b", vec![SpanId::new("span_1")]);
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        assert_ne!(
+            rule_a.rule_id, rule_b.rule_id,
+            "rules with different content must produce different stable IDs"
+        );
+    }
+
+    #[test]
+    fn pass12_different_spans_different_id() {
+        let mut rule_a = make_rule("test", "test", vec![SpanId::new("span_1")]);
+        let mut rule_b = make_rule("test", "test", vec![SpanId::new("span_2")]);
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        assert_ne!(
+            rule_a.rule_id, rule_b.rule_id,
+            "rules with different source anchors must produce different stable IDs"
+        );
+    }
+
+    #[test]
+    fn pass12_already_stable_no_rewrite() {
+        let mut rule = make_rule("test", "test", vec![SpanId::new("span_1")]);
+        normalize_all(&mut rule);
+        let stable_id = rule.rule_id.clone();
+
+        let ctx = normalize_all(&mut rule);
+
+        assert_eq!(rule.rule_id, stable_id, "stable ID must persist across normalizations");
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 12),
+            "re-normalization with stable ID must record no pass 12 rewrite");
+    }
+
+    #[test]
+    fn pass12_commutative_variants_same_stable_id() {
+        use crate::canonical::content_hash;
+
+        let mut rule_a = make_rule(
+            "(adult patient) AND (dx sepsis)",
+            "adult_patient AND sepsis",
+            vec![SpanId::new("span_s1")],
+        );
+        let mut rule_b = make_rule(
+            "(dx sepsis) AND (adult patient)",
+            "sepsis AND adult_patient",
+            vec![SpanId::new("span_s1")],
+        );
+
+        normalize_all(&mut rule_a);
+        normalize_all(&mut rule_b);
+
+        assert_eq!(
+            rule_a.rule_id, rule_b.rule_id,
+            "commutative antecedent variants must produce identical stable IDs"
+        );
+        assert_eq!(content_hash(&rule_a), content_hash(&rule_b));
+    }
+
+    #[test]
+    fn pass12_decision_table_stable_id() {
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_original"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![make_decision_row("row_a", 37)],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        normalize_all(&mut dt);
+
+        assert!(dt.table_id.as_str().starts_with("nf-"));
+    }
+
+    #[test]
+    fn pass12_argument_graph_stable_id() {
+        let mut ag = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_original"),
+            arguments: vec![serde_json::json!({"id": "arg_1"})],
+            attack_edges: vec![],
+            support_edges: vec![],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![],
+            source_span_ids: vec![SpanId::new("span_s1")],
+        };
+
+        normalize_all(&mut ag);
+
+        assert!(ag.argument_graph_id.as_str().starts_with("nf-"));
+    }
+
+    #[test]
+    fn pass12_conflict_stable_id() {
+        let mut conflict = Conflict {
+            conflict_id: ConflictId::new("original"),
+            conflict_type: "norm_contradiction".into(),
+            severity: Severity::High,
+            confidence: 0.95,
+            minimal_artifact_set: vec![],
+            source_spans: vec![SpanId::new("span_s1")],
+            normalized_view: serde_json::json!({}),
+            witness: None,
+            repair_candidates: vec![],
+            solver_evidence: vec![],
+            argument_graph_id: None,
+            human_review_question_ja: "テスト".into(),
+            human_review_question_en: "test".into(),
+            classification: ConflictClassification::TrueConflict,
+        };
+
+        normalize_all(&mut conflict);
+
+        assert!(conflict.conflict_id.as_str().starts_with("nf-"));
+    }
+
+    #[test]
+    fn pass12_stable_id_format_length() {
+        let mut rule = make_rule("test", "test", vec![SpanId::new("span_1")]);
+        normalize_all(&mut rule);
+
+        let id = rule.rule_id.as_str();
+        assert!(id.starts_with("nf-"), "stable ID must start with 'nf-'");
+        assert_eq!(id.len(), 35, "stable ID must be 35 chars: 'nf-' + 32 hex");
+        assert!(id[3..].chars().all(|c| c.is_ascii_hexdigit()),
+            "stable ID suffix must be lowercase hex");
+    }
+
+    // ===================================================================
+    // Pass 13 tests: diagnostic ordering
+    // ===================================================================
+
+    #[test]
+    fn pass13_diagnostics_sorted() {
+        let mut ctx = NfContext::new();
+        ctx.diagnostics.push(NfDiagnostic {
+            stage: "z_stage".into(),
+            code: "a_code".into(),
+            message: "msg".into(),
+        });
+        ctx.diagnostics.push(NfDiagnostic {
+            stage: "a_stage".into(),
+            code: "z_code".into(),
+            message: "msg".into(),
+        });
+        ctx.diagnostics.push(NfDiagnostic {
+            stage: "a_stage".into(),
+            code: "a_code".into(),
+            message: "z_msg".into(),
+        });
+        ctx.diagnostics.push(NfDiagnostic {
+            stage: "a_stage".into(),
+            code: "a_code".into(),
+            message: "a_msg".into(),
+        });
+
+        ctx.sort_diagnostics();
+
+        assert_eq!(ctx.diagnostics[0].stage, "a_stage");
+        assert_eq!(ctx.diagnostics[0].code, "a_code");
+        assert_eq!(ctx.diagnostics[0].message, "a_msg");
+        assert_eq!(ctx.diagnostics[1].message, "z_msg");
+        assert_eq!(ctx.diagnostics[2].code, "z_code");
+        assert_eq!(ctx.diagnostics[3].stage, "z_stage");
+    }
+
+    #[test]
+    fn pass13_empty_diagnostics_no_error() {
+        let mut ctx = NfContext::new();
+        ctx.sort_diagnostics();
+        assert!(ctx.diagnostics.is_empty());
+    }
+
+    // ===================================================================
+    // NF idempotency tests: NF(NF(x)) == NF(x)
+    // ===================================================================
+
+    #[test]
+    fn idempotent_rule() {
+        use crate::canonical::content_hash;
+
+        let mut rule = make_rule(
+            "(dx sepsis) AND (adult patient)",
+            "sepsis AND adult_patient",
+            vec![SpanId::new("span_z"), SpanId::new("span_a")],
+        );
+        normalize_all(&mut rule);
+        let hash_after_first = content_hash(&rule);
+        let bytes_after_first = to_canonical_bytes(&rule);
+
+        normalize_all(&mut rule);
+        let hash_after_second = content_hash(&rule);
+        let bytes_after_second = to_canonical_bytes(&rule);
+
+        assert_eq!(hash_after_first, hash_after_second, "NF(NF(rule)) must equal NF(rule)");
+        assert_eq!(bytes_after_first, bytes_after_second);
+    }
+
+    #[test]
+    fn idempotent_clinical_claim() {
+        use crate::canonical::content_hash;
+
+        let mut claim = ClinicalClaim {
+            claim_id: ClaimId::new("claim_test"),
+            claim_type: "recommendation".into(),
+            profiles: vec![SemanticProfile::Norm, SemanticProfile::Evidence],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            pico: None,
+            etd: None,
+            evidence_atoms: vec![],
+            rule_ids: vec![RuleId::new("rule_z"), RuleId::new("rule_a")],
+            decision_table_ids: vec![],
+            workflow_fragment_ids: vec![],
+            gloss_ja: "βラクタム系\u{3000}抗菌薬".into(),
+            gloss_en: "Beta-lactam  antibiotics".into(),
+            status: "candidate".into(),
+        };
+        normalize_all(&mut claim);
+        let hash1 = content_hash(&claim);
+
+        normalize_all(&mut claim);
+        let hash2 = content_hash(&claim);
+
+        assert_eq!(hash1, hash2, "NF(NF(claim)) must equal NF(claim)");
+    }
+
+    #[test]
+    fn idempotent_decision_table() {
+        use crate::canonical::content_hash;
+
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["体温\u{3000}".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![
+                make_decision_row("row_z", 39),
+                make_decision_row("row_a", 37),
+            ],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+        normalize_all(&mut dt);
+        let hash1 = content_hash(&dt);
+
+        normalize_all(&mut dt);
+        let hash2 = content_hash(&dt);
+
+        assert_eq!(hash1, hash2, "NF(NF(decision_table)) must equal NF(decision_table)");
+    }
+
+    #[test]
+    fn idempotent_argument_graph() {
+        use crate::canonical::content_hash;
+
+        let mut ag = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_test"),
+            arguments: vec![
+                serde_json::json!({"id": "z_arg"}),
+                serde_json::json!({"id": "a_arg"}),
+            ],
+            attack_edges: vec![
+                serde_json::json!({"from": "z", "to": "a"}),
+                serde_json::json!({"from": "a", "to": "z"}),
+            ],
+            support_edges: vec![],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+        };
+        normalize_all(&mut ag);
+        let hash1 = content_hash(&ag);
+
+        normalize_all(&mut ag);
+        let hash2 = content_hash(&ag);
+
+        assert_eq!(hash1, hash2, "NF(NF(argument_graph)) must equal NF(argument_graph)");
+    }
+
+    #[test]
+    fn idempotent_workflow_fragment() {
+        use crate::canonical::content_hash;
+
+        let mut wf = WorkflowFragment {
+            workflow_id: WorkflowId::new("wf_test"),
+            workflow_type: "epath".into(),
+            states: vec![
+                serde_json::json!({"id": "b"}),
+                serde_json::json!({"id": "a"}),
+            ],
+            transitions: vec![],
+            outcomes: vec![],
+            assessments: vec![],
+            tasks: vec![],
+            variance_rules: vec![],
+            source_span_ids: vec![SpanId::new("span_2"), SpanId::new("span_1")],
+        };
+        normalize_all(&mut wf);
+        let hash1 = content_hash(&wf);
+
+        normalize_all(&mut wf);
+        let hash2 = content_hash(&wf);
+
+        assert_eq!(hash1, hash2, "NF(NF(workflow)) must equal NF(workflow)");
+    }
+
+    #[test]
+    fn idempotent_conflict() {
+        use crate::canonical::content_hash;
+
+        let mut conflict = Conflict {
+            conflict_id: ConflictId::new("conflict_test"),
+            conflict_type: "norm_contradiction".into(),
+            severity: Severity::High,
+            confidence: 0.9,
+            minimal_artifact_set: vec![],
+            source_spans: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            normalized_view: serde_json::json!({}),
+            witness: None,
+            repair_candidates: vec![],
+            solver_evidence: vec![],
+            argument_graph_id: None,
+            human_review_question_ja: "テスト\u{3000}質問".into(),
+            human_review_question_en: "test  question".into(),
+            classification: ConflictClassification::TrueConflict,
+        };
+        normalize_all(&mut conflict);
+        let hash1 = content_hash(&conflict);
+
+        normalize_all(&mut conflict);
+        let hash2 = content_hash(&conflict);
+
+        assert_eq!(hash1, hash2, "NF(NF(conflict)) must equal NF(conflict)");
+    }
+
+    #[test]
+    fn idempotent_patient_case() {
+        use crate::canonical::content_hash;
+
+        let mut pc = PatientCase {
+            case_id: CaseId::new("case_test"),
+            case_type: CaseType::Synthetic,
+            facts: vec![
+                serde_json::json!({"type": "z_fact"}),
+                serde_json::json!({"type": "a_fact"}),
+            ],
+            events: vec![serde_json::json!({"time": 1})],
+            observations: vec![],
+            medications: vec![],
+            conditions: vec![],
+            allergies: vec![],
+            time_origin: None,
+            source_span_ids: vec![SpanId::new("span_1")],
+            privacy_status: "synthetic".into(),
+        };
+        normalize_all(&mut pc);
+        let hash1 = content_hash(&pc);
+
+        normalize_all(&mut pc);
+        let hash2 = content_hash(&pc);
+
+        assert_eq!(hash1, hash2, "NF(NF(patient_case)) must equal NF(patient_case)");
+    }
+
+    #[test]
+    fn idempotent_execution_witness() {
+        use crate::canonical::content_hash;
+
+        let mut ew = ExecutionWitness {
+            witness_id: WitnessId::new("w_test"),
+            bundle_id: BundleId::new("b_test"),
+            case_id: None,
+            context_facts: vec![serde_json::json!({"fact": "z"}), serde_json::json!({"fact": "a"})],
+            trace: vec![serde_json::json!({"step": 1})],
+            applicable_rules: vec![RuleId::new("rule_z"), RuleId::new("rule_a")],
+            defeated_rules: vec![],
+            violated_constraints: vec![],
+            models: vec![],
+            unsat_cores: vec![],
+            source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
+            certificate_ids: vec![],
+        };
+        normalize_all(&mut ew);
+        let hash1 = content_hash(&ew);
+
+        normalize_all(&mut ew);
+        let hash2 = content_hash(&ew);
+
+        assert_eq!(hash1, hash2, "NF(NF(execution_witness)) must equal NF(execution_witness)");
+    }
+
+    #[test]
+    fn idempotent_concept() {
+        use crate::canonical::content_hash;
+
+        let mut concept = Concept {
+            concept_id: ConceptId::new("concept_test"),
+            label_ja: "βラクタム系\u{3000}抗菌薬".into(),
+            label_en: Some("Beta-Lactam  Antibiotics".into()),
+            semantic_type: "drug_class".into(),
+            terminology_bindings: vec![],
+            egraph_class_id: None,
+            source_span_ids: vec![SpanId::new("span_1")],
+        };
+        normalize_all(&mut concept);
+        let hash1 = content_hash(&concept);
+
+        normalize_all(&mut concept);
+        let hash2 = content_hash(&concept);
+
+        assert_eq!(hash1, hash2, "NF(NF(concept)) must equal NF(concept)");
     }
 }

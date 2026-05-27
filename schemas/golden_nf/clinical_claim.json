@@ -1,0 +1,1 @@
+{"claim_id":"nf-552fb030ec85623ba9eec26511eb18b9","claim_type":"recommendation","decision_table_ids":[],"evidence_atoms":[],"gloss_en":"Beta-lactam antibiotics are strongly recommended","gloss_ja":"βラクタム系 抗菌薬の投与を強く推奨する","profiles":["CKC-Evidence","CKC-Norm"],"rule_ids":["rule_a","rule_z"],"source_span_ids":["span_s1","span_s2"],"status":"candidate","workflow_fragment_ids":[]}

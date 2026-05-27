@@ -1,0 +1,1 @@
+{"allergies":[{"substance":"beta_lactam"}],"case_id":"nf-31b38194ec0edfc488dad2269cf02b69","case_type":"synthetic","conditions":[],"events":[{"time":1,"type":"admission"}],"facts":[{"type":"a_fact"},{"type":"z_fact"}],"medications":[],"observations":[],"privacy_status":"synthetic","source_span_ids":["span_c1","span_c2"]}

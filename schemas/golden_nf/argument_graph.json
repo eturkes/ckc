@@ -1,0 +1,1 @@
+{"argument_graph_id":"nf-0de1cc45255bec0fa603d7601362d09f","arguments":[{"claim":"administer","id":"arg_recommend"},{"claim":"withhold","id":"arg_contraindicate"}],"attack_edges":[{"from":"arg_contraindicate","to":"arg_recommend"}],"defeat_edges":[],"extension_summaries":[],"source_span_ids":["span_s1","span_s2"],"support_edges":[],"undercut_edges":[]}
