@@ -18,9 +18,9 @@ roadmap. Commit the updated roadmap and end the session.
 
 **Type B — Complete one subtask:** The next incomplete top-level task already
 has subtasks. This session completes exactly one subtask: the first incomplete
-one. Do the work, commit, and mark the subtask `[x]` in the roadmap. If it
-was the last incomplete subtask, also mark the parent top-level task `[x]`.
-Commit the roadmap update and end the session.
+one. Do the work, then mark the subtask `[x]` in the roadmap (and the parent
+top-level task `[x]` if it was the last incomplete subtask). Stage everything
+and make a single commit covering both the task work and the roadmap update.
 
 **Type C — Create next Phase:** Every top-level task in the current Phase is
 `[x]`, and the next Phase has no top-level tasks listed yet. This session is
