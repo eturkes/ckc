@@ -1,12 +1,5 @@
 # Agent Memory
 
-Cross-session scratchpad for CKC development. Contains only information that
-future sessions and subagents require but cannot derive from SPEC.md, CLAUDE.md,
-the codebase, git history, config files, tool `--version` output, or the
-runtime environment.
-
-Prune entries when they become obsolete or newly derivable.
-
 ## Decisions
 
 ## Lessons
