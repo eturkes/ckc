@@ -19,5 +19,14 @@ technically derivable but easily forgotten under token pressure.
   all content written to files must be token-efficient for future LLM readers.
   Self-audit this balance before committing; the user expects it done
   proactively.
+- [2026-05-27] When a mistake is caught after the fact, record it here so
+  future sessions avoid repeating it. Verify tool operations against their
+  actual output before reporting success.
+
+## Mistakes
+
+- [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
+  silently miss case variants. Always read the result or verify match count
+  covers all intended occurrences.
 
 ## Open Questions
