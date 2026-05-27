@@ -155,6 +155,12 @@ version = "0.0.0"
 [[package]]
 name = "ckc-store"
 version = "0.0.0"
+dependencies = [
+ "ckc-core",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
 
 [[package]]
 name = "ckc-term"

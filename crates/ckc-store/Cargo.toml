@@ -3,3 +3,13 @@ name = "ckc-store"
 version = "0.0.0"
 edition.workspace = true
 license.workspace = true
+
+[dependencies]
+ckc-core = { path = "../ckc-core" }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+ckc-core = { path = "../ckc-core", features = [] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
