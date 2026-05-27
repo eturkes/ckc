@@ -8,7 +8,7 @@ Build `CKC`: a research-grade, proof-carrying clinical knowledge compiler for Ja
 
 Initial artifact: a headless system plus a small bilingual JA/EN result UI. The system ingests Japanese clinical text, extracts and indexes all textual content and every textual span, formalizes clinically relevant statements into deterministic executable representations, and reports source-grounded logical incompatibilities or factual inconsistencies that warrant human revision of the source text.
 
-Initial operating mode: text-quality and formalization QA for research, not live clinical care. All outputs are review candidates for clinician/formalist adjudication. Later CDS/SaMD deployment may discard the implementation while preserving CKC schemas, normal forms, corpora, terminology alignments, proof artifacts, conflict datasets, evaluation evidence, and assurance cases.
+Initial operating mode: text-quality and formalization QA restricted to research use. All outputs are review candidates for clinician/formalist adjudication. Later CDS/SaMD deployment may discard the implementation while preserving CKC schemas, normal forms, corpora, terminology alignments, proof artifacts, conflict datasets, evaluation evidence, and assurance cases.
 
 Ultimate ambition: a layered Japanese clinical knowledge corpus that can later evaluate EHR state, clinician notes, pharmacology, comorbidity, temporal trajectories, multimodal observations, and hospital workflow hooks under a regulated CDS/SaMD lifecycle. Keep late-stage architecture fluid; protect the formal evidence chain.
 
@@ -57,7 +57,7 @@ Future bridge code is demonstrative in this phase. Clinical deployment requires 
 
 ## 3. Distilled domain commitments
 
-This file is self-contained and immutable. You are to receive the designated commitments as the authoritative synthesis of the domain research. The underlying documents comprising this research will not be provided. Pivot from a commitment only if you identify a superior alternative during development, making note of it in a separate file and designating this file as a historical initial draft.
+This file is self-contained and immutable. You are to receive the designated commitments as the authoritative synthesis of the domain research. The underlying documents comprising this research are unavailable. Pivot from a commitment only if you identify a superior alternative during development, making note of it in a separate file and designating this file as a historical initial draft.
 
 Core commitments:
 
@@ -347,7 +347,7 @@ Invariants:
 
 ### 11.1 Executable witness semantics
 
-CKC is executable through target backends, not by trusting natural-language explanations. Each executable profile must define one of these witness forms: `sat_model`, `unsat_core`, `asp_model`, `prolog_justification`, `decision_table_witness`, `event_trace`, `workflow_trace`, `shacl_report`, `owl_explanation`, `lean_theorem`, or `adjudication_record`. Each witness must map target symbols back to CKC node IDs and source spans. Future EHR execution uses the same witness schema with `PatientCase` inputs.
+CKC is executable exclusively through target backends. Each executable profile must define one of these witness forms: `sat_model`, `unsat_core`, `asp_model`, `prolog_justification`, `decision_table_witness`, `event_trace`, `workflow_trace`, `shacl_report`, `owl_explanation`, `lean_theorem`, or `adjudication_record`. Each witness must map target symbols back to CKC node IDs and source spans. Future EHR execution uses the same witness schema with `PatientCase` inputs.
 
 ## 12. Semantic firewall and certificates
 
@@ -721,7 +721,7 @@ Acceptance:
 - repeated runs produce identical accepted artifact hashes;
 - every verifier output maps to source spans;
 - accepted Lean files compile with zero `sorry` or `admit`;
-- report JSON renders without live services;
+- report JSON renders from static artifacts alone;
 - backend disagreement appears as a structured diagnostic.
 
 ### Phase 1: extraction and span registry
@@ -762,7 +762,7 @@ Acceptance: every UI claim links to source spans and evidence artifact hashes; m
 
 ### Phase 7: future CDS/SaMD bridge
 
-Deliver non-production stubs: JP Core patient-context adapter, SS-MIX2-to-JP-Core mapping notes, ePath/BPMN export prototype, audit-event mapping, drift monitor skeleton, and assurance-case extension. These stubs demonstrate continuity without clinical-use deployment.
+Deliver non-production stubs: JP Core patient-context adapter, SS-MIX2-to-JP-Core mapping notes, ePath/BPMN export prototype, audit-event mapping, drift monitor skeleton, and assurance-case extension. These stubs demonstrate design continuity only.
 
 ## 21. UI requirements
 
@@ -834,7 +834,7 @@ Generate automatically:
 - limitations ledger;
 - reproducibility package manifest.
 
-Bound manuscript claim: CKC identifies formally checkable candidate inconsistencies in Japanese clinical texts with deterministic, source-grounded, proof-carrying evidence. It claims review support rather than autonomous clinical correctness.
+Bound manuscript claim: CKC identifies formally checkable candidate inconsistencies in Japanese clinical texts with deterministic, source-grounded, proof-carrying evidence. It claims review support; clinical correctness authority belongs to human adjudicators.
 
 ## 24. Mandate compliance checklist
 
@@ -845,7 +845,7 @@ Before project initiation and before each phase transition, verify that the repo
 - CKC accepted artifacts are deterministic, explainable, verifiable, executable, and replayable.
 - Logical incompatibilities and factual inconsistencies are phrased as source-text revision candidates.
 - The UI is bilingual, read-only, evidence-first, and research-only.
-- Coding-agent autonomy applies to implementation details, while stack choices, semantic profiles, normal forms, evidence chains, and evaluation obligations remain stable unless an experiment-backed spec update replaces them.
+- Coding-agent autonomy applies to implementation details, while stack choices, semantic profiles, normal forms, evidence chains, and evaluation obligations remain stable; changes require an experiment-backed spec update.
 - Future EHR/CDS/SaMD ambitions influence abstractions but remain outside initial clinical deployment scope.
 
 ## 25. Immediate first task
@@ -862,4 +862,4 @@ The command creates accepted CKC Normal Form JSON, canonical hash manifest, sour
 
 Then run the same command twice and prove identical accepted artifact hashes.
 
-Keep Phase 0 small. Make every concept explicit enough that later phases can expand without changing the evidence chain.
+Keep Phase 0 small. Make every concept explicit enough that later phases can expand while preserving the evidence chain.
