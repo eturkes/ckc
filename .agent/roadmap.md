@@ -8,10 +8,6 @@ single lines.
 
 - [x] 0.1 Project scaffold
 - [ ] 0.2 CKC schema v0 (SPEC 10)
-  - [ ] 0.2a Shared primitives/enums + source/terminology types (CorpusDocument, SourceSpan, ExtractedTable, Concept, TerminologyBinding)
-  - [ ] 0.2b Claim/rule/norm types (ClinicalClaim, PICOFrame, EtDFrame, EvidenceAtom, Rule, Norm, Action)
-  - [ ] 0.2c Decision/workflow/execution types (DecisionTable, DecisionRow, WorkflowFragment, EventNarrative, PatientCase, ExecutionWitness)
-  - [ ] 0.2d Verification/assurance types (Conflict, ArgumentGraph, Certificate, AssuranceNode, AuditTrace) + JSON Schema tests
 - [ ] 0.3 Normal Form (SPEC 11)
 - [ ] 0.4 Content-addressed store
 - [ ] 0.5 Toy fixtures (SPEC 20 Phase 0 scenarios)
