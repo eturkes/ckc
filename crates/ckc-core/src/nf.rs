@@ -14,7 +14,7 @@ use crate::source::{
     TerminologyBinding,
 };
 use crate::canonical::to_canonical_bytes;
-use crate::enums::HitPolicy;
+use crate::enums::{DeonticProjection, HitPolicy};
 use crate::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -97,9 +97,13 @@ impl NfContext {
         });
     }
 
-    /// Sort a `Vec<T: Serialize>` by RFC 8785 canonical JSON byte comparison.
-    /// Record a rewrite when order changes.
-    pub fn sort_by_canonical<T: Serialize>(&mut self, field: &str, values: &mut Vec<T>) {
+    fn sort_by_canonical_impl<T: Serialize>(
+        &mut self,
+        pass: u8,
+        field: &str,
+        desc: &str,
+        values: &mut Vec<T>,
+    ) {
         if values.len() <= 1 {
             return;
         }
@@ -114,13 +118,25 @@ impl NfContext {
         if !already_sorted {
             keyed.sort_by(|a, b| a.0.cmp(&b.0));
             self.rewrites.push(NfRewrite {
-                pass: 4,
+                pass,
                 field: field.into(),
                 before: format!("{} items", keyed.len()),
-                after: "sorted by canonical bytes".into(),
+                after: desc.into(),
             });
         }
         values.extend(keyed.into_iter().map(|(_, v)| v));
+    }
+
+    /// Sort a `Vec<T: Serialize>` by RFC 8785 canonical JSON byte comparison.
+    /// Record a rewrite when order changes.
+    pub fn sort_by_canonical<T: Serialize>(&mut self, field: &str, values: &mut Vec<T>) {
+        self.sort_by_canonical_impl(4, field, "sorted by canonical bytes", values);
+    }
+
+    /// Pass 11: sort graph elements by canonical bytes for stable graph
+    /// canonicalization. Used for ArgumentGraph and WorkflowFragment arrays.
+    pub fn sort_graph<T: Serialize>(&mut self, field: &str, values: &mut Vec<T>) {
+        self.sort_by_canonical_impl(11, field, "sorted for graph canonicalization", values);
     }
 
     /// Sort commutative AND/OR operands in a string expression.
@@ -318,6 +334,33 @@ fn normalize_json_units(v: &mut Value) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Pass 9: Japanese clinical modality lexicon (stub)
+// ---------------------------------------------------------------------------
+
+/// Look up a Japanese clinical modality phrase in the toy-scenario lexicon.
+/// Returns the canonical `DeonticProjection` for recognized phrases.
+/// Uses NFKC-normalized comparison for fullwidth/spacing tolerance.
+///
+/// This stub covers the minimal phrase set for Phase 0 toy scenarios.
+/// Later phases expand coverage using corpus-derived phrase extraction.
+fn modality_lexicon(phrase: &str) -> Option<DeonticProjection> {
+    let normalized = normalize_text(phrase);
+    match normalized.as_str() {
+        "投与を推奨する" | "投与を強く推奨する" | "使用を推奨する" | "使用を提案する" => {
+            Some(DeonticProjection::Recommended)
+        }
+        "投与すべきである" | "使用すべきである" => Some(DeonticProjection::Obligatory),
+        "投与してはならない" | "使用してはならない" | "禁忌である"
+        | "投与しないことを推奨する" | "使用しないことを推奨する" => {
+            Some(DeonticProjection::Prohibited)
+        }
+        "投与を考慮してもよい" | "使用を考慮してもよい" => Some(DeonticProjection::Permitted),
+        "投与は任意である" | "使用は任意である" => Some(DeonticProjection::Optional),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Normalize trait
 // ---------------------------------------------------------------------------
 
@@ -458,6 +501,18 @@ impl Normalize for Norm {
     fn normalize(&mut self, ctx: &mut NfContext) {
         // Pass 1: original_modality_phrase_ja preserved verbatim
         self.action.normalize(ctx);
+        // Pass 9: normalize deontic projection through modality lexicon
+        if let Some(canonical) = modality_lexicon(&self.original_modality_phrase_ja) {
+            if self.deontic_projection != canonical {
+                ctx.rewrites.push(NfRewrite {
+                    pass: 9,
+                    field: "deontic_projection".into(),
+                    before: format!("{:?}", self.deontic_projection).to_ascii_lowercase(),
+                    after: format!("{:?}", canonical).to_ascii_lowercase(),
+                });
+                self.deontic_projection = canonical;
+            }
+        }
     }
 }
 
@@ -527,6 +582,13 @@ impl Normalize for EvidenceAtom {
 
 impl Normalize for DecisionRow {
     fn normalize(&mut self, ctx: &mut NfContext) {
+        // Pass 10: normalize cell Value trees (unit normalization)
+        for (i, cond) in self.conditions.iter_mut().enumerate() {
+            ctx.normalize_units(&format!("conditions[{i}]"), cond);
+        }
+        for (i, out) in self.outputs.iter_mut().enumerate() {
+            ctx.normalize_units(&format!("outputs[{i}]"), out);
+        }
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("cell_refs", &mut self.cell_refs);
         // Pass 5: conditions, outputs preserve column correspondence
@@ -535,9 +597,14 @@ impl Normalize for DecisionRow {
 
 impl Normalize for WorkflowFragment {
     fn normalize(&mut self, ctx: &mut NfContext) {
+        // Pass 11: stable graph canonicalization by canonical bytes
+        ctx.sort_graph("states", &mut self.states);
+        ctx.sort_graph("transitions", &mut self.transitions);
+        ctx.sort_graph("outcomes", &mut self.outcomes);
+        ctx.sort_graph("assessments", &mut self.assessments);
+        ctx.sort_graph("tasks", &mut self.tasks);
+        ctx.sort_graph("variance_rules", &mut self.variance_rules);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 5: states, transitions, outcomes, assessments, tasks,
-        //         variance_rules preserve workflow sequence
     }
 }
 
@@ -580,12 +647,13 @@ impl Normalize for ExecutionWitness {
 
 impl Normalize for ArgumentGraph {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        ctx.sort_by_canonical("arguments", &mut self.arguments);
-        ctx.sort_by_canonical("attack_edges", &mut self.attack_edges);
-        ctx.sort_by_canonical("support_edges", &mut self.support_edges);
-        ctx.sort_by_canonical("undercut_edges", &mut self.undercut_edges);
-        ctx.sort_by_canonical("defeat_edges", &mut self.defeat_edges);
-        ctx.sort_by_canonical("extension_summaries", &mut self.extension_summaries);
+        // Pass 11: stable graph canonicalization by canonical bytes
+        ctx.sort_graph("arguments", &mut self.arguments);
+        ctx.sort_graph("attack_edges", &mut self.attack_edges);
+        ctx.sort_graph("support_edges", &mut self.support_edges);
+        ctx.sort_graph("undercut_edges", &mut self.undercut_edges);
+        ctx.sort_graph("defeat_edges", &mut self.defeat_edges);
+        ctx.sort_graph("extension_summaries", &mut self.extension_summaries);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
     }
 }
@@ -1482,10 +1550,10 @@ mod tests {
         assert!(ctx.rewrites.iter().any(|r| r.field == "event_types"));
     }
 
-    // -- WorkflowFragment: source_span_ids sorted, workflow preserved --
+    // -- WorkflowFragment: graph canonicalized (pass 11) --
 
     #[test]
-    fn workflow_fragment_span_ids_sorted_workflow_preserved() {
+    fn workflow_fragment_graph_canonicalized() {
         let mut wf = WorkflowFragment {
             workflow_id: WorkflowId::new("wf_test"),
             workflow_type: "epath".into(),
@@ -1493,24 +1561,39 @@ mod tests {
                 serde_json::json!({"id": "b"}),
                 serde_json::json!({"id": "a"}),
             ],
-            transitions: vec![serde_json::json!({"from": "b", "to": "a"})],
-            outcomes: vec![],
+            transitions: vec![
+                serde_json::json!({"from": "b", "to": "a"}),
+                serde_json::json!({"from": "a", "to": "b"}),
+            ],
+            outcomes: vec![
+                serde_json::json!({"id": "z_outcome"}),
+                serde_json::json!({"id": "a_outcome"}),
+            ],
             assessments: vec![],
             tasks: vec![],
             variance_rules: vec![],
             source_span_ids: vec![SpanId::new("span_z"), SpanId::new("span_a")],
         };
 
-        normalize_all(&mut wf);
+        let ctx = normalize_all(&mut wf);
 
-        // States/transitions preserve workflow order
-        assert_eq!(wf.states[0]["id"], "b");
-        assert_eq!(wf.states[1]["id"], "a");
-        // source_span_ids sorted
+        // Pass 11: states sorted by canonical bytes
+        assert_eq!(wf.states[0]["id"], "a");
+        assert_eq!(wf.states[1]["id"], "b");
+        // Pass 11: transitions sorted by canonical bytes
+        assert_eq!(wf.transitions[0]["from"], "a");
+        assert_eq!(wf.transitions[1]["from"], "b");
+        // Pass 11: outcomes sorted
+        assert_eq!(wf.outcomes[0]["id"], "a_outcome");
+        assert_eq!(wf.outcomes[1]["id"], "z_outcome");
+        // source_span_ids sorted (pass 4)
         assert_eq!(
             wf.source_span_ids,
             vec![SpanId::new("span_a"), SpanId::new("span_z")]
         );
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "states"));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "transitions"));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "outcomes"));
     }
 
     // -- ExecutionWitness: trace preserved, sets sorted --
@@ -2074,5 +2157,471 @@ mod tests {
 
         assert_eq!(before_hash, after_hash,
             "canonical action must be unchanged by NF pipeline");
+    }
+
+    // ===================================================================
+    // Pass 9 tests: Japanese clinical modality lexicon
+    // ===================================================================
+
+    #[test]
+    fn modality_lexicon_recommended_phrases() {
+        assert_eq!(modality_lexicon("投与を推奨する"), Some(DeonticProjection::Recommended));
+        assert_eq!(modality_lexicon("投与を強く推奨する"), Some(DeonticProjection::Recommended));
+        assert_eq!(modality_lexicon("使用を推奨する"), Some(DeonticProjection::Recommended));
+        assert_eq!(modality_lexicon("使用を提案する"), Some(DeonticProjection::Recommended));
+    }
+
+    #[test]
+    fn modality_lexicon_obligatory_phrases() {
+        assert_eq!(modality_lexicon("投与すべきである"), Some(DeonticProjection::Obligatory));
+        assert_eq!(modality_lexicon("使用すべきである"), Some(DeonticProjection::Obligatory));
+    }
+
+    #[test]
+    fn modality_lexicon_prohibited_phrases() {
+        assert_eq!(modality_lexicon("投与してはならない"), Some(DeonticProjection::Prohibited));
+        assert_eq!(modality_lexicon("使用してはならない"), Some(DeonticProjection::Prohibited));
+        assert_eq!(modality_lexicon("禁忌である"), Some(DeonticProjection::Prohibited));
+        assert_eq!(modality_lexicon("投与しないことを推奨する"), Some(DeonticProjection::Prohibited));
+        assert_eq!(modality_lexicon("使用しないことを推奨する"), Some(DeonticProjection::Prohibited));
+    }
+
+    #[test]
+    fn modality_lexicon_permitted_phrases() {
+        assert_eq!(modality_lexicon("投与を考慮してもよい"), Some(DeonticProjection::Permitted));
+        assert_eq!(modality_lexicon("使用を考慮してもよい"), Some(DeonticProjection::Permitted));
+    }
+
+    #[test]
+    fn modality_lexicon_optional_phrases() {
+        assert_eq!(modality_lexicon("投与は任意である"), Some(DeonticProjection::Optional));
+        assert_eq!(modality_lexicon("使用は任意である"), Some(DeonticProjection::Optional));
+    }
+
+    #[test]
+    fn modality_lexicon_unrecognized() {
+        assert_eq!(modality_lexicon("何か別の表現"), None);
+        assert_eq!(modality_lexicon(""), None);
+    }
+
+    #[test]
+    fn modality_lexicon_fullwidth_tolerance() {
+        // Leading/trailing ideographic spaces and fullwidth ASCII are
+        // normalized before lookup
+        assert_eq!(
+            modality_lexicon("\u{3000}投与を推奨する\u{3000}"),
+            Some(DeonticProjection::Recommended),
+        );
+        // Fullwidth katakana in a phrase is NFKC-normalized
+        assert_eq!(
+            modality_lexicon("禁忌である"),
+            Some(DeonticProjection::Prohibited),
+        );
+    }
+
+    #[test]
+    fn norm_pass9_corrects_projection() {
+        let mut norm = Norm {
+            context: "test".into(),
+            direction: RecommendationDirection::For,
+            action: Action {
+                action_type: "administer".into(),
+                target_concept: ConceptId::new("concept_test"),
+                parameters: serde_json::Value::Null,
+                temporal_constraints: serde_json::Value::Null,
+                quantity_constraints: serde_json::Value::Null,
+            },
+            recommendation_strength: RecommendationStrength::Strong,
+            evidence_certainty: EvidenceCertainty::Moderate,
+            original_modality_phrase_ja: "投与すべきである".into(),
+            // Intentionally wrong: phrase says obligatory, field says recommended
+            deontic_projection: DeonticProjection::Recommended,
+            exception_policy: "none".into(),
+            prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+        };
+
+        let ctx = normalize_all(&mut norm);
+
+        assert_eq!(norm.deontic_projection, DeonticProjection::Obligatory);
+        assert_eq!(norm.original_modality_phrase_ja, "投与すべきである");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 9
+            && r.field == "deontic_projection"
+            && r.before == "recommended"
+            && r.after == "obligatory"));
+    }
+
+    #[test]
+    fn norm_pass9_matching_projection_no_rewrite() {
+        let mut norm = Norm {
+            context: "test".into(),
+            direction: RecommendationDirection::For,
+            action: Action {
+                action_type: "administer".into(),
+                target_concept: ConceptId::new("concept_test"),
+                parameters: serde_json::Value::Null,
+                temporal_constraints: serde_json::Value::Null,
+                quantity_constraints: serde_json::Value::Null,
+            },
+            recommendation_strength: RecommendationStrength::Strong,
+            evidence_certainty: EvidenceCertainty::Moderate,
+            original_modality_phrase_ja: "投与を推奨する".into(),
+            deontic_projection: DeonticProjection::Recommended,
+            exception_policy: "none".into(),
+            prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+        };
+
+        let ctx = normalize_all(&mut norm);
+
+        assert_eq!(norm.deontic_projection, DeonticProjection::Recommended);
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 9));
+    }
+
+    #[test]
+    fn norm_pass9_unrecognized_phrase_no_rewrite() {
+        let mut norm = Norm {
+            context: "test".into(),
+            direction: RecommendationDirection::For,
+            action: Action {
+                action_type: "administer".into(),
+                target_concept: ConceptId::new("concept_test"),
+                parameters: serde_json::Value::Null,
+                temporal_constraints: serde_json::Value::Null,
+                quantity_constraints: serde_json::Value::Null,
+            },
+            recommendation_strength: RecommendationStrength::Strong,
+            evidence_certainty: EvidenceCertainty::Moderate,
+            original_modality_phrase_ja: "未知の表現".into(),
+            deontic_projection: DeonticProjection::Recommended,
+            exception_policy: "none".into(),
+            prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+        };
+
+        let ctx = normalize_all(&mut norm);
+
+        assert_eq!(norm.deontic_projection, DeonticProjection::Recommended);
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 9));
+    }
+
+    #[test]
+    fn norm_pass9_prohibited_contraindication() {
+        let mut norm = Norm {
+            context: "allergy_context".into(),
+            direction: RecommendationDirection::Against,
+            action: Action {
+                action_type: "administer".into(),
+                target_concept: ConceptId::new("concept_beta_lactam"),
+                parameters: serde_json::Value::Null,
+                temporal_constraints: serde_json::Value::Null,
+                quantity_constraints: serde_json::Value::Null,
+            },
+            recommendation_strength: RecommendationStrength::Strong,
+            evidence_certainty: EvidenceCertainty::High,
+            original_modality_phrase_ja: "禁忌である".into(),
+            deontic_projection: DeonticProjection::Recommended,
+            exception_policy: "absolute".into(),
+            prima_facie_or_all_things_considered: NormCommitment::AllThingsConsidered,
+        };
+
+        let ctx = normalize_all(&mut norm);
+
+        assert_eq!(norm.deontic_projection, DeonticProjection::Prohibited);
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 9));
+    }
+
+    // ===================================================================
+    // Pass 10 tests: decision table cell normalization
+    // ===================================================================
+
+    #[test]
+    fn decision_row_cell_units_normalized() {
+        let mut row = DecisionRow {
+            row_id: DecisionRowId::new("row_test"),
+            conditions: vec![
+                serde_json::json!({"field": "temperature", "unit": "degC", "op": ">=", "value": 38.0}),
+                serde_json::json!({"field": "heart_rate", "unit": "bpm", "op": ">=", "value": 90}),
+            ],
+            outputs: vec![
+                serde_json::json!({"dose": {"value": 500, "unit": "ml"}}),
+            ],
+            priority: None,
+            source_span_ids: vec![],
+            cell_refs: vec![],
+        };
+
+        let ctx = normalize_all(&mut row);
+
+        assert_eq!(row.conditions[0]["unit"], "Cel");
+        assert_eq!(row.conditions[1]["unit"], "/min");
+        assert_eq!(row.outputs[0]["dose"]["unit"], "mL");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "conditions[0]"));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "conditions[1]"));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "outputs[0]"));
+    }
+
+    #[test]
+    fn decision_row_canonical_units_no_rewrite() {
+        let mut row = DecisionRow {
+            row_id: DecisionRowId::new("row_test"),
+            conditions: vec![
+                serde_json::json!({"field": "temperature", "unit": "Cel", "value": 38.0}),
+            ],
+            outputs: vec![
+                serde_json::json!({"dose": {"value": 500, "unit": "mL"}}),
+            ],
+            priority: None,
+            source_span_ids: vec![],
+            cell_refs: vec![],
+        };
+
+        let ctx = normalize_all(&mut row);
+
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 7));
+    }
+
+    #[test]
+    fn decision_table_cell_normalization_through_rows() {
+        let mut dt = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![
+                DecisionRow {
+                    row_id: DecisionRowId::new("row_a"),
+                    conditions: vec![serde_json::json!({"temp_unit": "degC"})],
+                    outputs: vec![serde_json::json!({"dose_unit": "ml"})],
+                    priority: None,
+                    source_span_ids: vec![],
+                    cell_refs: vec![],
+                },
+            ],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        let ctx = normalize_all(&mut dt);
+
+        assert_eq!(dt.rows[0].conditions[0]["temp_unit"], "Cel");
+        assert_eq!(dt.rows[0].outputs[0]["dose_unit"], "mL");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 7));
+    }
+
+    #[test]
+    fn gate_decision_table_unit_variants_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut dt_a = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![DecisionRow {
+                row_id: DecisionRowId::new("row_1"),
+                conditions: vec![serde_json::json!({"unit": "Cel"})],
+                outputs: vec![serde_json::json!({"unit": "mL"})],
+                priority: None,
+                source_span_ids: vec![],
+                cell_refs: vec![],
+            }],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+        let mut dt_b = DecisionTable {
+            table_id: DecisionTableId::new("dt_test"),
+            hit_policy: HitPolicy::Unique,
+            input_columns: vec!["temp".into()],
+            output_columns: vec!["action".into()],
+            rows: vec![DecisionRow {
+                row_id: DecisionRowId::new("row_1"),
+                conditions: vec![serde_json::json!({"unit": "degC"})],
+                outputs: vec![serde_json::json!({"unit": "ml"})],
+                priority: None,
+                source_span_ids: vec![],
+                cell_refs: vec![],
+            }],
+            source_table_id: None,
+            dmn_export_id: None,
+            certificate_ids: vec![],
+        };
+
+        normalize_all(&mut dt_a);
+        normalize_all(&mut dt_b);
+
+        assert_eq!(
+            to_canonical_bytes(&dt_a),
+            to_canonical_bytes(&dt_b),
+            "DecisionTables with unit variants must produce identical NF bytes"
+        );
+        assert_eq!(
+            content_hash(&dt_a),
+            content_hash(&dt_b),
+            "DecisionTables with unit variants must produce identical NF digest"
+        );
+    }
+
+    // ===================================================================
+    // Pass 11 tests: graph canonicalization
+    // ===================================================================
+
+    #[test]
+    fn sort_graph_records_pass_11() {
+        let mut ctx = NfContext::new();
+        let mut vals = vec![
+            serde_json::json!({"id": "z"}),
+            serde_json::json!({"id": "a"}),
+        ];
+        ctx.sort_graph("nodes", &mut vals);
+
+        assert_eq!(vals[0], serde_json::json!({"id": "a"}));
+        assert_eq!(vals[1], serde_json::json!({"id": "z"}));
+        assert_eq!(ctx.rewrites.len(), 1);
+        assert_eq!(ctx.rewrites[0].pass, 11);
+        assert_eq!(ctx.rewrites[0].field, "nodes");
+    }
+
+    #[test]
+    fn sort_graph_already_sorted_no_rewrite() {
+        let mut ctx = NfContext::new();
+        let mut vals = vec![
+            serde_json::json!({"id": "a"}),
+            serde_json::json!({"id": "z"}),
+        ];
+        ctx.sort_graph("nodes", &mut vals);
+        assert!(ctx.rewrites.is_empty());
+    }
+
+    #[test]
+    fn argument_graph_uses_pass_11() {
+        let mut ag = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_test"),
+            arguments: vec![
+                serde_json::json!({"id": "z_arg"}),
+                serde_json::json!({"id": "a_arg"}),
+            ],
+            attack_edges: vec![
+                serde_json::json!({"from": "z", "to": "a"}),
+                serde_json::json!({"from": "a", "to": "z"}),
+            ],
+            support_edges: vec![],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![],
+            source_span_ids: vec![],
+        };
+
+        let ctx = normalize_all(&mut ag);
+
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "arguments"));
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "attack_edges"));
+    }
+
+    #[test]
+    fn gate_argument_graph_shuffled_edges_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut ag_a = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_test"),
+            arguments: vec![
+                serde_json::json!({"id": "arg_1", "claim": "recommend"}),
+                serde_json::json!({"id": "arg_2", "claim": "contraindicate"}),
+            ],
+            attack_edges: vec![
+                serde_json::json!({"from": "arg_1", "to": "arg_2"}),
+                serde_json::json!({"from": "arg_2", "to": "arg_1"}),
+            ],
+            support_edges: vec![serde_json::json!({"from": "ev_1", "to": "arg_1"})],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![serde_json::json!({"type": "grounded", "args": ["arg_1"]})],
+            source_span_ids: vec![SpanId::new("span_s1"), SpanId::new("span_s2")],
+        };
+        let mut ag_b = ArgumentGraph {
+            argument_graph_id: ArgumentGraphId::new("ag_test"),
+            arguments: vec![
+                serde_json::json!({"id": "arg_2", "claim": "contraindicate"}),
+                serde_json::json!({"id": "arg_1", "claim": "recommend"}),
+            ],
+            attack_edges: vec![
+                serde_json::json!({"from": "arg_2", "to": "arg_1"}),
+                serde_json::json!({"from": "arg_1", "to": "arg_2"}),
+            ],
+            support_edges: vec![serde_json::json!({"from": "ev_1", "to": "arg_1"})],
+            undercut_edges: vec![],
+            defeat_edges: vec![],
+            extension_summaries: vec![serde_json::json!({"type": "grounded", "args": ["arg_1"]})],
+            source_span_ids: vec![SpanId::new("span_s2"), SpanId::new("span_s1")],
+        };
+
+        normalize_all(&mut ag_a);
+        normalize_all(&mut ag_b);
+
+        assert_eq!(
+            to_canonical_bytes(&ag_a),
+            to_canonical_bytes(&ag_b),
+            "ArgumentGraphs with shuffled nodes/edges must produce identical NF bytes"
+        );
+        assert_eq!(
+            content_hash(&ag_a),
+            content_hash(&ag_b),
+            "ArgumentGraphs with shuffled nodes/edges must produce identical NF digest"
+        );
+    }
+
+    #[test]
+    fn gate_workflow_shuffled_states_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let mut wf_a = WorkflowFragment {
+            workflow_id: WorkflowId::new("wf_test"),
+            workflow_type: "epath".into(),
+            states: vec![
+                serde_json::json!({"id": "triage", "label": "トリアージ"}),
+                serde_json::json!({"id": "abx_admin", "label": "抗菌薬投与"}),
+                serde_json::json!({"id": "monitoring", "label": "経過観察"}),
+            ],
+            transitions: vec![
+                serde_json::json!({"from": "triage", "to": "abx_admin"}),
+                serde_json::json!({"from": "abx_admin", "to": "monitoring"}),
+            ],
+            outcomes: vec![serde_json::json!({"id": "recovery"})],
+            assessments: vec![],
+            tasks: vec![serde_json::json!({"id": "blood_culture"})],
+            variance_rules: vec![],
+            source_span_ids: vec![SpanId::new("span_p1")],
+        };
+        let mut wf_b = WorkflowFragment {
+            workflow_id: WorkflowId::new("wf_test"),
+            workflow_type: "epath".into(),
+            states: vec![
+                serde_json::json!({"id": "monitoring", "label": "経過観察"}),
+                serde_json::json!({"id": "triage", "label": "トリアージ"}),
+                serde_json::json!({"id": "abx_admin", "label": "抗菌薬投与"}),
+            ],
+            transitions: vec![
+                serde_json::json!({"from": "abx_admin", "to": "monitoring"}),
+                serde_json::json!({"from": "triage", "to": "abx_admin"}),
+            ],
+            outcomes: vec![serde_json::json!({"id": "recovery"})],
+            assessments: vec![],
+            tasks: vec![serde_json::json!({"id": "blood_culture"})],
+            variance_rules: vec![],
+            source_span_ids: vec![SpanId::new("span_p1")],
+        };
+
+        normalize_all(&mut wf_a);
+        normalize_all(&mut wf_b);
+
+        assert_eq!(
+            to_canonical_bytes(&wf_a),
+            to_canonical_bytes(&wf_b),
+            "WorkflowFragments with shuffled states/transitions must produce identical NF bytes"
+        );
+        assert_eq!(
+            content_hash(&wf_a),
+            content_hash(&wf_b),
+            "WorkflowFragments with shuffled states/transitions must produce identical NF digest"
+        );
     }
 }
