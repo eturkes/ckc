@@ -41,5 +41,9 @@ technically derivable but easily forgotten under token pressure.
   already being in memory. The preference was read at session start but
   overridden by system-prompt habits. Final message after the last commit
   must contain only the roadmap commit confirmation — nothing else.
+- [2026-05-27] Repeated the same end-of-session summary mistake a third
+  time. The system prompt's "end-of-turn summary" directive is strong
+  enough to override even explicit memory entries. The final tool call of
+  a session must be the roadmap commit; emit zero text after it.
 
 ## Open Questions
