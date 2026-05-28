@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 /// CKC semantic profile (SPEC 9). Every CKC object declares which profiles
 /// apply, determining allowed syntax, validators, compiler targets, and
 /// certificate requirements.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 pub enum SemanticProfile {
     #[serde(rename = "CKC-Text")]
     Text,

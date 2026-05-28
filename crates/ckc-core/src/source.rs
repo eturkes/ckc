@@ -19,7 +19,9 @@ pub struct BBox {
 }
 
 /// Reference to a cell within an extracted table.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 pub struct TableCellRef {
     pub table_id: ExtractedTableId,
     pub row: u32,
@@ -171,7 +173,9 @@ mod tests {
             publication_date: Some("2024-03-01".into()),
             access_date: Some("2026-05-01".into()),
             license_status: "permitted_research".into(),
-            content_hash: ContentHash("sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".into()),
+            content_hash: ContentHash(
+                "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".into(),
+            ),
             extraction_manifest_id: ManifestId::new("manifest_sepsis_gl_2024"),
             supersedes: None,
             superseded_by: None,
@@ -233,8 +237,7 @@ mod tests {
                 confidence: 0.92,
             }],
             normalized_table_hash: ContentHash(
-                "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-                    .into(),
+                "sha256:1111111111111111111111111111111111111111111111111111111111111111".into(),
             ),
         }
     }

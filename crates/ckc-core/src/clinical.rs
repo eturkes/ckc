@@ -467,7 +467,10 @@ mod tests {
             "certificate_ids": []
         }"#;
         let result = serde_json::from_str::<Rule>(json);
-        assert!(result.is_err(), "invalid profile must reject deserialization");
+        assert!(
+            result.is_err(),
+            "invalid profile must reject deserialization"
+        );
     }
 
     #[test]
@@ -486,7 +489,10 @@ mod tests {
             "status": "test"
         }"#;
         let result = serde_json::from_str::<ClinicalClaim>(json);
-        assert!(result.is_err(), "invalid profile must reject deserialization");
+        assert!(
+            result.is_err(),
+            "invalid profile must reject deserialization"
+        );
     }
 
     // -- Cross-type referential consistency --

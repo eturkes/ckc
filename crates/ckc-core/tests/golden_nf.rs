@@ -1,5 +1,5 @@
 use ckc_core::artifact::*;
-use ckc_core::canonical::{to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, to_canonical_bytes};
 use ckc_core::clinical::*;
 use ckc_core::enums::*;
 use ckc_core::id::*;
@@ -147,7 +147,9 @@ fn fixture_decision_table() -> DecisionTable {
         rows: vec![
             DecisionRow {
                 row_id: DecisionRowId::new("row_z"),
-                conditions: vec![serde_json::json!({"field": "temp", "unit": "degC", "op": ">=", "value": 38.0})],
+                conditions: vec![
+                    serde_json::json!({"field": "temp", "unit": "degC", "op": ">=", "value": 38.0}),
+                ],
                 outputs: vec![serde_json::json!({"dose": {"value": 500, "unit": "ml"}})],
                 priority: None,
                 source_span_ids: vec![],
@@ -155,7 +157,9 @@ fn fixture_decision_table() -> DecisionTable {
             },
             DecisionRow {
                 row_id: DecisionRowId::new("row_a"),
-                conditions: vec![serde_json::json!({"field": "temp", "unit": "Cel", "value": 37.0})],
+                conditions: vec![
+                    serde_json::json!({"field": "temp", "unit": "Cel", "value": 37.0}),
+                ],
                 outputs: vec![serde_json::json!({"action": "normal"})],
                 priority: None,
                 source_span_ids: vec![],
@@ -224,7 +228,8 @@ fn fixture_conflict() -> Conflict {
         solver_evidence: vec![],
         argument_graph_id: None,
         human_review_question_ja: "βラクタムアレルギー患者への\u{3000}投与について".into(),
-        human_review_question_en: "Regarding  administration  to  beta-lactam  allergic  patients".into(),
+        human_review_question_en: "Regarding  administration  to  beta-lactam  allergic  patients"
+            .into(),
         classification: ConflictClassification::TrueConflict,
     }
 }
@@ -273,14 +278,34 @@ fn fixture_execution_witness() -> ExecutionWitness {
 // ---------------------------------------------------------------------------
 
 golden_nf_test!(gnf_rule, fixture_rule, "rule.json");
-golden_nf_test!(gnf_clinical_claim, fixture_clinical_claim, "clinical_claim.json");
+golden_nf_test!(
+    gnf_clinical_claim,
+    fixture_clinical_claim,
+    "clinical_claim.json"
+);
 golden_nf_test!(gnf_concept, fixture_concept, "concept.json");
-golden_nf_test!(gnf_decision_table, fixture_decision_table, "decision_table.json");
-golden_nf_test!(gnf_workflow_fragment, fixture_workflow_fragment, "workflow_fragment.json");
-golden_nf_test!(gnf_argument_graph, fixture_argument_graph, "argument_graph.json");
+golden_nf_test!(
+    gnf_decision_table,
+    fixture_decision_table,
+    "decision_table.json"
+);
+golden_nf_test!(
+    gnf_workflow_fragment,
+    fixture_workflow_fragment,
+    "workflow_fragment.json"
+);
+golden_nf_test!(
+    gnf_argument_graph,
+    fixture_argument_graph,
+    "argument_graph.json"
+);
 golden_nf_test!(gnf_conflict, fixture_conflict, "conflict.json");
 golden_nf_test!(gnf_patient_case, fixture_patient_case, "patient_case.json");
-golden_nf_test!(gnf_execution_witness, fixture_execution_witness, "execution_witness.json");
+golden_nf_test!(
+    gnf_execution_witness,
+    fixture_execution_witness,
+    "execution_witness.json"
+);
 
 // ---------------------------------------------------------------------------
 // Regeneration (ignored by default; run manually to update golden files)
@@ -292,16 +317,80 @@ fn regenerate() {
     let dir = golden_dir();
     std::fs::create_dir_all(&dir).unwrap();
 
-    let fixtures: Vec<(&str, Box<dyn FnOnce() -> Vec<u8>>)> = vec![
-        ("rule.json", Box::new(|| { let mut v = fixture_rule(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("clinical_claim.json", Box::new(|| { let mut v = fixture_clinical_claim(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("concept.json", Box::new(|| { let mut v = fixture_concept(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("decision_table.json", Box::new(|| { let mut v = fixture_decision_table(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("workflow_fragment.json", Box::new(|| { let mut v = fixture_workflow_fragment(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("argument_graph.json", Box::new(|| { let mut v = fixture_argument_graph(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("conflict.json", Box::new(|| { let mut v = fixture_conflict(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("patient_case.json", Box::new(|| { let mut v = fixture_patient_case(); normalize_all(&mut v); to_canonical_bytes(&v) })),
-        ("execution_witness.json", Box::new(|| { let mut v = fixture_execution_witness(); normalize_all(&mut v); to_canonical_bytes(&v) })),
+    type Fixture = (&'static str, Box<dyn FnOnce() -> Vec<u8>>);
+    let fixtures: Vec<Fixture> = vec![
+        (
+            "rule.json",
+            Box::new(|| {
+                let mut v = fixture_rule();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "clinical_claim.json",
+            Box::new(|| {
+                let mut v = fixture_clinical_claim();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "concept.json",
+            Box::new(|| {
+                let mut v = fixture_concept();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "decision_table.json",
+            Box::new(|| {
+                let mut v = fixture_decision_table();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "workflow_fragment.json",
+            Box::new(|| {
+                let mut v = fixture_workflow_fragment();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "argument_graph.json",
+            Box::new(|| {
+                let mut v = fixture_argument_graph();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "conflict.json",
+            Box::new(|| {
+                let mut v = fixture_conflict();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "patient_case.json",
+            Box::new(|| {
+                let mut v = fixture_patient_case();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
+        (
+            "execution_witness.json",
+            Box::new(|| {
+                let mut v = fixture_execution_witness();
+                normalize_all(&mut v);
+                to_canonical_bytes(&v)
+            }),
+        ),
     ];
 
     for (name, make) in fixtures {

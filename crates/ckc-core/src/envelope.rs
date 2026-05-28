@@ -2,13 +2,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::canonical::{content_hash, ContentHash};
+use crate::canonical::{ContentHash, content_hash};
 use crate::id::CertificateId;
 use crate::profile::SemanticProfile;
 
 /// Tag enum discriminating all storable CKC artifact types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactKind {
     CorpusDocument,
@@ -70,14 +69,9 @@ impl ArtifactEnvelope {
     /// Build an envelope from a typed artifact. Computes the artifact's
     /// content hash and stores it in `meta.content_hash`, overwriting any
     /// prior value.
-    pub fn wrap<T: Serialize>(
-        kind: ArtifactKind,
-        artifact: &T,
-        meta: ArtifactMeta,
-    ) -> Self {
+    pub fn wrap<T: Serialize>(kind: ArtifactKind, artifact: &T, meta: ArtifactMeta) -> Self {
         let inner_hash = content_hash(artifact);
-        let payload =
-            serde_json::to_value(artifact).expect("CKC types must be serializable");
+        let payload = serde_json::to_value(artifact).expect("CKC types must be serializable");
         Self {
             kind,
             meta: ArtifactMeta {
@@ -94,9 +88,7 @@ impl ArtifactEnvelope {
     }
 
     /// Deserialize the payload into a typed artifact.
-    pub fn extract<T: serde::de::DeserializeOwned>(
-        &self,
-    ) -> Result<T, serde_json::Error> {
+    pub fn extract<T: serde::de::DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
         serde_json::from_value(self.payload.clone())
     }
 
@@ -121,18 +113,13 @@ mod tests {
             producer_version: "ckc-core/0.0.0".into(),
             command_manifest: serde_json::json!({"command": "ckc", "args": ["normalize"]}),
             source_input_hashes: vec![ContentHash(
-                "sha256:ee00000000000000000000000000000000000000000000000000000000000001"
-                    .into(),
+                "sha256:ee00000000000000000000000000000000000000000000000000000000000001".into(),
             )],
             parent_hashes: vec![],
             stage: "normalize".into(),
-            semantic_profiles: vec![
-                SemanticProfile::Norm,
-                SemanticProfile::Defeasible,
-            ],
+            semantic_profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
             content_hash: ContentHash(
-                "sha256:ff00000000000000000000000000000000000000000000000000000000000001"
-                    .into(),
+                "sha256:ff00000000000000000000000000000000000000000000000000000000000001".into(),
             ),
             certificate_ids: vec![],
             replay_command: Some("ckc normalize --bundle test".into()),
@@ -199,7 +186,10 @@ mod tests {
             (ArtifactKind::EgraphArtifact, "\"egraph_artifact\""),
             (ArtifactKind::ShaclReport, "\"shacl_report\""),
             (ArtifactKind::RdfExport, "\"rdf_export\""),
-            (ArtifactKind::AlignmentDiagnostic, "\"alignment_diagnostic\""),
+            (
+                ArtifactKind::AlignmentDiagnostic,
+                "\"alignment_diagnostic\"",
+            ),
             (ArtifactKind::RetrievalResult, "\"retrieval_result\""),
         ];
         for (variant, expected) in kinds {
@@ -248,11 +238,7 @@ mod tests {
     #[test]
     fn envelope_roundtrip() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         let json = serde_json::to_string(&envelope).unwrap();
         let rt: ArtifactEnvelope = serde_json::from_str(&json).unwrap();
         assert_eq!(envelope, rt);
@@ -261,15 +247,8 @@ mod tests {
     #[test]
     fn envelope_canonical_stability() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
-        assert_eq!(
-            to_canonical_bytes(&envelope),
-            to_canonical_bytes(&envelope)
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
+        assert_eq!(to_canonical_bytes(&envelope), to_canonical_bytes(&envelope));
         assert_eq!(content_hash(&envelope), content_hash(&envelope));
     }
 
@@ -277,11 +256,7 @@ mod tests {
     fn wrap_computes_correct_content_hash() {
         let rule = fixture_rule();
         let rule_hash = content_hash(&rule);
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         assert_eq!(
             envelope.meta.content_hash, rule_hash,
             "wrap() must set content_hash to the artifact's canonical hash"
@@ -293,11 +268,7 @@ mod tests {
         let rule = fixture_rule();
         let meta = fixture_meta();
         let placeholder = meta.content_hash.clone();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            meta,
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta);
         assert_ne!(
             envelope.meta.content_hash, placeholder,
             "wrap() must overwrite the placeholder content_hash"
@@ -307,11 +278,7 @@ mod tests {
     #[test]
     fn envelope_hash_differs_from_content_hash() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         assert_ne!(
             envelope.envelope_hash(),
             envelope.meta.content_hash,
@@ -322,11 +289,7 @@ mod tests {
     #[test]
     fn verify_content_hash_valid() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         assert!(
             envelope.verify_content_hash(),
             "freshly wrapped envelope must pass content hash verification"
@@ -336,14 +299,9 @@ mod tests {
     #[test]
     fn verify_content_hash_detects_tampering() {
         let rule = fixture_rule();
-        let mut envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let mut envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         envelope.meta.content_hash = ContentHash(
-            "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                .into(),
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
         );
         assert!(
             !envelope.verify_content_hash(),
@@ -354,11 +312,7 @@ mod tests {
     #[test]
     fn extract_recovers_typed_artifact() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         let extracted: Rule = envelope.extract().unwrap();
         assert_eq!(rule, extracted);
     }
@@ -366,11 +320,7 @@ mod tests {
     #[test]
     fn extract_wrong_type_fails() {
         let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::Rule,
-            &rule,
-            fixture_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
         let result = envelope.extract::<crate::source::CorpusDocument>();
         assert!(result.is_err(), "extracting wrong type must fail");
     }

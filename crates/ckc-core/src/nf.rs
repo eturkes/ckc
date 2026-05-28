@@ -9,16 +9,16 @@ use unicode_normalization::UnicodeNormalization;
 use crate::artifact::{
     DecisionRow, DecisionTable, EventNarrative, ExecutionWitness, PatientCase, WorkflowFragment,
 };
+use crate::canonical::to_canonical_bytes;
 use crate::clinical::{
     Action, ClinicalClaim, ConfidenceInterval, EtDFrame, EvidenceAtom, Norm, PICOFrame, Rule,
 };
+use crate::enums::{DeonticProjection, HitPolicy};
+use crate::id::{ConceptId, SpanId};
 use crate::source::{
     BBox, Concept, CorpusDocument, ExtractedTable, ExtractorVote, SourceSpan, TableCellRef,
     TerminologyBinding,
 };
-use crate::canonical::to_canonical_bytes;
-use crate::enums::{DeonticProjection, HitPolicy};
-use crate::id::{ConceptId, SpanId};
 use crate::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ impl NfContext {
     }
 
     /// Apply text normalization to each element of a string vector.
-    pub fn normalize_vec_field(&mut self, pass: u8, field: &str, values: &mut Vec<String>) {
+    pub fn normalize_vec_field(&mut self, pass: u8, field: &str, values: &mut [String]) {
         for (i, v) in values.iter_mut().enumerate() {
             let indexed = format!("{field}[{i}]");
             self.normalize_field(pass, &indexed, v);
@@ -106,7 +106,7 @@ impl NfContext {
     }
 
     /// Sort a `Vec<T: Ord>` in place. Record a rewrite when order changes.
-    pub fn sort_ord<T: Ord>(&mut self, field: &str, values: &mut Vec<T>) {
+    pub fn sort_ord<T: Ord>(&mut self, field: &str, values: &mut [T]) {
         if values.len() <= 1 {
             return;
         }
@@ -442,13 +442,20 @@ fn modality_lexicon(phrase: &str) -> Option<DeonticProjection> {
         "投与を推奨する" | "投与を強く推奨する" | "使用を推奨する" | "使用を提案する" => {
             Some(DeonticProjection::Recommended)
         }
-        "投与すべきである" | "使用すべきである" => Some(DeonticProjection::Obligatory),
-        "投与してはならない" | "使用してはならない" | "禁忌である"
-        | "投与しないことを推奨する" | "使用しないことを推奨する" => {
-            Some(DeonticProjection::Prohibited)
+        "投与すべきである" | "使用すべきである" => {
+            Some(DeonticProjection::Obligatory)
         }
-        "投与を考慮してもよい" | "使用を考慮してもよい" => Some(DeonticProjection::Permitted),
-        "投与は任意である" | "使用は任意である" => Some(DeonticProjection::Optional),
+        "投与してはならない"
+        | "使用してはならない"
+        | "禁忌である"
+        | "投与しないことを推奨する"
+        | "使用しないことを推奨する" => Some(DeonticProjection::Prohibited),
+        "投与を考慮してもよい" | "使用を考慮してもよい" => {
+            Some(DeonticProjection::Permitted)
+        }
+        "投与は任意である" | "使用は任意である" => {
+            Some(DeonticProjection::Optional)
+        }
         _ => None,
     }
 }
@@ -516,10 +523,15 @@ impl Normalize for Concept {
         ctx.sort_by_canonical("terminology_bindings", &mut self.terminology_bindings);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.concept_id.0, String::new());
+        let saved = std::mem::take(&mut self.concept_id.0);
         let content = to_canonical_bytes(self);
         self.concept_id.0 = saved;
-        ctx.set_stable_id("concept_id", &mut self.concept_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "concept_id",
+            &mut self.concept_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -556,10 +568,15 @@ impl Normalize for ClinicalClaim {
         ctx.sort_ord("decision_table_ids", &mut self.decision_table_ids);
         ctx.sort_ord("workflow_fragment_ids", &mut self.workflow_fragment_ids);
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.claim_id.0, String::new());
+        let saved = std::mem::take(&mut self.claim_id.0);
         let content = to_canonical_bytes(self);
         self.claim_id.0 = saved;
-        ctx.set_stable_id("claim_id", &mut self.claim_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "claim_id",
+            &mut self.claim_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -577,10 +594,15 @@ impl Normalize for Rule {
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: priority_over preserves priority chain order
         // Pass 12: stable ID from normalized content + source anchors
-        let saved = std::mem::replace(&mut self.rule_id.0, String::new());
+        let saved = std::mem::take(&mut self.rule_id.0);
         let content = to_canonical_bytes(self);
         self.rule_id.0 = saved;
-        ctx.set_stable_id("rule_id", &mut self.rule_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "rule_id",
+            &mut self.rule_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -589,16 +611,16 @@ impl Normalize for Norm {
         // Pass 1: original_modality_phrase_ja preserved verbatim
         self.action.normalize(ctx);
         // Pass 9: normalize deontic projection through modality lexicon
-        if let Some(canonical) = modality_lexicon(&self.original_modality_phrase_ja) {
-            if self.deontic_projection != canonical {
-                ctx.rewrites.push(NfRewrite {
-                    pass: 9,
-                    field: "deontic_projection".into(),
-                    before: format!("{:?}", self.deontic_projection).to_ascii_lowercase(),
-                    after: format!("{:?}", canonical).to_ascii_lowercase(),
-                });
-                self.deontic_projection = canonical;
-            }
+        if let Some(canonical) = modality_lexicon(&self.original_modality_phrase_ja)
+            && self.deontic_projection != canonical
+        {
+            ctx.rewrites.push(NfRewrite {
+                pass: 9,
+                field: "deontic_projection".into(),
+                before: format!("{:?}", self.deontic_projection).to_ascii_lowercase(),
+                after: format!("{:?}", canonical).to_ascii_lowercase(),
+            });
+            self.deontic_projection = canonical;
         }
     }
 }
@@ -619,7 +641,7 @@ impl Normalize for DecisionTable {
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: input_columns, output_columns preserve column order
         // Pass 12: stable ID (no direct source_span_ids on DecisionTable)
-        let saved = std::mem::replace(&mut self.table_id.0, String::new());
+        let saved = std::mem::take(&mut self.table_id.0);
         let content = to_canonical_bytes(self);
         self.table_id.0 = saved;
         ctx.set_stable_id("table_id", &mut self.table_id.0, &content, &[]);
@@ -628,18 +650,31 @@ impl Normalize for DecisionTable {
 
 impl Normalize for Conflict {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        ctx.normalize_field(2, "human_review_question_ja", &mut self.human_review_question_ja);
-        ctx.normalize_field(2, "human_review_question_en", &mut self.human_review_question_en);
+        ctx.normalize_field(
+            2,
+            "human_review_question_ja",
+            &mut self.human_review_question_ja,
+        );
+        ctx.normalize_field(
+            2,
+            "human_review_question_en",
+            &mut self.human_review_question_en,
+        );
         // Pass 4: sort unordered fields
         ctx.sort_ord("minimal_artifact_set", &mut self.minimal_artifact_set);
         ctx.sort_ord("source_spans", &mut self.source_spans);
         ctx.sort_by_canonical("repair_candidates", &mut self.repair_candidates);
         ctx.sort_by_canonical("solver_evidence", &mut self.solver_evidence);
         // Pass 12: stable ID (Conflict uses source_spans, not source_span_ids)
-        let saved = std::mem::replace(&mut self.conflict_id.0, String::new());
+        let saved = std::mem::take(&mut self.conflict_id.0);
         let content = to_canonical_bytes(self);
         self.conflict_id.0 = saved;
-        ctx.set_stable_id("conflict_id", &mut self.conflict_id.0, &content, &self.source_spans);
+        ctx.set_stable_id(
+            "conflict_id",
+            &mut self.conflict_id.0,
+            &content,
+            &self.source_spans,
+        );
     }
 }
 
@@ -703,10 +738,15 @@ impl Normalize for WorkflowFragment {
         ctx.sort_graph("variance_rules", &mut self.variance_rules);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.workflow_id.0, String::new());
+        let saved = std::mem::take(&mut self.workflow_id.0);
         let content = to_canonical_bytes(self);
         self.workflow_id.0 = saved;
-        ctx.set_stable_id("workflow_id", &mut self.workflow_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "workflow_id",
+            &mut self.workflow_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -731,10 +771,15 @@ impl Normalize for PatientCase {
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 5: events preserves temporal order
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.case_id.0, String::new());
+        let saved = std::mem::take(&mut self.case_id.0);
         let content = to_canonical_bytes(self);
         self.case_id.0 = saved;
-        ctx.set_stable_id("case_id", &mut self.case_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "case_id",
+            &mut self.case_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -750,10 +795,15 @@ impl Normalize for ExecutionWitness {
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
         // Pass 5: trace preserves temporal execution order
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.witness_id.0, String::new());
+        let saved = std::mem::take(&mut self.witness_id.0);
         let content = to_canonical_bytes(self);
         self.witness_id.0 = saved;
-        ctx.set_stable_id("witness_id", &mut self.witness_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "witness_id",
+            &mut self.witness_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -768,10 +818,15 @@ impl Normalize for ArgumentGraph {
         ctx.sort_graph("extension_summaries", &mut self.extension_summaries);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         // Pass 12: stable ID
-        let saved = std::mem::replace(&mut self.argument_graph_id.0, String::new());
+        let saved = std::mem::take(&mut self.argument_graph_id.0);
         let content = to_canonical_bytes(self);
         self.argument_graph_id.0 = saved;
-        ctx.set_stable_id("argument_graph_id", &mut self.argument_graph_id.0, &content, &self.source_span_ids);
+        ctx.set_stable_id(
+            "argument_graph_id",
+            &mut self.argument_graph_id.0,
+            &content,
+            &self.source_span_ids,
+        );
     }
 }
 
@@ -826,19 +881,15 @@ impl Normalize for Action {
         let resolved = ctx
             .resolve_concept(self.target_concept.as_str())
             .map(str::to_owned);
-        if let Some(canonical) = resolved {
-            if canonical != self.target_concept.as_str() {
-                ctx.rewrites.push(NfRewrite {
-                    pass: 8,
-                    field: "target_concept".into(),
-                    before: std::mem::replace(
-                        &mut self.target_concept,
-                        ConceptId::new(&canonical),
-                    )
-                    .0,
-                    after: canonical,
-                });
-            }
+        if let Some(canonical) = resolved
+            && canonical != self.target_concept.as_str()
+        {
+            ctx.rewrites.push(NfRewrite {
+                pass: 8,
+                field: "target_concept".into(),
+                before: std::mem::replace(&mut self.target_concept, ConceptId::new(&canonical)).0,
+                after: canonical,
+            });
         }
     }
 }
@@ -1016,8 +1067,7 @@ mod tests {
             access_date: None,
             license_status: "permitted".into(),
             content_hash: ContentHash(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
             ),
             extraction_manifest_id: ManifestId::new("manifest_test"),
             supersedes: None,
@@ -1049,8 +1099,7 @@ mod tests {
             access_date: None,
             license_status: "permitted".into(),
             content_hash: ContentHash(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
             ),
             extraction_manifest_id: ManifestId::new("manifest_test"),
             supersedes: None,
@@ -1097,7 +1146,11 @@ mod tests {
         assert_eq!(concept.label_en, Some("Beta-Lactam Antibiotics".into()));
         assert_eq!(concept.terminology_bindings[0].label, "βラクタム系 抗菌薬");
         assert_eq!(ctx.rewrites.len(), 4);
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "concept_id"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 12 && r.field == "concept_id")
+        );
     }
 
     // -- ClinicalClaim: glosses normalized --
@@ -1129,7 +1182,11 @@ mod tests {
             "Beta-lactam antibiotics are strongly recommended"
         );
         assert_eq!(ctx.rewrites.len(), 3);
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "claim_id"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 12 && r.field == "claim_id")
+        );
     }
 
     // -- Norm: original_modality_phrase_ja preserved --
@@ -1184,7 +1241,11 @@ mod tests {
         assert_eq!(dt.input_columns[1], "心拍数");
         assert_eq!(dt.output_columns[0], "アラート レベル");
         assert_eq!(ctx.rewrites.len(), 3);
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "table_id"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 12 && r.field == "table_id")
+        );
     }
 
     // -- ExtractedTable: headers normalized --
@@ -1201,8 +1262,7 @@ mod tests {
             reading_order: vec![],
             extraction_votes: vec![],
             normalized_table_hash: ContentHash(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
             ),
         };
 
@@ -1320,18 +1380,12 @@ mod tests {
 
     #[test]
     fn sort_already_sorted_unchanged() {
-        assert_eq!(
-            sort_commutative_operands("A AND B AND C"),
-            "A AND B AND C"
-        );
+        assert_eq!(sort_commutative_operands("A AND B AND C"), "A AND B AND C");
     }
 
     #[test]
     fn sort_three_and_operands() {
-        assert_eq!(
-            sort_commutative_operands("Z AND A AND M"),
-            "A AND M AND Z"
-        );
+        assert_eq!(sort_commutative_operands("Z AND A AND M"), "A AND M AND Z");
     }
 
     // -- Gate test: commutative antecedent order → identical NF --
@@ -1458,10 +1512,7 @@ mod tests {
     #[test]
     fn sort_by_canonical_values() {
         let mut ctx = NfContext::new();
-        let mut vals = vec![
-            serde_json::json!({"z": 1}),
-            serde_json::json!({"a": 2}),
-        ];
+        let mut vals = vec![serde_json::json!({"z": 1}), serde_json::json!({"a": 2})];
         ctx.sort_by_canonical("vals", &mut vals);
 
         assert_eq!(vals[0], serde_json::json!({"a": 2}));
@@ -1473,10 +1524,7 @@ mod tests {
     #[test]
     fn sort_by_canonical_already_sorted_no_rewrite() {
         let mut ctx = NfContext::new();
-        let mut vals = vec![
-            serde_json::json!({"a": 1}),
-            serde_json::json!({"b": 2}),
-        ];
+        let mut vals = vec![serde_json::json!({"a": 1}), serde_json::json!({"b": 2})];
         ctx.sort_by_canonical("vals", &mut vals);
         assert!(ctx.rewrites.is_empty());
     }
@@ -1569,7 +1617,10 @@ mod tests {
             hit_policy: HitPolicy::Unique,
             input_columns: vec!["temp".into()],
             output_columns: vec!["action".into()],
-            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            rows: vec![
+                make_decision_row("row_z", 39),
+                make_decision_row("row_a", 37),
+            ],
             source_table_id: None,
             dmn_export_id: None,
             certificate_ids: vec![],
@@ -1589,7 +1640,10 @@ mod tests {
             hit_policy: HitPolicy::Priority,
             input_columns: vec!["temp".into()],
             output_columns: vec!["action".into()],
-            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            rows: vec![
+                make_decision_row("row_z", 39),
+                make_decision_row("row_a", 37),
+            ],
             source_table_id: None,
             dmn_export_id: None,
             certificate_ids: vec![],
@@ -1608,7 +1662,10 @@ mod tests {
             hit_policy: HitPolicy::First,
             input_columns: vec!["temp".into()],
             output_columns: vec!["action".into()],
-            rows: vec![make_decision_row("row_z", 39), make_decision_row("row_a", 37)],
+            rows: vec![
+                make_decision_row("row_z", 39),
+                make_decision_row("row_a", 37),
+            ],
             source_table_id: None,
             dmn_export_id: None,
             certificate_ids: vec![],
@@ -1727,9 +1784,21 @@ mod tests {
             wf.source_span_ids,
             vec![SpanId::new("span_a"), SpanId::new("span_z")]
         );
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "states"));
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "transitions"));
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "outcomes"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 11 && r.field == "states")
+        );
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 11 && r.field == "transitions")
+        );
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 11 && r.field == "outcomes")
+        );
     }
 
     // -- ExecutionWitness: trace preserved, sets sorted --
@@ -1925,10 +1994,7 @@ mod tests {
         let ctx = normalize_all(&mut action);
 
         assert_eq!(action.action_type, "contraindicate");
-        assert_eq!(
-            ctx.rewrites.iter().filter(|r| r.pass == 6).count(),
-            1,
-        );
+        assert_eq!(ctx.rewrites.iter().filter(|r| r.pass == 6).count(), 1,);
     }
 
     #[test]
@@ -2029,8 +2095,11 @@ mod tests {
         let ctx = normalize_all(&mut action);
 
         assert_eq!(action.quantity_constraints["volume"]["unit"], "mL");
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 7
-            && r.field == "quantity_constraints"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 7 && r.field == "quantity_constraints")
+        );
     }
 
     #[test]
@@ -2057,8 +2126,11 @@ mod tests {
         let ctx = normalize_all(&mut action);
 
         assert_eq!(action.temporal_constraints["monitor_temp_unit"], "Cel");
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 7
-            && r.field == "temporal_constraints"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 7 && r.field == "temporal_constraints")
+        );
     }
 
     // -- Gate tests: domain normalization produces identical NF --
@@ -2246,8 +2318,10 @@ mod tests {
         normalize_all(&mut action);
         let after_hash = crate::canonical::content_hash(&action);
 
-        assert_eq!(before_hash, after_hash,
-            "pass 8 must be identity when no term_map is provided");
+        assert_eq!(
+            before_hash, after_hash,
+            "pass 8 must be identity when no term_map is provided"
+        );
         assert_eq!(action.target_concept.as_str(), "concept_test");
     }
 
@@ -2283,8 +2357,10 @@ mod tests {
         let ctx = normalize_with_terms(&mut action, toy_term_map());
 
         assert_eq!(action.target_concept.as_str(), "concept_beta_lactam");
-        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8),
-            "canonical concept must record no pass 8 rewrite");
+        assert!(
+            !ctx.rewrites.iter().any(|r| r.pass == 8),
+            "canonical concept must record no pass 8 rewrite"
+        );
     }
 
     #[test]
@@ -2344,8 +2420,11 @@ mod tests {
             rule.norm.as_ref().unwrap().action.target_concept.as_str(),
             "concept_beta_lactam"
         );
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 8
-            && r.field == "target_concept"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 8 && r.field == "target_concept")
+        );
     }
 
     #[test]
@@ -2404,12 +2483,18 @@ mod tests {
         let bytes_c = to_canonical_bytes(&rule_canonical);
         let bytes_b = to_canonical_bytes(&rule_brand);
 
-        assert_eq!(bytes_k, bytes_h,
-            "katakana and hyphenated variants must produce identical NF bytes");
-        assert_eq!(bytes_k, bytes_c,
-            "variant and canonical must produce identical NF bytes");
-        assert_eq!(bytes_k, bytes_b,
-            "variant and brand must produce identical NF bytes");
+        assert_eq!(
+            bytes_k, bytes_h,
+            "katakana and hyphenated variants must produce identical NF bytes"
+        );
+        assert_eq!(
+            bytes_k, bytes_c,
+            "variant and canonical must produce identical NF bytes"
+        );
+        assert_eq!(
+            bytes_k, bytes_b,
+            "variant and brand must produce identical NF bytes"
+        );
         assert_eq!(content_hash(&rule_katakana), content_hash(&rule_hyphenated));
         assert_eq!(content_hash(&rule_katakana), content_hash(&rule_canonical));
     }
@@ -2433,7 +2518,10 @@ mod tests {
         normalize_with_terms(&mut action, term_map);
         let hash2 = content_hash(&action);
 
-        assert_eq!(hash1, hash2, "NF(NF(action)) must equal NF(action) with term_map");
+        assert_eq!(
+            hash1, hash2,
+            "NF(NF(action)) must equal NF(action) with term_map"
+        );
     }
 
     // ===================================================================
@@ -2442,37 +2530,82 @@ mod tests {
 
     #[test]
     fn modality_lexicon_recommended_phrases() {
-        assert_eq!(modality_lexicon("投与を推奨する"), Some(DeonticProjection::Recommended));
-        assert_eq!(modality_lexicon("投与を強く推奨する"), Some(DeonticProjection::Recommended));
-        assert_eq!(modality_lexicon("使用を推奨する"), Some(DeonticProjection::Recommended));
-        assert_eq!(modality_lexicon("使用を提案する"), Some(DeonticProjection::Recommended));
+        assert_eq!(
+            modality_lexicon("投与を推奨する"),
+            Some(DeonticProjection::Recommended)
+        );
+        assert_eq!(
+            modality_lexicon("投与を強く推奨する"),
+            Some(DeonticProjection::Recommended)
+        );
+        assert_eq!(
+            modality_lexicon("使用を推奨する"),
+            Some(DeonticProjection::Recommended)
+        );
+        assert_eq!(
+            modality_lexicon("使用を提案する"),
+            Some(DeonticProjection::Recommended)
+        );
     }
 
     #[test]
     fn modality_lexicon_obligatory_phrases() {
-        assert_eq!(modality_lexicon("投与すべきである"), Some(DeonticProjection::Obligatory));
-        assert_eq!(modality_lexicon("使用すべきである"), Some(DeonticProjection::Obligatory));
+        assert_eq!(
+            modality_lexicon("投与すべきである"),
+            Some(DeonticProjection::Obligatory)
+        );
+        assert_eq!(
+            modality_lexicon("使用すべきである"),
+            Some(DeonticProjection::Obligatory)
+        );
     }
 
     #[test]
     fn modality_lexicon_prohibited_phrases() {
-        assert_eq!(modality_lexicon("投与してはならない"), Some(DeonticProjection::Prohibited));
-        assert_eq!(modality_lexicon("使用してはならない"), Some(DeonticProjection::Prohibited));
-        assert_eq!(modality_lexicon("禁忌である"), Some(DeonticProjection::Prohibited));
-        assert_eq!(modality_lexicon("投与しないことを推奨する"), Some(DeonticProjection::Prohibited));
-        assert_eq!(modality_lexicon("使用しないことを推奨する"), Some(DeonticProjection::Prohibited));
+        assert_eq!(
+            modality_lexicon("投与してはならない"),
+            Some(DeonticProjection::Prohibited)
+        );
+        assert_eq!(
+            modality_lexicon("使用してはならない"),
+            Some(DeonticProjection::Prohibited)
+        );
+        assert_eq!(
+            modality_lexicon("禁忌である"),
+            Some(DeonticProjection::Prohibited)
+        );
+        assert_eq!(
+            modality_lexicon("投与しないことを推奨する"),
+            Some(DeonticProjection::Prohibited)
+        );
+        assert_eq!(
+            modality_lexicon("使用しないことを推奨する"),
+            Some(DeonticProjection::Prohibited)
+        );
     }
 
     #[test]
     fn modality_lexicon_permitted_phrases() {
-        assert_eq!(modality_lexicon("投与を考慮してもよい"), Some(DeonticProjection::Permitted));
-        assert_eq!(modality_lexicon("使用を考慮してもよい"), Some(DeonticProjection::Permitted));
+        assert_eq!(
+            modality_lexicon("投与を考慮してもよい"),
+            Some(DeonticProjection::Permitted)
+        );
+        assert_eq!(
+            modality_lexicon("使用を考慮してもよい"),
+            Some(DeonticProjection::Permitted)
+        );
     }
 
     #[test]
     fn modality_lexicon_optional_phrases() {
-        assert_eq!(modality_lexicon("投与は任意である"), Some(DeonticProjection::Optional));
-        assert_eq!(modality_lexicon("使用は任意である"), Some(DeonticProjection::Optional));
+        assert_eq!(
+            modality_lexicon("投与は任意である"),
+            Some(DeonticProjection::Optional)
+        );
+        assert_eq!(
+            modality_lexicon("使用は任意である"),
+            Some(DeonticProjection::Optional)
+        );
     }
 
     #[test]
@@ -2617,9 +2750,7 @@ mod tests {
                 serde_json::json!({"field": "temperature", "unit": "degC", "op": ">=", "value": 38.0}),
                 serde_json::json!({"field": "heart_rate", "unit": "bpm", "op": ">=", "value": 90}),
             ],
-            outputs: vec![
-                serde_json::json!({"dose": {"value": 500, "unit": "ml"}}),
-            ],
+            outputs: vec![serde_json::json!({"dose": {"value": 500, "unit": "ml"}})],
             priority: None,
             source_span_ids: vec![],
             cell_refs: vec![],
@@ -2630,9 +2761,21 @@ mod tests {
         assert_eq!(row.conditions[0]["unit"], "Cel");
         assert_eq!(row.conditions[1]["unit"], "/min");
         assert_eq!(row.outputs[0]["dose"]["unit"], "mL");
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "conditions[0]"));
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "conditions[1]"));
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 7 && r.field == "outputs[0]"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 7 && r.field == "conditions[0]")
+        );
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 7 && r.field == "conditions[1]")
+        );
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 7 && r.field == "outputs[0]")
+        );
     }
 
     #[test]
@@ -2642,9 +2785,7 @@ mod tests {
             conditions: vec![
                 serde_json::json!({"field": "temperature", "unit": "Cel", "value": 38.0}),
             ],
-            outputs: vec![
-                serde_json::json!({"dose": {"value": 500, "unit": "mL"}}),
-            ],
+            outputs: vec![serde_json::json!({"dose": {"value": 500, "unit": "mL"}})],
             priority: None,
             source_span_ids: vec![],
             cell_refs: vec![],
@@ -2662,16 +2803,14 @@ mod tests {
             hit_policy: HitPolicy::Unique,
             input_columns: vec!["temp".into()],
             output_columns: vec!["action".into()],
-            rows: vec![
-                DecisionRow {
-                    row_id: DecisionRowId::new("row_a"),
-                    conditions: vec![serde_json::json!({"temp_unit": "degC"})],
-                    outputs: vec![serde_json::json!({"dose_unit": "ml"})],
-                    priority: None,
-                    source_span_ids: vec![],
-                    cell_refs: vec![],
-                },
-            ],
+            rows: vec![DecisionRow {
+                row_id: DecisionRowId::new("row_a"),
+                conditions: vec![serde_json::json!({"temp_unit": "degC"})],
+                outputs: vec![serde_json::json!({"dose_unit": "ml"})],
+                priority: None,
+                source_span_ids: vec![],
+                cell_refs: vec![],
+            }],
             source_table_id: None,
             dmn_export_id: None,
             certificate_ids: vec![],
@@ -2790,8 +2929,16 @@ mod tests {
 
         let ctx = normalize_all(&mut ag);
 
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "arguments"));
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 11 && r.field == "attack_edges"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 11 && r.field == "arguments")
+        );
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 11 && r.field == "attack_edges")
+        );
     }
 
     #[test]
@@ -2918,7 +3065,11 @@ mod tests {
 
         assert!(rule.rule_id.as_str().starts_with("nf-"));
         assert_ne!(rule.rule_id.as_str(), original_id);
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "rule_id"));
+        assert!(
+            ctx.rewrites
+                .iter()
+                .any(|r| r.pass == 12 && r.field == "rule_id")
+        );
     }
 
     #[test]
@@ -2971,9 +3122,14 @@ mod tests {
 
         let ctx = normalize_all(&mut rule);
 
-        assert_eq!(rule.rule_id, stable_id, "stable ID must persist across normalizations");
-        assert!(!ctx.rewrites.iter().any(|r| r.pass == 12),
-            "re-normalization with stable ID must record no pass 12 rewrite");
+        assert_eq!(
+            rule.rule_id, stable_id,
+            "stable ID must persist across normalizations"
+        );
+        assert!(
+            !ctx.rewrites.iter().any(|r| r.pass == 12),
+            "re-normalization with stable ID must record no pass 12 rewrite"
+        );
     }
 
     #[test]
@@ -3069,8 +3225,10 @@ mod tests {
         let id = rule.rule_id.as_str();
         assert!(id.starts_with("nf-"), "stable ID must start with 'nf-'");
         assert_eq!(id.len(), 35, "stable ID must be 35 chars: 'nf-' + 32 hex");
-        assert!(id[3..].chars().all(|c| c.is_ascii_hexdigit()),
-            "stable ID suffix must be lowercase hex");
+        assert!(
+            id[3..].chars().all(|c| c.is_ascii_hexdigit()),
+            "stable ID suffix must be lowercase hex"
+        );
     }
 
     // ===================================================================
@@ -3139,7 +3297,10 @@ mod tests {
         let hash_after_second = content_hash(&rule);
         let bytes_after_second = to_canonical_bytes(&rule);
 
-        assert_eq!(hash_after_first, hash_after_second, "NF(NF(rule)) must equal NF(rule)");
+        assert_eq!(
+            hash_after_first, hash_after_second,
+            "NF(NF(rule)) must equal NF(rule)"
+        );
         assert_eq!(bytes_after_first, bytes_after_second);
     }
 
@@ -3194,7 +3355,10 @@ mod tests {
         normalize_all(&mut dt);
         let hash2 = content_hash(&dt);
 
-        assert_eq!(hash1, hash2, "NF(NF(decision_table)) must equal NF(decision_table)");
+        assert_eq!(
+            hash1, hash2,
+            "NF(NF(decision_table)) must equal NF(decision_table)"
+        );
     }
 
     #[test]
@@ -3223,7 +3387,10 @@ mod tests {
         normalize_all(&mut ag);
         let hash2 = content_hash(&ag);
 
-        assert_eq!(hash1, hash2, "NF(NF(argument_graph)) must equal NF(argument_graph)");
+        assert_eq!(
+            hash1, hash2,
+            "NF(NF(argument_graph)) must equal NF(argument_graph)"
+        );
     }
 
     #[test]
@@ -3308,7 +3475,10 @@ mod tests {
         normalize_all(&mut pc);
         let hash2 = content_hash(&pc);
 
-        assert_eq!(hash1, hash2, "NF(NF(patient_case)) must equal NF(patient_case)");
+        assert_eq!(
+            hash1, hash2,
+            "NF(NF(patient_case)) must equal NF(patient_case)"
+        );
     }
 
     #[test]
@@ -3319,7 +3489,10 @@ mod tests {
             witness_id: WitnessId::new("w_test"),
             bundle_id: BundleId::new("b_test"),
             case_id: None,
-            context_facts: vec![serde_json::json!({"fact": "z"}), serde_json::json!({"fact": "a"})],
+            context_facts: vec![
+                serde_json::json!({"fact": "z"}),
+                serde_json::json!({"fact": "a"}),
+            ],
             trace: vec![serde_json::json!({"step": 1})],
             applicable_rules: vec![RuleId::new("rule_z"), RuleId::new("rule_a")],
             defeated_rules: vec![],
@@ -3335,7 +3508,10 @@ mod tests {
         normalize_all(&mut ew);
         let hash2 = content_hash(&ew);
 
-        assert_eq!(hash1, hash2, "NF(NF(execution_witness)) must equal NF(execution_witness)");
+        assert_eq!(
+            hash1, hash2,
+            "NF(NF(execution_witness)) must equal NF(execution_witness)"
+        );
     }
 
     #[test]

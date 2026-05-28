@@ -9,7 +9,7 @@
 //! `toy_source_corpus` regen test in `ckc-core`.
 
 use ckc_core::source::SourceSpan;
-use ckc_retrieve::{compute_index_fingerprint, ipadic_tokens, RetrievalHit, SparseIndex};
+use ckc_retrieve::{RetrievalHit, SparseIndex, compute_index_fingerprint, ipadic_tokens};
 
 const TOY_SPANS_JSON: &str =
     include_str!("../../../examples/toy_research_kernel/fixtures/spans.json");
@@ -32,7 +32,11 @@ fn index_builds_over_all_toy_spans() {
     // The Phase-0 fixture currently has 16 spans; the test should still pass
     // if that count drifts up or down, so we only require a non-trivial
     // corpus and that every span is indexable.
-    assert!(spans.len() >= 12, "toy span fixture should be non-trivial; got {}", spans.len());
+    assert!(
+        spans.len() >= 12,
+        "toy span fixture should be non-trivial; got {}",
+        spans.len()
+    );
 
     let index = SparseIndex::build_from_spans(&spans).expect("build SparseIndex");
     let fp = index.fingerprint().as_str();
@@ -65,7 +69,11 @@ fn query_sepsis_betalactam_administration_ranks_recommendation_in_top_3() {
     // Rank/score sanity: results are in score-descending order and rank is
     // 1-indexed contiguous.
     for (i, h) in hits.iter().enumerate() {
-        assert_eq!(h.rank as usize, i + 1, "rank must be 1-indexed and contiguous");
+        assert_eq!(
+            h.rank as usize,
+            i + 1,
+            "rank must be 1-indexed and contiguous"
+        );
     }
     let scores: Vec<f64> = hits.iter().map(|h| h.score).collect();
     let mut descending = scores.clone();
@@ -88,10 +96,7 @@ fn query_taion_retrieves_vitals_temperature_cells() {
     let hits = index.search("体温", 5).expect("search executes");
     let ids = span_ids(&hits);
     let temp_cell_ids = ["span_cell_r0c0", "span_cell_r1c0"];
-    let matched: Vec<&&str> = temp_cell_ids
-        .iter()
-        .filter(|id| ids.contains(id))
-        .collect();
+    let matched: Vec<&&str> = temp_cell_ids.iter().filter(|id| ids.contains(id)).collect();
     assert!(
         !matched.is_empty(),
         "expected at least one '体温' table-cell span in top-5; got {ids:?}",

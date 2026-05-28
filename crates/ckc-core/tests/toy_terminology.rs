@@ -7,7 +7,7 @@
 //!
 //! All concepts reference source spans from 0.5.1 (toy_source_corpus).
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::enums::*;
 use ckc_core::id::*;
 use ckc_core::nf::{NfContext, Normalize};
@@ -246,10 +246,7 @@ fn toy_concepts() -> Vec<Concept> {
                 },
             ],
             egraph_class_id: Some(EGraphClassId::new(ECLASS_SEPSIS)),
-            source_span_ids: vec![
-                SpanId::new(SPAN_REC_SEPSIS),
-                SpanId::new(SPAN_EVIDENCE),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
         },
         // Anaphylaxis
         Concept {
@@ -286,10 +283,7 @@ fn toy_concepts() -> Vec<Concept> {
                 },
             ],
             egraph_class_id: Some(EGraphClassId::new(ECLASS_ANAPHYLAXIS)),
-            source_span_ids: vec![
-                SpanId::new(SPAN_CONTRA),
-                SpanId::new(SPAN_ALLERGY_HIST),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_CONTRA), SpanId::new(SPAN_ALLERGY_HIST)],
         },
         // Body temperature
         Concept {
@@ -311,10 +305,7 @@ fn toy_concepts() -> Vec<Concept> {
                 valid_to: None,
             }],
             egraph_class_id: Some(EGraphClassId::new(ECLASS_BODY_TEMP)),
-            source_span_ids: vec![
-                SpanId::new(SPAN_CELL_R0C0),
-                SpanId::new(SPAN_CELL_R1C0),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_CELL_R0C0), SpanId::new(SPAN_CELL_R1C0)],
         },
         // Heart rate
         Concept {
@@ -373,15 +364,13 @@ fn beta_lactam_variants() -> Vec<Concept> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
 }
 
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
-    let bytes = std::fs::read(dir.join("spans.json")).expect(
-        "0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first",
-    );
+    let bytes = std::fs::read(dir.join("spans.json"))
+        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -398,7 +387,11 @@ fn load_span_ids_from_fixtures() -> HashSet<String> {
 #[test]
 fn all_beta_lactam_variants_share_egraph_class() {
     let variants = beta_lactam_variants();
-    assert_eq!(variants.len(), 5, "fixture must have 5 beta-lactam variants");
+    assert_eq!(
+        variants.len(),
+        5,
+        "fixture must have 5 beta-lactam variants"
+    );
 
     let class_ids: HashSet<&str> = variants
         .iter()
@@ -421,8 +414,7 @@ fn all_beta_lactam_variants_share_egraph_class() {
 #[test]
 fn beta_lactam_variants_share_semantic_type() {
     let variants = beta_lactam_variants();
-    let types: HashSet<&str> =
-        variants.iter().map(|c| c.semantic_type.as_str()).collect();
+    let types: HashSet<&str> = variants.iter().map(|c| c.semantic_type.as_str()).collect();
     assert_eq!(
         types.len(),
         1,
@@ -434,8 +426,7 @@ fn beta_lactam_variants_share_semantic_type() {
 #[test]
 fn beta_lactam_variants_have_distinct_labels() {
     let variants = beta_lactam_variants();
-    let labels: HashSet<&str> =
-        variants.iter().map(|c| c.label_ja.as_str()).collect();
+    let labels: HashSet<&str> = variants.iter().map(|c| c.label_ja.as_str()).collect();
     assert_eq!(
         labels.len(),
         variants.len(),
@@ -485,7 +476,7 @@ fn non_variant_concepts_have_distinct_egraph_classes() {
         .filter(|c| {
             c.egraph_class_id
                 .as_ref()
-                .map_or(true, |e| e.as_str() != ECLASS_BETA_LACTAM)
+                .is_none_or(|e| e.as_str() != ECLASS_BETA_LACTAM)
         })
         .collect();
     let class_ids: HashSet<&str> = non_bl
@@ -616,8 +607,7 @@ fn canonical_hashes_deterministic_across_construction() {
 #[test]
 fn individual_concepts_have_distinct_hashes() {
     let concepts = toy_concepts();
-    let hashes: Vec<ContentHash> =
-        concepts.iter().map(|c| content_hash(c)).collect();
+    let hashes: Vec<ContentHash> = concepts.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -700,10 +690,7 @@ fn nf_sorts_anaphylaxis_span_ids() {
     // ["span_allergy_history", "span_contra_bl_allergy"]
     assert_eq!(
         concept.source_span_ids,
-        vec![
-            SpanId::new(SPAN_ALLERGY_HIST),
-            SpanId::new(SPAN_CONTRA),
-        ],
+        vec![SpanId::new(SPAN_ALLERGY_HIST), SpanId::new(SPAN_CONTRA),],
         "NF must sort anaphylaxis concept source_span_ids"
     );
 }
@@ -731,12 +718,7 @@ fn nf_sorts_terminology_bindings() {
     concept.normalize(&mut ctx);
 
     let post_nf_first = concept.terminology_bindings[0].system.as_str();
-    let post_nf_last = concept
-        .terminology_bindings
-        .last()
-        .unwrap()
-        .system
-        .as_str();
+    let post_nf_last = concept.terminology_bindings.last().unwrap().system.as_str();
     // Bindings sorted by canonical JSON bytes — deterministic
     assert_ne!(
         post_nf_first, post_nf_last,
@@ -824,9 +806,7 @@ fn nf_variants_retain_shared_egraph_class() {
 #[test]
 fn rule_target_concept_exists() {
     let dir = fixtures_dir();
-    let rule_bytes = std::fs::read(dir.join("rules.json")).expect(
-        "0.5.2 rules.json must exist",
-    );
+    let rule_bytes = std::fs::read(dir.join("rules.json")).expect("0.5.2 rules.json must exist");
     let rules: Vec<serde_json::Value> =
         serde_json::from_slice(&rule_bytes).expect("rules.json must parse");
     let concept_id_set: HashSet<String> = toy_concepts()
@@ -835,18 +815,17 @@ fn rule_target_concept_exists() {
         .collect();
 
     for rule in &rules {
-        if let Some(norm) = rule.get("norm") {
-            if let Some(action) = norm.get("action") {
-                if let Some(target) = action.get("target_concept") {
-                    let target_str = target.as_str().unwrap();
-                    assert!(
-                        concept_id_set.contains(target_str),
-                        "rule norm action target_concept {} must exist \
+        if let Some(norm) = rule.get("norm")
+            && let Some(action) = norm.get("action")
+            && let Some(target) = action.get("target_concept")
+        {
+            let target_str = target.as_str().unwrap();
+            assert!(
+                concept_id_set.contains(target_str),
+                "rule norm action target_concept {} must exist \
                          in terminology fixtures",
-                        target_str
-                    );
-                }
-            }
+                target_str
+            );
         }
     }
 }
@@ -877,10 +856,9 @@ fn committed_concepts_match() {
 #[test]
 fn committed_concepts_deserialize_correctly() {
     let dir = fixtures_dir();
-    let concepts: Vec<Concept> = serde_json::from_slice(
-        &std::fs::read(dir.join("concepts.json")).unwrap(),
-    )
-    .expect("concepts.json must deserialize");
+    let concepts: Vec<Concept> =
+        serde_json::from_slice(&std::fs::read(dir.join("concepts.json")).unwrap())
+            .expect("concepts.json must deserialize");
     assert_eq!(concepts.len(), 10);
 }
 

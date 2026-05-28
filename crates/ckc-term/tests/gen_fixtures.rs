@@ -31,5 +31,9 @@ fn generate_rdf_and_shacl_fixtures() {
     let report = ckc_term::shacl::validate_rules(&rules);
     let report_json = serde_json::to_string_pretty(&report).unwrap();
     fs::write(SHACL_OUT, format!("{report_json}\n")).unwrap();
-    eprintln!("Wrote {SHACL_OUT} ({} bytes, conforms={})", report_json.len(), report.conforms);
+    eprintln!(
+        "Wrote {SHACL_OUT} ({} bytes, conforms={})",
+        report_json.len(),
+        report.conforms
+    );
 }

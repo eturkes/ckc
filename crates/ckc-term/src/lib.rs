@@ -57,11 +57,7 @@ impl TerminologyGraph {
         let key = EGraphClassId::new(class_id);
         self.by_egraph_class
             .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.concepts.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.concepts.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -69,11 +65,7 @@ impl TerminologyGraph {
         let key = (system.to_owned(), code.to_owned());
         self.by_system_code
             .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.concepts.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.concepts.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -131,8 +123,7 @@ mod tests {
     );
 
     fn load_fixture() -> TerminologyGraph {
-        let json = std::fs::read_to_string(FIXTURE_PATH)
-            .expect("concepts.json fixture must exist");
+        let json = std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
@@ -210,7 +201,11 @@ mod tests {
         let graph = load_fixture();
         // "ラクタム" matches all beta-lactam JA variants containing that substring
         let results = graph.search_by_label("ラクタム");
-        assert!(results.len() >= 3, "expected >= 3 JA matches, got {}", results.len());
+        assert!(
+            results.len() >= 3,
+            "expected >= 3 JA matches, got {}",
+            results.len()
+        );
 
         let ids: HashSet<&str> = results.iter().map(|c| c.concept_id.as_str()).collect();
         assert!(ids.contains("concept_beta_lactam"));
@@ -236,7 +231,9 @@ mod tests {
         let graph = load_fixture();
         let results = graph.search_by_label("Sepsis");
         assert!(
-            results.iter().any(|c| c.concept_id.as_str() == "concept_sepsis"),
+            results
+                .iter()
+                .any(|c| c.concept_id.as_str() == "concept_sepsis"),
             "case-insensitive EN search must find sepsis"
         );
     }

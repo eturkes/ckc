@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use ckc_core::enums::BindingStatus;
 use ckc_core::id::ConceptId;
 
-use crate::egraph::TermEquivalence;
 use crate::TerminologyGraph;
+use crate::egraph::TermEquivalence;
 
 /// Detected incoherence: two concepts in the same e-graph equivalence class
 /// have `Exact` terminology bindings to the same system but different codes.
@@ -108,8 +108,7 @@ mod tests {
     );
 
     fn load_graph() -> TerminologyGraph {
-        let json =
-            std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
+        let json = std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
@@ -152,10 +151,7 @@ mod tests {
         let equiv = TermEquivalence::from_terminology_graph(&graph);
         let result = check_alignment_coherence(&graph, &equiv);
 
-        assert!(
-            !result.is_empty(),
-            "planted incoherence must be detected"
-        );
+        assert!(!result.is_empty(), "planted incoherence must be detected");
 
         let medis_hit = result
             .iter()

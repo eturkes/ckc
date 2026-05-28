@@ -2,8 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Terminology binding status (SPEC 6.2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BindingStatus {
     Exact,
@@ -18,8 +17,9 @@ pub enum BindingStatus {
 
 /// Certificate depth class (SPEC 12.2). Higher classes imply lower.
 /// Variant order matches depth: C0 < C1 < … < C9.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 pub enum CertificateClass {
     #[serde(rename = "C0-Parsed")]
     C0Parsed,
@@ -44,8 +44,7 @@ pub enum CertificateClass {
 }
 
 /// Conflict classification (SPEC 15.4).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConflictClassification {
     TrueConflict,
@@ -59,8 +58,9 @@ pub enum ConflictClassification {
 }
 
 /// Conflict / diagnostic severity. Variant order matches escalation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     Info,
@@ -71,8 +71,7 @@ pub enum Severity {
 }
 
 /// Rule kind (SPEC 9 CKC-Defeasible).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RuleKind {
     Strict,
@@ -81,8 +80,7 @@ pub enum RuleKind {
 }
 
 /// Patient case provenance (SPEC 10 PatientCase).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CaseType {
     Synthetic,
@@ -92,8 +90,7 @@ pub enum CaseType {
 }
 
 /// DMN hit policy for decision tables.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HitPolicy {
     Unique,
@@ -106,8 +103,7 @@ pub enum HitPolicy {
 }
 
 /// Recommendation direction (SPEC 10 EtDFrame, Norm).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecommendationDirection {
     For,
@@ -115,8 +111,7 @@ pub enum RecommendationDirection {
 }
 
 /// GRADE recommendation strength (SPEC 10 Norm).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecommendationStrength {
     Strong,
@@ -126,8 +121,9 @@ pub enum RecommendationStrength {
 
 /// GRADE evidence certainty (SPEC 10 Norm, EtDFrame, EvidenceAtom).
 /// Variant order matches certainty level: VeryLow < Low < Moderate < High.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceCertainty {
     VeryLow,
@@ -137,8 +133,7 @@ pub enum EvidenceCertainty {
 }
 
 /// Document language tag.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
     Ja,
@@ -146,8 +141,7 @@ pub enum Language {
 }
 
 /// Deontic projection of a clinical norm (SPEC 10 Norm).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DeonticProjection {
     Obligatory,
@@ -158,8 +152,7 @@ pub enum DeonticProjection {
 }
 
 /// Certificate replay status.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReplayStatus {
     Passed,
@@ -170,8 +163,7 @@ pub enum ReplayStatus {
 
 /// Whether a norm is prima-facie (defeasible) or all-things-considered
 /// (survived defeasible reasoning).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NormCommitment {
     PrimaFacie,

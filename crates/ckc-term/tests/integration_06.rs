@@ -1,19 +1,19 @@
 use std::fs;
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::clinical::Rule;
+use ckc_core::enums::BindingStatus;
 use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::id::{ConceptId, EGraphClassId};
 use ckc_core::nf::normalize_with_terms;
 use ckc_core::profile::SemanticProfile;
 use ckc_core::source::{Concept, TerminologyBinding};
-use ckc_core::enums::BindingStatus;
 use ckc_store::ContentStore;
-use ckc_term::alignment::{check_alignment_coherence, AlignmentIncoherence};
+use ckc_term::TerminologyGraph;
+use ckc_term::alignment::{AlignmentIncoherence, check_alignment_coherence};
 use ckc_term::egraph::TermEquivalence;
 use ckc_term::rdf::export_skos_turtle;
-use ckc_term::shacl::{validate_rules, ShaclReport};
-use ckc_term::TerminologyGraph;
+use ckc_term::shacl::{ShaclReport, validate_rules};
 use tempfile::TempDir;
 
 const CONCEPTS_PATH: &str = concat!(
@@ -43,8 +43,7 @@ fn test_meta(stage: &str, profiles: Vec<SemanticProfile>) -> ArtifactMeta {
         stage: stage.into(),
         semantic_profiles: profiles,
         content_hash: ContentHash(
-            "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                .into(),
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
         ),
         certificate_ids: vec![],
         replay_command: None,

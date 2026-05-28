@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::enums::Language;
 use ckc_core::id::{QueryId, SpanId};
 use ckc_retrieve::{AnalyzerConfig, QrelJudgment, RetrievalHit, RetrievalQuery, RetrievalResult};
@@ -52,8 +52,8 @@ fn check_roundtrip<T: Serialize + DeserializeOwned + PartialEq + std::fmt::Debug
 ) {
     let bytes1 = to_canonical_bytes(fixture);
     let hash1 = content_hash(fixture);
-    let rt: T = serde_json::from_slice(&bytes1)
-        .unwrap_or_else(|e| panic!("deserialize {stem}: {e}"));
+    let rt: T =
+        serde_json::from_slice(&bytes1).unwrap_or_else(|e| panic!("deserialize {stem}: {e}"));
     let bytes2 = to_canonical_bytes(&rt);
     let hash2 = content_hash(&rt);
     assert_eq!(bytes1, bytes2, "bytes differ after roundtrip for {stem}");
@@ -111,12 +111,10 @@ fn golden_retrieval_result() -> RetrievalResult {
             },
         ],
         index_fingerprint: ContentHash(
-            "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
-                .into(),
+            "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".into(),
         ),
         corpus_hash: ContentHash(
-            "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                .into(),
+            "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".into(),
         ),
     }
 }
@@ -160,11 +158,36 @@ macro_rules! golden_suite {
 // Suite invocations (5 types = 15 tests)
 // ---------------------------------------------------------------------------
 
-golden_suite!(gs_analyzer_config, AnalyzerConfig, golden_analyzer_config, "analyzer_config");
-golden_suite!(gs_retrieval_query, RetrievalQuery, golden_retrieval_query, "retrieval_query");
-golden_suite!(gs_retrieval_hit, RetrievalHit, golden_retrieval_hit, "retrieval_hit");
-golden_suite!(gs_retrieval_result, RetrievalResult, golden_retrieval_result, "retrieval_result");
-golden_suite!(gs_qrel_judgment, QrelJudgment, golden_qrel_judgment, "qrel_judgment");
+golden_suite!(
+    gs_analyzer_config,
+    AnalyzerConfig,
+    golden_analyzer_config,
+    "analyzer_config"
+);
+golden_suite!(
+    gs_retrieval_query,
+    RetrievalQuery,
+    golden_retrieval_query,
+    "retrieval_query"
+);
+golden_suite!(
+    gs_retrieval_hit,
+    RetrievalHit,
+    golden_retrieval_hit,
+    "retrieval_hit"
+);
+golden_suite!(
+    gs_retrieval_result,
+    RetrievalResult,
+    golden_retrieval_result,
+    "retrieval_result"
+);
+golden_suite!(
+    gs_qrel_judgment,
+    QrelJudgment,
+    golden_qrel_judgment,
+    "qrel_judgment"
+);
 
 // ---------------------------------------------------------------------------
 // Cross-type: all 5 retrieval golden fixtures produce distinct content hashes
@@ -181,7 +204,10 @@ fn all_retrieval_golden_fixtures_produce_distinct_hashes() {
     ];
     for (i, a) in hashes.iter().enumerate() {
         for (j, b) in hashes.iter().enumerate().skip(i + 1) {
-            assert_ne!(a, b, "hash collision between retrieval golden fixtures {i} and {j}");
+            assert_ne!(
+                a, b,
+                "hash collision between retrieval golden fixtures {i} and {j}"
+            );
         }
     }
 }

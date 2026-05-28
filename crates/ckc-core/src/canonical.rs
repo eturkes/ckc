@@ -5,8 +5,9 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 
 /// Content hash in the format `sha256:<hex>`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(transparent)]
 pub struct ContentHash(pub String);
 
@@ -136,10 +137,7 @@ mod tests {
     #[test]
     fn string_escaping() {
         let v = json!({"a": "hello\nworld"});
-        assert_eq!(
-            canonical_json_bytes(&v),
-            br#"{"a":"hello\nworld"}"#
-        );
+        assert_eq!(canonical_json_bytes(&v), br#"{"a":"hello\nworld"}"#);
     }
 
     #[test]

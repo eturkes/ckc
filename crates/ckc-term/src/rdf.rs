@@ -119,7 +119,9 @@ pub fn export_skos_turtle(graph: &TerminologyGraph) -> String {
         .for_writer(Vec::new());
 
     for triple in &triples {
-        serializer.serialize_triple(triple).expect("triple serialization");
+        serializer
+            .serialize_triple(triple)
+            .expect("triple serialization");
     }
 
     let buf = serializer.finish().expect("Turtle finalization");
@@ -137,8 +139,7 @@ mod tests {
     );
 
     fn load_graph() -> TerminologyGraph {
-        let json =
-            std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
+        let json = std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
@@ -160,10 +161,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("exported Turtle must re-parse");
 
-        assert!(
-            !parsed.is_empty(),
-            "round-trip parse must yield triples"
-        );
+        assert!(!parsed.is_empty(), "round-trip parse must yield triples");
 
         // Each concept: type + prefLabel + semanticType = 3 base triples
         // Plus optional altLabel, inScheme, match predicates, source spans
@@ -212,8 +210,7 @@ mod tests {
         let graph = load_graph();
         let turtle = export_skos_turtle(&graph);
         assert!(
-            turtle.contains("eclass/eclass_beta_lactam")
-                || turtle.contains("inScheme"),
+            turtle.contains("eclass/eclass_beta_lactam") || turtle.contains("inScheme"),
             "Turtle must reference e-graph class as scheme"
         );
     }
@@ -246,9 +243,7 @@ mod tests {
         let graph = load_graph();
         let turtle = export_skos_turtle(&graph);
 
-        let triple_count = TurtleParser::new()
-            .for_slice(&turtle)
-            .count();
+        let triple_count = TurtleParser::new().for_slice(&turtle).count();
 
         // Manually counted from fixture: 10 concepts, each has type + prefLabel
         // + semanticType = 30 base. Most have altLabel, inScheme, bindings, spans.

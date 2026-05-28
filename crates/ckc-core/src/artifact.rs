@@ -4,8 +4,8 @@ use serde_json::Value;
 
 use crate::enums::{CaseType, HitPolicy};
 use crate::id::{
-    BundleId, CaseId, CertificateId, DecisionRowId, DecisionTableId, DmnExportId,
-    ExtractedTableId, RuleId, SpanId, WitnessId, WorkflowId,
+    BundleId, CaseId, CertificateId, DecisionRowId, DecisionTableId, DmnExportId, ExtractedTableId,
+    RuleId, SpanId, WitnessId, WorkflowId,
 };
 use crate::source::TableCellRef;
 
@@ -125,9 +125,7 @@ mod tests {
                 serde_json::json!({"field": "temperature", "op": ">=", "value": 38.0}),
                 serde_json::json!({"field": "heart_rate", "op": ">=", "value": 90}),
             ],
-            outputs: vec![
-                serde_json::json!({"action": "sepsis_alert", "level": "high"}),
-            ],
+            outputs: vec![serde_json::json!({"action": "sepsis_alert", "level": "high"})],
             priority: Some(1),
             source_span_ids: vec![SpanId::new("span_tbl_r1")],
             cell_refs: vec![TableCellRef {
@@ -164,15 +162,9 @@ mod tests {
                 serde_json::json!({"from": "triage", "to": "abx_admin", "condition": "sepsis_confirmed"}),
                 serde_json::json!({"from": "abx_admin", "to": "monitoring", "condition": "dose_given"}),
             ],
-            outcomes: vec![
-                serde_json::json!({"id": "recovery", "label": "回復"}),
-            ],
-            assessments: vec![
-                serde_json::json!({"id": "sofa_score", "label": "SOFAスコア"}),
-            ],
-            tasks: vec![
-                serde_json::json!({"id": "blood_culture", "label": "血液培養採取"}),
-            ],
+            outcomes: vec![serde_json::json!({"id": "recovery", "label": "回復"})],
+            assessments: vec![serde_json::json!({"id": "sofa_score", "label": "SOFAスコア"})],
+            tasks: vec![serde_json::json!({"id": "blood_culture", "label": "血液培養採取"})],
             variance_rules: vec![
                 serde_json::json!({"trigger": "allergy_detected", "action": "switch_abx"}),
             ],
@@ -195,9 +187,7 @@ mod tests {
             terminates: vec![
                 serde_json::json!({"event": "clear_allergy", "fluent": "allergy_known"}),
             ],
-            initially: vec![
-                serde_json::json!({"fluent": "allergy_known", "value": false}),
-            ],
+            initially: vec![serde_json::json!({"fluent": "allergy_known", "value": false})],
             holds_queries: vec![
                 serde_json::json!({"fluent": "allergy_known", "time": 10, "expected": true}),
             ],
@@ -213,9 +203,7 @@ mod tests {
                 serde_json::json!({"type": "diagnosis", "code": "sepsis", "active": true}),
                 serde_json::json!({"type": "age", "value": 65, "unit": "years"}),
             ],
-            events: vec![
-                serde_json::json!({"type": "admission", "time": "2024-01-15T08:00:00Z"}),
-            ],
+            events: vec![serde_json::json!({"type": "admission", "time": "2024-01-15T08:00:00Z"})],
             observations: vec![
                 serde_json::json!({"type": "temperature", "value": 39.2, "unit": "celsius"}),
                 serde_json::json!({"type": "heart_rate", "value": 110, "unit": "bpm"}),
@@ -223,9 +211,7 @@ mod tests {
             medications: vec![
                 serde_json::json!({"drug": "beta_lactam", "route": "iv", "status": "proposed"}),
             ],
-            conditions: vec![
-                serde_json::json!({"code": "sepsis", "onset": "2024-01-15"}),
-            ],
+            conditions: vec![serde_json::json!({"code": "sepsis", "onset": "2024-01-15"})],
             allergies: vec![
                 serde_json::json!({"substance": "beta_lactam", "reaction": "anaphylaxis", "severity": "severe"}),
             ],

@@ -160,10 +160,12 @@ mod tests {
         Certificate {
             certificate_id: CertificateId::new("cert_z3_norm_conflict_001"),
             certificate_class: CertificateClass::C4Executable,
-            input_artifact_hashes: vec![
-                ContentHash("sha256:bbbb000000000000000000000000000000000000000000000000000000000001".into()),
-            ],
-            compiler_hash: Some(ContentHash("sha256:cccc000000000000000000000000000000000000000000000000000000000001".into())),
+            input_artifact_hashes: vec![ContentHash(
+                "sha256:bbbb000000000000000000000000000000000000000000000000000000000001".into(),
+            )],
+            compiler_hash: Some(ContentHash(
+                "sha256:cccc000000000000000000000000000000000000000000000000000000000001".into(),
+            )),
             solver_or_checker: "z3".into(),
             command_manifest: serde_json::json!({
                 "command": "z3",
@@ -171,9 +173,9 @@ mod tests {
                 "timeout_ms": 30000
             }),
             result: "sat".into(),
-            proof_artifact_hashes: vec![
-                ContentHash("sha256:dddd000000000000000000000000000000000000000000000000000000000001".into()),
-            ],
+            proof_artifact_hashes: vec![ContentHash(
+                "sha256:dddd000000000000000000000000000000000000000000000000000000000001".into(),
+            )],
             replay_status: ReplayStatus::Passed,
             diagnostics: vec![
                 serde_json::json!({"level": "info", "message": "satisfying assignment found in 42ms"}),
@@ -185,10 +187,12 @@ mod tests {
         AssuranceNode {
             node_id: AssuranceNodeId::new("goal_top_001"),
             node_type: "goal".into(),
-            claim: "Accepted CKC artifacts are source-grounded, deterministic, and formally checkable".into(),
-            evidence_artifact_ids: vec![
-                ContentHash("sha256:eeee000000000000000000000000000000000000000000000000000000000001".into()),
-            ],
+            claim:
+                "Accepted CKC artifacts are source-grounded, deterministic, and formally checkable"
+                    .into(),
+            evidence_artifact_ids: vec![ContentHash(
+                "sha256:eeee000000000000000000000000000000000000000000000000000000000001".into(),
+            )],
             status: "supported".into(),
             children: vec![
                 AssuranceNodeId::new("strategy_verification_001"),
@@ -216,8 +220,14 @@ mod tests {
                 serde_json::json!({"verifier": "clingo", "input_hash": "sha256:bb02", "result": "SAT", "models": 1, "elapsed_ms": 15}),
             ],
             artifact_hashes: vec![
-                ContentHash("sha256:ffff000000000000000000000000000000000000000000000000000000000001".into()),
-                ContentHash("sha256:ffff000000000000000000000000000000000000000000000000000000000002".into()),
+                ContentHash(
+                    "sha256:ffff000000000000000000000000000000000000000000000000000000000001"
+                        .into(),
+                ),
+                ContentHash(
+                    "sha256:ffff000000000000000000000000000000000000000000000000000000000002"
+                        .into(),
+                ),
             ],
             redaction_status: "none".into(),
             audit_export_refs: vec!["runs/toy/audit/trace_run_toy_001.jsonl".into()],
@@ -363,7 +373,11 @@ mod tests {
     fn certificate_input_hashes_nonempty() {
         let cert = fixture_certificate();
         assert!(!cert.input_artifact_hashes.is_empty());
-        assert!(cert.input_artifact_hashes[0].as_str().starts_with("sha256:"));
+        assert!(
+            cert.input_artifact_hashes[0]
+                .as_str()
+                .starts_with("sha256:")
+        );
     }
 
     // -- Empty arrays are valid --
@@ -408,9 +422,9 @@ mod tests {
             node_id: AssuranceNodeId::new("solution_leaf_001"),
             node_type: "solution".into(),
             claim: "Z3 proves norm conflict satisfiable".into(),
-            evidence_artifact_ids: vec![
-                ContentHash("sha256:eeee000000000000000000000000000000000000000000000000000000000001".into()),
-            ],
+            evidence_artifact_ids: vec![ContentHash(
+                "sha256:eeee000000000000000000000000000000000000000000000000000000000001".into(),
+            )],
             status: "supported".into(),
             children: vec![],
         };

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use egg::{define_language, CostFunction, EGraph, Extractor, Id, Language, Symbol};
+use egg::{CostFunction, EGraph, Extractor, Id, Language, Symbol, define_language};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unicode_normalization::UnicodeNormalization;
@@ -55,8 +55,7 @@ impl CostFunction<CkcTerm> for ShortestConceptCost {
 fn normalize_ja_label(label: &str) -> String {
     let nfkc: String = label.nfkc().collect();
     nfkc.replace('β', "ベータ")
-        .replace('-', "")
-        .replace('ー', "")
+        .replace(['-', 'ー'], "")
         .to_lowercase()
 }
 
@@ -129,9 +128,7 @@ impl TermEquivalence {
         sorted_concepts.sort_by_key(|c| c.concept_id.clone());
 
         for concept in &sorted_concepts {
-            let sym_id = egraph.add(CkcTerm::Symbol(
-                Symbol::from(concept.concept_id.as_str()),
-            ));
+            let sym_id = egraph.add(CkcTerm::Symbol(Symbol::from(concept.concept_id.as_str())));
             let ref_id = egraph.add(CkcTerm::ConceptRef([sym_id]));
             concept_node_ids.insert(concept.concept_id.as_str().to_owned(), ref_id);
         }
@@ -186,20 +183,17 @@ impl TermEquivalence {
         // Rule (c): brand-to-class subsumption via narrow bindings.
         for concept in &sorted_concepts {
             for binding in &concept.terminology_bindings {
-                if binding.status == BindingStatus::Narrow {
-                    if let Some(ref code) = binding.code {
-                        let class_concepts =
-                            graph.find_by_system_code(&binding.system, code);
-                        for class_concept in &class_concepts {
-                            if class_concept.concept_id != concept.concept_id {
-                                let brand =
-                                    concept_node_ids[concept.concept_id.as_str()];
-                                let class =
-                                    concept_node_ids[class_concept.concept_id.as_str()];
-                                if egraph.find(brand) != egraph.find(class) {
-                                    egraph.union(brand, class);
-                                    rewrite_count += 1;
-                                }
+                if binding.status == BindingStatus::Narrow
+                    && let Some(ref code) = binding.code
+                {
+                    let class_concepts = graph.find_by_system_code(&binding.system, code);
+                    for class_concept in &class_concepts {
+                        if class_concept.concept_id != concept.concept_id {
+                            let brand = concept_node_ids[concept.concept_id.as_str()];
+                            let class = concept_node_ids[class_concept.concept_id.as_str()];
+                            if egraph.find(brand) != egraph.find(class) {
+                                egraph.union(brand, class);
+                                rewrite_count += 1;
                             }
                         }
                     }
@@ -255,13 +249,13 @@ impl TermEquivalence {
         // via BTreeMap iteration of concept_node_ids).
         let mut egg_to_original: BTreeMap<Id, String> = BTreeMap::new();
         for concept in graph.concepts() {
-            if let Some(ref class_id) = concept.egraph_class_id {
-                if let Some(&node_id) = self.concept_node_ids.get(concept.concept_id.as_str()) {
-                    let canonical = self.egraph.find(node_id);
-                    egg_to_original
-                        .entry(canonical)
-                        .or_insert_with(|| class_id.as_str().to_owned());
-                }
+            if let Some(ref class_id) = concept.egraph_class_id
+                && let Some(&node_id) = self.concept_node_ids.get(concept.concept_id.as_str())
+            {
+                let canonical = self.egraph.find(node_id);
+                egg_to_original
+                    .entry(canonical)
+                    .or_insert_with(|| class_id.as_str().to_owned());
             }
         }
 
@@ -274,9 +268,7 @@ impl TermEquivalence {
                 .cloned()
                 .unwrap_or_else(|| format!("eclass_auto_{}", members[0]));
 
-            let canonical = self
-                .canonical_for(&members[0])
-                .unwrap_or_default();
+            let canonical = self.canonical_for(&members[0]).unwrap_or_default();
 
             class_ids.push(class_label.clone());
             canonical_representatives.push(CanonicalEntry {
@@ -320,9 +312,9 @@ impl TermEquivalence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ckc_core::canonical::ContentHash;
     use ckc_core::canonical::{content_hash, to_canonical_bytes};
     use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
-    use ckc_core::canonical::ContentHash;
     use ckc_core::profile::SemanticProfile;
 
     const FIXTURE_PATH: &str = concat!(
@@ -331,8 +323,7 @@ mod tests {
     );
 
     fn load_graph() -> TerminologyGraph {
-        let json =
-            std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
+        let json = std::fs::read_to_string(FIXTURE_PATH).expect("concepts.json fixture must exist");
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
@@ -352,8 +343,7 @@ mod tests {
             stage: "terminology".into(),
             semantic_profiles: vec![SemanticProfile::Term],
             content_hash: ContentHash(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
             ),
             certificate_ids: vec![],
             replay_command: None,
@@ -552,8 +542,13 @@ mod tests {
     fn artifact_singleton_classes_are_self_canonical() {
         let (graph, engine) = build_engine();
         let artifact = engine.emit_artifact(&graph);
-        let singletons = ["eclass_sepsis", "eclass_anaphylaxis", "eclass_body_temperature",
-                         "eclass_heart_rate", "eclass_blood_pressure"];
+        let singletons = [
+            "eclass_sepsis",
+            "eclass_anaphylaxis",
+            "eclass_body_temperature",
+            "eclass_heart_rate",
+            "eclass_blood_pressure",
+        ];
         for class in &singletons {
             let entry = artifact
                 .canonical_representatives
@@ -606,11 +601,7 @@ mod tests {
     fn artifact_storable_through_cas() {
         let (graph, engine) = build_engine();
         let artifact = engine.emit_artifact(&graph);
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::EgraphArtifact,
-            &artifact,
-            test_meta(),
-        );
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::EgraphArtifact, &artifact, test_meta());
         assert!(envelope.verify_content_hash());
         let extracted: EgraphArtifact = envelope.extract().unwrap();
         assert_eq!(artifact, extracted);
@@ -621,18 +612,10 @@ mod tests {
         let graph = load_graph();
         let e1 = TermEquivalence::from_terminology_graph(&graph);
         let a1 = e1.emit_artifact(&graph);
-        let env1 = ArtifactEnvelope::wrap(
-            ArtifactKind::EgraphArtifact,
-            &a1,
-            test_meta(),
-        );
+        let env1 = ArtifactEnvelope::wrap(ArtifactKind::EgraphArtifact, &a1, test_meta());
         let e2 = TermEquivalence::from_terminology_graph(&graph);
         let a2 = e2.emit_artifact(&graph);
-        let env2 = ArtifactEnvelope::wrap(
-            ArtifactKind::EgraphArtifact,
-            &a2,
-            test_meta(),
-        );
+        let env2 = ArtifactEnvelope::wrap(ArtifactKind::EgraphArtifact, &a2, test_meta());
         assert_eq!(env1.envelope_hash(), env2.envelope_hash());
     }
 
@@ -643,8 +626,14 @@ mod tests {
         let a = normalize_ja_label("βラクタム系抗菌薬");
         let b = normalize_ja_label("ベータラクタム系薬剤");
         let c = normalize_ja_label("β-ラクタム系抗菌薬");
-        assert_eq!(a, c, "Greek-letter and hyphenated variants must normalize identically");
-        assert_ne!(a, b, "suffix-different labels remain distinct after normalization");
+        assert_eq!(
+            a, c,
+            "Greek-letter and hyphenated variants must normalize identically"
+        );
+        assert_ne!(
+            a, b,
+            "suffix-different labels remain distinct after normalization"
+        );
     }
 
     #[test]
@@ -675,8 +664,11 @@ mod tests {
     fn canonical_map_covers_all_concepts() {
         let (graph, engine) = build_engine();
         let map = engine.to_canonical_map();
-        assert_eq!(map.len(), graph.len(),
-            "canonical map must have an entry for every concept");
+        assert_eq!(
+            map.len(),
+            graph.len(),
+            "canonical map must have an entry for every concept"
+        );
     }
 
     #[test]
@@ -703,7 +695,11 @@ mod tests {
     fn canonical_map_singletons_map_to_self() {
         let (_graph, engine) = build_engine();
         let map = engine.to_canonical_map();
-        for concept_id in ["concept_sepsis", "concept_anaphylaxis", "concept_body_temperature"] {
+        for concept_id in [
+            "concept_sepsis",
+            "concept_anaphylaxis",
+            "concept_body_temperature",
+        ] {
             assert_eq!(
                 map.get(concept_id).map(|s| s.as_str()),
                 Some(concept_id),

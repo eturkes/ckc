@@ -7,7 +7,7 @@
 //! Scenario coverage (SPEC 20 Phase 0):
 //!   1. norm conflict       — span_rec_sepsis_bl + span_contra_bl_allergy
 //!   2. terminology variants — span_term_bl_greek, span_term_bl_katakana,
-//!                             span_allergy_history (contains beta-ラクタム)
+//!      span_allergy_history (contains beta-ラクタム)
 //!   3. decision table      — table cell spans (r0-r3, c0-c1) with overlaps
 //!   4. Event Calculus      — span_allergy_history + span_contra_bl_allergy
 //!   5. repair candidates   — same as 1 + 3 (conflict sources for MaxSMT/ASP)
@@ -15,7 +15,7 @@
 //!   7. Lean proof          — same as 1 + 3 (conflict input for formal proof)
 //!   8. replay determinism  — all fixtures participate in hash verification
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::enums::Language;
 use ckc_core::id::*;
 use ckc_core::source::*;
@@ -74,9 +74,7 @@ fn toy_documents() -> Vec<CorpusDocument> {
         CorpusDocument {
             doc_id: DocId::new(DOC_ALLERGY),
             title_ja: "薬物アレルギー・アナフィラキシー対応マニュアル".into(),
-            title_en: Some(
-                "Drug Allergy and Anaphylaxis Management Manual".into(),
-            ),
+            title_en: Some("Drug Allergy and Anaphylaxis Management Manual".into()),
             source_type: "reference".into(),
             publisher: "日本アレルギー学会".into(),
             society: "JSA".into(),
@@ -164,10 +162,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_EVIDENCE),
             doc_id: DocId::new(DOC_SEPSIS),
-            section_path: vec![
-                "CQ1".into(),
-                "エビデンス".into(),
-            ],
+            section_path: vec!["CQ1".into(), "エビデンス".into()],
             cq_id: Some(CqId::new("cq_sepsis_abx")),
             page: Some(12),
             bbox: Some(BBox {
@@ -207,10 +202,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_TERM_GREEK),
             doc_id: DocId::new(DOC_SEPSIS),
-            section_path: vec![
-                "CQ1".into(),
-                "用語解説".into(),
-            ],
+            section_path: vec!["CQ1".into(), "用語解説".into()],
             cq_id: None,
             page: Some(13),
             bbox: Some(BBox {
@@ -245,10 +237,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_TERM_KATAKANA),
             doc_id: DocId::new(DOC_SEPSIS),
-            section_path: vec![
-                "CQ1".into(),
-                "用語解説".into(),
-            ],
+            section_path: vec!["CQ1".into(), "用語解説".into()],
             cq_id: None,
             page: Some(13),
             bbox: Some(BBox {
@@ -258,18 +247,10 @@ fn toy_spans() -> Vec<SourceSpan> {
                 height: 28.0,
             }),
             table_cell: None,
-            raw_text:
-                "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する"
-                    .into(),
-            nfkc_text:
-                "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する"
-                    .into(),
-            search_text:
-                "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する"
-                    .into(),
-            display_text:
-                "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する"
-                    .into(),
+            raw_text: "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する".into(),
+            nfkc_text: "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する".into(),
+            search_text: "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する".into(),
+            display_text: "ベータラクタム系薬剤はその化学構造にベータラクタム環を有する".into(),
             language: Language::Ja,
             previous_span_id: Some(SpanId::new(SPAN_TERM_GREEK)),
             next_span_id: Some(SpanId::new(SPAN_PROVENANCE)),
@@ -354,9 +335,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_ALLERGY_HIST),
             doc_id: DocId::new(DOC_ALLERGY),
-            section_path: vec![
-                "アレルギー歴確認".into(),
-            ],
+            section_path: vec!["アレルギー歴確認".into()],
             cq_id: None,
             page: Some(8),
             bbox: Some(BBox {
@@ -398,10 +377,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_VITALS_CAPTION),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -418,9 +394,7 @@ fn toy_spans() -> Vec<SourceSpan> {
             language: Language::Ja,
             previous_span_id: None,
             next_span_id: None,
-            extractor_votes: vec![yomitoku(
-                "表１：バイタルサイン評価基準と対応",
-            )],
+            extractor_votes: vec![yomitoku("表１：バイタルサイン評価基準と対応")],
             confidence: 0.97,
         },
         // Row 0: temperature >= 38.0 -> antipyretic
@@ -428,10 +402,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R0C0),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -458,10 +429,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R0C1),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -489,10 +457,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R1C0),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -519,10 +484,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R1C1),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -551,10 +513,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R2C0),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -581,10 +540,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R2C1),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -613,10 +569,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R3C0),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -643,10 +596,7 @@ fn toy_spans() -> Vec<SourceSpan> {
         SourceSpan {
             span_id: SpanId::new(SPAN_CELL_R3C1),
             doc_id: DocId::new(DOC_VITALS),
-            section_path: vec![
-                "バイタルサイン".into(),
-                "表1".into(),
-            ],
+            section_path: vec!["バイタルサイン".into(), "表1".into()],
             cq_id: None,
             page: Some(3),
             bbox: Some(BBox {
@@ -721,8 +671,7 @@ fn toy_tables() -> Vec<ExtractedTable> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
 }
 
 // =========================================================================
@@ -731,8 +680,7 @@ fn fixtures_dir() -> std::path::PathBuf {
 
 #[test]
 fn spans_reference_existing_documents() {
-    let doc_ids: HashSet<String> =
-        toy_documents().iter().map(|d| d.doc_id.0.clone()).collect();
+    let doc_ids: HashSet<String> = toy_documents().iter().map(|d| d.doc_id.0.clone()).collect();
     for span in &toy_spans() {
         assert!(
             doc_ids.contains(&span.doc_id.0),
@@ -746,8 +694,7 @@ fn spans_reference_existing_documents() {
 #[test]
 fn span_chains_are_consistent() {
     let spans = toy_spans();
-    let by_id: HashMap<&str, &SourceSpan> =
-        spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
+    let by_id: HashMap<&str, &SourceSpan> = spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
 
     for span in &spans {
         if let Some(ref next_id) = span.next_span_id {
@@ -790,8 +737,7 @@ fn span_chains_are_consistent() {
 #[test]
 fn span_chains_stay_within_same_document() {
     let spans = toy_spans();
-    let by_id: HashMap<&str, &SourceSpan> =
-        spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
+    let by_id: HashMap<&str, &SourceSpan> = spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
 
     for span in &spans {
         if let Some(ref next_id) = span.next_span_id {
@@ -807,8 +753,7 @@ fn span_chains_stay_within_same_document() {
 
 #[test]
 fn table_cell_spans_exist_in_span_set() {
-    let span_ids: HashSet<String> =
-        toy_spans().iter().map(|s| s.span_id.0.clone()).collect();
+    let span_ids: HashSet<String> = toy_spans().iter().map(|s| s.span_id.0.clone()).collect();
     for table in &toy_tables() {
         for cell_id in &table.cell_span_ids {
             assert!(
@@ -831,8 +776,7 @@ fn table_cell_spans_exist_in_span_set() {
 
 #[test]
 fn table_cell_refs_reference_existing_table() {
-    let table_ids: HashSet<String> =
-        toy_tables().iter().map(|t| t.table_id.0.clone()).collect();
+    let table_ids: HashSet<String> = toy_tables().iter().map(|t| t.table_id.0.clone()).collect();
     for span in &toy_spans() {
         if let Some(ref cell_ref) = span.table_cell {
             assert!(
@@ -921,7 +865,7 @@ fn canonical_hashes_deterministic_across_construction() {
 #[test]
 fn individual_spans_have_distinct_hashes() {
     let spans = toy_spans();
-    let hashes: Vec<ContentHash> = spans.iter().map(|s| content_hash(s)).collect();
+    let hashes: Vec<ContentHash> = spans.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -933,7 +877,7 @@ fn individual_spans_have_distinct_hashes() {
 #[test]
 fn individual_documents_have_distinct_hashes() {
     let docs = toy_documents();
-    let hashes: Vec<ContentHash> = docs.iter().map(|d| content_hash(d)).collect();
+    let hashes: Vec<ContentHash> = docs.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -949,8 +893,7 @@ fn individual_documents_have_distinct_hashes() {
 #[test]
 fn scenario_coverage_all_eight() {
     let spans = toy_spans();
-    let by_id: HashMap<&str, &SourceSpan> =
-        spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
+    let by_id: HashMap<&str, &SourceSpan> = spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
 
     // Scenario 1: norm conflict — recommendation + contraindication spans
     assert!(by_id.contains_key(SPAN_REC_SEPSIS));
@@ -987,7 +930,11 @@ fn scenario_coverage_all_eight() {
     // (no additional spans required)
 
     // Scenario 8: replay — all fixtures participate in hash determinism
-    assert_eq!(spans.len(), 16, "expected 16 spans for full scenario coverage");
+    assert_eq!(
+        spans.len(),
+        16,
+        "expected 16 spans for full scenario coverage"
+    );
 }
 
 // =========================================================================
@@ -1079,8 +1026,11 @@ fn regen_fixtures() {
     let dir = fixtures_dir();
     std::fs::create_dir_all(&dir).unwrap();
 
-    std::fs::write(dir.join("documents.json"), to_canonical_bytes(&toy_documents()))
-        .unwrap();
+    std::fs::write(
+        dir.join("documents.json"),
+        to_canonical_bytes(&toy_documents()),
+    )
+    .unwrap();
     std::fs::write(dir.join("spans.json"), to_canonical_bytes(&toy_spans())).unwrap();
     std::fs::write(dir.join("tables.json"), to_canonical_bytes(&toy_tables())).unwrap();
 

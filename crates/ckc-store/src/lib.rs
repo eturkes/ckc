@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use ckc_core::canonical::{to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, to_canonical_bytes};
 use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind};
 use ckc_core::profile::SemanticProfile;
 use schemars::JsonSchema;
@@ -148,10 +148,7 @@ impl ContentStore {
         Ok(StoreManifest { entries })
     }
 
-    fn walk_objects(
-        dir: &Path,
-        entries: &mut Vec<ManifestEntry>,
-    ) -> Result<(), StoreError> {
+    fn walk_objects(dir: &Path, entries: &mut Vec<ManifestEntry>) -> Result<(), StoreError> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -237,8 +234,7 @@ mod tests {
             stage: stage.into(),
             semantic_profiles: vec![],
             content_hash: ContentHash(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
             ),
             certificate_ids: vec![],
             replay_command: None,
@@ -305,8 +301,7 @@ mod tests {
             access_date: None,
             license_status: "permitted".into(),
             content_hash: ContentHash(
-                "sha256:bb00000000000000000000000000000000000000000000000000000000000001"
-                    .into(),
+                "sha256:bb00000000000000000000000000000000000000000000000000000000000001".into(),
             ),
             extraction_manifest_id: ManifestId::new("manifest_test_001"),
             supersedes: None,
@@ -413,8 +408,7 @@ mod tests {
     fn exists_false_for_absent() {
         let (store, _tmp) = test_store();
         let hash = ContentHash(
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                .into(),
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
         );
         assert!(!store.exists(&hash));
     }
@@ -455,8 +449,7 @@ mod tests {
     fn get_nonexistent_returns_io_error() {
         let (store, _tmp) = test_store();
         let hash = ContentHash(
-            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                .into(),
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
         );
         assert!(matches!(store.get(&hash), Err(StoreError::Io(_))));
     }
@@ -465,10 +458,7 @@ mod tests {
     fn invalid_hash_rejected_by_get() {
         let (store, _tmp) = test_store();
         let bad = ContentHash("bad_hash".into());
-        assert!(matches!(
-            store.get(&bad),
-            Err(StoreError::InvalidHash(_))
-        ));
+        assert!(matches!(store.get(&bad), Err(StoreError::InvalidHash(_))));
     }
 
     #[test]
@@ -665,11 +655,8 @@ mod tests {
             .put_batch(&[rule_envelope(), document_envelope()])
             .unwrap();
         let manifest = store.generate_manifest().unwrap();
-        let envelope = ArtifactEnvelope::wrap(
-            ArtifactKind::StoreManifest,
-            &manifest,
-            meta("manifest"),
-        );
+        let envelope =
+            ArtifactEnvelope::wrap(ArtifactKind::StoreManifest, &manifest, meta("manifest"));
         let hash = store.put(&envelope).unwrap();
         let got = store.get(&hash).unwrap();
         assert_eq!(envelope, got);

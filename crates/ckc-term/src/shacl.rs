@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 use ckc_core::clinical::Rule;
 
 /// SHACL severity levels.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ShaclSeverity {
     Info,
@@ -73,7 +74,10 @@ pub fn default_rule_shapes() -> Vec<NodeShape> {
     }]
 }
 
-fn evaluate_rule_constraint(rule: &Rule, constraint: &PropertyConstraint) -> Option<ShaclViolation> {
+fn evaluate_rule_constraint(
+    rule: &Rule,
+    constraint: &PropertyConstraint,
+) -> Option<ShaclViolation> {
     let (actual, required) = match (constraint.path.as_str(), &constraint.kind) {
         ("source_span_ids", ConstraintKind::MinCount(n)) => (rule.source_span_ids.len(), *n),
         ("provenance", ConstraintKind::MinLength(n)) => (rule.provenance.len(), *n),
@@ -156,7 +160,10 @@ mod tests {
              (source_span_ids + provenance)"
         );
 
-        let paths: Vec<&str> = incomplete_violations.iter().map(|v| v.path.as_str()).collect();
+        let paths: Vec<&str> = incomplete_violations
+            .iter()
+            .map(|v| v.path.as_str())
+            .collect();
         assert!(paths.contains(&"source_span_ids"));
         assert!(paths.contains(&"provenance"));
     }

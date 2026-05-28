@@ -6,7 +6,7 @@ use ckc_core::enums::Language;
 use ckc_core::id::{QueryId, SpanId};
 
 pub mod sparse;
-pub use sparse::{compute_index_fingerprint, ipadic_tokens, SparseIndex};
+pub use sparse::{SparseIndex, compute_index_fingerprint, ipadic_tokens};
 
 /// Morphological analyzer configuration for Japanese text retrieval.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -91,12 +91,10 @@ mod tests {
                 },
             ],
             index_fingerprint: ContentHash(
-                "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
-                    .into(),
+                "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".into(),
             ),
             corpus_hash: ContentHash(
-                "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                    .into(),
+                "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".into(),
             ),
         }
     }
@@ -121,10 +119,22 @@ mod tests {
         };
     }
 
-    roundtrip_test!(analyzer_config_roundtrip, fixture_analyzer_config, AnalyzerConfig);
-    roundtrip_test!(retrieval_query_roundtrip, fixture_retrieval_query, RetrievalQuery);
+    roundtrip_test!(
+        analyzer_config_roundtrip,
+        fixture_analyzer_config,
+        AnalyzerConfig
+    );
+    roundtrip_test!(
+        retrieval_query_roundtrip,
+        fixture_retrieval_query,
+        RetrievalQuery
+    );
     roundtrip_test!(retrieval_hit_roundtrip, fixture_retrieval_hit, RetrievalHit);
-    roundtrip_test!(retrieval_result_roundtrip, fixture_retrieval_result, RetrievalResult);
+    roundtrip_test!(
+        retrieval_result_roundtrip,
+        fixture_retrieval_result,
+        RetrievalResult
+    );
     roundtrip_test!(qrel_judgment_roundtrip, fixture_qrel_judgment, QrelJudgment);
 
     #[test]

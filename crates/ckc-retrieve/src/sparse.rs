@@ -17,9 +17,9 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
-use ckc_core::canonical::{content_hash, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash};
 use ckc_core::id::SpanId;
 use ckc_core::source::SourceSpan;
 
@@ -31,9 +31,9 @@ use lindera_tantivy::tokenizer::LinderaTokenizer;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::{
-    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED,
+    Field, IndexRecordOption, STORED, Schema, TextFieldIndexing, TextOptions, Value,
 };
-use tantivy::{doc, Index, IndexReader, TantivyDocument};
+use tantivy::{Index, IndexReader, TantivyDocument, doc};
 
 use crate::RetrievalHit;
 

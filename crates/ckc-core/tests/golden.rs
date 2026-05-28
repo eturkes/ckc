@@ -1,23 +1,23 @@
 use std::path::PathBuf;
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use ckc_core::artifact::{
     DecisionRow, DecisionTable, EventNarrative, ExecutionWitness, PatientCase, WorkflowFragment,
 };
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::clinical::{
     Action, ClinicalClaim, ConfidenceInterval, EtDFrame, EvidenceAtom, Norm, PICOFrame, Rule,
 };
 use ckc_core::enums::*;
+use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::id::*;
 use ckc_core::profile::SemanticProfile;
 use ckc_core::source::{
     BBox, Concept, CorpusDocument, ExtractedTable, ExtractorVote, SourceSpan, TableCellRef,
     TerminologyBinding,
 };
-use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -64,8 +64,8 @@ fn check_roundtrip<T: Serialize + DeserializeOwned + PartialEq + std::fmt::Debug
 ) {
     let bytes1 = to_canonical_bytes(fixture);
     let hash1 = content_hash(fixture);
-    let rt: T = serde_json::from_slice(&bytes1)
-        .unwrap_or_else(|e| panic!("deserialize {stem}: {e}"));
+    let rt: T =
+        serde_json::from_slice(&bytes1).unwrap_or_else(|e| panic!("deserialize {stem}: {e}"));
     let bytes2 = to_canonical_bytes(&rt);
     let hash2 = content_hash(&rt);
     assert_eq!(bytes1, bytes2, "bytes differ after roundtrip for {stem}");
@@ -87,9 +87,7 @@ fn check_schema<T: schemars::JsonSchema>(stem: &str) {
 // ---------------------------------------------------------------------------
 
 fn golden_content_hash() -> ContentHash {
-    ContentHash(
-        "sha256:a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1".into(),
-    )
+    ContentHash("sha256:a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1".into())
 }
 
 fn golden_bbox() -> BBox {
@@ -137,8 +135,7 @@ fn golden_corpus_document() -> CorpusDocument {
         access_date: None,
         license_status: "permitted_research".into(),
         content_hash: ContentHash(
-            "sha256:a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1"
-                .into(),
+            "sha256:a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1".into(),
         ),
         extraction_manifest_id: ManifestId::new("manifest_gl_sepsis_2024"),
         supersedes: None,
@@ -323,9 +320,7 @@ fn golden_clinical_claim() -> ClinicalClaim {
 fn golden_decision_row() -> DecisionRow {
     DecisionRow {
         row_id: DecisionRowId::new("row_vitals_r1"),
-        conditions: vec![
-            serde_json::json!({"field": "temperature", "op": ">=", "value": 38.0}),
-        ],
+        conditions: vec![serde_json::json!({"field": "temperature", "op": ">=", "value": 38.0})],
         outputs: vec![serde_json::json!({"action": "sepsis_alert"})],
         priority: Some(1),
         source_span_ids: vec![SpanId::new("span_tbl_r1")],
@@ -365,9 +360,7 @@ fn golden_event_narrative() -> EventNarrative {
         event_types: vec!["administer_drug".into(), "detect_allergy".into()],
         fluent_types: vec!["allergy_known".into()],
         happens: vec![serde_json::json!({"event": "detect_allergy", "time": 0})],
-        initiates: vec![
-            serde_json::json!({"event": "detect_allergy", "fluent": "allergy_known"}),
-        ],
+        initiates: vec![serde_json::json!({"event": "detect_allergy", "fluent": "allergy_known"})],
         terminates: vec![],
         initially: vec![serde_json::json!({"fluent": "allergy_known", "value": false})],
         holds_queries: vec![
@@ -382,15 +375,11 @@ fn golden_patient_case() -> PatientCase {
         case_id: CaseId::new("case_sepsis_allergy"),
         case_type: CaseType::Synthetic,
         facts: vec![serde_json::json!({"type": "diagnosis", "code": "sepsis"})],
-        events: vec![
-            serde_json::json!({"type": "admission", "time": "2024-01-15T08:00:00Z"}),
-        ],
+        events: vec![serde_json::json!({"type": "admission", "time": "2024-01-15T08:00:00Z"})],
         observations: vec![serde_json::json!({"type": "temperature", "value": 39.2})],
         medications: vec![],
         conditions: vec![serde_json::json!({"code": "sepsis"})],
-        allergies: vec![
-            serde_json::json!({"severity": "severe", "substance": "beta_lactam"}),
-        ],
+        allergies: vec![serde_json::json!({"severity": "severe", "substance": "beta_lactam"})],
         time_origin: Some("2024-01-15T08:00:00Z".into()),
         source_span_ids: vec![SpanId::new("span_case_001")],
         privacy_status: "synthetic".into(),
@@ -441,9 +430,7 @@ fn golden_argument_graph() -> ArgumentGraph {
     ArgumentGraph {
         argument_graph_id: ArgumentGraphId::new("ag_bl_001"),
         arguments: vec![serde_json::json!({"id": "arg_recommend"})],
-        attack_edges: vec![
-            serde_json::json!({"from": "arg_contra", "to": "arg_recommend"}),
-        ],
+        attack_edges: vec![serde_json::json!({"from": "arg_contra", "to": "arg_recommend"})],
         support_edges: vec![],
         undercut_edges: vec![],
         defeat_edges: vec![],
@@ -521,11 +508,7 @@ fn golden_artifact_meta() -> ArtifactMeta {
 }
 
 fn golden_artifact_envelope() -> ArtifactEnvelope {
-    ArtifactEnvelope::wrap(
-        ArtifactKind::Rule,
-        &golden_rule(),
-        golden_artifact_meta(),
-    )
+    ArtifactEnvelope::wrap(ArtifactKind::Rule, &golden_rule(), golden_artifact_meta())
 }
 
 // ---------------------------------------------------------------------------
@@ -560,37 +543,152 @@ macro_rules! golden_suite {
 // Suite invocations (31 types = 93 tests)
 // ---------------------------------------------------------------------------
 
-golden_suite!(gs_content_hash, ContentHash, golden_content_hash, "content_hash");
+golden_suite!(
+    gs_content_hash,
+    ContentHash,
+    golden_content_hash,
+    "content_hash"
+);
 golden_suite!(gs_bbox, BBox, golden_bbox, "bbox");
-golden_suite!(gs_table_cell_ref, TableCellRef, golden_table_cell_ref, "table_cell_ref");
-golden_suite!(gs_extractor_vote, ExtractorVote, golden_extractor_vote, "extractor_vote");
-golden_suite!(gs_confidence_interval, ConfidenceInterval, golden_confidence_interval, "confidence_interval");
-golden_suite!(gs_corpus_document, CorpusDocument, golden_corpus_document, "corpus_document");
-golden_suite!(gs_source_span, SourceSpan, golden_source_span, "source_span");
-golden_suite!(gs_extracted_table, ExtractedTable, golden_extracted_table, "extracted_table");
-golden_suite!(gs_terminology_binding, TerminologyBinding, golden_terminology_binding, "terminology_binding");
+golden_suite!(
+    gs_table_cell_ref,
+    TableCellRef,
+    golden_table_cell_ref,
+    "table_cell_ref"
+);
+golden_suite!(
+    gs_extractor_vote,
+    ExtractorVote,
+    golden_extractor_vote,
+    "extractor_vote"
+);
+golden_suite!(
+    gs_confidence_interval,
+    ConfidenceInterval,
+    golden_confidence_interval,
+    "confidence_interval"
+);
+golden_suite!(
+    gs_corpus_document,
+    CorpusDocument,
+    golden_corpus_document,
+    "corpus_document"
+);
+golden_suite!(
+    gs_source_span,
+    SourceSpan,
+    golden_source_span,
+    "source_span"
+);
+golden_suite!(
+    gs_extracted_table,
+    ExtractedTable,
+    golden_extracted_table,
+    "extracted_table"
+);
+golden_suite!(
+    gs_terminology_binding,
+    TerminologyBinding,
+    golden_terminology_binding,
+    "terminology_binding"
+);
 golden_suite!(gs_concept, Concept, golden_concept, "concept");
 golden_suite!(gs_pico_frame, PICOFrame, golden_pico_frame, "pico_frame");
 golden_suite!(gs_etd_frame, EtDFrame, golden_etd_frame, "etd_frame");
-golden_suite!(gs_evidence_atom, EvidenceAtom, golden_evidence_atom, "evidence_atom");
+golden_suite!(
+    gs_evidence_atom,
+    EvidenceAtom,
+    golden_evidence_atom,
+    "evidence_atom"
+);
 golden_suite!(gs_action, Action, golden_action, "action");
 golden_suite!(gs_norm, Norm, golden_norm, "norm");
 golden_suite!(gs_rule, Rule, golden_rule, "rule");
-golden_suite!(gs_clinical_claim, ClinicalClaim, golden_clinical_claim, "clinical_claim");
-golden_suite!(gs_decision_row, DecisionRow, golden_decision_row, "decision_row");
-golden_suite!(gs_decision_table, DecisionTable, golden_decision_table, "decision_table");
-golden_suite!(gs_workflow_fragment, WorkflowFragment, golden_workflow_fragment, "workflow_fragment");
-golden_suite!(gs_event_narrative, EventNarrative, golden_event_narrative, "event_narrative");
-golden_suite!(gs_patient_case, PatientCase, golden_patient_case, "patient_case");
-golden_suite!(gs_execution_witness, ExecutionWitness, golden_execution_witness, "execution_witness");
+golden_suite!(
+    gs_clinical_claim,
+    ClinicalClaim,
+    golden_clinical_claim,
+    "clinical_claim"
+);
+golden_suite!(
+    gs_decision_row,
+    DecisionRow,
+    golden_decision_row,
+    "decision_row"
+);
+golden_suite!(
+    gs_decision_table,
+    DecisionTable,
+    golden_decision_table,
+    "decision_table"
+);
+golden_suite!(
+    gs_workflow_fragment,
+    WorkflowFragment,
+    golden_workflow_fragment,
+    "workflow_fragment"
+);
+golden_suite!(
+    gs_event_narrative,
+    EventNarrative,
+    golden_event_narrative,
+    "event_narrative"
+);
+golden_suite!(
+    gs_patient_case,
+    PatientCase,
+    golden_patient_case,
+    "patient_case"
+);
+golden_suite!(
+    gs_execution_witness,
+    ExecutionWitness,
+    golden_execution_witness,
+    "execution_witness"
+);
 golden_suite!(gs_conflict, Conflict, golden_conflict, "conflict");
-golden_suite!(gs_argument_graph, ArgumentGraph, golden_argument_graph, "argument_graph");
-golden_suite!(gs_certificate, Certificate, golden_certificate, "certificate");
-golden_suite!(gs_assurance_node, AssuranceNode, golden_assurance_node, "assurance_node");
-golden_suite!(gs_audit_trace, AuditTrace, golden_audit_trace, "audit_trace");
-golden_suite!(gs_artifact_kind, ArtifactKind, golden_artifact_kind, "artifact_kind");
-golden_suite!(gs_artifact_meta, ArtifactMeta, golden_artifact_meta, "artifact_meta");
-golden_suite!(gs_artifact_envelope, ArtifactEnvelope, golden_artifact_envelope, "artifact_envelope");
+golden_suite!(
+    gs_argument_graph,
+    ArgumentGraph,
+    golden_argument_graph,
+    "argument_graph"
+);
+golden_suite!(
+    gs_certificate,
+    Certificate,
+    golden_certificate,
+    "certificate"
+);
+golden_suite!(
+    gs_assurance_node,
+    AssuranceNode,
+    golden_assurance_node,
+    "assurance_node"
+);
+golden_suite!(
+    gs_audit_trace,
+    AuditTrace,
+    golden_audit_trace,
+    "audit_trace"
+);
+golden_suite!(
+    gs_artifact_kind,
+    ArtifactKind,
+    golden_artifact_kind,
+    "artifact_kind"
+);
+golden_suite!(
+    gs_artifact_meta,
+    ArtifactMeta,
+    golden_artifact_meta,
+    "artifact_meta"
+);
+golden_suite!(
+    gs_artifact_envelope,
+    ArtifactEnvelope,
+    golden_artifact_envelope,
+    "artifact_envelope"
+);
 
 // ---------------------------------------------------------------------------
 // Cross-type: all 31 golden fixtures produce distinct content hashes

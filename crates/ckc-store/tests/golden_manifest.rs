@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::envelope::ArtifactKind;
 use ckc_core::profile::SemanticProfile;
 use ckc_store::{ManifestEntry, StoreManifest};
@@ -60,8 +60,8 @@ fn golden_canonical_bytes() {
     let manifest = golden_store_manifest();
     let bytes = to_canonical_bytes(&manifest);
     let path = golden_dir().join("store_manifest.json");
-    let golden = std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("read golden {}: {e}", path.display()));
+    let golden =
+        std::fs::read(&path).unwrap_or_else(|e| panic!("read golden {}: {e}", path.display()));
     assert!(
         bytes == golden,
         "canonical bytes mismatch for store_manifest (got {} bytes, golden {} bytes)",
@@ -101,11 +101,7 @@ fn regenerate() {
     let manifest = golden_store_manifest();
     let g = golden_dir();
     std::fs::create_dir_all(&g).unwrap();
-    std::fs::write(
-        g.join("store_manifest.json"),
-        to_canonical_bytes(&manifest),
-    )
-    .unwrap();
+    std::fs::write(g.join("store_manifest.json"), to_canonical_bytes(&manifest)).unwrap();
 
     let schema = schemars::schema_for!(StoreManifest);
     std::fs::write(

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use ckc_core::artifact::{
     DecisionTable, EventNarrative, ExecutionWitness, PatientCase, WorkflowFragment,
 };
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::clinical::{ClinicalClaim, Rule};
 use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::nf::{NfContext, Normalize};
@@ -19,14 +19,12 @@ use serde_json::json;
 
 const DOCUMENTS_JSON: &str =
     include_str!("../../../examples/toy_research_kernel/fixtures/documents.json");
-const SPANS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/spans.json");
+const SPANS_JSON: &str = include_str!("../../../examples/toy_research_kernel/fixtures/spans.json");
 const TABLES_JSON: &str =
     include_str!("../../../examples/toy_research_kernel/fixtures/tables.json");
 const CONCEPTS_JSON: &str =
     include_str!("../../../examples/toy_research_kernel/fixtures/concepts.json");
-const RULES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/rules.json");
+const RULES_JSON: &str = include_str!("../../../examples/toy_research_kernel/fixtures/rules.json");
 const CLAIMS_JSON: &str =
     include_str!("../../../examples/toy_research_kernel/fixtures/claims.json");
 const DECISION_TABLES_JSON: &str =
@@ -76,8 +74,7 @@ impl Bundle {
                 .expect("decision_tables.json"),
             event_narratives: serde_json::from_str(EVENT_NARRATIVES_JSON)
                 .expect("event_narratives.json"),
-            patient_cases: serde_json::from_str(PATIENT_CASES_JSON)
-                .expect("patient_cases.json"),
+            patient_cases: serde_json::from_str(PATIENT_CASES_JSON).expect("patient_cases.json"),
             workflows: serde_json::from_str(WORKFLOWS_JSON).expect("workflows.json"),
             conflicts: serde_json::from_str(CONFLICTS_JSON).expect("conflicts.json"),
             argument_graphs: serde_json::from_str(ARGUMENT_GRAPHS_JSON)
@@ -172,13 +169,10 @@ fn envelope_meta(stage: &str, profiles: Vec<SemanticProfile>) -> ArtifactMeta {
         stage: stage.into(),
         semantic_profiles: profiles,
         content_hash: ContentHash(
-            "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                .into(),
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
         ),
         certificate_ids: vec![],
-        replay_command: Some(
-            "ckc demo toy-research-kernel --replay --out runs/toy".into(),
-        ),
+        replay_command: Some("ckc demo toy-research-kernel --replay --out runs/toy".into()),
     }
 }
 
@@ -293,11 +287,7 @@ fn concepts_reference_valid_spans() {
     let sids = b.span_ids();
     for c in &b.concepts {
         let refs: Vec<&str> = c.source_span_ids.iter().map(|s| s.as_str()).collect();
-        assert_subset(
-            &refs,
-            &sids,
-            &format!("concept {}", c.concept_id.as_str()),
-        );
+        assert_subset(&refs, &sids, &format!("concept {}", c.concept_id.as_str()));
     }
 }
 
@@ -326,8 +316,7 @@ fn claims_reference_valid_spans_rules_dts_workflows() {
         assert_subset(&rule_refs, &rids, &ctx);
         let dt_refs: Vec<&str> = c.decision_table_ids.iter().map(|d| d.as_str()).collect();
         assert_subset(&dt_refs, &dtids, &ctx);
-        let wf_refs: Vec<&str> =
-            c.workflow_fragment_ids.iter().map(|w| w.as_str()).collect();
+        let wf_refs: Vec<&str> = c.workflow_fragment_ids.iter().map(|w| w.as_str()).collect();
         assert_subset(&wf_refs, &wids, &ctx);
     }
 }
@@ -340,7 +329,10 @@ fn decision_tables_reference_valid_spans_and_tables() {
     for dt in &b.decision_tables {
         let ctx = format!("decision_table {}", dt.table_id.as_str());
         if let Some(ref stid) = dt.source_table_id {
-            assert!(tids.contains(stid.as_str()), "{ctx}: unknown source_table_id");
+            assert!(
+                tids.contains(stid.as_str()),
+                "{ctx}: unknown source_table_id"
+            );
         }
         for row in &dt.rows {
             let refs: Vec<&str> = row.source_span_ids.iter().map(|s| s.as_str()).collect();
@@ -365,7 +357,11 @@ fn patient_cases_reference_valid_spans() {
     let sids = b.span_ids();
     for pc in &b.patient_cases {
         let refs: Vec<&str> = pc.source_span_ids.iter().map(|s| s.as_str()).collect();
-        assert_subset(&refs, &sids, &format!("patient_case {}", pc.case_id.as_str()));
+        assert_subset(
+            &refs,
+            &sids,
+            &format!("patient_case {}", pc.case_id.as_str()),
+        );
     }
 }
 
@@ -471,22 +467,26 @@ fn all_eight_scenarios_covered() {
     let b = Bundle::load();
 
     // Scenario 1: sepsis recommends beta-lactam, anaphylaxis contraindicates, shared witness
-    assert!(b
-        .conflicts
-        .iter()
-        .any(|c| c.conflict_type == "norm_contradiction"));
-    assert!(b
-        .execution_witnesses
-        .iter()
-        .any(|w| w.case_id
+    assert!(
+        b.conflicts
+            .iter()
+            .any(|c| c.conflict_type == "norm_contradiction")
+    );
+    assert!(b.execution_witnesses.iter().any(|w| {
+        w.case_id
             .as_ref()
-            .is_some_and(|c| c.as_str() == "case_sepsis_allergy")));
+            .is_some_and(|c| c.as_str() == "case_sepsis_allergy")
+    }));
 
     // Scenario 2: βラクタム variants normalize through e-graph
     let bl_variants: Vec<_> = b
         .concepts
         .iter()
-        .filter(|c| c.egraph_class_id.as_ref().is_some_and(|e| e.as_str() == "eclass_beta_lactam"))
+        .filter(|c| {
+            c.egraph_class_id
+                .as_ref()
+                .is_some_and(|e| e.as_str() == "eclass_beta_lactam")
+        })
         .collect();
     assert!(
         bl_variants.len() >= 5,
@@ -495,29 +495,29 @@ fn all_eight_scenarios_covered() {
     );
 
     // Scenario 3: decision table overlapping rows + gap witness
-    assert!(b
-        .conflicts
-        .iter()
-        .any(|c| c.conflict_type == "decision_table_overlap"));
+    assert!(
+        b.conflicts
+            .iter()
+            .any(|c| c.conflict_type == "decision_table_overlap")
+    );
 
     // Scenario 4: Event Calculus allergy persistence
-    assert!(b
-        .conflicts
-        .iter()
-        .any(|c| c.conflict_type == "temporal_violation"));
+    assert!(
+        b.conflicts
+            .iter()
+            .any(|c| c.conflict_type == "temporal_violation")
+    );
     assert!(!b.event_narratives.is_empty());
 
     // Scenario 5: repair candidates exist
-    assert!(b
-        .conflicts
-        .iter()
-        .all(|c| !c.repair_candidates.is_empty()));
+    assert!(b.conflicts.iter().all(|c| !c.repair_candidates.is_empty()));
 
     // Scenario 6: missing provenance (for SHACL)
-    assert!(b
-        .rules
-        .iter()
-        .any(|r| r.source_span_ids.is_empty() && r.provenance.is_empty()));
+    assert!(
+        b.rules
+            .iter()
+            .any(|r| r.source_span_ids.is_empty() && r.provenance.is_empty())
+    );
 
     // Scenario 7: norm conflict as Lean proof obligation
     let norm_conflict = b

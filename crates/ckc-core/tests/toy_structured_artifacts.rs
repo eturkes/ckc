@@ -15,7 +15,7 @@
 //!   8. replay           — all fixtures participate in hash determinism
 
 use ckc_core::artifact::*;
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::enums::*;
 use ckc_core::id::*;
 use ckc_core::nf::{NfContext, Normalize};
@@ -64,11 +64,7 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
     vec![DecisionTable {
         table_id: DecisionTableId::new(DT_VITALS_TRIAGE),
         hit_policy: HitPolicy::Unique,
-        input_columns: vec![
-            "体温".into(),
-            "心拍数".into(),
-            "収縮期血圧".into(),
-        ],
+        input_columns: vec!["体温".into(), "心拍数".into(), "収縮期血圧".into()],
         output_columns: vec!["対応".into()],
         rows: vec![
             // Row 0: temperature >= 38.0 → antipyretic
@@ -83,13 +79,18 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
                     serde_json::json!({"action": "administer_antipyretic", "label_ja": "解熱薬投与を検討"}),
                 ],
                 priority: None,
-                source_span_ids: vec![
-                    SpanId::new(SPAN_CELL_R0C0),
-                    SpanId::new(SPAN_CELL_R0C1),
-                ],
+                source_span_ids: vec![SpanId::new(SPAN_CELL_R0C0), SpanId::new(SPAN_CELL_R0C1)],
                 cell_refs: vec![
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 0, col: 0 },
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 0, col: 1 },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 0,
+                        col: 0,
+                    },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 0,
+                        col: 1,
+                    },
                 ],
             },
             // Row 1: temperature >= 38.5 → cooling (OVERLAPS with row 0)
@@ -105,13 +106,18 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
                     serde_json::json!({"action": "initiate_cooling", "label_ja": "冷却処置を開始"}),
                 ],
                 priority: None,
-                source_span_ids: vec![
-                    SpanId::new(SPAN_CELL_R1C0),
-                    SpanId::new(SPAN_CELL_R1C1),
-                ],
+                source_span_ids: vec![SpanId::new(SPAN_CELL_R1C0), SpanId::new(SPAN_CELL_R1C1)],
                 cell_refs: vec![
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 1, col: 0 },
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 1, col: 1 },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 1,
+                        col: 0,
+                    },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 1,
+                        col: 1,
+                    },
                 ],
             },
             // Row 2: heart rate > 90 → enhanced monitoring
@@ -126,13 +132,18 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
                     serde_json::json!({"action": "enhance_monitoring", "label_ja": "経過観察を強化"}),
                 ],
                 priority: None,
-                source_span_ids: vec![
-                    SpanId::new(SPAN_CELL_R2C0),
-                    SpanId::new(SPAN_CELL_R2C1),
-                ],
+                source_span_ids: vec![SpanId::new(SPAN_CELL_R2C0), SpanId::new(SPAN_CELL_R2C1)],
                 cell_refs: vec![
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 2, col: 0 },
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 2, col: 1 },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 2,
+                        col: 0,
+                    },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 2,
+                        col: 1,
+                    },
                 ],
             },
             // Row 3: systolic BP < 90 → fluid resuscitation
@@ -147,13 +158,18 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
                     serde_json::json!({"action": "fluid_resuscitation", "label_ja": "輸液負荷を開始"}),
                 ],
                 priority: None,
-                source_span_ids: vec![
-                    SpanId::new(SPAN_CELL_R3C0),
-                    SpanId::new(SPAN_CELL_R3C1),
-                ],
+                source_span_ids: vec![SpanId::new(SPAN_CELL_R3C0), SpanId::new(SPAN_CELL_R3C1)],
                 cell_refs: vec![
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 3, col: 0 },
-                    TableCellRef { table_id: ExtractedTableId::new(TBL_VITALS), row: 3, col: 1 },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 3,
+                        col: 0,
+                    },
+                    TableCellRef {
+                        table_id: ExtractedTableId::new(TBL_VITALS),
+                        row: 3,
+                        col: 1,
+                    },
                 ],
             },
         ],
@@ -165,14 +181,8 @@ fn toy_decision_tables() -> Vec<DecisionTable> {
 
 fn toy_event_narratives() -> Vec<EventNarrative> {
     vec![EventNarrative {
-        event_types: vec![
-            "detect_allergy".into(),
-            "administer_drug".into(),
-        ],
-        fluent_types: vec![
-            "allergy_known".into(),
-            "drug_active".into(),
-        ],
+        event_types: vec!["detect_allergy".into(), "administer_drug".into()],
+        fluent_types: vec!["allergy_known".into(), "drug_active".into()],
         happens: vec![
             serde_json::json!({"event": "detect_allergy", "time": 0, "source": "allergy_history_review"}),
             serde_json::json!({"event": "administer_drug", "time": 10, "drug": "beta_lactam", "source": "sepsis_protocol"}),
@@ -186,18 +196,13 @@ fn toy_event_narratives() -> Vec<EventNarrative> {
             serde_json::json!({"fluent": "allergy_known", "value": false}),
             serde_json::json!({"fluent": "drug_active", "value": false}),
         ],
-        holds_queries: vec![
-            serde_json::json!({
-                "fluent": "allergy_known",
-                "time": 10,
-                "expected": true,
-                "rationale": "allergy_known persists from t=0; no terminating event clears it before t=10"
-            }),
-        ],
-        source_span_ids: vec![
-            SpanId::new(SPAN_ALLERGY_HIST),
-            SpanId::new(SPAN_CONTRA),
-        ],
+        holds_queries: vec![serde_json::json!({
+            "fluent": "allergy_known",
+            "time": 10,
+            "expected": true,
+            "rationale": "allergy_known persists from t=0; no terminating event clears it before t=10"
+        })],
+        source_span_ids: vec![SpanId::new(SPAN_ALLERGY_HIST), SpanId::new(SPAN_CONTRA)],
     }]
 }
 
@@ -262,10 +267,7 @@ fn toy_patient_cases() -> Vec<PatientCase> {
             ],
             allergies: vec![],
             time_origin: Some("2024-02-10T10:00:00Z".into()),
-            source_span_ids: vec![
-                SpanId::new(SPAN_REC_SEPSIS),
-                SpanId::new(SPAN_EVIDENCE),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
             privacy_status: "synthetic".into(),
         },
     ]
@@ -318,15 +320,13 @@ fn toy_workflows() -> Vec<WorkflowFragment> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
 }
 
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
-    let bytes = std::fs::read(dir.join("spans.json")).expect(
-        "0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first",
-    );
+    let bytes = std::fs::read(dir.join("spans.json"))
+        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -338,9 +338,8 @@ fn load_span_ids_from_fixtures() -> HashSet<String> {
 
 fn load_table_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
-    let bytes = std::fs::read(dir.join("tables.json")).expect(
-        "0.5.1 tables.json must exist; run toy_source_corpus regen_fixtures first",
-    );
+    let bytes = std::fs::read(dir.join("tables.json"))
+        .expect("0.5.1 tables.json must exist; run toy_source_corpus regen_fixtures first");
     let tables: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("tables.json must deserialize");
     tables
@@ -349,7 +348,6 @@ fn load_table_ids_from_fixtures() -> HashSet<String> {
         .map(String::from)
         .collect()
 }
-
 
 // =========================================================================
 // Decision table: overlap and gap validation (scenario 3)
@@ -408,7 +406,10 @@ fn decision_table_has_overlapping_temperature_rows() {
     assert!(
         t1 >= t0,
         "row {} threshold ({}) must be >= row {} threshold ({})",
-        i1, t1, i0, t0
+        i1,
+        t1,
+        i0,
+        t0
     );
 
     let out0 = &rows[i0].outputs;
@@ -470,14 +471,20 @@ fn decision_table_rows_have_consistent_column_count() {
     let n_out = dt.output_columns.len();
     for row in &dt.rows {
         assert_eq!(
-            row.conditions.len(), n_in,
+            row.conditions.len(),
+            n_in,
             "row {} has {} conditions but table has {} input columns",
-            row.row_id, row.conditions.len(), n_in
+            row.row_id,
+            row.conditions.len(),
+            n_in
         );
         assert_eq!(
-            row.outputs.len(), n_out,
+            row.outputs.len(),
+            n_out,
             "row {} has {} outputs but table has {} output columns",
-            row.row_id, row.outputs.len(), n_out
+            row.row_id,
+            row.outputs.len(),
+            n_out
         );
     }
 }
@@ -536,11 +543,7 @@ fn event_narrative_happens_times_non_negative() {
             .get("time")
             .and_then(|v| v.as_i64())
             .expect("happens axiom must have numeric time");
-        assert!(
-            time >= 0,
-            "happens time must be non-negative; got {}",
-            time
-        );
+        assert!(time >= 0, "happens time must be non-negative; got {}", time);
     }
 }
 
@@ -548,11 +551,7 @@ fn event_narrative_happens_times_non_negative() {
 fn event_narrative_initiates_reference_valid_events() {
     let narratives = toy_event_narratives();
     let en = &narratives[0];
-    let valid_events: HashSet<&str> = en
-        .event_types
-        .iter()
-        .map(String::as_str)
-        .collect();
+    let valid_events: HashSet<&str> = en.event_types.iter().map(String::as_str).collect();
     for init in &en.initiates {
         let event = init
             .get("event")
@@ -561,7 +560,8 @@ fn event_narrative_initiates_reference_valid_events() {
         assert!(
             valid_events.contains(event),
             "initiates references unknown event type {}; valid: {:?}",
-            event, valid_events
+            event,
+            valid_events
         );
     }
 }
@@ -570,11 +570,7 @@ fn event_narrative_initiates_reference_valid_events() {
 fn event_narrative_initiates_reference_valid_fluents() {
     let narratives = toy_event_narratives();
     let en = &narratives[0];
-    let valid_fluents: HashSet<&str> = en
-        .fluent_types
-        .iter()
-        .map(String::as_str)
-        .collect();
+    let valid_fluents: HashSet<&str> = en.fluent_types.iter().map(String::as_str).collect();
     for init in &en.initiates {
         let fluent = init
             .get("fluent")
@@ -583,7 +579,8 @@ fn event_narrative_initiates_reference_valid_fluents() {
         assert!(
             valid_fluents.contains(fluent),
             "initiates references unknown fluent type {}; valid: {:?}",
-            fluent, valid_fluents
+            fluent,
+            valid_fluents
         );
     }
 }
@@ -602,8 +599,15 @@ fn event_narrative_allergy_persists_at_administration() {
                 .and_then(|v| v.as_str())
                 .is_some_and(|f| f == "allergy_known")
     });
-    assert!(allergy_init.is_some(), "detect_allergy must initiate allergy_known");
-    let init_time = allergy_init.unwrap().get("time").and_then(|v| v.as_i64()).unwrap();
+    assert!(
+        allergy_init.is_some(),
+        "detect_allergy must initiate allergy_known"
+    );
+    let init_time = allergy_init
+        .unwrap()
+        .get("time")
+        .and_then(|v| v.as_i64())
+        .unwrap();
 
     // administer_drug happens at t=10
     let admin = en.happens.iter().find(|h| {
@@ -616,7 +620,8 @@ fn event_narrative_allergy_persists_at_administration() {
     assert!(
         admin_time > init_time,
         "administration (t={}) must occur after allergy detection (t={})",
-        admin_time, init_time
+        admin_time,
+        init_time
     );
 
     // No terminating event clears allergy_known before administration
@@ -642,7 +647,10 @@ fn event_narrative_allergy_persists_at_administration() {
                 .and_then(|v| v.as_i64())
                 .is_some_and(|t| t == admin_time)
     });
-    assert!(query.is_some(), "holds_query must check allergy_known at administration time");
+    assert!(
+        query.is_some(),
+        "holds_query must check allergy_known at administration time"
+    );
     let expected = query
         .unwrap()
         .get("expected")
@@ -804,7 +812,8 @@ fn all_decision_table_spans_exist() {
                 assert!(
                     valid_spans.contains(span_id.as_str()),
                     "decision table row {} references unknown span_id {}",
-                    row.row_id, span_id
+                    row.row_id,
+                    span_id
                 );
             }
         }
@@ -833,7 +842,8 @@ fn all_patient_case_spans_exist() {
             assert!(
                 valid_spans.contains(span_id.as_str()),
                 "patient case {} references unknown span_id {}",
-                pc.case_id, span_id
+                pc.case_id,
+                span_id
             );
         }
     }
@@ -847,7 +857,8 @@ fn all_workflow_spans_exist() {
             assert!(
                 valid_spans.contains(span_id.as_str()),
                 "workflow {} references unknown span_id {}",
-                wf.workflow_id, span_id
+                wf.workflow_id,
+                span_id
             );
         }
     }
@@ -862,7 +873,8 @@ fn decision_table_cell_refs_reference_existing_table() {
                 assert!(
                     table_ids.contains(cell_ref.table_id.as_str()),
                     "decision row {} cell_ref references unknown table {}",
-                    row.row_id, cell_ref.table_id
+                    row.row_id,
+                    cell_ref.table_id
                 );
             }
         }
@@ -900,7 +912,7 @@ fn canonical_hashes_deterministic_across_construction() {
 #[test]
 fn individual_patient_cases_have_distinct_hashes() {
     let cases = toy_patient_cases();
-    let hashes: Vec<ContentHash> = cases.iter().map(|c| content_hash(c)).collect();
+    let hashes: Vec<ContentHash> = cases.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -912,11 +924,7 @@ fn individual_patient_cases_have_distinct_hashes() {
 #[test]
 fn individual_decision_rows_have_distinct_hashes() {
     let tables = toy_decision_tables();
-    let hashes: Vec<ContentHash> = tables[0]
-        .rows
-        .iter()
-        .map(|r| content_hash(r))
-        .collect();
+    let hashes: Vec<ContentHash> = tables[0].rows.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -970,20 +978,12 @@ fn nf_decision_table_sorts_rows_under_unique_policy() {
 
     // Under Unique hit policy, rows are sorted by canonical bytes.
     // Verify rows are deterministically ordered.
-    let row_ids: Vec<&str> = tables[0]
-        .rows
-        .iter()
-        .map(|r| r.row_id.as_str())
-        .collect();
+    let row_ids: Vec<&str> = tables[0].rows.iter().map(|r| r.row_id.as_str()).collect();
     // Re-normalize to confirm stability
     let mut ctx2 = NfContext::new();
     let mut tables2 = toy_decision_tables();
     tables2[0].normalize(&mut ctx2);
-    let row_ids2: Vec<&str> = tables2[0]
-        .rows
-        .iter()
-        .map(|r| r.row_id.as_str())
-        .collect();
+    let row_ids2: Vec<&str> = tables2[0].rows.iter().map(|r| r.row_id.as_str()).collect();
     assert_eq!(row_ids, row_ids2, "NF row ordering must be deterministic");
 }
 
@@ -1057,7 +1057,10 @@ fn nf_idempotent_decision_tables() {
     }
     let bytes2 = to_canonical_bytes(&tables);
 
-    assert_eq!(bytes1, bytes2, "NF(NF(decision_tables)) must equal NF(decision_tables)");
+    assert_eq!(
+        bytes1, bytes2,
+        "NF(NF(decision_tables)) must equal NF(decision_tables)"
+    );
 }
 
 #[test]
@@ -1075,7 +1078,10 @@ fn nf_idempotent_event_narratives() {
     }
     let bytes2 = to_canonical_bytes(&narratives);
 
-    assert_eq!(bytes1, bytes2, "NF(NF(event_narratives)) must equal NF(event_narratives)");
+    assert_eq!(
+        bytes1, bytes2,
+        "NF(NF(event_narratives)) must equal NF(event_narratives)"
+    );
 }
 
 #[test]
@@ -1093,7 +1099,10 @@ fn nf_idempotent_patient_cases() {
     }
     let bytes2 = to_canonical_bytes(&cases);
 
-    assert_eq!(bytes1, bytes2, "NF(NF(patient_cases)) must equal NF(patient_cases)");
+    assert_eq!(
+        bytes1, bytes2,
+        "NF(NF(patient_cases)) must equal NF(patient_cases)"
+    );
 }
 
 #[test]
@@ -1198,28 +1207,24 @@ fn committed_workflows_match() {
 fn committed_fixtures_deserialize_correctly() {
     let dir = fixtures_dir();
 
-    let dts: Vec<DecisionTable> = serde_json::from_slice(
-        &std::fs::read(dir.join("decision_tables.json")).unwrap(),
-    )
-    .expect("decision_tables.json must deserialize");
+    let dts: Vec<DecisionTable> =
+        serde_json::from_slice(&std::fs::read(dir.join("decision_tables.json")).unwrap())
+            .expect("decision_tables.json must deserialize");
     assert_eq!(dts.len(), 1);
 
-    let ens: Vec<EventNarrative> = serde_json::from_slice(
-        &std::fs::read(dir.join("event_narratives.json")).unwrap(),
-    )
-    .expect("event_narratives.json must deserialize");
+    let ens: Vec<EventNarrative> =
+        serde_json::from_slice(&std::fs::read(dir.join("event_narratives.json")).unwrap())
+            .expect("event_narratives.json must deserialize");
     assert_eq!(ens.len(), 1);
 
-    let pcs: Vec<PatientCase> = serde_json::from_slice(
-        &std::fs::read(dir.join("patient_cases.json")).unwrap(),
-    )
-    .expect("patient_cases.json must deserialize");
+    let pcs: Vec<PatientCase> =
+        serde_json::from_slice(&std::fs::read(dir.join("patient_cases.json")).unwrap())
+            .expect("patient_cases.json must deserialize");
     assert_eq!(pcs.len(), 2);
 
-    let wfs: Vec<WorkflowFragment> = serde_json::from_slice(
-        &std::fs::read(dir.join("workflows.json")).unwrap(),
-    )
-    .expect("workflows.json must deserialize");
+    let wfs: Vec<WorkflowFragment> =
+        serde_json::from_slice(&std::fs::read(dir.join("workflows.json")).unwrap())
+            .expect("workflows.json must deserialize");
     assert_eq!(wfs.len(), 1);
 }
 
@@ -1254,5 +1259,8 @@ fn regen_fixtures() {
     )
     .unwrap();
 
-    eprintln!("Regenerated structured artifact fixtures in {}", dir.display());
+    eprintln!(
+        "Regenerated structured artifact fixtures in {}",
+        dir.display()
+    );
 }

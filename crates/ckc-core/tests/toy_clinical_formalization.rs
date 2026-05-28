@@ -11,7 +11,7 @@
 //!
 //! All objects reference source spans from 0.5.1 (toy_source_corpus).
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes, ContentHash};
+use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::clinical::*;
 use ckc_core::enums::*;
 use ckc_core::id::*;
@@ -77,10 +77,7 @@ fn toy_rules() -> Vec<Rule> {
             exceptions: vec!["beta_lactam_anaphylaxis".into()],
             temporal_scope: Some("acute_phase".into()),
             population_scope: Some("adult".into()),
-            source_span_ids: vec![
-                SpanId::new(SPAN_REC_SEPSIS),
-                SpanId::new(SPAN_EVIDENCE),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
             provenance: "JSICM sepsis guideline 2024, CQ1".into(),
             certificate_ids: vec![],
         },
@@ -89,8 +86,7 @@ fn toy_rules() -> Vec<Rule> {
             rule_id: RuleId::new(RULE_BL_CONTRA),
             profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
             kind: RuleKind::Defeasible,
-            context: "(allergy_history beta_lactam anaphylaxis) AND (patient)"
-                .into(),
+            context: "(allergy_history beta_lactam anaphylaxis) AND (patient)".into(),
             antecedent: "(allergy_history beta_lactam anaphylaxis)".into(),
             consequent: "(contraindicate beta_lactam)".into(),
             norm: Some(Norm {
@@ -117,12 +113,8 @@ fn toy_rules() -> Vec<Rule> {
             exceptions: vec![],
             temporal_scope: None,
             population_scope: None,
-            source_span_ids: vec![
-                SpanId::new(SPAN_CONTRA),
-                SpanId::new(SPAN_ALLERGY_HIST),
-            ],
-            provenance: "JSA drug allergy manual ed.3, contraindication section"
-                .into(),
+            source_span_ids: vec![SpanId::new(SPAN_CONTRA), SpanId::new(SPAN_ALLERGY_HIST)],
+            provenance: "JSA drug allergy manual ed.3, contraindication section".into(),
             certificate_ids: vec![],
         },
         // Rule C: provenance-incomplete rule (scenario 6 — SHACL violation)
@@ -154,10 +146,7 @@ fn toy_pico() -> PICOFrame {
         cq_id: Some(CqId::new(CQ_SEPSIS_ABX)),
         scope: "inpatient ICU".into(),
         exclusions: vec!["βラクタムアレルギー既往".into()],
-        source_span_ids: vec![
-            SpanId::new(SPAN_REC_SEPSIS),
-            SpanId::new(SPAN_EVIDENCE),
-        ],
+        source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
     }
 }
 
@@ -173,10 +162,7 @@ fn toy_etd() -> EtDFrame {
         feasibility: "feasible in ICU setting".into(),
         recommendation_direction: RecommendationDirection::For,
         recommendation_strength: RecommendationStrength::Strong,
-        source_span_ids: vec![
-            SpanId::new(SPAN_REC_SEPSIS),
-            SpanId::new(SPAN_EVIDENCE),
-        ],
+        source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
     }
 }
 
@@ -205,19 +191,14 @@ fn toy_claims() -> Vec<ClinicalClaim> {
             claim_id: ClaimId::new(CLAIM_SEPSIS_RECOMMEND),
             claim_type: "recommendation".into(),
             profiles: vec![SemanticProfile::Evidence, SemanticProfile::Norm],
-            source_span_ids: vec![
-                SpanId::new(SPAN_REC_SEPSIS),
-                SpanId::new(SPAN_EVIDENCE),
-            ],
+            source_span_ids: vec![SpanId::new(SPAN_REC_SEPSIS), SpanId::new(SPAN_EVIDENCE)],
             pico: Some(toy_pico()),
             etd: Some(toy_etd()),
             evidence_atoms: vec![toy_evidence_atom()],
             rule_ids: vec![RuleId::new(RULE_SEPSIS_RECOMMEND)],
             decision_table_ids: vec![],
             workflow_fragment_ids: vec![],
-            gloss_ja:
-                "敗血症患者にはβラクタム系抗菌薬の投与を強く推奨する"
-                    .into(),
+            gloss_ja: "敗血症患者にはβラクタム系抗菌薬の投与を強く推奨する".into(),
             gloss_en: "Beta-lactam antibiotics are strongly recommended \
                        for adult sepsis patients"
                 .into(),
@@ -251,16 +232,14 @@ fn toy_claims() -> Vec<ClinicalClaim> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
 }
 
 /// Load 0.5.1 span IDs from committed fixtures for referential validation.
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
-    let bytes = std::fs::read(dir.join("spans.json")).expect(
-        "0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first",
-    );
+    let bytes = std::fs::read(dir.join("spans.json"))
+        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -336,10 +315,7 @@ fn claims_reference_existing_spans() {
 
 #[test]
 fn claims_reference_existing_rules() {
-    let rule_ids: HashSet<String> = toy_rules()
-        .iter()
-        .map(|r| r.rule_id.0.clone())
-        .collect();
+    let rule_ids: HashSet<String> = toy_rules().iter().map(|r| r.rule_id.0.clone()).collect();
     for claim in &toy_claims() {
         for rid in &claim.rule_ids {
             assert!(
@@ -356,8 +332,7 @@ fn claims_reference_existing_rules() {
 fn pico_cq_id_matches_source_span_cq() {
     let dir = fixtures_dir();
     let bytes = std::fs::read(dir.join("spans.json")).unwrap();
-    let spans: Vec<serde_json::Value> =
-        serde_json::from_slice(&bytes).unwrap();
+    let spans: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
     let span_cq_ids: HashSet<String> = spans
         .iter()
         .filter_map(|s| s.get("cq_id").and_then(|v| v.as_str()))
@@ -476,7 +451,7 @@ fn canonical_hashes_deterministic_across_construction() {
 #[test]
 fn individual_rules_have_distinct_hashes() {
     let rules = toy_rules();
-    let hashes: Vec<ContentHash> = rules.iter().map(|r| content_hash(r)).collect();
+    let hashes: Vec<ContentHash> = rules.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -488,8 +463,7 @@ fn individual_rules_have_distinct_hashes() {
 #[test]
 fn individual_claims_have_distinct_hashes() {
     let claims = toy_claims();
-    let hashes: Vec<ContentHash> =
-        claims.iter().map(|c| content_hash(c)).collect();
+    let hashes: Vec<ContentHash> = claims.iter().map(content_hash).collect();
     let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
     assert_eq!(
         unique.len(),
@@ -535,10 +509,7 @@ fn nf_rule_recommendation_sorts_span_ids() {
     // ["span_evidence_sepsis", "span_rec_sepsis_bl"]
     assert_eq!(
         rule.source_span_ids,
-        vec![
-            SpanId::new(SPAN_EVIDENCE),
-            SpanId::new(SPAN_REC_SEPSIS),
-        ],
+        vec![SpanId::new(SPAN_EVIDENCE), SpanId::new(SPAN_REC_SEPSIS),],
         "NF must sort source_span_ids alphabetically"
     );
 }
@@ -553,10 +524,7 @@ fn nf_rule_contraindication_sorts_span_ids() {
     // ["span_allergy_history", "span_contra_bl_allergy"]
     assert_eq!(
         rule.source_span_ids,
-        vec![
-            SpanId::new(SPAN_ALLERGY_HIST),
-            SpanId::new(SPAN_CONTRA),
-        ],
+        vec![SpanId::new(SPAN_ALLERGY_HIST), SpanId::new(SPAN_CONTRA),],
         "NF must sort contraindication span_ids"
     );
 }
@@ -581,11 +549,7 @@ fn nf_deontic_projection_already_canonical() {
     );
 
     // No Pass 9 rewrites expected (projections already match lexicon)
-    let pass9_rewrites: Vec<_> = ctx
-        .rewrites
-        .iter()
-        .filter(|r| r.pass == 9)
-        .collect();
+    let pass9_rewrites: Vec<_> = ctx.rewrites.iter().filter(|r| r.pass == 9).collect();
     assert!(
         pass9_rewrites.is_empty(),
         "deontic projections already match lexicon; \
@@ -626,10 +590,7 @@ fn nf_stable_ids_are_deterministic() {
 
     let ids1 = normalize_and_collect();
     let ids2 = normalize_and_collect();
-    assert_eq!(
-        ids1, ids2,
-        "NF stable IDs must be identical across runs"
-    );
+    assert_eq!(ids1, ids2, "NF stable IDs must be identical across runs");
 }
 
 #[test]
@@ -737,9 +698,8 @@ fn committed_claims_match() {
 #[test]
 fn committed_fixtures_deserialize_correctly() {
     let dir = fixtures_dir();
-    let rules: Vec<Rule> =
-        serde_json::from_slice(&std::fs::read(dir.join("rules.json")).unwrap())
-            .expect("rules.json must deserialize");
+    let rules: Vec<Rule> = serde_json::from_slice(&std::fs::read(dir.join("rules.json")).unwrap())
+        .expect("rules.json must deserialize");
     let claims: Vec<ClinicalClaim> =
         serde_json::from_slice(&std::fs::read(dir.join("claims.json")).unwrap())
             .expect("claims.json must deserialize");
@@ -788,13 +748,8 @@ fn regen_fixtures() {
     let dir = fixtures_dir();
     std::fs::create_dir_all(&dir).unwrap();
 
-    std::fs::write(dir.join("rules.json"), to_canonical_bytes(&toy_rules()))
-        .unwrap();
-    std::fs::write(
-        dir.join("claims.json"),
-        to_canonical_bytes(&toy_claims()),
-    )
-    .unwrap();
+    std::fs::write(dir.join("rules.json"), to_canonical_bytes(&toy_rules())).unwrap();
+    std::fs::write(dir.join("claims.json"), to_canonical_bytes(&toy_claims())).unwrap();
 
     eprintln!("Regenerated clinical fixtures in {}", dir.display());
 }
