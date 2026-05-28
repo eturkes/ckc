@@ -44,6 +44,16 @@ technically derivable but easily forgotten under token pressure.
   invisible per-command. Either prefix commands with
   `PATH="$HOME/.local/share/mise/shims:$PATH"` or rely on tools already in the
   base PATH (`~/.cargo/bin`, `~/.local/bin`, `~/.local/share/pnpm/bin`).
+- [2026-05-29] The Claude `rust-analyzer-lsp` plugin requires the real
+  `rust-analyzer` binary on PATH; `~/.cargo/bin/rust-analyzer` is a rustup
+  multiplexer symlink that exists even when the component is not installed,
+  and invoking it without the component yields `Unknown binary 'rust-analyzer'
+  in official toolchain`. The Claude LSP host swallows this and surfaces only
+  a generic `Tool result missing due to internal error` after a long hang.
+  Fix: `rustup component add rust-analyzer`. Reproduce-detect cheaply by
+  running `rust-analyzer --version` before debugging the LSP host. Note this
+  supersedes the stance in commit 2fa9393, which deferred the install when
+  Claude's diagnostic loop relied only on `cargo check`/`clippy`/`test`.
 
 ## Mistakes
 
