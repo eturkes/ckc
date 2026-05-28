@@ -207,7 +207,9 @@ technically derivable but easily forgotten under token pressure.
   despite CLAUDE.md granting full permission to install/download anything.
   Treat "make full use of your capabilities and environment" as standing
   authorization: always provision the tool the task wants the moment it is
-  missing. This sandbox is apt-based with passwordless sudo (the kernel string
-  reads openSUSE-like but the working package manager is apt), so the path is
-  `sudo apt-get install -y <pkg>`; system-level installs of standard utilities
-  are appropriate and leave no project clutter.
+  missing. This sandbox is a Debian Distrobox container on an openSUSE-based
+  host, so userspace is Debian with apt + passwordless sudo even though `uname`
+  reports the openSUSE host kernel (that mismatch is expected, not a
+  misconfiguration). Install path: `sudo apt-get install -y <pkg>`;
+  system-level installs of standard utilities are appropriate and leave no
+  project clutter.
