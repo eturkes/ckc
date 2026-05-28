@@ -119,6 +119,40 @@ technically derivable but easily forgotten under token pressure.
   continuation indent line that follows it (`        //         …`) — it
   becomes an orphaned half-sentence otherwise. Verify with grep before
   committing.
+- [2026-05-29] LSP-first reflex for code navigation (user feedback: LSP is
+  under-used). When a session needs to find symbols, callers, definitions,
+  types, or call graphs in a file whose extension is covered by an installed
+  `*-lsp` plugin, default to the `LSP` tool over `grep` and full-file `Read`.
+  The Claude `LSP` tool exposes navigation/structure operations only — no
+  diagnostics, no completion: `goToDefinition`, `findReferences`, `hover`,
+  `documentSymbol`, `workspaceSymbol`, `goToImplementation`,
+  `prepareCallHierarchy`, `incomingCalls`, `outgoingCalls`. Map to the grep
+  patterns LLM sessions reach for first:
+  * `workspaceSymbol` replaces multi-dir `grep` for "where is `Foo`
+    defined" — name-only, no position needed.
+  * `documentSymbol` replaces `grep '^\(fn\|struct\|impl\|trait\)'` for
+    enumerating items in a file — path-only, no position needed.
+  * `findReferences` replaces `grep '\bfoo\b'` for callers/usages —
+    semantic, cross-file, immune to identifier collisions in unrelated
+    scopes.
+  * `goToDefinition` + `hover` replace `Read`ing a possibly-large defining
+    file when only the signature or jump target is needed.
+  * `incomingCalls`/`outgoingCalls` give a real call graph with no grep
+    equivalent — run before refactoring a function to size blast radius.
+  Position-based ops (`hover`, `findReferences`, `goToDefinition`,
+  `goToImplementation`, `prepareCallHierarchy`) need 1-based `line` and
+  `character`. Use `Read` once to locate the identifier, then issue LSP
+  in the next response (or in parallel with other tools once the position
+  is known). For diagnostics keep using `cargo check`/`just clippy`/
+  `just test` — the LSP value is navigation, not feedback. Covered
+  extensions today (cross-check `claude plugin list` if uncertain): `.rs`,
+  `.py`, `.json/.jsonc`, `.yaml/.yml`, `.md`, `.toml`, `.lean`, `.ttl/.nt`,
+  `.xml/.xsd/.dmn/.bpmn`, `.als`, `.pl/.pro`,
+  `.smt2/.cnf/.icnf/.p/.tptp/.zf`, `.dl`, `.egg`, `.html`,
+  `.css/.scss/.less`, `.svelte`. First call per server (notably
+  rust-analyzer) pays one indexing cost; treat as per-session warmup, not
+  a reason to fall back to grep. Fire LSP in parallel with other
+  independent tools in the same response.
 
 ## Mistakes
 
