@@ -206,10 +206,7 @@ technically derivable but easily forgotten under token pressure.
   `python3 -c` one-liners and only installed `jq` after the user interrupted,
   despite CLAUDE.md granting full permission to install/download anything.
   Treat "make full use of your capabilities and environment" as standing
-  authorization: always provision the tool the task wants the moment it is
-  missing. This sandbox is a Debian Distrobox container on an openSUSE-based
-  host, so userspace is Debian with apt + passwordless sudo even though `uname`
-  reports the openSUSE host kernel (that mismatch is expected, not a
-  misconfiguration). Install path: `sudo apt-get install -y <pkg>`;
-  system-level installs of standard utilities are appropriate and leave no
-  project clutter.
+  authorization: always provision the tool the moment it is missing. A standard
+  system utility (jq and the like) is fine to install system-wide despite the
+  prefer-project-local directive; distro/package-manager specifics now live in
+  CLAUDE.md.
