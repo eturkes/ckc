@@ -64,6 +64,21 @@ technically derivable but easily forgotten under token pressure.
   add … --scope project` + `claude plugin install <name> --scope project`
   is the supported automation path. Per-LSP install steps and gotchas live
   in `.claude/marketplace/plugins/<name>-lsp/README.md`.
+- [2026-05-29] `bgcmd` (single-file bash script from
+  github.com/izabera/bgcmd) is installed at `~/.local/bin/bgcmd` for driving
+  interactive REPLs across separate `Bash` tool calls (solvers like
+  z3/cvc5/clingo in interactive mode, lean REPL, duckdb, psql, gdb/rr, python).
+  Required env: `BGCMDPROMPT` must equal the REPL's exact prompt string;
+  `BGCMDDIR` (defaults `$HOME/.bgcmd`) holds the in/out fifos + pid file.
+  Pattern: `BGCMDDIR=path BGCMDPROMPT='>>> ' bgcmd START python3 -i -q` then
+  `BGCMDDIR=path BGCMDPROMPT='>>> ' bgcmd '<line>'` per turn; the prompt env
+  vars must be re-exported on each call because non-interactive `Bash` does not
+  preserve shell state. Per-REPL wrapper scripts (README pattern) eliminate
+  this repetition when used heavily. To run multiple concurrent REPLs, give
+  each a distinct `BGCMDDIR`. REPLs that suppress the prompt under non-TTY
+  stdout require a force-interactive flag (e.g. python `-i`, bash
+  `--noediting -i`). No pty is spawned, so ANSI escapes do not contaminate
+  output. Cleanup: `kill "$(cat $BGCMDDIR/pid)"` then `rm -rf $BGCMDDIR`.
 - [2026-05-29] No standalone LSP exists as of 2026-05 for these
   SPEC verification-target formats (audited at source):
   * TLA+ — `tlaplus/vscode-tlaplus` is a TS extension that shells out to
