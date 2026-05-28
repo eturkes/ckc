@@ -56,80 +56,26 @@ technically derivable but easily forgotten under token pressure.
   Claude's diagnostic loop relied only on `cargo check`/`clippy`/`test`.
 - [2026-05-29] Project-local LSP marketplace lives at
   `.claude/marketplace/.claude-plugin/marketplace.json` and is wired in via
-  project-scope `.claude/settings.json` (path stored relative,
-  `.claude/marketplace`). Adding/enabling plugins mid-session does NOT take
-  effect — the Claude LSP host caches plugin discovery at session start, so
-  any new `*-lsp@ckc-lsps` plugin requires a Claude Code restart before
-  `LSP` calls find it. Use `claude plugin list` to confirm enablement state
-  cheaply without restarting. `claude plugin marketplace add … --scope project`
-  + `claude plugin install <name> --scope project` is the supported automation
-  path (avoids hand-editing settings.json beyond fixing absolute→relative
-  marketplace path).
-- [2026-05-29] LSP server install gotchas hit on this project:
-  * `taplo` LSP is gated behind `--features lsp`; default `cargo install
-    taplo-cli` ships only the CLI. Use `cargo install --locked taplo-cli
-    --features lsp`.
-  * `cargo install marksman` resolves a placeholder crates.io package
-    (`marksman v0.0.1`, no targets). Install via release binary from
-    `github.com/artempyanykh/marksman/releases/latest` into `~/.local/bin/`
-    instead.
-  * `vscode-langservers-extracted` (single pnpm package) provides four
-    binaries: `vscode-{html,css,json,eslint}-language-server`. Reuse across
-    JSON/HTML/CSS plugins instead of installing each LSP separately.
-  * Lean 4 LSP is `lake serve`; elan provides `lake`/`lean`/`leanc` as
-    multiplexer hardlinks. Install via the upstream `elan-init.sh` script with
-    `-y --default-toolchain stable`, then symlink `~/.elan/bin/{lake,lean}`
-    into `~/.local/bin/`. `lake serve` works at repo root even without a
-    `lakefile.lean` — it just won't index project files until one exists.
-  * Alloy 6 LSP ships inside the dist jar as the `lsp` subcommand:
-    `java -jar org.alloytools.alloy.dist.jar lsp`. Get the jar from
-    `github.com/AlloyTools/org.alloytools.alloy/releases/download/v6.2.0/org.alloytools.alloy.dist.jar`
-    and wrap it as `~/.local/bin/alloy-lsp`. Requires `openjdk-21-jre-headless`.
-  * LemMinX (generic XML LSP) is NOT on Maven Central and the GitHub releases
-    page lists no jar assets. Use the Eclipse Nexus direct URL:
-    `https://repo.eclipse.org/content/repositories/lemminx-releases/org/eclipse/lemminx/org.eclipse.lemminx/<ver>/org.eclipse.lemminx-<ver>-uber.jar`
-    (verified for 0.31.1). Covers XML/XSD/DMN/BPMN/SHACL-XML.
-  * SWI-Prolog `lsp_server` pack expects `library(json)`, but the Debian
-    `swi-prolog-core-packages` splits the JSON library into
-    `/usr/lib/swi-prolog/library/ext/http/http/` and registers it only as
-    `library(http/json)`. Wrap `swipl` to prepend that dir to
-    `user:file_search_path(library, ...)` before `use_module(library(lsp_server))`.
-    Without the patch, `pack install lsp_server -y` succeeds but loading the
-    pack fails with `Cannot find source for library(json)`.
-- [2026-05-29] LSP coverage matrix for SPEC verification-target formats —
-  wired: Lean 4 (lake serve), Alloy 6 (dist-jar `lsp` subcommand), SWI-Prolog
-  (jamesnvc/lsp_server pack), LemMinX (DMN/BPMN/SHACL-XML/XSD), Dolmen
-  (SMT-LIB/TPTP/DIMACS/Zipperposition), Soufflé Datalog
-  (jdaridis/souffle-lsp-plugin), egglog (hatoo/egglog-language-server).
-  No standalone LSP exists as of 2026-05: TLA+ (vscode-tlaplus is a TS
-  extension shelling out to tla2tools.jar — no LSP server), ASP/Clingo
-  (CaptainUnbrauchbar/ASP-Language-Support and ffrankreiter extension both
-  just JS extensions calling clingo binary), Categorical CQL
-  (categoricaldata.net repo is a Java Swing IDE only; cqframework/cql-language-server
-  is HL7 Clinical Quality Language, not Categorical). Revisit per-format
-  before the corresponding SPEC phase lands; do not redo the survey from
-  scratch — start from these names.
-- [2026-05-29] Additional LSP install gotchas (round 2):
-  * Dolmen opam package is `dolmen_lsp` (underscore), not `dolmen-lsp`
-    (hyphen). Binary it installs is `dolmenls`. Path:
-    `~/.opam/<switch>/bin/dolmenls`. Symlink as `~/.local/bin/dolmen-lsp`.
-    `dolmenls --version` exits with `error: End_of_file` because dolmenls is
-    LSP-only (reads stdin); that exit is success, not failure. Total disk
-    footprint: ~1.5 GB for the OCaml 5.2.0 switch + dolmen toolchain.
-  * Soufflé apt package targets Ubuntu 20.04 and depends on libffi7; Debian
-    13 only ships libffi8. Workaround: install libffi7 3.3-6 from Debian
-    snapshot.debian.org, then `apt install souffle`. snapshot URL:
-    `http://snapshot.debian.org/archive/debian/20210602T144247Z/pool/main/libf/libffi/libffi7_3.3-6_amd64.deb`.
-    The Souffle LSP repo gradle-builds `Souffle_Ide_Plugin-1.0-SNAPSHOT.jar`;
-    main-class is `SouffleLanguageServerLauncher`. The LSP parses with an
-    in-process ANTLR grammar, so most features work without the `souffle`
-    binary; only `souffle-lint`-driven diagnostics require an external
-    binary (souffle-lint is a separate, optional install).
-  * egglog binary: `cargo install egglog` (egglog 2.0.0, Feb 2026). The LSP
-    workspace at hatoo/egglog-language-server is a tree-sitter-backed Rust
-    server, built via `cargo build --release -p egglog-language-server`.
-    Drop into `~/.local/bin/egglog-lsp`. File extension is `.egg` (not
-    `.egglog`).
+  project-scope `.claude/settings.json` (relative path,
+  `.claude/marketplace`). The Claude LSP host caches plugin discovery at
+  session start, so any new `*-lsp@ckc-lsps` plugin requires a Claude Code
+  restart before `LSP` calls find it. Use `claude plugin list` to confirm
+  enablement state cheaply without restarting. `claude plugin marketplace
+  add … --scope project` + `claude plugin install <name> --scope project`
+  is the supported automation path. Per-LSP install steps and gotchas live
+  in `.claude/marketplace/plugins/<name>-lsp/README.md`.
+- [2026-05-29] No standalone LSP exists as of 2026-05 for these
+  SPEC verification-target formats (audited at source):
+  * TLA+ — `tlaplus/vscode-tlaplus` is a TS extension that shells out to
+    `tla2tools.jar`; no LSP server component, no separate language-server
+    repo under the `tlaplus` or `tlaplus-community` orgs.
+  * ASP/Clingo — `CaptainUnbrauchbar/ASP-Language-Support` and
+    `ffrankreiter/answer-set-programming-language-support` are JS extensions
+    that call the `clingo` binary directly; no LSP.
+  * Categorical CQL — `CategoricalData/CQL` is a Java Swing IDE only;
+    `cqframework/cql-language-server` targets HL7 Clinical Quality Language
+    (FHIR), unrelated to Categorical CQL.
+  Revisit per-format before the corresponding SPEC phase lands.
 
 ## Mistakes
 
