@@ -42,7 +42,8 @@
         "egraph_artifact",
         "shacl_report",
         "rdf_export",
-        "alignment_diagnostic"
+        "alignment_diagnostic",
+        "retrieval_result"
       ]
     },
     "ArtifactMeta": {

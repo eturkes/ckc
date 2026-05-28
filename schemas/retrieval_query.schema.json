@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RetrievalQuery",
+  "description": "A retrieval query with analyzer context.",
+  "type": "object",
+  "properties": {
+    "analyzer_config": {
+      "$ref": "#/$defs/AnalyzerConfig"
+    },
+    "language": {
+      "$ref": "#/$defs/Language"
+    },
+    "query_id": {
+      "$ref": "#/$defs/QueryId"
+    },
+    "query_text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "query_id",
+    "query_text",
+    "language",
+    "analyzer_config"
+  ],
+  "$defs": {
+    "AnalyzerConfig": {
+      "description": "Morphological analyzer configuration for Japanese text retrieval.",
+      "type": "object",
+      "properties": {
+        "dictionary": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "dictionary",
+        "mode"
+      ]
+    },
+    "Language": {
+      "description": "Document language tag.",
+      "type": "string",
+      "enum": [
+        "ja",
+        "en"
+      ]
+    },
+    "QueryId": {
+      "description": "Primary key for `RetrievalQuery`.",
+      "type": "string"
+    }
+  }
+}

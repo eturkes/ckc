@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnalyzerConfig",
+  "description": "Morphological analyzer configuration for Japanese text retrieval.",
+  "type": "object",
+  "properties": {
+    "dictionary": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "dictionary",
+    "mode"
+  ]
+}

@@ -70,6 +70,8 @@ id_newtype! {
     EGraphClassId,
     /// DMN export artifact identifier.
     DmnExportId,
+    /// Primary key for `RetrievalQuery`.
+    QueryId,
 }
 
 #[cfg(test)]
@@ -112,4 +114,5 @@ mod tests {
     test_id_roundtrip!(manifest_id, ManifestId);
     test_id_roundtrip!(egraph_class_id, EGraphClassId);
     test_id_roundtrip!(dmn_export_id, DmnExportId);
+    test_id_roundtrip!(query_id, QueryId);
 }

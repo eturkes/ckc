@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RetrievalHit",
+  "description": "A single ranked retrieval hit.",
+  "type": "object",
+  "properties": {
+    "rank": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "score": {
+      "type": "number",
+      "format": "double"
+    },
+    "span_id": {
+      "$ref": "#/$defs/SpanId"
+    }
+  },
+  "required": [
+    "span_id",
+    "score",
+    "rank"
+  ],
+  "$defs": {
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

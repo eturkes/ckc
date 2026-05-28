@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RetrievalResult",
+  "description": "Full retrieval result for a single query: ranked hits plus index provenance.",
+  "type": "object",
+  "properties": {
+    "corpus_hash": {
+      "$ref": "#/$defs/ContentHash"
+    },
+    "hits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RetrievalHit"
+      }
+    },
+    "index_fingerprint": {
+      "$ref": "#/$defs/ContentHash"
+    },
+    "query": {
+      "$ref": "#/$defs/RetrievalQuery"
+    }
+  },
+  "required": [
+    "query",
+    "hits",
+    "index_fingerprint",
+    "corpus_hash"
+  ],
+  "$defs": {
+    "AnalyzerConfig": {
+      "description": "Morphological analyzer configuration for Japanese text retrieval.",
+      "type": "object",
+      "properties": {
+        "dictionary": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "dictionary",
+        "mode"
+      ]
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "Language": {
+      "description": "Document language tag.",
+      "type": "string",
+      "enum": [
+        "ja",
+        "en"
+      ]
+    },
+    "QueryId": {
+      "description": "Primary key for `RetrievalQuery`.",
+      "type": "string"
+    },
+    "RetrievalHit": {
+      "description": "A single ranked retrieval hit.",
+      "type": "object",
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "score": {
+          "type": "number",
+          "format": "double"
+        },
+        "span_id": {
+          "$ref": "#/$defs/SpanId"
+        }
+      },
+      "required": [
+        "span_id",
+        "score",
+        "rank"
+      ]
+    },
+    "RetrievalQuery": {
+      "description": "A retrieval query with analyzer context.",
+      "type": "object",
+      "properties": {
+        "analyzer_config": {
+          "$ref": "#/$defs/AnalyzerConfig"
+        },
+        "language": {
+          "$ref": "#/$defs/Language"
+        },
+        "query_id": {
+          "$ref": "#/$defs/QueryId"
+        },
+        "query_text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query_id",
+        "query_text",
+        "language",
+        "analyzer_config"
+      ]
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

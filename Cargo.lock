@@ -163,6 +163,12 @@ version = "0.0.0"
 [[package]]
 name = "ckc-retrieve"
 version = "0.0.0"
+dependencies = [
+ "ckc-core",
+ "schemars",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "ckc-store"
