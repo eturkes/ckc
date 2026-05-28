@@ -193,6 +193,27 @@ technically derivable but easily forgotten under token pressure.
   and was not needed; keep it in mind if BM25 score values themselves ever
   drift across runs (none observed in Phase-0).
 
+- [2026-05-29] Artifact-producer subtask sizing (calibration from the task-0.8
+  re-plan after a context-exhaustion `git reset --hard`): 0.8.1/0.8.2 completed
+  at 118K/102K — already past half — and the original 0.8.3 (emit + a
+  per-artifact `CompiledTarget` canonical-bytes golden + regenerate, in ONE
+  subtask) could not finish without compaction. The cost trap is the
+  per-artifact big golden: it embeds the whole artifact text as an escaped JSON
+  blob and forces a regen round-trip, paid once per emitter (×N). The artifact
+  TYPE's serialization is already golden-locked once in ckc-core; per-VALUE
+  locking does not belong in every emitter. Generalizable decomposition for any
+  "produce N target artifacts" task (apply when planning 0.9–0.13): (1) one
+  subtask for shared deterministic assembly helpers; (2) one subtask per emitter
+  whose test is CHEAP — two-call `content_hash` equality +
+  `artifact_text.contains(sentinel)` + `compilation_map` entry checks, with no
+  committed golden; (3) one subtask to write+commit the human-readable artifact
+  files with a byte-identical regen gate; (4) ONE consolidated golden over a
+  compact hash manifest that byte-locks every artifact; (5) CAS
+  persistence/determinism as its own subtask. Also defer all external-tool
+  invocation (souffle/z3/clingo/lean parse-checks) to the verification task
+  rather than PATH-guarding it inside emit subtasks — that keeps emit subtasks
+  tool-free and smaller.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
