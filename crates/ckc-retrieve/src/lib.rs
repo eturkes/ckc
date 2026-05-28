@@ -5,7 +5,9 @@ use ckc_core::canonical::ContentHash;
 use ckc_core::enums::Language;
 use ckc_core::id::{QueryId, SpanId};
 
+pub mod metrics;
 pub mod sparse;
+pub use metrics::{ndcg_at_k, recall_at_k, reciprocal_rank};
 pub use sparse::{SparseIndex, compute_index_fingerprint, ipadic_tokens};
 
 /// Morphological analyzer configuration for Japanese text retrieval.
