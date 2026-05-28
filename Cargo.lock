@@ -167,6 +167,11 @@ dependencies = [
 [[package]]
 name = "ckc-term"
 version = "0.0.0"
+dependencies = [
+ "ckc-core",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "ckc-verify"
