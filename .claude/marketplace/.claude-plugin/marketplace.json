@@ -1,0 +1,154 @@
+{
+  "name": "ckc-lsps",
+  "owner": {
+    "name": "ckc agents",
+    "email": "agents@ckc.local"
+  },
+  "metadata": {
+    "description": "Project-local LSP plugins for the ckc workspace. Covers formats authored in this repo plus formats planned for later phases per SPEC.md. Server binaries must be present on PATH; see plugin READMEs for install commands."
+  },
+  "plugins": [
+    {
+      "name": "json-lsp",
+      "description": "JSON LSP via vscode-json-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/json-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-json": {
+          "command": "vscode-json-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".json": "json",
+            ".jsonc": "jsonc"
+          }
+        }
+      }
+    },
+    {
+      "name": "yaml-lsp",
+      "description": "YAML LSP via yaml-language-server (Red Hat)",
+      "version": "1.0.0",
+      "source": "./plugins/yaml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "yaml": {
+          "command": "yaml-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".yaml": "yaml",
+            ".yml": "yaml"
+          }
+        }
+      }
+    },
+    {
+      "name": "markdown-lsp",
+      "description": "Markdown LSP via marksman",
+      "version": "1.0.0",
+      "source": "./plugins/markdown-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "marksman": {
+          "command": "marksman",
+          "args": ["server"],
+          "extensionToLanguage": {
+            ".md": "markdown",
+            ".markdown": "markdown"
+          }
+        }
+      }
+    },
+    {
+      "name": "toml-lsp",
+      "description": "TOML LSP via taplo",
+      "version": "1.0.0",
+      "source": "./plugins/toml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "taplo": {
+          "command": "taplo",
+          "args": ["lsp", "stdio"],
+          "extensionToLanguage": {
+            ".toml": "toml"
+          }
+        }
+      }
+    },
+    {
+      "name": "html-lsp",
+      "description": "HTML LSP via vscode-html-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/html-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-html": {
+          "command": "vscode-html-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".html": "html",
+            ".htm": "html"
+          }
+        }
+      }
+    },
+    {
+      "name": "css-lsp",
+      "description": "CSS LSP via vscode-css-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/css-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-css": {
+          "command": "vscode-css-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".css": "css",
+            ".scss": "scss",
+            ".less": "less"
+          }
+        }
+      }
+    },
+    {
+      "name": "svelte-lsp",
+      "description": "Svelte LSP via svelteserver",
+      "version": "1.0.0",
+      "source": "./plugins/svelte-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "svelte": {
+          "command": "svelteserver",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".svelte": "svelte"
+          }
+        }
+      }
+    },
+    {
+      "name": "lean4-lsp",
+      "description": "Lean 4 LSP via lake serve. Requires elan + a project-local lakefile.lean; install at start of Phase 4.",
+      "version": "1.0.0",
+      "source": "./plugins/lean4-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "lean4": {
+          "command": "lake",
+          "args": ["serve"],
+          "extensionToLanguage": {
+            ".lean": "lean4"
+          }
+        }
+      }
+    }
+  ]
+}

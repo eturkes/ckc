@@ -54,6 +54,30 @@ technically derivable but easily forgotten under token pressure.
   running `rust-analyzer --version` before debugging the LSP host. Note this
   supersedes the stance in commit 2fa9393, which deferred the install when
   Claude's diagnostic loop relied only on `cargo check`/`clippy`/`test`.
+- [2026-05-29] Project-local LSP marketplace lives at
+  `.claude/marketplace/.claude-plugin/marketplace.json` and is wired in via
+  project-scope `.claude/settings.json` (path stored relative,
+  `.claude/marketplace`). Adding/enabling plugins mid-session does NOT take
+  effect — the Claude LSP host caches plugin discovery at session start, so
+  any new `*-lsp@ckc-lsps` plugin requires a Claude Code restart before
+  `LSP` calls find it. Use `claude plugin list` to confirm enablement state
+  cheaply without restarting. `claude plugin marketplace add … --scope project`
+  + `claude plugin install <name> --scope project` is the supported automation
+  path (avoids hand-editing settings.json beyond fixing absolute→relative
+  marketplace path).
+- [2026-05-29] LSP server install gotchas hit on this project:
+  * `taplo` LSP is gated behind `--features lsp`; default `cargo install
+    taplo-cli` ships only the CLI. Use `cargo install --locked taplo-cli
+    --features lsp`.
+  * `cargo install marksman` resolves a placeholder crates.io package
+    (`marksman v0.0.1`, no targets). Install via release binary from
+    `github.com/artempyanykh/marksman/releases/latest` into `~/.local/bin/`
+    instead.
+  * `vscode-langservers-extracted` (single pnpm package) provides four
+    binaries: `vscode-{html,css,json,eslint}-language-server`. Reuse across
+    JSON/HTML/CSS plugins instead of installing each LSP separately.
+  * Lean 4 LSP is `lake serve`; install elan + a toolchain only after a
+    `lakefile.lean` exists in the repo (deferred until Phase 4).
 
 ## Mistakes
 

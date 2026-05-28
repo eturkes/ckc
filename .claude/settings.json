@@ -1,0 +1,22 @@
+{
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "json-lsp@ckc-lsps": true,
+    "yaml-lsp@ckc-lsps": true,
+    "markdown-lsp@ckc-lsps": true,
+    "toml-lsp@ckc-lsps": true,
+    "html-lsp@ckc-lsps": true,
+    "css-lsp@ckc-lsps": true,
+    "svelte-lsp@ckc-lsps": true,
+    "lean4-lsp@ckc-lsps": true
+  },
+  "extraKnownMarketplaces": {
+    "ckc-lsps": {
+      "source": {
+        "source": "directory",
+        "path": ".claude/marketplace"
+      }
+    }
+  }
+}
