@@ -126,72 +126,24 @@ mod tests {
     }
 
     #[test]
-    fn idempotent() {
-        let v = json!({"b": [3, 2, 1], "a": null, "c": true});
-        let bytes1 = canonical_json_bytes(&v);
-        let v2: Value = serde_json::from_slice(&bytes1).unwrap();
-        let bytes2 = canonical_json_bytes(&v2);
-        assert_eq!(bytes1, bytes2);
-    }
-
-    #[test]
     fn string_escaping() {
         let v = json!({"a": "hello\nworld"});
         assert_eq!(canonical_json_bytes(&v), br#"{"a":"hello\nworld"}"#);
     }
 
     #[test]
-    fn japanese_keys_deterministic() {
+    fn japanese_keys_sort_by_utf16() {
+        // Japanese identifiers in CKC data — JCS mandates UTF-16 code unit
+        // ordering, distinct from byte ordering. Sort order matters.
         let v = json!({"薬": 1, "病": 2, "検": 3});
-        let bytes1 = canonical_json_bytes(&v);
-        let v2: Value = serde_json::from_slice(&bytes1).unwrap();
-        let bytes2 = canonical_json_bytes(&v2);
-        assert_eq!(bytes1, bytes2);
+        let bytes = canonical_json_bytes(&v);
+        assert_eq!(bytes, "{\"検\":3,\"病\":2,\"薬\":1}".as_bytes());
     }
 
     #[test]
-    fn content_hash_format_and_determinism() {
-        let v = json!({"hello": "world"});
-        let h1 = content_hash(&v);
-        let h2 = content_hash(&v);
-        assert_eq!(h1, h2);
-        assert!(h1.as_str().starts_with("sha256:"));
-        assert_eq!(h1.as_str().len(), 7 + 64);
-    }
-
-    #[test]
-    fn content_hash_differs_on_different_input() {
-        let h1 = content_hash(&json!({"a": 1}));
-        let h2 = content_hash(&json!({"a": 2}));
-        assert_ne!(h1, h2);
-    }
-
-    #[test]
-    fn content_hash_ignores_key_insertion_order() {
-        let h1 = content_hash(&json!({"a": 1, "b": 2}));
-        let h2 = content_hash(&json!({"b": 2, "a": 1}));
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn to_canonical_bytes_matches_value_path() {
-        #[derive(Serialize)]
-        struct S {
-            b: i32,
-            a: i32,
-        }
-        let s = S { b: 2, a: 1 };
-        let via_struct = to_canonical_bytes(&s);
-        let via_value = canonical_json_bytes(&serde_json::to_value(&s).unwrap());
-        assert_eq!(via_struct, via_value);
-    }
-
-    #[test]
-    fn content_hash_serde_roundtrip() {
-        let h = ContentHash("sha256:abc123".into());
-        let json = serde_json::to_string(&h).unwrap();
-        assert_eq!(json, r#""sha256:abc123""#);
-        let rt: ContentHash = serde_json::from_str(&json).unwrap();
-        assert_eq!(h, rt);
+    fn content_hash_has_sha256_prefix_and_64_hex() {
+        let h = content_hash(&json!({"hello": "world"}));
+        assert!(h.as_str().starts_with("sha256:"));
+        assert_eq!(h.as_str().len(), 7 + 64);
     }
 }

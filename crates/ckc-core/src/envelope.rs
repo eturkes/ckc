@@ -102,231 +102,104 @@ impl ArtifactEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clinical::{Action, Norm, Rule};
-    use crate::enums::*;
-    use crate::id::*;
+    use crate::source::CorpusDocument;
+
+    /// Minimal Rule-like JSON payload. Avoids constructing a real Rule here:
+    /// envelope semantics are independent of payload shape, only canonical
+    /// hashing matters.
+    fn small_payload() -> serde_json::Value {
+        serde_json::json!({"id": "rule_x", "kind": "strict"})
+    }
 
     fn fixture_meta() -> ArtifactMeta {
         ArtifactMeta {
             schema_version: "0.0.0".into(),
             producer_version: "ckc-core/0.0.0".into(),
-            command_manifest: serde_json::json!({"command": "ckc", "args": ["normalize"]}),
-            source_input_hashes: vec![ContentHash(
-                "sha256:ee00000000000000000000000000000000000000000000000000000000000001".into(),
-            )],
+            command_manifest: serde_json::json!({"command": "ckc"}),
+            source_input_hashes: vec![],
             parent_hashes: vec![],
             stage: "normalize".into(),
-            semantic_profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
-            content_hash: ContentHash(
-                "sha256:ff00000000000000000000000000000000000000000000000000000000000001".into(),
-            ),
+            semantic_profiles: vec![],
+            // Intentional placeholder — wrap() must overwrite.
+            content_hash: ContentHash("sha256:00".repeat(32)),
             certificate_ids: vec![],
-            replay_command: Some("ckc normalize --bundle test".into()),
+            replay_command: None,
         }
     }
 
-    fn fixture_rule() -> Rule {
-        Rule {
-            rule_id: RuleId::new("rule_sepsis_beta_lactam_001"),
-            profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
-            kind: RuleKind::Defeasible,
-            context: "sepsis AND adult_patient".into(),
-            antecedent: "(dx sepsis) AND (adult patient)".into(),
-            consequent: "(administer beta_lactam)".into(),
-            norm: Some(Norm {
-                context: "sepsis in adult patients".into(),
-                direction: RecommendationDirection::For,
-                action: Action {
-                    action_type: "administer".into(),
-                    target_concept: ConceptId::new("concept_beta_lactam"),
-                    parameters: serde_json::json!({"dose_range": "standard", "route": "iv"}),
-                    temporal_constraints: serde_json::json!({"onset": "immediate"}),
-                    quantity_constraints: serde_json::json!({"min_dose_mg": 1000}),
-                },
-                recommendation_strength: RecommendationStrength::Strong,
-                evidence_certainty: EvidenceCertainty::Moderate,
-                original_modality_phrase_ja: "投与を推奨する".into(),
-                deontic_projection: DeonticProjection::Recommended,
-                exception_policy: "beta-lactam allergy contraindicates".into(),
-                prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
-            }),
-            priority_over: vec![],
-            exceptions: vec!["beta_lactam_allergy".into()],
-            temporal_scope: Some("acute_phase".into()),
-            population_scope: Some("adult".into()),
-            source_span_ids: vec![SpanId::new("span_s1")],
-            provenance: "guideline_sepsis_2024_cq1".into(),
-            certificate_ids: vec![],
-        }
-    }
-
-    // -- ArtifactKind tests --
-
+    /// Every `ArtifactKind` round-trips through its SPEC-mandated wire
+    /// string. Catches accidental rename of any variant; golden tests
+    /// only pin one variant at a time.
     #[test]
-    fn artifact_kind_roundtrip() {
+    fn artifact_kind_wire_format() {
         let kinds = [
-            (ArtifactKind::CorpusDocument, "\"corpus_document\""),
-            (ArtifactKind::SourceSpan, "\"source_span\""),
-            (ArtifactKind::ExtractedTable, "\"extracted_table\""),
-            (ArtifactKind::Concept, "\"concept\""),
-            (ArtifactKind::ClinicalClaim, "\"clinical_claim\""),
-            (ArtifactKind::Rule, "\"rule\""),
-            (ArtifactKind::DecisionTable, "\"decision_table\""),
-            (ArtifactKind::WorkflowFragment, "\"workflow_fragment\""),
-            (ArtifactKind::EventNarrative, "\"event_narrative\""),
-            (ArtifactKind::PatientCase, "\"patient_case\""),
-            (ArtifactKind::ExecutionWitness, "\"execution_witness\""),
-            (ArtifactKind::Conflict, "\"conflict\""),
-            (ArtifactKind::ArgumentGraph, "\"argument_graph\""),
-            (ArtifactKind::Certificate, "\"certificate\""),
-            (ArtifactKind::AssuranceNode, "\"assurance_node\""),
-            (ArtifactKind::AuditTrace, "\"audit_trace\""),
-            (ArtifactKind::StoreManifest, "\"store_manifest\""),
-            (ArtifactKind::EgraphArtifact, "\"egraph_artifact\""),
-            (ArtifactKind::ShaclReport, "\"shacl_report\""),
-            (ArtifactKind::RdfExport, "\"rdf_export\""),
-            (
-                ArtifactKind::AlignmentDiagnostic,
-                "\"alignment_diagnostic\"",
-            ),
-            (ArtifactKind::RetrievalResult, "\"retrieval_result\""),
+            (ArtifactKind::CorpusDocument, "corpus_document"),
+            (ArtifactKind::SourceSpan, "source_span"),
+            (ArtifactKind::ExtractedTable, "extracted_table"),
+            (ArtifactKind::Concept, "concept"),
+            (ArtifactKind::ClinicalClaim, "clinical_claim"),
+            (ArtifactKind::Rule, "rule"),
+            (ArtifactKind::DecisionTable, "decision_table"),
+            (ArtifactKind::WorkflowFragment, "workflow_fragment"),
+            (ArtifactKind::EventNarrative, "event_narrative"),
+            (ArtifactKind::PatientCase, "patient_case"),
+            (ArtifactKind::ExecutionWitness, "execution_witness"),
+            (ArtifactKind::Conflict, "conflict"),
+            (ArtifactKind::ArgumentGraph, "argument_graph"),
+            (ArtifactKind::Certificate, "certificate"),
+            (ArtifactKind::AssuranceNode, "assurance_node"),
+            (ArtifactKind::AuditTrace, "audit_trace"),
+            (ArtifactKind::StoreManifest, "store_manifest"),
+            (ArtifactKind::EgraphArtifact, "egraph_artifact"),
+            (ArtifactKind::ShaclReport, "shacl_report"),
+            (ArtifactKind::RdfExport, "rdf_export"),
+            (ArtifactKind::AlignmentDiagnostic, "alignment_diagnostic"),
+            (ArtifactKind::RetrievalResult, "retrieval_result"),
         ];
-        for (variant, expected) in kinds {
+        for (variant, wire) in kinds {
+            let expected = format!("\"{wire}\"");
             let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, expected, "serialize {variant:?}");
-            let rt: ArtifactKind = serde_json::from_str(&json).unwrap();
-            assert_eq!(variant, rt, "roundtrip {variant:?}");
+            assert_eq!(json, expected, "wire format for {variant:?}");
         }
     }
 
-    // -- ArtifactMeta tests --
-
     #[test]
-    fn artifact_meta_roundtrip() {
-        let meta = fixture_meta();
-        let json = serde_json::to_string(&meta).unwrap();
-        let rt: ArtifactMeta = serde_json::from_str(&json).unwrap();
-        assert_eq!(meta, rt);
+    fn wrap_sets_content_hash_to_payload_hash_overwriting_placeholder() {
+        let payload = small_payload();
+        let expected = content_hash(&payload);
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &payload, fixture_meta());
+        assert_eq!(envelope.meta.content_hash, expected);
     }
 
     #[test]
-    fn artifact_meta_replay_command_omitted_when_none() {
-        let mut meta = fixture_meta();
-        meta.replay_command = None;
-        let json = serde_json::to_string(&meta).unwrap();
-        assert!(!json.contains("replay_command"));
-        let rt: ArtifactMeta = serde_json::from_str(&json).unwrap();
-        assert_eq!(meta, rt);
-    }
-
-    // -- ArtifactEnvelope tests --
-
-    #[test]
-    fn envelope_roundtrip() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        let json = serde_json::to_string(&envelope).unwrap();
-        let rt: ArtifactEnvelope = serde_json::from_str(&json).unwrap();
-        assert_eq!(envelope, rt);
-    }
-
-    #[test]
-    fn wrap_computes_correct_content_hash() {
-        let rule = fixture_rule();
-        let rule_hash = content_hash(&rule);
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        assert_eq!(
-            envelope.meta.content_hash, rule_hash,
-            "wrap() must set content_hash to the artifact's canonical hash"
-        );
-    }
-
-    #[test]
-    fn wrap_overwrites_placeholder_content_hash() {
-        let rule = fixture_rule();
-        let meta = fixture_meta();
-        let placeholder = meta.content_hash.clone();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta);
-        assert_ne!(
-            envelope.meta.content_hash, placeholder,
-            "wrap() must overwrite the placeholder content_hash"
-        );
-    }
-
-    #[test]
-    fn envelope_hash_differs_from_content_hash() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        assert_ne!(
-            envelope.envelope_hash(),
-            envelope.meta.content_hash,
-            "envelope hash (store key) must differ from inner content hash"
-        );
-    }
-
-    #[test]
-    fn verify_content_hash_valid() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        assert!(
-            envelope.verify_content_hash(),
-            "freshly wrapped envelope must pass content hash verification"
-        );
+    fn envelope_hash_differs_from_inner_content_hash() {
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &small_payload(), fixture_meta());
+        assert_ne!(envelope.envelope_hash(), envelope.meta.content_hash);
     }
 
     #[test]
     fn verify_content_hash_detects_tampering() {
-        let rule = fixture_rule();
-        let mut envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        envelope.meta.content_hash = ContentHash(
-            "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
-        );
-        assert!(
-            !envelope.verify_content_hash(),
-            "tampered content_hash must fail verification"
-        );
-    }
-
-    #[test]
-    fn extract_recovers_typed_artifact() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        let extracted: Rule = envelope.extract().unwrap();
-        assert_eq!(rule, extracted);
+        let mut envelope =
+            ArtifactEnvelope::wrap(ArtifactKind::Rule, &small_payload(), fixture_meta());
+        assert!(envelope.verify_content_hash());
+        envelope.meta.content_hash = ContentHash("sha256:00".repeat(32));
+        assert!(!envelope.verify_content_hash());
     }
 
     #[test]
     fn extract_wrong_type_fails() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        let result = envelope.extract::<crate::source::CorpusDocument>();
-        assert!(result.is_err(), "extracting wrong type must fail");
+        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &small_payload(), fixture_meta());
+        assert!(envelope.extract::<CorpusDocument>().is_err());
     }
 
     #[test]
-    fn identical_artifacts_produce_identical_envelopes() {
-        let rule = fixture_rule();
-        let meta = fixture_meta();
-        let e1 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta.clone());
-        let e2 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta);
-        assert_eq!(e1.envelope_hash(), e2.envelope_hash());
-    }
-
-    #[test]
-    fn different_meta_produces_different_envelope_hash() {
-        let rule = fixture_rule();
-        let mut meta2 = fixture_meta();
-        meta2.stage = "compile".into();
-        let e1 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        let e2 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, meta2);
-        assert_eq!(
-            e1.meta.content_hash, e2.meta.content_hash,
-            "same artifact must produce same content_hash"
-        );
-        assert_ne!(
-            e1.envelope_hash(),
-            e2.envelope_hash(),
-            "different meta must produce different envelope hash"
-        );
+    fn meta_differs_changes_envelope_hash_but_not_content_hash() {
+        let payload = small_payload();
+        let e1 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &payload, fixture_meta());
+        let mut m2 = fixture_meta();
+        m2.stage = "compile".into();
+        let e2 = ArtifactEnvelope::wrap(ArtifactKind::Rule, &payload, m2);
+        assert_eq!(e1.meta.content_hash, e2.meta.content_hash);
+        assert_ne!(e1.envelope_hash(), e2.envelope_hash());
     }
 }

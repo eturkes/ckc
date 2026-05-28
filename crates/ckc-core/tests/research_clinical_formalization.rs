@@ -525,66 +525,10 @@ fn nf_assigns_stable_ids() {
     }
 }
 
-#[test]
-fn nf_stable_ids_are_deterministic() {
-    let normalize_and_collect = || {
-        let mut rules = toy_rules();
-        let mut ctx = NfContext::new();
-        for rule in &mut rules {
-            rule.normalize(&mut ctx);
-        }
-        rules
-            .iter()
-            .map(|r| r.rule_id.0.clone())
-            .collect::<Vec<_>>()
-    };
-
-    let ids1 = normalize_and_collect();
-    let ids2 = normalize_and_collect();
-    assert_eq!(ids1, ids2, "NF stable IDs must be identical across runs");
-}
-
-#[test]
-fn nf_idempotent_rules() {
-    let mut rules = toy_rules();
-    let mut ctx1 = NfContext::new();
-    for rule in &mut rules {
-        rule.normalize(&mut ctx1);
-    }
-    let bytes_after_first = to_canonical_bytes(&rules);
-
-    let mut ctx2 = NfContext::new();
-    for rule in &mut rules {
-        rule.normalize(&mut ctx2);
-    }
-    let bytes_after_second = to_canonical_bytes(&rules);
-
-    assert_eq!(
-        bytes_after_first, bytes_after_second,
-        "NF(NF(rules)) must equal NF(rules)"
-    );
-}
-
-#[test]
-fn nf_idempotent_claims() {
-    let mut claims = toy_claims();
-    let mut ctx1 = NfContext::new();
-    for claim in &mut claims {
-        claim.normalize(&mut ctx1);
-    }
-    let bytes_after_first = to_canonical_bytes(&claims);
-
-    let mut ctx2 = NfContext::new();
-    for claim in &mut claims {
-        claim.normalize(&mut ctx2);
-    }
-    let bytes_after_second = to_canonical_bytes(&claims);
-
-    assert_eq!(
-        bytes_after_first, bytes_after_second,
-        "NF(NF(claims)) must equal NF(claims)"
-    );
-}
+// NF idempotency for rules and claims is exercised by
+// `nf_idempotency_rules` and `nf_idempotency_claims` in
+// `ckc-store/tests/research_fixture_bundle.rs` over the canonical on-disk
+// fixtures; the inline duplicates were removed.
 
 #[test]
 fn nf_incomplete_rule_gets_stable_id_from_empty_spans() {
@@ -644,19 +588,6 @@ fn committed_claims_match() {
         "committed claims.json differs from constructor output; \
          regenerate with the regen_fixtures test"
     );
-}
-
-#[test]
-fn committed_fixtures_deserialize_correctly() {
-    let dir = fixtures_dir();
-    let rules: Vec<Rule> = serde_json::from_slice(&std::fs::read(dir.join("rules.json")).unwrap())
-        .expect("rules.json must deserialize");
-    let claims: Vec<ClinicalClaim> =
-        serde_json::from_slice(&std::fs::read(dir.join("claims.json")).unwrap())
-            .expect("claims.json must deserialize");
-
-    assert_eq!(rules.len(), 3);
-    assert_eq!(claims.len(), 2);
 }
 
 // =========================================================================

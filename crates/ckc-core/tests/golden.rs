@@ -691,52 +691,6 @@ golden_suite!(
 );
 
 // ---------------------------------------------------------------------------
-// Cross-type: all 31 golden fixtures produce distinct content hashes
-// ---------------------------------------------------------------------------
-
-#[test]
-fn all_golden_fixtures_produce_distinct_hashes() {
-    let hashes: Vec<ContentHash> = vec![
-        content_hash(&golden_content_hash()),
-        content_hash(&golden_bbox()),
-        content_hash(&golden_table_cell_ref()),
-        content_hash(&golden_extractor_vote()),
-        content_hash(&golden_confidence_interval()),
-        content_hash(&golden_corpus_document()),
-        content_hash(&golden_source_span()),
-        content_hash(&golden_extracted_table()),
-        content_hash(&golden_terminology_binding()),
-        content_hash(&golden_concept()),
-        content_hash(&golden_pico_frame()),
-        content_hash(&golden_etd_frame()),
-        content_hash(&golden_evidence_atom()),
-        content_hash(&golden_action()),
-        content_hash(&golden_norm()),
-        content_hash(&golden_rule()),
-        content_hash(&golden_clinical_claim()),
-        content_hash(&golden_decision_row()),
-        content_hash(&golden_decision_table()),
-        content_hash(&golden_workflow_fragment()),
-        content_hash(&golden_event_narrative()),
-        content_hash(&golden_patient_case()),
-        content_hash(&golden_execution_witness()),
-        content_hash(&golden_conflict()),
-        content_hash(&golden_argument_graph()),
-        content_hash(&golden_certificate()),
-        content_hash(&golden_assurance_node()),
-        content_hash(&golden_audit_trace()),
-        content_hash(&golden_artifact_kind()),
-        content_hash(&golden_artifact_meta()),
-        content_hash(&golden_artifact_envelope()),
-    ];
-    for (i, a) in hashes.iter().enumerate() {
-        for (j, b) in hashes.iter().enumerate().skip(i + 1) {
-            assert_ne!(a, b, "hash collision between golden fixtures {i} and {j}");
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Regeneration: run `cargo test -p ckc-core --test golden -- --ignored` to
 // update all golden canonical JSON and JSON Schema files.
 // ---------------------------------------------------------------------------

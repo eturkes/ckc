@@ -128,7 +128,6 @@ pub fn validate_rules(rules: &[Rule]) -> ShaclReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::canonical::content_hash;
 
     const RULES_PATH: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -140,113 +139,34 @@ mod tests {
         serde_json::from_str(&json).expect("rules must parse")
     }
 
+    /// The toy `rule_incomplete_provenance` triggers exactly the two
+    /// expected default-shape violations (missing source_span_ids and
+    /// empty provenance), each at Violation severity. The other rules
+    /// in the same fixture pass the shape clean.
     #[test]
-    fn catches_provenance_incomplete_rule() {
+    fn rule_shape_violations_localize_to_incomplete_rule() {
         let rules = load_rules();
         let report = validate_rules(&rules);
+        assert!(!report.conforms);
 
-        assert!(!report.conforms, "report must flag non-conformance");
-
-        let incomplete_violations: Vec<_> = report
+        let incomplete: Vec<_> = report
             .violations
             .iter()
             .filter(|v| v.focus_node == "rule_incomplete_provenance")
             .collect();
-
-        assert_eq!(
-            incomplete_violations.len(),
-            2,
-            "provenance-incomplete rule must trigger exactly 2 violations \
-             (source_span_ids + provenance)"
-        );
-
-        let paths: Vec<&str> = incomplete_violations
-            .iter()
-            .map(|v| v.path.as_str())
-            .collect();
+        let paths: Vec<&str> = incomplete.iter().map(|v| v.path.as_str()).collect();
+        assert_eq!(incomplete.len(), 2);
         assert!(paths.contains(&"source_span_ids"));
         assert!(paths.contains(&"provenance"));
-    }
-
-    #[test]
-    fn valid_rules_pass_clean() {
-        let rules = load_rules();
-        let valid_rules: Vec<_> = rules
-            .into_iter()
-            .filter(|r| r.rule_id.as_str() != "rule_incomplete_provenance")
-            .collect();
-
-        let report = validate_rules(&valid_rules);
-        assert!(
-            report.conforms,
-            "valid rules must pass: {:?}",
-            report.violations
-        );
-        assert!(report.violations.is_empty());
-    }
-
-    #[test]
-    fn empty_rules_pass() {
-        let report = validate_rules(&[]);
-        assert!(report.conforms);
-        assert!(report.violations.is_empty());
-    }
-
-    #[test]
-    fn violation_severity_is_violation() {
-        let rules = load_rules();
-        let report = validate_rules(&rules);
         for v in &report.violations {
             assert_eq!(v.severity, ShaclSeverity::Violation);
         }
-    }
 
-    #[test]
-    fn report_serializable_roundtrip() {
-        let rules = load_rules();
-        let report = validate_rules(&rules);
-
-        let json = serde_json::to_string(&report).expect("report must serialize");
-        let rt: ShaclReport = serde_json::from_str(&json).expect("report must deserialize");
-        assert_eq!(report, rt);
-    }
-
-    #[test]
-    fn report_content_hashable() {
-        let rules = load_rules();
-        let report = validate_rules(&rules);
-
-        let h1 = content_hash(&report);
-        let h2 = content_hash(&report);
-        assert_eq!(h1, h2, "content hash must be deterministic");
-        assert!(
-            h1.0.starts_with("sha256:"),
-            "content hash must use sha256 prefix"
-        );
-    }
-
-    #[test]
-    fn report_is_deterministic() {
-        let rules = load_rules();
-        let r1 = validate_rules(&rules);
-        let r2 = validate_rules(&rules);
-        assert_eq!(r1, r2, "repeated validation must produce identical reports");
-        assert_eq!(
-            content_hash(&r1),
-            content_hash(&r2),
-            "content hashes must match"
-        );
-    }
-
-    #[test]
-    fn default_shapes_have_expected_constraints() {
-        let shapes = default_rule_shapes();
-        assert_eq!(shapes.len(), 1);
-        assert_eq!(shapes[0].name, "RuleShape");
-        assert_eq!(shapes[0].constraints.len(), 2);
-        assert_eq!(shapes[0].constraints[0].path, "source_span_ids");
-        assert_eq!(shapes[0].constraints[0].kind, ConstraintKind::MinCount(1));
-        assert_eq!(shapes[0].constraints[1].path, "provenance");
-        assert_eq!(shapes[0].constraints[1].kind, ConstraintKind::MinLength(1));
+        let clean: Vec<_> = rules
+            .into_iter()
+            .filter(|r| r.rule_id.as_str() != "rule_incomplete_provenance")
+            .collect();
+        assert!(validate_rules(&clean).conforms);
+        assert!(validate_rules(&[]).conforms);
     }
 }

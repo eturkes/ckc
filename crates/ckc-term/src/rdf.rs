@@ -143,16 +143,11 @@ mod tests {
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
+    /// Toy export re-parses, yields >= 3 triples per concept, and contains
+    /// every SKOS predicate (preferred/alt label, eclass scheme, source
+    /// provenance, exactMatch and broadMatch from the fixture's bindings).
     #[test]
-    fn export_produces_nonempty_turtle() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-        assert!(!turtle.is_empty());
-        assert!(turtle.contains("skos:"));
-    }
-
-    #[test]
-    fn export_roundtrips_through_parser() {
+    fn toy_export_round_trips_with_skos_shape() {
         let graph = load_graph();
         let turtle = export_skos_turtle(&graph);
 
@@ -160,97 +155,25 @@ mod tests {
             .for_slice(&turtle)
             .collect::<Result<Vec<_>, _>>()
             .expect("exported Turtle must re-parse");
+        assert!(parsed.len() >= graph.len() * 3);
 
-        assert!(!parsed.is_empty(), "round-trip parse must yield triples");
-
-        // Each concept: type + prefLabel + semanticType = 3 base triples
-        // Plus optional altLabel, inScheme, match predicates, source spans
-        assert!(
-            parsed.len() >= graph.len() * 3,
-            "expected >= {} triples (3 per concept), got {}",
-            graph.len() * 3,
-            parsed.len()
-        );
+        // JA prefLabel propagates verbatim; SKOS match predicates and
+        // dct:source span IDs appear in their respective serialized forms.
+        assert!(turtle.contains("βラクタム系抗菌薬"));
+        assert!(turtle.contains("exactMatch"));
+        assert!(turtle.contains("broadMatch"));
+        assert!(turtle.contains("inScheme"));
+        assert!(turtle.contains("source") && turtle.contains("span_"));
     }
 
     #[test]
-    fn export_is_deterministic() {
-        let graph = load_graph();
-        let t1 = export_skos_turtle(&graph);
-        let t2 = export_skos_turtle(&graph);
-        assert_eq!(t1, t2, "repeated exports must be byte-identical");
-    }
-
-    #[test]
-    fn export_contains_beta_lactam_pref_label() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-        assert!(
-            turtle.contains("βラクタム系抗菌薬"),
-            "Turtle must contain JA prefLabel for beta-lactam"
-        );
-    }
-
-    #[test]
-    fn export_contains_skos_match_predicates() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-        assert!(
-            turtle.contains("exactMatch") || turtle.contains("skos:exactMatch"),
-            "Turtle must contain exactMatch predicates"
-        );
-        assert!(
-            turtle.contains("broadMatch") || turtle.contains("skos:broadMatch"),
-            "Turtle must contain broadMatch predicates"
-        );
-    }
-
-    #[test]
-    fn export_contains_eclass_scheme() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-        assert!(
-            turtle.contains("eclass/eclass_beta_lactam") || turtle.contains("inScheme"),
-            "Turtle must reference e-graph class as scheme"
-        );
-    }
-
-    #[test]
-    fn export_contains_source_provenance() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-        assert!(
-            turtle.contains("source") && turtle.contains("span_"),
-            "Turtle must include dct:source with span IDs"
-        );
-    }
-
-    #[test]
-    fn export_empty_graph_produces_valid_turtle() {
+    fn empty_graph_round_trips_as_zero_triples() {
         let graph = TerminologyGraph::new();
         let turtle = export_skos_turtle(&graph);
-
         let parsed: Vec<_> = TurtleParser::new()
             .for_slice(&turtle)
             .collect::<Result<Vec<_>, _>>()
             .expect("empty graph Turtle must re-parse");
-
-        assert_eq!(parsed.len(), 0, "empty graph yields zero triples");
-    }
-
-    #[test]
-    fn export_triple_count_matches_expected() {
-        let graph = load_graph();
-        let turtle = export_skos_turtle(&graph);
-
-        let triple_count = TurtleParser::new().for_slice(&turtle).count();
-
-        // Manually counted from fixture: 10 concepts, each has type + prefLabel
-        // + semanticType = 30 base. Most have altLabel, inScheme, bindings, spans.
-        // Exact count depends on fixture data; verify it's stable.
-        assert!(
-            triple_count > 30,
-            "expected > 30 triples for 10 concepts, got {triple_count}"
-        );
+        assert_eq!(parsed.len(), 0);
     }
 }

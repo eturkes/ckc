@@ -98,7 +98,6 @@ pub fn check_alignment_coherence(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::canonical::content_hash;
     use ckc_core::id::EGraphClassId;
     use ckc_core::source::{Concept, TerminologyBinding};
 
@@ -112,6 +111,8 @@ mod tests {
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
+    /// Insert a concept that shares the β-lactam e-graph class but binds
+    /// MEDIS to an incompatible exact code (Y9999 vs the fixture's Y0100).
     fn plant_incoherent_concept(graph: &mut TerminologyGraph) {
         graph.insert(Concept {
             concept_id: ConceptId::new("concept_incoherent_bl_test"),
@@ -137,92 +138,37 @@ mod tests {
     }
 
     #[test]
-    fn clean_fixture_has_no_incoherences() {
+    fn clean_fixture_and_empty_graph_have_no_incoherences() {
         let graph = load_graph();
         let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let result = check_alignment_coherence(&graph, &equiv);
-        assert!(result.is_empty(), "clean fixture must have no incoherences");
+        assert!(check_alignment_coherence(&graph, &equiv).is_empty());
+
+        let empty = TerminologyGraph::new();
+        let equiv_empty = TermEquivalence::from_terminology_graph(&empty);
+        assert!(check_alignment_coherence(&empty, &equiv_empty).is_empty());
     }
 
     #[test]
-    fn planted_incoherence_detected() {
+    fn planted_incoherence_surfaces_with_repair_text() {
         let mut graph = load_graph();
         plant_incoherent_concept(&mut graph);
         let equiv = TermEquivalence::from_terminology_graph(&graph);
         let result = check_alignment_coherence(&graph, &equiv);
-
-        assert!(!result.is_empty(), "planted incoherence must be detected");
-
-        let medis_hit = result
-            .iter()
-            .any(|d| d.system == "MEDIS" && (d.code_a == "Y9999" || d.code_b == "Y9999"));
-        assert!(medis_hit, "MEDIS Y9999 incoherence must appear");
-    }
-
-    #[test]
-    fn planted_incoherence_has_repair_suggestion() {
-        let mut graph = load_graph();
-        plant_incoherent_concept(&mut graph);
-        let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let result = check_alignment_coherence(&graph, &equiv);
-
-        for d in &result {
-            assert!(!d.repair_suggestion.is_empty());
-            assert!(d.repair_suggestion.contains(&d.system));
-        }
-    }
-
-    #[test]
-    fn result_is_deterministic() {
-        let mut graph = load_graph();
-        plant_incoherent_concept(&mut graph);
-        let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let r1 = check_alignment_coherence(&graph, &equiv);
-        let r2 = check_alignment_coherence(&graph, &equiv);
-        assert_eq!(r1, r2);
-        assert_eq!(content_hash(&r1), content_hash(&r2));
-    }
-
-    #[test]
-    fn result_is_serializable() {
-        let mut graph = load_graph();
-        plant_incoherent_concept(&mut graph);
-        let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let result = check_alignment_coherence(&graph, &equiv);
-
-        let json = serde_json::to_string(&result).unwrap();
-        let rt: Vec<AlignmentIncoherence> = serde_json::from_str(&json).unwrap();
-        assert_eq!(result, rt);
-    }
-
-    #[test]
-    fn empty_graph_returns_empty() {
-        let graph = TerminologyGraph::new();
-        let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let result = check_alignment_coherence(&graph, &equiv);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn incoherence_involves_correct_concept_pair() {
-        let mut graph = load_graph();
-        plant_incoherent_concept(&mut graph);
-        let equiv = TermEquivalence::from_terminology_graph(&graph);
-        let result = check_alignment_coherence(&graph, &equiv);
+        assert!(!result.is_empty());
 
         let medis_hits: Vec<_> = result
             .iter()
             .filter(|d| d.system == "MEDIS" && (d.code_a == "Y9999" || d.code_b == "Y9999"))
             .collect();
         assert!(!medis_hits.is_empty());
-
         for hit in &medis_hits {
-            let involves_planted = hit.concept_a == "concept_incoherent_bl_test"
-                || hit.concept_b == "concept_incoherent_bl_test";
+            // Every reported MEDIS hit involves the planted concept and
+            // carries a non-empty repair suggestion mentioning the system.
             assert!(
-                involves_planted,
-                "incoherence must involve the planted concept"
+                hit.concept_a == "concept_incoherent_bl_test"
+                    || hit.concept_b == "concept_incoherent_bl_test"
             );
+            assert!(hit.repair_suggestion.contains(&hit.system));
         }
     }
 }

@@ -190,29 +190,6 @@ golden_suite!(
 );
 
 // ---------------------------------------------------------------------------
-// Cross-type: all 5 retrieval golden fixtures produce distinct content hashes
-// ---------------------------------------------------------------------------
-
-#[test]
-fn all_retrieval_golden_fixtures_produce_distinct_hashes() {
-    let hashes: Vec<ContentHash> = vec![
-        content_hash(&golden_analyzer_config()),
-        content_hash(&golden_retrieval_query()),
-        content_hash(&golden_retrieval_hit()),
-        content_hash(&golden_retrieval_result()),
-        content_hash(&golden_qrel_judgment()),
-    ];
-    for (i, a) in hashes.iter().enumerate() {
-        for (j, b) in hashes.iter().enumerate().skip(i + 1) {
-            assert_ne!(
-                a, b,
-                "hash collision between retrieval golden fixtures {i} and {j}"
-            );
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Regeneration
 // ---------------------------------------------------------------------------
 

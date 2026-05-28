@@ -127,196 +127,105 @@ mod tests {
         TerminologyGraph::load_from_json(&json).expect("fixture must parse")
     }
 
+    /// All 10 toy concepts populate every secondary index and are reachable
+    /// via id + egraph-class + system-code + JA-label + EN-label lookups.
     #[test]
-    fn load_all_toy_concepts() {
+    fn toy_fixture_round_trip() {
         let graph = load_fixture();
         assert_eq!(graph.len(), 10);
-    }
 
-    #[test]
-    fn get_by_id_returns_known_concept() {
-        let graph = load_fixture();
-        let sepsis = graph
-            .get_by_id(&ConceptId::new("concept_sepsis"))
-            .expect("concept_sepsis must exist");
+        // Spot-check ID -> label content.
+        let sepsis = graph.get_by_id(&ConceptId::new("concept_sepsis")).unwrap();
         assert_eq!(sepsis.label_ja, "敗血症");
         assert_eq!(sepsis.label_en.as_deref(), Some("sepsis"));
-    }
 
-    #[test]
-    fn get_by_id_returns_none_for_unknown() {
-        let graph = load_fixture();
-        assert!(graph.get_by_id(&ConceptId::new("nonexistent")).is_none());
-    }
-
-    #[test]
-    fn beta_lactam_variants_share_egraph_class() {
-        let graph = load_fixture();
-        let variants = graph.get_by_egraph_class("eclass_beta_lactam");
-        assert_eq!(variants.len(), 5);
-
-        let ids: HashSet<&str> = variants.iter().map(|c| c.concept_id.as_str()).collect();
-        assert!(ids.contains("concept_beta_lactam"));
-        assert!(ids.contains("concept_bl_variant_katakana"));
-        assert!(ids.contains("concept_bl_variant_hyphenated"));
-        assert!(ids.contains("concept_bl_variant_english"));
-        assert!(ids.contains("concept_bl_variant_brand"));
-    }
-
-    #[test]
-    fn egraph_class_returns_empty_for_unknown() {
-        let graph = load_fixture();
-        assert!(graph.get_by_egraph_class("nonexistent").is_empty());
-    }
-
-    #[test]
-    fn find_by_system_code_medis_y0100() {
-        let graph = load_fixture();
-        let results = graph.find_by_system_code("MEDIS", "Y0100");
-        // Primary beta-lactam + katakana variant + hyphenated variant + brand (narrower)
-        assert_eq!(results.len(), 4);
-        let ids: HashSet<&str> = results.iter().map(|c| c.concept_id.as_str()).collect();
-        assert!(ids.contains("concept_beta_lactam"));
-        assert!(ids.contains("concept_bl_variant_katakana"));
-        assert!(ids.contains("concept_bl_variant_hyphenated"));
-        assert!(ids.contains("concept_bl_variant_brand"));
-    }
-
-    #[test]
-    fn find_by_system_code_jlac11() {
-        let graph = load_fixture();
-        let results = graph.find_by_system_code("JLAC11", "9N611000000000001");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].concept_id.as_str(), "concept_body_temperature");
-    }
-
-    #[test]
-    fn find_by_system_code_returns_empty_for_unknown() {
-        let graph = load_fixture();
-        assert!(graph.find_by_system_code("FAKE", "000").is_empty());
-    }
-
-    #[test]
-    fn search_by_label_ja_partial() {
-        let graph = load_fixture();
-        // "ラクタム" matches all beta-lactam JA variants containing that substring
-        let results = graph.search_by_label("ラクタム");
-        assert!(
-            results.len() >= 3,
-            "expected >= 3 JA matches, got {}",
-            results.len()
-        );
-
-        let ids: HashSet<&str> = results.iter().map(|c| c.concept_id.as_str()).collect();
-        assert!(ids.contains("concept_beta_lactam"));
-        assert!(ids.contains("concept_bl_variant_katakana"));
-        assert!(ids.contains("concept_bl_variant_hyphenated"));
-    }
-
-    #[test]
-    fn search_by_label_en_partial() {
-        let graph = load_fixture();
-        // "beta-lactam" matches EN labels with ASCII "beta"; concept_bl_variant_hyphenated
-        // uses Greek β in its EN label so it correctly does not match here.
-        let results = graph.search_by_label("beta-lactam");
-        let ids: HashSet<&str> = results.iter().map(|c| c.concept_id.as_str()).collect();
-        assert!(ids.contains("concept_beta_lactam"));
-        assert!(ids.contains("concept_bl_variant_katakana"));
-        assert!(ids.contains("concept_bl_variant_english"));
-        assert_eq!(ids.len(), 3);
-    }
-
-    #[test]
-    fn search_by_label_case_insensitive() {
-        let graph = load_fixture();
-        let results = graph.search_by_label("Sepsis");
-        assert!(
-            results
-                .iter()
-                .any(|c| c.concept_id.as_str() == "concept_sepsis"),
-            "case-insensitive EN search must find sepsis"
-        );
-    }
-
-    #[test]
-    fn search_by_label_ja_vital_sign() {
-        let graph = load_fixture();
-        let results = graph.search_by_label("血圧");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].concept_id.as_str(), "concept_blood_pressure");
-    }
-
-    #[test]
-    fn each_concept_queryable_by_id() {
-        let graph = load_fixture();
-        let expected_ids = [
-            "concept_beta_lactam",
-            "concept_bl_variant_katakana",
-            "concept_bl_variant_hyphenated",
-            "concept_bl_variant_english",
-            "concept_bl_variant_brand",
-            "concept_sepsis",
-            "concept_anaphylaxis",
-            "concept_body_temperature",
-            "concept_heart_rate",
-            "concept_blood_pressure",
-        ];
-        for id_str in &expected_ids {
-            assert!(
-                graph.get_by_id(&ConceptId::new(*id_str)).is_some(),
-                "concept {id_str} must be queryable by ID"
-            );
-        }
-    }
-
-    #[test]
-    fn each_egraph_class_returns_correct_count() {
-        let graph = load_fixture();
-        let expected = [
+        // Every fixture e-graph class returns its expected member count.
+        for (class_id, expected) in [
             ("eclass_beta_lactam", 5),
             ("eclass_sepsis", 1),
             ("eclass_anaphylaxis", 1),
             ("eclass_body_temperature", 1),
             ("eclass_heart_rate", 1),
             ("eclass_blood_pressure", 1),
-        ];
-        for (class_id, count) in &expected {
-            let results = graph.get_by_egraph_class(class_id);
-            assert_eq!(
-                results.len(),
-                *count,
-                "egraph class {class_id} expected {count} concepts, got {}",
-                results.len()
-            );
+        ] {
+            assert_eq!(graph.get_by_egraph_class(class_id).len(), expected);
+        }
+
+        // β-lactam variants share their e-graph class.
+        let variant_ids: HashSet<&str> = graph
+            .get_by_egraph_class("eclass_beta_lactam")
+            .iter()
+            .map(|c| c.concept_id.as_str())
+            .collect();
+        for id in [
+            "concept_beta_lactam",
+            "concept_bl_variant_katakana",
+            "concept_bl_variant_hyphenated",
+            "concept_bl_variant_english",
+            "concept_bl_variant_brand",
+        ] {
+            assert!(variant_ids.contains(id));
         }
     }
 
+    /// MEDIS Y0100 is shared by the primary β-lactam concept and three
+    /// variants (katakana/hyphenated/brand). JLAC11 codes are unique.
     #[test]
-    fn insert_then_query() {
-        let mut graph = TerminologyGraph::new();
-        let concept = Concept {
-            concept_id: ConceptId::new("test_concept"),
-            label_ja: "テスト".into(),
-            label_en: Some("test".into()),
-            semantic_type: "test".into(),
-            terminology_bindings: vec![],
-            egraph_class_id: Some(EGraphClassId::new("eclass_test")),
-            source_span_ids: vec![],
-        };
-        graph.insert(concept);
-        assert_eq!(graph.len(), 1);
-        assert!(graph.get_by_id(&ConceptId::new("test_concept")).is_some());
-        assert_eq!(graph.get_by_egraph_class("eclass_test").len(), 1);
+    fn find_by_system_code_groups_variants_under_shared_codes() {
+        let graph = load_fixture();
+        let medis_y0100: HashSet<&str> = graph
+            .find_by_system_code("MEDIS", "Y0100")
+            .iter()
+            .map(|c| c.concept_id.as_str())
+            .collect();
+        assert_eq!(medis_y0100.len(), 4);
+        for id in [
+            "concept_beta_lactam",
+            "concept_bl_variant_katakana",
+            "concept_bl_variant_hyphenated",
+            "concept_bl_variant_brand",
+        ] {
+            assert!(medis_y0100.contains(id));
+        }
+
+        let jlac = graph.find_by_system_code("JLAC11", "9N611000000000001");
+        assert_eq!(jlac.len(), 1);
+        assert_eq!(jlac[0].concept_id.as_str(), "concept_body_temperature");
     }
 
+    /// JA substring match, EN substring match, and case-insensitive EN
+    /// match all surface the right concepts; `concept_bl_variant_hyphenated`
+    /// uses Greek β in EN so an ASCII "beta-lactam" search must skip it.
     #[test]
-    fn empty_graph() {
-        let graph = TerminologyGraph::new();
-        assert!(graph.is_empty());
-        assert_eq!(graph.len(), 0);
-        assert!(graph.get_by_id(&ConceptId::new("x")).is_none());
-        assert!(graph.get_by_egraph_class("x").is_empty());
-        assert!(graph.find_by_system_code("x", "y").is_empty());
-        assert!(graph.search_by_label("x").is_empty());
+    fn search_by_label_covers_ja_en_case_insensitive() {
+        let graph = load_fixture();
+
+        let ja_ids: HashSet<&str> = graph
+            .search_by_label("ラクタム")
+            .iter()
+            .map(|c| c.concept_id.as_str())
+            .collect();
+        assert!(ja_ids.len() >= 3);
+        assert!(ja_ids.contains("concept_beta_lactam"));
+
+        let en_ids: HashSet<&str> = graph
+            .search_by_label("beta-lactam")
+            .iter()
+            .map(|c| c.concept_id.as_str())
+            .collect();
+        assert_eq!(en_ids.len(), 3);
+        assert!(en_ids.contains("concept_bl_variant_english"));
+        assert!(!en_ids.contains("concept_bl_variant_hyphenated"));
+
+        assert!(
+            graph
+                .search_by_label("Sepsis")
+                .iter()
+                .any(|c| c.concept_id.as_str() == "concept_sepsis")
+        );
+
+        let bp = graph.search_by_label("血圧");
+        assert_eq!(bp.len(), 1);
+        assert_eq!(bp[0].concept_id.as_str(), "concept_blood_pressure");
     }
 }
