@@ -5,6 +5,9 @@ use ckc_core::canonical::ContentHash;
 use ckc_core::enums::Language;
 use ckc_core::id::{QueryId, SpanId};
 
+pub mod sparse;
+pub use sparse::{compute_index_fingerprint, ipadic_tokens, SparseIndex};
+
 /// Morphological analyzer configuration for Japanese text retrieval.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AnalyzerConfig {

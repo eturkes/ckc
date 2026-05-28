@@ -33,3 +33,9 @@ oxrdf = "0.3"
 oxttl = "0.2"
 proptest = "1"
 tempfile = "3"
+# Sparse retrieval (subtask 0.7.2). lindera-tantivy 2.0.0 pins tantivy to 0.25
+# and lindera to 2.x — these three versions are the only triple that compiles
+# together as of 2026-05; do not bump independently.
+tantivy = "0.25.0"
+lindera = "2"
+lindera-tantivy = { version = "2.0.0", features = ["embed-ipadic"] }
