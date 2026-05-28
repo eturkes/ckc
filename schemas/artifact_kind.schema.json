@@ -20,6 +20,7 @@
     "certificate",
     "assurance_node",
     "audit_trace",
-    "store_manifest"
+    "store_manifest",
+    "egraph_artifact"
   ]
 }

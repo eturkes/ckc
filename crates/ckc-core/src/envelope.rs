@@ -28,6 +28,7 @@ pub enum ArtifactKind {
     AssuranceNode,
     AuditTrace,
     StoreManifest,
+    EgraphArtifact,
 }
 
 /// Pipeline metadata for a stored artifact (SPEC 5.2).
@@ -191,6 +192,7 @@ mod tests {
             (ArtifactKind::AssuranceNode, "\"assurance_node\""),
             (ArtifactKind::AuditTrace, "\"audit_trace\""),
             (ArtifactKind::StoreManifest, "\"store_manifest\""),
+            (ArtifactKind::EgraphArtifact, "\"egraph_artifact\""),
         ];
         for (variant, expected) in kinds {
             let json = serde_json::to_string(&variant).unwrap();

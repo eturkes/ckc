@@ -1,3 +1,5 @@
+pub mod egraph;
+
 use std::collections::HashMap;
 
 use ckc_core::id::{ConceptId, EGraphClassId};
