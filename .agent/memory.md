@@ -96,15 +96,40 @@ technically derivable but easily forgotten under token pressure.
     `user:file_search_path(library, ...)` before `use_module(library(lsp_server))`.
     Without the patch, `pack install lsp_server -y` succeeds but loading the
     pack fails with `Cannot find source for library(json)`.
-- [2026-05-29] LSP coverage decisions for SPEC verification-target formats:
-  Lean 4 (lake serve), Alloy 6 (dist jar `lsp` subcommand), SWI-Prolog
-  (jamesnvc/lsp_server pack), and LemMinX (DMN/BPMN/SHACL-XML/XSD) are wired.
-  Deliberately skipped — no production-quality LSP exists as of 2026-05:
-  TLA+ (only experimental servers, not maintained), ASP/Clingo (research-grade
-  servers only), SMT-LIB (Dolmen LSP is experimental), Soufflé Datalog (only
-  a thesis prototype), egglog (no LSP), CQL (no LSP). Revisit per-format
+- [2026-05-29] LSP coverage matrix for SPEC verification-target formats —
+  wired: Lean 4 (lake serve), Alloy 6 (dist-jar `lsp` subcommand), SWI-Prolog
+  (jamesnvc/lsp_server pack), LemMinX (DMN/BPMN/SHACL-XML/XSD), Dolmen
+  (SMT-LIB/TPTP/DIMACS/Zipperposition), Soufflé Datalog
+  (jdaridis/souffle-lsp-plugin), egglog (hatoo/egglog-language-server).
+  No standalone LSP exists as of 2026-05: TLA+ (vscode-tlaplus is a TS
+  extension shelling out to tla2tools.jar — no LSP server), ASP/Clingo
+  (CaptainUnbrauchbar/ASP-Language-Support and ffrankreiter extension both
+  just JS extensions calling clingo binary), Categorical CQL
+  (categoricaldata.net repo is a Java Swing IDE only; cqframework/cql-language-server
+  is HL7 Clinical Quality Language, not Categorical). Revisit per-format
   before the corresponding SPEC phase lands; do not redo the survey from
   scratch — start from these names.
+- [2026-05-29] Additional LSP install gotchas (round 2):
+  * Dolmen opam package is `dolmen_lsp` (underscore), not `dolmen-lsp`
+    (hyphen). Binary it installs is `dolmenls`. Path:
+    `~/.opam/<switch>/bin/dolmenls`. Symlink as `~/.local/bin/dolmen-lsp`.
+    `dolmenls --version` exits with `error: End_of_file` because dolmenls is
+    LSP-only (reads stdin); that exit is success, not failure. Total disk
+    footprint: ~1.5 GB for the OCaml 5.2.0 switch + dolmen toolchain.
+  * Soufflé apt package targets Ubuntu 20.04 and depends on libffi7; Debian
+    13 only ships libffi8. Workaround: install libffi7 3.3-6 from Debian
+    snapshot.debian.org, then `apt install souffle`. snapshot URL:
+    `http://snapshot.debian.org/archive/debian/20210602T144247Z/pool/main/libf/libffi/libffi7_3.3-6_amd64.deb`.
+    The Souffle LSP repo gradle-builds `Souffle_Ide_Plugin-1.0-SNAPSHOT.jar`;
+    main-class is `SouffleLanguageServerLauncher`. The LSP parses with an
+    in-process ANTLR grammar, so most features work without the `souffle`
+    binary; only `souffle-lint`-driven diagnostics require an external
+    binary (souffle-lint is a separate, optional install).
+  * egglog binary: `cargo install egglog` (egglog 2.0.0, Feb 2026). The LSP
+    workspace at hatoo/egglog-language-server is a tree-sitter-backed Rust
+    server, built via `cargo build --release -p egglog-language-server`.
+    Drop into `~/.local/bin/egglog-lsp`. File extension is `.egg` (not
+    `.egglog`).
 
 ## Mistakes
 

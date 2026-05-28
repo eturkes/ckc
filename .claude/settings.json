@@ -14,7 +14,10 @@
     "turtle-lsp@ckc-lsps": true,
     "xml-lsp@ckc-lsps": true,
     "alloy-lsp@ckc-lsps": true,
-    "prolog-lsp@ckc-lsps": true
+    "prolog-lsp@ckc-lsps": true,
+    "dolmen-lsp@ckc-lsps": true,
+    "souffle-lsp@ckc-lsps": true,
+    "egglog-lsp@ckc-lsps": true
   },
   "extraKnownMarketplaces": {
     "ckc-lsps": {

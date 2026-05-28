@@ -219,6 +219,59 @@
           }
         }
       }
+    },
+    {
+      "name": "dolmen-lsp",
+      "description": "Dolmen LSP for SMT-LIB, TPTP, DIMACS, Zipperposition",
+      "version": "1.0.0",
+      "source": "./plugins/dolmen-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "dolmenls": {
+          "command": "dolmen-lsp",
+          "extensionToLanguage": {
+            ".smt2": "smtlib",
+            ".cnf": "dimacs",
+            ".icnf": "dimacs",
+            ".p": "tptp",
+            ".tptp": "tptp",
+            ".zf": "zf"
+          }
+        }
+      }
+    },
+    {
+      "name": "souffle-lsp",
+      "description": "Soufflé Datalog LSP via jdaridis/souffle-lsp-plugin",
+      "version": "1.0.0",
+      "source": "./plugins/souffle-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "souffle": {
+          "command": "souffle-lsp",
+          "extensionToLanguage": {
+            ".dl": "souffle"
+          }
+        }
+      }
+    },
+    {
+      "name": "egglog-lsp",
+      "description": "egglog LSP via hatoo/egglog-language-server",
+      "version": "1.0.0",
+      "source": "./plugins/egglog-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "egglog": {
+          "command": "egglog-lsp",
+          "extensionToLanguage": {
+            ".egg": "egglog"
+          }
+        }
+      }
     }
   ]
 }
