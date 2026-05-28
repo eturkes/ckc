@@ -31,6 +31,19 @@ technically derivable but easily forgotten under token pressure.
   `content_hash`/`envelope_hash` (or manifest entries minus timestamp), as in
   ckc-store `cas_manifest_hash_is_stable` and `all_fixtures_have_deterministic_hashes`.
   Avoid asserting raw manifest-byte equality across independent runs.
+- [2026-05-28] Fresh-container toolchain drift: `rust-toolchain.toml` pins
+  channel `stable` (not a specific version), so a new container's rustup may
+  resolve a newer stable than committed code was formatted/linted under. Result:
+  `just fmt-check` and `just clippy` may fail on otherwise-correct code while
+  `just test` still passes. Treat such failures as drift, not regressions;
+  remediation is `cargo fmt --all` + manual clippy fixes (then commit), or pin
+  the toolchain to a specific version in `rust-toolchain.toml`. Verify tooling
+  via `just test` first when bringing up a fresh environment.
+- [2026-05-28] Non-interactive `Bash` tool invocations do NOT source
+  `~/.bashrc`, so `PATH` additions appended there (e.g. for mise shims) are
+  invisible per-command. Either prefix commands with
+  `PATH="$HOME/.local/share/mise/shims:$PATH"` or rely on tools already in the
+  base PATH (`~/.cargo/bin`, `~/.local/bin`, `~/.local/share/pnpm/bin`).
 
 ## Mistakes
 
