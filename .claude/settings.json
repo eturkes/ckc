@@ -10,7 +10,11 @@
     "css-lsp@ckc-lsps": true,
     "svelte-lsp@ckc-lsps": true,
     "lean4-lsp@ckc-lsps": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "turtle-lsp@ckc-lsps": true,
+    "xml-lsp@ckc-lsps": true,
+    "alloy-lsp@ckc-lsps": true,
+    "prolog-lsp@ckc-lsps": true
   },
   "extraKnownMarketplaces": {
     "ckc-lsps": {

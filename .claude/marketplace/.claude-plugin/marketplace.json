@@ -135,7 +135,7 @@
     },
     {
       "name": "lean4-lsp",
-      "description": "Lean 4 LSP via lake serve. Requires elan + a project-local lakefile.lean; install at start of Phase 4.",
+      "description": "Lean 4 LSP via lake serve",
       "version": "1.0.0",
       "source": "./plugins/lean4-lsp",
       "category": "development",
@@ -146,6 +146,76 @@
           "args": ["serve"],
           "extensionToLanguage": {
             ".lean": "lean4"
+          }
+        }
+      }
+    },
+    {
+      "name": "turtle-lsp",
+      "description": "Turtle/RDF LSP via Stardog turtle-language-server",
+      "version": "1.0.0",
+      "source": "./plugins/turtle-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "turtle": {
+          "command": "turtle-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".ttl": "turtle",
+            ".nt": "turtle"
+          }
+        }
+      }
+    },
+    {
+      "name": "xml-lsp",
+      "description": "XML LSP via Eclipse LemMinX; covers DMN, BPMN, SHACL-XML and generic XML/XSD",
+      "version": "1.0.0",
+      "source": "./plugins/xml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "lemminx": {
+          "command": "lemminx",
+          "extensionToLanguage": {
+            ".xml": "xml",
+            ".xsd": "xml",
+            ".dmn": "xml",
+            ".bpmn": "xml"
+          }
+        }
+      }
+    },
+    {
+      "name": "alloy-lsp",
+      "description": "Alloy 6 LSP via the `lsp` subcommand of org.alloytools.alloy.dist.jar",
+      "version": "1.0.0",
+      "source": "./plugins/alloy-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "alloy": {
+          "command": "alloy-lsp",
+          "extensionToLanguage": {
+            ".als": "alloy"
+          }
+        }
+      }
+    },
+    {
+      "name": "prolog-lsp",
+      "description": "SWI-Prolog LSP via jamesnvc/lsp_server pack",
+      "version": "1.0.0",
+      "source": "./plugins/prolog-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "prolog": {
+          "command": "prolog-lsp",
+          "extensionToLanguage": {
+            ".pl": "prolog",
+            ".pro": "prolog"
           }
         }
       }

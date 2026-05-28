@@ -76,8 +76,35 @@ technically derivable but easily forgotten under token pressure.
   * `vscode-langservers-extracted` (single pnpm package) provides four
     binaries: `vscode-{html,css,json,eslint}-language-server`. Reuse across
     JSON/HTML/CSS plugins instead of installing each LSP separately.
-  * Lean 4 LSP is `lake serve`; install elan + a toolchain only after a
-    `lakefile.lean` exists in the repo (deferred until Phase 4).
+  * Lean 4 LSP is `lake serve`; elan provides `lake`/`lean`/`leanc` as
+    multiplexer hardlinks. Install via the upstream `elan-init.sh` script with
+    `-y --default-toolchain stable`, then symlink `~/.elan/bin/{lake,lean}`
+    into `~/.local/bin/`. `lake serve` works at repo root even without a
+    `lakefile.lean` — it just won't index project files until one exists.
+  * Alloy 6 LSP ships inside the dist jar as the `lsp` subcommand:
+    `java -jar org.alloytools.alloy.dist.jar lsp`. Get the jar from
+    `github.com/AlloyTools/org.alloytools.alloy/releases/download/v6.2.0/org.alloytools.alloy.dist.jar`
+    and wrap it as `~/.local/bin/alloy-lsp`. Requires `openjdk-21-jre-headless`.
+  * LemMinX (generic XML LSP) is NOT on Maven Central and the GitHub releases
+    page lists no jar assets. Use the Eclipse Nexus direct URL:
+    `https://repo.eclipse.org/content/repositories/lemminx-releases/org/eclipse/lemminx/org.eclipse.lemminx/<ver>/org.eclipse.lemminx-<ver>-uber.jar`
+    (verified for 0.31.1). Covers XML/XSD/DMN/BPMN/SHACL-XML.
+  * SWI-Prolog `lsp_server` pack expects `library(json)`, but the Debian
+    `swi-prolog-core-packages` splits the JSON library into
+    `/usr/lib/swi-prolog/library/ext/http/http/` and registers it only as
+    `library(http/json)`. Wrap `swipl` to prepend that dir to
+    `user:file_search_path(library, ...)` before `use_module(library(lsp_server))`.
+    Without the patch, `pack install lsp_server -y` succeeds but loading the
+    pack fails with `Cannot find source for library(json)`.
+- [2026-05-29] LSP coverage decisions for SPEC verification-target formats:
+  Lean 4 (lake serve), Alloy 6 (dist jar `lsp` subcommand), SWI-Prolog
+  (jamesnvc/lsp_server pack), and LemMinX (DMN/BPMN/SHACL-XML/XSD) are wired.
+  Deliberately skipped — no production-quality LSP exists as of 2026-05:
+  TLA+ (only experimental servers, not maintained), ASP/Clingo (research-grade
+  servers only), SMT-LIB (Dolmen LSP is experimental), Soufflé Datalog (only
+  a thesis prototype), egglog (no LSP), CQL (no LSP). Revisit per-format
+  before the corresponding SPEC phase lands; do not redo the survey from
+  scratch — start from these names.
 
 ## Mistakes
 
