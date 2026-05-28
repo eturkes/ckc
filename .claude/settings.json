@@ -9,7 +9,8 @@
     "html-lsp@ckc-lsps": true,
     "css-lsp@ckc-lsps": true,
     "svelte-lsp@ckc-lsps": true,
-    "lean4-lsp@ckc-lsps": true
+    "lean4-lsp@ckc-lsps": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "ckc-lsps": {
