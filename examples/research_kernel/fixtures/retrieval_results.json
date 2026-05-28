@@ -1,0 +1,183 @@
+[
+  {
+    "query": {
+      "query_id": "q_sepsis_bl",
+      "query_text": "敗血症 βラクタム 投与",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_rec_sepsis_bl",
+        "score": 8.38786792755127,
+        "rank": 1
+      },
+      {
+        "span_id": "span_contra_bl_allergy",
+        "score": 5.943687438964844,
+        "rank": 2
+      },
+      {
+        "span_id": "span_evidence_sepsis",
+        "score": 4.431221961975098,
+        "rank": 3
+      },
+      {
+        "span_id": "span_cell_r0c1",
+        "score": 4.356322765350342,
+        "rank": 4
+      },
+      {
+        "span_id": "span_term_bl_greek",
+        "score": 3.6479361057281494,
+        "rank": 5
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  },
+  {
+    "query": {
+      "query_id": "q_contra_allergy",
+      "query_text": "アナフィラキシー 禁忌",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_contra_bl_allergy",
+        "score": 6.729425430297852,
+        "rank": 1
+      },
+      {
+        "span_id": "span_allergy_history",
+        "score": 2.740438222885132,
+        "rank": 2
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  },
+  {
+    "query": {
+      "query_id": "q_allergy_history",
+      "query_text": "薬物アレルギー歴 確認 既往",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_allergy_history",
+        "score": 13.882863998413086,
+        "rank": 1
+      },
+      {
+        "span_id": "span_contra_bl_allergy",
+        "score": 3.760319471359253,
+        "rank": 2
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  },
+  {
+    "query": {
+      "query_id": "q_vitals_temp",
+      "query_text": "体温",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_cell_r0c0",
+        "score": 5.094640254974365,
+        "rank": 1
+      },
+      {
+        "span_id": "span_cell_r1c0",
+        "score": 5.094640254974365,
+        "rank": 2
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  },
+  {
+    "query": {
+      "query_id": "q_provenance",
+      "query_text": "ガイドライン 第5版 発行",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_provenance_meta",
+        "score": 19.212745666503906,
+        "rank": 1
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  },
+  {
+    "query": {
+      "query_id": "q_term_variants",
+      "query_text": "βラクタム ベータラクタム 化学構造",
+      "language": "ja",
+      "analyzer_config": {
+        "name": "lindera_ipadic",
+        "dictionary": "ipadic",
+        "mode": "normal"
+      }
+    },
+    "hits": [
+      {
+        "span_id": "span_term_bl_katakana",
+        "score": 17.718191146850586,
+        "rank": 1
+      },
+      {
+        "span_id": "span_term_bl_greek",
+        "score": 3.6479361057281494,
+        "rank": 2
+      },
+      {
+        "span_id": "span_contra_bl_allergy",
+        "score": 3.4957408905029297,
+        "rank": 3
+      },
+      {
+        "span_id": "span_rec_sepsis_bl",
+        "score": 3.2898566722869873,
+        "rank": 4
+      },
+      {
+        "span_id": "span_evidence_sepsis",
+        "score": 2.3960976600646973,
+        "rank": 5
+      }
+    ],
+    "index_fingerprint": "sha256:486731dad2d72d75a174e7460cc6908982c030595af2e8e049b19f9bb91c02d3",
+    "corpus_hash": "sha256:2866f18b5c208337d533186495c0abcb22505a7e24586349d0472b8c8e469ef9"
+  }
+]

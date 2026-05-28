@@ -306,12 +306,14 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ckc-core",
+ "ckc-store",
  "lindera",
  "lindera-tantivy",
  "schemars",
  "serde",
  "serde_json",
  "tantivy",
+ "tempfile",
 ]
 
 [[package]]

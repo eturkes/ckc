@@ -156,6 +156,43 @@ technically derivable but easily forgotten under token pressure.
   a reason to fall back to grep. Fire LSP in parallel with other
   independent tools in the same response.
 
+- [2026-05-29] serde_json f64 parse/format asymmetry: serde_json's f64
+  deserializer (lexical-core, Eisel-Lemire) and serializer (ryu, shortest
+  round-trip vs Rust std parser) disagree at ULP boundaries. Concretely,
+  `19.212745666503906_f64` (bits `4033367680000000`) serializes to
+  `"19.212745666503906"` via ryu, but `serde_json::from_str` re-parses that
+  literal back to `19.212745666503903_f64` (bits `403336767fffffff`, the
+  neighbouring f64). Round-trip fails by 1 ULP for some values. Rust's std
+  `<str as FromStr>::parse::<f64>` does round-trip cleanly, so the asymmetry
+  is purely between the two serde_json algorithms. Implication: do not write
+  snapshot tests that assert `assert_eq!(live, serde_json::from_slice(disk))`
+  on structs containing f64 fields — Vec equality will fire on values you
+  cannot fix at the serializer. Workarounds: (a) compare via `content_hash`
+  over canonical bytes in-memory only; (b) deserialize then compare
+  structurally (query ids, span_id sequences, fingerprints) not by full
+  struct equality; (c) quantize f64 to a fixed precision (e.g. `{:.9}`)
+  before storage so values stay in the round-trippable interior. CKC took
+  (b) for `crates/ckc-retrieve/tests/persistence.rs` Gate 3. Verified
+  empirically in this session via a 5-line snippet against serde_json 1.x.
+- [2026-05-29] Tantivy `TopDocs` tie-break is NOT cross-run-deterministic.
+  Upstream docs say ties are broken by ascending doc id, which suggests
+  insertion-order stability — but the default `Index::writer(budget)`
+  uses multiple indexer threads, so doc ids assigned to specific spans can
+  swap across independent index builds even when input order is byte-for-byte
+  identical. Symptom: two independent `SparseIndex::build_from_spans(spans)`
+  calls return tied hits in opposite orders (Phase-0 `q_vitals_temp`:
+  `span_cell_r0c0` vs `span_cell_r1c0` swap between runs at score
+  `5.094640254974365`). The original 0.7.2 sparse-index test suite only
+  asserts top-k set membership and rank monotonicity, so it did not catch
+  this; 0.7.6's `per_result_hashes_match_across_two_independent_runs`
+  surfaced it. Fix applied in `crates/ckc-retrieve/src/sparse.rs::search`:
+  post-collector stable sort by `(score DESC, span_id ASC)` then reassign
+  ranks 1..N. This dominates whatever Tantivy does internally and costs
+  nothing for non-tied results. Alternative fix
+  (`index.writer_with_num_threads(1, budget)`) would force serial indexing
+  and was not needed; keep it in mind if BM25 score values themselves ever
+  drift across runs (none observed in Phase-0).
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can

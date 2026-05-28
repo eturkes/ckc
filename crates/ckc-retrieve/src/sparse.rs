@@ -8,12 +8,13 @@
 //! - The `index_fingerprint` is the SHA-256 content hash (RFC 8785 canonical
 //!   JSON) of the lex-sorted `(span_id, content_hash(span))` pairs and is
 //!   therefore invariant under the order in which spans are passed in.
-//! - BM25 ranking itself is deterministic given a fixed corpus content, since
-//!   Tantivy's `TopDocs` collector breaks score ties by ascending doc id.
-//!   Span insertion order can still shift the doc-id assignment, so ranked
-//!   results are deterministic only when spans are inserted in a stable order
-//!   (callers that need cross-run rank stability must sort spans by `span_id`
-//!   before calling `build_from_spans`).
+//! - BM25 ranking is deterministic across independent index builds because
+//!   `search` applies a post-collector stable sort: primary key is score
+//!   descending; secondary key is `span_id` ascending. This dominates any
+//!   Tantivy-internal tie-breaking that can otherwise vary across builds
+//!   (multi-threaded indexers may assign different doc ids to the same
+//!   spans even under identical insertion order, breaking the implicit
+//!   `TopDocs` "doc-id-ascending" tie-break).
 
 use std::collections::BTreeMap;
 
@@ -224,7 +225,7 @@ impl SparseIndex {
             .context("execute BM25 search")?;
 
         let mut hits = Vec::with_capacity(top_docs.len());
-        for (rank_idx, (score, addr)) in top_docs.into_iter().enumerate() {
+        for (score, addr) in top_docs.into_iter() {
             let doc: TantivyDocument = searcher
                 .doc(addr)
                 .with_context(|| format!("fetch stored doc at {addr:?}"))?;
@@ -236,8 +237,25 @@ impl SparseIndex {
             hits.push(RetrievalHit {
                 span_id: SpanId::new(span_id_str),
                 score: score as f64,
-                rank: (rank_idx as u32) + 1,
+                rank: 0,
             });
+        }
+
+        // Deterministic tie-break: primary score DESC, secondary span_id ASC.
+        // Without this, two independently-built indices over the same span
+        // set can return tied hits in opposite orders because Tantivy assigns
+        // doc ids based on indexer-thread interleaving rather than purely on
+        // insertion order. `partial_cmp` over BM25 scores always returns
+        // `Some` (BM25 produces finite non-NaN f32), so `unwrap_or(Equal)` is
+        // defensive only.
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.span_id.as_str().cmp(b.span_id.as_str()))
+        });
+        for (i, h) in hits.iter_mut().enumerate() {
+            h.rank = (i as u32) + 1;
         }
         Ok(hits)
     }

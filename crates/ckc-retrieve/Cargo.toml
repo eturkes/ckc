@@ -13,3 +13,7 @@ anyhow = { workspace = true }
 tantivy = { workspace = true }
 lindera = { workspace = true }
 lindera-tantivy = { workspace = true }
+
+[dev-dependencies]
+ckc-store = { path = "../ckc-store" }
+tempfile = { workspace = true }
