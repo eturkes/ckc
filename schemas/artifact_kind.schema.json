@@ -21,6 +21,9 @@
     "assurance_node",
     "audit_trace",
     "store_manifest",
-    "egraph_artifact"
+    "egraph_artifact",
+    "shacl_report",
+    "rdf_export",
+    "alignment_diagnostic"
   ]
 }

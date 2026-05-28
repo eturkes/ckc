@@ -1,3 +1,4 @@
+pub mod alignment;
 pub mod egraph;
 pub mod rdf;
 pub mod shacl;

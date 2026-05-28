@@ -29,6 +29,9 @@ pub enum ArtifactKind {
     AuditTrace,
     StoreManifest,
     EgraphArtifact,
+    ShaclReport,
+    RdfExport,
+    AlignmentDiagnostic,
 }
 
 /// Pipeline metadata for a stored artifact (SPEC 5.2).
@@ -193,6 +196,9 @@ mod tests {
             (ArtifactKind::AuditTrace, "\"audit_trace\""),
             (ArtifactKind::StoreManifest, "\"store_manifest\""),
             (ArtifactKind::EgraphArtifact, "\"egraph_artifact\""),
+            (ArtifactKind::ShaclReport, "\"shacl_report\""),
+            (ArtifactKind::RdfExport, "\"rdf_export\""),
+            (ArtifactKind::AlignmentDiagnostic, "\"alignment_diagnostic\""),
         ];
         for (variant, expected) in kinds {
             let json = serde_json::to_string(&variant).unwrap();
