@@ -5,7 +5,7 @@ test:
     cargo test --workspace
 
 clippy:
-    cargo clippy --workspace -- -D warnings
+    cargo clippy --workspace --all-targets -- -D warnings
 
 fmt:
     cargo fmt --all
