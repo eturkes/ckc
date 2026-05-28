@@ -132,7 +132,7 @@ mod tests {
 
     const RULES_PATH: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/toy_research_kernel/fixtures/rules.json"
+        "/../../examples/research_kernel/fixtures/rules.json"
     );
 
     fn load_rules() -> Vec<Rule> {

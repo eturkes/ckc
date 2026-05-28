@@ -637,7 +637,7 @@ Commands:
 - `ckc report <run_id>`: produce bilingual report JSON.
 - `ckc ui`: serve/read static bilingual result UI.
 - `ckc replay <manifest>`: replay a run and compare hashes.
-- `ckc demo toy-research-kernel --replay --out runs/toy`: run Phase 0.
+- `ckc demo research-kernel --replay --out runs/research`: run Phase 0.
 
 Every command emits structured diagnostics and immutable artifacts.
 
@@ -674,7 +674,7 @@ Every command emits structured diagnostics and immutable artifacts.
 ├── certs/
 ├── eval/{gold,synthetic_conflicts,metamorphic,retrieval_qrels,metrics}/
 ├── ui/sveltekit-app/
-├── examples/toy_research_kernel/
+├── examples/research_kernel/
 └── runs/.gitkeep
 ```
 
@@ -717,7 +717,7 @@ Deliver:
 
 Acceptance:
 
-- `ckc demo toy-research-kernel --replay --out runs/toy` runs all toy checks;
+- `ckc demo research-kernel --replay --out runs/research` runs all toy checks;
 - repeated runs produce identical accepted artifact hashes;
 - every verifier output maps to source spans;
 - accepted Lean files compile with zero `sorry` or `admit`;
@@ -855,7 +855,7 @@ Implement Phase 0.
 Minimum command target:
 
 ```bash
-ckc demo toy-research-kernel --replay --out runs/toy
+ckc demo research-kernel --replay --out runs/research
 ```
 
 The command creates accepted CKC Normal Form JSON, canonical hash manifest, source-span/table fixture JSON, retrieval output, e-graph equivalence artifact, SMT-LIB files and Z3 witnesses/cores, MaxSMT repair output, cvc5 proof artifact where feasible, Clingo programs/models, Datalog/static-analysis output, RDF/Turtle/TriG export, SHACL report, Lean theorem file and compile result, TLA+/Alloy stub specs, bilingual report JSON, assurance seed, certificate graph, and replay manifest.

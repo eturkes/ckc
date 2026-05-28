@@ -203,7 +203,7 @@ mod tests {
 
     fn fixture_audit_trace() -> AuditTrace {
         AuditTrace {
-            trace_id: AuditTraceId::new("trace_run_toy_001"),
+            trace_id: AuditTraceId::new("trace_run_research_001"),
             stage_spans: vec![
                 serde_json::json!({"stage": "normalize", "start_ms": 0, "end_ms": 12, "status": "ok"}),
                 serde_json::json!({"stage": "compile_smt", "start_ms": 12, "end_ms": 45, "status": "ok"}),
@@ -230,7 +230,7 @@ mod tests {
                 ),
             ],
             redaction_status: "none".into(),
-            audit_export_refs: vec!["runs/toy/audit/trace_run_toy_001.jsonl".into()],
+            audit_export_refs: vec!["runs/research/audit/trace_run_research_001.jsonl".into()],
         }
     }
 

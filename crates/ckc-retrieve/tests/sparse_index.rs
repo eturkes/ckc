@@ -5,14 +5,14 @@
 //! and to keep it compiled-in even when the workspace cwd shifts. The 16
 //! toy spans (sepsis recommendation, β-lactam allergy contraindication,
 //! vital-sign table cells, etc.) are documented in
-//! `examples/toy_research_kernel/fixtures/spans.json` and built by the
+//! `examples/research_kernel/fixtures/spans.json` and built by the
 //! `toy_source_corpus` regen test in `ckc-core`.
 
 use ckc_core::source::SourceSpan;
 use ckc_retrieve::{RetrievalHit, SparseIndex, compute_index_fingerprint, ipadic_tokens};
 
 const TOY_SPANS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/spans.json");
+    include_str!("../../../examples/research_kernel/fixtures/spans.json");
 
 fn load_toy_spans() -> Vec<SourceSpan> {
     serde_json::from_str(TOY_SPANS_JSON).expect("toy spans.json must deserialize")

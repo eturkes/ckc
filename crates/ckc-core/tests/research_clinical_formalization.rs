@@ -232,7 +232,7 @@ fn toy_claims() -> Vec<ClinicalClaim> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/research_kernel/fixtures")
 }
 
 /// Load 0.5.1 span IDs from committed fixtures for referential validation.

@@ -364,7 +364,7 @@ fn beta_lactam_variants() -> Vec<Concept> {
 // =========================================================================
 
 fn fixtures_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/toy_research_kernel/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/research_kernel/fixtures")
 }
 
 fn load_span_ids_from_fixtures() -> HashSet<String> {

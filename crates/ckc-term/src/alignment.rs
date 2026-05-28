@@ -104,7 +104,7 @@ mod tests {
 
     const FIXTURE_PATH: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/toy_research_kernel/fixtures/concepts.json"
+        "/../../examples/research_kernel/fixtures/concepts.json"
     );
 
     fn load_graph() -> TerminologyGraph {

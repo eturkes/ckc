@@ -2,19 +2,19 @@ use std::fs;
 
 const CONCEPTS_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/toy_research_kernel/fixtures/concepts.json"
+    "/../../examples/research_kernel/fixtures/concepts.json"
 );
 const RULES_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/toy_research_kernel/fixtures/rules.json"
+    "/../../examples/research_kernel/fixtures/rules.json"
 );
 const TTL_OUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/toy_research_kernel/fixtures/terminology.ttl"
+    "/../../examples/research_kernel/fixtures/terminology.ttl"
 );
 const SHACL_OUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/toy_research_kernel/fixtures/shacl_report.json"
+    "/../../examples/research_kernel/fixtures/shacl_report.json"
 );
 
 #[test]

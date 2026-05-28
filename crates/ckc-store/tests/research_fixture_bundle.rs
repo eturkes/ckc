@@ -18,31 +18,31 @@ use serde_json::json;
 // ---------------------------------------------------------------------------
 
 const DOCUMENTS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/documents.json");
-const SPANS_JSON: &str = include_str!("../../../examples/toy_research_kernel/fixtures/spans.json");
+    include_str!("../../../examples/research_kernel/fixtures/documents.json");
+const SPANS_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/spans.json");
 const TABLES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/tables.json");
+    include_str!("../../../examples/research_kernel/fixtures/tables.json");
 const CONCEPTS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/concepts.json");
-const RULES_JSON: &str = include_str!("../../../examples/toy_research_kernel/fixtures/rules.json");
+    include_str!("../../../examples/research_kernel/fixtures/concepts.json");
+const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
 const CLAIMS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/claims.json");
+    include_str!("../../../examples/research_kernel/fixtures/claims.json");
 const DECISION_TABLES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/decision_tables.json");
+    include_str!("../../../examples/research_kernel/fixtures/decision_tables.json");
 const EVENT_NARRATIVES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/event_narratives.json");
+    include_str!("../../../examples/research_kernel/fixtures/event_narratives.json");
 const PATIENT_CASES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/patient_cases.json");
+    include_str!("../../../examples/research_kernel/fixtures/patient_cases.json");
 const WORKFLOWS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/workflows.json");
+    include_str!("../../../examples/research_kernel/fixtures/workflows.json");
 const CONFLICTS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/conflicts.json");
+    include_str!("../../../examples/research_kernel/fixtures/conflicts.json");
 const ARGUMENT_GRAPHS_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/argument_graphs.json");
+    include_str!("../../../examples/research_kernel/fixtures/argument_graphs.json");
 const ASSURANCE_NODES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/assurance_nodes.json");
+    include_str!("../../../examples/research_kernel/fixtures/assurance_nodes.json");
 const EXECUTION_WITNESSES_JSON: &str =
-    include_str!("../../../examples/toy_research_kernel/fixtures/execution_witnesses.json");
+    include_str!("../../../examples/research_kernel/fixtures/execution_witnesses.json");
 
 struct Bundle {
     documents: Vec<CorpusDocument>,
@@ -163,7 +163,7 @@ fn envelope_meta(stage: &str, profiles: Vec<SemanticProfile>) -> ArtifactMeta {
     ArtifactMeta {
         schema_version: "0.0.0".into(),
         producer_version: "ckc-core/0.0.0".into(),
-        command_manifest: json!({"command": "ckc", "args": ["demo", "toy-research-kernel"]}),
+        command_manifest: json!({"command": "ckc", "args": ["demo", "research-kernel"]}),
         source_input_hashes: vec![],
         parent_hashes: vec![],
         stage: stage.into(),
@@ -172,7 +172,7 @@ fn envelope_meta(stage: &str, profiles: Vec<SemanticProfile>) -> ArtifactMeta {
             "sha256:0000000000000000000000000000000000000000000000000000000000000000".into(),
         ),
         certificate_ids: vec![],
-        replay_command: Some("ckc demo toy-research-kernel --replay --out runs/toy".into()),
+        replay_command: Some("ckc demo research-kernel --replay --out runs/research".into()),
     }
 }
 
