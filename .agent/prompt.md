@@ -14,7 +14,9 @@ one session type:
 **Type A — Plan subtasks:** The next incomplete top-level task has zero
 subtasks listed beneath it. This session is dedicated to decomposing it into
 session-sized subtasks. Add indented `- [ ]` lines under the task in the
-roadmap. Commit the updated roadmap and end the session.
+roadmap. Also erase all subtask lines from previously completed top-level tasks
+(keep only the `- [x] N.M Title` line for each). Commit the updated roadmap
+and end the session.
 
 **Type B — Complete one subtask:** The next incomplete top-level task already
 has subtasks. This session completes exactly one subtask: the first incomplete
@@ -25,5 +27,6 @@ and make a single commit covering both the task work and the roadmap update.
 **Type C — Create next Phase:** Every top-level task in the current Phase is
 `[x]`, and the next Phase has no top-level tasks listed yet. This session is
 dedicated to writing the next Phase's top-level tasks (with no subtasks).
-Derive them from SPEC.md Section 20. Commit the updated roadmap and end the
-session.
+Derive them from SPEC.md Section 20. Also erase all subtask lines from the
+now-completed previous Phase (keep only top-level task lines). Commit the
+updated roadmap and end the session.
