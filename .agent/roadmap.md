@@ -3,6 +3,11 @@
 Phases contain top-level tasks; top-level tasks may contain indented subtasks.
 See `.agent/prompt.md` for the session workflow that governs progression.
 
+A trailing `(NNNK/200K)` on a completed subtask records the session's
+context-window usage at completion, produced by `python3 .agent/context_window.py`
+just before commit. Type A reads the prior top-level task's annotations to
+calibrate new subtask granularity.
+
 ## Phase 0: Proof-Carrying Research Kernel
 
 - [x] 0.1 Project scaffold
