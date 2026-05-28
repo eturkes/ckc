@@ -4,16 +4,8 @@ members = [
     "crates/ckc-cli",
     "crates/ckc-core",
     "crates/ckc-store",
-    "crates/ckc-extract",
     "crates/ckc-retrieve",
     "crates/ckc-term",
-    "crates/ckc-datalog",
-    "crates/ckc-compile",
-    "crates/ckc-verify",
-    "crates/ckc-cert",
-    "crates/ckc-report",
-    "crates/ckc-assurance",
-    "crates/ckc-audit",
 ]
 
 [workspace.package]

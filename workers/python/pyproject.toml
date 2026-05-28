@@ -1,9 +1,0 @@
-[project]
-name = "ckc-workers"
-version = "0.0.0"
-requires-python = ">=3.13"
-license = "Apache-2.0 WITH LLVM-exception"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"

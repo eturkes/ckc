@@ -20,13 +20,11 @@ use serde_json::json;
 const DOCUMENTS_JSON: &str =
     include_str!("../../../examples/research_kernel/fixtures/documents.json");
 const SPANS_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/spans.json");
-const TABLES_JSON: &str =
-    include_str!("../../../examples/research_kernel/fixtures/tables.json");
+const TABLES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/tables.json");
 const CONCEPTS_JSON: &str =
     include_str!("../../../examples/research_kernel/fixtures/concepts.json");
 const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
-const CLAIMS_JSON: &str =
-    include_str!("../../../examples/research_kernel/fixtures/claims.json");
+const CLAIMS_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/claims.json");
 const DECISION_TABLES_JSON: &str =
     include_str!("../../../examples/research_kernel/fixtures/decision_tables.json");
 const EVENT_NARRATIVES_JSON: &str =

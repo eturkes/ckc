@@ -92,6 +92,34 @@ technically derivable but easily forgotten under token pressure.
     (FHIR), unrelated to Categorical CQL.
   Revisit per-format before the corresponding SPEC phase lands.
 
+- [2026-05-29] Test-suite KISS gatekeeper directive (user, review pass):
+  golden bytes + proptests are the durable assets; per-type unit tests should
+  be one roundtrip + one optional-field-omission max. Skip these categories
+  unless a specific behavior actually motivates them: (1) canonical-stability
+  self-equality `assert_eq!(to_canonical_bytes(&x), to_canonical_bytes(&x))`
+  — trivially true once serializer is deterministic; (2)
+  distinct-types-distinct-hashes loops — assumes SHA-256 non-collision;
+  (3) cross-type referential-consistency tests over hardcoded fixtures
+  (`claim.rule_ids.contains(&rule.rule_id)`) — fixtures are self-consistent
+  with themselves by construction; (4) serde-behavior tests
+  (`invalid_variant_rejects_deserialization`) — tests the library, not CKC;
+  (5) "empty arrays are valid" smokes — covered by serde derive. Cross-bundle
+  reference invariants (catching fixture programmer error before regen) are
+  legitimate and should be kept. Roadmap-gate phrasing like "round-trip serde
+  tests for every type" means "for each type that has roundtrip", not
+  "produce N×3 mechanical assertions per type". Apply this when planning
+  and when implementing.
+- [2026-05-29] Repo-layout scaffolding policy (this session): empty crates
+  and `.gitkeep`-only directories in the SPEC §19 target layout are added
+  by the roadmap phase that needs them, not pre-scaffolded. Phase 0 keeps
+  only `crates/{ckc-cli,ckc-core,ckc-store,ckc-retrieve,ckc-term}/`,
+  `examples/research_kernel/`, `schemas/`, `runs/`. SPEC.md §19 remains the
+  target-layout source; current state lags intentionally.
+- [2026-05-29] When sed-deleting a multi-line comment block, also delete the
+  continuation indent line that follows it (`        //         …`) — it
+  becomes an orphaned half-sentence otherwise. Verify with grep before
+  committing.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can

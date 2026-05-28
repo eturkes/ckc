@@ -78,41 +78,14 @@ id_newtype! {
 mod tests {
     use super::*;
 
-    macro_rules! test_id_roundtrip {
-        ($test_name:ident, $ty:ty) => {
-            #[test]
-            fn $test_name() {
-                let id = <$ty>::new("test_value_123");
-                let json = serde_json::to_string(&id).unwrap();
-                assert_eq!(json, r#""test_value_123""#);
-                let rt: $ty = serde_json::from_str(&json).unwrap();
-                assert_eq!(id, rt);
-                assert_eq!(id.as_str(), "test_value_123");
-                assert_eq!(id.to_string(), "test_value_123");
-            }
-        };
+    #[test]
+    fn newtype_roundtrip_via_macro() {
+        let id = DocId::new("test_value_123");
+        let json = serde_json::to_string(&id).unwrap();
+        assert_eq!(json, r#""test_value_123""#);
+        let rt: DocId = serde_json::from_str(&json).unwrap();
+        assert_eq!(id, rt);
+        assert_eq!(id.as_str(), "test_value_123");
+        assert_eq!(id.to_string(), "test_value_123");
     }
-
-    test_id_roundtrip!(doc_id, DocId);
-    test_id_roundtrip!(span_id, SpanId);
-    test_id_roundtrip!(extracted_table_id, ExtractedTableId);
-    test_id_roundtrip!(concept_id, ConceptId);
-    test_id_roundtrip!(claim_id, ClaimId);
-    test_id_roundtrip!(rule_id, RuleId);
-    test_id_roundtrip!(decision_table_id, DecisionTableId);
-    test_id_roundtrip!(decision_row_id, DecisionRowId);
-    test_id_roundtrip!(workflow_id, WorkflowId);
-    test_id_roundtrip!(case_id, CaseId);
-    test_id_roundtrip!(witness_id, WitnessId);
-    test_id_roundtrip!(conflict_id, ConflictId);
-    test_id_roundtrip!(argument_graph_id, ArgumentGraphId);
-    test_id_roundtrip!(certificate_id, CertificateId);
-    test_id_roundtrip!(assurance_node_id, AssuranceNodeId);
-    test_id_roundtrip!(audit_trace_id, AuditTraceId);
-    test_id_roundtrip!(cq_id, CqId);
-    test_id_roundtrip!(bundle_id, BundleId);
-    test_id_roundtrip!(manifest_id, ManifestId);
-    test_id_roundtrip!(egraph_class_id, EGraphClassId);
-    test_id_roundtrip!(dmn_export_id, DmnExportId);
-    test_id_roundtrip!(query_id, QueryId);
 }

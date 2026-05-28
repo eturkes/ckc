@@ -143,7 +143,6 @@ pub struct TerminologyBinding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canonical::{content_hash, to_canonical_bytes};
 
     fn fixture_terminology_binding() -> TerminologyBinding {
         TerminologyBinding {
@@ -330,88 +329,6 @@ mod tests {
         assert_eq!(span, rt);
     }
 
-    // -- Canonical JSON byte stability --
-
-    #[test]
-    fn corpus_document_canonical_stability() {
-        let doc = fixture_corpus_document();
-        let bytes1 = to_canonical_bytes(&doc);
-        let bytes2 = to_canonical_bytes(&doc);
-        assert_eq!(bytes1, bytes2);
-        let h1 = content_hash(&doc);
-        let h2 = content_hash(&doc);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn source_span_canonical_stability() {
-        let span = fixture_source_span();
-        let bytes1 = to_canonical_bytes(&span);
-        let bytes2 = to_canonical_bytes(&span);
-        assert_eq!(bytes1, bytes2);
-        let h1 = content_hash(&span);
-        let h2 = content_hash(&span);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn extracted_table_canonical_stability() {
-        let table = fixture_extracted_table();
-        let bytes1 = to_canonical_bytes(&table);
-        let bytes2 = to_canonical_bytes(&table);
-        assert_eq!(bytes1, bytes2);
-        let h1 = content_hash(&table);
-        let h2 = content_hash(&table);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn concept_canonical_stability() {
-        let concept = fixture_concept();
-        let bytes1 = to_canonical_bytes(&concept);
-        let bytes2 = to_canonical_bytes(&concept);
-        assert_eq!(bytes1, bytes2);
-        let h1 = content_hash(&concept);
-        let h2 = content_hash(&concept);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn terminology_binding_canonical_stability() {
-        let binding = fixture_terminology_binding();
-        let bytes1 = to_canonical_bytes(&binding);
-        let bytes2 = to_canonical_bytes(&binding);
-        assert_eq!(bytes1, bytes2);
-        let h1 = content_hash(&binding);
-        let h2 = content_hash(&binding);
-        assert_eq!(h1, h2);
-    }
-
-    // -- Cross-type referential integrity --
-
-    #[test]
-    fn source_span_references_valid_doc() {
-        let doc = fixture_corpus_document();
-        let span = fixture_source_span();
-        assert_eq!(span.doc_id, doc.doc_id);
-    }
-
-    #[test]
-    fn extracted_table_references_valid_doc() {
-        let doc = fixture_corpus_document();
-        let table = fixture_extracted_table();
-        assert_eq!(table.doc_id, doc.doc_id);
-    }
-
-    #[test]
-    fn concept_bindings_match_count() {
-        let concept = fixture_concept();
-        assert_eq!(concept.terminology_bindings.len(), 1);
-        assert_eq!(concept.terminology_bindings[0].system, "MEDIS");
-    }
-
-    // -- Table cell ref --
-
     #[test]
     fn table_cell_ref_roundtrip() {
         let cell = TableCellRef {
@@ -451,39 +368,5 @@ mod tests {
         let json = serde_json::to_string(&vote).unwrap();
         let rt: ExtractorVote = serde_json::from_str(&json).unwrap();
         assert_eq!(vote, rt);
-    }
-
-    // -- Source span with table cell --
-
-    #[test]
-    fn source_span_with_table_cell_roundtrip() {
-        let mut span = fixture_source_span();
-        span.table_cell = Some(TableCellRef {
-            table_id: ExtractedTableId::new("tbl_vitals_001"),
-            row: 0,
-            col: 1,
-        });
-        span.bbox = None;
-        let json = serde_json::to_string(&span).unwrap();
-        let rt: SourceSpan = serde_json::from_str(&json).unwrap();
-        assert_eq!(span, rt);
-    }
-
-    // -- Distinct fixtures produce distinct hashes --
-
-    #[test]
-    fn distinct_types_distinct_hashes() {
-        let h_doc = content_hash(&fixture_corpus_document());
-        let h_span = content_hash(&fixture_source_span());
-        let h_table = content_hash(&fixture_extracted_table());
-        let h_concept = content_hash(&fixture_concept());
-        let h_binding = content_hash(&fixture_terminology_binding());
-
-        let hashes = [&h_doc, &h_span, &h_table, &h_concept, &h_binding];
-        for (i, a) in hashes.iter().enumerate() {
-            for b in hashes.iter().skip(i + 1) {
-                assert_ne!(a, b, "hash collision between fixture types");
-            }
-        }
     }
 }

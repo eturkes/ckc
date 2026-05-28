@@ -102,7 +102,6 @@ impl ArtifactEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canonical::to_canonical_bytes;
     use crate::clinical::{Action, Norm, Rule};
     use crate::enums::*;
     use crate::id::*;
@@ -200,12 +199,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn artifact_kind_invalid_rejects() {
-        let result = serde_json::from_str::<ArtifactKind>("\"bogus_kind\"");
-        assert!(result.is_err());
-    }
-
     // -- ArtifactMeta tests --
 
     #[test]
@@ -226,13 +219,6 @@ mod tests {
         assert_eq!(meta, rt);
     }
 
-    #[test]
-    fn artifact_meta_canonical_stability() {
-        let meta = fixture_meta();
-        assert_eq!(to_canonical_bytes(&meta), to_canonical_bytes(&meta));
-        assert_eq!(content_hash(&meta), content_hash(&meta));
-    }
-
     // -- ArtifactEnvelope tests --
 
     #[test]
@@ -242,14 +228,6 @@ mod tests {
         let json = serde_json::to_string(&envelope).unwrap();
         let rt: ArtifactEnvelope = serde_json::from_str(&json).unwrap();
         assert_eq!(envelope, rt);
-    }
-
-    #[test]
-    fn envelope_canonical_stability() {
-        let rule = fixture_rule();
-        let envelope = ArtifactEnvelope::wrap(ArtifactKind::Rule, &rule, fixture_meta());
-        assert_eq!(to_canonical_bytes(&envelope), to_canonical_bytes(&envelope));
-        assert_eq!(content_hash(&envelope), content_hash(&envelope));
     }
 
     #[test]

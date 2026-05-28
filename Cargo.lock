@@ -281,28 +281,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "ckc-assurance"
-version = "0.0.0"
-
-[[package]]
-name = "ckc-audit"
-version = "0.0.0"
-
-[[package]]
-name = "ckc-cert"
-version = "0.0.0"
-
-[[package]]
 name = "ckc-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
 ]
-
-[[package]]
-name = "ckc-compile"
-version = "0.0.0"
 
 [[package]]
 name = "ckc-core"
@@ -315,18 +299,6 @@ dependencies = [
  "sha2",
  "unicode-normalization",
 ]
-
-[[package]]
-name = "ckc-datalog"
-version = "0.0.0"
-
-[[package]]
-name = "ckc-extract"
-version = "0.0.0"
-
-[[package]]
-name = "ckc-report"
-version = "0.0.0"
 
 [[package]]
 name = "ckc-retrieve"
@@ -369,10 +341,6 @@ dependencies = [
  "tempfile",
  "unicode-normalization",
 ]
-
-[[package]]
-name = "ckc-verify"
-version = "0.0.0"
 
 [[package]]
 name = "clap"

@@ -345,24 +345,6 @@ mod tests {
         assert_eq!(envelope, got);
     }
 
-    #[test]
-    fn put_get_roundtrip_document() {
-        let (store, _tmp) = test_store();
-        let envelope = document_envelope();
-        let hash = store.put(&envelope).unwrap();
-        let got = store.get(&hash).unwrap();
-        assert_eq!(envelope, got);
-    }
-
-    #[test]
-    fn put_get_roundtrip_conflict() {
-        let (store, _tmp) = test_store();
-        let envelope = conflict_envelope();
-        let hash = store.put(&envelope).unwrap();
-        let got = store.get(&hash).unwrap();
-        assert_eq!(envelope, got);
-    }
-
     // -- hash consistency --
 
     #[test]
@@ -371,14 +353,6 @@ mod tests {
         let envelope = rule_envelope();
         let hash = store.put(&envelope).unwrap();
         assert_eq!(hash, envelope.envelope_hash());
-    }
-
-    #[test]
-    fn put_hash_matches_content_hash_fn() {
-        let (store, _tmp) = test_store();
-        let envelope = rule_envelope();
-        let hash = store.put(&envelope).unwrap();
-        assert_eq!(hash, content_hash(&envelope));
     }
 
     // -- idempotency --

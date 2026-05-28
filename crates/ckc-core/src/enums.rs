@@ -209,18 +209,6 @@ mod tests {
     }
 
     #[test]
-    fn conflict_classification_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&ConflictClassification::NeedsClinicianAdjudication).unwrap(),
-            r#""needs_clinician_adjudication""#
-        );
-        assert_eq!(
-            serde_json::to_string(&ConflictClassification::InteropCompilerError).unwrap(),
-            r#""interop_compiler_error""#
-        );
-    }
-
-    #[test]
     fn severity_ordering() {
         assert!(Severity::Info < Severity::Critical);
         assert!(Severity::Low < Severity::High);
@@ -230,33 +218,5 @@ mod tests {
     fn evidence_certainty_ordering() {
         assert!(EvidenceCertainty::VeryLow < EvidenceCertainty::High);
         assert!(EvidenceCertainty::Low < EvidenceCertainty::Moderate);
-    }
-
-    #[test]
-    fn case_type_multiword_variant() {
-        assert_eq!(
-            serde_json::to_string(&CaseType::DeidentifiedLater).unwrap(),
-            r#""deidentified_later""#
-        );
-    }
-
-    #[test]
-    fn deontic_roundtrip() {
-        let d = DeonticProjection::Prohibited;
-        let json = serde_json::to_string(&d).unwrap();
-        let rt: DeonticProjection = serde_json::from_str(&json).unwrap();
-        assert_eq!(d, rt);
-    }
-
-    #[test]
-    fn norm_commitment_roundtrip() {
-        assert_eq!(
-            serde_json::to_string(&NormCommitment::PrimaFacie).unwrap(),
-            r#""prima_facie""#
-        );
-        assert_eq!(
-            serde_json::to_string(&NormCommitment::AllThingsConsidered).unwrap(),
-            r#""all_things_considered""#
-        );
     }
 }

@@ -15,7 +15,7 @@
 //!   7. Lean proof          — same as 1 + 3 (conflict input for formal proof)
 //!   8. replay determinism  — all fixtures participate in hash verification
 
-use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
+use ckc_core::canonical::{content_hash, to_canonical_bytes};
 use ckc_core::enums::Language;
 use ckc_core::id::*;
 use ckc_core::source::*;
@@ -789,154 +789,6 @@ fn table_cell_refs_reference_existing_table() {
     }
 }
 
-#[test]
-fn table_cell_positions_cover_expected_grid() {
-    let spans = toy_spans();
-    let cells: Vec<&SourceSpan> = spans
-        .iter()
-        .filter(|s| {
-            s.table_cell
-                .as_ref()
-                .is_some_and(|c| c.table_id.as_str() == TBL_VITALS)
-        })
-        .collect();
-    let mut positions: HashSet<(u32, u32)> = HashSet::new();
-    for span in &cells {
-        let cell = span.table_cell.as_ref().unwrap();
-        positions.insert((cell.row, cell.col));
-    }
-    // 4 rows x 2 columns = 8 positions
-    assert_eq!(positions.len(), 8, "expected 4x2 grid of table cells");
-    for row in 0..4 {
-        for col in 0..2 {
-            assert!(
-                positions.contains(&(row, col)),
-                "missing table cell at row={row}, col={col}"
-            );
-        }
-    }
-}
-
-#[test]
-fn all_span_ids_are_unique() {
-    let spans = toy_spans();
-    let mut seen = HashSet::new();
-    for span in &spans {
-        assert!(
-            seen.insert(span.span_id.as_str()),
-            "duplicate span_id: {}",
-            span.span_id
-        );
-    }
-}
-
-#[test]
-fn all_doc_ids_are_unique() {
-    let docs = toy_documents();
-    let mut seen = HashSet::new();
-    for doc in &docs {
-        assert!(
-            seen.insert(doc.doc_id.as_str()),
-            "duplicate doc_id: {}",
-            doc.doc_id
-        );
-    }
-}
-
-// =========================================================================
-// Hash determinism tests
-// =========================================================================
-
-#[test]
-fn canonical_hashes_deterministic_across_construction() {
-    let h1_docs = content_hash(&toy_documents());
-    let h2_docs = content_hash(&toy_documents());
-    assert_eq!(h1_docs, h2_docs, "document fixture hashes must be stable");
-
-    let h1_spans = content_hash(&toy_spans());
-    let h2_spans = content_hash(&toy_spans());
-    assert_eq!(h1_spans, h2_spans, "span fixture hashes must be stable");
-
-    let h1_tables = content_hash(&toy_tables());
-    let h2_tables = content_hash(&toy_tables());
-    assert_eq!(h1_tables, h2_tables, "table fixture hashes must be stable");
-}
-
-#[test]
-fn individual_spans_have_distinct_hashes() {
-    let spans = toy_spans();
-    let hashes: Vec<ContentHash> = spans.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each span fixture must produce a unique content hash"
-    );
-}
-
-#[test]
-fn individual_documents_have_distinct_hashes() {
-    let docs = toy_documents();
-    let hashes: Vec<ContentHash> = docs.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each document fixture must produce a unique content hash"
-    );
-}
-
-// =========================================================================
-// Scenario coverage test
-// =========================================================================
-
-#[test]
-fn scenario_coverage_all_eight() {
-    let spans = toy_spans();
-    let by_id: HashMap<&str, &SourceSpan> = spans.iter().map(|s| (s.span_id.as_str(), s)).collect();
-
-    // Scenario 1: norm conflict — recommendation + contraindication spans
-    assert!(by_id.contains_key(SPAN_REC_SEPSIS));
-    assert!(by_id.contains_key(SPAN_CONTRA));
-
-    // Scenario 2: terminology variants — three different beta-lactam spellings
-    let term_greek = &by_id[SPAN_TERM_GREEK];
-    assert!(term_greek.raw_text.contains("βラクタム"));
-    let term_katakana = &by_id[SPAN_TERM_KATAKANA];
-    assert!(term_katakana.raw_text.contains("ベータラクタム"));
-    let allergy = &by_id[SPAN_ALLERGY_HIST];
-    assert!(allergy.raw_text.contains("β-ラクタム"));
-
-    // Scenario 3: decision table — cell spans with overlapping conditions
-    assert!(by_id.contains_key(SPAN_CELL_R0C0));
-    assert!(by_id.contains_key(SPAN_CELL_R1C0));
-    let r0 = &by_id[SPAN_CELL_R0C0];
-    let r1 = &by_id[SPAN_CELL_R1C0];
-    assert!(
-        r0.nfkc_text.contains("38.0") && r1.nfkc_text.contains("38.5"),
-        "rows 0 and 1 must have overlapping temperature conditions"
-    );
-
-    // Scenario 4: Event Calculus — allergy history span
-    assert!(by_id.contains_key(SPAN_ALLERGY_HIST));
-
-    // Scenario 5: repair — uses same conflict sources as 1 and 3
-    // (no additional spans required)
-
-    // Scenario 6: SHACL provenance — provenance metadata span
-    assert!(by_id.contains_key(SPAN_PROVENANCE));
-
-    // Scenario 7: Lean proof — uses same conflict input as 1 and 3
-    // (no additional spans required)
-
-    // Scenario 8: replay — all fixtures participate in hash determinism
-    assert_eq!(
-        spans.len(),
-        16,
-        "expected 16 spans for full scenario coverage"
-    );
-}
-
 // =========================================================================
 // Committed fixture file tests
 // =========================================================================
@@ -947,7 +799,7 @@ fn committed_documents_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_source_corpus regen_fixtures -- --ignored\n\
+             --test research_source_corpus regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -966,7 +818,7 @@ fn committed_spans_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_source_corpus regen_fixtures -- --ignored\n\
+             --test research_source_corpus regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -985,7 +837,7 @@ fn committed_tables_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_source_corpus regen_fixtures -- --ignored\n\
+             --test research_source_corpus regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )

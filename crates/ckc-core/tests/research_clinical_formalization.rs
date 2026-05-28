@@ -9,9 +9,9 @@
 //!   6. SHACL provenance    — rule_incomplete_provenance (empty spans + provenance)
 //!   7. Lean proof          — same norm conflict as input for formal proof
 //!
-//! All objects reference source spans from 0.5.1 (toy_source_corpus).
+//! All objects reference source spans from 0.5.1 (research_source_corpus).
 
-use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
+use ckc_core::canonical::to_canonical_bytes;
 use ckc_core::clinical::*;
 use ckc_core::enums::*;
 use ckc_core::id::*;
@@ -33,7 +33,7 @@ const CLAIM_BL_CONTRA: &str = "claim_bl_contra";
 
 const CQ_SEPSIS_ABX: &str = "cq_sepsis_abx";
 
-// Span IDs from 0.5.1 (toy_source_corpus)
+// Span IDs from 0.5.1 (research_source_corpus)
 const SPAN_REC_SEPSIS: &str = "span_rec_sepsis_bl";
 const SPAN_EVIDENCE: &str = "span_evidence_sepsis";
 const SPAN_CONTRA: &str = "span_contra_bl_allergy";
@@ -239,7 +239,7 @@ fn fixtures_dir() -> std::path::PathBuf {
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
     let bytes = std::fs::read(dir.join("spans.json"))
-        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
+        .expect("0.5.1 spans.json must exist; run research_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -350,16 +350,6 @@ fn pico_cq_id_matches_source_span_cq() {
 }
 
 #[test]
-fn evidence_atom_pico_ref_matches_pico_cq() {
-    let atom = toy_evidence_atom();
-    let pico = toy_pico();
-    assert_eq!(
-        atom.pico_ref, pico.cq_id,
-        "evidence atom pico_ref must match PICO cq_id"
-    );
-}
-
-#[test]
 fn opposing_rules_target_same_concept() {
     let rules = toy_rules();
     let recommend = &rules[0];
@@ -431,45 +421,6 @@ fn provenance_incomplete_rule_detectable_programmatically() {
         "exactly one rule must be provenance-incomplete"
     );
     assert_eq!(incomplete_ids[0], RULE_INCOMPLETE);
-}
-
-// =========================================================================
-// Hash determinism
-// =========================================================================
-
-#[test]
-fn canonical_hashes_deterministic_across_construction() {
-    let h1_rules = content_hash(&toy_rules());
-    let h2_rules = content_hash(&toy_rules());
-    assert_eq!(h1_rules, h2_rules, "rule fixture hashes must be stable");
-
-    let h1_claims = content_hash(&toy_claims());
-    let h2_claims = content_hash(&toy_claims());
-    assert_eq!(h1_claims, h2_claims, "claim fixture hashes must be stable");
-}
-
-#[test]
-fn individual_rules_have_distinct_hashes() {
-    let rules = toy_rules();
-    let hashes: Vec<ContentHash> = rules.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each rule fixture must produce a unique content hash"
-    );
-}
-
-#[test]
-fn individual_claims_have_distinct_hashes() {
-    let claims = toy_claims();
-    let hashes: Vec<ContentHash> = claims.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each claim fixture must produce a unique content hash"
-    );
 }
 
 // =========================================================================
@@ -663,7 +614,7 @@ fn committed_rules_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_clinical_formalization regen_fixtures -- --ignored\n\
+             --test research_clinical_formalization regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -682,7 +633,7 @@ fn committed_claims_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_clinical_formalization regen_fixtures -- --ignored\n\
+             --test research_clinical_formalization regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -706,36 +657,6 @@ fn committed_fixtures_deserialize_correctly() {
 
     assert_eq!(rules.len(), 3);
     assert_eq!(claims.len(), 2);
-}
-
-// =========================================================================
-// Unique IDs
-// =========================================================================
-
-#[test]
-fn all_rule_ids_are_unique() {
-    let rules = toy_rules();
-    let mut seen = HashSet::new();
-    for rule in &rules {
-        assert!(
-            seen.insert(rule.rule_id.as_str()),
-            "duplicate rule_id: {}",
-            rule.rule_id
-        );
-    }
-}
-
-#[test]
-fn all_claim_ids_are_unique() {
-    let claims = toy_claims();
-    let mut seen = HashSet::new();
-    for claim in &claims {
-        assert!(
-            seen.insert(claim.claim_id.as_str()),
-            "duplicate claim_id: {}",
-            claim.claim_id
-        );
-    }
 }
 
 // =========================================================================

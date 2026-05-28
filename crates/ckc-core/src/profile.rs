@@ -73,17 +73,4 @@ mod tests {
             assert_eq!(variant, rt, "roundtrip {variant:?}");
         }
     }
-
-    #[test]
-    fn profile_array_roundtrip() {
-        let profiles = vec![
-            SemanticProfile::Norm,
-            SemanticProfile::Defeasible,
-            SemanticProfile::Temporal,
-        ];
-        let json = serde_json::to_string(&profiles).unwrap();
-        assert_eq!(json, r#"["CKC-Norm","CKC-Defeasible","CKC-Temporal"]"#);
-        let rt: Vec<SemanticProfile> = serde_json::from_str(&json).unwrap();
-        assert_eq!(profiles, rt);
-    }
 }

@@ -15,7 +15,7 @@
 //!   8. replay           — all fixtures participate in hash determinism
 
 use ckc_core::artifact::*;
-use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
+use ckc_core::canonical::to_canonical_bytes;
 use ckc_core::enums::*;
 use ckc_core::id::*;
 use ckc_core::nf::{NfContext, Normalize};
@@ -326,7 +326,7 @@ fn fixtures_dir() -> std::path::PathBuf {
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
     let bytes = std::fs::read(dir.join("spans.json"))
-        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
+        .expect("0.5.1 spans.json must exist; run research_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -339,7 +339,7 @@ fn load_span_ids_from_fixtures() -> HashSet<String> {
 fn load_table_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
     let bytes = std::fs::read(dir.join("tables.json"))
-        .expect("0.5.1 tables.json must exist; run toy_source_corpus regen_fixtures first");
+        .expect("0.5.1 tables.json must exist; run research_source_corpus regen_fixtures first");
     let tables: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("tables.json must deserialize");
     tables
@@ -882,91 +882,6 @@ fn decision_table_cell_refs_reference_existing_table() {
 }
 
 // =========================================================================
-// Hash determinism
-// =========================================================================
-
-#[test]
-fn canonical_hashes_deterministic_across_construction() {
-    assert_eq!(
-        content_hash(&toy_decision_tables()),
-        content_hash(&toy_decision_tables()),
-        "decision table fixture hashes must be stable"
-    );
-    assert_eq!(
-        content_hash(&toy_event_narratives()),
-        content_hash(&toy_event_narratives()),
-        "event narrative fixture hashes must be stable"
-    );
-    assert_eq!(
-        content_hash(&toy_patient_cases()),
-        content_hash(&toy_patient_cases()),
-        "patient case fixture hashes must be stable"
-    );
-    assert_eq!(
-        content_hash(&toy_workflows()),
-        content_hash(&toy_workflows()),
-        "workflow fixture hashes must be stable"
-    );
-}
-
-#[test]
-fn individual_patient_cases_have_distinct_hashes() {
-    let cases = toy_patient_cases();
-    let hashes: Vec<ContentHash> = cases.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each patient case must produce a unique content hash"
-    );
-}
-
-#[test]
-fn individual_decision_rows_have_distinct_hashes() {
-    let tables = toy_decision_tables();
-    let hashes: Vec<ContentHash> = tables[0].rows.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each decision row must produce a unique content hash"
-    );
-}
-
-#[test]
-fn all_fixture_types_have_distinct_hashes() {
-    let h_dt = content_hash(&toy_decision_tables());
-    let h_en = content_hash(&toy_event_narratives());
-    let h_pc = content_hash(&toy_patient_cases());
-    let h_wf = content_hash(&toy_workflows());
-    let hashes = [&h_dt, &h_en, &h_pc, &h_wf];
-    for (i, a) in hashes.iter().enumerate() {
-        for b in hashes.iter().skip(i + 1) {
-            assert_ne!(a, b, "different fixture types must have distinct hashes");
-        }
-    }
-}
-
-// =========================================================================
-// Unique IDs
-// =========================================================================
-
-#[test]
-fn all_decision_row_ids_are_unique() {
-    let tables = toy_decision_tables();
-    let mut seen = HashSet::new();
-    for dt in &tables {
-        for row in &dt.rows {
-            assert!(
-                seen.insert(row.row_id.as_str()),
-                "duplicate row_id: {}",
-                row.row_id
-            );
-        }
-    }
-}
-
-// =========================================================================
 // NF normalization
 // =========================================================================
 
@@ -1133,7 +1048,7 @@ fn committed_decision_tables_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_structured_artifacts regen_fixtures -- --ignored\n\
+             --test research_structured_artifacts regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -1152,7 +1067,7 @@ fn committed_event_narratives_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_structured_artifacts regen_fixtures -- --ignored\n\
+             --test research_structured_artifacts regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -1171,7 +1086,7 @@ fn committed_patient_cases_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_structured_artifacts regen_fixtures -- --ignored\n\
+             --test research_structured_artifacts regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )
@@ -1190,7 +1105,7 @@ fn committed_workflows_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_structured_artifacts regen_fixtures -- --ignored\n\
+             --test research_structured_artifacts regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )

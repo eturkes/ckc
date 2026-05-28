@@ -5,9 +5,9 @@
 //!   1, 5, 7. norm conflict, repair, proof — sepsis and anaphylaxis concepts
 //!   3, 4. decision table, Event Calculus — vital-sign concepts (体温, 心拍数, 収縮期血圧)
 //!
-//! All concepts reference source spans from 0.5.1 (toy_source_corpus).
+//! All concepts reference source spans from 0.5.1 (research_source_corpus).
 
-use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
+use ckc_core::canonical::to_canonical_bytes;
 use ckc_core::enums::*;
 use ckc_core::id::*;
 use ckc_core::nf::{NfContext, Normalize};
@@ -370,7 +370,7 @@ fn fixtures_dir() -> std::path::PathBuf {
 fn load_span_ids_from_fixtures() -> HashSet<String> {
     let dir = fixtures_dir();
     let bytes = std::fs::read(dir.join("spans.json"))
-        .expect("0.5.1 spans.json must exist; run toy_source_corpus regen_fixtures first");
+        .expect("0.5.1 spans.json must exist; run research_source_corpus regen_fixtures first");
     let spans: Vec<serde_json::Value> =
         serde_json::from_slice(&bytes).expect("spans.json must deserialize");
     spans
@@ -597,58 +597,6 @@ fn binding_confidence_in_valid_range() {
 // Hash determinism
 // =========================================================================
 
-#[test]
-fn canonical_hashes_deterministic_across_construction() {
-    let h1 = content_hash(&toy_concepts());
-    let h2 = content_hash(&toy_concepts());
-    assert_eq!(h1, h2, "concept fixture hashes must be stable");
-}
-
-#[test]
-fn individual_concepts_have_distinct_hashes() {
-    let concepts = toy_concepts();
-    let hashes: Vec<ContentHash> = concepts.iter().map(content_hash).collect();
-    let unique: HashSet<&str> = hashes.iter().map(|h| h.as_str()).collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "each concept fixture must produce a unique content hash"
-    );
-}
-
-// =========================================================================
-// Unique IDs
-// =========================================================================
-
-#[test]
-fn all_concept_ids_are_unique() {
-    let concepts = toy_concepts();
-    let mut seen = HashSet::new();
-    for concept in &concepts {
-        assert!(
-            seen.insert(concept.concept_id.as_str()),
-            "duplicate concept_id: {}",
-            concept.concept_id
-        );
-    }
-}
-
-#[test]
-fn all_egraph_class_ids_are_well_formed() {
-    let concepts = toy_concepts();
-    for concept in &concepts {
-        let eid = concept
-            .egraph_class_id
-            .as_ref()
-            .expect("all toy concepts must have egraph_class_id");
-        assert!(
-            eid.as_str().starts_with("eclass_"),
-            "egraph_class_id {} must start with 'eclass_'",
-            eid
-        );
-    }
-}
-
 // =========================================================================
 // NF normalization
 // =========================================================================
@@ -840,7 +788,7 @@ fn committed_concepts_match() {
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "fixture file missing: {}\nRun: cargo test -p ckc-core \
-             --test toy_terminology regen_fixtures -- --ignored\n\
+             --test research_terminology regen_fixtures -- --ignored\n\
              Error: {e}",
             path.display()
         )

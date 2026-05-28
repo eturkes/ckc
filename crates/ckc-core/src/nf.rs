@@ -495,15 +495,11 @@ impl<T: Normalize> Normalize for Option<T> {
 
 impl Normalize for SourceSpan {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 1: raw_text preserved verbatim
-        // Pass 2: normalize derived text fields
         ctx.normalize_field(2, "nfkc_text", &mut self.nfkc_text);
         ctx.normalize_field(2, "search_text", &mut self.search_text);
         ctx.normalize_field(2, "display_text", &mut self.display_text);
         self.extractor_votes.normalize(ctx);
-        // Pass 4: sort unordered fields
         ctx.sort_by_canonical("extractor_votes", &mut self.extractor_votes);
-        // Pass 5: section_path preserves document hierarchy order
     }
 }
 
@@ -519,10 +515,8 @@ impl Normalize for Concept {
         ctx.normalize_field(2, "label_ja", &mut self.label_ja);
         ctx.normalize_opt_field(2, "label_en", &mut self.label_en);
         self.terminology_bindings.normalize(ctx);
-        // Pass 4: sort unordered fields
         ctx.sort_by_canonical("terminology_bindings", &mut self.terminology_bindings);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.concept_id.0);
         let content = to_canonical_bytes(self);
         self.concept_id.0 = saved;
@@ -546,10 +540,8 @@ impl Normalize for ExtractedTable {
         ctx.normalize_vec_field(2, "row_headers", &mut self.row_headers);
         ctx.normalize_vec_field(2, "column_headers", &mut self.column_headers);
         self.extraction_votes.normalize(ctx);
-        // Pass 4: sort unordered fields
         ctx.sort_ord("cell_span_ids", &mut self.cell_span_ids);
         ctx.sort_by_canonical("extraction_votes", &mut self.extraction_votes);
-        // Pass 5: row_headers, column_headers, reading_order preserve table structure
     }
 }
 
@@ -560,14 +552,12 @@ impl Normalize for ClinicalClaim {
         self.pico.normalize(ctx);
         self.etd.normalize(ctx);
         self.evidence_atoms.normalize(ctx);
-        // Pass 4: sort unordered fields
         ctx.sort_ord("profiles", &mut self.profiles);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_by_canonical("evidence_atoms", &mut self.evidence_atoms);
         ctx.sort_ord("rule_ids", &mut self.rule_ids);
         ctx.sort_ord("decision_table_ids", &mut self.decision_table_ids);
         ctx.sort_ord("workflow_fragment_ids", &mut self.workflow_fragment_ids);
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.claim_id.0);
         let content = to_canonical_bytes(self);
         self.claim_id.0 = saved;
@@ -583,17 +573,13 @@ impl Normalize for ClinicalClaim {
 impl Normalize for Rule {
     fn normalize(&mut self, ctx: &mut NfContext) {
         self.norm.normalize(ctx);
-        // Pass 4: sort commutative operands in string expressions
         ctx.sort_commutative("context", &mut self.context);
         ctx.sort_commutative("antecedent", &mut self.antecedent);
         ctx.sort_commutative("consequent", &mut self.consequent);
-        // Pass 4: sort unordered fields
         ctx.sort_ord("profiles", &mut self.profiles);
         ctx.sort_ord("exceptions", &mut self.exceptions);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
-        // Pass 5: priority_over preserves priority chain order
-        // Pass 12: stable ID from normalized content + source anchors
         let saved = std::mem::take(&mut self.rule_id.0);
         let content = to_canonical_bytes(self);
         self.rule_id.0 = saved;
@@ -608,9 +594,7 @@ impl Normalize for Rule {
 
 impl Normalize for Norm {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 1: original_modality_phrase_ja preserved verbatim
         self.action.normalize(ctx);
-        // Pass 9: normalize deontic projection through modality lexicon
         if let Some(canonical) = modality_lexicon(&self.original_modality_phrase_ja)
             && self.deontic_projection != canonical
         {
@@ -630,17 +614,13 @@ impl Normalize for DecisionTable {
         ctx.normalize_vec_field(2, "input_columns", &mut self.input_columns);
         ctx.normalize_vec_field(2, "output_columns", &mut self.output_columns);
         self.rows.normalize(ctx);
-        // Pass 4: sort rows for commutative hit policies only
         match self.hit_policy {
             HitPolicy::Unique | HitPolicy::Any | HitPolicy::Collect => {
                 ctx.sort_by_canonical("rows", &mut self.rows);
             }
-            // Pass 5: First, Priority, RuleOrder, OutputOrder preserve row order
             _ => {}
         }
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
-        // Pass 5: input_columns, output_columns preserve column order
-        // Pass 12: stable ID (no direct source_span_ids on DecisionTable)
         let saved = std::mem::take(&mut self.table_id.0);
         let content = to_canonical_bytes(self);
         self.table_id.0 = saved;
@@ -660,12 +640,10 @@ impl Normalize for Conflict {
             "human_review_question_en",
             &mut self.human_review_question_en,
         );
-        // Pass 4: sort unordered fields
         ctx.sort_ord("minimal_artifact_set", &mut self.minimal_artifact_set);
         ctx.sort_ord("source_spans", &mut self.source_spans);
         ctx.sort_by_canonical("repair_candidates", &mut self.repair_candidates);
         ctx.sort_by_canonical("solver_evidence", &mut self.solver_evidence);
-        // Pass 12: stable ID (Conflict uses source_spans, not source_span_ids)
         let saved = std::mem::take(&mut self.conflict_id.0);
         let content = to_canonical_bytes(self);
         self.conflict_id.0 = saved;
@@ -681,9 +659,7 @@ impl Normalize for Conflict {
 impl Normalize for AssuranceNode {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_field(2, "claim", &mut self.claim);
-        // Pass 4: sort unordered fields
         ctx.sort_ord("evidence_artifact_ids", &mut self.evidence_artifact_ids);
-        // Pass 5: children preserves assurance tree structure
     }
 }
 
@@ -695,7 +671,6 @@ impl Normalize for PICOFrame {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.sort_ord("exclusions", &mut self.exclusions);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 5: outcomes preserves clinical importance order
     }
 }
 
@@ -714,7 +689,6 @@ impl Normalize for EvidenceAtom {
 
 impl Normalize for DecisionRow {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 10: normalize cell Value trees (unit normalization)
         for (i, cond) in self.conditions.iter_mut().enumerate() {
             ctx.normalize_units(&format!("conditions[{i}]"), cond);
         }
@@ -723,13 +697,11 @@ impl Normalize for DecisionRow {
         }
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("cell_refs", &mut self.cell_refs);
-        // Pass 5: conditions, outputs preserve column correspondence
     }
 }
 
 impl Normalize for WorkflowFragment {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 11: stable graph canonicalization by canonical bytes
         ctx.sort_graph("states", &mut self.states);
         ctx.sort_graph("transitions", &mut self.transitions);
         ctx.sort_graph("outcomes", &mut self.outcomes);
@@ -737,7 +709,6 @@ impl Normalize for WorkflowFragment {
         ctx.sort_graph("tasks", &mut self.tasks);
         ctx.sort_graph("variance_rules", &mut self.variance_rules);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.workflow_id.0);
         let content = to_canonical_bytes(self);
         self.workflow_id.0 = saved;
@@ -757,7 +728,6 @@ impl Normalize for EventNarrative {
         ctx.sort_by_canonical("initially", &mut self.initially);
         ctx.sort_by_canonical("holds_queries", &mut self.holds_queries);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 5: happens, initiates, terminates preserve temporal order
     }
 }
 
@@ -769,8 +739,6 @@ impl Normalize for PatientCase {
         ctx.sort_by_canonical("conditions", &mut self.conditions);
         ctx.sort_by_canonical("allergies", &mut self.allergies);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 5: events preserves temporal order
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.case_id.0);
         let content = to_canonical_bytes(self);
         self.case_id.0 = saved;
@@ -793,8 +761,6 @@ impl Normalize for ExecutionWitness {
         ctx.sort_by_canonical("unsat_cores", &mut self.unsat_cores);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
         ctx.sort_ord("certificate_ids", &mut self.certificate_ids);
-        // Pass 5: trace preserves temporal execution order
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.witness_id.0);
         let content = to_canonical_bytes(self);
         self.witness_id.0 = saved;
@@ -809,7 +775,6 @@ impl Normalize for ExecutionWitness {
 
 impl Normalize for ArgumentGraph {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 11: stable graph canonicalization by canonical bytes
         ctx.sort_graph("arguments", &mut self.arguments);
         ctx.sort_graph("attack_edges", &mut self.attack_edges);
         ctx.sort_graph("support_edges", &mut self.support_edges);
@@ -817,7 +782,6 @@ impl Normalize for ArgumentGraph {
         ctx.sort_graph("defeat_edges", &mut self.defeat_edges);
         ctx.sort_graph("extension_summaries", &mut self.extension_summaries);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 12: stable ID
         let saved = std::mem::take(&mut self.argument_graph_id.0);
         let content = to_canonical_bytes(self);
         self.argument_graph_id.0 = saved;
@@ -834,7 +798,6 @@ impl Normalize for Certificate {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.sort_ord("input_artifact_hashes", &mut self.input_artifact_hashes);
         ctx.sort_ord("proof_artifact_hashes", &mut self.proof_artifact_hashes);
-        // Pass 5: diagnostics preserves temporal/causal order
     }
 }
 
@@ -842,8 +805,6 @@ impl Normalize for AuditTrace {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.sort_ord("artifact_hashes", &mut self.artifact_hashes);
         ctx.sort_ord("audit_export_refs", &mut self.audit_export_refs);
-        // Pass 5: stage_spans, model_invocations, retrieval_events,
-        //         verifier_events preserve temporal order
     }
 }
 
@@ -869,15 +830,11 @@ normalize_noop!(ExtractorVote, BBox, TableCellRef, ConfidenceInterval);
 
 impl Normalize for Action {
     fn normalize(&mut self, ctx: &mut NfContext) {
-        // Pass 6: canonical action_type casing (lowercase ASCII)
         ctx.normalize_action_type(&mut self.action_type);
-        // Pass 6: parameter keys are sorted by BTreeMap-backed serde_json::Map;
         //         canonical serializer handles RFC 8785 UTF-16 key ordering.
-        // Pass 7: normalize unit strings in JSON value fields
         ctx.normalize_units("parameters", &mut self.parameters);
         ctx.normalize_units("temporal_constraints", &mut self.temporal_constraints);
         ctx.normalize_units("quantity_constraints", &mut self.quantity_constraints);
-        // Pass 8: resolve target_concept through e-graph canonical representative
         let resolved = ctx
             .resolve_concept(self.target_concept.as_str())
             .map(str::to_owned);
@@ -1340,7 +1297,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 3-5 tests: structural normalization
     // ===================================================================
 
     // -- sort_commutative_operands unit tests --
@@ -1770,16 +1726,12 @@ mod tests {
 
         let ctx = normalize_all(&mut wf);
 
-        // Pass 11: states sorted by canonical bytes
         assert_eq!(wf.states[0]["id"], "a");
         assert_eq!(wf.states[1]["id"], "b");
-        // Pass 11: transitions sorted by canonical bytes
         assert_eq!(wf.transitions[0]["from"], "a");
         assert_eq!(wf.transitions[1]["from"], "b");
-        // Pass 11: outcomes sorted
         assert_eq!(wf.outcomes[0]["id"], "a_outcome");
         assert_eq!(wf.outcomes[1]["id"], "z_outcome");
-        // source_span_ids sorted (pass 4)
         assert_eq!(
             wf.source_span_ids,
             vec![SpanId::new("span_a"), SpanId::new("span_z")]
@@ -1953,7 +1905,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 6-8 tests: domain normalization
     // ===================================================================
 
     fn make_action(action_type: &str, params: serde_json::Value, qty: serde_json::Value) -> Action {
@@ -2525,7 +2476,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 9 tests: Japanese clinical modality lexicon
     // ===================================================================
 
     #[test]
@@ -2739,7 +2689,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 10 tests: decision table cell normalization
     // ===================================================================
 
     #[test]
@@ -2878,7 +2827,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 11 tests: graph canonicalization
     // ===================================================================
 
     #[test]
@@ -3050,7 +2998,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 12 tests: stable ID generation
     // ===================================================================
 
     #[test]
@@ -3232,7 +3179,6 @@ mod tests {
     }
 
     // ===================================================================
-    // Pass 13 tests: diagnostic ordering
     // ===================================================================
 
     #[test]
