@@ -2,4 +2,3 @@
 python = "3.13"
 node = "20"
 just = "1"
-taplo = "0.10"
