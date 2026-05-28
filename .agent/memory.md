@@ -20,6 +20,17 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] When a mistake is caught after the fact, record it here so
   future sessions avoid repeating it. Verify tool operations against their
   actual output before reporting success.
+- [2026-05-28] Subtask sizing directive (user): size each roadmap subtask so a
+  fresh agent completes AND commits it within one context window with margin; if
+  it would need compaction, split it. One conceptual deliverable + one gate per
+  subtask; prefer more, smaller subtasks. Operationalized in `.agent/prompt.md`
+  → "Subtask sizing". Apply when planning (Type A) and any re-planning.
+- [2026-05-28] CAS determinism pitfall: `StoreManifest` entries carry
+  `stored_at_epoch` (file mtime), so raw manifest canonical bytes differ across
+  runs/machines. Assert cross-run determinism on per-artifact
+  `content_hash`/`envelope_hash` (or manifest entries minus timestamp), as in
+  ckc-store `cas_manifest_hash_is_stable` and `all_fixtures_have_deterministic_hashes`.
+  Avoid asserting raw manifest-byte equality across independent runs.
 
 ## Mistakes
 

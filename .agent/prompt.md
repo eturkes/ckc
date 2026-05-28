@@ -30,3 +30,21 @@ dedicated to writing the next Phase's top-level tasks (with no subtasks).
 Derive them from SPEC.md Section 20. Also erase all subtask lines from the
 now-completed previous Phase (keep only top-level task lines). Commit the
 updated roadmap and end the session.
+
+## Subtask sizing (Type A and any re-planning)
+
+Size every subtask so a fresh agent finishes the work AND commits it within a
+single context window with margin to spare. When completing a subtask would
+require context compaction, it is too large; split it into more subtasks.
+
+Scope each subtask to exactly one conceptual deliverable plus its gate, e.g.:
+author one fixture/data set; implement one logic module with its unit tests;
+wire one integration test; add persistence/determinism for one artifact kind.
+Keep data authoring, pure-logic implementation, integration wiring, and
+persistence/determinism in separate subtasks rather than bundling them.
+
+Prefer many small subtasks over few large ones; default to splitting. Give each
+subtask explicit file paths, the exact types/functions it touches, real
+identifiers from the existing fixtures/codebase, and exactly one crisp gate
+command. Number them N.M sequentially and add as many as the deliverable
+honestly needs.
