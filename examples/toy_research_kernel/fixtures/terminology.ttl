@@ -1,0 +1,77 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix ckc: <http://ckc.example.org/> .
+ckc:concept\/concept_anaphylaxis a skos:Concept ;
+	skos:prefLabel "アナフィラキシー"@ja ;
+	skos:altLabel "anaphylaxis"@en ;
+	ckc:semanticType "adverse_event" ;
+	skos:inScheme ckc:eclass\/eclass_anaphylaxis ;
+	skos:exactMatch ckc:external\/MedDRA\/J\/10002198 ;
+	skos:relatedMatch ckc:external\/ICD-10\/T78.2 ;
+	dct:source "span_contra_bl_allergy" , "span_allergy_history" .
+ckc:concept\/concept_beta_lactam a skos:Concept ;
+	skos:prefLabel "βラクタム系抗菌薬"@ja ;
+	skos:altLabel "beta-lactam antibiotics"@en ;
+	ckc:semanticType "drug_class" ;
+	skos:inScheme ckc:eclass\/eclass_beta_lactam ;
+	skos:exactMatch ckc:external\/MEDIS\/Y0100 ;
+	skos:broadMatch ckc:external\/HOT\/1190100 , ckc:external\/ICD-10\/Y40.1 ;
+	dct:source "span_rec_sepsis_bl" , "span_term_bl_greek" .
+ckc:concept\/concept_bl_variant_brand a skos:Concept ;
+	skos:prefLabel "セフトリアキソン"@ja ;
+	skos:altLabel "ceftriaxone"@en ;
+	ckc:semanticType "drug_class" ;
+	skos:inScheme ckc:eclass\/eclass_beta_lactam ;
+	skos:exactMatch ckc:external\/HOT\/1149028 ;
+	skos:narrowMatch ckc:external\/MEDIS\/Y0100 ;
+	dct:source "span_rec_sepsis_bl" .
+ckc:concept\/concept_bl_variant_english a skos:Concept ;
+	skos:prefLabel "ベータラクタム"@ja ;
+	skos:altLabel "beta-lactam"@en ;
+	ckc:semanticType "drug_class" ;
+	skos:inScheme ckc:eclass\/eclass_beta_lactam ;
+	skos:broadMatch ckc:external\/ICD-10\/Y40.1 ;
+	dct:source "span_term_bl_greek" .
+ckc:concept\/concept_bl_variant_hyphenated a skos:Concept ;
+	skos:prefLabel "β-ラクタム系抗菌薬"@ja ;
+	skos:altLabel "β-lactam antibiotics"@en ;
+	ckc:semanticType "drug_class" ;
+	skos:inScheme ckc:eclass\/eclass_beta_lactam ;
+	skos:exactMatch ckc:external\/MEDIS\/Y0100 ;
+	dct:source "span_allergy_history" .
+ckc:concept\/concept_bl_variant_katakana a skos:Concept ;
+	skos:prefLabel "ベータラクタム系薬剤"@ja ;
+	skos:altLabel "beta-lactam agents"@en ;
+	ckc:semanticType "drug_class" ;
+	skos:inScheme ckc:eclass\/eclass_beta_lactam ;
+	skos:exactMatch ckc:external\/MEDIS\/Y0100 ;
+	dct:source "span_term_bl_katakana" .
+ckc:concept\/concept_blood_pressure a skos:Concept ;
+	skos:prefLabel "収縮期血圧"@ja ;
+	skos:altLabel "systolic blood pressure"@en ;
+	ckc:semanticType "vital_sign" ;
+	skos:inScheme ckc:eclass\/eclass_blood_pressure ;
+	skos:exactMatch ckc:external\/JLAC11\/9A051000000000001 ;
+	dct:source "span_cell_r3c0" .
+ckc:concept\/concept_body_temperature a skos:Concept ;
+	skos:prefLabel "体温"@ja ;
+	skos:altLabel "body temperature"@en ;
+	ckc:semanticType "vital_sign" ;
+	skos:inScheme ckc:eclass\/eclass_body_temperature ;
+	skos:exactMatch ckc:external\/JLAC11\/9N611000000000001 ;
+	dct:source "span_cell_r0c0" , "span_cell_r1c0" .
+ckc:concept\/concept_heart_rate a skos:Concept ;
+	skos:prefLabel "心拍数"@ja ;
+	skos:altLabel "heart rate"@en ;
+	ckc:semanticType "vital_sign" ;
+	skos:inScheme ckc:eclass\/eclass_heart_rate ;
+	skos:exactMatch ckc:external\/JLAC11\/9A751000000000001 ;
+	dct:source "span_cell_r2c0" .
+ckc:concept\/concept_sepsis a skos:Concept ;
+	skos:prefLabel "敗血症"@ja ;
+	skos:altLabel "sepsis"@en ;
+	ckc:semanticType "diagnosis" ;
+	skos:inScheme ckc:eclass\/eclass_sepsis ;
+	skos:exactMatch ckc:external\/MEDIS\/BQEF , ckc:external\/ICD-10\/A41.9 ;
+	dct:source "span_rec_sepsis_bl" , "span_evidence_sepsis" .

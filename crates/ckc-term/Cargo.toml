@@ -11,6 +11,8 @@ serde_json = { workspace = true }
 schemars = { workspace = true }
 unicode-normalization = { workspace = true }
 egg = { workspace = true }
+oxrdf = { workspace = true }
+oxttl = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

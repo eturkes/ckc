@@ -1,4 +1,6 @@
 pub mod egraph;
+pub mod rdf;
+pub mod shacl;
 
 use std::collections::HashMap;
 
