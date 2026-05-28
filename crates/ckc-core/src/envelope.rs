@@ -32,6 +32,7 @@ pub enum ArtifactKind {
     RdfExport,
     AlignmentDiagnostic,
     RetrievalResult,
+    CompiledTarget,
 }
 
 /// Pipeline metadata for a stored artifact (SPEC 5.2).
@@ -155,6 +156,7 @@ mod tests {
             (ArtifactKind::RdfExport, "rdf_export"),
             (ArtifactKind::AlignmentDiagnostic, "alignment_diagnostic"),
             (ArtifactKind::RetrievalResult, "retrieval_result"),
+            (ArtifactKind::CompiledTarget, "compiled_target"),
         ];
         for (variant, wire) in kinds {
             let expected = format!("\"{wire}\"");

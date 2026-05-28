@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod canonical;
 pub mod clinical;
+pub mod compile;
 pub mod enums;
 pub mod envelope;
 pub mod id;

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompileDiagnostic",
+  "description": "Structured compiler diagnostic with bilingual messages and source spans\n(SPEC 12.1, 14 deterministic diagnostics).",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "message_en": {
+      "type": "string"
+    },
+    "message_ja": {
+      "type": "string"
+    },
+    "source_span_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpanId"
+      }
+    }
+  },
+  "required": [
+    "code",
+    "message_ja",
+    "message_en",
+    "source_span_ids"
+  ],
+  "$defs": {
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    }
+  }
+}

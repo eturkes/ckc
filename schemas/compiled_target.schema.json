@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompiledTarget",
+  "description": "A compiled target artifact: target text plus the CKC→target symbol map,\ndiagnostics, source provenance, and a replay command (SPEC 14).\n\nProduced from an already-normalized bundle and not itself re-normalized,\nso this type carries no `Normalize` impl. `certificate_class` is\nintentionally absent: certificates are assigned in the verification stage\nvia `Certificate.certificate_class` referencing this artifact's content\nhash.",
+  "type": "object",
+  "properties": {
+    "artifact_text": {
+      "type": "string"
+    },
+    "compilation_map": {
+      "$ref": "#/$defs/CompilationMap"
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CompileDiagnostic"
+      }
+    },
+    "replay_command": {
+      "type": "string"
+    },
+    "source_artifact_hashes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentHash"
+      }
+    },
+    "target_language": {
+      "$ref": "#/$defs/TargetLanguage"
+    },
+    "target_parse_ok": {
+      "description": "`Some` when a target-language parser/tool was on PATH and run as an\nemit-time sanity check; `None` when no such tool was available.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "target_language",
+    "artifact_text",
+    "compilation_map",
+    "diagnostics",
+    "source_artifact_hashes",
+    "replay_command"
+  ],
+  "$defs": {
+    "CompilationMap": {
+      "description": "CKC-node-id → target-symbol mapping for one compiled artifact (SPEC 14).\nTransparent newtype: serializes as the bare array of mappings.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SymbolMapping"
+      }
+    },
+    "CompileDiagnostic": {
+      "description": "Structured compiler diagnostic with bilingual messages and source spans\n(SPEC 12.1, 14 deterministic diagnostics).",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message_en": {
+          "type": "string"
+        },
+        "message_ja": {
+          "type": "string"
+        },
+        "source_span_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SpanId"
+          }
+        }
+      },
+      "required": [
+        "code",
+        "message_ja",
+        "message_en",
+        "source_span_ids"
+      ]
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "SymbolMapping": {
+      "description": "One CKC node id mapped to a target-language symbol with source grounding\n(SPEC 14 CompilationMap entry).",
+      "type": "object",
+      "properties": {
+        "ckc_node_id": {
+          "type": "string"
+        },
+        "source_span_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SpanId"
+          }
+        },
+        "target_symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ckc_node_id",
+        "target_symbol",
+        "source_span_ids"
+      ]
+    },
+    "TargetLanguage": {
+      "description": "Target language for CKC compilation (SPEC 14 target compilers).",
+      "type": "string",
+      "enum": [
+        "smt_lib",
+        "asp",
+        "datalog",
+        "lean",
+        "tla_plus",
+        "alloy"
+      ]
+    }
+  }
+}

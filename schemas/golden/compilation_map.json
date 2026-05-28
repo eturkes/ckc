@@ -1,0 +1,1 @@
+[{"ckc_node_id":"rule_sepsis_bl_recommend","source_span_ids":["span_rec_sepsis_bl"],"target_symbol":"recommend_administer_beta_lactam"},{"ckc_node_id":"rule_bl_anaphylaxis_contra","source_span_ids":["span_contra_bl_allergy","span_allergy_history"],"target_symbol":"prohibit_administer_beta_lactam"}]

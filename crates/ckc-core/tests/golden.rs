@@ -10,6 +10,7 @@ use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 use ckc_core::clinical::{
     Action, ClinicalClaim, ConfidenceInterval, EtDFrame, EvidenceAtom, Norm, PICOFrame, Rule,
 };
+use ckc_core::compile::{CompilationMap, CompileDiagnostic, CompiledTarget, SymbolMapping};
 use ckc_core::enums::*;
 use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
 use ckc_core::id::*;
@@ -511,6 +512,52 @@ fn golden_artifact_envelope() -> ArtifactEnvelope {
     ArtifactEnvelope::wrap(ArtifactKind::Rule, &golden_rule(), golden_artifact_meta())
 }
 
+fn golden_symbol_mapping() -> SymbolMapping {
+    SymbolMapping {
+        ckc_node_id: "rule_sepsis_bl_recommend".into(),
+        target_symbol: "recommend_administer_beta_lactam".into(),
+        source_span_ids: vec![SpanId::new("span_rec_sepsis_bl")],
+    }
+}
+
+fn golden_compilation_map() -> CompilationMap {
+    CompilationMap(vec![
+        golden_symbol_mapping(),
+        SymbolMapping {
+            ckc_node_id: "rule_bl_anaphylaxis_contra".into(),
+            target_symbol: "prohibit_administer_beta_lactam".into(),
+            source_span_ids: vec![
+                SpanId::new("span_contra_bl_allergy"),
+                SpanId::new("span_allergy_history"),
+            ],
+        },
+    ])
+}
+
+fn golden_compile_diagnostic() -> CompileDiagnostic {
+    CompileDiagnostic {
+        code: "ckc_compile_norm_conflict".into(),
+        message_ja: "推奨と禁忌が優先順位なしで衝突します".into(),
+        message_en: "Recommendation and contraindication conflict without priority".into(),
+        source_span_ids: vec![
+            SpanId::new("span_rec_sepsis_bl"),
+            SpanId::new("span_contra_bl_allergy"),
+        ],
+    }
+}
+
+fn golden_compiled_target() -> CompiledTarget {
+    CompiledTarget {
+        target_language: TargetLanguage::SmtLib,
+        artifact_text: "(set-logic QF_UF)\n(check-sat)\n".into(),
+        compilation_map: golden_compilation_map(),
+        diagnostics: vec![golden_compile_diagnostic()],
+        source_artifact_hashes: vec![golden_content_hash()],
+        replay_command: "z3 -smt2 logic/smt/norm_conflict.smt2".into(),
+        target_parse_ok: Some(true),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Test macro: for each type, verify canonical golden bytes, round-trip hash
 // determinism, and JSON Schema stability.
@@ -540,7 +587,7 @@ macro_rules! golden_suite {
 }
 
 // ---------------------------------------------------------------------------
-// Suite invocations (31 types = 93 tests)
+// Suite invocations (34 types = 102 tests)
 // ---------------------------------------------------------------------------
 
 golden_suite!(
@@ -689,6 +736,24 @@ golden_suite!(
     golden_artifact_envelope,
     "artifact_envelope"
 );
+golden_suite!(
+    gs_compilation_map,
+    CompilationMap,
+    golden_compilation_map,
+    "compilation_map"
+);
+golden_suite!(
+    gs_compile_diagnostic,
+    CompileDiagnostic,
+    golden_compile_diagnostic,
+    "compile_diagnostic"
+);
+golden_suite!(
+    gs_compiled_target,
+    CompiledTarget,
+    golden_compiled_target,
+    "compiled_target"
+);
 
 // ---------------------------------------------------------------------------
 // Regeneration: run `cargo test -p ckc-core --test golden -- --ignored` to
@@ -743,4 +808,7 @@ fn regenerate() {
     write_type(&golden_artifact_kind(), "artifact_kind");
     write_type(&golden_artifact_meta(), "artifact_meta");
     write_type(&golden_artifact_envelope(), "artifact_envelope");
+    write_type(&golden_compilation_map(), "compilation_map");
+    write_type(&golden_compile_diagnostic(), "compile_diagnostic");
+    write_type(&golden_compiled_target(), "compiled_target");
 }

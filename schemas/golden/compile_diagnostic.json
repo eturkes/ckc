@@ -1,0 +1,1 @@
+{"code":"ckc_compile_norm_conflict","message_en":"Recommendation and contraindication conflict without priority","message_ja":"推奨と禁忌が優先順位なしで衝突します","source_span_ids":["span_rec_sepsis_bl","span_contra_bl_allergy"]}

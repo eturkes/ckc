@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompilationMap",
+  "description": "CKC-node-id → target-symbol mapping for one compiled artifact (SPEC 14).\nTransparent newtype: serializes as the bare array of mappings.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/SymbolMapping"
+  },
+  "$defs": {
+    "SpanId": {
+      "description": "Primary key for `SourceSpan`.",
+      "type": "string"
+    },
+    "SymbolMapping": {
+      "description": "One CKC node id mapped to a target-language symbol with source grounding\n(SPEC 14 CompilationMap entry).",
+      "type": "object",
+      "properties": {
+        "ckc_node_id": {
+          "type": "string"
+        },
+        "source_span_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SpanId"
+          }
+        },
+        "target_symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ckc_node_id",
+        "target_symbol",
+        "source_span_ids"
+      ]
+    }
+  }
+}

@@ -25,6 +25,7 @@
     "shacl_report",
     "rdf_export",
     "alignment_diagnostic",
-    "retrieval_result"
+    "retrieval_result",
+    "compiled_target"
   ]
 }

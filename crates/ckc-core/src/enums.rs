@@ -170,6 +170,18 @@ pub enum NormCommitment {
     AllThingsConsidered,
 }
 
+/// Target language for CKC compilation (SPEC 14 target compilers).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetLanguage {
+    SmtLib,
+    Asp,
+    Datalog,
+    Lean,
+    TlaPlus,
+    Alloy,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
