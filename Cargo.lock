@@ -289,6 +289,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckc-compile"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "ckc-core",
+ "ckc-store",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "ckc-core"
 version = "0.0.0"
 dependencies = [

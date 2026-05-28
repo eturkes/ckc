@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/ckc-cli",
+    "crates/ckc-compile",
     "crates/ckc-core",
     "crates/ckc-store",
     "crates/ckc-retrieve",
