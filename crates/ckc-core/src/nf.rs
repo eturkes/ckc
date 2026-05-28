@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,7 +18,7 @@ use crate::source::{
 };
 use crate::canonical::to_canonical_bytes;
 use crate::enums::{DeonticProjection, HitPolicy};
-use crate::id::SpanId;
+use crate::id::{ConceptId, SpanId};
 use crate::verify::{ArgumentGraph, AssuranceNode, AuditTrace, Certificate, Conflict};
 
 // ---------------------------------------------------------------------------
@@ -45,11 +47,32 @@ pub struct NfDiagnostic {
 pub struct NfContext {
     pub rewrites: Vec<NfRewrite>,
     pub diagnostics: Vec<NfDiagnostic>,
+    /// Pre-computed concept_id → canonical concept_id mapping from e-graph
+    /// equivalence. Populated by `with_term_map()` or `normalize_with_terms()`.
+    /// When `None`, pass 8 is identity.
+    #[serde(skip)]
+    term_map: Option<BTreeMap<String, String>>,
 }
 
 impl NfContext {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a context with a pre-computed terminology map.
+    /// Pass 8 resolves concept references through this map.
+    pub fn with_term_map(term_map: BTreeMap<String, String>) -> Self {
+        Self {
+            rewrites: vec![],
+            diagnostics: vec![],
+            term_map: Some(term_map),
+        }
+    }
+
+    /// Look up the canonical concept_id for a given concept_id.
+    /// Returns `None` when no term_map is set or the concept_id is unknown.
+    pub fn resolve_concept(&self, concept_id: &str) -> Option<&str> {
+        self.term_map.as_ref()?.get(concept_id).map(|s| s.as_str())
     }
 
     /// Apply text normalization to a string field. Records a rewrite when
@@ -273,8 +296,22 @@ pub fn normalize_text(s: &str) -> String {
 
 /// Convenience: normalize a value in place and return the accumulated context.
 /// Applies Pass 13 (diagnostic ordering) after all type-level passes.
+/// Pass 8 (terminology) is identity; use `normalize_with_terms` for e-graph resolution.
 pub fn normalize_all<T: Normalize>(value: &mut T) -> NfContext {
     let mut ctx = NfContext::new();
+    value.normalize(&mut ctx);
+    ctx.sort_diagnostics();
+    ctx
+}
+
+/// Normalize with a pre-computed terminology map from e-graph equivalence.
+/// Pass 8 resolves concept references (e.g., Action.target_concept) through
+/// the canonical mapping, so variant concept IDs converge to one representative.
+pub fn normalize_with_terms<T: Normalize>(
+    value: &mut T,
+    term_map: BTreeMap<String, String>,
+) -> NfContext {
+    let mut ctx = NfContext::with_term_map(term_map);
     value.normalize(&mut ctx);
     ctx.sort_diagnostics();
     ctx
@@ -446,23 +483,6 @@ impl<T: Normalize> Normalize for Option<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Pass 8: terminology normalization trait (identity stub)
-// ---------------------------------------------------------------------------
-
-/// Normalize through e-graph equivalence classes and terminology bindings.
-///
-/// Identity transform at schema v0. E-graph integration in task 0.6 will
-/// override implementations to canonicalize concepts, bindings, and action
-/// targets through their equivalence classes.
-pub trait TermNormalize {
-    fn term_normalize(&mut self, _ctx: &mut NfContext) {}
-}
-
-impl TermNormalize for Concept {}
-impl TermNormalize for TerminologyBinding {}
-impl TermNormalize for Action {}
-
-// ---------------------------------------------------------------------------
 // Pass 1-2 implementations: types with text fields or delegating children
 // ---------------------------------------------------------------------------
 
@@ -495,8 +515,6 @@ impl Normalize for Concept {
         // Pass 4: sort unordered fields
         ctx.sort_by_canonical("terminology_bindings", &mut self.terminology_bindings);
         ctx.sort_ord("source_span_ids", &mut self.source_span_ids);
-        // Pass 8: terminology normalization (identity stub)
-        self.term_normalize(ctx);
         // Pass 12: stable ID
         let saved = std::mem::replace(&mut self.concept_id.0, String::new());
         let content = to_canonical_bytes(self);
@@ -508,8 +526,6 @@ impl Normalize for Concept {
 impl Normalize for TerminologyBinding {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_field(2, "label", &mut self.label);
-        // Pass 8: terminology normalization (identity stub)
-        self.term_normalize(ctx);
     }
 }
 
@@ -806,8 +822,24 @@ impl Normalize for Action {
         ctx.normalize_units("parameters", &mut self.parameters);
         ctx.normalize_units("temporal_constraints", &mut self.temporal_constraints);
         ctx.normalize_units("quantity_constraints", &mut self.quantity_constraints);
-        // Pass 8: terminology normalization (identity stub)
-        self.term_normalize(ctx);
+        // Pass 8: resolve target_concept through e-graph canonical representative
+        let resolved = ctx
+            .resolve_concept(self.target_concept.as_str())
+            .map(str::to_owned);
+        if let Some(canonical) = resolved {
+            if canonical != self.target_concept.as_str() {
+                ctx.rewrites.push(NfRewrite {
+                    pass: 8,
+                    field: "target_concept".into(),
+                    before: std::mem::replace(
+                        &mut self.target_concept,
+                        ConceptId::new(&canonical),
+                    )
+                    .0,
+                    after: canonical,
+                });
+            }
+        }
     }
 }
 
@@ -2187,69 +2219,23 @@ mod tests {
         assert!(ctx.rewrites.iter().any(|r| r.pass == 6));
     }
 
-    // -- Pass 8: terminology normalization identity --
+    // -- Pass 8: terminology normalization --
 
-    #[test]
-    fn term_normalize_identity_on_concept() {
-        let mut concept = Concept {
-            concept_id: ConceptId::new("concept_test"),
-            label_ja: "敗血症".into(),
-            label_en: Some("sepsis".into()),
-            semantic_type: "diagnosis".into(),
-            terminology_bindings: vec![TerminologyBinding {
-                system: "MEDIS".into(),
-                code: Some("M001".into()),
-                version: Some("2024".into()),
-                label: "敗血症".into(),
-                status: BindingStatus::Exact,
-                mapping_relation: "equivalent".into(),
-                provenance: "test".into(),
-                confidence: 1.0,
-                license_status: "permitted".into(),
-                valid_from: None,
-                valid_to: None,
-            }],
-            egraph_class_id: Some(EGraphClassId::new("eclass_test")),
-            source_span_ids: vec![SpanId::new("span_s1")],
-        };
-
-        let ctx = normalize_all(&mut concept);
-
-        // Pass 8 (terminology normalization) is identity at schema v0
-        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8),
-            "identity stub must record no rewrites");
-        // Pass 12 generates a stable ID (the only non-identity change
-        // for an already-canonical concept)
-        assert!(ctx.rewrites.iter().any(|r| r.pass == 12 && r.field == "concept_id"));
-        assert!(concept.concept_id.as_str().starts_with("nf-"));
+    /// Build a toy term_map mapping beta-lactam variant concept IDs
+    /// to the canonical representative "concept_beta_lactam".
+    fn toy_term_map() -> BTreeMap<String, String> {
+        let canonical = "concept_beta_lactam".to_string();
+        BTreeMap::from([
+            ("concept_beta_lactam".into(), canonical.clone()),
+            ("concept_bl_variant_katakana".into(), canonical.clone()),
+            ("concept_bl_variant_hyphenated".into(), canonical.clone()),
+            ("concept_bl_variant_brand".into(), canonical.clone()),
+            ("concept_bl_variant_english".into(), canonical),
+        ])
     }
 
     #[test]
-    fn term_normalize_identity_on_binding() {
-        let mut binding = TerminologyBinding {
-            system: "HOT".into(),
-            code: Some("H001".into()),
-            version: None,
-            label: "テスト薬".into(),
-            status: BindingStatus::Exact,
-            mapping_relation: "equivalent".into(),
-            provenance: "test".into(),
-            confidence: 0.95,
-            license_status: "permitted".into(),
-            valid_from: None,
-            valid_to: None,
-        };
-
-        let before_hash = crate::canonical::content_hash(&binding);
-        let ctx = normalize_all(&mut binding);
-        let after_hash = crate::canonical::content_hash(&binding);
-
-        assert_eq!(before_hash, after_hash);
-        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8));
-    }
-
-    #[test]
-    fn term_normalize_identity_on_action() {
+    fn pass8_identity_without_term_map() {
         let mut action = make_action(
             "administer",
             serde_json::json!({"route": "iv"}),
@@ -2261,7 +2247,193 @@ mod tests {
         let after_hash = crate::canonical::content_hash(&action);
 
         assert_eq!(before_hash, after_hash,
-            "canonical action must be unchanged by NF pipeline");
+            "pass 8 must be identity when no term_map is provided");
+        assert_eq!(action.target_concept.as_str(), "concept_test");
+    }
+
+    #[test]
+    fn pass8_resolves_variant_to_canonical() {
+        let mut action = Action {
+            action_type: "administer".into(),
+            target_concept: ConceptId::new("concept_bl_variant_katakana"),
+            parameters: serde_json::json!({"route": "iv"}),
+            temporal_constraints: serde_json::Value::Null,
+            quantity_constraints: serde_json::Value::Null,
+        };
+
+        let ctx = normalize_with_terms(&mut action, toy_term_map());
+
+        assert_eq!(action.target_concept.as_str(), "concept_beta_lactam");
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 8
+            && r.field == "target_concept"
+            && r.before == "concept_bl_variant_katakana"
+            && r.after == "concept_beta_lactam"));
+    }
+
+    #[test]
+    fn pass8_canonical_concept_unchanged() {
+        let mut action = Action {
+            action_type: "administer".into(),
+            target_concept: ConceptId::new("concept_beta_lactam"),
+            parameters: serde_json::Value::Null,
+            temporal_constraints: serde_json::Value::Null,
+            quantity_constraints: serde_json::Value::Null,
+        };
+
+        let ctx = normalize_with_terms(&mut action, toy_term_map());
+
+        assert_eq!(action.target_concept.as_str(), "concept_beta_lactam");
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8),
+            "canonical concept must record no pass 8 rewrite");
+    }
+
+    #[test]
+    fn pass8_unknown_concept_unchanged() {
+        let mut action = Action {
+            action_type: "administer".into(),
+            target_concept: ConceptId::new("concept_unknown"),
+            parameters: serde_json::Value::Null,
+            temporal_constraints: serde_json::Value::Null,
+            quantity_constraints: serde_json::Value::Null,
+        };
+
+        let ctx = normalize_with_terms(&mut action, toy_term_map());
+
+        assert_eq!(action.target_concept.as_str(), "concept_unknown");
+        assert!(!ctx.rewrites.iter().any(|r| r.pass == 8));
+    }
+
+    #[test]
+    fn pass8_propagates_through_norm_and_rule() {
+        let mut rule = Rule {
+            rule_id: RuleId::new("rule_test"),
+            profiles: vec![SemanticProfile::Norm],
+            kind: RuleKind::Defeasible,
+            context: "test".into(),
+            antecedent: "test".into(),
+            consequent: "test".into(),
+            norm: Some(Norm {
+                context: "test".into(),
+                direction: RecommendationDirection::For,
+                action: Action {
+                    action_type: "administer".into(),
+                    target_concept: ConceptId::new("concept_bl_variant_hyphenated"),
+                    parameters: serde_json::Value::Null,
+                    temporal_constraints: serde_json::Value::Null,
+                    quantity_constraints: serde_json::Value::Null,
+                },
+                recommendation_strength: RecommendationStrength::Strong,
+                evidence_certainty: EvidenceCertainty::Moderate,
+                original_modality_phrase_ja: "投与を推奨する".into(),
+                deontic_projection: DeonticProjection::Recommended,
+                exception_policy: "none".into(),
+                prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+            }),
+            priority_over: vec![],
+            exceptions: vec![],
+            temporal_scope: None,
+            population_scope: None,
+            source_span_ids: vec![SpanId::new("span_s1")],
+            provenance: "test".into(),
+            certificate_ids: vec![],
+        };
+
+        let ctx = normalize_with_terms(&mut rule, toy_term_map());
+
+        assert_eq!(
+            rule.norm.as_ref().unwrap().action.target_concept.as_str(),
+            "concept_beta_lactam"
+        );
+        assert!(ctx.rewrites.iter().any(|r| r.pass == 8
+            && r.field == "target_concept"));
+    }
+
+    #[test]
+    fn gate_variant_concepts_produce_identical_nf() {
+        use crate::canonical::{content_hash, to_canonical_bytes};
+
+        let make = |concept_id: &str| -> Rule {
+            Rule {
+                rule_id: RuleId::new("rule_test"),
+                profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
+                kind: RuleKind::Defeasible,
+                context: "sepsis AND adult_patient".into(),
+                antecedent: "(dx sepsis) AND (adult patient)".into(),
+                consequent: "(administer beta_lactam)".into(),
+                norm: Some(Norm {
+                    context: "sepsis in adult patients".into(),
+                    direction: RecommendationDirection::For,
+                    action: Action {
+                        action_type: "administer".into(),
+                        target_concept: ConceptId::new(concept_id),
+                        parameters: serde_json::json!({"route": "iv"}),
+                        temporal_constraints: serde_json::Value::Null,
+                        quantity_constraints: serde_json::Value::Null,
+                    },
+                    recommendation_strength: RecommendationStrength::Strong,
+                    evidence_certainty: EvidenceCertainty::Moderate,
+                    original_modality_phrase_ja: "投与を推奨する".into(),
+                    deontic_projection: DeonticProjection::Recommended,
+                    exception_policy: "none".into(),
+                    prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+                }),
+                priority_over: vec![],
+                exceptions: vec![],
+                temporal_scope: None,
+                population_scope: None,
+                source_span_ids: vec![SpanId::new("span_s1")],
+                provenance: "test".into(),
+                certificate_ids: vec![],
+            }
+        };
+
+        let term_map = toy_term_map();
+
+        let mut rule_katakana = make("concept_bl_variant_katakana");
+        let mut rule_hyphenated = make("concept_bl_variant_hyphenated");
+        let mut rule_canonical = make("concept_beta_lactam");
+        let mut rule_brand = make("concept_bl_variant_brand");
+
+        normalize_with_terms(&mut rule_katakana, term_map.clone());
+        normalize_with_terms(&mut rule_hyphenated, term_map.clone());
+        normalize_with_terms(&mut rule_canonical, term_map.clone());
+        normalize_with_terms(&mut rule_brand, term_map);
+
+        let bytes_k = to_canonical_bytes(&rule_katakana);
+        let bytes_h = to_canonical_bytes(&rule_hyphenated);
+        let bytes_c = to_canonical_bytes(&rule_canonical);
+        let bytes_b = to_canonical_bytes(&rule_brand);
+
+        assert_eq!(bytes_k, bytes_h,
+            "katakana and hyphenated variants must produce identical NF bytes");
+        assert_eq!(bytes_k, bytes_c,
+            "variant and canonical must produce identical NF bytes");
+        assert_eq!(bytes_k, bytes_b,
+            "variant and brand must produce identical NF bytes");
+        assert_eq!(content_hash(&rule_katakana), content_hash(&rule_hyphenated));
+        assert_eq!(content_hash(&rule_katakana), content_hash(&rule_canonical));
+    }
+
+    #[test]
+    fn pass8_idempotent_with_term_map() {
+        use crate::canonical::content_hash;
+
+        let mut action = Action {
+            action_type: "administer".into(),
+            target_concept: ConceptId::new("concept_bl_variant_katakana"),
+            parameters: serde_json::json!({"route": "iv"}),
+            temporal_constraints: serde_json::Value::Null,
+            quantity_constraints: serde_json::Value::Null,
+        };
+
+        let term_map = toy_term_map();
+        normalize_with_terms(&mut action, term_map.clone());
+        let hash1 = content_hash(&action);
+
+        normalize_with_terms(&mut action, term_map);
+        let hash2 = content_hash(&action);
+
+        assert_eq!(hash1, hash2, "NF(NF(action)) must equal NF(action) with term_map");
     }
 
     // ===================================================================

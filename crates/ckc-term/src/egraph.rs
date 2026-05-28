@@ -302,6 +302,19 @@ impl TermEquivalence {
             iterations: self.iterations,
         }
     }
+
+    /// Produce a concept_id → canonical concept_id map for NF pass 8.
+    /// Every known concept_id maps to its canonical representative.
+    /// Concepts already canonical map to themselves.
+    pub fn to_canonical_map(&self) -> BTreeMap<String, String> {
+        self.concept_node_ids
+            .keys()
+            .filter_map(|cid| {
+                self.canonical_for(cid)
+                    .map(|canonical| (cid.clone(), canonical))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -654,5 +667,56 @@ mod tests {
         assert!(artifact.class_ids.is_empty());
         assert!(artifact.canonical_representatives.is_empty());
         assert_eq!(artifact.rewrite_count, 0);
+    }
+
+    // -- to_canonical_map tests --
+
+    #[test]
+    fn canonical_map_covers_all_concepts() {
+        let (graph, engine) = build_engine();
+        let map = engine.to_canonical_map();
+        assert_eq!(map.len(), graph.len(),
+            "canonical map must have an entry for every concept");
+    }
+
+    #[test]
+    fn canonical_map_beta_lactam_variants_converge() {
+        let (_graph, engine) = build_engine();
+        let map = engine.to_canonical_map();
+        let variants = [
+            "concept_beta_lactam",
+            "concept_bl_variant_katakana",
+            "concept_bl_variant_hyphenated",
+            "concept_bl_variant_brand",
+            "concept_bl_variant_english",
+        ];
+        for v in &variants {
+            assert_eq!(
+                map.get(*v).map(|s| s.as_str()),
+                Some("concept_beta_lactam"),
+                "variant {v} must map to canonical concept_beta_lactam"
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_map_singletons_map_to_self() {
+        let (_graph, engine) = build_engine();
+        let map = engine.to_canonical_map();
+        for concept_id in ["concept_sepsis", "concept_anaphylaxis", "concept_body_temperature"] {
+            assert_eq!(
+                map.get(concept_id).map(|s| s.as_str()),
+                Some(concept_id),
+                "singleton {concept_id} must map to itself"
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_map_empty_graph() {
+        let graph = TerminologyGraph::new();
+        let engine = TermEquivalence::from_terminology_graph(&graph);
+        let map = engine.to_canonical_map();
+        assert!(map.is_empty());
     }
 }

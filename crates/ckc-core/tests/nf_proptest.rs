@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
 use ckc_core::artifact::{DecisionRow, DecisionTable};
 use ckc_core::canonical::{content_hash, to_canonical_bytes};
 use ckc_core::clinical::{Action, ClinicalClaim, Norm, Rule};
 use ckc_core::enums::*;
 use ckc_core::id::*;
-use ckc_core::nf::normalize_all;
+use ckc_core::nf::{normalize_all, normalize_with_terms};
 use ckc_core::profile::SemanticProfile;
 use ckc_core::verify::ArgumentGraph;
 use proptest::prelude::*;
@@ -244,5 +246,144 @@ proptest! {
         normalize_all(&mut rule);
         prop_assert!(rule.rule_id.as_str().starts_with("nf-"));
         prop_assert_eq!(rule.rule_id.as_str().len(), 35);
+    }
+}
+
+fn toy_term_map() -> BTreeMap<String, String> {
+    let canonical = "concept_beta_lactam".to_string();
+    BTreeMap::from([
+        ("concept_beta_lactam".into(), canonical.clone()),
+        ("concept_bl_variant_katakana".into(), canonical.clone()),
+        ("concept_bl_variant_hyphenated".into(), canonical.clone()),
+        ("concept_bl_variant_brand".into(), canonical.clone()),
+        ("concept_bl_variant_english".into(), canonical),
+    ])
+}
+
+fn arb_concept_variant() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("concept_beta_lactam".to_string()),
+        Just("concept_bl_variant_katakana".to_string()),
+        Just("concept_bl_variant_hyphenated".to_string()),
+        Just("concept_bl_variant_brand".to_string()),
+        Just("concept_bl_variant_english".to_string()),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+
+    #[test]
+    fn pass8_variant_convergence(
+        variant_a in arb_concept_variant(),
+        variant_b in arb_concept_variant(),
+        antecedent in arb_antecedent(),
+        kind in arb_rule_kind(),
+        action_type in arb_action_type(),
+        unit in arb_unit(),
+        span_ids in arb_span_ids(),
+    ) {
+        let make_rule = |concept_id: &str| -> Rule {
+            Rule {
+                rule_id: RuleId::new("rule_proptest"),
+                profiles: vec![SemanticProfile::Norm, SemanticProfile::Defeasible],
+                kind,
+                context: "test".into(),
+                antecedent: antecedent.clone(),
+                consequent: "(result)".into(),
+                norm: Some(Norm {
+                    context: "test".into(),
+                    direction: RecommendationDirection::For,
+                    action: Action {
+                        action_type: action_type.clone(),
+                        target_concept: ConceptId::new(concept_id),
+                        parameters: serde_json::json!({"route": "iv"}),
+                        temporal_constraints: serde_json::Value::Null,
+                        quantity_constraints: serde_json::json!({"unit": unit.clone()}),
+                    },
+                    recommendation_strength: RecommendationStrength::Strong,
+                    evidence_certainty: EvidenceCertainty::Moderate,
+                    original_modality_phrase_ja: "投与を推奨する".into(),
+                    deontic_projection: DeonticProjection::Recommended,
+                    exception_policy: "none".into(),
+                    prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+                }),
+                priority_over: vec![],
+                exceptions: vec![],
+                temporal_scope: None,
+                population_scope: None,
+                source_span_ids: span_ids.clone(),
+                provenance: "proptest".into(),
+                certificate_ids: vec![],
+            }
+        };
+
+        let term_map = toy_term_map();
+
+        let mut rule_a = make_rule(&variant_a);
+        let mut rule_b = make_rule(&variant_b);
+
+        normalize_with_terms(&mut rule_a, term_map.clone());
+        normalize_with_terms(&mut rule_b, term_map);
+
+        let bytes_a = to_canonical_bytes(&rule_a);
+        let bytes_b = to_canonical_bytes(&rule_b);
+
+        prop_assert_eq!(bytes_a, bytes_b,
+            "Rules with variant concepts ({} vs {}) must produce identical NF bytes",
+            variant_a, variant_b);
+        prop_assert_eq!(content_hash(&rule_a), content_hash(&rule_b));
+    }
+
+    #[test]
+    fn pass8_idempotent_with_term_map(
+        variant in arb_concept_variant(),
+        antecedent in arb_antecedent(),
+        kind in arb_rule_kind(),
+    ) {
+        let mut rule = Rule {
+            rule_id: RuleId::new("rule_proptest"),
+            profiles: vec![SemanticProfile::Norm],
+            kind,
+            context: "test".into(),
+            antecedent,
+            consequent: "(result)".into(),
+            norm: Some(Norm {
+                context: "test".into(),
+                direction: RecommendationDirection::For,
+                action: Action {
+                    action_type: "administer".into(),
+                    target_concept: ConceptId::new(&variant),
+                    parameters: serde_json::Value::Null,
+                    temporal_constraints: serde_json::Value::Null,
+                    quantity_constraints: serde_json::Value::Null,
+                },
+                recommendation_strength: RecommendationStrength::Strong,
+                evidence_certainty: EvidenceCertainty::Moderate,
+                original_modality_phrase_ja: "投与を推奨する".into(),
+                deontic_projection: DeonticProjection::Recommended,
+                exception_policy: "none".into(),
+                prima_facie_or_all_things_considered: NormCommitment::PrimaFacie,
+            }),
+            priority_over: vec![],
+            exceptions: vec![],
+            temporal_scope: None,
+            population_scope: None,
+            source_span_ids: vec![],
+            provenance: "proptest".into(),
+            certificate_ids: vec![],
+        };
+
+        let term_map = toy_term_map();
+        normalize_with_terms(&mut rule, term_map.clone());
+        let hash1 = content_hash(&rule);
+        let bytes1 = to_canonical_bytes(&rule);
+
+        normalize_with_terms(&mut rule, term_map);
+        let hash2 = content_hash(&rule);
+        let bytes2 = to_canonical_bytes(&rule);
+
+        prop_assert_eq!(hash1, hash2, "NF(NF(rule)) must equal NF(rule) with term_map");
+        prop_assert_eq!(bytes1, bytes2);
     }
 }
