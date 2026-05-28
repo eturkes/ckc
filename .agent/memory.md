@@ -201,3 +201,13 @@ technically derivable but easily forgotten under token pressure.
 - [2026-05-27] User gave a directive and the agent acknowledged it verbally
   but failed to persist it to memory. Any user directive meant for future
   sessions must be written to memory immediately, in the same turn.
+- [2026-05-29] Missing CLI tool → install it in the same turn instead of
+  reaching for a workaround. When `jq` was absent the agent fell back to ad-hoc
+  `python3 -c` one-liners and only installed `jq` after the user interrupted,
+  despite CLAUDE.md granting full permission to install/download anything.
+  Treat "make full use of your capabilities and environment" as standing
+  authorization: always provision the tool the task wants the moment it is
+  missing. This sandbox is apt-based with passwordless sudo (the kernel string
+  reads openSUSE-like but the working package manager is apt), so the path is
+  `sudo apt-get install -y <pkg>`; system-level installs of standard utilities
+  are appropriate and leave no project clutter.
