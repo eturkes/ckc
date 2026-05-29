@@ -14,12 +14,15 @@ use serde_json::{Value, json};
 
 use ckc_compile::{CompileBundle, CompiledTarget, compile_all};
 use ckc_core::canonical::content_hash;
-use ckc_core::enums::ReplayStatus;
+use ckc_core::enums::{CertificateClass, ReplayStatus};
 use ckc_core::id::CertificateId;
 use ckc_core::nf::normalize_all;
 use ckc_core::verify::Certificate;
+use ckc_term::shacl::ShaclReport;
 
-use crate::verdict::{RecordedOutcomes, SolverId, VerifierOutcome, load_recorded_outcomes};
+use crate::verdict::{
+    RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome, load_recorded_outcomes,
+};
 
 /// The committed cvc5 proof of the norm-conflict unsat — recorded evidence (the
 /// live cvc5 re-run in task 0.9.4 is structural, not byte-equal). Its content hash
@@ -151,4 +154,36 @@ pub fn certificates(bundle: &CompileBundle) -> Vec<Certificate> {
     certs.push(certificate_for(&targets[0], cvc5));
 
     certs
+}
+
+/// Build the SHACL rule-shape certificate (task 0.9.10, scenario 6). Wraps the
+/// in-process [`ckc_term::shacl::validate_rules`] `report` in a `C6-ProofObject`
+/// certificate whose single proof artifact is the report itself. This checker runs
+/// in-process and deterministically, so the report is built live (by the caller in
+/// [`crate::witness::shacl_certificate`]) rather than read from the recorded oracle;
+/// `input_artifact_hashes` covers every validated rule and `result` records the
+/// `violations_found` token with the violation count (the `violations_found:2` shape
+/// the eight solver certs' `result` tokens mirror via their appended objectives).
+pub(crate) fn shacl_rules_certificate(report: &ShaclReport, bundle: &CompileBundle) -> Certificate {
+    let input_artifact_hashes = bundle.rules.iter().map(content_hash).collect();
+    let result = format!(
+        "{}:{}",
+        wire_token(VerdictStatus::ViolationsFound),
+        report.violations.len()
+    );
+
+    let mut certificate = Certificate {
+        certificate_id: CertificateId::new("cert_shacl_rules"),
+        certificate_class: CertificateClass::C6ProofObject,
+        input_artifact_hashes,
+        compiler_hash: None,
+        solver_or_checker: "ckc-shacl".to_string(),
+        command_manifest: json!({ "command": "ckc-shacl", "args": ["validate_rules"] }),
+        result,
+        proof_artifact_hashes: vec![content_hash(report)],
+        replay_status: ReplayStatus::Passed,
+        diagnostics: Vec::new(),
+    };
+    normalize_all(&mut certificate);
+    certificate
 }

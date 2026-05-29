@@ -17,8 +17,9 @@ use ckc_core::artifact::ExecutionWitness;
 use ckc_core::enums::RuleKind;
 use ckc_core::id::{BundleId, RuleId, SpanId, WitnessId};
 use ckc_core::nf::normalize_all;
+use ckc_core::verify::Certificate;
 
-use crate::certificate::certificate_for;
+use crate::certificate::{certificate_for, shacl_rules_certificate};
 use crate::verdict::{
     RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome, load_recorded_outcomes,
 };
@@ -172,4 +173,56 @@ pub fn witnesses(bundle: &CompileBundle) -> Vec<ExecutionWitness> {
     ws.push(witness_for(&targets[0], cvc5, bundle));
 
     ws
+}
+
+/// Build the SHACL rule-shape certificate and its execution witness (task 0.9.10,
+/// scenario 6 — missing provenance fails SHACL). Runs the in-process
+/// [`ckc_term::shacl::validate_rules`] over the bundle's rules, wraps the report in a
+/// `C6-ProofObject` certificate ([`shacl_rules_certificate`]), and records a witness
+/// whose `violated_constraints` name the two violated shapes as `<rule>/<path>`,
+/// matching the recorded oracle's SHACL `salient_atoms`. The rule under review
+/// (`rule_incomplete_provenance`) has no source spans — that absence is itself the
+/// violation — so the witness references it through `applicable_rules` and leaves
+/// `source_span_ids` empty rather than inventing a span.
+pub fn shacl_certificate(bundle: &CompileBundle) -> (Certificate, ExecutionWitness) {
+    let report = ckc_term::shacl::validate_rules(&bundle.rules);
+    let certificate = shacl_rules_certificate(&report, bundle);
+
+    // Distinct focus nodes are the rules under review. Dedup explicitly: both
+    // violations share `rule_incomplete_provenance`, and the NF sort does not dedup.
+    let mut focus_nodes: Vec<String> = report
+        .violations
+        .iter()
+        .map(|v| v.focus_node.clone())
+        .collect();
+    focus_nodes.sort();
+    focus_nodes.dedup();
+    let applicable_rules: Vec<RuleId> = focus_nodes.into_iter().map(RuleId::new).collect();
+
+    // Each violated constraint is `<focus_node>/<path>`, the same identifier the
+    // recorded oracle's SHACL outcome carries as a salient atom (task 0.9.2).
+    let violated_constraints: Vec<String> = report
+        .violations
+        .iter()
+        .map(|v| format!("{}/{}", v.focus_node, v.path))
+        .collect();
+
+    let certificate_ids = vec![certificate.certificate_id.clone()];
+
+    let mut witness = ExecutionWitness {
+        witness_id: WitnessId::new(String::new()),
+        bundle_id: BundleId::new("bundle_research_kernel"),
+        case_id: None,
+        context_facts: Vec::new(),
+        trace: Vec::new(),
+        applicable_rules,
+        defeated_rules: Vec::new(),
+        violated_constraints,
+        models: Vec::new(),
+        unsat_cores: Vec::new(),
+        source_span_ids: Vec::new(),
+        certificate_ids,
+    };
+    normalize_all(&mut witness);
+    (certificate, witness)
 }

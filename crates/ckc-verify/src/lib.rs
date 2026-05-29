@@ -20,4 +20,4 @@ pub use ckc_core::verify::Certificate;
 pub use verdict::{
     RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome, load_recorded_outcomes,
 };
-pub use witness::{witness_for, witnesses};
+pub use witness::{shacl_certificate, witness_for, witnesses};
