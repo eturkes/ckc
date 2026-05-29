@@ -63,3 +63,17 @@ pub struct VerifierOutcome {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct RecordedOutcomes(pub Vec<VerifierOutcome>);
+
+/// Load the committed recorded solver-outcome oracle: the 11 Phase-0 verifier
+/// outcomes — the 9 `compile_all` targets in `ARTIFACT_PATHS` order, the cvc5
+/// proof outcome, and the SHACL validation outcome. Embedded at compile time
+/// (`include_str!`), so the oracle needs no filesystem access and stays
+/// byte-locked by the `verifier_outcomes` golden. The verdicts were confirmed
+/// against the installed solvers (the `tests/live_*.rs` of tasks 0.9.3–0.9.7
+/// re-derive and compare them).
+pub fn load_recorded_outcomes() -> RecordedOutcomes {
+    serde_json::from_str(include_str!(
+        "../../../examples/research_kernel/fixtures/verifier_outcomes.json"
+    ))
+    .expect("committed verifier_outcomes.json must deserialize")
+}

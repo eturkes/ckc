@@ -1,0 +1,122 @@
+[
+  {
+    "target_language": "smt_lib",
+    "artifact_path": "logic/smt/norm_conflict.smt2",
+    "solver": "z3",
+    "status": "unsat",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "smt_lib",
+    "artifact_path": "logic/smt/decision_table.smt2",
+    "solver": "z3",
+    "status": "sat",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "smt_lib",
+    "artifact_path": "logic/smt/repair_maxsmt.smt2",
+    "solver": "z3",
+    "status": "sat",
+    "salient_atoms": [],
+    "objective": 1,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "asp",
+    "artifact_path": "logic/asp/defeasible.lp",
+    "solver": "clingo",
+    "status": "satisfiable",
+    "salient_atoms": [
+      "defeated(rule_sepsis_bl_recommend)",
+      "in(arg_rule_bl_anaphylaxis_contra)",
+      "defeated_arg(arg_rule_sepsis_bl_recommend)"
+    ],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "asp",
+    "artifact_path": "logic/asp/event_calculus.lp",
+    "solver": "clingo",
+    "status": "satisfiable",
+    "salient_atoms": [
+      "holdsAt(allergy_known,10)",
+      "violation(conflict_ec_allergy_persistence)"
+    ],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "datalog",
+    "artifact_path": "logic/datalog/priority.dl",
+    "solver": "souffle",
+    "status": "empty_relation",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "lean",
+    "artifact_path": "lean/Ckc/NormConflict.lean",
+    "solver": "lean",
+    "status": "kernel_checked",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C7-Kernel"
+  },
+  {
+    "target_language": "tla_plus",
+    "artifact_path": "logic/tla/Conflict.tla",
+    "solver": "tla_sany",
+    "status": "semantic_check_passed",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "alloy",
+    "artifact_path": "logic/alloy/Priority.als",
+    "solver": "alloy",
+    "status": "no_counterexample",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C4-Executable"
+  },
+  {
+    "target_language": "smt_lib",
+    "artifact_path": "logic/smt/norm_conflict.smt2",
+    "solver": "cvc5",
+    "status": "unsat",
+    "salient_atoms": [],
+    "objective": null,
+    "proof_present": true,
+    "certificate_class": "C6-ProofObject"
+  },
+  {
+    "target_language": "rdf",
+    "artifact_path": "examples/research_kernel/fixtures/shacl_report.json",
+    "solver": "shacl",
+    "status": "violations_found",
+    "salient_atoms": [
+      "rule_incomplete_provenance/provenance",
+      "rule_incomplete_provenance/source_span_ids"
+    ],
+    "objective": null,
+    "proof_present": false,
+    "certificate_class": "C6-ProofObject"
+  }
+]

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecordedOutcomes",
+  "description": "The recorded oracle: every Phase-0 verifier outcome in one array.\nTransparent newtype — serializes as the bare array of outcomes.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/VerifierOutcome"
+  },
+  "$defs": {
+    "CertificateClass": {
+      "description": "Certificate depth class (SPEC 12.2). Higher classes imply lower.\nVariant order matches depth: C0 < C1 < … < C9.",
+      "type": "string",
+      "enum": [
+        "C0-Parsed",
+        "C1-Schema",
+        "C2-Normal",
+        "C3-Grounded",
+        "C4-Executable",
+        "C5-Portfolio",
+        "C6-ProofObject",
+        "C7-Kernel",
+        "C8-Adjudicated",
+        "C9-Assured"
+      ]
+    },
+    "SolverId": {
+      "description": "Identifier of the solver/checker that produced a recorded verdict (SPEC 13).",
+      "type": "string",
+      "enum": [
+        "z3",
+        "cvc5",
+        "clingo",
+        "souffle",
+        "lean",
+        "tla_sany",
+        "alloy",
+        "shacl"
+      ]
+    },
+    "TargetLanguage": {
+      "description": "Target language for CKC compilation (SPEC 14 target compilers).",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "smt_lib",
+            "asp",
+            "datalog",
+            "lean",
+            "tla_plus",
+            "alloy"
+          ]
+        },
+        {
+          "description": "RDF/SHACL export-and-validation target (SPEC 14 `CKC -> RDF/SHACL`).\nEmitted by `ckc-term` and checked by SHACL, so it has no `ckc-compile`\nemitter; the SHACL verifier outcome carries it.",
+          "type": "string",
+          "const": "rdf"
+        }
+      ]
+    },
+    "VerdictStatus": {
+      "description": "Normalized verdict token a Phase-0 backend reports (SPEC 11.1 witness forms,\nSPEC 13 portfolio). One variant per distinct accepted outcome shape the\nrecorded oracle captures across the toy targets.",
+      "type": "string",
+      "enum": [
+        "unsat",
+        "sat",
+        "satisfiable",
+        "no_counterexample",
+        "empty_relation",
+        "semantic_check_passed",
+        "kernel_checked",
+        "violations_found"
+      ]
+    },
+    "VerifierOutcome": {
+      "description": "One recorded verifier outcome over a single compiled target artifact: the\nverdict the named solver produces, the salient model/core atoms worth\nsurfacing, an optional optimization objective (MaxSMT), whether a proof\nartifact accompanies it, and the achieved certificate class.",
+      "type": "object",
+      "properties": {
+        "artifact_path": {
+          "type": "string"
+        },
+        "certificate_class": {
+          "$ref": "#/$defs/CertificateClass"
+        },
+        "objective": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "proof_present": {
+          "type": "boolean"
+        },
+        "salient_atoms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "solver": {
+          "$ref": "#/$defs/SolverId"
+        },
+        "status": {
+          "$ref": "#/$defs/VerdictStatus"
+        },
+        "target_language": {
+          "$ref": "#/$defs/TargetLanguage"
+        }
+      },
+      "required": [
+        "target_language",
+        "artifact_path",
+        "solver",
+        "status",
+        "salient_atoms",
+        "proof_present",
+        "certificate_class"
+      ]
+    }
+  }
+}

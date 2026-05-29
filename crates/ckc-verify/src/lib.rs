@@ -11,4 +11,6 @@ pub mod verdict;
 
 pub use ckc_core::canonical::{ContentHash, content_hash};
 pub use ckc_core::enums::{CertificateClass, TargetLanguage};
-pub use verdict::{RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome};
+pub use verdict::{
+    RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome, load_recorded_outcomes,
+};

@@ -180,6 +180,10 @@ pub enum TargetLanguage {
     Lean,
     TlaPlus,
     Alloy,
+    /// RDF/SHACL export-and-validation target (SPEC 14 `CKC -> RDF/SHACL`).
+    /// Emitted by `ckc-term` and checked by SHACL, so it has no `ckc-compile`
+    /// emitter; the SHACL verifier outcome carries it.
+    Rdf,
 }
 
 #[cfg(test)]

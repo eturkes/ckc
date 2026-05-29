@@ -159,6 +159,7 @@ pub fn replay_command(lang: TargetLanguage) -> String {
         TargetLanguage::Lean => "lean",
         TargetLanguage::TlaPlus => "tla_plus",
         TargetLanguage::Alloy => "alloy",
+        TargetLanguage::Rdf => "rdf",
     };
     format!("ckc compile examples/research_kernel --target {target}")
 }

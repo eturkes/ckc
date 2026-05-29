@@ -112,14 +112,23 @@
     },
     "TargetLanguage": {
       "description": "Target language for CKC compilation (SPEC 14 target compilers).",
-      "type": "string",
-      "enum": [
-        "smt_lib",
-        "asp",
-        "datalog",
-        "lean",
-        "tla_plus",
-        "alloy"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "smt_lib",
+            "asp",
+            "datalog",
+            "lean",
+            "tla_plus",
+            "alloy"
+          ]
+        },
+        {
+          "description": "RDF/SHACL export-and-validation target (SPEC 14 `CKC -> RDF/SHACL`).\nEmitted by `ckc-term` and checked by SHACL, so it has no `ckc-compile`\nemitter; the SHACL verifier outcome carries it.",
+          "type": "string",
+          "const": "rdf"
+        }
       ]
     }
   }

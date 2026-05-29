@@ -314,9 +314,24 @@ technically derivable but easily forgotten under token pressure.
   mechanical to extract when 0.13 replay warrants it. RDF/SHACL are NOT rebuilt:
   `ckc-term::{rdf,shacl}` already emit `terminology.ttl` + `shacl_report.json`
   (scenario 6: `rule_incomplete_provenance` → exactly 2 violations); 0.9.10 only
-  wraps that report in a C6 certificate. No ckc-core changes needed — Certificate
-  /ExecutionWitness/AssuranceNode/CertificateClass and every persistence
-  ArtifactKind already exist.
+  wraps that report in a C6 certificate. Certificate/ExecutionWitness/
+  AssuranceNode/CertificateClass and every persistence ArtifactKind already
+  exist. CORRECTION (0.9.2, user decision): one ckc-core change WAS needed — the
+  SHACL `VerifierOutcome` has no representable `target_language` (the 6-variant
+  `TargetLanguage` lacked RDF/SHACL), so a `Rdf` variant was added to
+  `ckc_core::enums::TargetLanguage`. Ripple stayed minimal and contained: one new
+  `replay_command` arm (`Rdf => "rdf"`, the only exhaustive match) + regen of the
+  two schemas embedding the enum (`compiled_target.schema.json`,
+  `compile_portfolio_manifest.schema.json`); no value goldens shifted. cvc5's
+  outcome is `SmtLib` (over the `.smt2`); only SHACL carries `Rdf`.
+- [2026-05-30] Cargo integration tests (`crates/<c>/tests/*.rs`) can `use` the
+  crate's normal `[dependencies]` directly, not just `[dev-dependencies]` —
+  proven by `ckc-compile/tests/manifest.rs` doing `use ckc_core::canonical::…`
+  while ckc-compile lists ckc-core only under `[dependencies]`. So a golden
+  harness in `ckc-verify/tests/` reaches `ckc_core::canonical::{content_hash,
+  to_canonical_bytes}` with no dev-dep or re-export needed. (Task 0.9.1 routed
+  everything through `ckc_verify` re-exports, which is fine but not required;
+  prefer the direct `use ckc_core::…` when copying the manifest.rs harness.)
 
 ## Mistakes
 
