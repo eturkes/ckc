@@ -7,11 +7,14 @@
 //! live solvers run only in PATH-guarded `tests/live_*.rs` that re-derive
 //! verdicts (via [`runner`]) and compare against the oracle.
 
+pub mod certificate;
 pub mod runner;
 pub mod verdict;
 
+pub use certificate::{certificate_for, certificates};
 pub use ckc_core::canonical::{ContentHash, content_hash};
 pub use ckc_core::enums::{CertificateClass, TargetLanguage};
+pub use ckc_core::verify::Certificate;
 pub use verdict::{
     RecordedOutcomes, SolverId, VerdictStatus, VerifierOutcome, load_recorded_outcomes,
 };
