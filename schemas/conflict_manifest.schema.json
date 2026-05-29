@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConflictManifest",
+  "description": "The Phase-0 conflict manifest (SPEC 15, 25): every detected conflict and\nargument-graph artifact paired with its committed `certs/` path and content\nhash. One compact golden over this manifest byte-locks the whole conflict\nartifact set through its hashes. Transparent newtype — serializes as the bare\narray of entries.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/ConflictManifestEntry"
+  },
+  "$defs": {
+    "ConflictManifestEntry": {
+      "description": "One row of the [`ConflictManifest`]: a single committed `certs/` conflict or\nargument-graph artifact, tagged by kind and byte-locked through the\n`content_hash` of its canonical form. Mirrors `ckc_verify::VerificationEntry`.",
+      "type": "object",
+      "properties": {
+        "artifact_kind": {
+          "type": "string"
+        },
+        "artifact_path": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        }
+      },
+      "required": [
+        "artifact_kind",
+        "artifact_path",
+        "content_hash"
+      ]
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    }
+  }
+}
