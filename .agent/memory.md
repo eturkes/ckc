@@ -224,6 +224,19 @@ technically derivable but easily forgotten under token pressure.
   natural `apt-get install clingo` attempt into a dead-end. Task 0.9 runs clingo;
   install it from `gringo`. (clingo 5.6.2 is installed in the current sandbox.)
 
+- [2026-05-29] TLA+ tooling for task 0.9 verification: `java` is present in the
+  sandbox; there is no apt package or LSP for TLA+ (LSP absence already noted
+  above). The SANY syntax+semantic checker is class `tla2sany.SANY` inside
+  `tla2tools.jar`, fetched from
+  `https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar`
+  (the same jar `tlaplus/vscode-tlaplus` shells out to; it also bundles TLC).
+  Invoke `java -cp tla2tools.jar tla2sany.SANY <file.tla>`; on success it prints
+  only `Parsing file …` / `Semantic processing of module …` and exits 0, and
+  emits explicit error lines on failure. Verified this session against the
+  0.8.11 emitter output (`logic/tla/Conflict.tla`): parses and semantically
+  processes with zero errors. The PATH/jar-guarded run belongs to 0.9 so
+  solver-less containers stay green; install pattern mirrors the gringo note.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
