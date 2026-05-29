@@ -1,0 +1,15 @@
+; CKC -> SMT-LIB norm conflict: conflict_norm_bl_contradiction
+; rule_sepsis_bl_recommend (for/recommended) vs rule_bl_anaphylaxis_contra (against/prohibited)
+; shared context: (dx sepsis) AND (allergy_history beta_lactam anaphylaxis)
+; check-sat is unsat: the norms cannot coexist absent a priority rule
+(set-logic QF_UF)
+(declare-const allergy_history_beta_lactam_anaphylaxis Bool)
+(declare-const dx_sepsis Bool)
+(declare-const prohibit_administer_beta_lactam Bool)
+(declare-const recommend_administer_beta_lactam Bool)
+(assert dx_sepsis)
+(assert allergy_history_beta_lactam_anaphylaxis)
+(assert (=> dx_sepsis recommend_administer_beta_lactam))
+(assert (=> allergy_history_beta_lactam_anaphylaxis prohibit_administer_beta_lactam))
+(assert (not (and recommend_administer_beta_lactam prohibit_administer_beta_lactam)))
+(check-sat)

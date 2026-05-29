@@ -104,6 +104,23 @@ pub fn compile_all(bundle: &CompileBundle) -> Vec<CompiledTarget> {
     ]
 }
 
+/// Canonical repository-relative path of each [`compile_all`] target's
+/// committed artifact file, in portfolio order. The committed `logic/*` and
+/// `lean/Ckc/*` files (task 0.8.14), the portfolio manifest (task 0.8.15), and
+/// CAS persistence (task 0.8.16) index targets by this position, so this array
+/// stays aligned with the [`compile_all`] emitter order element-for-element.
+pub const ARTIFACT_PATHS: [&str; 9] = [
+    "logic/smt/norm_conflict.smt2",
+    "logic/smt/decision_table.smt2",
+    "logic/smt/repair_maxsmt.smt2",
+    "logic/asp/defeasible.lp",
+    "logic/asp/event_calculus.lp",
+    "logic/datalog/priority.dl",
+    "lean/Ckc/NormConflict.lean",
+    "logic/tla/Conflict.tla",
+    "logic/alloy/Priority.als",
+];
+
 /// Canonical replay command that regenerates a target artifact through the
 /// `ckc` CLI (SPEC 14 replay command, SPEC 18 `ckc compile`). The `--target`
 /// token is the snake_case `TargetLanguage` wire form that downstream goldens

@@ -1,0 +1,15 @@
+// CKC -> Datalog/Souffle priority-cycle analysis: conflict_norm_bl_contradiction priority graph
+// One priority_over(sup,inf) input fact per rule superiority edge:
+//   rule_bl_anaphylaxis_contra > rule_sepsis_bl_recommend
+// reaches is the transitive closure of priority_over; cycle(R) holds when a rule
+// reaches itself. The toy superiority is a single edge, so cycle is empty -> the
+// priority graph is acyclic (SPEC 15.1 cyclic/contradictory priority relations).
+// Emit-only: the souffle parse/run is task 0.9.
+.decl priority_over(sup:symbol, inf:symbol)
+priority_over("rule_bl_anaphylaxis_contra","rule_sepsis_bl_recommend").
+.decl reaches(src:symbol, dst:symbol)
+reaches(X,Y) :- priority_over(X,Y).
+reaches(X,Z) :- priority_over(X,Y), reaches(Y,Z).
+.decl cycle(r:symbol)
+cycle(R) :- reaches(R,R).
+.output cycle
