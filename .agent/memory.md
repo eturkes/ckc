@@ -237,6 +237,24 @@ technically derivable but easily forgotten under token pressure.
   processes with zero errors. The PATH/jar-guarded run belongs to 0.9 so
   solver-less containers stay green; install pattern mirrors the gringo note.
 
+- [2026-05-29] Alloy tooling for task 0.9 verification: the org.alloytools
+  distribution jar is at `~/.local/share/alloy/alloy.jar` (v6.2.0; `java` is
+  present). It ships a headless CLI (Main-Class
+  `org.alloytools.alloy.core.infra.Alloy`): invoke
+  `java -jar alloy.jar exec <file.als>` (add `-Djava.awt.headless=true` for
+  safety). It prints one line per command, e.g.
+  `00. check NoPriorityCycle    0    UNSAT`. For a `check`, `UNSAT` means NO
+  counterexample exists (assertion holds); `SAT` would report a counterexample.
+  So the 0.8.12 emitter's `logic/alloy/Priority.als` acyclicity check returns
+  UNSAT — the witnessed-acyclic result, the Alloy analog of the empty Soufflé
+  `cycle` relation. The demo class
+  `edu.mit.csail.sdg.alloy4whole.ExampleUsingTheCompiler` is NOT in this jar;
+  use the `exec` subcommand. Verified this session against the emitted stub.
+  Side effect: `exec` writes a `<ModuleName>/receipt.json` (here `Priority/`)
+  into the CWD, so run it from a scratch/run dir to avoid polluting the repo
+  root. The jar-guarded run belongs to 0.9 so solver-less containers stay green;
+  mirrors the gringo/SANY notes.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
