@@ -49,9 +49,23 @@ pub fn run_z3(artifact_abs: &Path) -> anyhow::Result<RunResult> {
     capture(cmd)
 }
 
-/// Decode z3's leading verdict token into a [`VerdictStatus`]: `unsat` -> `Unsat`,
-/// `sat` -> `Sat`. Returns `None` for `unknown` or any other first token.
-pub fn parse_z3_status(stdout: &str) -> Option<VerdictStatus> {
+/// Run cvc5 over one SMT-LIB artifact with proof production:
+/// `cvc5 --produce-proofs --dump-proofs <artifact_abs>`. cvc5 prints the standard
+/// SMT-LIB verdict token (`unsat`) followed by an Alethe-style proof whose steps
+/// carry `:rule` annotations; [`parse_smt_status`] decodes the token and
+/// [`cvc5_proof_present`] confirms the proof block (the C6 proof-object signal).
+pub fn run_cvc5_proof(artifact_abs: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("cvc5");
+    cmd.args(["--produce-proofs", "--dump-proofs"])
+        .arg(artifact_abs);
+    capture(cmd)
+}
+
+/// Decode an SMT-LIB solver's leading `(check-sat)` response token into a
+/// [`VerdictStatus`]: `unsat` -> `Unsat`, `sat` -> `Sat`. Returns `None` for
+/// `unknown` or any other first token. Shared by the z3 and cvc5 runners, which
+/// both print the standard SMT-LIB verdict token first.
+pub fn parse_smt_status(stdout: &str) -> Option<VerdictStatus> {
     match stdout.split_whitespace().next()? {
         "unsat" => Some(VerdictStatus::Unsat),
         "sat" => Some(VerdictStatus::Sat),
@@ -69,6 +83,14 @@ pub fn parse_z3_objective(stdout: &str) -> Option<i64> {
         .replace(['(', ')'], " ")
         .split_whitespace()
         .find_map(|tok| tok.parse::<i64>().ok())
+}
+
+/// Report whether cvc5's dumped proof carries explicit derivation steps. cvc5
+/// prints each Alethe proof step with a `:rule` annotation, so the substring's
+/// presence is the structural proof-object signal recorded as `proof_present`
+/// (certificate class C6).
+pub fn cvc5_proof_present(stdout: &str) -> bool {
+    stdout.contains(":rule")
 }
 
 /// Assert that a live-derived outcome matches its recorded oracle entry: the

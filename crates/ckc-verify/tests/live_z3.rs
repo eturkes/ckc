@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 
 use ckc_verify::runner::{
-    assert_matches_recorded, parse_z3_objective, parse_z3_status, run_z3, solver_available,
+    assert_matches_recorded, parse_smt_status, parse_z3_objective, run_z3, solver_available,
 };
 use ckc_verify::{RecordedOutcomes, SolverId, VerifierOutcome, load_recorded_outcomes};
 
@@ -45,7 +45,7 @@ fn z3_smt_verdicts_match_recorded() {
     for recorded in z3_outcomes {
         let abs = root.join(&recorded.artifact_path);
         let run = run_z3(&abs).expect("z3 run completes");
-        let status = parse_z3_status(&run.stdout)
+        let status = parse_smt_status(&run.stdout)
             .unwrap_or_else(|| panic!("z3 reports sat/unsat for {}", recorded.artifact_path));
         let objective = parse_z3_objective(&run.stdout);
         let live = VerifierOutcome {
