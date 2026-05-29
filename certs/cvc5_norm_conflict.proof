@@ -1,0 +1,18 @@
+unsat
+(
+(declare-const prohibit_administer_beta_lactam Bool)
+(declare-const recommend_administer_beta_lactam Bool)
+(declare-const allergy_history_beta_lactam_anaphylaxis Bool)
+(declare-const dx_sepsis Bool)
+(assume @p1 dx_sepsis)
+(assume @p2 allergy_history_beta_lactam_anaphylaxis)
+(assume @p3 (=> dx_sepsis recommend_administer_beta_lactam))
+(assume @p4 (=> allergy_history_beta_lactam_anaphylaxis prohibit_administer_beta_lactam))
+(assume @p5 (not (and recommend_administer_beta_lactam prohibit_administer_beta_lactam)))
+(step @p6 :rule implies_elim :premises (@p4))
+(step @p7 :rule resolution :premises (@p6 @p2) :args (false allergy_history_beta_lactam_anaphylaxis))
+(step @p8 :rule implies_elim :premises (@p3))
+(step @p9 :rule resolution :premises (@p8 @p1) :args (false dx_sepsis))
+(step @p10 :rule and_intro :premises (@p9 @p7))
+(step @p11 false :rule contra :premises (@p10 @p5))
+)
