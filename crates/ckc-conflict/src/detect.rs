@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use ckc_core::artifact::{DecisionRow, DecisionTable};
+use ckc_core::artifact::{DecisionRow, DecisionTable, EventNarrative};
 use ckc_core::clinical::Rule;
 use ckc_core::enums::{
     ConflictClassification, HitPolicy, RecommendationDirection, RuleKind, Severity,
@@ -313,6 +313,157 @@ pub fn detect_decision_table_defects(
         repair_candidates: repair::repair_candidates("decision_table_overlap", oracle),
         solver_evidence: oracle.solver_evidence.clone(),
         argument_graph_id: None,
+        human_review_question_ja: oracle.human_review_question_ja.clone(),
+        human_review_question_en: oracle.human_review_question_en.clone(),
+        classification: ConflictClassification::TrueConflict,
+    };
+    normalize_all(&mut conflict);
+    vec![conflict]
+}
+
+/// The Event-Calculus certificate key (SPEC 15.1 #6/#7): the clingo check over the
+/// `logic/asp/event_calculus.lp` narrative target — the deterministic
+/// `cert_clingo_event_calculus` id the 0.9 builder emits. [`link::witness_for_cert`]
+/// and [`link::minimal_artifact_set`] resolve it to the real EC witness and
+/// certificate hash that replace the toy `conflicts.json` placeholders.
+const EC_CERT_KEY: &str = "cert_clingo_event_calculus";
+
+/// The violated-constraint name the recorded EC witness carries when the
+/// contraindication fluent persists through drug administration — the
+/// `violation(<conflict>)` atom argument the 0.9 clingo EC outcome surfaces. The
+/// detector cross-checks it against the witness so detection rests on the recorded
+/// solver verdict, not merely the oracle carrying the class.
+const EC_VIOLATION: &str = "conflict_ec_allergy_persistence";
+
+/// The happens-time of the `administer_drug` event in `narrative` — the moment the
+/// drug is given. `None` when the narrative schedules no such event.
+fn administer_time(narrative: &EventNarrative) -> Option<f64> {
+    narrative
+        .happens
+        .iter()
+        .find(|h| h.get("event").and_then(Value::as_str) == Some("administer_drug"))
+        .and_then(|h| h.get("time").and_then(Value::as_f64))
+}
+
+/// Whether `fluent` genuinely holds at time `t` under Event-Calculus persistence: an
+/// event initiates it at some time at or before `t`, and no event terminates it at a
+/// time before `t`. Once initiated and never clipped, the fluent persists to `t`.
+fn persists_until(narrative: &EventNarrative, fluent: &str, t: f64) -> bool {
+    let initiated = narrative.initiates.iter().any(|i| {
+        i.get("fluent").and_then(Value::as_str) == Some(fluent)
+            && i.get("time")
+                .and_then(Value::as_f64)
+                .is_some_and(|ti| ti <= t)
+    });
+    let cleared = narrative.terminates.iter().any(|term| {
+        term.get("fluent").and_then(Value::as_str) == Some(fluent)
+            && term
+                .get("time")
+                .and_then(Value::as_f64)
+                .is_some_and(|tt| tt < t)
+    });
+    initiated && !cleared
+}
+
+/// Whether `narrative` exhibits the allergy-persistence temporal violation
+/// (SPEC 15.1 #6/#7): a `holds_query` asserts a fluent still holds (`expected = true`)
+/// at the `administer_drug` time, and that fluent — initiated earlier and terminated
+/// by no event before then ([`persists_until`]) — genuinely persists there, so the
+/// contraindication is active when the drug is given. Over the toy bundle the single
+/// narrative satisfies this for `allergy_known` at t = 10. Exposed so the bundle-side
+/// scan is checkable independently of the curated oracle (part of the task-0.10.7
+/// detection-agreement gate).
+pub fn allergy_persists_at_administration(narrative: &EventNarrative) -> bool {
+    let Some(t_admin) = administer_time(narrative) else {
+        return false;
+    };
+    narrative.holds_queries.iter().any(|q| {
+        q.get("expected").and_then(Value::as_bool) == Some(true)
+            && q.get("time").and_then(Value::as_f64) == Some(t_admin)
+            && q.get("fluent")
+                .and_then(Value::as_str)
+                .is_some_and(|f| persists_until(narrative, f, t_admin))
+    })
+}
+
+/// The violated-constraint names the recorded Event-Calculus witness carries — the
+/// `violation(<conflict>)` atom arguments the clingo EC run surfaced, behind
+/// [`EC_CERT_KEY`]. Over the toy bundle this is `["conflict_ec_allergy_persistence"]`;
+/// empty when the report carries no EC witness. Exposed so the report-side cross-check
+/// is checkable independently of the curated oracle (part of the task-0.10.7
+/// detection-agreement gate).
+pub fn ec_violated_constraints(report: &VerificationReport) -> Vec<String> {
+    report
+        .witnesses
+        .iter()
+        .find(|w| w.certificate_ids.iter().any(|c| c.as_str() == EC_CERT_KEY))
+        .map(|w| w.violated_constraints.clone())
+        .unwrap_or_default()
+}
+
+/// Detect the Event-Calculus temporal violation (SPEC 15.1 #6/#7): the persistence
+/// defect where the contraindication fluent `allergy_known`, initiated at the
+/// allergy-detection event and never terminated, still holds when `administer_drug`
+/// fires — so the drug is given under an active contraindication.
+///
+/// Detection is twofold and both halves must agree: the bundle's single narrative
+/// must exhibit the persistence ([`allergy_persists_at_administration`]) and the
+/// recorded EC witness must name [`EC_VIOLATION`] among its [`ec_violated_constraints`].
+/// With either absent the scan reports nothing. On a hit it assembles one [`Conflict`]
+/// with the computed verdict — `conflict_type = "temporal_violation"`,
+/// `classification = TrueConflict`, `severity = High` — and the real evidence linkage
+/// from `report`: the EC witness behind [`EC_CERT_KEY`] ([`link::witness_for_cert`])
+/// and that certificate's hash ([`link::minimal_artifact_set`]), replacing the toy
+/// `conflicts.json` placeholders. The curated `source_spans`, `confidence`,
+/// `normalized_view`, `solver_evidence`, and JA/EN review questions come from the
+/// matching oracle — whose `source_spans` cover the narrative's own
+/// `source_span_ids` (asserted) — and the source-revision [`repair::repair_candidates`]
+/// and normalized Dung [`argument::build_argument_graph`] back the conflict.
+/// [`normalize_all`] then assigns the content-derived `nf-…` `conflict_id`.
+pub fn detect_temporal_violation(
+    bundle: &CompileBundle,
+    report: &VerificationReport,
+) -> Vec<Conflict> {
+    // Detection drives emission: the narrative must show the persistence AND the
+    // recorded EC witness must name the violation, not merely the oracle carrying it.
+    let Some(narrative) = bundle.event_narratives.first() else {
+        return Vec::new();
+    };
+    if !allergy_persists_at_administration(narrative)
+        || !ec_violated_constraints(report)
+            .iter()
+            .any(|c| c == EC_VIOLATION)
+    {
+        return Vec::new();
+    }
+    let oracle = conflict_oracle(bundle, "temporal_violation");
+
+    // The curated oracle's source spans must cover the narrative's own spans, so the
+    // conflict's grounding subsumes the narrative it was detected from. A divergent
+    // fixture surfaces here as a build-time bug, mirroring `conflict_oracle`.
+    for span in &narrative.source_span_ids {
+        assert!(
+            oracle
+                .source_spans
+                .iter()
+                .any(|s| s.as_str() == span.as_str()),
+            "temporal-violation oracle source_spans must cover narrative span {}",
+            span.as_str()
+        );
+    }
+
+    let mut conflict = Conflict {
+        conflict_id: oracle.conflict_id.clone(),
+        conflict_type: "temporal_violation".to_string(),
+        severity: Severity::High,
+        confidence: oracle.confidence,
+        minimal_artifact_set: link::minimal_artifact_set(report, &[EC_CERT_KEY]),
+        source_spans: oracle.source_spans.clone(),
+        normalized_view: oracle.normalized_view.clone(),
+        witness: link::witness_for_cert(report, EC_CERT_KEY),
+        repair_candidates: repair::repair_candidates("temporal_violation", oracle),
+        solver_evidence: oracle.solver_evidence.clone(),
+        argument_graph_id: Some(argument::build_argument_graph(bundle).argument_graph_id),
         human_review_question_ja: oracle.human_review_question_ja.clone(),
         human_review_question_en: oracle.human_review_question_en.clone(),
         classification: ConflictClassification::TrueConflict,
