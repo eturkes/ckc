@@ -217,6 +217,13 @@ technically derivable but easily forgotten under token pressure.
   checks of emitted artifacts during emit subtasks (CLAUDE.md standing
   authorization).
 
+- [2026-05-29] Solver provisioning gotcha (fresh container): the `clingo` binary
+  ships in the Debian apt package **`gringo`** (`sudo apt-get install -y gringo`
+  installs `clasp` + `/usr/bin/{clingo,gringo,iclingo,oclingo,lpconvert,reify}`).
+  `apt-cache policy clingo` reports `Candidate: (none)`, which misleads the
+  natural `apt-get install clingo` attempt into a dead-end. Task 0.9 runs clingo;
+  install it from `gringo`. (clingo 5.6.2 is installed in the current sandbox.)
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
