@@ -32,10 +32,11 @@ fn cvc5_proof() -> &'static str {
 }
 
 /// Snake_case wire token of a Copy enum, read from its `Serialize` impl so the
-/// string never drifts from the recorded oracle's wire form. Drives both the
-/// `cert_<solver>_…` id prefix / `solver_or_checker` field (over [`SolverId`]) and
-/// the `result` verdict token (over `VerdictStatus`).
-fn wire_token<T: Serialize>(value: T) -> String {
+/// string never drifts from the recorded oracle's wire form. Shared across the
+/// verification crate: the `cert_<solver>_…` id prefix / `solver_or_checker`
+/// field and the `result` verdict token here, and the backend-sort key plus the
+/// disagreement summary in [`crate::portfolio`].
+pub(crate) fn wire_token<T: Serialize>(value: T) -> String {
     match serde_json::to_value(value) {
         Ok(Value::String(s)) => s,
         _ => unreachable!("oracle enums serialize to a JSON string"),
