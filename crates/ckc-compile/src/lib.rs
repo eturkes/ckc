@@ -8,10 +8,12 @@
 
 use ckc_core::artifact::{DecisionTable, EventNarrative};
 use ckc_core::clinical::Rule;
-use ckc_core::compile::CompiledTarget;
-use ckc_core::enums::TargetLanguage;
 use ckc_core::source::{Concept, SourceSpan};
 use ckc_core::verify::Conflict;
+
+pub use ckc_core::canonical::{ContentHash, content_hash};
+pub use ckc_core::compile::{CompilationMap, CompiledTarget, SymbolMapping};
+pub use ckc_core::enums::TargetLanguage;
 
 const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
 const CONCEPTS_JSON: &str =
@@ -88,4 +90,37 @@ pub fn replay_command(lang: TargetLanguage) -> String {
         TargetLanguage::Alloy => "alloy",
     };
     format!("ckc compile examples/research_kernel --target {target}")
+}
+
+/// Assemble a [`CompiledTarget`] from an emitter's text and symbol map, filling
+/// the emit-only invariants every Phase-0 compiler shares: the canonical
+/// [`replay_command`] for `target_language`, an empty diagnostics list, and an
+/// absent `target_parse_ok` (the PATH-guarded target parse check belongs to
+/// task 0.9). The four passed fields are stored verbatim.
+pub fn build_target(
+    target_language: TargetLanguage,
+    artifact_text: String,
+    compilation_map: CompilationMap,
+    source_artifact_hashes: Vec<ContentHash>,
+) -> CompiledTarget {
+    CompiledTarget {
+        target_language,
+        artifact_text,
+        compilation_map,
+        diagnostics: Vec::new(),
+        source_artifact_hashes,
+        replay_command: replay_command(target_language),
+        target_parse_ok: None,
+    }
+}
+
+/// Build a deterministic text block: sort `lines` lexicographically, join them
+/// with `'\n'`, and terminate with a single trailing `'\n'`. Every text emitter
+/// reuses this for declaration/fact blocks so a block's bytes depend only on its
+/// contents, not on the order an emitter discovers them.
+pub fn sorted_lines(mut lines: Vec<String>) -> String {
+    lines.sort();
+    let mut block = lines.join("\n");
+    block.push('\n');
+    block
 }
