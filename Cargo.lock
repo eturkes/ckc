@@ -301,6 +301,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckc-conflict"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "ckc-compile",
+ "ckc-core",
+ "ckc-store",
+ "ckc-verify",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "ckc-core"
 version = "0.0.0"
 dependencies = [
