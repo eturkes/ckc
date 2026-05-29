@@ -286,6 +286,38 @@ technically derivable but easily forgotten under token pressure.
   regenerate`); committed `logic/*`+`lean/*` files and the persistence test
   (live hashes) stay correct untouched.
 
+- [2026-05-30] Task 0.9 solver runbook (all verifiers now installed in this
+  sandbox; complements the gringo/alloy/SANY provisioning notes above). Paths:
+  z3 `/usr/bin/z3`, clingo `/usr/bin/clingo`, souffle `/usr/bin/souffle`, java
+  `/usr/bin/java`; cvc5 `~/.local/bin/cvc5` (proof flags `--produce-proofs
+  --dump-proofs [--proof-format-mode=alethe]`); lean/lake `~/.local/bin/{lean,
+  lake}` via elan; jars `~/.local/share/alloy/alloy.jar` (`java -jar … exec
+  <f.als>`) and `~/.local/share/tla/tla2tools.jar` (`java -cp … tla2sany.SANY
+  <f.tla>`, newly fetched this session). All resolvable on the non-interactive
+  base PATH. RUN GOTCHAS: clingo exits 30 (not 0) on SAT — assert on the
+  `SATISFIABLE` stdout token + model atoms, accept exit ∈ {10,30}; souffle writes
+  `cycle.csv` and alloy writes a `<Module>/` dir relative to CWD — run both from
+  a throwaway TempDir CWD; a single import-free Lean file kernel-checks via bare
+  `lean <file>` (no lakefile/lake project; only `import Mathlib`/cross-file deps
+  would need one). The per-target recorded toy verdicts live in roadmap 0.9.2 /
+  `verifier_outcomes.json`.
+- [2026-05-30] Task 0.9 design rationale (Type A plan): determinism via a
+  RECORDED-ORACLE — accepted Certificates/ExecutionWitnesses are built from
+  committed canonicalized verdicts (`verifier_outcomes.json`), never from live
+  solver stdout (z3 model order / cvc5 proof bytes drift run-to-run and would
+  break the 0.13 replay-hash acceptance). Live solvers run ONLY in PATH-guarded
+  auto-skip `tests/live_*.rs` that re-derive verdicts and compare to the oracle;
+  0.9.3 introduces `runner::solver_available(bin)` (spawn `bin --version`, false
+  on spawn error) as the repo's first binary-guard idiom (none existed; mirrors
+  the emit-only stance of 0.8). Scope: ONE crate `crates/ckc-verify/`; SPEC §19
+  `ckc-cert` deferred — its concerns live as `graph`/`assurance` modules,
+  mechanical to extract when 0.13 replay warrants it. RDF/SHACL are NOT rebuilt:
+  `ckc-term::{rdf,shacl}` already emit `terminology.ttl` + `shacl_report.json`
+  (scenario 6: `rule_incomplete_provenance` → exactly 2 violations); 0.9.10 only
+  wraps that report in a C6 certificate. No ckc-core changes needed — Certificate
+  /ExecutionWitness/AssuranceNode/CertificateClass and every persistence
+  ArtifactKind already exist.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
