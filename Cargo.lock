@@ -357,6 +357,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckc-verify"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "ckc-compile",
+ "ckc-core",
+ "ckc-store",
+ "ckc-term",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "clap"
 version = "4.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

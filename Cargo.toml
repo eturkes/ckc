@@ -7,6 +7,7 @@ members = [
     "crates/ckc-store",
     "crates/ckc-retrieve",
     "crates/ckc-term",
+    "crates/ckc-verify",
 ]
 
 [workspace.package]
