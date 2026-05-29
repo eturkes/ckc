@@ -67,7 +67,10 @@ fn every_source_rule_resolves_to_a_bundle_rule() {
     for argument in &graph.arguments {
         if let Some(source_rule) = argument.get("source_rule").and_then(Value::as_str) {
             assert!(
-                bundle.rules.iter().any(|r| r.rule_id.as_str() == source_rule),
+                bundle
+                    .rules
+                    .iter()
+                    .any(|r| r.rule_id.as_str() == source_rule),
                 "argument source_rule {source_rule} is not a bundle rule id"
             );
         }

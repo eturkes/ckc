@@ -48,7 +48,10 @@ pub fn build_argument_graph(bundle: &CompileBundle) -> ArgumentGraph {
     for argument in &graph.arguments {
         if let Some(source_rule) = argument.get("source_rule").and_then(Value::as_str) {
             assert!(
-                bundle.rules.iter().any(|r| r.rule_id.as_str() == source_rule),
+                bundle
+                    .rules
+                    .iter()
+                    .any(|r| r.rule_id.as_str() == source_rule),
                 "argument source_rule {source_rule} must resolve to a bundle rule"
             );
         }
@@ -57,7 +60,10 @@ pub fn build_argument_graph(bundle: &CompileBundle) -> ArgumentGraph {
     // Ground every source span in bundle.spans.
     for span in &graph.source_span_ids {
         assert!(
-            bundle.spans.iter().any(|s| s.span_id.as_str() == span.as_str()),
+            bundle
+                .spans
+                .iter()
+                .any(|s| s.span_id.as_str() == span.as_str()),
             "argument graph source span {} must resolve to a bundle span",
             span.as_str()
         );
