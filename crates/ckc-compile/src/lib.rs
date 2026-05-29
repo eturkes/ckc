@@ -15,6 +15,8 @@ pub use ckc_core::canonical::{ContentHash, content_hash};
 pub use ckc_core::compile::{CompilationMap, CompiledTarget, SymbolMapping};
 pub use ckc_core::enums::TargetLanguage;
 
+pub mod smt;
+
 const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
 const CONCEPTS_JSON: &str =
     include_str!("../../../examples/research_kernel/fixtures/concepts.json");
