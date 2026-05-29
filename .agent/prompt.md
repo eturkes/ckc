@@ -3,7 +3,8 @@ following files to load context, then determine your session type.
 
 ## Step 1: Load context
 
-Read `SPEC.md`, `.agent/memory.md`, `.agent/roadmap.md`, and `git show HEAD`.
+Read `SPEC.md`, `.agent/memory.md`, and `.agent/roadmap.md`. Once Step 2 selects
+your session type, read any further git history that type names.
 
 ## Step 2: Determine session type
 
@@ -48,8 +49,9 @@ recorded. End the session.
 
 ## Type B — Complete one subtask
 
-Complete exactly the first incomplete subtask of `T`: do the work and pass its
-gate. Right before staging, run `python3 .agent/context_window.py`; in the same
+Read `git show HEAD` to see the previous subtask's commit and match its
+patterns. Complete exactly the first incomplete subtask of `T`: do the work and
+pass its gate. Right before staging, run `python3 .agent/context_window.py`; in the same
 roadmap edit that marks the subtask `[x]`, append its `(NNNK/200K)` output
 verbatim to the end of that subtask's line. Mark `T` `[x]` too when this was its
 last incomplete subtask. Leave all subtask lines in place for the later review
