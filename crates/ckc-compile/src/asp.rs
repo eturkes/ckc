@@ -1,10 +1,16 @@
 //! CKC → ASP/Clingo emitters (SPEC 13.3, 14).
 //!
-//! Phase-0 task 0.8: the defeasible + argumentation encoding
-//! (`emit_defeasible`). `CompileBundle` carries no argument graph, so the
+//! Phase-0 task 0.8: the defeasible + argumentation encoding (`emit_defeasible`)
+//! and the Event Calculus persistence/clipping narrative
+//! (`emit_event_calculus`). `CompileBundle` carries no argument graph, so the
 //! Dung-style argumentation view is derived here from the toy rules' superiority
-//! relation. Emit-only — the clingo run, stable-model recovery, and
-//! grounded-extension extraction belong to task 0.9.
+//! relation. Emit-only — the clingo run, stable-model recovery,
+//! grounded-extension extraction, and holdsAt/violation witness recovery belong
+//! to task 0.9.
+
+use std::collections::BTreeMap;
+
+use serde_json::Value;
 
 use crate::{
     CompilationMap, CompileBundle, CompiledTarget, SymbolMapping, TargetLanguage, build_target,
@@ -109,6 +115,139 @@ pub fn emit_defeasible(bundle: &CompileBundle) -> CompiledTarget {
     );
 
     let source_artifact_hashes = vec![content_hash(rule_recommend), content_hash(rule_contra)];
+
+    build_target(
+        TargetLanguage::Asp,
+        artifact_text,
+        compilation_map,
+        source_artifact_hashes,
+    )
+}
+
+/// Read a required string field from an open-JSON narrative entry. Panics when a
+/// committed fixture stops carrying it — a build-time bug, mirroring
+/// [`crate::find_rule`].
+fn str_field<'a>(entry: &'a Value, key: &str) -> &'a str {
+    entry
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("event-narrative entry must carry string `{key}`"))
+}
+
+/// Read a required integer field (a discrete Event Calculus time point) from an
+/// open-JSON narrative entry. Panics on a malformed committed fixture.
+fn i64_field(entry: &Value, key: &str) -> i64 {
+    entry
+        .get(key)
+        .and_then(Value::as_i64)
+        .unwrap_or_else(|| panic!("event-narrative entry must carry integer `{key}`"))
+}
+
+/// Emit the ASP/Clingo Event Calculus program for `conflict_ec_allergy_persistence`
+/// (SPEC 13.4 event layer; SPEC 15.1 unsafe-persistence Event Calculus conflict).
+///
+/// The single `EventNarrative` records an allergy detected at t=0 and a
+/// beta-lactam administered at t=10. Discrete Event Calculus persistence/clipping
+/// axioms over a `happens`/`initiates`/`terminates` narrative carry a fluent
+/// forward: `holdsAt(F,T2)` derives from an initiating event at `T1 < T2` when no
+/// terminating event `stoppedIn` the open interval clips it. `allergy_known` is
+/// initiated at t=0 and the narrative's `terminates` set is empty, so
+/// `holdsAt(allergy_known,10)` derives. The ground violation query fires because
+/// `administer_drug` happens at t=10 while that contraindicating fluent still
+/// holds — the persistence-conflict witness.
+///
+/// The `time/1` domain is data-driven from `happens`, so `T2` ranges only over
+/// narrated instants. `happens`/`initiates` facts are data-driven from the
+/// narrative and go through [`sorted_lines`]; the `#defined terminates/3`
+/// declaration (silencing the empty-relation warning), the Event Calculus
+/// axioms, the ground violation query, and the `#show` footer stay in fixed
+/// order. The clingo run / holdsAt + violation recovery is task 0.9.
+pub fn emit_event_calculus(bundle: &CompileBundle) -> CompiledTarget {
+    let narrative = bundle
+        .event_narratives
+        .first()
+        .expect("toy bundle must contain an event narrative");
+
+    const HEADER: &str = "\
+% CKC -> ASP/Clingo Event Calculus: conflict_ec_allergy_persistence
+% Allergy detected at t=0, beta-lactam administered at t=10.
+% Discrete Event Calculus persistence/clipping: holdsAt derives from an initiating
+% event when no terminating event clips the fluent in the open interval.
+% allergy_known is initiated at t=0 and never terminated, so holdsAt(allergy_known,10)
+% derives; the violation fires as administer_drug at t=10 meets the persisted allergy.
+% Emit-only: the clingo run is task 0.9.
+";
+
+    // Fixed-order Event Calculus axioms. `#defined terminates/3` declares the
+    // possibly-empty narrative relation so clingo stays quiet when no terminating
+    // event exists. The violation query is ground at the toy conflict instant
+    // (administer_drug at t=10 vs holdsAt(allergy_known,10)).
+    const AXIOMS: &str = "\
+#defined terminates/3.
+time(T) :- happens(_,T).
+holdsAt(F,T2) :- happens(E,T1), initiates(E,F,T1), time(T2), T1 < T2, not stoppedIn(T1,F,T2).
+stoppedIn(T1,F,T2) :- happens(E,T), terminates(E,F,T), time(T1), time(T2), T1 < T, T < T2.
+violation(conflict_ec_allergy_persistence) :- happens(administer_drug,10), holdsAt(allergy_known,10).
+";
+
+    const FOOTER: &str = "\
+#show holdsAt/2.
+#show violation/1.
+";
+
+    // happens/2 + initiates/3 facts, data-driven from the narrative. Each event
+    // maps to its happens atom and each fluent to its initiates atom — the ground
+    // fact that introduces the entity — for the compilation map.
+    let mut facts = Vec::new();
+    let mut event_atom: BTreeMap<String, String> = BTreeMap::new();
+    for h in &narrative.happens {
+        let event = str_field(h, "event");
+        let time = i64_field(h, "time");
+        let atom = format!("happens({event},{time})");
+        facts.push(format!("{atom}."));
+        event_atom.insert(event.to_string(), atom);
+    }
+    let mut fluent_atom: BTreeMap<String, String> = BTreeMap::new();
+    for i in &narrative.initiates {
+        let event = str_field(i, "event");
+        let fluent = str_field(i, "fluent");
+        let time = i64_field(i, "time");
+        let atom = format!("initiates({event},{fluent},{time})");
+        facts.push(format!("{atom}."));
+        fluent_atom.insert(fluent.to_string(), atom);
+    }
+    let facts = sorted_lines(facts);
+
+    let artifact_text = format!("{HEADER}{facts}{AXIOMS}{FOOTER}");
+
+    // Vocabulary grounding: events (event_types order) then fluents (fluent_types
+    // order), each to its introducing atom and the narrative's shared spans.
+    let mut symbol_mappings = Vec::new();
+    for event in &narrative.event_types {
+        let target_symbol = event_atom
+            .get(event.as_str())
+            .unwrap_or_else(|| panic!("event {event} must have a happens fact"))
+            .clone();
+        symbol_mappings.push(SymbolMapping {
+            ckc_node_id: event.clone(),
+            target_symbol,
+            source_span_ids: narrative.source_span_ids.clone(),
+        });
+    }
+    for fluent in &narrative.fluent_types {
+        let target_symbol = fluent_atom
+            .get(fluent.as_str())
+            .unwrap_or_else(|| panic!("fluent {fluent} must have an initiates fact"))
+            .clone();
+        symbol_mappings.push(SymbolMapping {
+            ckc_node_id: fluent.clone(),
+            target_symbol,
+            source_span_ids: narrative.source_span_ids.clone(),
+        });
+    }
+    let compilation_map = CompilationMap(symbol_mappings);
+
+    let source_artifact_hashes = vec![content_hash(narrative)];
 
     build_target(
         TargetLanguage::Asp,
