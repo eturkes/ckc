@@ -333,6 +333,21 @@ technically derivable but easily forgotten under token pressure.
   to_canonical_bytes}` with no dev-dep or re-export needed. (Task 0.9.1 routed
   everything through `ckc_verify` re-exports, which is fine but not required;
   prefer the direct `use ckc_core::…` when copying the manifest.rs harness.)
+- [2026-05-30] NF sort helpers do NOT deduplicate — correcting a recurring
+  misstatement in the 0.9.x roadmap task text ("Normalize sorts/dedups").
+  `NfContext::sort_ord` (used for `source_span_ids`, hash vecs, rule-id vecs)
+  sorts in place and records a rewrite but never dedups; `sort_by_canonical`/
+  `sort_graph` likewise sort-by-key without dedup. So any builder field that is
+  conceptually a *union* must sort+dedup itself before `normalize_all`, or
+  duplicates survive. Concrete trap hit in 0.9.9: the Event Calculus compiled
+  target repeats its 2 narrative spans across 4 `compilation_map` entries, so
+  the naive flat-mapped `source_span_ids` had 8 entries; `witness_for` calls
+  `.sort()` + `.dedup()` to get the 2 distinct spans. Applies ahead to 0.9.12
+  (`build_graph` nodes/edges: multiple certs/witnesses reference the same target
+  or source-artifact hash → dedup `CertNode`s before/after sorting, else the
+  graph carries duplicate nodes and the golden bloats) and any later
+  union-shaped artifact. Verify with a quick len check on a known-overlapping
+  input rather than trusting the "dedups" phrasing.
 
 ## Mistakes
 
