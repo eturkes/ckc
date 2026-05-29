@@ -5,8 +5,9 @@
 //! certificates, execution witnesses, portfolio-agreement records, a certificate
 //! graph, and an assurance seed. Determinism comes from the recorded oracle:
 //! live solvers run only in PATH-guarded `tests/live_*.rs` that re-derive
-//! verdicts and compare against the oracle.
+//! verdicts (via [`runner`]) and compare against the oracle.
 
+pub mod runner;
 pub mod verdict;
 
 pub use ckc_core::canonical::{ContentHash, content_hash};
