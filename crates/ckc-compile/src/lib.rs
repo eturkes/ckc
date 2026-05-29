@@ -15,6 +15,7 @@ pub use ckc_core::canonical::{ContentHash, content_hash};
 pub use ckc_core::compile::{CompilationMap, CompiledTarget, SymbolMapping};
 pub use ckc_core::enums::TargetLanguage;
 
+pub mod asp;
 pub mod smt;
 
 const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
@@ -125,4 +126,15 @@ pub fn sorted_lines(mut lines: Vec<String>) -> String {
     let mut block = lines.join("\n");
     block.push('\n');
     block
+}
+
+/// Borrow a rule by its `rule_id`. Panics when the committed fixture stops
+/// carrying it — a build-time bug, mirroring [`CompileBundle::load_toy`]. Shared
+/// by the rule-driven emitters (SMT, ASP, and later Lean/Datalog/Alloy).
+pub(crate) fn find_rule<'a>(bundle: &'a CompileBundle, rule_id: &str) -> &'a Rule {
+    bundle
+        .rules
+        .iter()
+        .find(|r| r.rule_id.as_str() == rule_id)
+        .unwrap_or_else(|| panic!("toy bundle must contain rule {rule_id}"))
 }

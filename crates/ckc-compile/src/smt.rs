@@ -8,23 +8,12 @@
 //! task 0.9.
 
 use ckc_core::artifact::DecisionTable;
-use ckc_core::clinical::Rule;
 use ckc_core::verify::Conflict;
 
 use crate::{
     CompilationMap, CompileBundle, CompiledTarget, SymbolMapping, TargetLanguage, build_target,
-    content_hash, sorted_lines,
+    content_hash, find_rule, sorted_lines,
 };
-
-/// Borrow a rule by its `rule_id`. Panics when the committed fixture stops
-/// carrying it — a build-time bug, mirroring [`CompileBundle::load_toy`].
-fn find_rule<'a>(bundle: &'a CompileBundle, rule_id: &str) -> &'a Rule {
-    bundle
-        .rules
-        .iter()
-        .find(|r| r.rule_id.as_str() == rule_id)
-        .unwrap_or_else(|| panic!("toy bundle must contain rule {rule_id}"))
-}
 
 /// Emit the SMT-LIB deontic norm-conflict encoding for
 /// `conflict_norm_bl_contradiction` (SPEC 15.1: recommendation-for vs
