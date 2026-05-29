@@ -156,6 +156,17 @@ technically derivable but easily forgotten under token pressure.
   a reason to fall back to grep. Fire LSP in parallel with other
   independent tools in the same response.
 
+- [2026-05-29] rust-analyzer `unlinked-file` on a freshly-added `tests/*.rs`
+  integration file is a stale-metadata false positive, not a wiring bug. Each
+  `tests/*.rs` is its own auto-discovered cargo target (crates here use default
+  `autotests` with no explicit `[[test]]`), so RA links it on its next workspace
+  metadata reload; the file is already a real target the moment cargo sees it.
+  Authoritative check: `cargo test --test <name>` compiling+running the file
+  proves linkage. Do NOT apply the lint's own suggested fix (adding
+  `unlinked-file` to `rust-analyzer.diagnostics.disabled`) — that suppresses
+  detection of genuinely orphaned `src/*.rs` (missing `mod`) workspace-wide.
+  Expect this on every subtask that adds a new integration test; ignore it.
+
 - [2026-05-29] serde_json f64 parse/format asymmetry: serde_json's f64
   deserializer (lexical-core, Eisel-Lemire) and serializer (ryu, shortest
   round-trip vs Rust std parser) disagree at ULP boundaries. Concretely,
