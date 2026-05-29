@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationManifest",
+  "description": "The Phase-0 verification manifest (SPEC 12–13, 25): every [`verify_all`]\nartifact paired with its committed `certs/` path and content hash, in the\ndeterministic order task 0.9.15 writes the files — the 11 certificates, the 11\nwitnesses, the certificate graph, then the assurance seed. One compact golden\nover this manifest byte-locks the whole verification artifact set through its\nhashes, so a drift in any builder surfaces as a manifest mismatch. Transparent\nnewtype — serializes as the bare array of entries.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/VerificationEntry"
+  },
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "VerificationEntry": {
+      "description": "One row of the [`VerificationManifest`]: a single committed `certs/` artifact,\ntagged by kind and byte-locked through the `content_hash` of its canonical\nform.",
+      "type": "object",
+      "properties": {
+        "artifact_kind": {
+          "type": "string"
+        },
+        "artifact_path": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        }
+      },
+      "required": [
+        "artifact_kind",
+        "artifact_path",
+        "content_hash"
+      ]
+    }
+  }
+}

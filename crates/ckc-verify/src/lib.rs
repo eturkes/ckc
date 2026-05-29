@@ -85,3 +85,59 @@ pub fn verify_all(bundle: &CompileBundle) -> VerificationReport {
         assurance,
     }
 }
+
+/// One row of the [`VerificationManifest`]: a single committed `certs/` artifact,
+/// tagged by kind and byte-locked through the `content_hash` of its canonical
+/// form.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct VerificationEntry {
+    pub artifact_kind: String,
+    pub artifact_path: String,
+    pub content_hash: ContentHash,
+}
+
+/// The Phase-0 verification manifest (SPEC 12–13, 25): every [`verify_all`]
+/// artifact paired with its committed `certs/` path and content hash, in the
+/// deterministic order task 0.9.15 writes the files — the 11 certificates, the 11
+/// witnesses, the certificate graph, then the assurance seed. One compact golden
+/// over this manifest byte-locks the whole verification artifact set through its
+/// hashes, so a drift in any builder surfaces as a manifest mismatch. Transparent
+/// newtype — serializes as the bare array of entries.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct VerificationManifest(pub Vec<VerificationEntry>);
+
+/// Build the verification manifest for `bundle` from a live [`verify_all`] run,
+/// pairing each artifact with the canonical `certs/` path task 0.9.15 commits it
+/// to and its [`content_hash`]. The path layout mirrors that task's
+/// `report_artifacts` exactly; the cvc5 proof copy is recorded evidence rather
+/// than a `verify_all` artifact, so it carries no manifest entry.
+pub fn verification_manifest(bundle: &CompileBundle) -> VerificationManifest {
+    let report = verify_all(bundle);
+    let mut entries = Vec::new();
+    for cert in &report.certificates {
+        entries.push(VerificationEntry {
+            artifact_kind: "certificate".to_string(),
+            artifact_path: format!("certs/certificates/{}.json", cert.certificate_id.as_str()),
+            content_hash: content_hash(cert),
+        });
+    }
+    for witness in &report.witnesses {
+        entries.push(VerificationEntry {
+            artifact_kind: "execution_witness".to_string(),
+            artifact_path: format!("certs/witnesses/{}.json", witness.witness_id.as_str()),
+            content_hash: content_hash(witness),
+        });
+    }
+    entries.push(VerificationEntry {
+        artifact_kind: "certificate_graph".to_string(),
+        artifact_path: "certs/certificate_graph.json".to_string(),
+        content_hash: content_hash(&report.graph),
+    });
+    entries.push(VerificationEntry {
+        artifact_kind: "assurance_seed".to_string(),
+        artifact_path: "certs/assurance_seed.json".to_string(),
+        content_hash: content_hash(&report.assurance),
+    });
+    VerificationManifest(entries)
+}
