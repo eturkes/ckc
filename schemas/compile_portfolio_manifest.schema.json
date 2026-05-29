@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortfolioManifest",
+  "description": "The whole Phase-0 compiler portfolio as a hash manifest, in [`compile_all`]\norder. Transparent newtype: serializes as the bare array of entries.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/PortfolioEntry"
+  },
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "PortfolioEntry": {
+      "description": "One compiled target paired with its committed artifact path and the\n`content_hash` of the emitted [`CompiledTarget`] (SPEC 14). The hash is the\nbyte-lock: the portfolio-manifest golden records every target's hash, so any\nchange in an emitter's output moves the golden, with no need to embed each\ntarget's full artifact text.",
+      "type": "object",
+      "properties": {
+        "artifact_path": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "target_language": {
+          "$ref": "#/$defs/TargetLanguage"
+        }
+      },
+      "required": [
+        "target_language",
+        "artifact_path",
+        "content_hash"
+      ]
+    },
+    "TargetLanguage": {
+      "description": "Target language for CKC compilation (SPEC 14 target compilers).",
+      "type": "string",
+      "enum": [
+        "smt_lib",
+        "asp",
+        "datalog",
+        "lean",
+        "tla_plus",
+        "alloy"
+      ]
+    }
+  }
+}

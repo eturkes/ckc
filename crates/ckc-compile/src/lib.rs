@@ -6,6 +6,9 @@
 //! This crate stays emit-only through Phase-0 task 0.8; solver/kernel
 //! execution and certificate assignment happen in task 0.9.
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use ckc_core::artifact::{DecisionTable, EventNarrative};
 use ckc_core::clinical::Rule;
 use ckc_core::source::{Concept, SourceSpan};
@@ -120,6 +123,43 @@ pub const ARTIFACT_PATHS: [&str; 9] = [
     "logic/tla/Conflict.tla",
     "logic/alloy/Priority.als",
 ];
+
+/// One compiled target paired with its committed artifact path and the
+/// `content_hash` of the emitted [`CompiledTarget`] (SPEC 14). The hash is the
+/// byte-lock: the portfolio-manifest golden records every target's hash, so any
+/// change in an emitter's output moves the golden, with no need to embed each
+/// target's full artifact text.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PortfolioEntry {
+    pub target_language: TargetLanguage,
+    pub artifact_path: String,
+    pub content_hash: ContentHash,
+}
+
+/// The whole Phase-0 compiler portfolio as a hash manifest, in [`compile_all`]
+/// order. Transparent newtype: serializes as the bare array of entries.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct PortfolioManifest(pub Vec<PortfolioEntry>);
+
+/// Build the Phase-0 portfolio hash manifest: pair every [`compile_all`] target,
+/// in order, with its committed artifact path ([`ARTIFACT_PATHS`]) and the
+/// `content_hash` of the [`CompiledTarget`]. One compact manifest byte-locks the
+/// whole portfolio — a golden over it shifts whenever any emitter's output
+/// changes — without embedding each target's full artifact text.
+pub fn portfolio_manifest(bundle: &CompileBundle) -> PortfolioManifest {
+    PortfolioManifest(
+        compile_all(bundle)
+            .into_iter()
+            .zip(ARTIFACT_PATHS)
+            .map(|(target, path)| PortfolioEntry {
+                target_language: target.target_language,
+                artifact_path: path.to_string(),
+                content_hash: content_hash(&target),
+            })
+            .collect(),
+    )
+}
 
 /// Canonical replay command that regenerates a target artifact through the
 /// `ckc` CLI (SPEC 14 replay command, SPEC 18 `ckc compile`). The `--target`
