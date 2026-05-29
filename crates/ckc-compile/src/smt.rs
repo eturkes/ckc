@@ -1,12 +1,15 @@
 //! CKC → SMT-LIB emitters (SPEC 13.2, 14).
 //!
 //! Phase-0 task 0.8: the deontic norm-conflict encoding (`emit_norm_conflict`,
-//! QF_UF, unsat witness) and the decision-table overlap/gap analysis
-//! (`emit_decision_table`, QF_LRA, sat witness). Emit-only — the Z3/cvc5 solver
-//! run, unsat-core extraction, and model recovery belong to task 0.9.
+//! QF_UF, unsat witness), the decision-table overlap/gap analysis
+//! (`emit_decision_table`, QF_LRA, sat witness), and the MaxSMT minimal-repair
+//! search (`emit_repair_maxsmt`, Z3 Optimize). Emit-only — the Z3/cvc5 solver
+//! run, unsat-core extraction, model recovery, and optimization belong to
+//! task 0.9.
 
 use ckc_core::artifact::DecisionTable;
 use ckc_core::clinical::Rule;
+use ckc_core::verify::Conflict;
 
 use crate::{
     CompilationMap, CompileBundle, CompiledTarget, SymbolMapping, TargetLanguage, build_target,
@@ -186,6 +189,142 @@ pub fn emit_decision_table(bundle: &CompileBundle) -> CompiledTarget {
     );
 
     let source_artifact_hashes = vec![content_hash(table)];
+
+    build_target(
+        TargetLanguage::SmtLib,
+        artifact_text,
+        compilation_map,
+        source_artifact_hashes,
+    )
+}
+
+/// Borrow the conflict by its `conflict_id`. Panics when the committed fixture
+/// stops carrying it — a build-time bug, mirroring [`find_rule`].
+fn find_conflict<'a>(bundle: &'a CompileBundle, conflict_id: &str) -> &'a Conflict {
+    bundle
+        .conflicts
+        .iter()
+        .find(|c| c.conflict_id.as_str() == conflict_id)
+        .unwrap_or_else(|| panic!("toy bundle must contain conflict {conflict_id}"))
+}
+
+/// Emit the SMT-LIB MaxSMT minimal-repair search for
+/// `conflict_norm_bl_contradiction` (SPEC 13.2 MaxSMT repair; Z3 Optimize
+/// dialect).
+///
+/// The encoding reuses the [`emit_norm_conflict`] hard constraints, then gates
+/// the recommendation on the conflict's two `repair_candidates` (read from the
+/// `Conflict`, in fixture order). The recommendation fires from sepsis *unless*
+/// a repair is applied; either repair withdraws it under the allergy context:
+///
+/// * `repair_add_priority` — `rule_bl_anaphylaxis_contra` ≻
+///   `rule_sepsis_bl_recommend`, so the contraindication defeats the
+///   recommendation;
+/// * `repair_add_exception` — `rule_sepsis_bl_recommend` excludes
+///   `beta_lactam_anaphylaxis` from its scope.
+///
+/// The contraindication and the deontic exclusion stay absolute, so while the
+/// allergy context holds the recommendation must be false — which needs at
+/// least one repair applied. Each repair carries an `(assert-soft (not …)
+/// :weight 1)` penalty for being applied, so the minimum-cost model applies
+/// exactly one. `(check-sat)` then `(get-objectives)` report the optimum.
+/// Declarations go through [`sorted_lines`]; hard asserts then soft asserts
+/// stay in fixed order. The Z3 Optimize run / model recovery is task 0.9.
+pub fn emit_repair_maxsmt(bundle: &CompileBundle) -> CompiledTarget {
+    const CONFLICT_ID: &str = "conflict_norm_bl_contradiction";
+    const SYM_RECOMMEND: &str = "recommend_administer_beta_lactam";
+    const SYM_PROHIBIT: &str = "prohibit_administer_beta_lactam";
+    const ATOM_SEPSIS: &str = "dx_sepsis";
+    const ATOM_ALLERGY: &str = "allergy_history_beta_lactam_anaphylaxis";
+
+    const HEADER: &str = "\
+; CKC -> SMT-LIB MaxSMT repair: conflict_norm_bl_contradiction (Z3 Optimize)
+; Reuses the norm-conflict hard constraints; the recommendation fires from sepsis
+; unless a repair toggle withdraws it under the allergy context:
+;   repair_add_priority   - rule_bl_anaphylaxis_contra > rule_sepsis_bl_recommend
+;   repair_add_exception  - rule_sepsis_bl_recommend excludes beta_lactam_anaphylaxis
+; assert-soft penalizes applying a repair (weight 1 each); the minimum-cost model
+; applies exactly one, restoring satisfiability. Optimize run is task 0.9.
+(set-logic QF_UF)
+";
+
+    let conflict = find_conflict(bundle, CONFLICT_ID);
+
+    // Repair toggles, in fixture (document) order: each candidate's `type`
+    // becomes the soft-constraint symbol `repair_<type>`.
+    let repair_types: Vec<String> = conflict
+        .repair_candidates
+        .iter()
+        .map(|rc| {
+            rc.get("type")
+                .and_then(|v| v.as_str())
+                .expect("repair candidate must carry a string `type`")
+                .to_string()
+        })
+        .collect();
+    let repair_symbols: Vec<String> = repair_types.iter().map(|t| format!("repair_{t}")).collect();
+
+    // One Bool per context/deontic atom plus one per repair toggle; sorted so
+    // the block's bytes depend only on its contents.
+    let mut decl_lines = vec![
+        format!("(declare-const {ATOM_SEPSIS} Bool)"),
+        format!("(declare-const {ATOM_ALLERGY} Bool)"),
+        format!("(declare-const {SYM_RECOMMEND} Bool)"),
+        format!("(declare-const {SYM_PROHIBIT} Bool)"),
+    ];
+    decl_lines.extend(
+        repair_symbols
+            .iter()
+            .map(|s| format!("(declare-const {s} Bool)")),
+    );
+    let declarations = sorted_lines(decl_lines);
+
+    // "no repair applied" guard, e.g. `(not repair_add_priority) (not
+    // repair_add_exception)`, in fixture order.
+    let no_repair = repair_symbols
+        .iter()
+        .map(|s| format!("(not {s})"))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    // Hard constraints, fixed clinical order: context holds; the recommendation
+    // fires from sepsis unless a repair is applied; the contraindication fires
+    // from allergy; the deontic exclusion is absolute.
+    let hard = [
+        format!("(assert {ATOM_SEPSIS})"),
+        format!("(assert {ATOM_ALLERGY})"),
+        format!("(assert (=> (and {ATOM_SEPSIS} {no_repair}) {SYM_RECOMMEND}))"),
+        format!("(assert (=> {ATOM_ALLERGY} {SYM_PROHIBIT}))"),
+        format!("(assert (not (and {SYM_RECOMMEND} {SYM_PROHIBIT})))"),
+    ]
+    .join("\n");
+
+    // Soft constraints in fixture order: each applied repair costs 1, so the
+    // minimum-cost model applies exactly one.
+    let soft = repair_symbols
+        .iter()
+        .map(|s| format!("(assert-soft (not {s}) :weight 1)"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let artifact_text =
+        format!("{HEADER}{declarations}{hard}\n{soft}\n(check-sat)\n(get-objectives)\n");
+
+    // Each repair candidate maps to its soft-constraint symbol, grounded in the
+    // conflict's own source spans.
+    let compilation_map = CompilationMap(
+        repair_types
+            .iter()
+            .zip(&repair_symbols)
+            .map(|(repair_type, sym)| SymbolMapping {
+                ckc_node_id: repair_type.clone(),
+                target_symbol: sym.clone(),
+                source_span_ids: conflict.source_spans.clone(),
+            })
+            .collect(),
+    );
+
+    let source_artifact_hashes = vec![content_hash(conflict)];
 
     build_target(
         TargetLanguage::SmtLib,
