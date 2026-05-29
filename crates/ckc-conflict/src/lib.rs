@@ -53,3 +53,60 @@ pub struct ConflictManifestEntry {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct ConflictManifest(pub Vec<ConflictManifestEntry>);
+
+/// Compose the Phase-0 conflict report for `bundle` from its verification `report`
+/// (SPEC 15), orchestrating the task-0.10.5–0.10.7 detectors:
+///
+/// - `conflicts`: the norm-contradiction, decision-table-defect, and
+///   temporal-violation passes ([`detect`]) — 3 over the toy bundle;
+/// - `argument_graphs`: the single Dung graph backing the defeasible conflicts
+///   ([`argument::build_argument_graph`]) — 1;
+/// - `diagnostics`: the backend-disagreement diagnostics passed through from the
+///   verification portfolio (SPEC 15.1 #16) — 0 on the real oracle, where the
+///   portfolio agrees; the synthetic-divergence branch is already covered in
+///   `ckc-verify`'s portfolio check.
+///
+/// Each conflict and the argument graph is already normalized by its builder, so the
+/// report composes normalized artifacts and carries no `Normalize` impl of its own,
+/// mirroring [`verify_all`].
+pub fn detect_all(bundle: &CompileBundle, report: &VerificationReport) -> ConflictReport {
+    let mut conflicts = detect::detect_norm_contradiction(bundle, report);
+    conflicts.extend(detect::detect_decision_table_defects(bundle, report));
+    conflicts.extend(detect::detect_temporal_violation(bundle, report));
+    ConflictReport {
+        conflicts,
+        argument_graphs: vec![argument::build_argument_graph(bundle)],
+        diagnostics: report.disagreements.clone(),
+    }
+}
+
+/// Build the conflict manifest for `bundle` from a live [`detect_all`] run over its
+/// verification `report`, pairing each artifact with the canonical `certs/` path task
+/// 0.10.9 commits it to and its [`content_hash`]: every detected conflict
+/// (`certs/conflicts/<conflict_id>.json`) first, then each argument graph
+/// (`certs/argument_graphs/<argument_graph_id>.json`), in that deterministic order.
+/// One compact golden over this manifest byte-locks the whole conflict artifact set
+/// through its hashes, so a drift in any detector surfaces as a manifest mismatch.
+/// Mirrors `ckc_verify::verification_manifest`.
+pub fn conflict_manifest(bundle: &CompileBundle, report: &VerificationReport) -> ConflictManifest {
+    let detected = detect_all(bundle, report);
+    let mut entries = Vec::new();
+    for conflict in &detected.conflicts {
+        entries.push(ConflictManifestEntry {
+            artifact_kind: "conflict".to_string(),
+            artifact_path: format!("certs/conflicts/{}.json", conflict.conflict_id.as_str()),
+            content_hash: content_hash(conflict),
+        });
+    }
+    for graph in &detected.argument_graphs {
+        entries.push(ConflictManifestEntry {
+            artifact_kind: "argument_graph".to_string(),
+            artifact_path: format!(
+                "certs/argument_graphs/{}.json",
+                graph.argument_graph_id.as_str()
+            ),
+            content_hash: content_hash(graph),
+        });
+    }
+    ConflictManifest(entries)
+}
