@@ -349,6 +349,23 @@ technically derivable but easily forgotten under token pressure.
   union-shaped artifact. Verify with a quick len check on a known-overlapping
   input rather than trusting the "dedups" phrasing.
 
+- [2026-05-30] Certificate-graph scope (task 0.9.12): `build_graph`'s
+  `schemas/golden/certificate_graph.json` was locked over the FULL Phase-0 set —
+  `certificates(bundle)` + `shacl_certificate` cert (11) and `witnesses(bundle)` +
+  shacl witness (11) — so 0.9.14 `verify_all` MUST call `build_graph` with that
+  same 11+11 set, else the graph `content_hash` diverges from this golden and from
+  the 0.9.15 committed `certs/certificate_graph.json` (which 0.9.15 byte-locks
+  against the live `verify_all` graph). Edge model: cert→target `checks`
+  (resolved by intersecting the cert's `input_artifact_hashes` with the
+  `compile_all` target hashes — exactly one hit per solver/cvc5 cert, zero for the
+  in-process SHACL cert), target→source `derived_from`, cert→witness
+  `witnessed_by` (matched on `certificate_id`). The norm-conflict SMT target is
+  checked by BOTH z3 and cvc5, so its node + `derived_from` edges are emitted
+  twice and MUST be deduped (confirmed: 1 node, 2 incoming `checks`, sources once)
+  — the union-dedup trap the prior NF note flagged. Phase-0 shape: 9
+  compiled_target + 5 source_artifact + 11 certificate + 11 execution_witness
+  nodes; 10 checks + 14 derived_from + 11 witnessed_by edges.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can

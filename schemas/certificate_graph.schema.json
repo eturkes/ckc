@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CertificateGraph",
+  "description": "The Phase-0 certificate graph: a deterministic, deduplicated, acyclic\nprovenance DAG over verification artifacts.",
+  "type": "object",
+  "properties": {
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CertEdge"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CertNode"
+      }
+    }
+  },
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "$defs": {
+    "CertEdge": {
+      "description": "A directed edge: `from`'s artifact references `to`'s under `relation` — one of\n`checks`, `derived_from`, or `witnessed_by`.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "relation": {
+          "type": "string"
+        },
+        "to": {
+          "$ref": "#/$defs/ContentHash"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "relation"
+      ]
+    },
+    "CertNode": {
+      "description": "A node in the certificate graph, identified by the `content_hash` of the\nartifact it stands for. `certificate_class` is `Some` only for certificate\nnodes; compiled-target, source-artifact, and witness nodes leave it absent.",
+      "type": "object",
+      "properties": {
+        "artifact_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "certificate_class": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CertificateClass"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_hash",
+        "kind"
+      ]
+    },
+    "CertificateClass": {
+      "description": "Certificate depth class (SPEC 12.2). Higher classes imply lower.\nVariant order matches depth: C0 < C1 < … < C9.",
+      "type": "string",
+      "enum": [
+        "C0-Parsed",
+        "C1-Schema",
+        "C2-Normal",
+        "C3-Grounded",
+        "C4-Executable",
+        "C5-Portfolio",
+        "C6-ProofObject",
+        "C7-Kernel",
+        "C8-Adjudicated",
+        "C9-Assured"
+      ]
+    },
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    }
+  }
+}
