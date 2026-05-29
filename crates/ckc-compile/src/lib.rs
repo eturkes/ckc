@@ -82,6 +82,28 @@ pub trait Compiler {
     fn compile(&self, bundle: &CompileBundle) -> CompiledTarget;
 }
 
+/// Emit the whole Phase-0 compiler portfolio for `bundle` (SPEC 14 target
+/// compilers) in one fixed, deterministic order. The sequence is the contract:
+/// downstream consumers index targets by position — the committed artifact
+/// files (task 0.8.14), the portfolio manifest (task 0.8.15), and CAS
+/// persistence (task 0.8.16). Nine targets are emitted, with `SmtLib` and
+/// `Asp` repeating: SMT-LIB norm-conflict, SMT-LIB decision-table, SMT-LIB
+/// MaxSMT repair, ASP defeasible/argumentation, ASP Event Calculus, Datalog
+/// priority analysis, Lean norm-conflict theorem, TLA+ stub, then Alloy stub.
+pub fn compile_all(bundle: &CompileBundle) -> Vec<CompiledTarget> {
+    vec![
+        smt::emit_norm_conflict(bundle),
+        smt::emit_decision_table(bundle),
+        smt::emit_repair_maxsmt(bundle),
+        asp::emit_defeasible(bundle),
+        asp::emit_event_calculus(bundle),
+        datalog::emit_priority_analysis(bundle),
+        lean::emit_norm_conflict_theorem(bundle),
+        modelcheck::emit_tlaplus_stub(bundle),
+        modelcheck::emit_alloy_stub(bundle),
+    ]
+}
+
 /// Canonical replay command that regenerates a target artifact through the
 /// `ckc` CLI (SPEC 14 replay command, SPEC 18 `ckc compile`). The `--target`
 /// token is the snake_case `TargetLanguage` wire form that downstream goldens
