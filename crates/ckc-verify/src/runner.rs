@@ -72,6 +72,30 @@ pub fn run_clingo(artifact_abs: &Path) -> anyhow::Result<RunResult> {
     capture(cmd)
 }
 
+/// Run souffle over one Datalog artifact: `souffle <artifact_abs>`, executed from
+/// `cwd`. souffle materializes each `.output` relation as `<relation>.csv` relative
+/// to its working directory, so the caller passes a scratch dir to keep the repo
+/// clean (the Phase-0 `priority.dl` emits `cycle.csv`). An acyclic priority graph
+/// yields an empty `cycle` relation — a zero-byte `cycle.csv` — which is the
+/// `empty_relation` verdict the caller re-derives from the file size.
+pub fn run_souffle(artifact_abs: &Path, cwd: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("souffle");
+    cmd.arg(artifact_abs).current_dir(cwd);
+    capture(cmd)
+}
+
+/// Run lean over one source file: `lean <artifact_abs>` (lean resolves on the base
+/// PATH via elan). The single import-free Phase-0 file kernel-checks standalone, so
+/// no lakefile/lake project is needed. lean exits 0 and prints nothing when the
+/// kernel accepts the file, and emits `error:` diagnostics (with a nonzero exit) on
+/// any failure; a clean check — exit 0 with no `error:` and no `sorry`/`admit` — is
+/// the `kernel_checked` (C7) verdict the caller re-derives.
+pub fn run_lean(artifact_abs: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("lean");
+    cmd.arg(artifact_abs);
+    capture(cmd)
+}
+
 /// Decode an SMT-LIB solver's leading `(check-sat)` response token into a
 /// [`VerdictStatus`]: `unsat` -> `Unsat`, `sat` -> `Sat`. Returns `None` for
 /// `unknown` or any other first token. Shared by the z3 and cvc5 runners, which
