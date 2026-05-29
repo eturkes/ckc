@@ -73,26 +73,14 @@ impl CompileBundle {
     }
 }
 
-/// A CKC → target-language compiler (SPEC 14 compiler contract).
-///
-/// Implementors are emit-only: [`Compiler::compile`] produces target text and
-/// its symbol map deterministically from `bundle` without invoking the target
-/// solver/checker, which is task 0.9.
-pub trait Compiler {
-    /// The target language this compiler emits.
-    fn target_language(&self) -> TargetLanguage;
-    /// Emit the target artifact for `bundle`.
-    fn compile(&self, bundle: &CompileBundle) -> CompiledTarget;
-}
-
 /// Emit the whole Phase-0 compiler portfolio for `bundle` (SPEC 14 target
 /// compilers) in one fixed, deterministic order. The sequence is the contract:
-/// downstream consumers index targets by position — the committed artifact
-/// files (task 0.8.14), the portfolio manifest (task 0.8.15), and CAS
-/// persistence (task 0.8.16). Nine targets are emitted, with `SmtLib` and
-/// `Asp` repeating: SMT-LIB norm-conflict, SMT-LIB decision-table, SMT-LIB
-/// MaxSMT repair, ASP defeasible/argumentation, ASP Event Calculus, Datalog
-/// priority analysis, Lean norm-conflict theorem, TLA+ stub, then Alloy stub.
+/// downstream consumers ([`ARTIFACT_PATHS`], [`portfolio_manifest`], CAS
+/// persistence) index targets by position, so this order stays stable. Nine
+/// targets are emitted, with `SmtLib` and `Asp` repeating: SMT-LIB norm-conflict,
+/// SMT-LIB decision-table, SMT-LIB MaxSMT repair, ASP defeasible/argumentation,
+/// ASP Event Calculus, Datalog priority analysis, Lean norm-conflict theorem,
+/// TLA+ stub, then Alloy stub.
 pub fn compile_all(bundle: &CompileBundle) -> Vec<CompiledTarget> {
     vec![
         smt::emit_norm_conflict(bundle),
@@ -108,10 +96,8 @@ pub fn compile_all(bundle: &CompileBundle) -> Vec<CompiledTarget> {
 }
 
 /// Canonical repository-relative path of each [`compile_all`] target's
-/// committed artifact file, in portfolio order. The committed `logic/*` and
-/// `lean/Ckc/*` files (task 0.8.14), the portfolio manifest (task 0.8.15), and
-/// CAS persistence (task 0.8.16) index targets by this position, so this array
-/// stays aligned with the [`compile_all`] emitter order element-for-element.
+/// committed artifact file, in [`compile_all`] order — aligned with the emitter
+/// sequence element-for-element.
 pub const ARTIFACT_PATHS: [&str; 9] = [
     "logic/smt/norm_conflict.smt2",
     "logic/smt/decision_table.smt2",
@@ -212,7 +198,7 @@ pub fn sorted_lines(mut lines: Vec<String>) -> String {
 
 /// Borrow a rule by its `rule_id`. Panics when the committed fixture stops
 /// carrying it — a build-time bug, mirroring [`CompileBundle::load_toy`]. Shared
-/// by the rule-driven emitters (SMT, ASP, and later Lean/Datalog/Alloy).
+/// by the rule-driven emitters.
 pub(crate) fn find_rule<'a>(bundle: &'a CompileBundle, rule_id: &str) -> &'a Rule {
     bundle
         .rules

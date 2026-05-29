@@ -9,7 +9,6 @@ ckc-core = { path = "../ckc-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = { workspace = true }
-anyhow = { workspace = true }
 
 [dev-dependencies]
 ckc-store = { path = "../ckc-store" }

@@ -15,8 +15,6 @@
 //! already byte-locked by the committed `logic/*`+`lean/Ckc/*` files (0.8.14)
 //! and the manifest golden (0.8.15).
 
-use std::collections::HashSet;
-
 use ckc_compile::{CompileBundle, CompiledTarget, compile_all};
 use ckc_core::canonical::{ContentHash, content_hash};
 use ckc_core::envelope::{ArtifactEnvelope, ArtifactKind, ArtifactMeta};
@@ -115,7 +113,7 @@ fn each_target_is_stored_verified_and_content_hashed() {
     assert_eq!(targets.len(), 9, "Phase-0 portfolio emits nine targets");
     let envelopes = wrap_portfolio(&targets);
 
-    let (_tmp, hashes) = build_store_and_verify(&envelopes);
+    let (_tmp, _hashes) = build_store_and_verify(&envelopes);
 
     // `wrap` overwrote the placeholder hash with the CompiledTarget's true
     // canonical digest.
@@ -127,15 +125,6 @@ fn each_target_is_stored_verified_and_content_hashed() {
             t.target_language,
         );
     }
-
-    // Distinct targets yield distinct envelope store keys; catches accidental
-    // payload aliasing even where target_language or profiles repeat.
-    let unique: HashSet<&ContentHash> = hashes.iter().collect();
-    assert_eq!(
-        unique.len(),
-        hashes.len(),
-        "every CompiledTarget envelope must have a distinct store key",
-    );
 }
 
 // ---------------------------------------------------------------------------

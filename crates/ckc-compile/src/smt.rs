@@ -116,11 +116,12 @@ fn find_decision_table<'a>(bundle: &'a CompileBundle, table_id: &str) -> &'a Dec
 ///   `initiate_cooling`) differ, so the `unique` policy is violated;
 /// * gap — the concrete point `(37.5, 85, 95)` fires no row.
 ///
-/// `(check-sat)` is `sat`: the model is the overlap point, and SAT also
-/// certifies the gap point stays uncovered — a covered point would assert
-/// `false` and flip the result to `unsat`. Declarations go through
-/// [`sorted_lines`]; predicate definitions follow table row order; asserts
-/// stay in fixed order.
+/// `(check-sat)` is `sat`: the solver finds a real overlap point (the symbolic
+/// vital signs), and the gap assert — a closed formula over the literal point
+/// `(37.5, 85, 95)`, decided at emit time — holds because that point is
+/// uncovered; a covered point would reduce it to `false` and flip the result to
+/// `unsat`. Declarations go through [`sorted_lines`]; predicate definitions
+/// follow table row order; asserts stay in fixed order.
 pub fn emit_decision_table(bundle: &CompileBundle) -> CompiledTarget {
     const TABLE_ID: &str = "dt_vitals_triage";
 
@@ -299,14 +300,16 @@ pub fn emit_repair_maxsmt(bundle: &CompileBundle) -> CompiledTarget {
     let artifact_text =
         format!("{HEADER}{declarations}{hard}\n{soft}\n(check-sat)\n(get-objectives)\n");
 
-    // Each repair candidate maps to its soft-constraint symbol, grounded in the
-    // conflict's own source spans.
+    // Each repair candidate maps the owning conflict node to its soft-constraint
+    // symbol, grounded in the conflict's own source spans. A candidate `type` is
+    // a repair kind, not a CKC node id, so the resolvable node is the conflict
+    // that carries the repair_candidates; the symbol (repair_<type>) records
+    // which repair.
     let compilation_map = CompilationMap(
-        repair_types
+        repair_symbols
             .iter()
-            .zip(&repair_symbols)
-            .map(|(repair_type, sym)| SymbolMapping {
-                ckc_node_id: repair_type.clone(),
+            .map(|sym| SymbolMapping {
+                ckc_node_id: CONFLICT_ID.to_string(),
                 target_symbol: sym.clone(),
                 source_span_ids: conflict.source_spans.clone(),
             })

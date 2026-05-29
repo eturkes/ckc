@@ -1,4 +1,4 @@
-//! CKC → Datalog/Soufflé emitter (SPEC 13.6 static analysis, 14).
+//! CKC → Datalog/Soufflé emitter (SPEC 13.3 priority, 14).
 //!
 //! Phase-0 task 0.8: the rule-superiority priority-cycle analysis
 //! (`emit_priority_analysis`). Each rule's `priority_over` edge becomes a
@@ -13,8 +13,8 @@ use crate::{
 };
 
 /// Emit the Datalog/Soufflé priority-cycle program over the toy rules'
-/// superiority relation (SPEC 13.6 Datalog/Soufflé static analysis; SPEC 15.1
-/// cyclic or contradictory priority relations).
+/// superiority relation (SPEC 14 Datalog/Soufflé target; SPEC 15.1 cyclic or
+/// contradictory priority relations).
 ///
 /// Each rule's `priority_over` entry becomes one `priority_over(sup, inf)` input
 /// fact; the sole toy edge is
@@ -50,18 +50,18 @@ cycle(R) :- reaches(R,R).
 ";
 
     // priority_over(sup,inf) input facts, data-driven from each rule's
-    // superiority edges. Rules that carry an edge are the hashed sources; the
-    // distinct endpoints (sup then inf, in first-seen order) are the mapped CKC
-    // nodes. rule_incomplete_provenance and rule_sepsis_bl_recommend carry no
-    // priority_over field, so neither is a carrier.
+    // superiority edges. A rule with a non-empty priority_over is a superior
+    // endpoint; each id it lists is an inferior endpoint. The endpoints
+    // (superior-first, first-seen) are both the mapped CKC nodes and the hashed
+    // sources — the rules that appear in the priority graph. rule_sepsis_bl_recommend
+    // and rule_incomplete_provenance carry no priority_over field, so neither is a
+    // superior; the former still appears as an inferior endpoint.
     let mut facts = Vec::new();
     let mut endpoint_ids: Vec<&str> = Vec::new();
-    let mut carriers = Vec::new();
     for rule in &bundle.rules {
         if rule.priority_over.is_empty() {
             continue;
         }
-        carriers.push(rule);
         let sup = rule.rule_id.as_str();
         if !endpoint_ids.contains(&sup) {
             endpoint_ids.push(sup);
@@ -91,7 +91,10 @@ cycle(R) :- reaches(R,R).
             .collect(),
     );
 
-    let source_artifact_hashes = carriers.iter().map(|r| content_hash(*r)).collect();
+    let source_artifact_hashes = endpoint_ids
+        .iter()
+        .map(|&id| content_hash(find_rule(bundle, id)))
+        .collect();
 
     build_target(
         TargetLanguage::Datalog,

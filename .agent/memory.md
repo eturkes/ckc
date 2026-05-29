@@ -266,6 +266,26 @@ technically derivable but easily forgotten under token pressure.
   root. The jar-guarded run belongs to 0.9 so solver-less containers stay green;
   mirrors the gringo/SANY notes.
 
+- [2026-05-29] CompiledTarget provenance invariants (task 0.8 review, applied to
+  the datalog + SMT-repair emitters). Two rules for every emitter, including the
+  0.9+ verification wiring and the later target-language phases: (1) a
+  `CompilationMap` `ckc_node_id` must be a *resolvable* CKC node id — a
+  rule/conflict/row/narrative id a `find_*` lookup can return — so a reported
+  target symbol traces back to a real node. The repair emitter had used the
+  repair `type` string ("add_priority"), which resolves to nothing; corrected to
+  the owning conflict id, with the repair kind preserved in the target symbol
+  (`repair_<type>`). (2) `source_artifact_hashes` must cover every CKC artifact
+  the emitter reads, including endpoints it maps but does not "own". The datalog
+  priority emitter hashed only the superiority-edge carrier; corrected to both
+  graph endpoints, mirroring the alloy emitter over the same priority relation.
+  When two emitters compile the same CKC view (here datalog + alloy over the
+  superiority graph), cross-check them for provenance consistency. Mechanics:
+  changing `compilation_map`/`source_artifact_hashes` moves the CompiledTarget
+  `content_hash` but NOT `artifact_text`, so only the portfolio-manifest golden
+  needs regen (`cargo test -p ckc-compile --test manifest -- --ignored
+  regenerate`); committed `logic/*`+`lean/*` files and the persistence test
+  (live hashes) stay correct untouched.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can

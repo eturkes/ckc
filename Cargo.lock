@@ -292,7 +292,6 @@ dependencies = [
 name = "ckc-compile"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "ckc-core",
  "ckc-store",
  "schemars",

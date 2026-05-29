@@ -55,12 +55,21 @@ fn emit_priority_analysis_grounds_both_endpoints() {
     let inf_spans: Vec<&str> = inf.source_span_ids.iter().map(|s| s.as_str()).collect();
     assert_eq!(inf_spans, ["span_rec_sepsis_bl", "span_evidence_sepsis"]);
 
-    // source_artifact_hashes are only the rules that CARRY a priority_over edge —
-    // here just rule_bl_anaphylaxis_contra, not its inferior endpoint.
-    let carrier = bundle
-        .rules
-        .iter()
-        .find(|r| r.rule_id.as_str() == "rule_bl_anaphylaxis_contra")
-        .unwrap();
-    assert_eq!(target.source_artifact_hashes, vec![content_hash(carrier)]);
+    // source_artifact_hashes are both priority-graph endpoints, superior-first
+    // (first-seen order over the single edge), mirroring the Alloy emitter over
+    // the same superiority relation.
+    let find = |id: &str| {
+        bundle
+            .rules
+            .iter()
+            .find(|r| r.rule_id.as_str() == id)
+            .unwrap()
+    };
+    assert_eq!(
+        target.source_artifact_hashes,
+        vec![
+            content_hash(find("rule_bl_anaphylaxis_contra")),
+            content_hash(find("rule_sepsis_bl_recommend")),
+        ]
+    );
 }

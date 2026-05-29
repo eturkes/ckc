@@ -41,26 +41,27 @@ fn emit_repair_maxsmt_grounds_both_repairs() {
         ["span_rec_sepsis_bl", "span_contra_bl_allergy"]
     );
 
-    // One mapping per repair candidate: the candidate `type` is the ckc node id,
-    // `repair_<type>` is the soft-constraint symbol, both carry the conflict
-    // spans, and the symbol appears verbatim in the emitted program.
-    let expected = [
-        ("add_priority", "repair_add_priority"),
-        ("add_exception", "repair_add_exception"),
-    ];
+    // One mapping per repair candidate: the owning conflict is the ckc node id (a
+    // repair `type` is a kind, not a resolvable node), `repair_<type>` is the
+    // soft-constraint symbol, both carry the conflict spans, and the symbol
+    // appears verbatim in the emitted program.
+    let expected_symbols = ["repair_add_priority", "repair_add_exception"];
     assert_eq!(
         map.len(),
-        expected.len(),
+        expected_symbols.len(),
         "one mapping per repair candidate"
     );
-    for (repair_type, sym) in expected {
+    for sym in expected_symbols {
         let entry = map
             .iter()
-            .find(|m| m.ckc_node_id == repair_type)
-            .unwrap_or_else(|| panic!("mapping for {repair_type}"));
-        assert_eq!(entry.target_symbol, sym, "soft-constraint symbol");
+            .find(|m| m.target_symbol == sym)
+            .unwrap_or_else(|| panic!("mapping for {sym}"));
+        assert_eq!(
+            entry.ckc_node_id, "conflict_norm_bl_contradiction",
+            "repair maps to the owning conflict node"
+        );
         let spans: Vec<&str> = entry.source_span_ids.iter().map(|s| s.as_str()).collect();
-        assert_eq!(spans, conflict_spans, "conflict spans for {repair_type}");
+        assert_eq!(spans, conflict_spans, "conflict spans for {sym}");
         assert!(
             target.artifact_text.contains(sym),
             "{sym} appears in the program"
