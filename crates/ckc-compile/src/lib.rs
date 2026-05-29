@@ -17,6 +17,7 @@ pub use ckc_core::enums::TargetLanguage;
 
 pub mod asp;
 pub mod datalog;
+pub mod lean;
 pub mod smt;
 
 const RULES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/rules.json");
