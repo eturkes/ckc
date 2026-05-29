@@ -278,8 +278,9 @@ pub fn decision_table_gap(bundle: &CompileBundle) -> Option<BTreeMap<String, f64
 /// rows overlap (a pair fires together under differing outputs) and leave a gap (a
 /// point firing no row).
 ///
-/// Runs [`decision_table_overlap`] over `bundle.decision_tables`; with no
-/// overlapping unique-policy pair the scan reports nothing. On a hit it assembles
+/// Runs [`decision_table_overlap`] and [`decision_table_gap`] over
+/// `bundle.decision_tables`; unless both fire — an overlapping unique-policy pair and
+/// a gap point — the scan reports nothing. On a hit it assembles
 /// one [`Conflict`] with the computed verdict — `conflict_type =
 /// "decision_table_overlap"`, `classification = TrueConflict`, `severity = Medium`
 /// — and the real evidence linkage from `report`: the witness behind
@@ -295,9 +296,11 @@ pub fn detect_decision_table_defects(
     bundle: &CompileBundle,
     report: &VerificationReport,
 ) -> Vec<Conflict> {
-    // Detection drives emission: report only when the scan finds an overlapping
-    // unique-policy row pair, not merely because the oracle carries the class.
-    if decision_table_overlap(bundle).is_none() {
+    // Detection drives emission: report only when both scans fire — an overlapping
+    // unique-policy row pair AND a gap point firing no row — not merely because the
+    // oracle carries the class. The SPEC #14 defect is the conjunction, so both
+    // [`decision_table_overlap`] and [`decision_table_gap`] gate emission.
+    if decision_table_overlap(bundle).is_none() || decision_table_gap(bundle).is_none() {
         return Vec::new();
     }
     let oracle = conflict_oracle(bundle, "decision_table_overlap");
@@ -321,7 +324,7 @@ pub fn detect_decision_table_defects(
     vec![conflict]
 }
 
-/// The Event-Calculus certificate key (SPEC 15.1 #6/#7): the clingo check over the
+/// The Event-Calculus certificate key (SPEC 15.1 #6): the clingo check over the
 /// `logic/asp/event_calculus.lp` narrative target — the deterministic
 /// `cert_clingo_event_calculus` id the 0.9 builder emits. [`link::witness_for_cert`]
 /// and [`link::minimal_artifact_set`] resolve it to the real EC witness and
@@ -345,28 +348,31 @@ fn administer_time(narrative: &EventNarrative) -> Option<f64> {
         .and_then(|h| h.get("time").and_then(Value::as_f64))
 }
 
-/// Whether `fluent` genuinely holds at time `t` under Event-Calculus persistence: an
-/// event initiates it at some time at or before `t`, and no event terminates it at a
-/// time before `t`. Once initiated and never clipped, the fluent persists to `t`.
+/// Whether `fluent` genuinely holds at time `t` under Event-Calculus persistence,
+/// matching the `holdsAt`/`stoppedIn` convention of `logic/asp/event_calculus.lp`: an
+/// event initiates it at some time `ti < t` (strict, per the `.lp` `T1 < T2` guard),
+/// and no event terminates it inside the open interval `(ti, t)` (per `stoppedIn`'s
+/// `T1 < T < T2`). The clip check is interval-local to each initiation, so a
+/// terminate at or before an initiation never spuriously clears it. Once initiated
+/// and never clipped within its interval, the fluent persists to `t`.
 fn persists_until(narrative: &EventNarrative, fluent: &str, t: f64) -> bool {
-    let initiated = narrative.initiates.iter().any(|i| {
+    narrative.initiates.iter().any(|i| {
         i.get("fluent").and_then(Value::as_str) == Some(fluent)
-            && i.get("time")
-                .and_then(Value::as_f64)
-                .is_some_and(|ti| ti <= t)
-    });
-    let cleared = narrative.terminates.iter().any(|term| {
-        term.get("fluent").and_then(Value::as_str) == Some(fluent)
-            && term
-                .get("time")
-                .and_then(Value::as_f64)
-                .is_some_and(|tt| tt < t)
-    });
-    initiated && !cleared
+            && i.get("time").and_then(Value::as_f64).is_some_and(|ti| {
+                ti < t
+                    && !narrative.terminates.iter().any(|term| {
+                        term.get("fluent").and_then(Value::as_str) == Some(fluent)
+                            && term
+                                .get("time")
+                                .and_then(Value::as_f64)
+                                .is_some_and(|tt| ti < tt && tt < t)
+                    })
+            })
+    })
 }
 
 /// Whether `narrative` exhibits the allergy-persistence temporal violation
-/// (SPEC 15.1 #6/#7): a `holds_query` asserts a fluent still holds (`expected = true`)
+/// (SPEC 15.1 #6): a `holds_query` asserts a fluent still holds (`expected = true`)
 /// at the `administer_drug` time, and that fluent — initiated earlier and terminated
 /// by no event before then ([`persists_until`]) — genuinely persists there, so the
 /// contraindication is active when the drug is given. Over the toy bundle the single
@@ -401,7 +407,7 @@ pub fn ec_violated_constraints(report: &VerificationReport) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Detect the Event-Calculus temporal violation (SPEC 15.1 #6/#7): the persistence
+/// Detect the Event-Calculus temporal violation (SPEC 15.1 #6): the persistence
 /// defect where the contraindication fluent `allergy_known`, initiated at the
 /// allergy-detection event and never terminated, still holds when `administer_drug`
 /// fires — so the drug is given under an active contraindication.

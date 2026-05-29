@@ -366,6 +366,41 @@ technically derivable but easily forgotten under token pressure.
   compiled_target + 5 source_artifact + 11 certificate + 11 execution_witness
   nodes; 10 checks + 14 derived_from + 11 witnessed_by edges.
 
+- [2026-05-30] Conflict-detector invariants (task 0.10 Type-R review corrections).
+  (1) The Rust Event-Calculus persistence mirror
+  `ckc-conflict::detect::persists_until` must match `logic/asp/event_calculus.lp`
+  exactly: initiation is STRICT (`ti < t`, the `.lp` `holdsAt` `T1 < T2` guard) and
+  clipping is OPEN-INTERVAL per `stoppedIn` (`ti < tt < t`), evaluated interval-local
+  to each initiation — NOT a global `<=`-initiation plus any-earlier-terminate test
+  (the pre-review form, which mis-clips a terminate at/before initiation and admits
+  `ti == t`). Re-verify any later temporal mirror against the `.lp` clauses, not
+  intuition. (2) "Detection drives emission" for a SPEC defect defined as a
+  CONJUNCTION must gate on EVERY conjunct: the #14 decision-table defect is overlap
+  AND gap, so both `decision_table_overlap` and `decision_table_gap` gate
+  `detect_decision_table_defects` (gap was load-bearing in name only before). Apply
+  to any future multi-condition detector. Both fixes were byte-identical on the toy
+  bundle (same verdict, same emitted set), so no committed cert/golden regen.
+
+## Known issues
+
+- [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
+  decision, not a code bug.) Norm-conflict double-resolution in
+  `examples/research_kernel/fixtures/rules.json`: the sepsis/anaphylaxis pair is
+  resolved TWICE in the same direction —
+  `rule_bl_anaphylaxis_contra.priority_over=[rule_sepsis_bl_recommend]` AND
+  `rule_sepsis_bl_recommend.exceptions=[beta_lactam_anaphylaxis]` — yet
+  `conflicts.json` / `detect_norm_contradiction` still emit it as a
+  `norm_contradiction` `TrueConflict` (severity High) carrying human-review
+  questions, with repair candidates `add_priority` + `add_exception` that DUPLICATE
+  resolutions already present in the fixtures. Tension: an already-resolved pair is
+  presented as an unresolved conflict needing adjudication. NOT patched in a
+  per-task review — reconciling it is a scenario-design decision (does the demo mean
+  to surface a latent-but-resolved contradiction, or a genuinely unprioritized one?)
+  that ripples across committed compile (superiority graph + priority datalog/alloy),
+  verify (norm-conflict certificate), and conflict (conflict + argument graph +
+  repair) artifacts and needs cross-crate regen + re-review. Resolve as a dedicated
+  future task before treating the norm-conflict scenario as authoritative.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can
