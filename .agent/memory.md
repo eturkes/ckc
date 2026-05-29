@@ -253,7 +253,8 @@ technically derivable but easily forgotten under token pressure.
   present). It ships a headless CLI (Main-Class
   `org.alloytools.alloy.core.infra.Alloy`): invoke
   `java -jar alloy.jar exec <file.als>` (add `-Djava.awt.headless=true` for
-  safety). It prints one line per command, e.g.
+  safety). It prints one line per command to **stderr** (stdout stays empty —
+  confirmed task 0.9.7 when a live test read stdout and matched nothing), e.g.
   `00. check NoPriorityCycle    0    UNSAT`. For a `check`, `UNSAT` means NO
   counterexample exists (assertion holds); `SAT` would report a counterexample.
   So the 0.8.12 emitter's `logic/alloy/Priority.als` acyclicity check returns

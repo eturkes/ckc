@@ -8,7 +8,7 @@
 //! still matches the solvers. [`solver_available`] is the binary guard that lets a
 //! solver-less environment skip the live tests while the rest of the suite passes.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::verdict::{VerdictStatus, VerifierOutcome};
@@ -93,6 +93,64 @@ pub fn run_souffle(artifact_abs: &Path, cwd: &Path) -> anyhow::Result<RunResult>
 pub fn run_lean(artifact_abs: &Path) -> anyhow::Result<RunResult> {
     let mut cmd = Command::new("lean");
     cmd.arg(artifact_abs);
+    capture(cmd)
+}
+
+/// Resolve the bundled TLA+ tools jar at `$HOME/.local/share/tla/tla2tools.jar`
+/// (it carries both SANY and TLC). There is no standalone SANY binary, so the
+/// model-check live test guards on this path's `Path::exists` alongside
+/// `solver_available("java")` rather than a `solver_available` shim.
+pub fn tla_tools_jar() -> PathBuf {
+    local_share().join("tla/tla2tools.jar")
+}
+
+/// Resolve the Alloy distribution jar at `$HOME/.local/share/alloy/alloy.jar`.
+/// Like [`tla_tools_jar`], the model-check live test guards on its `Path::exists`
+/// plus `solver_available("java")`.
+pub fn alloy_jar() -> PathBuf {
+    local_share().join("alloy/alloy.jar")
+}
+
+/// `$HOME/.local/share`, resolved through `HOME`. A missing `HOME` yields a
+/// relative path that fails `Path::exists`, so the jar guards skip the model-check
+/// live tests cleanly rather than erroring.
+fn local_share() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/share")
+}
+
+/// Run the TLA+ SANY syntax+semantic checker over one `.tla` module:
+/// `java -cp <tla2tools.jar> tla2sany.SANY <artifact_abs>`. SANY prints its
+/// `Parsing file …` / `Semantic processing of module …` progress to stdout and
+/// exits 0 on a clean module, emitting explicit error lines (and a nonzero exit) on
+/// any syntax/semantic fault. A clean exit-0 run carrying the
+/// `Semantic processing of module <name>` line with no `error`/`Abort` is the
+/// `semantic_check_passed` (C4) verdict the caller re-derives. The jar resolves via
+/// [`tla_tools_jar`]; the caller guards on java + jar existence.
+pub fn run_tla_sany(artifact_abs: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("java");
+    cmd.arg("-cp")
+        .arg(tla_tools_jar())
+        .arg("tla2sany.SANY")
+        .arg(artifact_abs);
+    capture(cmd)
+}
+
+/// Run the Alloy Analyzer's headless CLI over one `.als` module:
+/// `java -jar <alloy.jar> exec <artifact_abs>`, executed from `cwd`. `exec`
+/// materializes a `<Module>/receipt.json` directory relative to its working dir, so
+/// the caller passes a scratch CWD to keep the repo clean (the Phase-0
+/// `Priority.als` writes `Priority/`). Alloy prints one result line per command;
+/// for a `check`, a trailing `UNSAT` means no counterexample exists — the acyclic
+/// priority graph — which is the `no_counterexample` (C4) verdict the caller
+/// re-derives. The jar resolves via [`alloy_jar`]; the caller guards on java + jar
+/// existence.
+pub fn run_alloy(artifact_abs: &Path, cwd: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("java");
+    cmd.arg("-jar")
+        .arg(alloy_jar())
+        .arg("exec")
+        .arg(artifact_abs)
+        .current_dir(cwd);
     capture(cmd)
 }
 
