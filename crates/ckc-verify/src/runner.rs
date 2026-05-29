@@ -61,6 +61,17 @@ pub fn run_cvc5_proof(artifact_abs: &Path) -> anyhow::Result<RunResult> {
     capture(cmd)
 }
 
+/// Run clingo over one ASP artifact: `clingo <artifact_abs>`. clingo prints its
+/// answer set(s) then a standalone `SATISFIABLE`/`UNSATISFIABLE` line. It encodes
+/// the result in its exit code as the clasp bitmask (SAT = 10, EXHAUST = 20, so a
+/// satisfiable+enumerated program exits 30), never 0 — so callers read the verdict
+/// from stdout via [`parse_clingo_status`] and treat exit `{10, 30}` as success.
+pub fn run_clingo(artifact_abs: &Path) -> anyhow::Result<RunResult> {
+    let mut cmd = Command::new("clingo");
+    cmd.arg(artifact_abs);
+    capture(cmd)
+}
+
 /// Decode an SMT-LIB solver's leading `(check-sat)` response token into a
 /// [`VerdictStatus`]: `unsat` -> `Unsat`, `sat` -> `Sat`. Returns `None` for
 /// `unknown` or any other first token. Shared by the z3 and cvc5 runners, which
@@ -71,6 +82,18 @@ pub fn parse_smt_status(stdout: &str) -> Option<VerdictStatus> {
         "sat" => Some(VerdictStatus::Sat),
         _ => None,
     }
+}
+
+/// Decode clingo's solve-result line into a [`VerdictStatus`]. clingo prints a
+/// standalone `SATISFIABLE`/`UNSATISFIABLE` token after its answer sets; this
+/// returns `Some(Satisfiable)` on an exact `SATISFIABLE` token (splitting on
+/// whitespace guards against the `UNSATISFIABLE` superstring) and `None`
+/// otherwise. Both Phase-0 ASP targets are satisfiable.
+pub fn parse_clingo_status(stdout: &str) -> Option<VerdictStatus> {
+    stdout
+        .split_whitespace()
+        .any(|tok| tok == "SATISFIABLE")
+        .then_some(VerdictStatus::Satisfiable)
 }
 
 /// Extract the optimization objective from a z3 `(get-objectives)` block. The
