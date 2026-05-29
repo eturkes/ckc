@@ -209,10 +209,13 @@ technically derivable but easily forgotten under token pressure.
   committed golden; (3) one subtask to write+commit the human-readable artifact
   files with a byte-identical regen gate; (4) ONE consolidated golden over a
   compact hash manifest that byte-locks every artifact; (5) CAS
-  persistence/determinism as its own subtask. Also defer all external-tool
-  invocation (souffle/z3/clingo/lean parse-checks) to the verification task
-  rather than PATH-guarding it inside emit subtasks — that keeps emit subtasks
-  tool-free and smaller.
+  persistence/determinism as its own subtask. Keep *committed* emit-subtask
+  tests solver-independent so solver-less containers stay green — the
+  PATH-guarded parse/solve checks are the 0.9 verification task per the roadmap.
+  That is a test-placement choice only: install and run any solver
+  (z3/cvc5/clingo/souffle/lean) freely at any time, including dev-time sanity
+  checks of emitted artifacts during emit subtasks (CLAUDE.md standing
+  authorization).
 
 ## Mistakes
 
