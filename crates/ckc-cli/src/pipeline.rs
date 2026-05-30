@@ -7,8 +7,9 @@ use std::path::Path;
 
 use anyhow::bail;
 
+use crate::emit::write_artifact;
 use crate::manifest::{RunManifest, RunManifestEntry};
-use ckc_compile::CompileBundle;
+use ckc_compile::{ARTIFACT_PATHS, CompileBundle, compile_all, portfolio_manifest};
 use ckc_verify::VerificationReport;
 
 /// Load the [`CompileBundle`] for a run. Phase-0 serves only the committed
@@ -24,12 +25,29 @@ pub fn load_bundle(path: &str) -> anyhow::Result<CompileBundle> {
 }
 
 /// Compile stage (task 0.11.2): emit the SPEC-14 target portfolio under `out_dir`.
+///
+/// Writes each [`compile_all`] target's `artifact_text` to its canonical
+/// [`ARTIFACT_PATHS`] slot under `out_dir`, returning one `compile`-stage
+/// [`RunManifestEntry`] per target. Each entry carries the `content_hash` that
+/// [`portfolio_manifest`] byte-locks its target with, so the run manifest pins
+/// every emitted artifact by hash.
 pub fn run_compile(
     bundle: &CompileBundle,
     out_dir: &Path,
 ) -> anyhow::Result<Vec<RunManifestEntry>> {
-    let _ = (bundle, out_dir);
-    bail!("pending")
+    let targets = compile_all(bundle);
+    let manifest = portfolio_manifest(bundle);
+    let mut entries = Vec::with_capacity(targets.len());
+    for ((target, rel), entry) in targets.iter().zip(ARTIFACT_PATHS).zip(manifest.0) {
+        write_artifact(out_dir, rel, target.artifact_text.as_bytes())?;
+        entries.push(RunManifestEntry {
+            stage: "compile".to_string(),
+            artifact_kind: "compiled_target".to_string(),
+            artifact_path: rel.to_string(),
+            content_hash: entry.content_hash,
+        });
+    }
+    Ok(entries)
 }
 
 /// Verify stage (task 0.11.3): emit certificates, witnesses, the certificate
