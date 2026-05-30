@@ -285,7 +285,18 @@ name = "ckc-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "ckc-compile",
+ "ckc-conflict",
+ "ckc-core",
+ "ckc-retrieve",
+ "ckc-store",
+ "ckc-term",
+ "ckc-verify",
  "clap",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

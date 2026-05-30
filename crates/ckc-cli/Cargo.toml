@@ -9,5 +9,18 @@ name = "ckc"
 path = "src/main.rs"
 
 [dependencies]
+ckc-core = { path = "../ckc-core" }
+ckc-compile = { path = "../ckc-compile" }
+ckc-verify = { path = "../ckc-verify" }
+ckc-conflict = { path = "../ckc-conflict" }
+ckc-term = { path = "../ckc-term" }
+ckc-retrieve = { path = "../ckc-retrieve" }
+ckc-store = { path = "../ckc-store" }
 clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
 anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
