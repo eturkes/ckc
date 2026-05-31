@@ -8,8 +8,11 @@ use anyhow::bail;
 use crate::emit::write_artifact;
 use crate::manifest::{RunManifest, RunManifestEntry};
 use ckc_compile::{ARTIFACT_PATHS, CompileBundle, compile_all, portfolio_manifest};
-use ckc_conflict::{conflict_manifest, detect_all};
+use ckc_conflict::{ConflictReport, detect_all};
 use ckc_core::canonical::{content_hash, to_canonical_bytes};
+use ckc_core::clinical::ClinicalClaim;
+use ckc_core::source::CorpusDocument;
+use ckc_report::{assemble_report, load_claims, load_documents};
 use ckc_retrieve::{RetrievalQuery, RetrievalResult, SparseIndex};
 use ckc_term::TerminologyGraph;
 use ckc_term::rdf::export_skos_turtle;
@@ -120,43 +123,46 @@ pub fn run_verify(
 }
 
 /// Conflicts stage (task 0.11.4): emit the SPEC-15 conflict artifact set under
-/// `out_dir`, detected over the verification `report`.
+/// `out_dir` from the already-detected `conflicts` report.
 ///
 /// Writes each [`Conflict`](ckc_conflict::Conflict) as `to_canonical_bytes` to its
 /// `certs/conflicts/<conflict_id>.json` slot and each
 /// [`ArgumentGraph`](ckc_conflict::ArgumentGraph) to
 /// `certs/argument_graphs/<argument_graph_id>.json` — mirroring task 0.10.9's
-/// `report_artifacts` layout byte-for-byte. The returned `conflicts`-stage entries
-/// come from [`conflict_manifest`], so each entry's `content_hash` byte-locks the
-/// file emitted at its path (4 entries: 3 conflicts, 1 argument graph).
+/// `report_artifacts` layout byte-for-byte. Each returned `conflicts`-stage
+/// entry's `content_hash` byte-locks the file emitted at its path, in the same
+/// conflicts-then-argument-graphs order [`conflict_manifest`] uses (4 entries: 3
+/// conflicts, 1 argument graph). Detection is hoisted to [`run_pipeline`], which
+/// runs the single [`detect_all`] and shares the report with [`run_report`].
 pub fn run_conflicts(
-    bundle: &CompileBundle,
-    report: &VerificationReport,
+    conflicts: &ConflictReport,
     out_dir: &Path,
 ) -> anyhow::Result<Vec<RunManifestEntry>> {
-    let detected = detect_all(bundle, report);
-    for conflict in &detected.conflicts {
+    let mut entries =
+        Vec::with_capacity(conflicts.conflicts.len() + conflicts.argument_graphs.len());
+    for conflict in &conflicts.conflicts {
         let rel = format!("certs/conflicts/{}.json", conflict.conflict_id.as_str());
         write_artifact(out_dir, &rel, &to_canonical_bytes(conflict))?;
+        entries.push(RunManifestEntry {
+            stage: "conflicts".to_string(),
+            artifact_kind: "conflict".to_string(),
+            artifact_path: rel,
+            content_hash: content_hash(conflict),
+        });
     }
-    for graph in &detected.argument_graphs {
+    for graph in &conflicts.argument_graphs {
         let rel = format!(
             "certs/argument_graphs/{}.json",
             graph.argument_graph_id.as_str()
         );
         write_artifact(out_dir, &rel, &to_canonical_bytes(graph))?;
-    }
-
-    let entries = conflict_manifest(bundle, report)
-        .0
-        .into_iter()
-        .map(|e| RunManifestEntry {
+        entries.push(RunManifestEntry {
             stage: "conflicts".to_string(),
-            artifact_kind: e.artifact_kind,
-            artifact_path: e.artifact_path,
-            content_hash: e.content_hash,
-        })
-        .collect();
+            artifact_kind: "argument_graph".to_string(),
+            artifact_path: rel,
+            content_hash: content_hash(graph),
+        });
+    }
     Ok(entries)
 }
 
@@ -237,6 +243,33 @@ pub fn run_substrate(
     ])
 }
 
+/// Report stage (task 0.12.5): assemble the SPEC-21/23 bilingual [`Report`] over
+/// the run's already-computed artifacts and emit it to `out_dir/report.json`.
+///
+/// [`assemble_report`] composes the report from the compile `bundle`, the toy
+/// `claims`/`documents`, the `verification` portfolio, and the detected
+/// `conflicts` — the same inputs `ckc_report::assemble_toy_report` feeds the
+/// committed `report.json` golden (task 0.12.4), so the emitted bytes match it.
+/// Returns the single `report`-stage [`RunManifestEntry`] whose `content_hash`
+/// byte-locks the emitted report.
+pub fn run_report(
+    bundle: &CompileBundle,
+    claims: &[ClinicalClaim],
+    documents: &[CorpusDocument],
+    verification: &VerificationReport,
+    conflicts: &ConflictReport,
+    out_dir: &Path,
+) -> anyhow::Result<Vec<RunManifestEntry>> {
+    let report = assemble_report(bundle, claims, documents, verification, conflicts);
+    write_artifact(out_dir, "report.json", &to_canonical_bytes(&report))?;
+    Ok(vec![RunManifestEntry {
+        stage: "report".to_string(),
+        artifact_kind: "report".to_string(),
+        artifact_path: "report.json".to_string(),
+        content_hash: content_hash(&report),
+    }])
+}
+
 /// Canonical Phase-0 demo command recorded in every [`RunManifest`]. Held
 /// independent of the concrete `out_dir` — it names the clap `--out` default and
 /// the SPEC §25 invocation — so the manifest hash stays stable across output
@@ -251,8 +284,9 @@ const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
 /// independent pass over the same stages.
 ///
 /// Entries concatenate in pipeline order — compile (9) ++ verify (24) ++
-/// conflicts (4) ++ substrate (3) — so the manifest pins every emitted artifact
-/// by content hash, stage-ordered.
+/// conflicts (4) ++ substrate (3) ++ report (1) — so the manifest pins every
+/// emitted artifact by content hash, stage-ordered. Conflict detection runs once
+/// here ([`detect_all`]), shared by the conflicts and report stages.
 fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {
     if scenario != "research-kernel" {
         bail!("unsupported demo scenario {scenario:?}; Phase-0 serves research-kernel");
@@ -261,8 +295,17 @@ fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {
     let mut entries = run_compile(&bundle, out_dir)?;
     let (report, verify_entries) = run_verify(&bundle, out_dir)?;
     entries.extend(verify_entries);
-    entries.extend(run_conflicts(&bundle, &report, out_dir)?);
+    let conflicts = detect_all(&bundle, &report);
+    entries.extend(run_conflicts(&conflicts, out_dir)?);
     entries.extend(run_substrate(&bundle, out_dir)?);
+    entries.extend(run_report(
+        &bundle,
+        &load_claims(),
+        &load_documents(),
+        &report,
+        &conflicts,
+        out_dir,
+    )?);
     Ok(RunManifest {
         command: DEMO_COMMAND.to_string(),
         producer_version: env!("CARGO_PKG_VERSION").to_string(),

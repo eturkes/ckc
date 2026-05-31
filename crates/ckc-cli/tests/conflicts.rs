@@ -7,9 +7,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ckc_cli::conflict_manifest;
 use ckc_cli::pipeline::{load_bundle, run_conflicts};
-use ckc_cli::verify_all;
+use ckc_cli::{conflict_manifest, detect_all, verify_all};
 
 /// Repository root, two levels above this crate's manifest, so the committed
 /// `certs/*` conflict artifacts resolve.
@@ -21,8 +20,9 @@ fn workspace_root() -> PathBuf {
 fn run_conflicts_emits_4_artifacts_matching_committed_certs() {
     let bundle = load_bundle("examples/research_kernel").expect("load toy bundle");
     let report = verify_all(&bundle);
+    let conflicts = detect_all(&bundle, &report);
     let out = tempfile::tempdir().expect("tempdir");
-    let entries = run_conflicts(&bundle, &report, out.path()).expect("run_conflicts");
+    let entries = run_conflicts(&conflicts, out.path()).expect("run_conflicts");
 
     let manifest = conflict_manifest(&bundle, &report);
     assert_eq!(entries.len(), 4, "3 conflicts + 1 argument graph");
@@ -58,10 +58,11 @@ fn run_conflicts_emits_4_artifacts_matching_committed_certs() {
 fn run_conflicts_is_deterministic_across_runs() {
     let bundle = load_bundle("examples/research_kernel").expect("load toy bundle");
     let report = verify_all(&bundle);
+    let conflicts = detect_all(&bundle, &report);
     let a = tempfile::tempdir().expect("tempdir a");
     let b = tempfile::tempdir().expect("tempdir b");
-    let ea = run_conflicts(&bundle, &report, a.path()).expect("run a");
-    let eb = run_conflicts(&bundle, &report, b.path()).expect("run b");
+    let ea = run_conflicts(&conflicts, a.path()).expect("run a");
+    let eb = run_conflicts(&conflicts, b.path()).expect("run b");
     assert_eq!(ea, eb, "manifest entries identical across runs");
     for entry in &ea {
         let rel = &entry.artifact_path;

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use ckc_cli::{pipeline, verify_all};
+use ckc_cli::{detect_all, load_claims, load_documents, pipeline, verify_all};
 
 /// Default run output directory, shared by every subcommand's `--out` (SPEC §25
 /// names `runs/research`). The demo manifest's recorded command string is pinned
@@ -43,6 +43,14 @@ enum Command {
         #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
+    /// Assemble the SPEC-21/23 bilingual report JSON
+    Report {
+        /// Bundle path (Phase-0: examples/research_kernel)
+        bundle: String,
+        /// Output directory
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
+        out: PathBuf,
+    },
     /// Run a demo scenario end to end
     Demo {
         /// Scenario name
@@ -70,7 +78,21 @@ fn main() -> Result<()> {
         Command::Conflicts { bundle, out } => {
             let bundle = pipeline::load_bundle(&bundle)?;
             let report = verify_all(&bundle);
-            pipeline::run_conflicts(&bundle, &report, &out)?;
+            let conflicts = detect_all(&bundle, &report);
+            pipeline::run_conflicts(&conflicts, &out)?;
+        }
+        Command::Report { bundle, out } => {
+            let bundle = pipeline::load_bundle(&bundle)?;
+            let report = verify_all(&bundle);
+            let conflicts = detect_all(&bundle, &report);
+            pipeline::run_report(
+                &bundle,
+                &load_claims(),
+                &load_documents(),
+                &report,
+                &conflicts,
+                &out,
+            )?;
         }
         Command::Demo {
             scenario,

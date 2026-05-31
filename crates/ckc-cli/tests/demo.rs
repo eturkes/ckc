@@ -1,10 +1,11 @@
 //! Task 0.11.6 gate: `pipeline::run_demo` orchestrates the full Phase-0
 //! pipeline under a fresh output dir — compile ++ verify ++ conflicts ++
-//! substrate — assembles the deterministic [`RunManifest`], writes
+//! substrate ++ report — assembles the deterministic [`RunManifest`], writes
 //! `run_manifest.json`, and (with `--replay`) re-runs and hash-compares a second
 //! pass. Per-artifact byte identity lives in the per-stage gates
-//! (compile/verify/conflicts/substrate); this gate covers orchestration: stage
-//! composition, file presence, cross-location determinism, and the binary path.
+//! (compile/verify/conflicts/substrate/report); this gate covers orchestration:
+//! stage composition, file presence, cross-location determinism, and the binary
+//! path.
 
 use std::fs;
 
@@ -19,6 +20,12 @@ use ckc_cli::{
 /// its count is locked by the `run_substrate` gate, so this mirror is the
 /// expected contribution to the demo manifest.
 const SUBSTRATE_ENTRIES: usize = 3;
+
+/// Report-stage entry count: the single `report.json` artifact. Like the
+/// substrate stage, the report stage has no manifest function; its count is
+/// locked by the `run_report` gate, so this mirror is its expected contribution
+/// to the demo manifest (bringing the whole to 9+24+4+3+1 = 41).
+const REPORT_ENTRIES: usize = 1;
 
 #[test]
 fn run_demo_assembles_manifest_over_all_stages() {
@@ -45,10 +52,11 @@ fn run_demo_assembles_manifest_over_all_stages() {
         SUBSTRATE_ENTRIES,
         "substrate-stage entry count"
     );
+    assert_eq!(count("report"), REPORT_ENTRIES, "report-stage entry count");
     assert_eq!(
         manifest.entries.len(),
-        n_compile + n_verify + n_conflicts + SUBSTRATE_ENTRIES,
-        "manifest length equals the sum of the four stage manifests"
+        n_compile + n_verify + n_conflicts + SUBSTRATE_ENTRIES + REPORT_ENTRIES,
+        "manifest length equals the sum of the five stage manifests"
     );
 
     // Every manifest entry's artifact is on disk under out_dir, plus the cvc5

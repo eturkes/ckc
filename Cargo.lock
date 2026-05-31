@@ -288,6 +288,7 @@ dependencies = [
  "ckc-compile",
  "ckc-conflict",
  "ckc-core",
+ "ckc-report",
  "ckc-retrieve",
  "ckc-term",
  "ckc-verify",
