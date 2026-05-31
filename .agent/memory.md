@@ -396,6 +396,24 @@ technically derivable but easily forgotten under token pressure.
   re-derive deliberately the ones you accept. To prevent mutation entirely, run
   mutation-capable review agents under `isolation: 'worktree'`.
 
+- [2026-05-31] Subagent model enforcement (user feedback: spawned subagents keep
+  running on Haiku, violating the CLAUDE.md "always latest+largest Opus"
+  directive). Durable lever is the env var `CLAUDE_CODE_SUBAGENT_MODEL` in the
+  settings.json `env` block: it forces the model for ALL subagents + agent teams
+  and OUTRANKS the per-call `model` param, the agent-definition frontmatter, AND
+  parent inheritance (value `inherit` disables it). Set to `"opus"` in project
+  `.claude/settings.json` this session — the alias tracks the latest Opus, no
+  version drift. Root cause it closes: with no `.claude/agents/` defs and no env
+  override, each built-in `subagent_type` uses its OWN bundled default —
+  `Explore` and `claude-code-guide` are pinned to Haiku, while `general-purpose`
+  and `Plan` inherit the parent — so an omitted param silently ran the
+  search/guide agents on Haiku (hence the "often"). No settings.json KEY sets a
+  default subagent model; it must be this env var. The env var is read at
+  startup, so it applies only after a Claude Code restart — until the next
+  session, pass `model: "opus"` explicitly on every `Agent`/`Workflow agent()`
+  dispatch (param precedence beats the Haiku-pinned defaults). Precedence +
+  built-in defaults verified against code.claude.com/docs/en/{sub-agents,model-config}.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
