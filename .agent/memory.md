@@ -110,12 +110,16 @@ technically derivable but easily forgotten under token pressure.
   tests for every type" means "for each type that has roundtrip", not
   "produce N×3 mechanical assertions per type". Apply this when planning
   and when implementing.
-- [2026-05-29] Repo-layout scaffolding policy (this session): empty crates
-  and `.gitkeep`-only directories in the SPEC §19 target layout are added
-  by the roadmap phase that needs them, not pre-scaffolded. Phase 0 keeps
-  only `crates/{ckc-cli,ckc-core,ckc-store,ckc-retrieve,ckc-term}/`,
-  `examples/research_kernel/`, `schemas/`, `runs/`. SPEC.md §19 remains the
-  target-layout source; current state lags intentionally.
+- [2026-05-29] Repo-layout scaffolding policy: empty crates, `.gitkeep`-only
+  directories, AND unused declarative dependencies (`Cargo.toml` path-deps) in
+  the SPEC §19 target layout are added by the roadmap phase that first uses them,
+  not pre-scaffolded. SPEC.md §19 remains the target-layout source; current state
+  lags it intentionally. Type-A calibration trap: a subtask's prose may
+  over-specify a dep — task 0.11.1 told ckc-cli to declare `ckc-store`, unused
+  until 0.13's CAS-store-of-run, and the 0.11 Type-R review removed it. Add a
+  path-dep in the task whose code first `use`s it; sibling crates that genuinely
+  reach into `ckc_store` (ckc-compile/verify/conflict/term/retrieve, one ref each)
+  keep theirs.
 - [2026-05-29] When sed-deleting a multi-line comment block, also delete the
   continuation indent line that follows it (`        //         …`) — it
   becomes an orphaned half-sentence otherwise. Verify with grep before
@@ -380,6 +384,17 @@ technically derivable but easily forgotten under token pressure.
   `detect_decision_table_defects` (gap was load-bearing in name only before). Apply
   to any future multi-condition detector. Both fixes were byte-identical on the toy
   bundle (same verdict, same emitted set), so no committed cert/golden regen.
+
+- [2026-05-31] Review-workflow tree-mutation hygiene (Type-R via Workflow tool):
+  `agentType: 'Explore'` subagents are read-only by EDIT permission but still hold
+  `Bash`, so a verifier proving "the fix keeps gates green" can write files and
+  invalidate `Cargo.lock` (the 0.11 review left an untracked
+  `crates/ckc-cli/tests/common/mod.rs` from an e4 dedup experiment plus a
+  `Cargo.lock` with `ckc-store` dropped — an in-place test of a finding that was
+  later applied anyway). Always `git status` after a review workflow returns and
+  reconcile every stray path before staging: discard experiments you reject,
+  re-derive deliberately the ones you accept. To prevent mutation entirely, run
+  mutation-capable review agents under `isolation: 'worktree'`.
 
 ## Known issues
 

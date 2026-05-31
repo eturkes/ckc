@@ -1,7 +1,5 @@
 //! Run-pipeline stages (SPEC 18): load the bundle, then drive compile / verify /
-//! conflicts / substrate emission and the `demo` orchestration. Task 0.11.1
-//! lands the load entry point and the stage signatures; tasks 0.11.2–0.11.6
-//! fill in each stage body.
+//! conflicts / substrate emission and the `demo` orchestration.
 
 use std::path::Path;
 

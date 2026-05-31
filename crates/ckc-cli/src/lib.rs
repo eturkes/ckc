@@ -1,7 +1,7 @@
 //! `ckc` CLI library (SPEC 18). The binary (`src/main.rs`) is a thin clap shell;
 //! every command's work lives here so each pipeline stage stays unit-testable
-//! without spawning a process. Re-export the downstream crate surface the
-//! stages and tests drive against.
+//! without spawning a process. The `pub use` block below is the downstream-crate
+//! surface the stages and tests drive against.
 
 pub mod emit;
 pub mod manifest;

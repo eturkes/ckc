@@ -5,6 +5,11 @@ use clap::{Parser, Subcommand};
 
 use ckc_cli::{pipeline, verify_all};
 
+/// Default run output directory, shared by every subcommand's `--out` (SPEC §25
+/// names `runs/research`). The demo manifest's recorded command string is pinned
+/// separately in `pipeline::DEMO_COMMAND` for cross-location hash stability.
+const DEFAULT_OUT_DIR: &str = "runs/research";
+
 #[derive(Parser)]
 #[command(name = "ckc", about = "Clinical Knowledge Compiler")]
 struct Cli {
@@ -19,7 +24,7 @@ enum Command {
         /// Bundle path (Phase-0: examples/research_kernel)
         bundle: String,
         /// Output directory
-        #[arg(long, default_value = "runs/research")]
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
     /// Run solver/proof checks and emit certificates
@@ -27,7 +32,7 @@ enum Command {
         /// Bundle path (Phase-0: examples/research_kernel)
         bundle: String,
         /// Output directory
-        #[arg(long, default_value = "runs/research")]
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
     /// Detect logical incompatibilities and factual inconsistencies
@@ -35,7 +40,7 @@ enum Command {
         /// Bundle path (Phase-0: examples/research_kernel)
         bundle: String,
         /// Output directory
-        #[arg(long, default_value = "runs/research")]
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
     /// Run a demo scenario end to end
@@ -46,7 +51,7 @@ enum Command {
         #[arg(long)]
         replay: bool,
         /// Output directory
-        #[arg(long, default_value = "runs/research")]
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
 }

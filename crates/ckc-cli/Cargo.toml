@@ -15,7 +15,6 @@ ckc-verify = { path = "../ckc-verify" }
 ckc-conflict = { path = "../ckc-conflict" }
 ckc-term = { path = "../ckc-term" }
 ckc-retrieve = { path = "../ckc-retrieve" }
-ckc-store = { path = "../ckc-store" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
