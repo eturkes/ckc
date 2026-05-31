@@ -11,7 +11,11 @@ use crate::emit::write_artifact;
 use crate::manifest::{RunManifest, RunManifestEntry};
 use ckc_compile::{ARTIFACT_PATHS, CompileBundle, compile_all, portfolio_manifest};
 use ckc_conflict::{conflict_manifest, detect_all};
-use ckc_core::canonical::to_canonical_bytes;
+use ckc_core::canonical::{content_hash, to_canonical_bytes};
+use ckc_retrieve::{RetrievalQuery, RetrievalResult, SparseIndex};
+use ckc_term::TerminologyGraph;
+use ckc_term::rdf::export_skos_turtle;
+use ckc_term::shacl::validate_rules;
 use ckc_verify::{VerificationReport, verification_manifest, verify_all};
 
 /// The recorded cvc5 proof artifact, embedded so [`run_verify`] can place it
@@ -20,6 +24,14 @@ use ckc_verify::{VerificationReport, verification_manifest, verify_all};
 /// not a `verify_all` artifact, so it carries no run-manifest entry of its own.
 const CVC5_PROOF: &[u8] =
     include_bytes!("../../../examples/research_kernel/fixtures/cvc5_norm_conflict.proof");
+
+/// The committed Phase-0 retrieval queries, embedded so [`run_substrate`] can
+/// reproduce the `retrieval_results.json` snapshot without filesystem access.
+const QUERIES_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/queries.json");
+
+/// Top-k retrieval depth. Matches `ckc-retrieve/tests/persistence.rs` so the
+/// emitted result set equals the committed snapshot.
+const RETRIEVAL_TOP_K: usize = 5;
 
 /// Load the [`CompileBundle`] for a run. Phase-0 serves only the committed
 /// research-kernel toy bundle ([`CompileBundle::load_toy`]); any other path is a
@@ -150,14 +162,81 @@ pub fn run_conflicts(
     Ok(entries)
 }
 
-/// Substrate stage (task 0.11.5): emit the RDF/SHACL terminology artifacts and
-/// the retrieval results under `out_dir`.
+/// Substrate stage (task 0.11.5): emit the terminology, validation, and
+/// retrieval substrate under `out_dir`, returning three `substrate`-stage
+/// entries whose `content_hash` pins each emitted artifact in-memory.
+///
+/// - `terminology.ttl`: the SKOS/Turtle [`export_skos_turtle`] of the bundle's
+///   concepts, written as raw Turtle bytes (byte-identical to the committed
+///   `gen_fixtures` export — the export sorts by `concept_id`, so building the
+///   graph from the in-memory bundle reproduces it exactly).
+/// - `shacl_report.json`: the canonical-JSON [`validate_rules`] report over the
+///   bundle's rules (an accepted CKC artifact, SPEC 5.2).
+/// - `retrieval/retrieval_results.json`: the canonical-JSON `Vec<RetrievalResult>`
+///   from running the committed `queries.json` over a [`SparseIndex`]. The span
+///   set is sorted by `span_id` first so the corpus hash and index fingerprint
+///   match the `ckc-retrieve/tests/persistence.rs` snapshot; BM25 ranking is
+///   itself order-invariant (stable score/`span_id` sort).
 pub fn run_substrate(
     bundle: &CompileBundle,
     out_dir: &Path,
 ) -> anyhow::Result<Vec<RunManifestEntry>> {
-    let _ = (bundle, out_dir);
-    bail!("pending")
+    // (a) RDF/SKOS terminology export.
+    let mut graph = TerminologyGraph::new();
+    for concept in &bundle.concepts {
+        graph.insert(concept.clone());
+    }
+    let turtle = export_skos_turtle(&graph);
+    write_artifact(out_dir, "terminology.ttl", turtle.as_bytes())?;
+
+    // (b) SHACL rule-provenance report.
+    let shacl = validate_rules(&bundle.rules);
+    write_artifact(out_dir, "shacl_report.json", &to_canonical_bytes(&shacl))?;
+
+    // (c) Sparse BM25 retrieval over the committed queries.
+    let mut spans = bundle.spans.clone();
+    spans.sort_by(|a, b| a.span_id.as_str().cmp(b.span_id.as_str()));
+    let index = SparseIndex::build_from_spans(&spans)?;
+    let index_fingerprint = index.fingerprint().clone();
+    let corpus_hash = content_hash(&spans);
+    let queries: Vec<RetrievalQuery> =
+        serde_json::from_str(QUERIES_JSON).expect("toy queries.json must deserialize");
+    let mut results = Vec::with_capacity(queries.len());
+    for query in &queries {
+        let hits = index.search(&query.query_text, RETRIEVAL_TOP_K)?;
+        results.push(RetrievalResult {
+            query: query.clone(),
+            hits,
+            index_fingerprint: index_fingerprint.clone(),
+            corpus_hash: corpus_hash.clone(),
+        });
+    }
+    write_artifact(
+        out_dir,
+        "retrieval/retrieval_results.json",
+        &to_canonical_bytes(&results),
+    )?;
+
+    Ok(vec![
+        RunManifestEntry {
+            stage: "substrate".to_string(),
+            artifact_kind: "rdf_export".to_string(),
+            artifact_path: "terminology.ttl".to_string(),
+            content_hash: content_hash(&turtle),
+        },
+        RunManifestEntry {
+            stage: "substrate".to_string(),
+            artifact_kind: "shacl_report".to_string(),
+            artifact_path: "shacl_report.json".to_string(),
+            content_hash: content_hash(&shacl),
+        },
+        RunManifestEntry {
+            stage: "substrate".to_string(),
+            artifact_kind: "retrieval_result".to_string(),
+            artifact_path: "retrieval/retrieval_results.json".to_string(),
+            content_hash: content_hash(&results),
+        },
+    ])
 }
 
 /// Demo orchestration (task 0.11.6): run every stage under `out_dir`, assemble
