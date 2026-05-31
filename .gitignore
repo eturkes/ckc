@@ -8,6 +8,7 @@ dist/
 build/
 node_modules/
 .svelte-kit/
+ui/sveltekit-app/static/report.json
 .env
 .env.*
 *.duckdb
