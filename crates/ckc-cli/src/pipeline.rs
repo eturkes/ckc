@@ -10,6 +10,7 @@ use anyhow::bail;
 use crate::emit::write_artifact;
 use crate::manifest::{RunManifest, RunManifestEntry};
 use ckc_compile::{ARTIFACT_PATHS, CompileBundle, compile_all, portfolio_manifest};
+use ckc_conflict::{conflict_manifest, detect_all};
 use ckc_core::canonical::to_canonical_bytes;
 use ckc_verify::{VerificationReport, verification_manifest, verify_all};
 
@@ -108,15 +109,45 @@ pub fn run_verify(
     Ok((report, entries))
 }
 
-/// Conflicts stage (task 0.11.4): emit detected conflicts and argument graphs
-/// under `out_dir`.
+/// Conflicts stage (task 0.11.4): emit the SPEC-15 conflict artifact set under
+/// `out_dir`, detected over the verification `report`.
+///
+/// Writes each [`Conflict`](ckc_conflict::Conflict) as `to_canonical_bytes` to its
+/// `certs/conflicts/<conflict_id>.json` slot and each
+/// [`ArgumentGraph`](ckc_conflict::ArgumentGraph) to
+/// `certs/argument_graphs/<argument_graph_id>.json` — mirroring task 0.10.9's
+/// `report_artifacts` layout byte-for-byte. The returned `conflicts`-stage entries
+/// come from [`conflict_manifest`], so each entry's `content_hash` byte-locks the
+/// file emitted at its path (4 entries: 3 conflicts, 1 argument graph).
 pub fn run_conflicts(
     bundle: &CompileBundle,
     report: &VerificationReport,
     out_dir: &Path,
 ) -> anyhow::Result<Vec<RunManifestEntry>> {
-    let _ = (bundle, report, out_dir);
-    bail!("pending")
+    let detected = detect_all(bundle, report);
+    for conflict in &detected.conflicts {
+        let rel = format!("certs/conflicts/{}.json", conflict.conflict_id.as_str());
+        write_artifact(out_dir, &rel, &to_canonical_bytes(conflict))?;
+    }
+    for graph in &detected.argument_graphs {
+        let rel = format!(
+            "certs/argument_graphs/{}.json",
+            graph.argument_graph_id.as_str()
+        );
+        write_artifact(out_dir, &rel, &to_canonical_bytes(graph))?;
+    }
+
+    let entries = conflict_manifest(bundle, report)
+        .0
+        .into_iter()
+        .map(|e| RunManifestEntry {
+            stage: "conflicts".to_string(),
+            artifact_kind: e.artifact_kind,
+            artifact_path: e.artifact_path,
+            content_hash: e.content_hash,
+        })
+        .collect();
+    Ok(entries)
 }
 
 /// Substrate stage (task 0.11.5): emit the RDF/SHACL terminology artifacts and
