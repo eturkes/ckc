@@ -2,7 +2,7 @@
 //! `report.json` locks the full bilingual report (SPEC 21, 23) — the summary
 //! tallies plus every SPEC-21 conflict card — to its committed canonical bytes.
 //! `Report` composes already-normalized inputs, so it is compared only by
-//! canonical bytes and `content_hash`, never a deserialize -> `PartialEq`
+//! canonical bytes and `content_hash` rather than a deserialize -> `PartialEq`
 //! roundtrip: serde_json's f64 parse/format asymmetry (agent-memory 2026-05-29)
 //! can break that at ULP boundaries inside the embedded witness/normalized_view
 //! `serde_json::Value`s. Regenerate with
@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use ckc_core::canonical::{content_hash, to_canonical_bytes};
+use ckc_core::canonical::to_canonical_bytes;
 use ckc_report::assemble_toy_report;
 
 fn workspace_root() -> PathBuf {
@@ -55,7 +55,6 @@ fn report_structure_is_sane() {
 fn report_assembly_is_deterministic() {
     let first = assemble_toy_report();
     let second = assemble_toy_report();
-    assert_eq!(content_hash(&first), content_hash(&second));
     assert_eq!(to_canonical_bytes(&first), to_canonical_bytes(&second));
 }
 

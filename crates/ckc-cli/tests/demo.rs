@@ -32,7 +32,7 @@ fn run_demo_assembles_manifest_over_all_stages() {
     let out = tempfile::tempdir().expect("tempdir");
     let manifest = run_demo("research-kernel", true, out.path()).expect("run_demo");
 
-    // Per-stage entry counts sum to the whole, validating the four-stage
+    // Per-stage entry counts sum to the whole, validating the five-stage
     // concatenation against each stage's own manifest (substrate via its mirror).
     let bundle = load_bundle("examples/research_kernel").expect("bundle");
     let report = verify_all(&bundle);

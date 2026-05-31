@@ -454,6 +454,21 @@ technically derivable but easily forgotten under token pressure.
   repair) artifacts and needs cross-crate regen + re-review. Resolve as a dedicated
   future task before treating the norm-conflict scenario as authoritative.
 
+- [2026-06-01] (Task 0.12 review, completeness-critic finding; currently correct,
+  defer to a versioning task.) Cross-crate `producer_version` coupling:
+  `Report.producer_version` (ckc-report) and `RunManifest.producer_version`
+  (ckc-cli) each expand `env!("CARGO_PKG_VERSION")` in their OWN crate, and
+  `[workspace.package]` defines no `version` — every crate hardcodes
+  `version = "0.0.0"`. So the two `producer_version` values for one demo run
+  (embedded in `report.json` and `run_manifest.json`) agree only via the shared
+  `0.0.0` placeholder; the first independent crate bump would silently diverge
+  them. Same 0.0.0-pinning already in `artifact_meta`/`artifact_envelope`
+  (`ckc-core/0.0.0`). No live bug while all crates are 0.0.0, and no golden bytes
+  shift is pending. Resolve before the first real version (0.13+) by either
+  workspace-inheriting one version (`[workspace.package] version` +
+  `version.workspace = true` across crates) or sourcing every artifact's
+  producer_version from a single shared constant.
+
 ## Mistakes
 
 - [2026-05-27] `replace_all` is case-sensitive. A single replace_all pass can

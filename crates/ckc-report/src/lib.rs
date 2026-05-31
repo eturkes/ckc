@@ -135,8 +135,7 @@ pub fn load_documents() -> Vec<CorpusDocument> {
 /// conflict-taxonomy counts tallied over `conflicts.conflicts`. Both
 /// distributions are emitted in a deterministic order — depth ascending by
 /// [`CertificateClass`] (`C0 < … < C9`), taxonomy ascending by `conflict_type` —
-/// via `BTreeMap` accumulation, so the summary inherits the determinism of its
-/// already-normalized inputs.
+/// via `BTreeMap` accumulation.
 pub fn build_summary(
     bundle: &CompileBundle,
     claims: &[ClinicalClaim],
@@ -309,9 +308,9 @@ pub fn build_conflict_card(
 }
 
 /// The Phase-0 demo command (SPEC 18, 25) recorded as the report's `command`.
-/// Mirrors `ckc_cli::pipeline::DEMO_COMMAND` by value; the two live in separate
-/// crates (ckc-cli depends on ckc-report, never the reverse) so the literal is
-/// duplicated rather than shared, and must stay equal across both.
+/// Mirrors `ckc_cli::pipeline::DEMO_COMMAND` by value; the dependency runs one
+/// way (ckc-cli depends on ckc-report), so the literal is duplicated rather than
+/// shared, and must stay equal across both.
 const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
 
 /// Assemble the complete Phase-0 bilingual [`Report`] (SPEC 21, 23) for one

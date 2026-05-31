@@ -2,7 +2,7 @@
 // SPEC 21/23). The UI is a structural consumer of the committed report.json
 // artifact, so these interfaces track the Rust serde shape (snake_case fields,
 // string-valued enums). Severity / classification / conflict_type stay `string`
-// to avoid drifting from the Rust enums; the C0–C9 certificate ladder (SPEC 12.2)
+// to track the Rust enums exactly; the C0–C9 certificate ladder (SPEC 12.2)
 // is a stable closed set worth enumerating for the depth badge.
 
 export type CertificateClass =
