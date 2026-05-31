@@ -26,7 +26,11 @@ fn run_conflicts_emits_4_artifacts_matching_committed_certs() {
 
     let manifest = conflict_manifest(&bundle, &report);
     assert_eq!(entries.len(), 4, "3 conflicts + 1 argument graph");
-    assert_eq!(entries.len(), manifest.0.len(), "one entry per manifest row");
+    assert_eq!(
+        entries.len(),
+        manifest.0.len(),
+        "one entry per manifest row"
+    );
 
     let root = workspace_root();
     for (i, entry) in entries.iter().enumerate() {

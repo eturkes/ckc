@@ -239,10 +239,54 @@ pub fn run_substrate(
     ])
 }
 
-/// Demo orchestration (task 0.11.6): run every stage under `out_dir`, assemble
-/// the [`RunManifest`], and — when `replay` — prove the run hashes identically a
-/// second time.
+/// Canonical Phase-0 demo command recorded in every [`RunManifest`]. Held
+/// independent of the concrete `out_dir` — it names the clap `--out` default and
+/// the SPEC §25 invocation — so the manifest hash stays stable across output
+/// locations, the cross-run determinism the demo gate and Phase-0 acceptance
+/// require. (Standalone `ckc replay` against a committed `runs/research` manifest
+/// is task 0.13.)
+const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
+
+/// Run the full Phase-0 stage pipeline under `out_dir` and assemble the
+/// [`RunManifest`], without writing the manifest file itself. [`run_demo`] calls
+/// this once per pass so `--replay` can re-derive and hash-compare a second,
+/// independent pass over the same stages.
+///
+/// Entries concatenate in pipeline order — compile (9) ++ verify (24) ++
+/// conflicts (4) ++ substrate (3) — so the manifest pins every emitted artifact
+/// by content hash, stage-ordered.
+fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {
+    if scenario != "research-kernel" {
+        bail!("unsupported demo scenario {scenario:?}; Phase-0 serves research-kernel");
+    }
+    let bundle = load_bundle("examples/research_kernel")?;
+    let mut entries = run_compile(&bundle, out_dir)?;
+    let (report, verify_entries) = run_verify(&bundle, out_dir)?;
+    entries.extend(verify_entries);
+    entries.extend(run_conflicts(&bundle, &report, out_dir)?);
+    entries.extend(run_substrate(&bundle, out_dir)?);
+    Ok(RunManifest {
+        command: DEMO_COMMAND.to_string(),
+        producer_version: env!("CARGO_PKG_VERSION").to_string(),
+        entries,
+    })
+}
+
+/// Demo orchestration (task 0.11.6): run every Phase-0 stage under `out_dir`,
+/// assemble the deterministic [`RunManifest`], write it to
+/// `out_dir/run_manifest.json`, and — when `replay` — re-run the whole pipeline
+/// a second time and fail if the second pass hashes differently. The replay pass
+/// re-emits into the same `out_dir` (idempotent, byte-identical writes), so a
+/// clean replay proves the stages are reproducible end to end.
 pub fn run_demo(scenario: &str, replay: bool, out_dir: &Path) -> anyhow::Result<RunManifest> {
-    let _ = (scenario, replay, out_dir);
-    bail!("pending")
+    let manifest = run_pipeline(scenario, out_dir)?;
+    write_artifact(out_dir, "run_manifest.json", &to_canonical_bytes(&manifest))?;
+    if replay {
+        let replayed = run_pipeline(scenario, out_dir)?;
+        let (got, want) = (content_hash(&replayed), content_hash(&manifest));
+        if got != want {
+            bail!("replay hash mismatch: second pass {got} != first {want}");
+        }
+    }
+    Ok(manifest)
 }

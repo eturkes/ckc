@@ -33,7 +33,11 @@ fn run_verify_emits_24_artifacts_matching_committed_certs() {
         24,
         "11 certificates + 11 witnesses + the graph + the assurance seed"
     );
-    assert_eq!(entries.len(), manifest.0.len(), "one entry per manifest row");
+    assert_eq!(
+        entries.len(),
+        manifest.0.len(),
+        "one entry per manifest row"
+    );
 
     let root = workspace_root();
     for (i, entry) in entries.iter().enumerate() {
