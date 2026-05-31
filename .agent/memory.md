@@ -414,6 +414,26 @@ technically derivable but easily forgotten under token pressure.
   dispatch (param precedence beats the Haiku-pinned defaults). Precedence +
   built-in defaults verified against code.claude.com/docs/en/{sub-agents,model-config}.
 
+- [2026-05-31] Reasoning-effort enforcement (companion to the subagent-model
+  lever above; user: "ensure we are using max"). Opus 4.8 effort tiers are
+  low/medium/high/xhigh/max, DEFAULT `high`, and switching INTO Opus 4.8 resets
+  effort to that default — so persistence matters. `max` = deepest tier, no
+  token-spend cap; it supersedes `MAX_THINKING_TOKENS` and the `ultrathink`
+  keyword on adaptive models (neither raises it further — set neither).
+  PERSISTENCE NUANCE: `max` is session-only via the `--effort` flag, `/effort`,
+  and the `effortLevel` settings KEY (that key accepts only low/medium/high/
+  xhigh) — it survives across sessions ONLY through env var
+  `CLAUDE_CODE_EFFORT_LEVEL`, which also outranks the key, `/effort`, and
+  per-agent `effort` frontmatter. Set `"max"` in project `.claude/settings.json`
+  `env`. PROPAGATION: no dedicated subagent-effort var exists; subagent/teammate
+  `effort` frontmatter defaults to inherit-from-session, so the session env var
+  drives them to max too (our `.claude/agents/` is empty → nothing overrides
+  down). Binary-confirmed (2.1.158): `CLAUDE_CODE_EFFORT_LEVEL` is the READ
+  control; the live `CLAUDE_EFFORT` var is an EXPORT for hooks/`${CLAUDE_EFFORT}`
+  templates (not an input) — a live `CLAUDE_EFFORT=max` only reports the current
+  session (set via flag/`/effort`) and does NOT persist. Applies after restart;
+  fast mode (/fast) is orthogonal and does not lower effort.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
