@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report",
+  "description": "The Phase-0 bilingual report (SPEC 21, 23) for one compile bundle: the run\ncommand, the producer version, a [`ReportSummary`], and one [`ConflictCard`]\nper detected conflict in the §21 card order.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string"
+    },
+    "conflict_cards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ConflictCard"
+      }
+    },
+    "producer_version": {
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/ReportSummary"
+    }
+  },
+  "required": [
+    "command",
+    "producer_version",
+    "summary",
+    "conflict_cards"
+  ],
+  "$defs": {
+    "CardCertificate": {
+      "description": "One certificate backing a [`ConflictCard`] (SPEC 21 element 6): its id, depth\nclass, and the solver/checker that produced it.",
+      "type": "object",
+      "properties": {
+        "certificate_class": {
+          "$ref": "#/$defs/CertificateClass"
+        },
+        "certificate_id": {
+          "type": "string"
+        },
+        "solver_or_checker": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate_id",
+        "certificate_class",
+        "solver_or_checker"
+      ]
+    },
+    "CardSpan": {
+      "description": "One source span shown on a [`ConflictCard`] (SPEC 21 element 1): the JA exact\nsource text and its table-cell anchor where present, kept source-first.",
+      "type": "object",
+      "properties": {
+        "display_text": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "raw_text": {
+          "type": "string"
+        },
+        "span_id": {
+          "type": "string"
+        },
+        "table_cell": true
+      },
+      "required": [
+        "span_id",
+        "raw_text",
+        "display_text",
+        "language"
+      ]
+    },
+    "CertificateClass": {
+      "description": "Certificate depth class (SPEC 12.2). Higher classes imply lower.\nVariant order matches depth: C0 < C1 < … < C9.",
+      "type": "string",
+      "enum": [
+        "C0-Parsed",
+        "C1-Schema",
+        "C2-Normal",
+        "C3-Grounded",
+        "C4-Executable",
+        "C5-Portfolio",
+        "C6-ProofObject",
+        "C7-Kernel",
+        "C8-Adjudicated",
+        "C9-Assured"
+      ]
+    },
+    "ConflictCard": {
+      "description": "One conflict card (SPEC 21) rendered JA-source-first: the conflict identity,\nits source spans, bilingual glosses and explanation, the normalized CKC\nview, the witness/model, the per-conflict certificate evidence and depth\nbadge, the repair candidates, the bilingual human-review question, and the\nadjudication status. Field order follows the §21 card order.",
+      "type": "object",
+      "properties": {
+        "adjudication_status": {
+          "type": "string"
+        },
+        "certificate_depth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CertificateClass"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "certificate_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CardCertificate"
+          }
+        },
+        "classification": {
+          "$ref": "#/$defs/ConflictClassification"
+        },
+        "conflict_id": {
+          "type": "string"
+        },
+        "conflict_type": {
+          "type": "string"
+        },
+        "explanation_en": {
+          "type": "string"
+        },
+        "explanation_ja": {
+          "type": "string"
+        },
+        "gloss_en": {
+          "type": "string"
+        },
+        "gloss_ja": {
+          "type": "string"
+        },
+        "human_review_question_en": {
+          "type": "string"
+        },
+        "human_review_question_ja": {
+          "type": "string"
+        },
+        "normalized_view": true,
+        "repair_candidates": {
+          "type": "array",
+          "items": true
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "source_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CardSpan"
+          }
+        },
+        "witness": {
+          "type": "array",
+          "items": true
+        }
+      },
+      "required": [
+        "conflict_id",
+        "conflict_type",
+        "severity",
+        "classification",
+        "source_spans",
+        "gloss_ja",
+        "gloss_en",
+        "normalized_view",
+        "explanation_ja",
+        "explanation_en",
+        "witness",
+        "certificate_evidence",
+        "repair_candidates",
+        "human_review_question_ja",
+        "human_review_question_en",
+        "adjudication_status"
+      ]
+    },
+    "ConflictClassification": {
+      "description": "Conflict classification (SPEC 15.4).",
+      "type": "string",
+      "enum": [
+        "true_conflict",
+        "likely_ambiguity",
+        "extraction_error",
+        "formalization_error",
+        "terminology_error",
+        "interop_compiler_error",
+        "stale_source",
+        "needs_clinician_adjudication"
+      ]
+    },
+    "DepthCount": {
+      "description": "One bucket of the certificate-depth distribution (SPEC 12.2, 23): a\ncertificate class and how many accepted certificates reached it.",
+      "type": "object",
+      "properties": {
+        "certificate_class": {
+          "$ref": "#/$defs/CertificateClass"
+        },
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "certificate_class",
+        "count"
+      ]
+    },
+    "ReportSummary": {
+      "description": "Run-level tallies (SPEC 23): corpus/extraction/claim/rule/conflict counts,\nthe certificate-depth distribution, and the conflict-taxonomy counts.",
+      "type": "object",
+      "properties": {
+        "certificate_depth_distribution": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DepthCount"
+          }
+        },
+        "conflict_taxonomy_counts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TaxonomyCount"
+          }
+        },
+        "n_claims": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "n_conflicts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "n_documents": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "n_rules": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "n_spans": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "n_documents",
+        "n_spans",
+        "n_claims",
+        "n_rules",
+        "n_conflicts",
+        "certificate_depth_distribution",
+        "conflict_taxonomy_counts"
+      ]
+    },
+    "Severity": {
+      "description": "Conflict / diagnostic severity. Variant order matches escalation.",
+      "type": "string",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "TaxonomyCount": {
+      "description": "One bucket of the conflict-taxonomy counts (SPEC 15, 23): a conflict type\nand how many detected conflicts carry it.",
+      "type": "object",
+      "properties": {
+        "conflict_type": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "conflict_type",
+        "count"
+      ]
+    }
+  }
+}

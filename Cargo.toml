@@ -5,6 +5,7 @@ members = [
     "crates/ckc-compile",
     "crates/ckc-conflict",
     "crates/ckc-core",
+    "crates/ckc-report",
     "crates/ckc-store",
     "crates/ckc-retrieve",
     "crates/ckc-term",
