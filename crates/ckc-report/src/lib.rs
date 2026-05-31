@@ -17,11 +17,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use ckc_compile::CompileBundle;
-use ckc_conflict::{Conflict, ConflictReport};
+use ckc_conflict::{Conflict, ConflictReport, detect_all};
 use ckc_core::canonical::content_hash;
 use ckc_core::clinical::ClinicalClaim;
 use ckc_core::source::{CorpusDocument, SourceSpan};
-use ckc_verify::VerificationReport;
+use ckc_verify::{VerificationReport, verify_all};
 
 pub use ckc_core::enums::{CertificateClass, ConflictClassification, Severity};
 
@@ -306,4 +306,56 @@ pub fn build_conflict_card(
         human_review_question_en: conflict.human_review_question_en.clone(),
         adjudication_status: "pending_adjudication".to_string(),
     }
+}
+
+/// The Phase-0 demo command (SPEC 18, 25) recorded as the report's `command`.
+/// Mirrors `ckc_cli::pipeline::DEMO_COMMAND` by value; the two live in separate
+/// crates (ckc-cli depends on ckc-report, never the reverse) so the literal is
+/// duplicated rather than shared, and must stay equal across both.
+const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
+
+/// Assemble the complete Phase-0 bilingual [`Report`] (SPEC 21, 23) for one
+/// compile bundle: the run [`DEMO_COMMAND`] and `CARGO_PKG_VERSION` producer
+/// version, the [`build_summary`] tallies, and one [`build_conflict_card`] per
+/// detected conflict. The cards are sorted by `(conflict_type, conflict_id)` so
+/// the report's card order is deterministic regardless of detection order,
+/// which the committed `report.json` golden depends on.
+pub fn assemble_report(
+    bundle: &CompileBundle,
+    claims: &[ClinicalClaim],
+    documents: &[CorpusDocument],
+    verification: &VerificationReport,
+    conflicts: &ConflictReport,
+) -> Report {
+    let mut conflict_cards: Vec<ConflictCard> = conflicts
+        .conflicts
+        .iter()
+        .map(|conflict| build_conflict_card(conflict, &bundle.spans, claims, verification))
+        .collect();
+    conflict_cards.sort_by(|a, b| {
+        a.conflict_type
+            .cmp(&b.conflict_type)
+            .then_with(|| a.conflict_id.cmp(&b.conflict_id))
+    });
+
+    Report {
+        command: DEMO_COMMAND.to_string(),
+        producer_version: env!("CARGO_PKG_VERSION").to_string(),
+        summary: build_summary(bundle, claims, documents, verification, conflicts),
+        conflict_cards,
+    }
+}
+
+/// Assemble the Phase-0 toy [`Report`] from the committed fixtures: the compiler
+/// [`CompileBundle::load_toy`] bundle, [`load_claims`]/[`load_documents`], the
+/// [`verify_all`] portfolio, and the [`detect_all`] conflicts over them. This is
+/// the single source of the committed `report.json` golden (task 0.12.4) and the
+/// `ckc report` demo artifact (task 0.12.5).
+pub fn assemble_toy_report() -> Report {
+    let bundle = CompileBundle::load_toy();
+    let claims = load_claims();
+    let documents = load_documents();
+    let verification = verify_all(&bundle);
+    let conflicts = detect_all(&bundle, &verification);
+    assemble_report(&bundle, &claims, &documents, &verification, &conflicts)
 }
