@@ -10,9 +10,17 @@
 //! those inputs, which the committed `report.json` golden (task 0.12.4)
 //! depends on.
 
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use ckc_compile::CompileBundle;
+use ckc_conflict::ConflictReport;
+use ckc_core::clinical::ClinicalClaim;
+use ckc_core::source::CorpusDocument;
+use ckc_verify::VerificationReport;
 
 pub use ckc_core::enums::{CertificateClass, ConflictClassification, Severity};
 
@@ -100,4 +108,72 @@ pub struct CardCertificate {
     pub certificate_id: String,
     pub certificate_class: CertificateClass,
     pub solver_or_checker: String,
+}
+
+const CLAIMS_JSON: &str = include_str!("../../../examples/research_kernel/fixtures/claims.json");
+const DOCUMENTS_JSON: &str =
+    include_str!("../../../examples/research_kernel/fixtures/documents.json");
+
+/// Load the Phase-0 toy [`ClinicalClaim`] set from the committed fixture
+/// embedded at compile time, mirroring [`ckc_compile::CompileBundle::load_toy`].
+/// Panics only when the committed fixture stops matching its `ckc-core` type,
+/// which is a build-time bug rather than a runtime condition.
+pub fn load_claims() -> Vec<ClinicalClaim> {
+    serde_json::from_str(CLAIMS_JSON).expect("toy claims.json must deserialize")
+}
+
+/// Load the Phase-0 toy [`CorpusDocument`] set from the committed fixture
+/// embedded at compile time, mirroring [`load_claims`].
+pub fn load_documents() -> Vec<CorpusDocument> {
+    serde_json::from_str(DOCUMENTS_JSON).expect("toy documents.json must deserialize")
+}
+
+/// Assemble the [`ReportSummary`] (SPEC 23) for one compile bundle: the
+/// corpus/extraction/claim/rule/conflict counts, the certificate-depth
+/// distribution tallied over `verification.certificates`, and the
+/// conflict-taxonomy counts tallied over `conflicts.conflicts`. Both
+/// distributions are emitted in a deterministic order — depth ascending by
+/// [`CertificateClass`] (`C0 < … < C9`), taxonomy ascending by `conflict_type` —
+/// via `BTreeMap` accumulation, so the summary inherits the determinism of its
+/// already-normalized inputs.
+pub fn build_summary(
+    bundle: &CompileBundle,
+    claims: &[ClinicalClaim],
+    documents: &[CorpusDocument],
+    verification: &VerificationReport,
+    conflicts: &ConflictReport,
+) -> ReportSummary {
+    let mut depth: BTreeMap<CertificateClass, usize> = BTreeMap::new();
+    for cert in &verification.certificates {
+        *depth.entry(cert.certificate_class).or_insert(0) += 1;
+    }
+    let certificate_depth_distribution = depth
+        .into_iter()
+        .map(|(certificate_class, count)| DepthCount {
+            certificate_class,
+            count,
+        })
+        .collect();
+
+    let mut taxonomy: BTreeMap<String, usize> = BTreeMap::new();
+    for conflict in &conflicts.conflicts {
+        *taxonomy.entry(conflict.conflict_type.clone()).or_insert(0) += 1;
+    }
+    let conflict_taxonomy_counts = taxonomy
+        .into_iter()
+        .map(|(conflict_type, count)| TaxonomyCount {
+            conflict_type,
+            count,
+        })
+        .collect();
+
+    ReportSummary {
+        n_documents: documents.len(),
+        n_spans: bundle.spans.len(),
+        n_claims: claims.len(),
+        n_rules: bundle.rules.len(),
+        n_conflicts: conflicts.conflicts.len(),
+        certificate_depth_distribution,
+        conflict_taxonomy_counts,
+    }
 }
