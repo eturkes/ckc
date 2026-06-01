@@ -180,8 +180,8 @@ mod tests {
     #[test]
     fn recall_at_k_caps_to_hits_len() {
         let (hits, rel) = recall_walkthrough();
-        // k=5 must equal k=4: trailing positions do not exist and must not
-        // pad the denominator either.
+        // k=5 equals k=4: positions beyond the available hits are absent, so
+        // the denominator stays capped at the number of hits.
         assert_eq!(recall_at_k(&hits, &rel, 5), 1.0);
     }
 

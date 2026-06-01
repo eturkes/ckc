@@ -23,12 +23,16 @@ impl std::fmt::Display for ContentHash {
     }
 }
 
-/// Serialize a `serde_json::Value` to RFC 8785 (JCS) canonical JSON bytes.
+/// Serialize a `serde_json::Value` to canonical JSON bytes.
 ///
 /// Key properties:
-/// - Object keys sorted by UTF-16 code unit comparison.
+/// - Object keys sorted by UTF-16 code-unit comparison (RFC 8785).
 /// - No insignificant whitespace.
-/// - Deterministic number and string formatting via serde_json.
+/// - Numbers/strings use serde_json's deterministic itoa/ryu formatting:
+///   byte-stable across runs and RFC 8785-equal for integers, but diverging
+///   from RFC 8785's ECMAScript number form for some non-integer floats
+///   (see the canonical-number known issue in `.agent/memory.md`). CKC's
+///   contract is cross-run byte-stability, which this satisfies.
 pub fn canonical_json_bytes(value: &Value) -> Vec<u8> {
     let mut buf = Vec::new();
     write_canonical(value, &mut buf);

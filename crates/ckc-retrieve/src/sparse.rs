@@ -1,8 +1,8 @@
 //! In-memory Tantivy + Lindera (IPADIC) BM25 sparse index over `SourceSpan`.
 //!
-//! Subtask 0.7.2 deliverable. The index is the sparse-retrieval oracle of the
-//! Phase-0 toy corpus and is the baseline that future dense/late-interaction
-//! retrievers must beat or match on the Japanese qrels.
+//! Subtask 0.7.2 deliverable. The index is the Phase-0 sparse-retrieval
+//! baseline over the toy corpus -- the reference that future dense/
+//! late-interaction retrievers must beat or match on the Japanese qrels.
 //!
 //! Determinism guarantees:
 //! - The `index_fingerprint` is the SHA-256 content hash (RFC 8785 canonical
@@ -148,9 +148,10 @@ impl SparseIndex {
     /// Build a fresh in-memory index over the given spans.
     ///
     /// Each span produces one Tantivy document with the five-field schema
-    /// described in [`SchemaFields`]. Order is preserved on the way in
-    /// (matters for tie-breaking in `TopDocs`); callers that want cross-run
-    /// rank stability should sort `spans` by `span_id` first.
+    /// described in [`SchemaFields`]. Input order influences only Tantivy's
+    /// internal doc-id assignment; `search` applies a post-collector stable
+    /// sort (score DESC, span_id ASC) that delivers cross-run rank stability
+    /// regardless of input order, so callers need not pre-sort `spans`.
     pub fn build_from_spans(spans: &[SourceSpan]) -> Result<Self> {
         let (schema, fields) = build_schema();
         let index = Index::create_in_ram(schema);

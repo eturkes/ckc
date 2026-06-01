@@ -12,7 +12,4 @@ schemars = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]
-ckc-core = { path = "../ckc-core", features = [] }
-schemars = { workspace = true }
-serde_json = { workspace = true }
 tempfile = { workspace = true }

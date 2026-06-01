@@ -244,11 +244,13 @@ impl TermEquivalence {
                 .push(concept_id.clone());
         }
 
-        // Map egg e-class Ids back to original egraph_class_ids.
-        // Use the first encountered original class_id per e-class (deterministic
-        // via BTreeMap iteration of concept_node_ids).
+        // Map egg e-class Ids back to original egraph_class_ids. Visit concepts
+        // in concept_id order so the first-wins choice per e-class is
+        // deterministic (graph.concepts() iterates a HashMap).
         let mut egg_to_original: BTreeMap<Id, String> = BTreeMap::new();
-        for concept in graph.concepts() {
+        let mut sorted_concepts: Vec<_> = graph.concepts().collect();
+        sorted_concepts.sort_by(|a, b| a.concept_id.as_str().cmp(b.concept_id.as_str()));
+        for concept in sorted_concepts {
             if let Some(ref class_id) = concept.egraph_class_id
                 && let Some(&node_id) = self.concept_node_ids.get(concept.concept_id.as_str())
             {

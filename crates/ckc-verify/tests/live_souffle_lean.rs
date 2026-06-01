@@ -5,8 +5,8 @@
 //! scratch CWD and re-derives the recorded C4 `empty_relation` verdict: the acyclic
 //! toy priority graph yields a zero-byte `cycle.csv`. Runs lean over the committed
 //! `NormConflict.lean` and re-derives the recorded C7 `kernel_checked` verdict:
-//! exit 0 with no `error:` diagnostic means the kernel accepted the file
-//! sorry/admit-free. The two solvers are PATH-guarded independently — an
+//! exit 0 with no `error:` diagnostic and no `sorry` warning means the kernel
+//! accepted it sorry/admit-free. The two solvers are PATH-guarded independently — an
 //! environment missing either one `eprintln!`s and skips just that test, so a
 //! solver-less environment stays green. Each verdict is a solver side-effect (the
 //! empty relation file) or exit-condition (a clean kernel check), not a parsed
@@ -101,6 +101,16 @@ fn lean_kernel_verdict_matches_recorded() {
     assert!(
         !run.stdout.contains("error:") && !run.stderr.contains("error:"),
         "lean reports no error: for {} (stdout={}, stderr={})",
+        recorded.artifact_path,
+        run.stdout,
+        run.stderr
+    );
+
+    // `sorry`/`admit` both surface as a `declaration uses 'sorry'` warning, so an
+    // absent "sorry" substring across both streams confirms a complete proof.
+    assert!(
+        !run.stdout.contains("sorry") && !run.stderr.contains("sorry"),
+        "lean proof for {} uses no sorry/admit (stdout={}, stderr={})",
         recorded.artifact_path,
         run.stdout,
         run.stderr

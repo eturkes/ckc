@@ -8,9 +8,12 @@
 //! rank, nDCG@5). Per-query rank assertions and aggregate MRR guard the
 //! retrieval-quality acceptance gate.
 //!
-//! Determinism note: spans are sorted by `span_id` before indexing so that
-//! Tantivy's tie-breaking-by-ascending-doc-id behaviour produces a stable
-//! ranking across runs (see `crates/ckc-retrieve/src/sparse.rs` docs).
+//! Determinism note: cross-run rank stability comes from
+//! `SparseIndex::search`'s post-collector stable sort (score DESC, span_id
+//! ASC), which dominates Tantivy's internal doc-id assignment (see
+//! `crates/ckc-retrieve/src/sparse.rs` docs and the Tantivy tie-break lesson
+//! in `.agent/memory.md`). Spans are sorted by `span_id` here only to give
+//! the corpus a stable `content_hash` fingerprint.
 
 use std::collections::{HashMap, HashSet};
 

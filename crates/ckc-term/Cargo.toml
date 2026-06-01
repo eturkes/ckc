@@ -16,5 +16,4 @@ oxttl = { workspace = true }
 
 [dev-dependencies]
 ckc-store = { path = "../ckc-store" }
-serde_json = { workspace = true }
 tempfile = { workspace = true }

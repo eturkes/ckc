@@ -272,9 +272,10 @@ pub fn run_report(
 
 /// Canonical Phase-0 demo command recorded in every [`RunManifest`]. Held
 /// independent of the concrete `out_dir` — it names the clap `--out` default and
-/// the SPEC §25 invocation — so the manifest hash stays stable across output
-/// locations, the cross-run determinism the demo gate and Phase-0 acceptance
-/// require. [`run_replay`](crate::replay::run_replay) gates a committed manifest's
+/// the artifact-producing form of the SPEC §25 invocation (minus the `--replay`
+/// self-check flag, which only triggers a second verify pass) — so the manifest
+/// hash stays stable across output locations, the cross-run determinism the demo
+/// gate and Phase-0 acceptance require. [`run_replay`](crate::replay::run_replay) gates a committed manifest's
 /// `command` against this constant before re-deriving the run.
 pub(crate) const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
 

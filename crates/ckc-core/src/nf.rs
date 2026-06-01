@@ -831,7 +831,6 @@ normalize_noop!(ExtractorVote, BBox, TableCellRef, ConfidenceInterval);
 impl Normalize for Action {
     fn normalize(&mut self, ctx: &mut NfContext) {
         ctx.normalize_action_type(&mut self.action_type);
-        //         canonical serializer handles RFC 8785 UTF-16 key ordering.
         ctx.normalize_units("parameters", &mut self.parameters);
         ctx.normalize_units("temporal_constraints", &mut self.temporal_constraints);
         ctx.normalize_units("quantity_constraints", &mut self.quantity_constraints);

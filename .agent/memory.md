@@ -166,8 +166,8 @@ technically derivable but easily forgotten under token pressure.
   `autotests` with no explicit `[[test]]`), so RA links it on its next workspace
   metadata reload; the file is already a real target the moment cargo sees it.
   Authoritative check: `cargo test --test <name>` compiling+running the file
-  proves linkage. Do NOT apply the lint's own suggested fix (adding
-  `unlinked-file` to `rust-analyzer.diagnostics.disabled`) — that suppresses
+  proves linkage. Keep `unlinked-file` enabled — the lint's own suggested fix
+  (adding it to `rust-analyzer.diagnostics.disabled`) would also suppress
   detection of genuinely orphaned `src/*.rs` (missing `mod`) workspace-wide.
   Expect this on every subtask that adds a new integration test; ignore it.
 
@@ -179,10 +179,10 @@ technically derivable but easily forgotten under token pressure.
   literal back to `19.212745666503903_f64` (bits `403336767fffffff`, the
   neighbouring f64). Round-trip fails by 1 ULP for some values. Rust's std
   `<str as FromStr>::parse::<f64>` does round-trip cleanly, so the asymmetry
-  is purely between the two serde_json algorithms. Implication: do not write
-  snapshot tests that assert `assert_eq!(live, serde_json::from_slice(disk))`
-  on structs containing f64 fields — Vec equality will fire on values you
-  cannot fix at the serializer. Workarounds: (a) compare via `content_hash`
+  is purely between the two serde_json algorithms. Implication: for structs
+  containing f64 fields, compare structurally rather than via a snapshot
+  `assert_eq!(live, serde_json::from_slice(disk))` — full equality fires on
+  values you cannot fix at the serializer. Workarounds: (a) compare via `content_hash`
   over canonical bytes in-memory only; (b) deserialize then compare
   structurally (query ids, span_id sequences, fingerprints) not by full
   struct equality; (c) quantize f64 to a fixed precision (e.g. `{:.9}`)
@@ -468,6 +468,70 @@ technically derivable but easily forgotten under token pressure.
   workspace-inheriting one version (`[workspace.package] version` +
   `version.workspace = true` across crates) or sourcing every artifact's
   producer_version from a single shared constant.
+
+- [2026-06-01] (Phase-0 Type-P review deferred backlog — real findings whose
+  fixes need committed-golden regen, fixture redesign, or a design decision, so
+  each is left for a dedicated follow-up task rather than the review commit; the
+  zero-hash-impact corrections from the same review WERE applied.) Grouped by
+  remediation shape:
+  GOLDEN-CASCADE conformance (one "compile replay/header" task; regen
+  schemas/golden/{compile_portfolio_manifest,run_manifest}.json + scaffold.rs):
+  * `replay-command-target-flag-nonexistent` — ckc-compile/src/lib.rs:149-164:
+    every CompiledTarget's `replay_command` = `ckc compile examples/research_kernel
+    --target {target}`, but the CLI (main.rs:23-28) has no `--target` (clap
+    rejects it) and the 6/7-way TargetLanguage cannot address the 9 artifacts
+    (3 SMT->smt_lib, 2 ASP->asp); the doc-comment falsely claims it "regenerates
+    a target artifact". Fix: emit `ckc compile examples/research_kernel` (drop
+    `--target`), correct the doc.
+  * `ec-header-never-negative-constraint` — ckc-compile/src/asp.rs:176 HEADER
+    `% ... never terminated` (mirrored byte-for-byte to logic/asp/event_calculus.lp:5):
+    pink-elephant "never" in generated prose. Fix: reframe to "the terminates set
+    is empty" (matches asp.rs:154), rerun the artifact regenerator.
+  * `canonical-number-not-rfc8785` — ckc-core/src/canonical.rs:61-63
+    `Value::Number => n.to_string()` emits integer-valued floats as "38.0"/"1.0",
+    diverging from RFC 8785's ECMAScript number form (SPEC.md:104). Byte-stable
+    across runs (CKC's real contract), so no live determinism bug; locked in
+    schemas/golden_nf/{decision_table,concept}.json. The canonical.rs doc was made
+    honest about this in the review; a true fix needs an RFC 8785 number formatter
+    + Phase-wide golden_nf regen.
+  E-GRAPH demo deliverable (one task; all touch EgraphArtifact/emit_artifact;
+  emit_artifact's e-class-label choice was made deterministic in this review --
+  concept_id-order visit -- so wiring it into the run_manifest is now safe):
+  * `egraph-artifact-not-emitted` — ckc-cli/src/pipeline.rs run_substrate never
+    emits the SPEC-25 "e-graph equivalence artifact" (SPEC.md:861; scenario 2
+    SPEC.md:686); emit_artifact (egraph.rs:236) has only in-crate test callers.
+    Fix: build TermEquivalence, write term/egraph_equivalence.json, add a 4th
+    substrate RunManifestEntry (run_manifest 41->42, SUBSTRATE_ENTRIES 3->4 in
+    demo.rs/substrate.rs), regen run_manifest + add a committed fixture golden,
+    using integration_06.rs's saturation (class_ids.len()==6).
+  * `cost-function-not-recorded-in-artifact` — egraph.rs:81-87 EgraphArtifact
+    omits the extraction cost function (SPEC 13.5) although ShortestConceptCost
+    (egraph.rs:30-46) is applied. Record it when emitting the artifact above.
+  FIXTURE/NF idempotency (fixture + golden_nf regen):
+  * `nfkc-text-undecomposed-celsius` — examples/research_kernel/fixtures/spans.json
+    (span_cell_r0c0, span_cell_r1c0): nfkc_text keeps U+2103 ℃ instead of NFKC
+    "°C", non-idempotent under Pass 2.
+  * `pass2-text-fields-unnormalized` — nf.rs:670-681 (PICOFrame, EtDFrame) and
+    nf.rs:595-609 (Norm) skip the Pass-2 text normalization sibling fields get.
+  * `ungrounded-ceftriaxone-brand-variant` — concepts.json `concept_bl_variant_brand`
+    label has no source-span support in the corpus (generator
+    research_terminology.rs CONCEPT_BL_BRAND); ground it or mark it synthetic.
+  PROVENANCE/determinism hardening (each small, each its own golden touch):
+  * `terminology-ttl-entry-hash-not-file-hash` — pipeline.rs:174 vs :229: the
+    terminology.ttl manifest entry hashes a JSON-quoted string, not the .ttl
+    bytes, so its content_hash does not byte-lock the file. Hash the file bytes.
+  * `bm25-f32-score-cross-machine` — sparse.rs:239 `score as f64` feeds
+    retrieval_results.json -> the golden-locked run_manifest retrieval entry with
+    no cross-machine guard; f32 BM25 may drift across CPUs/Tantivy builds.
+    Quantize/guard before cross-machine replay is claimed (complements the
+    Tantivy tie-break lesson above, which covers same-machine rank order only).
+  DESIGN observations (decide before changing):
+  * `recommendation-strength-weak-conditional-ambiguity` — enums.rs:117-120:
+    RecommendationStrength carries both Weak and Conditional with no normalization
+    between them.
+  * `binding-predicate-collapses-four-statuses` — rdf.rs:21-26: RDF export maps
+    unmapped/ambiguous/deprecated/incoherent bindings to `skos:relatedMatch` via a
+    wildcard, erasing the distinction.
 
 ## Mistakes
 
