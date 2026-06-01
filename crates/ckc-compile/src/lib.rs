@@ -147,26 +147,18 @@ pub fn portfolio_manifest(bundle: &CompileBundle) -> PortfolioManifest {
     )
 }
 
-/// Canonical replay command that regenerates a target artifact through the
-/// `ckc` CLI (SPEC 14 replay command, SPEC 18 `ckc compile`). The `--target`
-/// token is the snake_case `TargetLanguage` wire form that downstream goldens
-/// bake into each `CompiledTarget`.
-pub fn replay_command(lang: TargetLanguage) -> String {
-    let target = match lang {
-        TargetLanguage::SmtLib => "smt_lib",
-        TargetLanguage::Asp => "asp",
-        TargetLanguage::Datalog => "datalog",
-        TargetLanguage::Lean => "lean",
-        TargetLanguage::TlaPlus => "tla_plus",
-        TargetLanguage::Alloy => "alloy",
-        TargetLanguage::Rdf => "rdf",
-    };
-    format!("ckc compile examples/research_kernel --target {target}")
+/// Canonical replay command that regenerates the compiled portfolio through the
+/// `ckc` CLI (SPEC 14 replay, SPEC 18 `ckc compile`). `ckc compile` re-emits
+/// every target from the bundle in a single pass, so each `CompiledTarget`
+/// records the same whole-portfolio command -- the CLI exposes no per-target
+/// selection flag, so the artifact set is addressed only as a whole.
+pub fn replay_command() -> String {
+    "ckc compile examples/research_kernel".to_string()
 }
 
 /// Assemble a [`CompiledTarget`] from an emitter's text and symbol map, filling
 /// the emit-only invariants every Phase-0 compiler shares: the canonical
-/// [`replay_command`] for `target_language`, an empty diagnostics list, and an
+/// [`replay_command`], an empty diagnostics list, and an
 /// absent `target_parse_ok` (the PATH-guarded target parse check belongs to
 /// task 0.9). The four passed fields are stored verbatim.
 pub fn build_target(
@@ -181,7 +173,7 @@ pub fn build_target(
         compilation_map,
         diagnostics: Vec::new(),
         source_artifact_hashes,
-        replay_command: replay_command(target_language),
+        replay_command: replay_command(),
         target_parse_ok: None,
     }
 }

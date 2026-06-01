@@ -34,10 +34,7 @@ fn build_target_fills_emit_only_invariants() {
     );
 
     // Emit-only invariants.
-    assert_eq!(
-        target.replay_command,
-        replay_command(TargetLanguage::SmtLib)
-    );
+    assert_eq!(target.replay_command, replay_command());
     assert!(target.diagnostics.is_empty());
     assert_eq!(target.target_parse_ok, None);
 

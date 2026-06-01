@@ -1,9 +1,9 @@
 //! Scaffold gate for task 0.8.2: the toy bundle loads every fixture into its
 //! `ckc-core` type with the expected cardinalities, and `replay_command`
-//! renders the snake_case target token that downstream goldens depend on.
+//! renders the whole-portfolio `ckc compile` invocation that downstream goldens
+//! bake into each `CompiledTarget`.
 
 use ckc_compile::{CompileBundle, replay_command};
-use ckc_core::enums::TargetLanguage;
 
 #[test]
 fn load_toy_parses_all_fixtures_with_expected_counts() {
@@ -17,13 +17,6 @@ fn load_toy_parses_all_fixtures_with_expected_counts() {
 }
 
 #[test]
-fn replay_command_uses_snake_case_target_tokens() {
-    assert_eq!(
-        replay_command(TargetLanguage::SmtLib),
-        "ckc compile examples/research_kernel --target smt_lib"
-    );
-    assert_eq!(
-        replay_command(TargetLanguage::TlaPlus),
-        "ckc compile examples/research_kernel --target tla_plus"
-    );
+fn replay_command_is_whole_portfolio_compile() {
+    assert_eq!(replay_command(), "ckc compile examples/research_kernel");
 }
