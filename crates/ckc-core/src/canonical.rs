@@ -28,11 +28,12 @@ impl std::fmt::Display for ContentHash {
 /// Key properties:
 /// - Object keys sorted by UTF-16 code-unit comparison (RFC 8785).
 /// - No insignificant whitespace.
-/// - Numbers/strings use serde_json's deterministic itoa/ryu formatting:
-///   byte-stable across runs and RFC 8785-equal for integers, but diverging
-///   from RFC 8785's ECMAScript number form for some non-integer floats
-///   (see the canonical-number known issue in `.agent/memory.md`). CKC's
-///   contract is cross-run byte-stability, which this satisfies.
+/// - Integers serialize via itoa (`to_string`); floats via `ryu-js`, the
+///   ECMAScript `Number::toString` algorithm (ECMA-262 7.1.12.1) that RFC 8785
+///   mandates -- so integer-valued floats render as `38`, not `38.0`, and the
+///   exponent thresholds follow ECMAScript rather than Rust's `Display`.
+///   Strings use serde_json's escaping. The result is full RFC 8785 number
+///   conformance and cross-run byte-stability.
 pub fn canonical_json_bytes(value: &Value) -> Vec<u8> {
     let mut buf = Vec::new();
     write_canonical(value, &mut buf);
@@ -63,8 +64,18 @@ fn write_canonical(value: &Value, buf: &mut Vec<u8>) {
         Value::Bool(true) => buf.extend_from_slice(b"true"),
         Value::Bool(false) => buf.extend_from_slice(b"false"),
         Value::Number(n) => {
-            let s = n.to_string();
-            buf.extend_from_slice(s.as_bytes());
+            // RFC 8785 numbers: integers (i64/u64) already match ECMAScript's
+            // Number::toString, so itoa via `to_string` is exact. Floats route
+            // through ryu-js (ECMA-262 7.1.12.1), so integer-valued floats render
+            // as "38" not "38.0". `Value::Number` is always finite, hence
+            // `format_finite`.
+            if n.is_f64() {
+                let f = n.as_f64().expect("is_f64 implies a finite f64");
+                let mut ryu = ryu_js::Buffer::new();
+                buf.extend_from_slice(ryu.format_finite(f).as_bytes());
+            } else {
+                buf.extend_from_slice(n.to_string().as_bytes());
+            }
         }
         Value::String(s) => {
             let escaped = serde_json::to_string(s).expect("string serializable");
@@ -142,6 +153,39 @@ mod tests {
         let v = json!({"薬": 1, "病": 2, "検": 3});
         let bytes = canonical_json_bytes(&v);
         assert_eq!(bytes, "{\"検\":3,\"病\":2,\"薬\":1}".as_bytes());
+    }
+
+    #[test]
+    fn integer_valued_floats_drop_the_decimal() {
+        // The RFC 8785 number bug this fix closes: ECMAScript Number::toString
+        // renders 38.0 as "38". A literal with a decimal point parses as f64.
+        let v: Value = serde_json::from_str("38.0").unwrap();
+        assert!(v.is_f64(), "a decimal-point literal parses as f64");
+        assert_eq!(canonical_json_bytes(&v), b"38");
+    }
+
+    #[test]
+    fn floats_use_shortest_ecmascript_form() {
+        assert_eq!(canonical_json_bytes(&json!(0.1)), b"0.1");
+        assert_eq!(canonical_json_bytes(&json!(1.5)), b"1.5");
+        assert_eq!(canonical_json_bytes(&json!(-0.5)), b"-0.5");
+        // Magnitude thresholds follow ECMAScript, not Rust's Display: large and
+        // small magnitudes switch to exponential with an explicit sign.
+        let big: Value = serde_json::from_str("1e21").unwrap();
+        assert_eq!(canonical_json_bytes(&big), b"1e+21");
+        let small: Value = serde_json::from_str("1e-7").unwrap();
+        assert_eq!(canonical_json_bytes(&small), b"1e-7");
+    }
+
+    #[test]
+    fn integers_serialize_without_a_decimal() {
+        assert_eq!(canonical_json_bytes(&json!(38)), b"38");
+        assert_eq!(canonical_json_bytes(&json!(-7)), b"-7");
+        assert_eq!(canonical_json_bytes(&json!(0)), b"0");
+        assert_eq!(
+            canonical_json_bytes(&json!(u64::MAX)),
+            b"18446744073709551615"
+        );
     }
 
     #[test]

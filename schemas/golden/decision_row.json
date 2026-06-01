@@ -1,1 +1,1 @@
-{"cell_refs":[{"col":0,"row":1,"table_id":"tbl_vitals_001"}],"conditions":[{"field":"temperature","op":">=","value":38.0}],"outputs":[{"action":"sepsis_alert"}],"priority":1,"row_id":"row_vitals_r1","source_span_ids":["span_tbl_r1"]}
+{"cell_refs":[{"col":0,"row":1,"table_id":"tbl_vitals_001"}],"conditions":[{"field":"temperature","op":">=","value":38}],"outputs":[{"action":"sepsis_alert"}],"priority":1,"row_id":"row_vitals_r1","source_span_ids":["span_tbl_r1"]}

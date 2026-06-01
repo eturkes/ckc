@@ -21,6 +21,10 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# ECMAScript-compliant f64 -> string, the number form RFC 8785 (JCS) mandates
+# via ECMA-262 7.1.12.1. serde_json's plain ryu renders integer-valued floats
+# as "38.0"; JCS requires "38". Used only by ckc-core::canonical.
+ryu-js = "1"
 sha2 = "0.10"
 schemars = { version = "1", features = ["derive"] }
 unicode-normalization = "0.1"

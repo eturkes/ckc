@@ -662,7 +662,16 @@ fn cas_put_batch_stores_all_artifacts() {
         assert!(store.exists(hash));
         assert!(store.verify(hash).unwrap());
         let got = store.get(hash).unwrap();
-        assert_eq!(env, &got);
+        // Content-addressed equality is canonical-byte equality, not raw
+        // `serde_json::Value` identity: the untyped envelope payload carries a
+        // bbox float like 28.0, which RFC 8785 normalizes to "28" and the
+        // stored bytes re-read as the integer 28, so typed identity outruns
+        // canonical equality (golden.rs::check_roundtrip notes the same).
+        assert_eq!(
+            to_canonical_bytes(env),
+            to_canonical_bytes(&got),
+            "stored envelope must round-trip to identical canonical bytes"
+        );
     }
 }
 
