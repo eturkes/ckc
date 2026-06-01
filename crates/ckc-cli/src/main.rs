@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use ckc_cli::{detect_all, load_claims, load_documents, pipeline, verify_all};
+use ckc_cli::{detect_all, load_claims, load_documents, pipeline, replay, verify_all};
 
 /// Default run output directory, shared by every subcommand's `--out` (SPEC §25
 /// names `runs/research`). The demo manifest's recorded command string is pinned
@@ -62,6 +62,14 @@ enum Command {
         #[arg(long, default_value = DEFAULT_OUT_DIR)]
         out: PathBuf,
     },
+    /// Replay a committed run manifest and compare hashes (SPEC 18)
+    Replay {
+        /// Committed run manifest path
+        manifest: PathBuf,
+        /// Output directory
+        #[arg(long, default_value = DEFAULT_OUT_DIR)]
+        out: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -100,6 +108,9 @@ fn main() -> Result<()> {
             out,
         } => {
             pipeline::run_demo(&scenario, replay, &out)?;
+        }
+        Command::Replay { manifest, out } => {
+            replay::run_replay(&manifest, &out)?;
         }
     }
     Ok(())
