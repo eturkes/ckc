@@ -6,6 +6,9 @@
 pub mod emit;
 pub mod manifest;
 pub mod pipeline;
+pub mod replay;
+
+pub use replay::ReplayReport;
 
 pub use ckc_compile::{ARTIFACT_PATHS, CompileBundle, compile_all, portfolio_manifest};
 pub use ckc_conflict::{conflict_manifest, detect_all};

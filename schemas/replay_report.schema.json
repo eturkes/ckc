@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReplayReport",
+  "description": "The structured result of a `ckc replay` run (SPEC 18): the replayed command,\nthe overall [`ReplayStatus`], how many committed entries were compared\n(`n_entries`) and matched byte-for-byte (`n_matched`), and one\n[`ReplayMismatch`] per divergent artifact. `Passed` with an empty\n`mismatches` list is the deterministic-replay success witness.",
+  "type": "object",
+  "properties": {
+    "manifest_command": {
+      "type": "string"
+    },
+    "mismatches": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ReplayMismatch"
+      }
+    },
+    "n_entries": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "n_matched": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "status": {
+      "$ref": "#/$defs/ReplayStatus"
+    }
+  },
+  "required": [
+    "manifest_command",
+    "status",
+    "n_entries",
+    "n_matched",
+    "mismatches"
+  ],
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "ReplayMismatch": {
+      "description": "One artifact whose replayed `content_hash` diverged from the committed\nmanifest, or that appears on only one side. `expected_hash` is `None` when\nthe path appears only in the replayed run; `actual_hash` is `None` when it\nappears only in the committed manifest.",
+      "type": "object",
+      "properties": {
+        "actual_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentHash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_path": {
+          "type": "string"
+        },
+        "expected_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentHash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "artifact_path"
+      ]
+    },
+    "ReplayStatus": {
+      "description": "Certificate replay status.",
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "pending",
+        "skipped"
+      ]
+    }
+  }
+}
