@@ -434,6 +434,25 @@ technically derivable but easily forgotten under token pressure.
   session (set via flag/`/effort`) and does NOT persist. Applies after restart;
   fast mode (/fast) is orthogonal and does not lower effort.
 
+- [2026-06-01] RFC 8785 int/float normalization is a round-trip trap distinct
+  from the [2026-05-29] f64 ULP asymmetry above — same symptom (typed equality
+  fails after serialize->deserialize->serialize), different cause. canonical.rs
+  now renders integer-valued floats in ECMAScript form (38.0 -> "38" via
+  ryu-js), and serde_json re-reads "38" as the INTEGER 38. So
+  `Value::Number(38.0_f64) != Value::Number(38_i64)`, and any `assert_eq!` that
+  compares the value through an UNTYPED `serde_json::Value` breaks; a TYPED
+  `f64` struct field stays safe ("38" parses back to 38.0_f64). Two sites
+  tripped on the 0.13.x golden regen and were switched to assert canonical-byte
+  + hash stability (the content-addressed contract) instead of raw Value
+  identity: `golden.rs::check_roundtrip` (DecisionRow.conditions: Vec<Value>)
+  and `research_fixture_bundle.rs::cas_put_batch` (ArtifactEnvelope.payload:
+  Value). The other 9 per-crate `check_roundtrip` helpers keep their stronger
+  `assert_eq!(*fixture, rt)` — their fixtures carry no integer-valued float in
+  an untyped Value, so the typed assert is real passing coverage; leave them
+  rather than weakening for "consistency". Rule for new round-trip tests:
+  untyped-Value-that-may-hold-an-integer-float -> assert canonical bytes;
+  fully-typed -> typed equality is fine.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
@@ -472,41 +491,18 @@ technically derivable but easily forgotten under token pressure.
 - [2026-06-01] (Phase-0 Type-P review deferred backlog — real findings whose
   fixes need committed-golden regen, fixture redesign, or a design decision, so
   each is left for a dedicated follow-up task rather than the review commit; the
-  zero-hash-impact corrections from the same review WERE applied.) Grouped by
-  remediation shape:
-  GOLDEN-CASCADE conformance (one "compile replay/header" task; regen
-  schemas/golden/{compile_portfolio_manifest,run_manifest}.json + scaffold.rs):
-  * `replay-command-target-flag-nonexistent` — ckc-compile/src/lib.rs:149-164:
-    every CompiledTarget's `replay_command` = `ckc compile examples/research_kernel
-    --target {target}`, but the CLI (main.rs:23-28) has no `--target` (clap
-    rejects it) and the 6/7-way TargetLanguage cannot address the 9 artifacts
-    (3 SMT->smt_lib, 2 ASP->asp); the doc-comment falsely claims it "regenerates
-    a target artifact". Fix: emit `ckc compile examples/research_kernel` (drop
-    `--target`), correct the doc.
+  zero-hash-impact corrections from the same review WERE applied.) The 3 medium
+  findings are now resolved in dedicated commits: replay-command-target-flag-
+  nonexistent (308fe9f), egraph-artifact-not-emitted + cost-function-not-
+  recorded-in-artifact (38a673f), canonical-number-not-rfc8785 (8d60ce5). The
+  remainder, grouped by remediation shape:
+  EC-HEADER prose (own small task; reframe then rerun the artifact regenerator,
+  which shifts the EC CompiledTarget artifact_text -> regen the compile golden
+  that hashes it):
   * `ec-header-never-negative-constraint` — ckc-compile/src/asp.rs:176 HEADER
     `% ... never terminated` (mirrored byte-for-byte to logic/asp/event_calculus.lp:5):
     pink-elephant "never" in generated prose. Fix: reframe to "the terminates set
     is empty" (matches asp.rs:154), rerun the artifact regenerator.
-  * `canonical-number-not-rfc8785` — ckc-core/src/canonical.rs:61-63
-    `Value::Number => n.to_string()` emits integer-valued floats as "38.0"/"1.0",
-    diverging from RFC 8785's ECMAScript number form (SPEC.md:104). Byte-stable
-    across runs (CKC's real contract), so no live determinism bug; locked in
-    schemas/golden_nf/{decision_table,concept}.json. The canonical.rs doc was made
-    honest about this in the review; a true fix needs an RFC 8785 number formatter
-    + Phase-wide golden_nf regen.
-  E-GRAPH demo deliverable (one task; all touch EgraphArtifact/emit_artifact;
-  emit_artifact's e-class-label choice was made deterministic in this review --
-  concept_id-order visit -- so wiring it into the run_manifest is now safe):
-  * `egraph-artifact-not-emitted` — ckc-cli/src/pipeline.rs run_substrate never
-    emits the SPEC-25 "e-graph equivalence artifact" (SPEC.md:861; scenario 2
-    SPEC.md:686); emit_artifact (egraph.rs:236) has only in-crate test callers.
-    Fix: build TermEquivalence, write term/egraph_equivalence.json, add a 4th
-    substrate RunManifestEntry (run_manifest 41->42, SUBSTRATE_ENTRIES 3->4 in
-    demo.rs/substrate.rs), regen run_manifest + add a committed fixture golden,
-    using integration_06.rs's saturation (class_ids.len()==6).
-  * `cost-function-not-recorded-in-artifact` — egraph.rs:81-87 EgraphArtifact
-    omits the extraction cost function (SPEC 13.5) although ShortestConceptCost
-    (egraph.rs:30-46) is applied. Record it when emitting the artifact above.
   FIXTURE/NF idempotency (fixture + golden_nf regen):
   * `nfkc-text-undecomposed-celsius` — examples/research_kernel/fixtures/spans.json
     (span_cell_r0c0, span_cell_r1c0): nfkc_text keeps U+2103 ℃ instead of NFKC
