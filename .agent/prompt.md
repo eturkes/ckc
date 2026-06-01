@@ -51,7 +51,7 @@ recorded. End the session.
 
 Read `git show HEAD` to see the previous subtask's commit and match its
 patterns. Complete exactly the first incomplete subtask of `T`: do the work and
-pass its gate. Right before staging, run `.agent/compaction.sh`; in the same
+pass its gate. Right before staging, run `$HOME/.claude/compaction.sh`; in the same
 roadmap edit that marks the subtask `[x]`, append its `NN% NNNK/200K` output
 verbatim to the end of that subtask's line. Mark `T` `[x]` too when this was its
 last incomplete subtask. Leave all subtask lines in place for the later review
