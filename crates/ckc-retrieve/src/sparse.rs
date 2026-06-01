@@ -9,12 +9,15 @@
 //!   JSON) of the lex-sorted `(span_id, content_hash(span))` pairs and is
 //!   therefore invariant under the order in which spans are passed in.
 //! - BM25 ranking is deterministic across independent index builds because
-//!   `search` applies a post-collector stable sort: primary key is score
-//!   descending; secondary key is `span_id` ascending. This dominates any
-//!   Tantivy-internal tie-breaking that can otherwise vary across builds
-//!   (multi-threaded indexers may assign different doc ids to the same
-//!   spans even under identical insertion order, breaking the implicit
-//!   `TopDocs` "doc-id-ascending" tie-break).
+//!   `search` fetches every matching document, applies a post-collector stable
+//!   sort (primary key score descending, secondary key `span_id` ascending),
+//!   and only then truncates to `top_k`. Sorting before truncating makes both
+//!   the ORDER and the SELECTION of survivors a function of that total order,
+//!   dominating any Tantivy-internal tie-breaking that can otherwise vary
+//!   across builds (multi-threaded indexers may assign different doc ids to the
+//!   same spans even under identical insertion order, breaking the implicit
+//!   `TopDocs` "doc-id-ascending" tie-break that would otherwise decide both
+//!   order and, at the `top_k` boundary, membership).
 
 use std::collections::BTreeMap;
 
@@ -221,8 +224,17 @@ impl SparseIndex {
             .parse_query(query_text)
             .with_context(|| format!("parse query: {query_text:?}"))?;
 
+        // Fetch every matching document, not just Tantivy's own top_k:
+        // `TopDocs::with_limit` truncates by (score, internal doc-id) BEFORE the
+        // post-collector stable sort runs, so an exact f32 score tie straddling
+        // the top_k boundary would let Tantivy's nondeterministic doc-id
+        // assignment decide which spans survive. Over-fetching and truncating
+        // AFTER the (score DESC, span_id ASC) sort makes survivor selection -- not
+        // just ordering -- a deterministic function of the total order. Phase-0
+        // corpora are tiny, so fetching all matches is free.
+        let fetch_limit = (searcher.num_docs() as usize).max(1);
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(top_k))
+            .search(&query, &TopDocs::with_limit(fetch_limit))
             .context("execute BM25 search")?;
 
         let mut hits = Vec::with_capacity(top_docs.len());
@@ -255,6 +267,7 @@ impl SparseIndex {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.span_id.as_str().cmp(b.span_id.as_str()))
         });
+        hits.truncate(top_k);
         for (i, h) in hits.iter_mut().enumerate() {
             h.rank = (i as u32) + 1;
         }
@@ -278,4 +291,66 @@ pub fn ipadic_tokens(text: &str) -> Result<Vec<String>> {
         out.push(stream.token().text.clone());
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ckc_core::enums::Language;
+    use ckc_core::id::DocId;
+
+    /// Minimal span carrying `text` in every text slot, for tokenizer-driven
+    /// scoring tests that need synthetic content the toy corpus lacks.
+    fn span(id: &str, text: &str) -> SourceSpan {
+        SourceSpan {
+            span_id: SpanId::new(id),
+            doc_id: DocId::new("doc_tie"),
+            section_path: Vec::new(),
+            cq_id: None,
+            page: None,
+            bbox: None,
+            table_cell: None,
+            raw_text: text.to_owned(),
+            nfkc_text: text.to_owned(),
+            search_text: text.to_owned(),
+            display_text: text.to_owned(),
+            language: Language::Ja,
+            previous_span_id: None,
+            next_span_id: None,
+            extractor_votes: Vec::new(),
+            confidence: 1.0,
+        }
+    }
+
+    /// Five spans share identical text, so a matching query scores them all
+    /// identically -- an exact BM25 tie wider than `top_k`. Survivor selection
+    /// must then be the lexicographically-smallest `span_id`s and must be
+    /// identical across two independent index builds, since Tantivy's internal
+    /// doc-id tie-break is not stable across builds. Exercises the `>top_k`
+    /// truncation path the toy corpus never reaches, guarding the over-fetch-
+    /// then-truncate determinism contract.
+    #[test]
+    fn truncation_selects_deterministic_set_under_score_ties() {
+        let spans: Vec<SourceSpan> = (0..5)
+            .map(|i| span(&format!("span_tie_{i}"), "発熱 体温 上昇"))
+            .collect();
+
+        let run = || {
+            SparseIndex::build_from_spans(&spans)
+                .expect("index builds")
+                .search("発熱", 2)
+                .expect("search succeeds")
+        };
+        let first = run();
+        let second = run();
+
+        // Two independent builds agree on both selection and order.
+        assert_eq!(first, second);
+        // The two lexicographically-smallest span_ids survive truncation.
+        let ids: Vec<&str> = first.iter().map(|h| h.span_id.as_str()).collect();
+        assert_eq!(ids, vec!["span_tie_0", "span_tie_1"]);
+        // Ranks are reassigned 1..=2 over the survivors, which share the tie score.
+        assert_eq!((first[0].rank, first[1].rank), (1, 2));
+        assert_eq!(first[0].score, first[1].score);
+    }
 }
