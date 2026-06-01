@@ -35,7 +35,7 @@ Phase's last task) → the next Type A erases its subtasks.
 
 `T` has no subtasks. Decompose it into session-sized subtasks (see "Subtask
 sizing"). Calibrate granularity from `L`'s still-present per-subtask
-`(NNNK/200K)` annotations: split more finely wherever context ran hot. `L` may
+`NN% NNNK/200K` annotations: split more finely wherever context ran hot. `L` may
 sit in an earlier Phase than `T` (the Phase-boundary case); calibrating across
 that boundary is correct. At project start, when no `L` carries subtasks, size
 from the sizing guidance alone.
@@ -51,8 +51,8 @@ recorded. End the session.
 
 Read `git show HEAD` to see the previous subtask's commit and match its
 patterns. Complete exactly the first incomplete subtask of `T`: do the work and
-pass its gate. Right before staging, run `python3 .agent/context_window.py`; in the same
-roadmap edit that marks the subtask `[x]`, append its `(NNNK/200K)` output
+pass its gate. Right before staging, run `.agent/compaction.sh`; in the same
+roadmap edit that marks the subtask `[x]`, append its `NN% NNNK/200K` output
 verbatim to the end of that subtask's line. Mark `T` `[x]` too when this was its
 last incomplete subtask. Leave all subtask lines in place for the later review
 and the next Type A. Stage everything and make a single commit covering both the
