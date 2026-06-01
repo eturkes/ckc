@@ -9,7 +9,7 @@ Top-level task annotations:
 - ` reviewed`: a Type R (per-task) or Type P (Phase) review has covered the task.
 
 A trailing `NN% NNNK/200K` on a completed subtask records the session's
-context-window usage at completion, produced by `$HOME/.claude/compaction.sh`
+context-window usage at completion, produced by `.agent/compaction.sh`
 just before commit. Type A reads the prior top-level task's annotations to
 calibrate new subtask granularity.
 
