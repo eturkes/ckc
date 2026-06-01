@@ -15,6 +15,7 @@ use ckc_core::source::CorpusDocument;
 use ckc_report::{assemble_report, load_claims, load_documents};
 use ckc_retrieve::{RetrievalQuery, RetrievalResult, SparseIndex};
 use ckc_term::TerminologyGraph;
+use ckc_term::egraph::TermEquivalence;
 use ckc_term::rdf::export_skos_turtle;
 use ckc_term::shacl::validate_rules;
 use ckc_verify::{VerificationReport, verification_manifest, verify_all};
@@ -166,14 +167,19 @@ pub fn run_conflicts(
     Ok(entries)
 }
 
-/// Substrate stage (task 0.11.5): emit the terminology, validation, and
-/// retrieval substrate under `out_dir`, returning three `substrate`-stage
-/// entries whose `content_hash` pins each emitted artifact in-memory.
+/// Substrate stage (task 0.11.5): emit the terminology, validation, e-graph
+/// equivalence, and retrieval substrate under `out_dir`, returning four
+/// `substrate`-stage entries whose `content_hash` pins each emitted artifact
+/// in-memory.
 ///
 /// - `terminology.ttl`: the SKOS/Turtle [`export_skos_turtle`] of the bundle's
 ///   concepts, written as raw Turtle bytes (byte-identical to the committed
 ///   `gen_fixtures` export — the export sorts by `concept_id`, so building the
 ///   graph from the in-memory bundle reproduces it exactly).
+/// - `term/egraph_equivalence.json`: the canonical-JSON
+///   [`EgraphArtifact`](ckc_term::egraph::EgraphArtifact) describing the concept
+///   e-graph's saturated equivalence classes, canonical representatives, and the
+///   recorded extraction cost function (SPEC 13.5).
 /// - `shacl_report.json`: the canonical-JSON [`validate_rules`] report over the
 ///   bundle's rules (an accepted CKC artifact, SPEC 5.2).
 /// - `retrieval/retrieval_results.json`: the canonical-JSON `Vec<RetrievalResult>`
@@ -221,6 +227,16 @@ pub fn run_substrate(
         &to_canonical_bytes(&results),
     )?;
 
+    // (d) e-graph terminology equivalence: saturate the concept graph and emit
+    // its canonical equivalence classes + extraction cost function (SPEC 13.5).
+    let equivalence = TermEquivalence::from_terminology_graph(&graph);
+    let egraph_artifact = equivalence.emit_artifact(&graph);
+    write_artifact(
+        out_dir,
+        "term/egraph_equivalence.json",
+        &to_canonical_bytes(&egraph_artifact),
+    )?;
+
     Ok(vec![
         RunManifestEntry {
             stage: "substrate".to_string(),
@@ -239,6 +255,12 @@ pub fn run_substrate(
             artifact_kind: "retrieval_result".to_string(),
             artifact_path: "retrieval/retrieval_results.json".to_string(),
             content_hash: content_hash(&results),
+        },
+        RunManifestEntry {
+            stage: "substrate".to_string(),
+            artifact_kind: "egraph_equivalence".to_string(),
+            artifact_path: "term/egraph_equivalence.json".to_string(),
+            content_hash: content_hash(&egraph_artifact),
         },
     ])
 }
@@ -287,7 +309,7 @@ pub(crate) const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/resea
 /// committed run is compared against.
 ///
 /// Entries concatenate in pipeline order — compile (9) ++ verify (24) ++
-/// conflicts (4) ++ substrate (3) ++ report (1) — so the manifest pins every
+/// conflicts (4) ++ substrate (4) ++ report (1) — so the manifest pins every
 /// emitted artifact by content hash, stage-ordered. Conflict detection runs once
 /// here ([`detect_all`]), shared by the conflicts and report stages.
 pub(crate) fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {

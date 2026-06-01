@@ -44,6 +44,12 @@ impl CostFunction<CkcTerm> for ShortestConceptCost {
     }
 }
 
+/// Identifier recorded in [`EgraphArtifact::extraction_cost_function`]. The
+/// extractor minimizes summed `Symbol` length, so each class's canonical
+/// representative is the concept bearing the shortest concept_id (SPEC 13.5
+/// extraction provenance).
+const EXTRACTION_COST_FUNCTION: &str = "shortest_concept_id";
+
 // ---------------------------------------------------------------------------
 // Label normalization for Japanese variant detection
 // ---------------------------------------------------------------------------
@@ -84,6 +90,9 @@ pub struct EgraphArtifact {
     pub rewrite_count: usize,
     pub saturation_stats: SaturationStats,
     pub iterations: usize,
+    /// Identifier of the egg cost function used to extract each class's
+    /// canonical representative (SPEC 13.5). See [`EXTRACTION_COST_FUNCTION`].
+    pub extraction_cost_function: String,
 }
 
 impl fmt::Display for EgraphArtifact {
@@ -294,6 +303,7 @@ impl TermEquivalence {
                 saturated: true,
             },
             iterations: self.iterations,
+            extraction_cost_function: EXTRACTION_COST_FUNCTION.to_string(),
         }
     }
 

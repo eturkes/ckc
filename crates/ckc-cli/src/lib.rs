@@ -16,6 +16,7 @@ pub use ckc_core::canonical::{ContentHash, content_hash, to_canonical_bytes};
 pub use ckc_report::{Report, assemble_report, load_claims, load_documents};
 pub use ckc_retrieve::{RetrievalQuery, RetrievalResult, SparseIndex};
 pub use ckc_term::TerminologyGraph;
+pub use ckc_term::egraph::EgraphArtifact;
 pub use ckc_term::rdf::export_skos_turtle;
 pub use ckc_term::shacl::{ShaclReport, validate_rules};
 pub use ckc_verify::{VerificationReport, verification_manifest, verify_all};

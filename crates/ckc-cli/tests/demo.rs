@@ -15,16 +15,17 @@ use ckc_cli::{
     conflict_manifest, content_hash, portfolio_manifest, verification_manifest, verify_all,
 };
 
-/// Substrate-stage entry count: `rdf_export` + `shacl_report` + `retrieval_result`.
-/// The substrate stage has no manifest function (unlike compile/verify/conflicts);
-/// its count is locked by the `run_substrate` gate, so this mirror is the
-/// expected contribution to the demo manifest.
-const SUBSTRATE_ENTRIES: usize = 3;
+/// Substrate-stage entry count: `rdf_export`, `shacl_report`, `retrieval_result`,
+/// and `egraph_equivalence` (SPEC 13.5). The substrate stage has no manifest
+/// function (unlike compile/verify/conflicts); its count is locked by the
+/// `run_substrate` gate, so this mirror is the expected contribution to the demo
+/// manifest.
+const SUBSTRATE_ENTRIES: usize = 4;
 
 /// Report-stage entry count: the single `report.json` artifact. Like the
 /// substrate stage, the report stage has no manifest function; its count is
 /// locked by the `run_report` gate, so this mirror is its expected contribution
-/// to the demo manifest (bringing the whole to 9+24+4+3+1 = 41).
+/// to the demo manifest (bringing the whole to 9+24+4+4+1 = 42).
 const REPORT_ENTRIES: usize = 1;
 
 #[test]

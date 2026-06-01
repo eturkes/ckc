@@ -40,7 +40,7 @@ fn run_replay_reproduces_committed_manifest() {
 
     assert_eq!(report.status, ReplayStatus::Passed, "replay did not pass");
     assert!(report.mismatches.is_empty(), "unexpected mismatches");
-    assert_eq!(report.n_entries, 41, "expected all 41 committed entries");
+    assert_eq!(report.n_entries, 42, "expected all 42 committed entries");
     assert_eq!(
         report.n_matched, report.n_entries,
         "not every entry reproduced byte-for-byte"

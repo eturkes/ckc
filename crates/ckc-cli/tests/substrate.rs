@@ -1,7 +1,8 @@
 //! Task 0.11.5 gate: `pipeline::run_substrate` emits the Phase-0 substrate
 //! artifacts under a fresh output dir — the SKOS/Turtle terminology export, the
-//! SHACL rule report, and the sparse-retrieval results — with three
-//! `substrate`-stage manifest entries and cross-run determinism.
+//! SHACL rule report, the e-graph equivalence artifact, and the sparse-retrieval
+//! results — with four `substrate`-stage manifest entries and cross-run
+//! determinism.
 //!
 //! Comparison modes mirror how each committed golden is stored. `terminology.ttl`
 //! is raw Turtle and byte-identical. The JSON artifacts are emitted canonical
@@ -17,7 +18,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use ckc_cli::pipeline::{load_bundle, run_substrate};
-use ckc_cli::{RetrievalResult, ShaclReport, content_hash, validate_rules};
+use ckc_cli::{EgraphArtifact, RetrievalResult, ShaclReport, content_hash, validate_rules};
 
 /// Repository root, two levels above this crate's manifest, so the committed
 /// `examples/research_kernel/fixtures/*` goldens resolve.
@@ -26,16 +27,24 @@ fn workspace_root() -> PathBuf {
 }
 
 #[test]
-fn run_substrate_emits_terminology_shacl_retrieval() {
+fn run_substrate_emits_terminology_shacl_retrieval_egraph() {
     let bundle = load_bundle("examples/research_kernel").expect("load toy bundle");
     let out = tempfile::tempdir().expect("tempdir");
     let entries = run_substrate(&bundle, out.path()).expect("run_substrate");
     let root = workspace_root();
 
-    // Three substrate entries in rdf -> shacl -> retrieval order.
-    assert_eq!(entries.len(), 3);
+    // Four substrate entries in rdf -> shacl -> retrieval -> egraph order.
+    assert_eq!(entries.len(), 4);
     let kinds: Vec<&str> = entries.iter().map(|e| e.artifact_kind.as_str()).collect();
-    assert_eq!(kinds, ["rdf_export", "shacl_report", "retrieval_result"]);
+    assert_eq!(
+        kinds,
+        [
+            "rdf_export",
+            "shacl_report",
+            "retrieval_result",
+            "egraph_equivalence"
+        ]
+    );
     let paths: Vec<&str> = entries.iter().map(|e| e.artifact_path.as_str()).collect();
     assert_eq!(
         paths,
@@ -43,6 +52,7 @@ fn run_substrate_emits_terminology_shacl_retrieval() {
             "terminology.ttl",
             "shacl_report.json",
             "retrieval/retrieval_results.json",
+            "term/egraph_equivalence.json",
         ]
     );
     for e in &entries {
@@ -125,6 +135,22 @@ fn run_substrate_emits_terminology_shacl_retrieval() {
             e.query.query_id.as_str()
         );
     }
+
+    // (d) egraph_equivalence.json: canonical on disk and free of f64, so it is
+    // byte-identical to the committed fixture (the structural compares above
+    // dodge the serde_json f64 asymmetry; this artifact carries no floats).
+    let egraph_bytes = fs::read(out.path().join("term/egraph_equivalence.json"))
+        .expect("read emitted egraph_equivalence");
+    let committed_egraph =
+        fs::read(root.join("examples/research_kernel/fixtures/egraph_equivalence.json"))
+            .expect("read committed egraph_equivalence");
+    assert_eq!(
+        egraph_bytes, committed_egraph,
+        "egraph_equivalence.json drifted from the committed fixture"
+    );
+    let egraph_artifact: EgraphArtifact =
+        serde_json::from_slice(&egraph_bytes).expect("emitted egraph parses");
+    assert_eq!(entries[3].content_hash, content_hash(&egraph_artifact));
 }
 
 #[test]
