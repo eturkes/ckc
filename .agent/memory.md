@@ -486,3 +486,15 @@ technically derivable but easily forgotten under token pressure.
   system utility (jq and the like) is fine to install system-wide despite the
   prefer-project-local directive; distro/package-manager specifics now live in
   CLAUDE.md.
+- [2026-06-01] Type-A hash-record recurrence (the generic "verify against actual
+  output" lesson alone did not prevent it): a fabricated placeholder short hash
+  went into the 0.13 roadmap line + chore commit message instead of the plan
+  commit's real hash. Always paste from the plan commit's actual
+  `git log -1 --format=%h` and re-read the committed line before closing. Fix
+  mechanic when caught: the `@<hash>` annotation targets the PLAN commit (the
+  chore commit's parent), so `git commit --amend` on the still-unpushed chore
+  commit corrects both line and message without moving the target. Second
+  failure mode this session: when `Bash` stdout rendered empty mid-turn the same
+  git command was re-fired ~5×; results were merely batched, so re-issuing an
+  identical read wastes a turn — route output to a temp file and `Read` it once
+  instead of retrying.
