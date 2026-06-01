@@ -117,7 +117,12 @@ macro_rules! golden_suite {
     };
 }
 
-golden_suite!(gs_run_manifest, RunManifest, golden_run_manifest, "run_manifest");
+golden_suite!(
+    gs_run_manifest,
+    RunManifest,
+    golden_run_manifest,
+    "run_manifest"
+);
 
 // ---------------------------------------------------------------------------
 // Regeneration: `cargo test -p ckc-cli --test manifest_golden -- --ignored`

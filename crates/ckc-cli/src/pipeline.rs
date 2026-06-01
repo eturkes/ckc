@@ -274,20 +274,22 @@ pub fn run_report(
 /// independent of the concrete `out_dir` — it names the clap `--out` default and
 /// the SPEC §25 invocation — so the manifest hash stays stable across output
 /// locations, the cross-run determinism the demo gate and Phase-0 acceptance
-/// require. (Standalone `ckc replay` against a committed `runs/research` manifest
-/// is task 0.13.)
-const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
+/// require. [`run_replay`](crate::replay::run_replay) gates a committed manifest's
+/// `command` against this constant before re-deriving the run.
+pub(crate) const DEMO_COMMAND: &str = "ckc demo research-kernel --out runs/research";
 
 /// Run the full Phase-0 stage pipeline under `out_dir` and assemble the
 /// [`RunManifest`], without writing the manifest file itself. [`run_demo`] calls
 /// this once per pass so `--replay` can re-derive and hash-compare a second,
-/// independent pass over the same stages.
+/// independent pass over the same stages;
+/// [`run_replay`](crate::replay::run_replay) calls it to re-derive the manifest a
+/// committed run is compared against.
 ///
 /// Entries concatenate in pipeline order — compile (9) ++ verify (24) ++
 /// conflicts (4) ++ substrate (3) ++ report (1) — so the manifest pins every
 /// emitted artifact by content hash, stage-ordered. Conflict detection runs once
 /// here ([`detect_all`]), shared by the conflicts and report stages.
-fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {
+pub(crate) fn run_pipeline(scenario: &str, out_dir: &Path) -> anyhow::Result<RunManifest> {
     if scenario != "research-kernel" {
         bail!("unsupported demo scenario {scenario:?}; Phase-0 serves research-kernel");
     }
