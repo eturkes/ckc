@@ -453,6 +453,30 @@ technically derivable but easily forgotten under token pressure.
   untyped-Value-that-may-hold-an-integer-float -> assert canonical bytes;
   fully-typed -> typed equality is fine.
 
+- [2026-06-01] Tantivy tie-break part 2 — SELECTION, not just order (extends the
+  2026-05-29 `TopDocs` lesson). The post-collector stable sort fixes the ORDER of
+  the returned top-k but not their SELECTION: `TopDocs::with_limit(top_k)`
+  truncates by Tantivy's internal doc-id tie-break BEFORE that sort, so an exact
+  f32 score tie straddling the top_k boundary can change WHICH spans survive
+  across independent index builds. `ckc-retrieve::sparse::search` now over-fetches
+  every match (`with_limit(searcher.num_docs())`), stable-sorts (score DESC,
+  span_id ASC), then `truncate(top_k)`, so survivor selection is a function of that
+  total order too. Zero-hash on Phase-0 fixtures (the only tie, q_vitals_temp at
+  5.09464, has both cells inside top_k=5, so no boundary truncation); guarded by
+  `sparse::tests::truncation_selects_deterministic_set_under_score_ties`.
+
+- [2026-06-01] Review false-positive preempt — `AssuranceNode.children` is
+  deliberately NOT sorted by NF, unlike every sibling set-valued id field
+  (`evidence_artifact_ids`, `source_span_ids`, …). `ckc-verify::assurance::node`
+  builds children from fixed declaration-order slice literals (documented at
+  assurance.rs ~61: "a goal lists its strategies in declaration order"), and
+  committed `certs/assurance_seed.json` keeps `asn_root` children in narrative
+  order (grounding, determinism, formal_checkability), not sorted. Determinism
+  holds (fixed literals → idempotent NF, identical across runs); this is SPEC §11
+  Pass 5 order-preservation, not a Pass 4 sort omission. A careful reviewer that
+  skips the data+comment cross-check re-flags it as a determinism bug — it is not.
+  Leave children unsorted.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
@@ -528,6 +552,26 @@ technically derivable but easily forgotten under token pressure.
   * `binding-predicate-collapses-four-statuses` — rdf.rs:21-26: RDF export maps
     unmapped/ambiguous/deprecated/incoherent bindings to `skos:relatedMatch` via a
     wildcard, erasing the distinction.
+
+- [2026-06-01] (Another-review finding; verified real, deferred — needs a design
+  decision plus cross-crate golden regen.) EventNarrative CompilationMap
+  `ckc_node_id` is a vocabulary token, not a resolvable node id. `EventNarrative`
+  (ckc-core/artifact.rs) is the lone SPEC §10 artifact with no id field, no id
+  newtype, and no `find_*` lookup, so both emitters over it set `ckc_node_id` to an
+  event/fluent NAME: `ckc-compile::asp::emit_event_calculus` (each
+  `event_types`/`fluent_types` element) and
+  `ckc-compile::modelcheck::emit_tlaplus_stub` (each fluent). This contradicts the
+  resolvable-`ckc_node_id` invariant (the CompilationMap-provenance lesson), whose
+  "narrative id" clause presumes an id that does not exist. Source-span provenance
+  is intact (both carry `narrative.source_span_ids`), so the gap is `ckc_node_id`
+  GRANULARITY, not a broken trace — severity medium. Resolve by either (A) adding
+  `narrative_id` + `NarrativeId` + a `find_event_narrative` accessor and using it
+  as `ckc_node_id` while moving the vocab token to `target_symbol` (a SPEC §10
+  addition; shifts only the 2 EC/TLA CompiledTarget content_hashes, not their
+  artifact_text → regen the portfolio-manifest + EC/TLA witness/cert goldens +
+  certificate_graph), or (B) refining the invariant to allow a sub-artifact
+  vocabulary handle for id-less artifacts and documenting it. Decide before
+  treating EC/TLA provenance as authoritative.
 
 ## Mistakes
 
