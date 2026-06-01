@@ -478,6 +478,20 @@ technically derivable but easily forgotten under token pressure.
   skips the data+comment cross-check re-flags it as a determinism bug — it is not.
   Leave children unsorted.
 
+- [2026-06-01] Editing a committed generated artifact's TEXT cascades wider than
+  the `compilation_map`-only case of the CompiledTarget-provenance note above
+  (whose hash shift stops at the portfolio golden): the target `content_hash`
+  flows to the cert that lists it in `input_artifact_hashes` → that cert's hash →
+  the conflict's `minimal_artifact_set` → the conflict's `nf-<hash>` FILENAME (a
+  rename, not an in-place edit) → the `conflict_manifest`, `report.json`,
+  `run_manifest`, `certificate_graph`, and `assurance` goldens. The EC HEADER
+  pink-elephant reframe touched 14 files this way. `git grep <old-hash>` to bound
+  the radius first; regen via the per-crate ignored tests (compile portfolio;
+  verify certs + verification/cert-graph/assurance goldens; conflict certs +
+  manifest; report; run_manifest); `git rm` the renamed conflict's orphan (regen
+  writes the new name, never the deletion); confirm zero stale-hash refs after.
+  Expect this on any Phase-4 generated-artifact content edit.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design
