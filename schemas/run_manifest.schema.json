@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RunManifest",
+  "description": "The deterministic manifest of a whole `ckc` run (SPEC 18): the command that\nproduced it, the `producer_version` (`CARGO_PKG_VERSION` at the construction\nsite), and every emitted artifact. Carries no timestamp, so repeated runs of\nthe same command hash identically.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RunManifestEntry"
+      }
+    },
+    "producer_version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "command",
+    "producer_version",
+    "entries"
+  ],
+  "$defs": {
+    "ContentHash": {
+      "description": "Content hash in the format `sha256:<hex>`.",
+      "type": "string"
+    },
+    "RunManifestEntry": {
+      "description": "One emitted artifact in a [`RunManifest`]: the pipeline stage that produced\nit, its artifact kind, its run-relative path, and the `content_hash` that\nbyte-locks it.",
+      "type": "object",
+      "properties": {
+        "artifact_kind": {
+          "type": "string"
+        },
+        "artifact_path": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "stage": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "artifact_kind",
+        "artifact_path",
+        "content_hash"
+      ]
+    }
+  }
+}
