@@ -7,19 +7,14 @@ technically derivable but easily forgotten under token pressure.
 
 ## Lessons
 
-- [2026-05-27] Every piece of natural language in the project (docs, comments,
-  diagnostics) must use positive constraint framing per the pink elephant
-  principle in CLAUDE.md. Audit before committing.
-- [2026-05-27] Memory entries, roadmap descriptions, and doc preambles are the
-  highest-risk locations for redundancy with SPEC.md and config files. Default
-  assumption: if a fact lives in a file, it belongs only in that file.
-- [2026-05-27] Spend freely on reasoning and iteration within a session, but
-  all content written to files must be token-efficient for future LLM readers.
-  Self-audit this balance before committing; the user expects it done
-  proactively.
-- [2026-05-27] When a mistake is caught after the fact, record it here so
-  future sessions avoid repeating it. Verify tool operations against their
-  actual output before reporting success.
+- [2026-05-27] Before committing, self-audit every written file (docs, comments,
+  diagnostics) for token efficiency, positive (pink-elephant) framing, and
+  redundancy: memory entries, roadmap descriptions, and doc preambles are the
+  highest-risk overlap with SPEC.md, CLAUDE.md, and config files — if a fact
+  lives in a file, it belongs only there. The user expects this proactively.
+- [2026-05-27] Verify tool operations against their actual output before
+  reporting success; record any after-the-fact mistake here so future sessions
+  avoid it.
 - [2026-05-28] Subtask sizing directive (user): size each roadmap subtask so a
   fresh agent completes AND commits it within one context window with margin; if
   it would need compaction, split it. One conceptual deliverable + one gate per
@@ -52,9 +47,7 @@ technically derivable but easily forgotten under token pressure.
   in official toolchain`. The Claude LSP host swallows this and surfaces only
   a generic `Tool result missing due to internal error` after a long hang.
   Fix: `rustup component add rust-analyzer`. Reproduce-detect cheaply by
-  running `rust-analyzer --version` before debugging the LSP host. Note this
-  supersedes the stance in commit 2fa9393, which deferred the install when
-  Claude's diagnostic loop relied only on `cargo check`/`clippy`/`test`.
+  running `rust-analyzer --version` before debugging the LSP host.
 - [2026-05-29] Project-local LSP marketplace lives at
   `.claude/marketplace/.claude-plugin/marketplace.json` and is wired in via
   project-scope `.claude/settings.json` (relative path,
@@ -520,14 +513,10 @@ technically derivable but easily forgotten under token pressure.
   `version.workspace = true` across crates) or sourcing every artifact's
   producer_version from a single shared constant.
 
-- [2026-06-01] (Phase-0 Type-P review deferred backlog — real findings whose
+- [2026-06-01] (Phase-0 Type-P review deferred backlog — open findings whose
   fixes need committed-golden regen, fixture redesign, or a design decision, so
-  each is left for a dedicated follow-up task rather than the review commit; the
-  zero-hash-impact corrections from the same review WERE applied.) The 3 medium
-  findings are now resolved in dedicated commits: replay-command-target-flag-
-  nonexistent (308fe9f), egraph-artifact-not-emitted + cost-function-not-
-  recorded-in-artifact (38a673f), canonical-number-not-rfc8785 (8d60ce5). The
-  remainder, grouped by remediation shape:
+  each awaits a dedicated follow-up task; the zero-hash-impact corrections from
+  the same review were applied.) Open items, grouped by remediation shape:
   FIXTURE/NF idempotency (fixture + golden_nf regen):
   * `nfkc-text-undecomposed-celsius` — examples/research_kernel/fixtures/spans.json
     (span_cell_r0c0, span_cell_r1c0): nfkc_text keeps U+2103 ℃ instead of NFKC

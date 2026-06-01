@@ -1,24 +1,22 @@
 # SPEC: CKC — Clinical Knowledge Compiler
 
-Audience: coding agent only. Optimize for deterministic parsing, formal semantics, executable evidence, reproducibility, and scientific novelty. Code is disposable. Durable assets and durable artifacts are schemas, normal forms, terminology graphs, formal corpora, proof obligations, certificates, evaluations, adjudications, and assurance evidence.
+Audience: coding agent only. Optimize for deterministic parsing, formal semantics, executable evidence, reproducibility, and scientific novelty. Code is disposable. Durable assets are schemas, normal forms, terminology graphs, formal corpora, proof obligations, certificates, evaluations, adjudications, and assurance evidence.
 
 ## 0. Mission
 
 Build `CKC`: a research-grade, proof-carrying clinical knowledge compiler for Japanese clinical guidelines and medical textbooks.
 
-Initial artifact: a headless system plus a small bilingual JA/EN result UI. The system ingests Japanese clinical text, extracts and indexes all textual content and every textual span, formalizes clinically relevant statements into deterministic executable representations, and reports source-grounded logical incompatibilities or factual inconsistencies that warrant human revision of the source text.
+Initial artifact: a headless system plus a small bilingual JA/EN result UI. It ingests Japanese clinical text, extracts and indexes all textual content as addressable spans, formalizes clinically relevant statements into deterministic executable representations, and reports source-grounded logical incompatibilities or factual inconsistencies warranting human revision of the source text.
 
-Initial operating mode: text-quality and formalization QA restricted to research use. All outputs are review candidates for clinician/formalist adjudication. Later CDS/SaMD deployment may discard the implementation while preserving CKC schemas, normal forms, corpora, terminology alignments, proof artifacts, conflict datasets, evaluation evidence, and assurance cases.
+Initial operating mode: text-quality and formalization QA, research use only. All outputs are review candidates for clinician/formalist adjudication. Later CDS/SaMD deployment may discard the implementation while preserving CKC schemas, normal forms, corpora, terminology alignments, proof artifacts, conflict datasets, evaluation evidence, and assurance cases.
 
 Ultimate ambition: a layered Japanese clinical knowledge corpus that can later evaluate EHR state, clinician notes, pharmacology, comorbidity, temporal trajectories, multimodal observations, and hospital workflow hooks under a regulated CDS/SaMD lifecycle. Keep late-stage architecture fluid; protect the formal evidence chain.
 
 ## 1. Design thesis
 
-CKC is a compiler and assurance system.
+CKC is a compiler and assurance system. Natural language is input; LLM output is candidate syntax. Accepted CKC output is the subset that passes the semantic firewall: source grounding, schema validation, CKC Normal Form, terminology alignment, profile admission, compiler generation, verifier execution, certificate generation, deterministic hashing, and replay.
 
-Natural language is input. LLM output is candidate syntax. Accepted CKC output is the subset that passes the semantic firewall: source grounding, schema validation, CKC Normal Form, terminology alignment, profile admission, compiler generation, verifier execution, certificate generation, deterministic hashing, and replay.
-
-The source of truth is `CKC Normal Form + certificate graph`. FHIR/CQL/ELM, DMN/FEEL, BPMN/ePath, openEHR/GDL, OWL/SKOS/SHACL, SMT-LIB, ASP, Datalog, Event Calculus, Lean, TLA+, Alloy/Forge, PRISM/JANI, and RDF are compilation/export/checking targets. They are valuable target languages. CKC Normal Form remains the semantic core.
+The source of truth is `CKC Normal Form + certificate graph`. FHIR/CQL/ELM, DMN/FEEL, BPMN/ePath, openEHR/GDL, OWL/SKOS/SHACL, SMT-LIB, ASP, Datalog, Event Calculus, Lean, TLA+, Alloy/Forge, PRISM/JANI, and RDF are compilation/export/checking targets; CKC Normal Form remains the semantic core.
 
 Use agent-native language principles: canonical ASTs, explicit effects, finite grammars, stable diagnostics, typed artifacts, machine-checkable contracts, hash-chained provenance, translation validation, and verifier-first development.
 
@@ -57,7 +55,7 @@ Future bridge code is demonstrative in this phase. Clinical deployment requires 
 
 ## 3. Distilled domain commitments
 
-The designated commitments are the authoritative synthesis of the domain research. The underlying documents comprising this research are unavailable. Pivot from a commitment only if you identify a superior alternative during development, and update this file accordingly.
+These commitments are the authoritative synthesis of domain research whose underlying documents are unavailable. Pivot from a commitment only on identifying a superior alternative during development, then update this file.
 
 Core commitments:
 
