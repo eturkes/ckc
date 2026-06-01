@@ -658,6 +658,7 @@ Every command emits structured diagnostics and immutable artifacts.
 │   ├── ckc-compile/       # target compilers
 │   ├── ckc-verify/        # solver/checker orchestration
 │   ├── ckc-cert/          # certificate graph and replay
+│   ├── ckc-conflict/      # conflict and inconsistency detection
 │   ├── ckc-report/        # bilingual report JSON
 │   ├── ckc-assurance/     # GSN/SACM/risk/traceability
 │   └── ckc-audit/         # research observability and replay traces

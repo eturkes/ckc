@@ -120,6 +120,14 @@ technically derivable but easily forgotten under token pressure.
   path-dep in the task whose code first `use`s it; sibling crates that genuinely
   reach into `ckc_store` (ckc-compile/verify/conflict/term/retrieve, one ref each)
   keep theirs.
+- [2026-06-01] Drift-audit reconciliation + lesson: `ckc-conflict` (the SPEC §15
+  detector crate, added in task 0.10) was the lone code-ahead-of-spec crate —
+  SPEC §19's crate list never gained it and the 0.10 review missed the layout
+  drift. Now listed in §19 between `ckc-cert` and `ckc-report`. Asymmetry to keep
+  straight against the scaffolding-policy note above: the §19 crates still absent
+  from the repo (ckc-extract/datalog/cert/assurance/audit) are spec-ahead-of-code
+  and blessed; ckc-conflict was the reverse. Lesson: when a phase adds a crate
+  §19 omits, update §19 in that same task rather than leaving it for an audit.
 - [2026-05-29] When sed-deleting a multi-line comment block, also delete the
   continuation indent line that follows it (`        //         …`) — it
   becomes an orphaned half-sentence otherwise. Verify with grep before
@@ -155,7 +163,7 @@ technically derivable but easily forgotten under token pressure.
   `.py`, `.json/.jsonc`, `.yaml/.yml`, `.md`, `.toml`, `.lean`, `.ttl/.nt`,
   `.xml/.xsd/.dmn/.bpmn`, `.als`, `.pl/.pro`,
   `.smt2/.cnf/.icnf/.p/.tptp/.zf`, `.dl`, `.egg`, `.html`,
-  `.css/.scss/.less`, `.svelte`. First call per server (notably
+  `.css/.scss/.less`, `.ts/.js`, `.svelte`. First call per server (notably
   rust-analyzer) pays one indexing cost; treat as per-session warmup, not
   a reason to fall back to grep. Fire LSP in parallel with other
   independent tools in the same response.
