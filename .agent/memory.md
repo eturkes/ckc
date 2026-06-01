@@ -528,13 +528,6 @@ technically derivable but easily forgotten under token pressure.
   nonexistent (308fe9f), egraph-artifact-not-emitted + cost-function-not-
   recorded-in-artifact (38a673f), canonical-number-not-rfc8785 (8d60ce5). The
   remainder, grouped by remediation shape:
-  EC-HEADER prose (own small task; reframe then rerun the artifact regenerator,
-  which shifts the EC CompiledTarget artifact_text -> regen the compile golden
-  that hashes it):
-  * `ec-header-never-negative-constraint` — ckc-compile/src/asp.rs:176 HEADER
-    `% ... never terminated` (mirrored byte-for-byte to logic/asp/event_calculus.lp:5):
-    pink-elephant "never" in generated prose. Fix: reframe to "the terminates set
-    is empty" (matches asp.rs:154), rerun the artifact regenerator.
   FIXTURE/NF idempotency (fixture + golden_nf regen):
   * `nfkc-text-undecomposed-celsius` — examples/research_kernel/fixtures/spans.json
     (span_cell_r0c0, span_cell_r1c0): nfkc_text keeps U+2103 ℃ instead of NFKC

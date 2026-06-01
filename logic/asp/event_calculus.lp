@@ -2,7 +2,7 @@
 % Allergy detected at t=0, beta-lactam administered at t=10.
 % Discrete Event Calculus persistence/clipping: holdsAt derives from an initiating
 % event when no terminating event clips the fluent in the open interval.
-% allergy_known is initiated at t=0 and never terminated, so holdsAt(allergy_known,10)
+% allergy_known is initiated at t=0 and the terminates set is empty, so holdsAt(allergy_known,10)
 % derives; the violation fires as administer_drug at t=10 meets the persisted allergy.
 % Emit-only: the clingo run is task 0.9.
 happens(administer_drug,10).
