@@ -20,3 +20,7 @@ ui/sveltekit-app/static/report.json
 *~
 runs/*/
 !runs/.gitkeep
+
+# Claude Code local/transient runtime artifacts (tracked content: .claude/marketplace/)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
