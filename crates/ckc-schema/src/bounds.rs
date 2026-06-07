@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use ckc_core::scalar::{FeaturePath, Hash, Id, UInt};
+use ckc_core::scalar::{FeaturePath, Id, UInt};
 use ckc_core::{bare_enum, canonical_record};
 use serde::Deserialize;
 
@@ -43,11 +43,8 @@ canonical_record!(SchemaCollectionBound: "schema_collection_bound",
 pub struct SchemaBoundManifest {
     pub manifest_id: Id,
     pub schema_collection_bounds: BTreeSet<SchemaCollectionBound>,
-    pub generator_static_bound_policy_hash: Hash,
-    pub closure_bound_policy_hash: Hash,
-    pub parser_bound_policy_hash: Hash,
 }
 
 canonical_record!(SchemaBoundManifest: "schema_bound_manifest",
-    fields { manifest_id, generator_static_bound_policy_hash, closure_bound_policy_hash, parser_bound_policy_hash },
+    fields { manifest_id },
     sets { schema_collection_bounds });

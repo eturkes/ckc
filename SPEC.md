@@ -64,12 +64,14 @@ S SourceSupportAlias(schema_id:Id,path:FeaturePath,alias_kind:SourceSupportAlias
 
 E SourceSupportAliasKind = singleton_region | region_set | inherited_subject | inherited_input | closed_region_members
 
-S SchemaBoundManifest(manifest_id:Id,schema_collection_bounds:Set[SchemaCollectionBound],generator_static_bound_policy_hash:Hash,closure_bound_policy_hash:Hash,parser_bound_policy_hash:Hash)
+S SchemaBoundManifest(manifest_id:Id,schema_collection_bounds:Set[SchemaCollectionBound])
 
 S SchemaCollectionBound(schema_id:Id,path:FeaturePath,max_items:UInt,overflow_disposition:BoundOverflowDisposition)
 
 E BoundOverflowDisposition = reject_with_diagnostic | emit_residual | emit_ambiguity | emit_incoherence
 ```
+
+`canonicalization_policy_hash` stores the accepted `UnicodePolicyManifest` envelope `artifact_hash` (§1.4). The §1.5 canonical-bytes grammar is fixed by `spec_contract_hash`.
 
 `HandleBoundOverflow(bound, subject_hash, candidate_members, producer_id) -> invalid | residual | ambiguity | incoherence` is the total dispatch for every overflow of a `SchemaCollectionBound`. `candidate_members` is the canonical finite sequence considered for insertion into the bounded collection. The checker need only retain the first `bound.max_items + 1` members by `canonical_sort_key` to prove overflow; call this retained sequence `overflow_members`. `overflow_member_hash(x)` is `x.artifact_hash` for an enveloped artifact and otherwise `sha256(canonical_payload_bytes(x))`. `overflow_source_regions` is the canonical union of source-support projections of `subject_hash` and `overflow_members`; unresolved projections contribute `{}`. `overflow_proof_roots` is the canonical union of proof roots available from the same inputs. The canonical diagnostic text is exactly `bound_overflow schema=<schema_id> path=<feature_path> max=<max_items> observed=<observed_count> producer=<producer_id>`, where `<feature_path>` is `/` joined and `<observed_count> = |overflow_members|`.
 
@@ -327,13 +329,13 @@ S ReplayIdentityCheck(replay_manifest_hash:Hash,expected_output_hashes:Set[Hash]
 
 S ProducerManifest(manifest_id:Id,operation_id:Id,command:List[Text<identifier_ascii>],input_hashes:Set[Hash],implementation_unit_hashes:Set[Hash],schema_registry_hash:Hash,toolchain_manifest_hash:Hash,accepted_effect_row:Set[Effect])
 
-S ToolchainManifest(manifest_id:Id,tool_records:Set[ToolRecord],build_input_hashes:Set[Hash],reproducibility_profile_hash:Hash)
+S ToolchainManifest(manifest_id:Id,tool_records:Set[ToolRecord],build_input_hashes:Set[Hash])
 
 S ToolRecord(tool_id:Id,tool_family:Id,version:Text<identifier_ascii>,executable_hash:Hash?,config_hash:Hash?)
 
-S EnvironmentProfile(profile_id:Id,os_family:Id,architecture:Id,locale_policy_hash:Hash,timezone_policy:Text<identifier_ascii>,network_policy:Effect,clock_policy:Effect,environment_variable_hashes:Set[Hash])
+S EnvironmentProfile(profile_id:Id,os_family:Id,architecture:Id,locale_policy:Text<identifier_ascii>,timezone_policy:Text<identifier_ascii>,network_policy:Effect,clock_policy:Effect,environment_variable_hashes:Set[Hash])
 
-S ValidationManifest(manifest_id:Id,validator_id:Id,subject_hashes:Set[Hash],check_ids:Set[Id],diagnostic_hashes:Set[Hash],replay_manifest_hash:Hash)
+S ValidationManifest(manifest_id:Id,validator_id:Id,validated_artifact_hashes:Set[Hash],check_ids:Set[Id],diagnostic_hashes:Set[Hash],replay_manifest_hash:Hash)
 ```
 
 Replay identity compares a well-founded issuance stratum of canonical payload hashes, envelope fields, proof roots, certificate hashes, report hashes, and replay-check hashes. Wall-clock timestamps are evidence metadata with `Effect = Clock`; accepted semantic replay uses logical time. A `ReplayManifest.expected_output_hashes` set names one closed prior stratum. It excludes the manifest payload itself, excludes any artifact whose payload or envelope `replay_manifest_hash` equals that manifest hash, excludes the enclosing `ReplayIdentityCheck` payload, and excludes every `Certificate` whose `replay_identity_hashes` contains that enclosing check. Payload and envelope `replay_manifest_hash` fields therefore name lower-stratum producer manifests; audit manifests that list output hashes are referenced by the subsequent `ReplayIdentityCheck`. A later stratum may certify the replay check. For the demo, `RM-PRODUCER-BASE` is the lower-stratum producer manifest used by emitted artifacts, `RM-DEMO-CORE` audits outputs through `ReviewReport` and all certificates except `report_replay`, `RIC-DEMO-CORE` checks that set, and `CERT-report_replay` then references the report and `RIC-DEMO-CORE`. Appendix A.10 enumerates the outer fixture inventory and remains the replay authority for `ckc demo m0`.
@@ -2450,6 +2452,8 @@ S Diagnostic(diagnostic_id:Id,code:Id,subject_hash:Hash?,source_regions:Set[Regi
 
 S DiagnosticRef(diagnostic_hash:Hash)
 ```
+
+`Incoherence.subject_hashes` members are subject-identity hashes: the envelope `artifact_hash` for an enveloped subject, otherwise `sha256(canonical_payload_bytes(subject))`. §1.1 `overflow_member_hash` instantiates this rule.
 
 Review-classification assignment is total and fixed:
 

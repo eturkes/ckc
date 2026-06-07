@@ -311,11 +311,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "self-referential: a payload field cannot store the hash of bytes that include itself; envelope artifact_hash already records identity",
     ),
     (
-        "canonicalization_policy_hash",
-        HashFieldClass::Unresolved,
-        "§1.1/§1.5 never define the canonicalization policy's byte source",
-    ),
-    (
         "checker_hashes",
         HashFieldClass::Unresolved,
         "referent undefined: verifier-witness artifacts vs checker executable bytes (§7.2)",
@@ -329,11 +324,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "closed_region_hash",
         HashFieldClass::Unresolved,
         "mutual artifact refs with SourceRegion.closure_certificate_hash are unconstructible under content addressing",
-    ),
-    (
-        "closure_bound_policy_hash",
-        HashFieldClass::Unresolved,
-        "bound-policy payload undefined: no schema, no computation (§1.1)",
     ),
     (
         "closure_certificate_hash",
@@ -426,11 +416,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "§1.1 T-Schema-Equivalence, registry-wide manifest level; M0.0.4 implements",
     ),
     (
-        "generator_static_bound_policy_hash",
-        HashFieldClass::Unresolved,
-        "bound-policy payload undefined: no schema, no computation (§1.1)",
-    ),
-    (
         "graph_retrieval_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external graph-retrieval manifest bytes (evidence-discovery trace)",
@@ -461,11 +446,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "normalized clause is not an accepted artifact; hashing rule undefined (§8.1; family: right_clause_hash)",
     ),
     (
-        "locale_policy_hash",
-        HashFieldClass::Unresolved,
-        "hash input undefined; sibling timezone_policy is inline text (§1.6)",
-    ),
-    (
         "minimality_proof_hash",
         HashFieldClass::Unresolved,
         "no minimality-proof schema exists and §8.1 ctx_compatible never constructs one; intended referent undefined",
@@ -474,11 +454,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "normalization_table_hash",
         HashFieldClass::RawRecordedBytes,
         "Unicode normalization-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
-    ),
-    (
-        "parser_bound_policy_hash",
-        HashFieldClass::Unresolved,
-        "bound-policy payload undefined: no schema, no computation (§1.1)",
     ),
     (
         "parser_state_machine_hash",
@@ -534,11 +509,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "reading_hash",
         HashFieldClass::Unresolved,
         "Reading values are License sub-payloads, not accepted artifacts; digest computation undefined (§6.3)",
-    ),
-    (
-        "reproducibility_profile_hash",
-        HashFieldClass::Unresolved,
-        "reproducibility-profile payload undefined: no schema, no computation; sole spec mention is this field (§1.6)",
     ),
     (
         "required_output_hashes",
@@ -617,8 +587,8 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
     ),
     (
         "subject_hashes",
-        HashFieldClass::Unresolved,
-        "divergent referents under one name: ValidationManifest stores validated-artifact refs while Incoherence stores §1.1 overflow_member_hash values (payload digests for non-enveloped members)",
+        HashFieldClass::FieldSpecific,
+        "subject-identity hashes defined beside §8.7 Incoherence: envelope artifact_hash for enveloped subjects, else canonical-payload digest; §1.1 overflow_member_hash instantiates the rule",
     ),
     (
         "tagged_json_schema_hash",
@@ -1424,9 +1394,10 @@ mod tests {
         row.path.segments().last().unwrap().as_str()
     }
 
-    /// Totality + final per-class path counts over the real SPEC
-    /// (M0.0.3.4.5.1.2 finalizes; both table halves judged): suffix
-    /// defaults make every HashNamed walk row classify.
+    /// Totality + per-class path counts over the real SPEC: suffix
+    /// defaults make every HashNamed walk row classify. Counts track the
+    /// .5.2.x burn-down (.5.2.1.1 done: 7 names); .5.2.3.2 finalizes with
+    /// an empty Unresolved class.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
         let text = spec_text();
@@ -1437,18 +1408,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 260);
+        assert_eq!(rows.len(), 255);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 171);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 85);
+        assert_eq!(names.len(), 167);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 82);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
-        assert_eq!(count(HashFieldClass::ArtifactRef), 164);
+        assert_eq!(count(HashFieldClass::ArtifactRef), 166);
         assert_eq!(count(HashFieldClass::NamedPayloadDigest), 9);
         assert_eq!(count(HashFieldClass::RawRecordedBytes), 27);
-        assert_eq!(count(HashFieldClass::FieldSpecific), 11);
-        assert_eq!(count(HashFieldClass::Unresolved), 49);
+        assert_eq!(count(HashFieldClass::FieldSpecific), 12);
+        assert_eq!(count(HashFieldClass::Unresolved), 41);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1534,6 +1505,21 @@ mod tests {
                 "match_class",
                 "class_signature_hash",
                 HashFieldClass::FieldSpecific,
+            ),
+            (
+                "incoherence",
+                "subject_hashes",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "validation_manifest",
+                "validated_artifact_hashes",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "schema_registry",
+                "canonicalization_policy_hash",
+                HashFieldClass::ArtifactRef,
             ),
             (
                 "proof_dag",

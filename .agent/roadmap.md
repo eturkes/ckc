@@ -154,7 +154,7 @@ rule.
   assertions; second-half default + exception spot-checks; SPEC.md stays
   untouched. Read: §1.2 hash conventions + judged fields' S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.1.1 hash-defect burn-down: §1.x cluster. Resolve 7 of the
+- [x] M0.0.3.4.5.2.1.1 69% 139K/200K hash-defect burn-down: §1.x cluster. Resolve 7 of the
   42 Unresolved terminal names: §1.1 bound-policy family
   (canonicalization_policy_hash, closure_bound_policy_hash,
   generator_static_bound_policy_hash, parser_bound_policy_hash — one shared

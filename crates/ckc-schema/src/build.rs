@@ -626,10 +626,9 @@ fn anchor_line_hash(spec_text: &str, prefix: &str) -> Hash {
 /// the defining § header line, per field: `rust_type_manifest_hash` and
 /// `generated_json_schema_manifest_hash` -> §1.1 (both equal pending the
 /// M0.0.4 T-Schema-Equivalence manifests, like the per-entry pair);
-/// `canonicalization_policy_hash` -> §1.5 (policy artifact pending);
-/// `generator_static_bound_policy_hash` -> §6.1 (C-GEN-static bound-excess
-/// policy); `parser_bound_policy_hash` -> §6.2 (parser state machine);
-/// `closure_bound_policy_hash` -> §7.1 (closure bounds).
+/// `canonicalization_policy_hash` -> §1.4 (stores the accepted
+/// `UnicodePolicyManifest` envelope hash once M0.0.5 envelopes the §1.4
+/// fixture manifest).
 pub fn build_v0_registry(
     decls: &SpecDecls,
     spec_text: &str,
@@ -637,9 +636,6 @@ pub fn build_v0_registry(
     let manifest = SchemaBoundManifest {
         manifest_id: Id::new("ckc_schema_bound_manifest_v0").expect("authored Id is valid"),
         schema_collection_bounds: bound_rows(decls).into_iter().collect(),
-        generator_static_bound_policy_hash: anchor_line_hash(spec_text, "### 6.1 "),
-        closure_bound_policy_hash: anchor_line_hash(spec_text, "### 7.1 "),
-        parser_bound_policy_hash: anchor_line_hash(spec_text, "### 6.2 "),
     };
     let manifest_bytes =
         canonical_payload_bytes(&manifest).expect("built bound manifest canonicalizes");
@@ -650,7 +646,7 @@ pub fn build_v0_registry(
         spec_contract_hash: Hash::of_bytes(spec_text.as_bytes()),
         rust_type_manifest_hash: section_1_1.clone(),
         generated_json_schema_manifest_hash: section_1_1,
-        canonicalization_policy_hash: anchor_line_hash(spec_text, "### 1.5 "),
+        canonicalization_policy_hash: anchor_line_hash(spec_text, "### 1.4 "),
         schema_bound_manifest_hash: Hash::of_bytes(&manifest_bytes),
         schema_entries: build_schema_entries(decls, spec_text).into_iter().collect(),
         string_policy_bindings: binding_rows(decls).into_iter().collect(),
@@ -1230,13 +1226,7 @@ mod tests {
             registry.generated_json_schema_manifest_hash,
             anchor("### 1.1 ")
         );
-        assert_eq!(registry.canonicalization_policy_hash, anchor("### 1.5 "));
-        assert_eq!(
-            manifest.generator_static_bound_policy_hash,
-            anchor("### 6.1 ")
-        );
-        assert_eq!(manifest.parser_bound_policy_hash, anchor("### 6.2 "));
-        assert_eq!(manifest.closure_bound_policy_hash, anchor("### 7.1 "));
+        assert_eq!(registry.canonicalization_policy_hash, anchor("### 1.4 "));
 
         assert_eq!(registry.schema_entries.len(), decls.inventory.len());
         assert_eq!(

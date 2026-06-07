@@ -45,9 +45,6 @@ mod tests {
                 max_items: UInt::from(4096u64),
                 overflow_disposition: BoundOverflowDisposition::RejectWithDiagnostic,
             }]),
-            generator_static_bound_policy_hash: Hash::of_bytes(b"generator"),
-            closure_bound_policy_hash: Hash::of_bytes(b"closure"),
-            parser_bound_policy_hash: Hash::of_bytes(b"parser"),
         };
         let bounds_bytes = canonical_payload_bytes(&bounds).unwrap();
         assert_eq!(

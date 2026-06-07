@@ -246,8 +246,8 @@ technically derivable but easily forgotten under token pressure.
 - [2026-06-07] Registry-surface sizing constants (calibrate splits of
   registry-adjacent units, e.g. M0.0.4 schema equivalence walks the same
   surfaces; re-grep after SPEC edits): 227 S-decls spec-wide, ~75 §3.1
-  inventory roots, 366 collection fields, 459 hash-named fields, 61 Text
-  fields in S-decl lines. Split heuristic (m0.0.3.4 rebalances, 3→5 then
+  inventory roots, 364 collection fields, 454 hash-named fields, 56 Text
+  fields in S-decl lines (2026-06-08 re-grep). Split heuristic (m0.0.3.4 rebalances, 3→5 then
   user-directed 5→7, both pre-implementation): a unit that both implements
   a nontrivial algorithm AND authors a per-inventory-row table is two
   units; a checker family that authors a per-path/per-name table or
