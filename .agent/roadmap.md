@@ -30,7 +30,7 @@ rule.
   accepted-reference sort helper (artifact_hash, then schema_id, then
   reference field name). Read: §1.5 sort-key/set/map paragraphs, §1.2
   hash-field conventions. Test: `cargo test -p ckc-core canon`
-- [ ] M0.0.2.3 unions, strict reading, gate. Tagged-union `{"tag","value"}`
+- [x] M0.0.2.3 86% 172K/200K unions, strict reading, gate. Tagged-union `{"tag","value"}`
   encoding (bare tag → `{}` value, duplicate-tag rejection); decide and
   document E-enum encoding (Id string vs tagged object); §1.7
   `OperationResult<T>` + §2 `Outcome` as first unions in new

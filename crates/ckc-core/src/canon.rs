@@ -1,10 +1,22 @@
-//! SPEC §1.5 canonical JSON payload bytes: writer core.
+//! SPEC §1.5 canonical JSON payload bytes: writer core, union encoding,
+//! strict canonical reading.
 //!
 //! Single emission authority for canonical bytes (§0 one canonical
 //! representation per fact): artifact bytes are produced here; serde
-//! `Deserialize` impls are the validating read side. `TYPE_ID` values are
-//! provisional symbol ids pending the M0.0.3 `SchemaRegistry`. Tagged
-//! unions and strict canonical reading land in M0.0.2.3.
+//! `Deserialize` impls are the validating read side, entered at byte level
+//! through [`from_canonical_bytes`]. `TYPE_ID` values are provisional
+//! symbol ids pending the M0.0.3 `SchemaRegistry`.
+//!
+//! Enum-vs-union encoding (decided M0.0.2.3): a union whose alternatives
+//! are all bare — a §2-style `E` enum such as `Outcome`, `Effect`,
+//! `SchemaRole` — encodes as the bare JSON string of its variant symbol
+//! exactly as SPEC writes it (`"ok"`, `"Inference"`, `"G-RET-PARITY"`).
+//! §1.1 keeps enum variants and tagged-union alternatives as distinct
+//! symbol kinds, and variant symbols like `Inference`/`S0`/`G-RET-PARITY`
+//! violate the `Id` charset, so the encoding is a plain string holding the
+//! variant symbol, not an `Id`. A union with at least one payload-carrying
+//! alternative (e.g. §1.7 `OperationResult[T]`) encodes as the §1.5
+//! `{"tag","value"}` object; its bare alternatives carry value `{}`.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -142,6 +154,33 @@ impl ObjectEmitter {
         out.push(b'}');
         Ok(())
     }
+}
+
+/// §1.5 tagged union: an object with exactly two members, `"tag"` and
+/// `"value"`, written directly in sorted member order. `emit_value` writes
+/// the payload object, array, or scalar; [`emit_union_bare`] covers a bare
+/// tag or an absent optional payload. Constructor tags are unique within a
+/// union by Rust enum construction; the read side ([`read_union`]) rejects
+/// duplicate tag members.
+pub fn emit_union(
+    out: &mut Vec<u8>,
+    tag: &str,
+    emit_value: impl FnOnce(&mut Vec<u8>) -> Result<(), CanonError>,
+) -> Result<(), CanonError> {
+    out.extend_from_slice(b"{\"tag\":");
+    emit_string(out, tag);
+    out.extend_from_slice(b",\"value\":");
+    emit_value(out)?;
+    out.push(b'}');
+    Ok(())
+}
+
+/// §1.5 bare tag: `{"tag":<tag>,"value":{}}`.
+pub fn emit_union_bare(out: &mut Vec<u8>, tag: &str) -> Result<(), CanonError> {
+    emit_union(out, tag, |b| {
+        b.extend_from_slice(b"{}");
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +361,126 @@ pub fn emit_map<'a, K: MapKey + 'a, V: Canonical + 'a>(
             b.push(b'}');
             Ok(())
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Strict canonical reading (§1.5)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadError {
+    /// Typed parse rejected the bytes: malformed JSON, JSON null, JSON
+    /// numeric token, duplicate object field, unknown field, unknown or
+    /// duplicate or misordered union tag, or a scalar/policy canonicality
+    /// violation (`Text::from_canonical`, `Rational::from_canonical_parts`).
+    Parse { detail: String },
+    /// Parsed value re-serializes to different bytes: non-canonical member
+    /// order, whitespace, duplicate map keys or set elements that collapsed
+    /// on read, or non-canonical string escapes.
+    NonCanonical,
+    /// Re-serialization of the parsed value failed; reachable when a read
+    /// container holds entries the emitter rejects (e.g. duplicate
+    /// pair-array map keys read into a `Vec`).
+    Emit(CanonError),
+}
+
+impl fmt::Display for ReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Parse { detail } => write!(f, "canonical parse rejected: {detail}"),
+            Self::NonCanonical => f.write_str("bytes differ from canonical re-serialization"),
+            Self::Emit(e) => write!(f, "re-serialization failed: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ReadError {}
+
+/// §1.5 strict canonical read: typed parse, then re-serialize-compare.
+/// Accepts exactly the bytes [`canonical_payload_bytes`] emits for a
+/// schema-valid value of `T`.
+pub fn from_canonical_bytes<T>(bytes: &[u8]) -> Result<T, ReadError>
+where
+    T: Canonical + serde::de::DeserializeOwned,
+{
+    let value: T = serde_json::from_slice(bytes).map_err(|e| ReadError::Parse {
+        detail: e.to_string(),
+    })?;
+    let reserialized = canonical_payload_bytes(&value).map_err(ReadError::Emit)?;
+    if reserialized == bytes {
+        Ok(value)
+    } else {
+        Err(ReadError::NonCanonical)
+    }
+}
+
+/// Strict §1.5 union-read driver for manual `Deserialize` impls: enforces
+/// the exact `{"tag","value"}` two-member shape in canonical member order,
+/// rejecting empty objects, duplicate tag members, unknown members, and
+/// member counts above two. `parse` maps the tag to a value via
+/// `map.next_value::<…>()` and errors on unknown tags; bare tags read
+/// [`BareValue`].
+pub fn read_union<'de, A, V>(
+    mut map: A,
+    parse: impl FnOnce(&str, &mut A) -> Result<V, A::Error>,
+) -> Result<V, A::Error>
+where
+    A: serde::de::MapAccess<'de>,
+{
+    use serde::de::Error as _;
+    match map.next_key::<String>()? {
+        Some(k) if k == "tag" => {}
+        Some(k) => {
+            return Err(A::Error::custom(format!(
+                "union member 1 is \"tag\", found {k:?}"
+            )));
+        }
+        None => return Err(A::Error::custom("union object is empty")),
+    }
+    let tag: String = map.next_value()?;
+    match map.next_key::<String>()? {
+        Some(k) if k == "value" => {}
+        Some(k) if k == "tag" => return Err(A::Error::custom("duplicate union tag member")),
+        Some(k) => {
+            return Err(A::Error::custom(format!(
+                "union member 2 is \"value\", found {k:?}"
+            )));
+        }
+        None => return Err(A::Error::custom("union object misses \"value\"")),
+    }
+    let value = parse(&tag, &mut map)?;
+    if map.next_key::<String>()?.is_some() {
+        return Err(A::Error::custom("union object has exactly two members"));
+    }
+    Ok(value)
+}
+
+/// §1.5 bare-tag payload: deserializes exactly `{}`.
+pub struct BareValue;
+
+impl<'de> serde::Deserialize<'de> for BareValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = BareValue;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("bare union value {}")
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<BareValue, A::Error> {
+                use serde::de::Error as _;
+                if map.next_key::<String>()?.is_some() {
+                    return Err(A::Error::custom("bare union value is exactly {}"));
+                }
+                Ok(BareValue)
+            }
+        }
+        deserializer.deserialize_map(V)
     }
 }
 
@@ -641,5 +800,14 @@ mod tests {
             bytes_of(&Text::<RawSource>::new("x\ty").unwrap()),
             r#""x\u0009y""#
         );
+    }
+    #[test]
+    fn union_encoding_tag_then_value() {
+        let mut out = Vec::new();
+        emit_union(&mut out, "one", |b| UInt::from(2u64).emit_canonical(b)).unwrap();
+        assert_eq!(out, br#"{"tag":"one","value":"2"}"#);
+        let mut bare = Vec::new();
+        emit_union_bare(&mut bare, "empty").unwrap();
+        assert_eq!(bare, br#"{"tag":"empty","value":{}}"#);
     }
 }
