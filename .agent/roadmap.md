@@ -128,7 +128,7 @@ rule.
   build_v0_registry clean; perturbations (dropped/extra bound row, wrong
   role) reject. Read: §1.1 step 4 + bound paragraphs, §1.2 role rule.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.5.1.1 hash classifier + a-l table half. check.rs:
+- [x] M0.0.3.4.5.1.1 85% 171K/200K hash classifier + a-l table half. check.rs:
   HashFieldClass {ArtifactRef, NamedPayloadDigest, RawRecordedBytes,
   FieldSpecific, Unresolved} + classify_hash_fields over walk_inventory
   HashNamed rows — suffix defaults (*_hash/*_hashes ArtifactRef, *_digest

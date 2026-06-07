@@ -2,8 +2,11 @@
 //! against the [`crate::symtab`] symbol table, with checker-local sorted
 //! diagnostics. §1.1 step 4 (M0.0.3.4.4): [`check_registry`] validates a
 //! built registry+manifest pair — two-sided bound coverage over the §3.1
-//! type-graph walk and the §1.2 source-support/role rule. Every issue
-//! carries [`CheckIssue::CODE`] (`referential_integrity_error`); the §8.7
+//! type-graph walk and the §1.2 source-support/role rule. §1.2 hash
+//! conventions (M0.0.3.4.5.1): [`classify_hash_fields`] assigns every
+//! walked `HashNamed` row a [`HashFieldClass`] via suffix defaults plus
+//! the authored [`HASH_FIELD_EXCEPTIONS`] table. Every issue carries
+//! [`CheckIssue::CODE`] (`referential_integrity_error`); the §8.7
 //! `Diagnostic` artifact wrapper lands with its consuming unit.
 //!
 //! Checked references: S-decl field types and E-decl alternative/sexp
@@ -122,8 +125,9 @@ fn enclosing_anchor(decls: &SpecDecls, line: usize) -> String {
 
 /// §1.1 step-4 bound coverage and the §1.2 source-support/role rule over a
 /// built registry+manifest pair. Peer of [`check_spec`]: same issue type
-/// and ordering. The §1.2 hash-field-convention and §3.2 producer-mapping
-/// checkers plus step-1-2/5 composition land with M0.0.3.4.5-7.
+/// and ordering. [`classify_hash_fields`] wiring (.5.2), the §3.2
+/// producer-mapping checker (.4.6), and step-1-2/5 composition (.4.7)
+/// remain.
 pub fn check_registry(
     text: &str,
     registry: &SchemaRegistry,
@@ -225,6 +229,269 @@ pub fn check_registry(
     issues.sort();
     issues.dedup();
     CheckReport { issues }
+}
+
+/// §1.2 hash-field-convention class of one walked `HashNamed` path
+/// (M0.0.3.4.5.1): which computation produces the stored hash.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HashFieldClass {
+    /// `*_hash`/`*_hashes` naming an accepted artifact's envelope hash.
+    ArtifactRef,
+    /// `*_digest`: sha256 of canonical payload bytes of a payload defined
+    /// beside the field.
+    NamedPayloadDigest,
+    /// `sha256(exact_recorded_bytes)` of raw-source/executable/external-
+    /// manifest/index-fingerprint bytes, supplied by an accompanying
+    /// manifest.
+    RawRecordedBytes,
+    /// Field-specific computation defined beside the field in its section.
+    FieldSpecific,
+    /// No §1.2 convention or field-specific computation applies — spec
+    /// defect; M0.0.3.4.5.2 burns these down with SPEC corrections, then
+    /// wires the class into [`check_registry`] as
+    /// `referential_integrity_error`.
+    Unresolved,
+}
+
+/// One classified §3.1 walk row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassifiedHashField {
+    pub schema_id: Id,
+    pub path: FeaturePath,
+    pub class: HashFieldClass,
+}
+
+/// Suffix defaults (§1.2): `*_hash`/`*_hashes` reference accepted
+/// artifacts; `*_digest` digests a payload named beside the field.
+fn hash_suffix_default(terminal: &str) -> HashFieldClass {
+    if terminal.ends_with("_digest") {
+        HashFieldClass::NamedPayloadDigest
+    } else {
+        HashFieldClass::ArtifactRef
+    }
+}
+
+/// Authored terminal-name exceptions to the suffix defaults, sorted; rows
+/// are (terminal field name, class, one-line rationale). M0.0.3.4.5.1.1
+/// judged every name lexicographically < "m" against its S-decl context;
+/// names >= "m" ride suffix defaults unreviewed until .5.1.2 extends this
+/// table. Unresolved rows are .5.2's burn-down list. Outside HashNamed
+/// coverage entirely: WordingGateRecord.literal_part_digests (§9.3) ends
+/// `_digests`, a suffix §1.2 never names — .5.2 resolves it with the
+/// SPEC-edit batch.
+pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
+    (
+        "actual_output_hashes",
+        HashFieldClass::FieldSpecific,
+        "§1.6 ReplayIdentity step 3 defines the recomputed-stratum set; equals accepted hashes exactly on replay_identity_pass",
+    ),
+    (
+        "adapter_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external extraction-adapter manifest bytes; the owning ExtractionManifest supplies them",
+    ),
+    (
+        "admission_decision_hash",
+        HashFieldClass::Unresolved,
+        "AdmissionDecision is an enum, not an artifact; intended referent (cf. admission_record_hash elsewhere) undefined",
+    ),
+    (
+        "build_input_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "toolchain build-input bytes recorded by the owning ToolchainManifest",
+    ),
+    (
+        "candidate_hash",
+        HashFieldClass::Unresolved,
+        "pre-acceptance candidate payload hash; §6.4 never defines the computation; equals artifact_hash only on accept",
+    ),
+    (
+        "canonical_bytes_hash",
+        HashFieldClass::Unresolved,
+        "self-referential: a payload field cannot store the hash of bytes that include itself; envelope artifact_hash already records identity",
+    ),
+    (
+        "canonicalization_policy_hash",
+        HashFieldClass::Unresolved,
+        "§1.1/§1.5 never define the canonicalization policy's byte source",
+    ),
+    (
+        "checker_hashes",
+        HashFieldClass::Unresolved,
+        "referent undefined: verifier-witness artifacts vs checker executable bytes (§7.2)",
+    ),
+    (
+        "class_signature_hash",
+        HashFieldClass::FieldSpecific,
+        "sha256 over §7.2 proof_visible_signature canonical bytes",
+    ),
+    (
+        "closed_region_hash",
+        HashFieldClass::Unresolved,
+        "mutual artifact refs with SourceRegion.closure_certificate_hash are unconstructible under content addressing",
+    ),
+    (
+        "closure_bound_policy_hash",
+        HashFieldClass::Unresolved,
+        "bound-policy payload undefined: no schema, no computation (§1.1)",
+    ),
+    (
+        "closure_certificate_hash",
+        HashFieldClass::Unresolved,
+        "circular counterpart of RegionClosureCertificate.closed_region_hash",
+    ),
+    (
+        "config_hash",
+        HashFieldClass::RawRecordedBytes,
+        "tool/analyzer configuration bytes recorded by the enclosing manifest",
+    ),
+    (
+        "constrained_decoder_contract_hash",
+        HashFieldClass::Unresolved,
+        "contract payload undefined (§6.2 grammar artifact)",
+    ),
+    (
+        "content_hash",
+        HashFieldClass::RawRecordedBytes,
+        "raw document content bytes; sibling extraction_manifest_hash names the supplier",
+    ),
+    (
+        "dense_retriever_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external dense-retriever manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "display_grammar_hash",
+        HashFieldClass::Unresolved,
+        "display-grammar byte source undefined; spec-internal notation is outside the §1.2 raw-recorded list",
+    ),
+    (
+        "emitted_payload_hashes",
+        HashFieldClass::Unresolved,
+        "materialization-sandbox payload hashes; referents are not accepted artifacts and the computation is undefined (§6.4)",
+    ),
+    (
+        "entry_hashes",
+        HashFieldClass::Unresolved,
+        "MechanicalLexicon entries have no schema; referents are not accepted artifacts",
+    ),
+    (
+        "environment_variable_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "recorded environment-variable bytes; EnvironmentProfile is the supplying manifest",
+    ),
+    (
+        "executable_hash",
+        HashFieldClass::RawRecordedBytes,
+        "§1.2 names executable bytes explicitly",
+    ),
+    (
+        "external_backend_core_hash",
+        HashFieldClass::RawRecordedBytes,
+        "replayed external-solver core bytes; the recorded solver proof is the supplying manifest (§8.1)",
+    ),
+    (
+        "first_follow_sets_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash: Set[FirstFollowSet] payload is not an accepted artifact (§6.2)",
+    ),
+    (
+        "first_set_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash over FIRST token classes (§6.2)",
+    ),
+    (
+        "follow_set_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash over FOLLOW token classes (§6.2)",
+    ),
+    (
+        "forbidden_output_hashes",
+        HashFieldClass::Unresolved,
+        "hashes of payloads that must never exist; no convention covers hypothetical payloads (§6.4 suite comparison)",
+    ),
+    (
+        "fusion_policy_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external fusion-policy configuration bytes; the sibling family enum names the kind",
+    ),
+    (
+        "generated_json_schema_hash",
+        HashFieldClass::FieldSpecific,
+        "§1.1 T-Schema-Equivalence canonicalize-and-compare computation; M0.0.4 implements",
+    ),
+    (
+        "generated_json_schema_manifest_hash",
+        HashFieldClass::FieldSpecific,
+        "§1.1 T-Schema-Equivalence, registry-wide manifest level; M0.0.4 implements",
+    ),
+    (
+        "generator_static_bound_policy_hash",
+        HashFieldClass::Unresolved,
+        "bound-policy payload undefined: no schema, no computation (§1.1)",
+    ),
+    (
+        "graph_retrieval_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external graph-retrieval manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "implementation_unit_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "producing-implementation code bytes (executable-bytes family) beside ProducerManifest.toolchain_manifest_hash",
+    ),
+    (
+        "index_fingerprint_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "§1.2 names index fingerprints explicitly; §6.4 requires replayable fingerprints",
+    ),
+    (
+        "input_hash",
+        HashFieldClass::Unresolved,
+        "divergent computations under one name: ExtractionManifest raw source bytes vs VerifierWitness accepted-artifact ref; the §1.2 inherited_input alias assumes the latter",
+    ),
+    (
+        "late_interaction_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external late-interaction manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "left_clause_hash",
+        HashFieldClass::Unresolved,
+        "normalized clause is not an accepted artifact; hashing rule undefined (§8.1; family: right_clause_hash)",
+    ),
+    (
+        "locale_policy_hash",
+        HashFieldClass::Unresolved,
+        "hash input undefined; sibling timezone_policy is inline text (§1.6)",
+    ),
+];
+
+/// Classifies every `HashNamed` row of the §3.1 walk: authored exception
+/// by terminal field name, else suffix default. Total — every row gets a
+/// class. .5.2 wires Unresolved rows into [`check_registry`].
+pub fn classify_hash_fields(decls: &SpecDecls) -> Vec<ClassifiedHashField> {
+    walk_inventory(decls)
+        .into_iter()
+        .filter(|r| r.leaf == WalkedLeaf::HashNamed)
+        .map(|r| {
+            let terminal = r
+                .path
+                .segments()
+                .last()
+                .expect("HashNamed path is nonempty")
+                .as_str();
+            let class = HASH_FIELD_EXCEPTIONS
+                .iter()
+                .find(|(name, _, _)| *name == terminal)
+                .map_or_else(|| hash_suffix_default(terminal), |(_, class, _)| *class);
+            ClassifiedHashField {
+                schema_id: r.schema_id,
+                path: r.path,
+                class,
+            }
+        })
+        .collect()
 }
 
 /// schema_id -> §3.1 inventory S-decl (issue lines + role-rule input).
@@ -966,5 +1233,163 @@ mod tests {
             messages(&report),
             ["schema entry `no_such_schema` resolves to no §3.1 inventory S-decl"]
         );
+    }
+
+    fn terminal(row: &ClassifiedHashField) -> &str {
+        row.path.segments().last().unwrap().as_str()
+    }
+
+    /// M0.0.3.4.5.1.1 totality + provisional per-class path counts over
+    /// the real SPEC: suffix defaults make every HashNamed walk row
+    /// classify; the a-l half is judged, the m-z half rides defaults
+    /// until .5.1.2 finalizes these counts.
+    #[test]
+    fn check_hash_real_spec_totality_and_counts() {
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let rows = classify_hash_fields(&decls);
+        let hash_named = walk_inventory(&decls)
+            .into_iter()
+            .filter(|r| r.leaf == WalkedLeaf::HashNamed)
+            .count();
+        assert_eq!(rows.len(), hash_named);
+        assert_eq!(rows.len(), 260);
+
+        let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
+        assert_eq!(names.len(), 171);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 85);
+
+        let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
+        assert_eq!(count(HashFieldClass::ArtifactRef), 207);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 9);
+        assert_eq!(count(HashFieldClass::RawRecordedBytes), 16);
+        assert_eq!(count(HashFieldClass::FieldSpecific), 4);
+        assert_eq!(count(HashFieldClass::Unresolved), 24);
+    }
+
+    /// Exception-table hygiene: rows sorted and unique, each names a
+    /// walked terminal in the judged a-l half, never restates a suffix
+    /// default, and carries a rationale; every name >= "m" rides its
+    /// suffix default until .5.1.2 judges it.
+    #[test]
+    fn check_hash_exception_table_hygiene() {
+        assert!(HASH_FIELD_EXCEPTIONS.windows(2).all(|w| w[0].0 < w[1].0));
+
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let rows = classify_hash_fields(&decls);
+        let walked: BTreeSet<&str> = rows.iter().map(terminal).collect();
+        for (name, class, rationale) in HASH_FIELD_EXCEPTIONS {
+            assert!(*name < "m", "m-z exception `{name}` belongs to .5.1.2");
+            assert!(walked.contains(name), "dead exception row `{name}`");
+            assert_ne!(
+                *class,
+                hash_suffix_default(name),
+                "redundant exception row `{name}`"
+            );
+            assert!(!rationale.is_empty());
+        }
+        for row in &rows {
+            let t = terminal(row);
+            if t >= "m" {
+                assert_eq!(row.class, hash_suffix_default(t), "unjudged `{t}`");
+            }
+        }
+    }
+
+    /// Judged-half spot checks: suffix defaults that survived judgment
+    /// and one row per exception class, keyed (schema_id, /-joined path).
+    #[test]
+    fn check_hash_judged_half_spot_checks() {
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let by_key: BTreeMap<(String, String), HashFieldClass> = classify_hash_fields(&decls)
+            .into_iter()
+            .map(|r| ((r.schema_id.as_str().to_string(), joined(&r.path)), r.class))
+            .collect();
+        for (schema, path, class) in [
+            (
+                "admission_context",
+                "accepted_base_hash",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "closure_output",
+                "claim_record_hashes",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "conflict_theorem",
+                "left_artifact_hash",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "gloss_view",
+                "combined_slot_digest",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "proof_node",
+                "environment_digest",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "tool_record",
+                "executable_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "toolchain_manifest",
+                "tool_records/config_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "retrieval_proposal_trace",
+                "index_fingerprint_hashes",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "replay_identity_check",
+                "actual_output_hashes",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "match_class",
+                "class_signature_hash",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "proof_dag",
+                "proof_nodes/canonical_bytes_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "source_region",
+                "closure_certificate_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "region_closure_certificate",
+                "closed_region_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "extraction_manifest",
+                "input_hash",
+                HashFieldClass::Unresolved,
+            ),
+            ("verifier_witness", "input_hash", HashFieldClass::Unresolved),
+            (
+                "generator_grammar_artifact",
+                "nonterminal_schema_map/first_set_hash",
+                HashFieldClass::Unresolved,
+            ),
+        ] {
+            assert_eq!(
+                by_key.get(&(schema.to_string(), path.to_string())),
+                Some(&class),
+                "{schema}/{path}"
+            );
+        }
     }
 }
