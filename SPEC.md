@@ -229,7 +229,7 @@ semantic_en:
   lowercase ASCII letters only inside controlled-vocabulary identifier fields.
 
 identifier_ascii:
-  require Id syntax;
+  require nonempty ASCII bytes matching [a-z0-9_:./-]+;
   store bytes exactly.
 
 template_literal:

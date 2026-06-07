@@ -1,0 +1,5 @@
+# Exact pin: fmt/clippy gates must agree across fresh containers (channel
+# "stable" drifts; see .agent/memory.md). Bump deliberately, then re-run gates.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy", "rust-analyzer"]

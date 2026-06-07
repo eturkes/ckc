@@ -232,6 +232,12 @@ technically derivable but easily forgotten under token pressure.
   the gates' regen paths; confirm zero stale-hash refs after. Phase 0 hit a
   14-file cascade from one prose reframe; the M0 design is even more
   hash-chained, so expect this on any generated-content edit.
+- [2026-06-07] Fixture strings that must byte-match SPEC.md (all Appendix A
+  slices): extract programmatically from SPEC.md (python regex → generated
+  Rust const block pasted into the test) instead of retyping. A.1 mixes
+  visually identical fullwidth/ASCII variants (，U+FF0C vs , — and Ｘ vs X)
+  that retyping silently corrupts; assert expected count and charset
+  inventory after extraction. First use: M0.0.1 `t_unicode_idempotency.rs`.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
