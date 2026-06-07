@@ -492,6 +492,15 @@ technically derivable but easily forgotten under token pressure.
   writes the new name, never the deletion); confirm zero stale-hash refs after.
   Expect this on any Phase-4 generated-artifact content edit.
 
+- [2026-06-07] `.claude/settings.json` now carries the CLAUDE.md-mandated
+  `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
+  LICENSE). Verified live: permission rules hot-reload mid-session (no restart,
+  unlike `env`). Bash (`cat`/`git show`) bypasses `Read()` denies — the escape
+  hatch for rare legitimate reads; prefer `cargo tree` for dependency
+  questions. Kept readable as debugging surfaces: `runs/`, `certs/`,
+  `schemas/golden/`, fixtures. Extend the list when new generated/vendored
+  trees appear.
+
 ## Known issues
 
 - [2026-05-30] (FLAGGED, escalated to user — task 0.10 review; unresolved by design

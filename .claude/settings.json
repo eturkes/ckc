@@ -3,6 +3,18 @@
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
     "CLAUDE_CODE_EFFORT_LEVEL": "max"
   },
+  "permissions": {
+    "deny": [
+      "Read(./.git/**)",
+      "Read(./target/**)",
+      "Read(./Cargo.lock)",
+      "Read(./LICENSE)",
+      "Read(**/node_modules/**)",
+      "Read(**/.svelte-kit/**)",
+      "Read(./ui/sveltekit-app/build/**)",
+      "Read(**/pnpm-lock.yaml)"
+    ]
+  },
   "enabledPlugins": {
     "pyright-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
