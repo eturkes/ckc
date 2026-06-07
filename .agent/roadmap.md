@@ -81,7 +81,7 @@ rule.
   spec-defect fallout; SPEC.md corrections in-scope. Tests: real SPEC
   resolves clean; synthetic duplicate + dangling-ref perturbations reject.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.1 type-graph walker. New `crates/ckc-schema/src/build.rs` +
+- [x] M0.0.3.4.1 70% 139K/200K type-graph walker. New `crates/ckc-schema/src/build.rs` +
   lib.rs `pub mod build;`: WalkedPath {schema_id, path: FeaturePath, leaf}
   rows over SpecDecls — transitive walk from each §3.1 inventory root,
   recurse TypeExpr::Name into nested SDecls (visited-set on cycles; Optional

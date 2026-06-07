@@ -256,7 +256,7 @@ pub struct SpecParse {
 }
 
 /// One pass over SPEC.md text. Declarations are recognized only inside
-/// ``` fenced blocks; section anchors and block preambles (the last prose
+/// fenced code blocks; section anchors and block preambles (the last prose
 /// line before a fence, which keys the §6.2 builtin and §9.2 certificate
 /// blocks) are tracked outside them.
 pub fn parse_spec(text: &str) -> SpecParse {
