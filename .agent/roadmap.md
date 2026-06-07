@@ -128,19 +128,31 @@ rule.
   build_v0_registry clean; perturbations (dropped/extra bound row, wrong
   role) reject. Read: §1.1 step 4 + bound paragraphs, §1.2 role rule.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.5.1 hash-field classifier + authored table. check.rs:
+- [ ] M0.0.3.4.5.1.1 hash classifier + a-l table half. check.rs:
   HashFieldClass {ArtifactRef, NamedPayloadDigest, RawRecordedBytes,
   FieldSpecific, Unresolved} + classify_hash_fields over walk_inventory
-  HashNamed rows (260 paths/171 terminal names at split time) — suffix
-  defaults (*_hash/*_hashes ArtifactRef, *_digest NamedPayloadDigest)
-  overridden by an authored terminal-name exception table, one-line
-  rationale per row (spec_contract_hash, rust_type_hash,
-  canonicalization_policy_hash, executable/fingerprint families, …);
-  defect-suspect names (digest semantics under *_hash, conventionless
-  inputs) get Unresolved rows — .5.2's burn-down list; SPEC.md stays
-  untouched this unit. Tests (check_hash_* fns): real-SPEC totality (every
-  HashNamed row classifies), per-class counts, default + exception
-  spot-checks. Read: §1.2 hash conventions.
+  HashNamed rows — suffix defaults (*_hash/*_hashes ArtifactRef, *_digest
+  NamedPayloadDigest) overridden by an authored terminal-name exception
+  table, one-line rationale per row; judge only terminal names
+  lexicographically < "m" (85 names/123 paths at split:
+  canonicalization_policy_hash, canonical_bytes_hash, config_hash,
+  content_hash, environment_digest, executable_hash, grammar-payload
+  family, index_fingerprint_hashes, …); defect-suspect names (digest
+  semantics under *_hash, conventionless inputs) get Unresolved rows —
+  .5.2's burn-down list; names >= "m" ride defaults unreviewed until
+  .5.1.2; SPEC.md stays untouched. Tests (check_hash_* fns): real-SPEC
+  totality (suffix defaults make every HashNamed row classify),
+  provisional per-class counts, judged-half default + exception
+  spot-checks. Read: §1.2 hash conventions + judged fields' S-decl
+  context. Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.1.2 m-z table half. check.rs: judge remaining terminal
+  names >= "m" (86 names/137 paths at split: payload/support/semantic
+  digests, normalization/punctuation table hashes, query_hash,
+  rationale_hash, reviewer_identity_hash, rust_type_hash, source_hash,
+  spec_contract_hash, witness_payload_hash, …) — extend the exception +
+  Unresolved table with rationale rows; finalize per-class count
+  assertions; second-half default + exception spot-checks; SPEC.md stays
+  untouched. Read: §1.2 hash conventions + judged fields' S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
 - [ ] M0.0.3.4.5.2 hash-convention resolution + checker wiring. Burn down
   every Unresolved row: reclassify with rationale where §1.2 already covers

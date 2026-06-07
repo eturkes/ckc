@@ -260,7 +260,14 @@ technically derivable but easily forgotten under token pressure.
   171 distinct terminal names) exceeds the window; split along the
   SPEC-edit boundary (classify + author table, defects → Unresolved rows /
   burn down Unresolved with SPEC corrections + wiring) so the
-  unpredictable-fallout half starts from a committed, bounded list.
+  unpredictable-fallout half starts from a committed, bounded list. Second
+  corollary (m0.0.3.4.5.1 split 1→2, user-directed pre-implementation): a
+  per-name judgment sweep alone (171 distinct terminal names, each needing
+  its S-decl context) still exceeds the window even with suffix defaults
+  carrying the bulk and SPEC untouched; split at the lexicographic
+  terminal-name median (a-l 85 names/123 paths + classifier mechanics /
+  m-z 86/137 + finalized count assertions) so each name is judged exactly
+  once in exactly one half.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
