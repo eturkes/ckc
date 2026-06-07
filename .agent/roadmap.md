@@ -118,7 +118,7 @@ rule.
   per-family row counts vs independent line scan, binding spot-checks,
   composed from_canonical_bytes roundtrip. Read: §1.1 bound paragraphs, §1.2
   hash conventions, §1.4, §1.5. Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.4 structural coverage checkers. check.rs
+- [x] M0.0.3.4.4 60% 119K/200K structural coverage checkers. check.rs
   check_registry(text, &SchemaRegistry, &SchemaBoundManifest) -> CheckReport
   (peer of check_spec; CheckIssue code=referential_integrity_error): bound
   coverage — exactly one SchemaCollectionBound per walk_inventory Collection

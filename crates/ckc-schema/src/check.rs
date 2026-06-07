@@ -1,8 +1,10 @@
 //! §1.1 step 3 (M0.0.3.3): resolution of every spec-declared reference
 //! against the [`crate::symtab`] symbol table, with checker-local sorted
-//! diagnostics. Every issue carries [`CheckIssue::CODE`]
-//! (`referential_integrity_error`); the §8.7 `Diagnostic` artifact wrapper
-//! lands with its consuming unit.
+//! diagnostics. §1.1 step 4 (M0.0.3.4.4): [`check_registry`] validates a
+//! built registry+manifest pair — two-sided bound coverage over the §3.1
+//! type-graph walk and the §1.2 source-support/role rule. Every issue
+//! carries [`CheckIssue::CODE`] (`referential_integrity_error`); the §8.7
+//! `Diagnostic` artifact wrapper lands with its consuming unit.
 //!
 //! Checked references: S-decl field types and E-decl alternative/sexp
 //! argument types (generic-arity and string-policy aware); tagged-union
@@ -17,11 +19,15 @@
 //! in artifact columns (`schema diagnostics` and `Appendix A accepted
 //! artifact inventory` are skipped, never resolution errors).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ckc_core::policy::StringPolicy;
+use ckc_core::scalar::{FeaturePath, Id};
 
-use crate::spec::{EAlt, SpecDecls, TTable, TypeExpr, is_type_name, parse_spec};
+use crate::bounds::SchemaBoundManifest;
+use crate::build::{WalkedLeaf, schema_has_source_support, schema_ident, walk_inventory};
+use crate::registry::{SchemaRegistry, SchemaRole};
+use crate::spec::{EAlt, SDecl, SpecDecls, TTable, TypeExpr, is_type_name, parse_spec};
 use crate::symtab::{
     SymbolKind, SymbolTable, build_symbol_table, command_table, consumer_table, gate_table,
     operation_tokens, reading_table, rule_table, stage_table, unit_table,
@@ -55,8 +61,8 @@ impl CheckReport {
 }
 
 /// Runs §1.1 steps 1-3 over raw SPEC.md text: parse, build the symbol
-/// table, resolve every reference. Step 4 (collection-bound coverage) and
-/// step 5 (registry build) land with M0.0.3.4.
+/// table, resolve every reference. Step 4 lives in [`check_registry`];
+/// step-5 composition lands with M0.0.3.4.7.
 pub fn check_spec(text: &str) -> CheckReport {
     let parse = parse_spec(text);
     let decls = &parse.decls;
@@ -112,6 +118,131 @@ fn enclosing_anchor(decls: &SpecDecls, line: usize) -> String {
         .rev()
         .find(|s| s.line <= line)
         .map_or_else(|| "title".to_string(), |s| s.anchor.clone())
+}
+
+/// §1.1 step-4 bound coverage and the §1.2 source-support/role rule over a
+/// built registry+manifest pair. Peer of [`check_spec`]: same issue type
+/// and ordering. The §1.2 hash-field-convention and §3.2 producer-mapping
+/// checkers plus step-1-2/5 composition land with M0.0.3.4.5-7.
+pub fn check_registry(
+    text: &str,
+    registry: &SchemaRegistry,
+    manifest: &SchemaBoundManifest,
+) -> CheckReport {
+    let parse = parse_spec(text);
+    let decls = &parse.decls;
+    let inv = inventory_decls(decls);
+    let inv_line = decls
+        .sections
+        .iter()
+        .find(|s| s.anchor == "3.1")
+        .map_or(0, |s| s.line);
+    let line_of = |schema: &str| inv.get(schema).map_or(inv_line, |d| d.line);
+    let mut issues = Vec::new();
+    let mut push = |line: usize, message: String| {
+        issues.push(CheckIssue {
+            line,
+            anchor: enclosing_anchor(decls, line),
+            message,
+        });
+    };
+
+    // §1.1 step 4, two-sided: every walked non-exempt collection field has
+    // exactly one bound row, and every bound row sits on such a field.
+    let walked: BTreeSet<(String, String)> = walk_inventory(decls)
+        .into_iter()
+        .filter(|r| {
+            matches!(
+                r.leaf,
+                WalkedLeaf::Collection {
+                    enum_domain_key: false
+                }
+            )
+        })
+        .map(|r| (r.schema_id.as_str().to_string(), joined(&r.path)))
+        .collect();
+    let mut bound_keys: BTreeMap<(String, String), usize> = BTreeMap::new();
+    for b in &manifest.schema_collection_bounds {
+        *bound_keys
+            .entry((b.schema_id.as_str().to_string(), joined(&b.path)))
+            .or_insert(0) += 1;
+    }
+    for key @ (schema, path) in &walked {
+        match bound_keys.get(key).copied().unwrap_or(0) {
+            1 => {}
+            0 => push(
+                line_of(schema),
+                format!("collection `{schema}/{path}` has no SchemaCollectionBound row"),
+            ),
+            n => push(
+                line_of(schema),
+                format!("collection `{schema}/{path}` has {n} SchemaCollectionBound rows"),
+            ),
+        }
+    }
+    for key @ (schema, path) in bound_keys.keys() {
+        if !walked.contains(key) {
+            push(
+                line_of(schema),
+                format!(
+                    "SchemaCollectionBound `{schema}/{path}` matches no bounded collection field"
+                ),
+            );
+        }
+    }
+
+    // §1.2 role rule: a schema with neither source-support exposure over
+    // its direct fields nor a registered alias must keep a non-semantic
+    // `schema_role`.
+    let aliased: BTreeSet<&str> = registry
+        .source_support_aliases
+        .iter()
+        .map(|a| a.schema_id.as_str())
+        .collect();
+    for e in &registry.schema_entries {
+        let id = e.schema_id.as_str();
+        let Some(decl) = inv.get(id).copied() else {
+            push(
+                inv_line,
+                format!("schema entry `{id}` resolves to no §3.1 inventory S-decl"),
+            );
+            continue;
+        };
+        if e.schema_role == SchemaRole::Semantic
+            && !schema_has_source_support(decl)
+            && !aliased.contains(id)
+        {
+            push(
+                decl.line,
+                format!(
+                    "schema `{id}` has schema_role `semantic` with neither source-support \
+                     field nor registered alias"
+                ),
+            );
+        }
+    }
+
+    issues.sort();
+    issues.dedup();
+    CheckReport { issues }
+}
+
+/// schema_id -> §3.1 inventory S-decl (issue lines + role-rule input).
+fn inventory_decls(decls: &SpecDecls) -> BTreeMap<String, &SDecl> {
+    decls
+        .inventory
+        .iter()
+        .filter_map(|n| Some((schema_ident(n).as_str().to_string(), decls.s_decl(n)?)))
+        .collect()
+}
+
+/// `/`-joined `FeaturePath` segments (§1.1 diagnostic display convention).
+fn joined(path: &FeaturePath) -> String {
+    path.segments()
+        .iter()
+        .map(Id::as_str)
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Resolves one type expression. `generic` is the enclosing declaration's
@@ -550,6 +681,12 @@ fn numeric_anchor(chars: &[char], pos: usize) -> Option<(String, usize)> {
 
 #[cfg(test)]
 mod tests {
+    use ckc_core::scalar::UInt;
+
+    use crate::bounds::SchemaCollectionBound;
+    use crate::build::build_v0_registry;
+    use crate::registry::SchemaEntry;
+
     use super::*;
 
     fn spec_text() -> String {
@@ -682,6 +819,152 @@ mod tests {
                 .map(|i| i.message.as_str())
                 .collect::<Vec<_>>(),
             ["unresolved pipeline operation `Replay`"]
+        );
+    }
+
+    fn messages(report: &CheckReport) -> Vec<&str> {
+        report.issues.iter().map(|i| i.message.as_str()).collect()
+    }
+
+    /// Gate core (registry side): the built v0 registry+manifest pass the
+    /// step-4 and role-rule checks over the real SPEC.
+    #[test]
+    fn check_registry_real_spec_clean() {
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let (registry, manifest) = build_v0_registry(&decls, &text);
+        let report = check_registry(&text, &registry, &manifest);
+        assert!(report.is_clean(), "issues: {:#?}", report.issues);
+    }
+
+    /// Step-4 perturbations: dropped, duplicate-keyed, and off-walk bound
+    /// rows each produce exactly the targeted issue, anchored at the
+    /// owning S-decl's section.
+    #[test]
+    fn check_registry_bound_perturbations_reject() {
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let (registry, manifest) = build_v0_registry(&decls, &text);
+        let target = manifest
+            .schema_collection_bounds
+            .iter()
+            .find(|b| {
+                b.schema_id.as_str() == "schema_registry" && joined(&b.path) == "schema_entries"
+            })
+            .cloned()
+            .unwrap();
+
+        let mut dropped = manifest.clone();
+        assert!(dropped.schema_collection_bounds.remove(&target));
+        let report = check_registry(&text, &registry, &dropped);
+        assert_eq!(
+            messages(&report),
+            ["collection `schema_registry/schema_entries` has no SchemaCollectionBound row"]
+        );
+        assert_eq!(report.issues[0].anchor, "1.1");
+
+        let mut duplicated = manifest.clone();
+        assert!(
+            duplicated
+                .schema_collection_bounds
+                .insert(SchemaCollectionBound {
+                    max_items: UInt::from(7u64),
+                    ..target.clone()
+                })
+        );
+        let report = check_registry(&text, &registry, &duplicated);
+        assert_eq!(
+            messages(&report),
+            ["collection `schema_registry/schema_entries` has 2 SchemaCollectionBound rows"]
+        );
+
+        let mut extra = manifest.clone();
+        assert!(
+            extra
+                .schema_collection_bounds
+                .insert(SchemaCollectionBound {
+                    path: FeaturePath::new(vec![Id::new("no_such_field").unwrap()]),
+                    ..target
+                })
+        );
+        let report = check_registry(&text, &registry, &extra);
+        assert_eq!(
+            messages(&report),
+            [
+                "SchemaCollectionBound `schema_registry/no_such_field` matches no bounded collection field"
+            ]
+        );
+    }
+
+    /// §1.2 role-rule perturbations: a no-support schema flipped to
+    /// `semantic` and a nested-alias schema stripped of its registered
+    /// alias both reject; a support-bearing schema in a non-semantic role
+    /// stays clean (the rule constrains only the no-support direction); an
+    /// entry naming no inventory S-decl rejects.
+    #[test]
+    fn check_registry_role_perturbations() {
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let (registry, manifest) = build_v0_registry(&decls, &text);
+        let reroled = |id: &str, role: SchemaRole| {
+            let mut r = registry.clone();
+            let e = r
+                .schema_entries
+                .iter()
+                .find(|e| e.schema_id.as_str() == id)
+                .cloned()
+                .unwrap();
+            r.schema_entries.remove(&e);
+            r.schema_entries.insert(SchemaEntry {
+                schema_role: role,
+                ..e
+            });
+            r
+        };
+
+        let report = check_registry(
+            &text,
+            &reroled("schema_registry", SchemaRole::Semantic),
+            &manifest,
+        );
+        assert_eq!(
+            messages(&report),
+            [
+                "schema `schema_registry` has schema_role `semantic` with neither source-support field nor registered alias"
+            ]
+        );
+
+        // Registered-alias dependency: air_core_record exposes support only
+        // through the nested air_key/support_region_id alias row.
+        let mut dealiased = registry.clone();
+        let alias = dealiased
+            .source_support_aliases
+            .iter()
+            .find(|a| a.schema_id.as_str() == "air_core_record")
+            .cloned()
+            .unwrap();
+        assert!(dealiased.source_support_aliases.remove(&alias));
+        let report = check_registry(&text, &dealiased, &manifest);
+        assert_eq!(
+            messages(&report),
+            [
+                "schema `air_core_record` has schema_role `semantic` with neither source-support field nor registered alias"
+            ]
+        );
+
+        let report = check_registry(&text, &reroled("residual", SchemaRole::ViewOnly), &manifest);
+        assert!(report.is_clean(), "{:#?}", report.issues);
+
+        let mut stray = registry.clone();
+        let donor = stray.schema_entries.iter().next().cloned().unwrap();
+        stray.schema_entries.insert(SchemaEntry {
+            schema_id: Id::new("no_such_schema").unwrap(),
+            ..donor
+        });
+        let report = check_registry(&text, &stray, &manifest);
+        assert_eq!(
+            messages(&report),
+            ["schema entry `no_such_schema` resolves to no §3.1 inventory S-decl"]
         );
     }
 }

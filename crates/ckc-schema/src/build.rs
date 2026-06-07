@@ -1,7 +1,7 @@
 //! §1.1 steps 3-4 substrate (M0.0.3.4.1): the type-graph walk from each
 //! §3.1 inventory root, yielding [`WalkedPath`] rows that .4.2 (entry +
-//! alias authoring), .4.3 (binding/bound rows), and .4.4 (step-4 coverage
-//! and §1.2 hash-convention checks) consume.
+//! alias authoring), .4.3 (binding/bound rows), .4.4 (step-4 coverage +
+//! §1.2 role rule), and .4.5 (§1.2 hash conventions) consume.
 //!
 //! Walk semantics:
 //! - rows are payload-rooted: `schema_id` is the §3.1 root via
