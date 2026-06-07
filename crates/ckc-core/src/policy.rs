@@ -123,7 +123,7 @@ pub fn ascii_lowercase_controlled_vocab(input: &str) -> String {
     input.to_ascii_lowercase()
 }
 
-fn is_identifier_ascii(s: &str) -> bool {
+pub(crate) fn is_identifier_ascii(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
             .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'_' | b':' | b'.' | b'/' | b'-'))

@@ -22,7 +22,7 @@ rule.
   impls so canonical bytes have one authority. Prior art:
   archive/phase0-research-kernel serializer. Read: §1.5 grammar.
   Test: `cargo test -p ckc-core canon`
-- [ ] M0.0.2.2 sort keys + collections in `canon.rs`:
+- [x] M0.0.2.2 47% 93K/200K sort keys + collections in `canon.rs`:
   `canonical_sort_key(x) = (TYPE_ID, canonical_payload_bytes(x))`; `Set[T]`
   encodes as array sorted by it after dedup; `List[T]` keeps semantic order;
   `Map[K,V]` encodes as object iff K satisfies `is_identifier_ascii`, else
