@@ -23,6 +23,7 @@ bare_enum! {
         AdmissionControl = "admission_control",
         EvidenceDiscovery = "evidence_discovery",
         ViewOnly = "view_only",
+        ProofStructure = "proof_structure",
     }
 }
 

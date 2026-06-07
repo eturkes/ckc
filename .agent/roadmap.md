@@ -93,7 +93,7 @@ rule.
   cyclic, enum-domain map, generic), real-SPEC spot-checks + nonzero
   per-leaf-family counts. Read: §1.1 steps 3-4, §1.2 alias table, §3.1.
   Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.2 SchemaEntry + alias rows. build.rs: authored
+- [x] M0.0.3.4.2 87% 174K/200K SchemaEntry + alias rows. build.rs: authored
   schema_id->SchemaRole const table, one row per SpecDecls.inventory entry
   (roles from §2 Authority + §3.2 producer position +
   schema_has_source_support; non-obvious rows get one-line rationale);

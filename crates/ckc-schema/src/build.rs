@@ -22,9 +22,9 @@
 //! - the enum-domain Map-key flag requires a label-enum domain; decl-level
 //!   alias enums (`E RoleName = Id`) are open domains and stay unflagged.
 
-use ckc_core::scalar::{FeaturePath, Id};
+use ckc_core::scalar::{FeaturePath, Hash, Id};
 
-use crate::registry::SourceSupportAliasKind;
+use crate::registry::{SchemaEntry, SchemaRole, SourceSupportAlias, SourceSupportAliasKind};
 use crate::spec::{SDecl, SpecDecls, TypeExpr};
 
 /// Leaf classification of one walked path. A field can yield several rows
@@ -78,6 +78,7 @@ pub fn schema_ident(type_name: &str) -> Id {
 /// .4.2 authors `SourceSupportAlias` rows from matches over walked paths.
 pub const SOURCE_SUPPORT_ALIAS_DEFAULTS: &[(&str, SourceSupportAliasKind)] = &[
     ("source_region_id", SourceSupportAliasKind::SingletonRegion),
+    ("support_region_id", SourceSupportAliasKind::SingletonRegion),
     ("source_regions", SourceSupportAliasKind::RegionSet),
     (
         "exact_japanese_source_regions",
@@ -251,9 +252,264 @@ fn type_walk(
     }
 }
 
+/// §1.2 alias-default suppressions: walked paths whose hash field stores
+/// raw recorded bytes (§1.2 raw-bytes convention), which no alias kind can
+/// resolve to an artifact's support projection. Keys are
+/// (schema_id, `/`-joined path).
+pub const ALIAS_EXCEPTIONS: &[(&str, &str)] = &[
+    // §4.4: sha256 of the exact extraction input bytes, not an envelope
+    // reference, so inherited_input does not apply.
+    ("extraction_manifest", "input_hash"),
+];
+
+/// §1.2 `SourceSupportAlias` rows over the §3.1 inventory, in inventory
+/// order. A schema with a direct canonical `source_support` field
+/// registers no alias; otherwise its registered row is the
+/// highest-priority fixed-default field-name match over walked field
+/// paths — priority by ([`SOURCE_SUPPORT_ALIAS_DEFAULTS`] order, then walk
+/// order), minus [`ALIAS_EXCEPTIONS`]. One row per schema: §1.2 names one
+/// schema-defined alias as the canonical projection.
+pub fn alias_rows(decls: &SpecDecls) -> Vec<SourceSupportAlias> {
+    let mut out = Vec::new();
+    for name in &decls.inventory {
+        let Some(decl) = decls.s_decl(name) else {
+            continue;
+        };
+        if decl.fields.iter().any(|f| f.name == "source_support") {
+            continue;
+        }
+        let schema_id = schema_ident(name);
+        let mut cands = Vec::new();
+        let mut stack = vec![name.to_string()];
+        alias_candidates(decls, &schema_id, decl, &[], None, &mut stack, &mut cands);
+        if let Some((_, path, alias_kind)) = cands.into_iter().min_by_key(|(idx, ..)| *idx) {
+            out.push(SourceSupportAlias {
+                schema_id,
+                path: FeaturePath::new(path),
+                alias_kind,
+            });
+        }
+    }
+    out
+}
+
+/// Traversal mirrors [`walk_sdecl`], collecting
+/// (default-table index, path, kind) per matching field name.
+fn alias_candidates(
+    decls: &SpecDecls,
+    schema_id: &Id,
+    decl: &SDecl,
+    prefix: &[Id],
+    binding: Option<(&str, &TypeExpr)>,
+    stack: &mut Vec<String>,
+    out: &mut Vec<(usize, Vec<Id>, SourceSupportAliasKind)>,
+) {
+    for f in &decl.fields {
+        let mut path = prefix.to_vec();
+        path.push(Id::new(&f.name).expect("S-decl field name is a valid Id"));
+        let joined = path.iter().map(Id::as_str).collect::<Vec<_>>().join("/");
+        let excepted = ALIAS_EXCEPTIONS
+            .iter()
+            .any(|(s, p)| *s == schema_id.as_str() && *p == joined);
+        if !excepted
+            && let Some(idx) = SOURCE_SUPPORT_ALIAS_DEFAULTS
+                .iter()
+                .position(|(n, _)| *n == f.name)
+        {
+            out.push((idx, path.clone(), SOURCE_SUPPORT_ALIAS_DEFAULTS[idx].1));
+        }
+        let ty = substitute(&f.ty, binding);
+        alias_type_recurse(decls, schema_id, &ty, &path, stack, out);
+    }
+}
+
+/// Traversal mirrors [`type_walk`] (recursion only, no leaf emission).
+fn alias_type_recurse(
+    decls: &SpecDecls,
+    schema_id: &Id,
+    ty: &TypeExpr,
+    path: &[Id],
+    stack: &mut Vec<String>,
+    out: &mut Vec<(usize, Vec<Id>, SourceSupportAliasKind)>,
+) {
+    match ty {
+        TypeExpr::Optional(x) | TypeExpr::Set(x) | TypeExpr::List(x) => {
+            alias_type_recurse(decls, schema_id, x, path, stack, out);
+        }
+        TypeExpr::Map(k, v) => {
+            alias_type_recurse(decls, schema_id, k, path, stack, out);
+            alias_type_recurse(decls, schema_id, v, path, stack, out);
+        }
+        TypeExpr::Text(_) => {}
+        TypeExpr::Name { name, arg } => {
+            if let Some(nested) = decls.s_decl(name) {
+                if !stack.iter().any(|s| s == name) {
+                    stack.push(name.clone());
+                    let binding = nested.generic_param.as_deref().zip(arg.as_deref());
+                    alias_candidates(decls, schema_id, nested, path, binding, stack, out);
+                    stack.pop();
+                }
+            } else if let Some(a) = arg {
+                alias_type_recurse(decls, schema_id, a, path, stack, out);
+            }
+        }
+    }
+}
+
+/// Authored §1.2 schema_id -> `SchemaRole` rows, one per §3.1 inventory
+/// entry in inventory order. Roles derive from §2 Authority values, §3.2
+/// producer position, and source-support presence; non-obvious rows carry
+/// their rationale inline. The .4.4 checker validates the §1.2 role rule
+/// against registered aliases.
+pub const SCHEMA_ROLES: &[(&str, SchemaRole)] = &[
+    ("schema_registry", SchemaRole::SchemaControl),
+    ("schema_bound_manifest", SchemaRole::SchemaControl),
+    ("unicode_policy_manifest", SchemaRole::SchemaControl),
+    ("toolchain_manifest", SchemaRole::EnvironmentControl),
+    ("tool_record", SchemaRole::EnvironmentControl),
+    ("environment_profile", SchemaRole::EnvironmentControl),
+    ("producer_manifest", SchemaRole::ReplayControl),
+    // §1.6 gate-runner control emission referencing replay_manifest_hash.
+    ("validation_manifest", SchemaRole::ReplayControl),
+    ("source_edition", SchemaRole::SourceOnly),
+    ("source_permission_record", SchemaRole::SourceOnly),
+    ("corpus_document", SchemaRole::SourceOnly),
+    // §3.2 IngestSourceEdition output; input_hash is raw recorded bytes
+    // (see ALIAS_EXCEPTIONS), so no support projection.
+    ("extraction_manifest", SchemaRole::SourceOnly),
+    ("source_graph", SchemaRole::SourceOnly),
+    ("source_region", SchemaRole::SourceOnly),
+    ("source_span", SchemaRole::SourceOnly),
+    ("source_anchor", SchemaRole::SourceOnly),
+    // §3.2 stage -30 source_region_closure output (source builders).
+    ("region_closure_certificate", SchemaRole::SourceOnly),
+    // §4.4 analyzer identity/version/config: ToolRecord-shaped.
+    ("analyzer_manifest", SchemaRole::EnvironmentControl),
+    // §4.4 analyzer input resource; mechanical_authority, no support.
+    ("mechanical_lexicon", SchemaRole::EnvironmentControl),
+    ("mech_obs_payload", SchemaRole::Semantic),
+    ("pattern_obs", SchemaRole::Semantic),
+    ("match", SchemaRole::Semantic),
+    // §7.2 quotient structures: support is proof-DAG-inherited (§1.2).
+    ("match_class", SchemaRole::ProofStructure),
+    ("class_member", SchemaRole::ProofStructure),
+    // §6.4 admitted generator program; its emissions carry support, the
+    // program itself does not.
+    ("ckc_gen", SchemaRole::AdmissionControl),
+    // §6.2 authority = evidence_discovery_only.
+    ("generator_grammar_artifact", SchemaRole::EvidenceDiscovery),
+    // §6.1 fixture-control rows pin §7.1 closure finite domains for
+    // deterministic replay; SchemaRole has no fixture_control.
+    ("finite_fixture_manifest", SchemaRole::ReplayControl),
+    ("frozen_constant", SchemaRole::ReplayControl),
+    ("parsed_quantity", SchemaRole::ReplayControl),
+    ("diagnostic_tag", SchemaRole::ReplayControl),
+    ("accepted_generator_base", SchemaRole::AdmissionControl),
+    // Stage-10 term_resource generator emission with region-grounded
+    // concept/binding/relation rows.
+    ("terminology_resource_set", SchemaRole::Semantic),
+    ("terminology_closure", SchemaRole::Semantic),
+    // §5.3 admitted policy artifact; semantic keys carry no support.
+    ("semantic_policy_set", SchemaRole::AdmissionControl),
+    ("resolution_theorem", SchemaRole::Semantic),
+    // §6.4 admission machinery; §3.2 "accepted replay-control artifacts"
+    // names replay-inclusion behavior, not the registry role.
+    ("proposal_record", SchemaRole::AdmissionControl),
+    // §6.4 authority = evidence_discovery_only; scores stay evidence-only.
+    ("retrieval_proposal_trace", SchemaRole::EvidenceDiscovery),
+    ("admission_context", SchemaRole::AdmissionControl),
+    ("reviewer_record", SchemaRole::AdmissionControl),
+    ("admission_record", SchemaRole::AdmissionControl),
+    ("effect_discharge_record", SchemaRole::AdmissionControl),
+    ("counterexample_suite", SchemaRole::AdmissionControl),
+    (
+        "materialized_consequence_manifest",
+        SchemaRole::AdmissionControl,
+    ),
+    // §7.1 closure-run pinning: input/output hash manifests plus the
+    // recomputable bound/termination certificate.
+    ("closure_input", SchemaRole::ReplayControl),
+    ("closure_output", SchemaRole::ReplayControl),
+    ("closure_bound_certificate", SchemaRole::ReplayControl),
+    ("license", SchemaRole::Semantic),
+    ("licensed_reading_set", SchemaRole::Semantic),
+    ("air_core_record", SchemaRole::Semantic),
+    ("ckc_normal_form", SchemaRole::Semantic),
+    ("witness_context", SchemaRole::Semantic),
+    // §7.5 view_only authority invariant family.
+    ("gloss_template", SchemaRole::ViewOnly),
+    ("gloss_view", SchemaRole::ViewOnly),
+    ("conflict_theorem", SchemaRole::Semantic),
+    ("factual_inconsistency_theorem", SchemaRole::Semantic),
+    ("residual", SchemaRole::Semantic),
+    ("ambiguity", SchemaRole::Semantic),
+    ("incoherence", SchemaRole::Semantic),
+    ("diagnostic", SchemaRole::Semantic),
+    ("verifier_witness", SchemaRole::Semantic),
+    // §9.1 symbol->definition map: kernel structure without support.
+    ("symbol_source_map", SchemaRole::ProofStructure),
+    ("constraint_core_witness", SchemaRole::Semantic),
+    // §8.7 "proof-visible diagnostic trace" affecting accepted semantics
+    // only through admitted edits.
+    ("repair_set_search_trace", SchemaRole::EvidenceDiscovery),
+    ("proof_node", SchemaRole::ProofStructure),
+    ("proof_dag", SchemaRole::ProofStructure),
+    ("certificate", SchemaRole::Semantic),
+    ("claim_record", SchemaRole::Semantic),
+    // §9.3 report wording/rendering control, GlossTemplate-shaped.
+    ("report_question_template", SchemaRole::ViewOnly),
+    ("report_trace_index", SchemaRole::Semantic),
+    ("claim_tier_summary", SchemaRole::ViewOnly),
+    ("wording_gate_record", SchemaRole::ViewOnly),
+    ("review_report", SchemaRole::Semantic),
+    ("replay_manifest", SchemaRole::ReplayControl),
+    ("replay_identity_check", SchemaRole::ReplayControl),
+];
+
+/// [`SCHEMA_ROLES`] lookup.
+pub fn schema_role(schema_id: &str) -> Option<SchemaRole> {
+    SCHEMA_ROLES
+        .iter()
+        .find(|(id, _)| *id == schema_id)
+        .map(|(_, role)| *role)
+}
+
+/// One §1.1 `SchemaEntry` per §3.1 inventory entry, in inventory order.
+/// v0 placeholders pending M0.0.4 (T-Schema-Equivalence):
+/// `rust_type_hash` = `generated_json_schema_hash` = sha256 of the entry's
+/// S-decl line bytes (the §1.1 design authority for the v0 field set);
+/// `tagged_union_alternatives_hash` is None because every inventory row is
+/// an S-decl record.
+pub fn build_schema_entries(decls: &SpecDecls, spec_text: &str) -> Vec<SchemaEntry> {
+    let v0 = Id::new("v0").expect("v0 is a valid Id");
+    decls
+        .inventory
+        .iter()
+        .filter_map(|name| {
+            let decl = decls.s_decl(name)?;
+            let schema_id = schema_ident(name);
+            let schema_role =
+                schema_role(schema_id.as_str()).expect("SCHEMA_ROLES covers the inventory");
+            let line = spec_text
+                .lines()
+                .nth(decl.line - 1)
+                .expect("SDecl.line is 1-based into the parsed text");
+            let line_hash = Hash::of_bytes(line.as_bytes());
+            Some(SchemaEntry {
+                schema_id,
+                schema_version: v0.clone(),
+                schema_role,
+                rust_type_hash: line_hash.clone(),
+                generated_json_schema_hash: line_hash,
+                tagged_union_alternatives_hash: None,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use crate::spec::parse_spec;
 
@@ -478,6 +734,195 @@ mod tests {
                 .any(|r| r.schema_id.as_str() == "region_closure_certificate"
                     && r.path.segments().len() > 1
                     && r.path.segments()[0].as_str() == "added_member_batches")
+        );
+    }
+
+    /// SCHEMA_ROLES is the inventory in order; entries derive 1:1 with v0
+    /// placeholder hashes (S-decl line bytes, recomputed independently)
+    /// and role spot-checks across all nine roles.
+    #[test]
+    fn build_schema_entries_cover_inventory() {
+        let text = spec_text();
+        let parse = parse_spec(&text);
+        let decls = &parse.decls;
+        assert_eq!(SCHEMA_ROLES.len(), decls.inventory.len());
+        for (name, (id, _)) in decls.inventory.iter().zip(SCHEMA_ROLES) {
+            assert_eq!(schema_ident(name).as_str(), *id);
+        }
+
+        let entries = build_schema_entries(decls, &text);
+        assert_eq!(entries.len(), decls.inventory.len());
+        let registry_line = text
+            .lines()
+            .find(|l| l.starts_with("S SchemaRegistry("))
+            .unwrap();
+        assert_eq!(entries[0].schema_id.as_str(), "schema_registry");
+        assert_eq!(
+            entries[0].rust_type_hash,
+            Hash::of_bytes(registry_line.as_bytes())
+        );
+        for e in &entries {
+            assert_eq!(e.schema_version.as_str(), "v0");
+            assert_eq!(e.rust_type_hash, e.generated_json_schema_hash);
+            assert_eq!(e.tagged_union_alternatives_hash, None);
+        }
+        for (id, role) in [
+            ("pattern_obs", SchemaRole::Semantic),
+            ("proof_dag", SchemaRole::ProofStructure),
+            ("gloss_view", SchemaRole::ViewOnly),
+            ("proposal_record", SchemaRole::AdmissionControl),
+            ("retrieval_proposal_trace", SchemaRole::EvidenceDiscovery),
+            ("mechanical_lexicon", SchemaRole::EnvironmentControl),
+            ("frozen_constant", SchemaRole::ReplayControl),
+            ("region_closure_certificate", SchemaRole::SourceOnly),
+            ("unicode_policy_manifest", SchemaRole::SchemaControl),
+        ] {
+            assert_eq!(schema_role(id), Some(role), "{id}");
+        }
+    }
+
+    /// §1.2 alias rows over the real SPEC: one row per support-bearing
+    /// schema, highest-priority candidate, canonical-field and raw-bytes
+    /// exclusions hold.
+    #[test]
+    fn build_alias_rows_real_spec() {
+        let parse = parse_spec(&spec_text());
+        let rows = alias_rows(&parse.decls);
+        let by_schema: BTreeMap<&str, &SourceSupportAlias> =
+            rows.iter().map(|r| (r.schema_id.as_str(), r)).collect();
+        assert_eq!(by_schema.len(), rows.len());
+        assert_eq!(rows.len(), 25);
+
+        use SourceSupportAliasKind::*;
+        for (schema, path, kind) in [
+            ("mech_obs_payload", "source_region_id", SingletonRegion),
+            ("pattern_obs", "support_region_id", SingletonRegion),
+            (
+                "licensed_reading_set",
+                "air_key/support_region_id",
+                SingletonRegion,
+            ),
+            (
+                "air_core_record",
+                "air_key/support_region_id",
+                SingletonRegion,
+            ),
+            ("source_region", "closed_members", ClosedRegionMembers),
+            // source_regions beats subject_hash by default-table order.
+            ("residual", "source_regions", RegionSet),
+            ("diagnostic", "source_regions", RegionSet),
+            ("verifier_witness", "input_hash", InheritedInput),
+            ("certificate", "subject_hash", InheritedSubject),
+            ("admission_record", "subject_hash", InheritedSubject),
+            (
+                "terminology_resource_set",
+                "concepts/source_region_ids",
+                RegionSet,
+            ),
+            (
+                "terminology_closure",
+                "normalized_relations/source_region_ids",
+                RegionSet,
+            ),
+            (
+                "constraint_core_witness",
+                "named_atoms/source_region_ids",
+                RegionSet,
+            ),
+            ("report_trace_index", "rows/source_region_ids", RegionSet),
+            (
+                "review_report",
+                "report_items/exact_japanese_source_regions",
+                RegionSet,
+            ),
+            (
+                "finite_fixture_manifest",
+                "parsed_quantities/source_region_id",
+                SingletonRegion,
+            ),
+        ] {
+            let row = by_schema[schema];
+            let joined = row
+                .path
+                .segments()
+                .iter()
+                .map(Id::as_str)
+                .collect::<Vec<_>>()
+                .join("/");
+            assert_eq!((joined.as_str(), row.alias_kind), (path, kind), "{schema}");
+        }
+        // Canonical source_support field or raw-bytes exception -> no row.
+        for absent in [
+            "license",
+            "ckc_normal_form",
+            "resolution_theorem",
+            "witness_context",
+            "extraction_manifest",
+            "schema_registry",
+            "match_class",
+            "proof_dag",
+        ] {
+            assert!(!by_schema.contains_key(absent), "{absent}");
+        }
+    }
+
+    /// §1.2 role rule over authored roles + built aliases: semantic
+    /// schemas expose support (canonical field or registered alias);
+    /// canonical-field schemas register no alias; alias rows point at
+    /// inventory schemas.
+    #[test]
+    fn build_role_support_consistency() {
+        let parse = parse_spec(&spec_text());
+        let decls = &parse.decls;
+        let rows = alias_rows(decls);
+        let aliased: BTreeSet<&str> = rows.iter().map(|r| r.schema_id.as_str()).collect();
+        let ids: BTreeSet<Id> = decls.inventory.iter().map(|n| schema_ident(n)).collect();
+        for r in &rows {
+            assert!(ids.contains(&r.schema_id), "{:?}", r.schema_id);
+        }
+        for name in &decls.inventory {
+            let decl = decls.s_decl(name).unwrap();
+            let id = schema_ident(name);
+            let canonical = decl.fields.iter().any(|f| f.name == "source_support");
+            if schema_role(id.as_str()).unwrap() == SchemaRole::Semantic {
+                assert!(canonical || aliased.contains(id.as_str()), "{name}");
+            }
+            if canonical {
+                assert!(!aliased.contains(id.as_str()), "{name}");
+            }
+        }
+    }
+
+    /// Alias priority: default-table order picks source_regions over
+    /// subject_hash; walk order breaks same-kind ties; canonical
+    /// source_support suppresses the row.
+    #[test]
+    fn build_alias_priority_synthetic() {
+        let mut decls = synthetic(
+            "S Root(subject_hash:Hash,source_regions:Set[RegionId],note:Id)\n\
+             S Pair(a_rows:Set[Sub],b_rows:Set[Sub])\n\
+             S Sub(source_region_ids:Set[RegionId])\n\
+             S Canon(source_support:Set[RegionId],subject_hash:Hash)",
+        );
+        decls.inventory = ["Root", "Pair", "Canon"].map(String::from).to_vec();
+        let rows = alias_rows(&decls);
+        assert_eq!(
+            rows,
+            [
+                SourceSupportAlias {
+                    schema_id: Id::new("root").unwrap(),
+                    path: FeaturePath::new(vec![Id::new("source_regions").unwrap()]),
+                    alias_kind: SourceSupportAliasKind::RegionSet,
+                },
+                SourceSupportAlias {
+                    schema_id: Id::new("pair").unwrap(),
+                    path: FeaturePath::new(vec![
+                        Id::new("a_rows").unwrap(),
+                        Id::new("source_region_ids").unwrap()
+                    ]),
+                    alias_kind: SourceSupportAliasKind::RegionSet,
+                },
+            ]
         );
     }
 }

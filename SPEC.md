@@ -56,7 +56,7 @@ S SchemaRegistry(registry_id:Id,registry_version:Id,spec_contract_hash:Hash,rust
 
 S SchemaEntry(schema_id:Id,schema_version:Id,schema_role:SchemaRole,rust_type_hash:Hash,generated_json_schema_hash:Hash,tagged_union_alternatives_hash:Hash?)
 
-E SchemaRole = semantic | source_only | schema_control | replay_control | environment_control | admission_control | evidence_discovery | view_only
+E SchemaRole = semantic | source_only | schema_control | replay_control | environment_control | admission_control | evidence_discovery | view_only | proof_structure
 
 S StringPolicyBinding(schema_id:Id,path:FeaturePath,policy:StringPolicy,dependent_policy_field:FeaturePath?)
 
@@ -133,6 +133,7 @@ Source-support alias rows use these fixed field-name defaults unless a row names
 
 ```text
 source_region_id                  -> singleton_region
+support_region_id                 -> singleton_region
 source_regions                    -> region_set
 exact_japanese_source_regions     -> region_set
 source_region_ids                 -> region_set
@@ -143,7 +144,7 @@ closed_members                    -> closed_region_members
 
 `singleton_region` projects one `RegionId`; `region_set` projects `Set[RegionId]`; `inherited_subject` and `inherited_input` resolve the referenced artifact and use its canonical support projection; `closed_region_members` resolves through the owning `SourceRegion.region_id`.
 
-A schema that has neither a canonical source-support field nor a registered alias must have `SchemaEntry.schema_role` in `{source_only,schema_control,replay_control,environment_control,admission_control,evidence_discovery,view_only}`; otherwise `T-Registry-Referential-Integrity` rejects it.
+A schema that has neither a canonical source-support field nor a registered alias must have `SchemaEntry.schema_role` in `{source_only,schema_control,replay_control,environment_control,admission_control,evidence_discovery,view_only,proof_structure}`; otherwise `T-Registry-Referential-Integrity` rejects it. `proof_structure` marks kernel/proof payloads whose source support is proof-DAG-inherited (`ProofNode.support_digest`) rather than payload-projected.
 
 ### 1.3 Scalars
 
