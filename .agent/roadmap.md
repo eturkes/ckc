@@ -154,54 +154,73 @@ rule.
   assertions; second-half default + exception spot-checks; SPEC.md stays
   untouched. Read: §1.2 hash conventions + judged fields' S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.1 hash-defect burn-down: §1.x/§4.x cluster. Resolve 14 of
-  the 42 Unresolved terminal names: §1.1 bound-policy family
+- [ ] M0.0.3.4.5.2.1.1 hash-defect burn-down: §1.x cluster. Resolve 7 of the
+  42 Unresolved terminal names: §1.1 bound-policy family
   (canonicalization_policy_hash, closure_bound_policy_hash,
-  generator_static_bound_policy_hash, parser_bound_policy_hash),
-  canonical_bytes_hash, §1.6 locale_policy_hash +
-  reproducibility_profile_hash, subject_hashes divergence
-  (ValidationManifest vs Incoherence), §4.3 family (closed_region_hash,
-  closure_certificate_hash, seed_region_hash, termination_argument_hash),
-  §4.4 entry_hashes, input_hash divergence (ExtractionManifest vs
-  VerifierWitness). Per-name procedure (shared by .2.2/.2.3): reclassify
-  with rationale where §1.2 already covers the field, else correct SPEC.md
+  generator_static_bound_policy_hash, parser_bound_policy_hash — one shared
+  fix), §1.6 locale_policy_hash + reproducibility_profile_hash,
+  subject_hashes divergence (ValidationManifest §1.6 vs Incoherence §8.7).
+  Per-name procedure (shared by all .2.x sub-units): reclassify with
+  rationale where §1.2 already covers the field, else correct SPEC.md
   (rename to a convention suffix, define the computation beside the field,
-  or drop the field; mind hash-cascade radius, memory 2026-06-01); update
-  HASH_FIELD_EXCEPTIONS (drop rows for removed fields); adjust per-class
-  counts + spot-checks provisionally; reconcile spec.rs/build.rs test
-  fallout. SPEC-edit design judgment is the deliverable — checker wiring
-  waits for .2.3. Read: §1.2 hash conventions + each name's S-decl context.
+  or drop the field; mind hash-cascade radius, memory 2026-06-01; a rename
+  landing on plural *_digests extends the build.rs HashNamed suffix set in
+  the same session); update HASH_FIELD_EXCEPTIONS (drop rows for removed
+  fields); adjust per-class counts + spot-checks provisionally; reconcile
+  spec.rs/build.rs test fallout. SPEC-edit design judgment is the
+  deliverable — checker wiring waits for .2.3.2. Read: §1.2 hash
+  conventions + each name's S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.2 hash-defect burn-down: digest-semantics cluster.
-  Resolve 17 names dominated by the payload-not-an-accepted-artifact
-  pattern (expect *_digest renames + payload-byte definitions): §6.2
-  grammar family (constrained_decoder_contract_hash, display_grammar_hash,
-  first_follow_sets_hash, first_set_hash, follow_set_hash,
-  parser_state_machine_hash, tagged_json_schema_hash,
-  valid_next_token_masks_hash), §6.3 reading_hash, §7.1
-  schema_collection_bounds_hash, §7.2 checker_hashes +
-  reverse_dependency_index_hash, §7.5 slot_value_hash, §8.1
-  left_clause_hash + right_clause_hash + minimality_proof_hash, §9.1
-  witness_payload_hash. Procedure per .2.1. Read: §1.2 hash conventions +
-  each name's S-decl context.
+- [ ] M0.0.3.4.5.2.1.2 hash-defect burn-down: §4.x cluster. Resolve 6 names:
+  §4.3 family (closed_region_hash + closure_certificate_hash mutual-ref
+  cycle, seed_region_hash, termination_argument_hash — second site
+  ClosureBoundCertificate §7.1, one fix covers both), §4.4 entry_hashes
+  (MechanicalLexicon), input_hash divergence (ExtractionManifest §4.4 vs
+  VerifierWitness §9.1; the §1.2 alias row inherited_input is a cascade
+  site). Procedure per .2.1.1. Read: §1.2 hash conventions + §4.3/§4.4 +
+  each name's S-decl context. Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.2.2.1 hash-defect burn-down: §6.2 grammar family. Resolve 8
+  names sharing one digest-semantics fix (payloads are not accepted
+  artifacts; expect *_digest renames + payload-byte definitions beside the
+  §6.2 grammar-artifact schemas): constrained_decoder_contract_hash,
+  display_grammar_hash, first_follow_sets_hash, first_set_hash,
+  follow_set_hash, parser_state_machine_hash, tagged_json_schema_hash,
+  valid_next_token_masks_hash. Procedure per .2.1.1. Read: §1.2 hash
+  conventions + §6.2 grammar-artifact schemas.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.3 §6.4 cluster + checker wiring. Resolve the 11 remaining
-  names — §6.4 pre-acceptance/sandbox family (admission_decision_hash,
-  candidate_hash, emitted_payload_hashes, forbidden_output_hashes,
+- [ ] M0.0.3.4.5.2.2.2 hash-defect burn-down: §6.3-§7.x cluster. Resolve 6
+  names: reading_hash (§6.3), schema_collection_bounds_hash (§7.1),
+  ProofNode/ProofDAG trio checker_hashes + reverse_dependency_index_hash +
+  canonical_bytes_hash (§7.2, two shared S-decls; canonical_bytes_hash is
+  self-referential), slot_value_hash (§7.5). Procedure per .2.1.1. Read:
+  §1.2 hash conventions + each name's S-decl context.
+  Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.2.2.3 hash-defect burn-down: §8.1/§9.1 cluster. Resolve 4
+  names: left_clause_hash + right_clause_hash (one normalized-clause fix),
+  minimality_proof_hash (§8.1 ctx_compatible constructs none),
+  witness_payload_hash (§9.1 VerifierWitness, sole spec mention).
+  Procedure per .2.1.1. Read: §1.2 hash conventions + §8.1 + §9.1 S-decl
+  context. Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.2.3.1 hash-defect burn-down: §6.4 pre-acceptance cluster.
+  Resolve the 11 remaining names (admission_decision_hash, candidate_hash,
+  emitted_payload_hashes, forbidden_output_hashes,
   proposal_provenance_hashes, proposed_subject_hash, rationale_hash,
   required_output_hashes, reviewed_subject_hash, reviewer_identity_hash,
-  score_record_hashes); a shared pre-acceptance digest convention beside
-  §1.2/§6.4 likely covers most; proposal_provenance_hashes may instead add
-  ProposalProvenanceManifest to the §3.1 inventory (build.rs count
-  cascade). Also resolve WordingGateRecord.literal_part_digests (§9.3):
-  extend the build.rs HashNamed suffix set or rename in SPEC. Wire
-  classify_hash_fields into check_registry: Unresolved or unclassified
-  path emits referential_integrity_error; finalize per-class count
-  assertions. Tests: real SPEC + build_v0_registry clean with empty
-  Unresolved class; synthetic unclassified-suffix + lingering-Unresolved
-  perturbations reject. Procedure per .2.1. Read: §1.2 hash conventions,
-  §6.4, §9.3 WordingGateRecord + each name's S-decl context.
-  Test: `cargo test -p ckc-schema check`
+  score_record_hashes): author one shared pre-acceptance digest convention
+  beside §1.2/§6.4 to cover most; proposal_provenance_hashes may instead
+  add ProposalProvenanceManifest to the §3.1 inventory (build.rs
+  role-table + count cascade; classify any newly walked fields
+  in-session). Procedure per .2.1.1. Read: §1.2 hash conventions + §6.4.
+  Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.2.3.2 literal_part_digests + checker wiring. Resolve
+  WordingGateRecord.literal_part_digests (§9.3): extend the build.rs
+  HashNamed suffix set (when no earlier sub-unit already did) or rename in
+  SPEC. Wire classify_hash_fields into check_registry: Unresolved or
+  unclassified path emits referential_integrity_error; finalize per-class
+  count assertions with an empty Unresolved class. Tests: real SPEC +
+  build_v0_registry clean; synthetic unclassified-suffix +
+  lingering-Unresolved perturbations reject. Read: §1.2 hash conventions,
+  §9.3 WordingGateRecord. Test: `cargo test -p ckc-schema check`
 - [ ] M0.0.3.4.6 producer-mapping checker. check.rs §3.2 reverse coverage:
   every SpecDecls.inventory payload named in a stage-producer TTable
   emitted-artifacts cell (reuse resolve_artifact_cell name handling) or in

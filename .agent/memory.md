@@ -274,7 +274,19 @@ technically derivable but easily forgotten under token pressure.
   share one fix and one context read (§1.x/§4.x 14 / §6.2-§9.1
   digest-semantics 17 / §6.4 pre-acceptance 11 + wiring on the final
   sub-unit), so no fix family straddles sessions with divergent styles.
-  Judgment sweeps split lexicographically; burn-downs split by section.
+  Fourth corollary (m0.0.3.4.5.2.x re-split 3→7, user-directed
+  pre-implementation): section-family clusters at 14/17/11 names still
+  exceed the window; budget ≈5 heterogeneous fixes per session (one S-decl
+  context + one SPEC correction each) — names sharing one fix or one
+  section read batch as one unit (8-name §6.2 grammar family, 11-name §6.4
+  shared-convention family), and checker wiring/finalization stays its own
+  unit. Assign names to clusters by grepped S-decl site, not defect
+  framing: canonical_bytes_hash sat in the §1.x cluster but lives on
+  ProofNode/ProofDAG (§7.2) beside checker_hashes; dual-site names
+  (termination_argument_hash §4.3+§7.1, input_hash §4.4+§9.1) resolve once
+  in the primary-section unit with the second site's context loaded.
+  Judgment sweeps split lexicographically; burn-downs split by section at
+  ≈5 heterogeneous fixes per session.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
