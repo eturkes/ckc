@@ -1,0 +1,45 @@
+{
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.git/**)",
+      "Read(./target/**)",
+      "Read(./Cargo.lock)",
+      "Read(./LICENSE)",
+      "Read(**/node_modules/**)",
+      "Read(**/.svelte-kit/**)",
+      "Read(**/pnpm-lock.yaml)"
+    ]
+  },
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "json-lsp@ckc-lsps": true,
+    "yaml-lsp@ckc-lsps": true,
+    "markdown-lsp@ckc-lsps": true,
+    "toml-lsp@ckc-lsps": true,
+    "html-lsp@ckc-lsps": true,
+    "css-lsp@ckc-lsps": true,
+    "svelte-lsp@ckc-lsps": true,
+    "lean4-lsp@ckc-lsps": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "turtle-lsp@ckc-lsps": true,
+    "xml-lsp@ckc-lsps": true,
+    "alloy-lsp@ckc-lsps": true,
+    "prolog-lsp@ckc-lsps": true,
+    "dolmen-lsp@ckc-lsps": true,
+    "souffle-lsp@ckc-lsps": true,
+    "egglog-lsp@ckc-lsps": true
+  },
+  "extraKnownMarketplaces": {
+    "ckc-lsps": {
+      "source": {
+        "source": "directory",
+        "path": ".claude/marketplace"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+target/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+dist/
+build/
+node_modules/
+.svelte-kit/
+.env
+.env.*
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+runs/*/
+!runs/.gitkeep
+
+# Claude Code local/transient runtime artifacts (tracked content: .claude/marketplace/)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
