@@ -67,7 +67,7 @@ rule.
   counts equal an in-test independent line scan; spot-checks (SchemaRegistry
   fields, Premise sexps, OperationResult[T]); zero unparseable field types
   spec-wide. Test: `cargo test -p ckc-schema spec`
-- [ ] M0.0.3.3 symbol table + resolution (§1.1 steps 1-3).
+- [x] M0.0.3.3 82% 164K/200K symbol table + resolution (§1.1 steps 1-3).
   `crates/ckc-schema/src/symtab.rs` + `src/check.rs`: SymbolKind {schema,
   enum, enum_variant, union_alternative (both qualified Enum.name), builtin,
   proof_rule, certificate_class, gate, acceptance_gate, cli_operation, stage,

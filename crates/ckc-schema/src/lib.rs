@@ -1,11 +1,13 @@
-//! ckc-schema: SPEC §1.1 schema authority. Registry and bound types (.1)
-//! and the SPEC.md declaration extractor (.2) are in place; the symbol
-//! table and resolution (.3) and v0 registry build (.4) complete
-//! `T-Registry-Referential-Integrity`.
+//! ckc-schema: SPEC §1.1 schema authority. Registry and bound types (.1),
+//! the SPEC.md declaration extractor (.2), and the symbol table +
+//! resolution checker (.3) are in place; the v0 registry build (.4)
+//! completes `T-Registry-Referential-Integrity`.
 
 pub mod bounds;
+pub mod check;
 pub mod registry;
 pub mod spec;
+pub mod symtab;
 
 #[cfg(test)]
 mod tests {

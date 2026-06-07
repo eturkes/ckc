@@ -560,7 +560,7 @@ fn split_top_level(s: &str, sep: u8) -> Vec<&str> {
 }
 
 /// `[A-Z][A-Za-z0-9]*`.
-fn is_type_name(s: &str) -> bool {
+pub(crate) fn is_type_name(s: &str) -> bool {
     let b = s.as_bytes();
     !b.is_empty() && b[0].is_ascii_uppercase() && b.iter().all(|c| c.is_ascii_alphanumeric())
 }
