@@ -145,7 +145,7 @@ rule.
   provisional per-class counts, judged-half default + exception
   spot-checks. Read: §1.2 hash conventions + judged fields' S-decl
   context. Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.1.2 m-z table half. check.rs: judge remaining terminal
+- [x] M0.0.3.4.5.1.2 79% 158K/200K m-z table half. check.rs: judge remaining terminal
   names >= "m" (86 names/137 paths at split: payload/support/semantic
   digests, normalization/punctuation table hashes, query_hash,
   rationale_hash, reviewer_identity_hash, rust_type_hash, source_hash,

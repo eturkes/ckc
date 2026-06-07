@@ -272,10 +272,10 @@ fn hash_suffix_default(terminal: &str) -> HashFieldClass {
 }
 
 /// Authored terminal-name exceptions to the suffix defaults, sorted; rows
-/// are (terminal field name, class, one-line rationale). M0.0.3.4.5.1.1
-/// judged every name lexicographically < "m" against its S-decl context;
-/// names >= "m" ride suffix defaults unreviewed until .5.1.2 extends this
-/// table. Unresolved rows are .5.2's burn-down list. Outside HashNamed
+/// are (terminal field name, class, one-line rationale). Every walked
+/// terminal name is judged against its S-decl context (.5.1.1 a-l,
+/// .5.1.2 m-z); a name absent here means the suffix default survived
+/// judgment. Unresolved rows are .5.2's burn-down list. Outside HashNamed
 /// coverage entirely: WordingGateRecord.literal_part_digests (§9.3) ends
 /// `_digests`, a suffix §1.2 never names — .5.2 resolves it with the
 /// SPEC-edit batch.
@@ -464,6 +464,191 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "locale_policy_hash",
         HashFieldClass::Unresolved,
         "hash input undefined; sibling timezone_policy is inline text (§1.6)",
+    ),
+    (
+        "minimality_proof_hash",
+        HashFieldClass::Unresolved,
+        "no minimality-proof schema exists and §8.1 ctx_compatible never constructs one; intended referent undefined",
+    ),
+    (
+        "normalization_table_hash",
+        HashFieldClass::RawRecordedBytes,
+        "Unicode normalization-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
+    ),
+    (
+        "parser_bound_policy_hash",
+        HashFieldClass::Unresolved,
+        "bound-policy payload undefined: no schema, no computation (§1.1)",
+    ),
+    (
+        "parser_state_machine_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash: ParserStateMachine payload is not an accepted artifact (§6.2)",
+    ),
+    (
+        "permission_evidence_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external rights-evidence document bytes; the owning SourcePermissionRecord records access_ref (§4.1)",
+    ),
+    (
+        "policy_test_hash",
+        HashFieldClass::RawRecordedBytes,
+        "policy test-vector file bytes; UnicodePolicyManifest supplies them (M0.0.1 policy_vectors.json)",
+    ),
+    (
+        "proposal_bytes_hash",
+        HashFieldClass::RawRecordedBytes,
+        "recorded pre-discharge candidate bytes (§6.4 DischargeProposal candidate_bytes input)",
+    ),
+    (
+        "proposal_provenance_hashes",
+        HashFieldClass::Unresolved,
+        "ProposalProvenanceManifest is S-decl'd but absent from the §3.1 inventory, so referents are not accepted artifacts",
+    ),
+    (
+        "proposed_subject_hash",
+        HashFieldClass::Unresolved,
+        "pre-acceptance proposed-subject payload hash; computation undefined (§6.4; family: candidate_hash)",
+    ),
+    (
+        "punctuation_table_hash",
+        HashFieldClass::RawRecordedBytes,
+        "punctuation-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
+    ),
+    (
+        "query_decomposition_hash",
+        HashFieldClass::RawRecordedBytes,
+        "recorded decomposed-query bytes (§6.4 evidence-discovery trace)",
+    ),
+    (
+        "query_hash",
+        HashFieldClass::RawRecordedBytes,
+        "recorded retrieval-query bytes; the trace's retriever manifests supply the issuing context (§6.4)",
+    ),
+    (
+        "rationale_hash",
+        HashFieldClass::Unresolved,
+        "free-text reviewer rationale is neither an accepted artifact nor recorded bytes with a named supplier (§6.4)",
+    ),
+    (
+        "reading_hash",
+        HashFieldClass::Unresolved,
+        "Reading values are License sub-payloads, not accepted artifacts; digest computation undefined (§6.3)",
+    ),
+    (
+        "reproducibility_profile_hash",
+        HashFieldClass::Unresolved,
+        "reproducibility-profile payload undefined: no schema, no computation; sole spec mention is this field (§1.6)",
+    ),
+    (
+        "required_output_hashes",
+        HashFieldClass::Unresolved,
+        "compared byte-for-byte with emitted_payload_hashes (§6.4 step 9), inheriting its undefined sandbox-payload computation",
+    ),
+    (
+        "reranker_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external reranker manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "reverse_dependency_index_hash",
+        HashFieldClass::Unresolved,
+        "reverse-dependency index has no schema and is not an accepted artifact; computation undefined (§7.2)",
+    ),
+    (
+        "reviewed_subject_hash",
+        HashFieldClass::Unresolved,
+        "review precedes acceptance, so the reviewed subject is the pre-acceptance candidate; computation undefined (§6.4; family: candidate_hash)",
+    ),
+    (
+        "reviewer_identity_hash",
+        HashFieldClass::Unresolved,
+        "identity byte-source undefined; no §1.2 convention covers hashed-identity fields (§6.4)",
+    ),
+    (
+        "right_clause_hash",
+        HashFieldClass::Unresolved,
+        "normalized clause is not an accepted artifact; hashing rule undefined (§8.1; family: left_clause_hash)",
+    ),
+    (
+        "rust_type_hash",
+        HashFieldClass::FieldSpecific,
+        "§1.1 T-Schema-Equivalence canonicalize-and-compare computation; M0.0.4 implements",
+    ),
+    (
+        "rust_type_manifest_hash",
+        HashFieldClass::FieldSpecific,
+        "§1.1 T-Schema-Equivalence, registry-wide manifest level; M0.0.4 implements",
+    ),
+    (
+        "schema_collection_bounds_hash",
+        HashFieldClass::Unresolved,
+        "names the SchemaCollectionBound set, a SchemaBoundManifest sub-payload, not the manifest artifact; computation undefined (§7.1)",
+    ),
+    (
+        "score_record_hashes",
+        HashFieldClass::Unresolved,
+        "score records have no schema; referents are not accepted artifacts (§6.4 keeps scores evidence-only)",
+    ),
+    (
+        "seed_region_hash",
+        HashFieldClass::Unresolved,
+        "no seed-region artifact exists: closure input is a bare RegionMember set and the output SourceRegion is the closed region (§4.3)",
+    ),
+    (
+        "slot_value_hash",
+        HashFieldClass::Unresolved,
+        "resolved slot value is an NF sub-payload, not an accepted artifact; §7.5 step 6 defines only slot_digest",
+    ),
+    (
+        "source_hash",
+        HashFieldClass::RawRecordedBytes,
+        "raw source-document bytes; sibling extraction_manifest_hash names the supplier",
+    ),
+    (
+        "sparse_retriever_manifest_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external sparse-retriever manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "spec_contract_hash",
+        HashFieldClass::RawRecordedBytes,
+        "specification-document bytes (sha256 over SPEC.md, built by .4.3); §1.1 compares it under T-Schema-Equivalence",
+    ),
+    (
+        "subject_hashes",
+        HashFieldClass::Unresolved,
+        "divergent referents under one name: ValidationManifest stores validated-artifact refs while Incoherence stores §1.1 overflow_member_hash values (payload digests for non-enveloped members)",
+    ),
+    (
+        "tagged_json_schema_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash: the canonical tagged JSON schema payload is not an accepted artifact (§6.2)",
+    ),
+    (
+        "tagged_union_alternatives_hash",
+        HashFieldClass::FieldSpecific,
+        "§1.1 T-Schema-Equivalence canonicalizes the union-alternative set; M0.0.4 implements",
+    ),
+    (
+        "termination_argument_hash",
+        HashFieldClass::Unresolved,
+        "the termination argument is spec prose (§4.3/§7.1), not a payload; byte source undefined",
+    ),
+    (
+        "valid_next_token_masks_hash",
+        HashFieldClass::Unresolved,
+        "digest semantics under *_hash: Set[ValidNextTokenMask] payload is not an accepted artifact (§6.2)",
+    ),
+    (
+        "witness_hash",
+        HashFieldClass::FieldSpecific,
+        "§8.5/§8.6 fix the binding per kind: WitnessContext/ConstraintCoreWitness artifact refs, except terminology_mapping_incoherence digests the referenced incoherence-hash set",
+    ),
+    (
+        "witness_payload_hash",
+        HashFieldClass::Unresolved,
+        "referent undefined: sole spec mention is the S-decl field itself (§9.1)",
     ),
 ];
 
@@ -1239,10 +1424,9 @@ mod tests {
         row.path.segments().last().unwrap().as_str()
     }
 
-    /// M0.0.3.4.5.1.1 totality + provisional per-class path counts over
-    /// the real SPEC: suffix defaults make every HashNamed walk row
-    /// classify; the a-l half is judged, the m-z half rides defaults
-    /// until .5.1.2 finalizes these counts.
+    /// Totality + final per-class path counts over the real SPEC
+    /// (M0.0.3.4.5.1.2 finalizes; both table halves judged): suffix
+    /// defaults make every HashNamed walk row classify.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
         let text = spec_text();
@@ -1260,17 +1444,16 @@ mod tests {
         assert_eq!(names.iter().filter(|n| **n < "m").count(), 85);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
-        assert_eq!(count(HashFieldClass::ArtifactRef), 207);
+        assert_eq!(count(HashFieldClass::ArtifactRef), 164);
         assert_eq!(count(HashFieldClass::NamedPayloadDigest), 9);
-        assert_eq!(count(HashFieldClass::RawRecordedBytes), 16);
-        assert_eq!(count(HashFieldClass::FieldSpecific), 4);
-        assert_eq!(count(HashFieldClass::Unresolved), 24);
+        assert_eq!(count(HashFieldClass::RawRecordedBytes), 27);
+        assert_eq!(count(HashFieldClass::FieldSpecific), 11);
+        assert_eq!(count(HashFieldClass::Unresolved), 49);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
-    /// walked terminal in the judged a-l half, never restates a suffix
-    /// default, and carries a rationale; every name >= "m" rides its
-    /// suffix default until .5.1.2 judges it.
+    /// walked terminal, never restates a suffix default, and carries a
+    /// rationale.
     #[test]
     fn check_hash_exception_table_hygiene() {
         assert!(HASH_FIELD_EXCEPTIONS.windows(2).all(|w| w[0].0 < w[1].0));
@@ -1280,7 +1463,6 @@ mod tests {
         let rows = classify_hash_fields(&decls);
         let walked: BTreeSet<&str> = rows.iter().map(terminal).collect();
         for (name, class, rationale) in HASH_FIELD_EXCEPTIONS {
-            assert!(*name < "m", "m-z exception `{name}` belongs to .5.1.2");
             assert!(walked.contains(name), "dead exception row `{name}`");
             assert_ne!(
                 *class,
@@ -1289,18 +1471,13 @@ mod tests {
             );
             assert!(!rationale.is_empty());
         }
-        for row in &rows {
-            let t = terminal(row);
-            if t >= "m" {
-                assert_eq!(row.class, hash_suffix_default(t), "unjudged `{t}`");
-            }
-        }
     }
 
-    /// Judged-half spot checks: suffix defaults that survived judgment
-    /// and one row per exception class, keyed (schema_id, /-joined path).
+    /// Spot checks across both judged halves: suffix defaults that
+    /// survived judgment and rows per exception class, keyed
+    /// (schema_id, /-joined path).
     #[test]
-    fn check_hash_judged_half_spot_checks() {
+    fn check_hash_spot_checks() {
         let text = spec_text();
         let decls = parse_spec(&text).decls;
         let by_key: BTreeMap<(String, String), HashFieldClass> = classify_hash_fields(&decls)
@@ -1382,6 +1559,77 @@ mod tests {
             (
                 "generator_grammar_artifact",
                 "nonterminal_schema_map/first_set_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "closure_output",
+                "match_hashes",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "verifier_witness",
+                "symbol_source_map_hash",
+                HashFieldClass::ArtifactRef,
+            ),
+            ("review_report", "trace_hash", HashFieldClass::ArtifactRef),
+            (
+                "ckc_normal_form",
+                "semantic_digest",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "proof_node",
+                "support_digest",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "source_edition",
+                "source_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "unicode_policy_manifest",
+                "normalization_table_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "schema_registry",
+                "spec_contract_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "schema_registry",
+                "schema_entries/rust_type_hash",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "conflict_theorem",
+                "witness_hash",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "witness_context",
+                "right_clause_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "semantic_policy_set",
+                "output_exclusions/left_value/reading_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "verifier_witness",
+                "witness_payload_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "region_closure_certificate",
+                "termination_argument_hash",
+                HashFieldClass::Unresolved,
+            ),
+            (
+                "generator_grammar_artifact",
+                "parser_state_machine_hash",
                 HashFieldClass::Unresolved,
             ),
         ] {
