@@ -81,18 +81,44 @@ rule.
   spec-defect fallout; SPEC.md corrections in-scope. Tests: real SPEC
   resolves clean; synthetic duplicate + dangling-ref perturbations reject.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4 v0 registry build + bound coverage + gate (§1.1 steps 4-5).
-  `crates/ckc-schema/src/build.rs` build_v0_registry(spec_bytes): SchemaEntry
-  per §3.1 inventory row (authored schema_id->SchemaRole const; placeholder
+- [ ] M0.0.3.4.1 type-graph walk + SchemaEntry rows. New
+  `crates/ckc-schema/src/build.rs`: transitive walk from each §3.1 inventory
+  root over SpecDecls -> (schema_id, FeaturePath, leaf) rows — recurse
+  TypeExpr::Name into nested SDecls (visited-set on cycles; Optional
+  transparent; generic args walk through), leaf kinds = collection
+  (Set/List/Map, with enum-domain-key flag for Map via EDecl lookup), Text
+  policy, hash-named field (*_hash/*_hashes/*_digest); SchemaEntry per
+  inventory row: authored schema_id->SchemaRole const table (walker output
+  informs §1.2 role rule), placeholder
   rust_type_hash/generated_json_schema_hash = sha256(S-decl line bytes)
-  pending M0.0.4; spec_contract_hash = sha256(SPEC.md bytes));
-  StringPolicyBinding row per Text<p> field; SourceSupportAlias rows from
-  §1.2 fixed defaults; SchemaCollectionBound row per transitive Set/List/Map
-  FeaturePath (authored default max_items + override consts; enum-domain Map
-  exemption; default disposition reject_with_diagnostic). Checker: step 4
-  coverage, §1.2 hash-field naming convention, §1.2 source-support/role
-  rule, §3.2 producer_mapping_error, local-bound dispatch table, step-5
-  ok/diagnostics. Gate test
+  pending M0.0.4, tagged_union_alternatives_hash = None (every inventory row
+  is an S-decl; verified at split time). Tests: walker spot-checks (nested,
+  cyclic, enum-domain map), entry count = inventory count, role spot-checks.
+  Read: §1.1, §1.2 role rule, §3.1. Test: `cargo test -p ckc-schema build`
+- [ ] M0.0.3.4.2 binding/alias/bound rows + v0 assembly. build.rs
+  build_v0_registry(spec_bytes): StringPolicyBinding per walked Text<p> path
+  (dependent_policy_field = None for v0 unless a §1.4 algorithm names a
+  sibling field); SourceSupportAlias per §1.2 fixed-default field-name match;
+  SchemaCollectionBound per walked collection path minus enum-domain-Map
+  exemptions (authored default max_items + per-path override consts;
+  disposition reject_with_diagnostic); SchemaBoundManifest + SchemaRegistry
+  assembly — spec_contract_hash = sha256(SPEC.md bytes),
+  schema_bound_manifest_hash over built-manifest canonical bytes, remaining
+  *_hash fields placeholder = sha256 of named §-anchor line bytes pending
+  M0.0.4/M0.0.5 (document per-field in build.rs). Tests: per-family row
+  counts vs independent line scan, alias/binding spot-checks. Read: §1.1
+  bound paragraphs, §1.2 alias table + hash conventions, §1.4, §1.5.
+  Test: `cargo test -p ckc-schema build`
+- [ ] M0.0.3.4.3 registry checker steps 4-5 + gate (completes
+  T-Registry-Referential-Integrity). check.rs registry-aware entry point
+  (spec text + built registry/manifest): step-4 bound coverage (exactly one
+  SchemaCollectionBound per walked collection path, enum-domain Map
+  exemption), §1.2 hash-field naming-convention applicability, §1.2
+  source-support/role rule, §3.2 producer_mapping_error (every inventory
+  payload named in the stage-producer table or control-emission rule),
+  §1.1/§6.2 local-bound dispatch coverage, step-5 ok/diagnostics
+  (code=referential_integrity_error). Expect spec-defect fallout; SPEC.md
+  corrections in-scope. Gate test
   `crates/ckc-schema/tests/t_registry_referential_integrity.rs`: clean over
   real SPEC + built registry; perturbations (dropped bound row, wrong role,
   duplicate entry, unmapped payload) reject.
