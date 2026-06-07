@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/ckc-core"]
+members = ["crates/ckc-core", "crates/ckc-schema"]
 
 [workspace.package]
 edition = "2024"

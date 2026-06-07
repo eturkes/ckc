@@ -238,6 +238,11 @@ technically derivable but easily forgotten under token pressure.
   visually identical fullwidth/ASCII variants (，U+FF0C vs , — and Ｘ vs X)
   that retyping silently corrupts; assert expected count and charset
   inventory after extraction. First use: M0.0.1 `t_unicode_idempotency.rs`.
+- [2026-06-07] New `E` enums / `S` records route through ckc-core's
+  `bare_enum!` / `canonical_record!` (canon.rs declaration-macros section)
+  instead of hand-written Canonical/Deserialize impls; bare-enum `Ord` is
+  opt-in per invocation (`#[derive(PartialOrd, Ord)]`, needed for BTreeSet
+  elements).
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no

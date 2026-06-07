@@ -14,55 +14,26 @@ use std::marker::PhantomData;
 use serde::de::{Error as _, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
-use crate::canon::{
-    CanonError, Canonical, emit_list, emit_set, emit_string, emit_union, read_union,
-};
+use crate::canon::{CanonError, Canonical, emit_list, emit_set, emit_union, read_union};
 use crate::scalar::Hash;
 
 // ---------------------------------------------------------------------------
 // Outcome (§2)
 // ---------------------------------------------------------------------------
 
-const OUTCOME_IDS: [&str; 6] = [
-    "ok",
-    "residual",
-    "ambiguity",
-    "incoherence",
-    "unsupported",
-    "invalid",
-];
-
-/// §2 `E Outcome`, in listing order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Outcome {
-    Ok,
-    Residual,
-    Ambiguity,
-    Incoherence,
-    Unsupported,
-    Invalid,
+crate::bare_enum! {
+    /// §2 `E Outcome`, in listing order.
+    pub enum Outcome: "outcome" {
+        Ok = "ok",
+        Residual = "residual",
+        Ambiguity = "ambiguity",
+        Incoherence = "incoherence",
+        Unsupported = "unsupported",
+        Invalid = "invalid",
+    }
 }
 
 impl Outcome {
-    /// §2 listing order.
-    pub const ALL: [Self; 6] = [
-        Self::Ok,
-        Self::Residual,
-        Self::Ambiguity,
-        Self::Incoherence,
-        Self::Unsupported,
-        Self::Invalid,
-    ];
-
-    /// Variant symbol exactly as SPEC writes it.
-    pub fn id(self) -> &'static str {
-        OUTCOME_IDS[self as usize]
-    }
-
-    pub fn from_id(id: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|o| o.id() == id)
-    }
-
     /// §1.7 primary-status selection rank, ascending:
     /// `invalid > incoherence > unsupported > ambiguity > residual > ok`.
     /// That order differs from the §2 listing (`incoherence` listed before
@@ -78,22 +49,6 @@ impl Outcome {
             Self::Incoherence => 4,
             Self::Invalid => 5,
         }
-    }
-}
-
-impl Canonical for Outcome {
-    const TYPE_ID: &'static str = "outcome";
-
-    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
-        emit_string(out, self.id());
-        Ok(())
-    }
-}
-
-impl<'de> Deserialize<'de> for Outcome {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Self::from_id(&s).ok_or_else(|| D::Error::unknown_variant(&s, &OUTCOME_IDS))
     }
 }
 

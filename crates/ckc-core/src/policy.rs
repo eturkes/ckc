@@ -133,48 +133,22 @@ pub(crate) fn is_identifier_ascii(s: &str) -> bool {
 // StringPolicy
 // ---------------------------------------------------------------------------
 
-/// §1.4 `E StringPolicy`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StringPolicy {
-    RawSource,
-    SourceNfkc,
-    SemanticJa,
-    SemanticEn,
-    IdentifierAscii,
-    TemplateLiteral,
-    DiagnosticText,
-    ViewText,
+crate::bare_enum! {
+    /// §1.4 `E StringPolicy`.
+    #[derive(PartialOrd, Ord)]
+    pub enum StringPolicy: "string_policy" {
+        RawSource = "raw_source",
+        SourceNfkc = "source_nfkc",
+        SemanticJa = "semantic_ja",
+        SemanticEn = "semantic_en",
+        IdentifierAscii = "identifier_ascii",
+        TemplateLiteral = "template_literal",
+        DiagnosticText = "diagnostic_text",
+        ViewText = "view_text",
+    }
 }
 
 impl StringPolicy {
-    pub const ALL: [Self; 8] = [
-        Self::RawSource,
-        Self::SourceNfkc,
-        Self::SemanticJa,
-        Self::SemanticEn,
-        Self::IdentifierAscii,
-        Self::TemplateLiteral,
-        Self::DiagnosticText,
-        Self::ViewText,
-    ];
-
-    pub fn id(self) -> &'static str {
-        match self {
-            Self::RawSource => "raw_source",
-            Self::SourceNfkc => "source_nfkc",
-            Self::SemanticJa => "semantic_ja",
-            Self::SemanticEn => "semantic_en",
-            Self::IdentifierAscii => "identifier_ascii",
-            Self::TemplateLiteral => "template_literal",
-            Self::DiagnosticText => "diagnostic_text",
-            Self::ViewText => "view_text",
-        }
-    }
-
-    pub fn from_id(id: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|p| p.id() == id)
-    }
-
     /// Apply the policy algorithm (§1.4). `template_literal` gloss-template
     /// grammar validation lands with §7.5 at M0.4.8; until then the policy
     /// normalizes via NFKC, which preserves slot markers.

@@ -17,6 +17,10 @@
 //! variant symbol, not an `Id`. A union with at least one payload-carrying
 //! alternative (e.g. §1.7 `OperationResult[T]`) encodes as the §1.5
 //! `{"tag","value"}` object; its bare alternatives carry value `{}`.
+//!
+//! `bare_enum!` and `canonical_record!` (exported at crate root) mechanize
+//! the `E`/`S` declaration patterns; new enums and records route through
+//! them.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -24,7 +28,7 @@ use std::fmt;
 use crate::policy::{
     IdentifierAscii, PolicyMarker, StringPolicy, Text, UnicodePolicyManifest, is_identifier_ascii,
 };
-use crate::scalar::{Hash, Id, Int, Rational, UInt};
+use crate::scalar::{FeaturePath, Hash, Id, Int, Rational, UInt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanonError {
@@ -485,6 +489,100 @@ impl<'de> serde::Deserialize<'de> for BareValue {
 }
 
 // ---------------------------------------------------------------------------
+// Declaration macros (§1.1 E/S forms)
+// ---------------------------------------------------------------------------
+
+/// Declares a §1.1 all-bare `E` enum (the `Outcome` pattern): SPEC
+/// listing-order `IDS`/`ALL`, variant-symbol `id`/`from_id`, bare-string
+/// §1.5 canonical encoding, strict `Deserialize`. Base derives match
+/// `Outcome` — `Ord` is opt-in (`#[derive(PartialOrd, Ord)]` in the
+/// invocation) because a derived listing order can shadow an explicit
+/// semantic rank (§1.7 `Outcome::primacy`); opt in when the enum sits in a
+/// `BTreeSet`/`BTreeMap` element.
+#[macro_export]
+macro_rules! bare_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident : $type_id:literal {
+            $($(#[$vmeta:meta])* $variant:ident = $id:literal),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        $vis enum $name {
+            $($(#[$vmeta])* $variant),+
+        }
+
+        impl $name {
+            /// Variant symbols exactly as SPEC writes them, in listing order.
+            pub const IDS: &'static [&'static str] = &[$($id),+];
+
+            /// SPEC listing order.
+            pub const ALL: [Self; Self::IDS.len()] = [$(Self::$variant),+];
+
+            /// Variant symbol exactly as SPEC writes it.
+            pub fn id(self) -> &'static str {
+                Self::IDS[self as usize]
+            }
+
+            pub fn from_id(id: &str) -> Option<Self> {
+                Self::ALL.into_iter().find(|x| x.id() == id)
+            }
+        }
+
+        impl $crate::canon::Canonical for $name {
+            const TYPE_ID: &'static str = $type_id;
+
+            fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), $crate::canon::CanonError> {
+                $crate::canon::emit_string(out, self.id());
+                Ok(())
+            }
+        }
+
+        impl<'de> ::serde::Deserialize<'de> for $name {
+            fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let s = <String as ::serde::Deserialize>::deserialize(deserializer)?;
+                Self::from_id(&s)
+                    .ok_or_else(|| <D::Error as ::serde::de::Error>::unknown_variant(&s, Self::IDS))
+            }
+        }
+    };
+}
+
+/// Implements §1.5 `Canonical` for a §1.1 `S` record (the
+/// `UnicodePolicyManifest` pattern): JSON member names are the Rust field
+/// names, `ObjectEmitter` sorts them; `sets` members emit through
+/// [`emit_set`]; `optional` members (`Option<T>`) are omitted when `None`.
+/// Pair with `#[derive(Deserialize)] #[serde(deny_unknown_fields)]` for the
+/// strict read side.
+#[macro_export]
+macro_rules! canonical_record {
+    (
+        $name:ident : $type_id:literal,
+        fields { $($field:ident),* $(,)? }
+        $(, sets { $($set:ident),* $(,)? })?
+        $(, optional { $($opt:ident),* $(,)? })?
+        $(,)?
+    ) => {
+        impl $crate::canon::Canonical for $name {
+            const TYPE_ID: &'static str = $type_id;
+
+            fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), $crate::canon::CanonError> {
+                let mut obj = $crate::canon::ObjectEmitter::new();
+                $(obj.member(stringify!($field), |b| {
+                    $crate::canon::Canonical::emit_canonical(&self.$field, b)
+                })?;)*
+                $($(obj.member(stringify!($set), |b| $crate::canon::emit_set(b, &self.$set))?;)*)?
+                $($(if let Some(v) = &self.$opt {
+                    obj.member(stringify!($opt), |b| $crate::canon::Canonical::emit_canonical(v, b))?;
+                })*)?
+                obj.finish(out)
+            }
+        }
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Impls: §1.3 scalars, Text<P>, UnicodePolicyManifest
 // ---------------------------------------------------------------------------
 
@@ -544,6 +642,14 @@ impl Canonical for Rational {
     }
 }
 
+impl Canonical for FeaturePath {
+    const TYPE_ID: &'static str = "feature_path";
+
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        emit_list(out, self.segments())
+    }
+}
+
 impl<P: PolicyMarker> Canonical for Text<P> {
     /// Provisional `text:<policy_id>` symbol ids.
     const TYPE_ID: &'static str = match P::POLICY {
@@ -563,27 +669,8 @@ impl<P: PolicyMarker> Canonical for Text<P> {
     }
 }
 
-impl Canonical for UnicodePolicyManifest {
-    const TYPE_ID: &'static str = "unicode_policy_manifest";
-
-    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
-        let mut obj = ObjectEmitter::new();
-        obj.member("manifest_id", |b| self.manifest_id.emit_canonical(b))?;
-        obj.member("normalization_table_hash", |b| {
-            self.normalization_table_hash.emit_canonical(b)
-        })?;
-        obj.member("policy_test_hash", |b| {
-            self.policy_test_hash.emit_canonical(b)
-        })?;
-        obj.member("punctuation_table_hash", |b| {
-            self.punctuation_table_hash.emit_canonical(b)
-        })?;
-        obj.member("unicode_version", |b| {
-            self.unicode_version.emit_canonical(b)
-        })?;
-        obj.finish(out)
-    }
-}
+canonical_record!(UnicodePolicyManifest: "unicode_policy_manifest",
+    fields { manifest_id, normalization_table_hash, policy_test_hash, punctuation_table_hash, unicode_version });
 
 #[cfg(test)]
 mod tests {

@@ -44,7 +44,7 @@ rule.
   identity. Read: §1.1 schema-validation-rejects paragraph, §1.2, §1.5 union
   rule, §1.7, A.10.
   Gate: `cargo test -p ckc-core --test t_canonical_bytes`
-- [ ] M0.0.3.1 registry types. New crate `crates/ckc-schema` (add to workspace
+- [x] M0.0.3.1 69% 138K/200K registry types. New crate `crates/ckc-schema` (add to workspace
   members; dep ckc-core): `src/registry.rs` SchemaRegistry, SchemaEntry,
   SchemaRole, StringPolicyBinding, SourceSupportAlias, SourceSupportAliasKind;
   `src/bounds.rs` SchemaBoundManifest, SchemaCollectionBound,

@@ -21,8 +21,34 @@ use sha2::{Digest, Sha256};
 pub type ProofId = Id;
 /// `RegionId` names a `SourceRegion` (§1.3).
 pub type RegionId = Id;
-/// `FeaturePath` is a `List[Id]` traversed over a schema-validated payload.
-pub type FeaturePath = Vec<Id>;
+
+/// `FeaturePath`: `List[Id]` traversed over a schema-validated payload
+/// (§1.3). §1.1 diagnostic text renders it `/`-joined (`Display`).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
+#[serde(transparent)]
+pub struct FeaturePath(Vec<Id>);
+
+impl FeaturePath {
+    pub fn new(segments: Vec<Id>) -> Self {
+        Self(segments)
+    }
+
+    pub fn segments(&self) -> &[Id] {
+        &self.0
+    }
+}
+
+impl fmt::Display for FeaturePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, segment) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str("/")?;
+            }
+            f.write_str(segment.as_str())?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScalarError {
