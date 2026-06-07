@@ -267,7 +267,14 @@ technically derivable but easily forgotten under token pressure.
   carrying the bulk and SPEC untouched; split at the lexicographic
   terminal-name median (a-l 85 names/123 paths + classifier mechanics /
   m-z 86/137 + finalized count assertions) so each name is judged exactly
-  once in exactly one half.
+  once in exactly one half. Third corollary (m0.0.3.4.5.2 split 1→3,
+  user-directed pre-implementation): a defect burn-down (42 Unresolved
+  names/49 paths, each needing S-decl context + a SPEC correction) splits
+  by SPEC-section family, not lexicographic median — names in one section
+  share one fix and one context read (§1.x/§4.x 14 / §6.2-§9.1
+  digest-semantics 17 / §6.4 pre-acceptance 11 + wiring on the final
+  sub-unit), so no fix family straddles sessions with divergent styles.
+  Judgment sweeps split lexicographically; burn-downs split by section.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
