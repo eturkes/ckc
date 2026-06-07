@@ -56,7 +56,7 @@ rule.
   registry+bounds roundtrip via from_canonical_bytes + one
   optional-field-omission case. Read: §1.1 schema block, §1.2 alias table,
   §1.3 FeaturePath row. Test: `cargo test -p ckc-schema`
-- [ ] M0.0.3.2 spec extractor. `crates/ckc-schema/src/spec.rs`: line parser
+- [x] M0.0.3.2 72% 144K/200K spec extractor. `crates/ckc-schema/src/spec.rs`: line parser
   over SPEC.md bytes -> SpecDecls: S-decls (name, generic param, fields:
   TypeExpr), E-decls (alternative shapes: bare | name:Type | (sexp ArgTypes)
   | TypeRef | alias e.g. E RoleName = Id), T-tables by section (Rule,
