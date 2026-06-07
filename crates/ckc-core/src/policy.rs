@@ -10,7 +10,7 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use serde::de::Error as _;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::scalar::{Hash, Id};
@@ -344,12 +344,6 @@ impl<P: PolicyMarker> std::hash::Hash for Text<P> {
     }
 }
 
-impl<P: PolicyMarker> Serialize for Text<P> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.value)
-    }
-}
-
 impl<'de, P: PolicyMarker> Deserialize<'de> for Text<P> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -361,8 +355,7 @@ impl<'de, P: PolicyMarker> Deserialize<'de> for Text<P> {
 // UnicodePolicyManifest (§1.4)
 // ---------------------------------------------------------------------------
 
-/// Field declaration order is the canonical sorted member order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UnicodePolicyManifest {
     pub manifest_id: Id,

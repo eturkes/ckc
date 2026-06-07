@@ -27,11 +27,11 @@ proptest! {
     #[test]
     fn rational_new_reduces(num in any::<i128>(), den in 1u64..) {
         let r = Rational::new(BigInt::from(num), BigUint::from(den)).unwrap();
-        prop_assert!(!r.den().is_zero());
-        if r.num().is_zero() {
-            prop_assert!(r.den().is_one());
+        prop_assert!(!r.den().value().is_zero());
+        if r.num().value().is_zero() {
+            prop_assert!(r.den().value().is_one());
         } else {
-            prop_assert!(r.num().magnitude().gcd(r.den()).is_one());
+            prop_assert!(r.num().value().magnitude().gcd(r.den().value()).is_one());
         }
     }
 

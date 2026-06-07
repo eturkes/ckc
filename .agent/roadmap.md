@@ -11,7 +11,7 @@ rule.
 ## M0
 
 - [x] M0.0.1 81% 161K/200K
-- [ ] M0.0.2.1 §1.5 writer core. New `crates/ckc-core/src/canon.rs` + lib.rs
+- [x] M0.0.2.1 68% 136K/200K §1.5 writer core. New `crates/ckc-core/src/canon.rs` + lib.rs
   `pub mod canon;`: byte emitters for minimal-escape string (escape only
   U+0022, U+005C, controls as lowercase `\u00xx`), bool, array, object
   (members sorted by UTF-8 field-name bytes, duplicate-field rejection);

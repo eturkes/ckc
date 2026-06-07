@@ -264,6 +264,13 @@ technically derivable but easily forgotten under token pressure.
   system utility (jq and the like) is fine to install system-wide despite the
   prefer-project-local directive; distro/package-manager specifics now live in
   CLAUDE.md.
+- [2026-06-07] Escape sequences authored through tool JSON args (`\t`,
+  `\n`, …) inside Write/Edit string parameters decode to the literal control
+  character before landing in the file — the file then byte-differs from the
+  intended backslash-escape text and the tool-result echo renders both forms
+  identically. After writing any file that must contain literal
+  backslash-escape text, verify with `grep -nP '\t'`/`cat -A` and patch via
+  a python heredoc composing `chr(92)` explicitly.
 - [2026-06-01] Hash-record recurrence (the generic "verify against actual
   output" lesson alone did not prevent it): a fabricated placeholder short
   hash went into a roadmap line + commit message instead of the real commit

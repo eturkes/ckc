@@ -5,9 +5,8 @@
 //! `[1-9][0-9]*`, optional leading `-`, `-0` rejected); `Rational` is a
 //! reduced `{den,num}` object with `den > 0`. Deserialization validates
 //! canonical form and rejects non-canonical bytes; constructors normalize.
-//! Serde structs declare fields in sorted-name order so plain `serde_json`
-//! emission matches §1.5 sorted-member objects until M0.0.2 lands the
-//! canonical serializer.
+//! Canonical bytes are emitted solely by `crate::canon` (§1.5); serde here
+//! is the validating read side.
 
 use std::fmt;
 
@@ -15,7 +14,7 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{One, Zero};
 use serde::de::Error as _;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 
 /// `ProofId` names a `ProofNode` (§1.3).
@@ -95,12 +94,6 @@ impl fmt::Display for Id {
     }
 }
 
-impl Serialize for Id {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.0)
-    }
-}
-
 impl<'de> Deserialize<'de> for Id {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -159,12 +152,6 @@ impl fmt::Display for Hash {
     }
 }
 
-impl Serialize for Hash {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.0)
-    }
-}
-
 impl<'de> Deserialize<'de> for Hash {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -218,12 +205,6 @@ impl From<u64> for UInt {
     }
 }
 
-impl Serialize for UInt {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_decimal())
-    }
-}
-
 impl<'de> Deserialize<'de> for UInt {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -267,12 +248,6 @@ impl From<i64> for Int {
     }
 }
 
-impl Serialize for Int {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_decimal())
-    }
-}
-
 impl<'de> Deserialize<'de> for Int {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -285,9 +260,8 @@ impl<'de> Deserialize<'de> for Int {
 // ---------------------------------------------------------------------------
 
 /// Exact reduced rational (§1.3): `den > 0`, `gcd(|num|, den) = 1`, zero is
-/// `{num:"0", den:"1"}`. Field declaration order (`den`, `num`) is the
-/// canonical sorted member order.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+/// `{num:"0", den:"1"}`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Rational {
     den: UInt,
     num: Int,
@@ -398,12 +372,14 @@ impl Rational {
         }
     }
 
-    pub fn num(&self) -> &BigInt {
-        self.num.value()
+    /// Canonical numerator part; `.value()` reaches the `BigInt`.
+    pub fn num(&self) -> &Int {
+        &self.num
     }
 
-    pub fn den(&self) -> &BigUint {
-        self.den.value()
+    /// Canonical denominator part; `.value()` reaches the `BigUint`.
+    pub fn den(&self) -> &UInt {
+        &self.den
     }
 }
 
@@ -506,9 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn rational_serde_validates_canonical_bytes() {
-        let bytes = serde_json::to_string(&Rational::zero()).unwrap();
-        assert_eq!(bytes, r#"{"den":"1","num":"0"}"#);
+    fn rational_deserialize_validates_canonical_parts() {
         assert!(serde_json::from_str::<Rational>(r#"{"den":"2","num":"77"}"#).is_ok());
         for bad in [
             r#"{"den":"4","num":"2"}"#,

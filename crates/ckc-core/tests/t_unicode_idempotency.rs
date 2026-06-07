@@ -6,18 +6,21 @@
 //! outputs recomputed from the seed inputs below) and
 //! `fixtures/unicode_policy_manifest.json` (recomputed table fingerprints,
 //! vectors-file hash, Unicode version), then verifies. Fixture files are
-//! emitted by plain serde_json over sorted-field structs; M0.0.2 swaps
-//! emission to the §1.5 canonical serializer — re-bless then.
+//! emitted by the §1.5 canonical serializer (`ckc_core::canon`); serde_json
+//! is the validating reader.
 
 use std::fs;
 use std::path::PathBuf;
 
+use ckc_core::canon::{
+    CanonError, Canonical, ObjectEmitter, canonical_payload_bytes, emit_array, emit_string,
+};
 use ckc_core::policy::{
     StringPolicy, UnicodePolicyManifest, normalization_table_fingerprint,
     punctuation_table_fingerprint, unicode_version_string,
 };
 use ckc_core::scalar::Hash;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Appendix A.1 source strings U1..U27, bytes extracted verbatim from SPEC.md.
 const A1_SOURCES: [&str; 27] = [
@@ -99,8 +102,8 @@ const EDGE_SEEDS: &[(&str, &str, &str)] = &[
     ("identifier_ascii", "edge-ident-version", "16.0.0"),
 ];
 
-/// Canonical fixture rows: sorted-field structs, sorted vector order.
-#[derive(Debug, Serialize, Deserialize)]
+/// Canonical fixture rows in sorted vector order; emission via `Canonical`.
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Vector {
     expected: String,
@@ -109,10 +112,42 @@ struct Vector {
     vector_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct VectorFile {
     vectors: Vec<Vector>,
+}
+
+impl Canonical for Vector {
+    const TYPE_ID: &'static str = "policy_vector";
+
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        for (name, value) in [
+            ("expected", &self.expected),
+            ("input", &self.input),
+            ("policy", &self.policy),
+            ("vector_id", &self.vector_id),
+        ] {
+            obj.member(name, |b| {
+                emit_string(b, value);
+                Ok(())
+            })?;
+        }
+        obj.finish(out)
+    }
+}
+
+impl Canonical for VectorFile {
+    const TYPE_ID: &'static str = "policy_vector_file";
+
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("vectors", |b| {
+            emit_array(b, &self.vectors, |b, v| v.emit_canonical(b))
+        })?;
+        obj.finish(out)
+    }
 }
 
 fn seeds() -> Vec<(StringPolicy, String, String)> {
@@ -165,7 +200,7 @@ fn bless() {
             }
         })
         .collect();
-    let vector_bytes = serde_json::to_vec(&VectorFile { vectors }).expect("vector file serializes");
+    let vector_bytes = canonical_payload_bytes(&VectorFile { vectors }).expect("vector file emits");
     fs::create_dir_all(fixtures_dir()).expect("fixtures dir");
     fs::write(vectors_path(), &vector_bytes).expect("write policy_vectors.json");
 
@@ -177,7 +212,7 @@ fn bless() {
         unicode_version: ckc_core::policy::Text::from_canonical(&unicode_version_string())
             .expect("unicode version is identifier_ascii"),
     };
-    let manifest_bytes = serde_json::to_vec(&manifest).expect("manifest serializes");
+    let manifest_bytes = canonical_payload_bytes(&manifest).expect("manifest emits");
     fs::write(manifest_path(), &manifest_bytes).expect("write unicode_policy_manifest.json");
 }
 
@@ -194,7 +229,7 @@ fn t_unicode_idempotency() {
     // Committed file is the canonical serialization of its own parse, and
     // rows are sorted by (policy, vector_id) with unique ids.
     assert_eq!(
-        serde_json::to_vec(&vector_file).expect("reserialize"),
+        canonical_payload_bytes(&vector_file).expect("re-emit"),
         vector_bytes,
         "policy_vectors.json bytes are non-canonical"
     );
@@ -261,7 +296,7 @@ fn t_unicode_idempotency() {
         "policy_test_hash does not match policy_vectors.json bytes"
     );
     assert_eq!(
-        serde_json::to_vec(&manifest).expect("reserialize"),
+        canonical_payload_bytes(&manifest).expect("re-emit"),
         manifest_bytes,
         "unicode_policy_manifest.json bytes are non-canonical"
     );
