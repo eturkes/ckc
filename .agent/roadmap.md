@@ -81,44 +81,64 @@ rule.
   spec-defect fallout; SPEC.md corrections in-scope. Tests: real SPEC
   resolves clean; synthetic duplicate + dangling-ref perturbations reject.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.1 type-graph walk + SchemaEntry rows. New
-  `crates/ckc-schema/src/build.rs`: transitive walk from each §3.1 inventory
-  root over SpecDecls -> (schema_id, FeaturePath, leaf) rows — recurse
-  TypeExpr::Name into nested SDecls (visited-set on cycles; Optional
-  transparent; generic args walk through), leaf kinds = collection
-  (Set/List/Map, with enum-domain-key flag for Map via EDecl lookup), Text
-  policy, hash-named field (*_hash/*_hashes/*_digest); SchemaEntry per
-  inventory row: authored schema_id->SchemaRole const table (walker output
-  informs §1.2 role rule), placeholder
+- [ ] M0.0.3.4.1 type-graph walker. New `crates/ckc-schema/src/build.rs` +
+  lib.rs `pub mod build;`: WalkedPath {schema_id, path: FeaturePath, leaf}
+  rows over SpecDecls — transitive walk from each §3.1 inventory root,
+  recurse TypeExpr::Name into nested SDecls (visited-set on cycles; Optional
+  transparent; generic args walk through); leaf kinds = collection
+  (Set/List/Map + enum-domain-key flag for Map keys resolving via e_decl),
+  Text policy id, hash-named field (*_hash/*_hashes/*_digest); helper
+  schema_has_source_support (§1.2 canonical field/alias-default names;
+  shared by .4.2 authoring + .4.4 checker). Tests: synthetic decls (nested,
+  cyclic, enum-domain map, generic), real-SPEC spot-checks + nonzero
+  per-leaf-family counts. Read: §1.1 steps 3-4, §1.2 alias table, §3.1.
+  Test: `cargo test -p ckc-schema build`
+- [ ] M0.0.3.4.2 SchemaEntry + alias rows. build.rs: authored
+  schema_id->SchemaRole const table, one row per SpecDecls.inventory entry
+  (roles from §2 Authority + §3.2 producer position +
+  schema_has_source_support; non-obvious rows get one-line rationale);
+  SchemaEntry per row — placeholder
   rust_type_hash/generated_json_schema_hash = sha256(S-decl line bytes)
   pending M0.0.4, tagged_union_alternatives_hash = None (every inventory row
-  is an S-decl; verified at split time). Tests: walker spot-checks (nested,
-  cyclic, enum-domain map), entry count = inventory count, role spot-checks.
-  Read: §1.1, §1.2 role rule, §3.1. Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.2 binding/alias/bound rows + v0 assembly. build.rs
-  build_v0_registry(spec_bytes): StringPolicyBinding per walked Text<p> path
-  (dependent_policy_field = None for v0 unless a §1.4 algorithm names a
-  sibling field); SourceSupportAlias per §1.2 fixed-default field-name match;
-  SchemaCollectionBound per walked collection path minus enum-domain-Map
-  exemptions (authored default max_items + per-path override consts;
-  disposition reject_with_diagnostic); SchemaBoundManifest + SchemaRegistry
-  assembly — spec_contract_hash = sha256(SPEC.md bytes),
-  schema_bound_manifest_hash over built-manifest canonical bytes, remaining
-  *_hash fields placeholder = sha256 of named §-anchor line bytes pending
-  M0.0.4/M0.0.5 (document per-field in build.rs). Tests: per-family row
-  counts vs independent line scan, alias/binding spot-checks. Read: §1.1
-  bound paragraphs, §1.2 alias table + hash conventions, §1.4, §1.5.
+  is an S-decl); SourceSupportAlias rows via §1.2 fixed-default field-name
+  match over walked paths. Tests: entry count = inventory len, role + alias
+  spot-checks, role/support consistency. Read: §1.2 role rule + alias table,
+  §2 Authority rows, §3.2 producer table.
   Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.3 registry checker steps 4-5 + gate (completes
-  T-Registry-Referential-Integrity). check.rs registry-aware entry point
-  (spec text + built registry/manifest): step-4 bound coverage (exactly one
-  SchemaCollectionBound per walked collection path, enum-domain Map
-  exemption), §1.2 hash-field naming-convention applicability, §1.2
-  source-support/role rule, §3.2 producer_mapping_error (every inventory
-  payload named in the stage-producer table or control-emission rule),
-  §1.1/§6.2 local-bound dispatch coverage, step-5 ok/diagnostics
-  (code=referential_integrity_error). Expect spec-defect fallout; SPEC.md
-  corrections in-scope. Gate test
+- [ ] M0.0.3.4.3 binding/bound rows + v0 assembly. build.rs
+  build_v0_registry(spec_bytes) -> (SchemaRegistry, SchemaBoundManifest):
+  StringPolicyBinding per walked Text<p> path (dependent_policy_field = None
+  for v0 unless a §1.4 algorithm names a sibling field);
+  SchemaCollectionBound per walked collection path minus enum-domain-Map
+  exemptions (authored DEFAULT_MAX_ITEMS + sparse per-path override consts;
+  disposition reject_with_diagnostic); assembly — spec_contract_hash =
+  sha256(SPEC.md bytes), schema_bound_manifest_hash over built-manifest
+  canonical bytes, remaining *_hash fields placeholder = sha256 of named
+  §-anchor line bytes pending M0.0.4/M0.0.5 (document per-field). Tests:
+  per-family row counts vs independent line scan, binding spot-checks,
+  composed from_canonical_bytes roundtrip. Read: §1.1 bound paragraphs, §1.2
+  hash conventions, §1.4, §1.5. Test: `cargo test -p ckc-schema build`
+- [ ] M0.0.3.4.4 registry checker step 4, structural families. check.rs
+  check_registry(text, &SchemaRegistry, &SchemaBoundManifest) ->
+  CheckReport: bound coverage (exactly one SchemaCollectionBound per walked
+  collection path, enum-domain Map exemption); §1.2 hash-field convention
+  applicability (suffix defaults artifact-ref/digest + authored
+  raw-bytes/field-specific exception list; unclassified path rejects); §1.2
+  source-support/role rule via schema_has_source_support. Expect spec-defect
+  fallout; SPEC.md corrections in-scope. Tests: real SPEC + built registry
+  clean; perturbations (dropped bound row, wrong role, unclassified hash
+  field) reject. Read: §1.1 step 4, §1.2.
+  Test: `cargo test -p ckc-schema check`
+- [ ] M0.0.3.4.5 producer mapping + step 5 + gate (completes
+  T-Registry-Referential-Integrity). check.rs: §3.2 producer_mapping_error
+  (every inventory payload named in a stage-producer TTable
+  emitted-artifacts cell or the control-emission rule's authored allowlist);
+  §1.1/§6.2 local-bound dispatch coverage (local bound objects lacking
+  BoundOverflowDisposition, e.g. CollectBound, must carry a defined
+  consuming-algorithm dispatch; §6.2 reading = its bound lines only);
+  registry-declared schema_ids feed symtab duplicate rejection (steps 1-2);
+  step-5 ok/sorted diagnostics (code=referential_integrity_error). Expect
+  spec-defect fallout; SPEC.md corrections in-scope. Gate test
   `crates/ckc-schema/tests/t_registry_referential_integrity.rs`: clean over
   real SPEC + built registry; perturbations (dropped bound row, wrong role,
   duplicate entry, unmapped payload) reject.
