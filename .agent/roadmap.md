@@ -105,7 +105,7 @@ rule.
   spot-checks, role/support consistency. Read: §1.2 role rule + alias table,
   §2 Authority rows, §3.2 producer table.
   Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.3 binding/bound rows + v0 assembly. build.rs
+- [x] M0.0.3.4.3 57% 113K/200K binding/bound rows + v0 assembly. build.rs
   build_v0_registry(spec_bytes) -> (SchemaRegistry, SchemaBoundManifest):
   StringPolicyBinding per walked Text<p> path (dependent_policy_field = None
   for v0 unless a §1.4 algorithm names a sibling field);

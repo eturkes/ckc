@@ -22,9 +22,15 @@
 //! - the enum-domain Map-key flag requires a label-enum domain; decl-level
 //!   alias enums (`E RoleName = Id`) are open domains and stay unflagged.
 
-use ckc_core::scalar::{FeaturePath, Hash, Id};
+use ckc_core::canon::canonical_payload_bytes;
+use ckc_core::policy::StringPolicy;
+use ckc_core::scalar::{FeaturePath, Hash, Id, UInt};
 
-use crate::registry::{SchemaEntry, SchemaRole, SourceSupportAlias, SourceSupportAliasKind};
+use crate::bounds::{BoundOverflowDisposition, SchemaBoundManifest, SchemaCollectionBound};
+use crate::registry::{
+    SchemaEntry, SchemaRegistry, SchemaRole, SourceSupportAlias, SourceSupportAliasKind,
+    StringPolicyBinding,
+};
 use crate::spec::{SDecl, SpecDecls, TypeExpr};
 
 /// Leaf classification of one walked path. A field can yield several rows
@@ -507,9 +513,157 @@ pub fn build_schema_entries(decls: &SpecDecls, spec_text: &str) -> Vec<SchemaEnt
         .collect()
 }
 
+/// One §1.4 `StringPolicyBinding` per walked `Text` site, in walk order.
+/// Every S-decl-reachable site names a static §1.4 policy id, so
+/// `dependent_policy_field` is None across v0: the one §0 dependent-text
+/// site (`TextLiteral.value`, `Text<policy>`) sits inside tagged-union
+/// alternatives (`E Literal`/`E EvalScalar`), which `FeaturePath` rows
+/// cannot address — its dependency lands with the M0.0.4 union surface.
+pub fn binding_rows(decls: &SpecDecls) -> Vec<StringPolicyBinding> {
+    walk_inventory(decls)
+        .into_iter()
+        .filter_map(|r| match r.leaf {
+            WalkedLeaf::Text { policy } => Some(StringPolicyBinding {
+                schema_id: r.schema_id,
+                path: r.path,
+                policy: StringPolicy::from_id(&policy)
+                    .expect("every S-decl-reachable Text parameter is a §1.4 policy id"),
+                dependent_policy_field: None,
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+/// v0 authored `max_items` default for per-record collections. Every v0
+/// disposition is `reject_with_diagnostic` — §1.1 leaves the bounded
+/// artifact absent, the safe posture until a §8.7 consumer motivates
+/// residual/ambiguity/incoherence emission.
+pub const DEFAULT_MAX_ITEMS: u64 = 65_536;
+
+/// Whole-root `max_items` override: every collection walked under these
+/// §3.1 roots holds document/terminology/closure-run-scale data.
+pub const SCHEMA_MAX_ITEMS: &[(&str, u64)] = &[
+    ("source_graph", 1 << 20),
+    ("source_region", 1 << 20),
+    ("terminology_resource_set", 1 << 20),
+    ("terminology_closure", 1 << 20),
+    ("closure_output", 1 << 20),
+    ("proof_dag", 1 << 20),
+];
+
+/// Per-path `max_items` override for corpus-scale collections inside
+/// otherwise per-record roots. Keys are (schema_id, `/`-joined path).
+pub const PATH_MAX_ITEMS: &[(&str, &str, u64)] = &[
+    // §4.3 closure batches accumulate region members over a whole graph.
+    (
+        "region_closure_certificate",
+        "added_member_batches",
+        1 << 20,
+    ),
+    // §9.3 one row per report item across the corpus run.
+    ("report_trace_index", "rows", 1 << 20),
+];
+
+fn max_items(schema_id: &str, joined: &str) -> u64 {
+    PATH_MAX_ITEMS
+        .iter()
+        .find(|(s, p, _)| *s == schema_id && *p == joined)
+        .map(|(.., n)| *n)
+        .or_else(|| {
+            SCHEMA_MAX_ITEMS
+                .iter()
+                .find(|(s, _)| *s == schema_id)
+                .map(|(_, n)| *n)
+        })
+        .unwrap_or(DEFAULT_MAX_ITEMS)
+}
+
+/// One §1.1 `SchemaCollectionBound` per walked collection path, in walk
+/// order, minus the step-4 exemption for enum-domain Map keys.
+pub fn bound_rows(decls: &SpecDecls) -> Vec<SchemaCollectionBound> {
+    walk_inventory(decls)
+        .into_iter()
+        .filter_map(|r| match r.leaf {
+            WalkedLeaf::Collection {
+                enum_domain_key: false,
+            } => {
+                let joined = r
+                    .path
+                    .segments()
+                    .iter()
+                    .map(Id::as_str)
+                    .collect::<Vec<_>>()
+                    .join("/");
+                let max = max_items(r.schema_id.as_str(), &joined);
+                Some(SchemaCollectionBound {
+                    schema_id: r.schema_id,
+                    path: r.path,
+                    max_items: UInt::from(max),
+                    overflow_disposition: BoundOverflowDisposition::RejectWithDiagnostic,
+                })
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// sha256 of the named §-anchor header line: the v0 placeholder referent
+/// for `*_hash` fields whose real input lands later.
+fn anchor_line_hash(spec_text: &str, prefix: &str) -> Hash {
+    let line = spec_text
+        .lines()
+        .find(|l| l.starts_with(prefix))
+        .expect("named §-anchor is a SPEC.md header line");
+    Hash::of_bytes(line.as_bytes())
+}
+
+/// v0 `SchemaRegistry` + `SchemaBoundManifest` over parsed SPEC decls.
+/// Real hashes: `spec_contract_hash` = sha256 of the full SPEC.md bytes
+/// (pass the exact file content); `schema_bound_manifest_hash` = sha256 of
+/// the built manifest's canonical payload bytes (§1.2 artifact-ref
+/// convention; envelope pending M0.0.5 store). Placeholder hashes anchor
+/// the defining § header line, per field: `rust_type_manifest_hash` and
+/// `generated_json_schema_manifest_hash` -> §1.1 (both equal pending the
+/// M0.0.4 T-Schema-Equivalence manifests, like the per-entry pair);
+/// `canonicalization_policy_hash` -> §1.5 (policy artifact pending);
+/// `generator_static_bound_policy_hash` -> §6.1 (C-GEN-static bound-excess
+/// policy); `parser_bound_policy_hash` -> §6.2 (parser state machine);
+/// `closure_bound_policy_hash` -> §7.1 (closure bounds).
+pub fn build_v0_registry(
+    decls: &SpecDecls,
+    spec_text: &str,
+) -> (SchemaRegistry, SchemaBoundManifest) {
+    let manifest = SchemaBoundManifest {
+        manifest_id: Id::new("ckc_schema_bound_manifest_v0").expect("authored Id is valid"),
+        schema_collection_bounds: bound_rows(decls).into_iter().collect(),
+        generator_static_bound_policy_hash: anchor_line_hash(spec_text, "### 6.1 "),
+        closure_bound_policy_hash: anchor_line_hash(spec_text, "### 7.1 "),
+        parser_bound_policy_hash: anchor_line_hash(spec_text, "### 6.2 "),
+    };
+    let manifest_bytes =
+        canonical_payload_bytes(&manifest).expect("built bound manifest canonicalizes");
+    let section_1_1 = anchor_line_hash(spec_text, "### 1.1 ");
+    let registry = SchemaRegistry {
+        registry_id: Id::new("ckc_schema_registry").expect("authored Id is valid"),
+        registry_version: Id::new("v0").expect("v0 is a valid Id"),
+        spec_contract_hash: Hash::of_bytes(spec_text.as_bytes()),
+        rust_type_manifest_hash: section_1_1.clone(),
+        generated_json_schema_manifest_hash: section_1_1,
+        canonicalization_policy_hash: anchor_line_hash(spec_text, "### 1.5 "),
+        schema_bound_manifest_hash: Hash::of_bytes(&manifest_bytes),
+        schema_entries: build_schema_entries(decls, spec_text).into_iter().collect(),
+        string_policy_bindings: binding_rows(decls).into_iter().collect(),
+        source_support_aliases: alias_rows(decls).into_iter().collect(),
+    };
+    (registry, manifest)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
+
+    use ckc_core::canon::from_canonical_bytes;
 
     use crate::spec::parse_spec;
 
@@ -891,6 +1045,222 @@ mod tests {
                 assert!(!aliased.contains(id.as_str()), "{name}");
             }
         }
+    }
+
+    /// Test-local depth-0 splitter over one S-decl source line, returning
+    /// the field type strings — the independent scan for root-level row
+    /// counts (field types contain no parens; `<`/`>` only in `Text<p>`).
+    fn root_field_types(line: &str) -> Vec<&str> {
+        let inner = &line[line.find('(').unwrap() + 1..line.rfind(')').unwrap()];
+        let mut fields = Vec::new();
+        let (mut depth, mut start) = (0i32, 0usize);
+        for (i, c) in inner.char_indices() {
+            match c {
+                '[' | '<' => depth += 1,
+                ']' | '>' => depth -= 1,
+                ',' if depth == 0 => {
+                    fields.push(&inner[start..i]);
+                    start = i + 1;
+                }
+                _ => {}
+            }
+        }
+        fields.push(&inner[start..]);
+        fields
+            .iter()
+            .map(|f| f.split_once(':').unwrap().1)
+            .collect()
+    }
+
+    /// Binding/bound totals equal their walked leaf families, and per-root
+    /// single-segment counts equal an independent depth-0 scan of each
+    /// inventory S-decl source line (every root-line `Text<` is a
+    /// single-segment binding; nested-decl sites have longer paths).
+    #[test]
+    fn build_row_counts_vs_line_scan() {
+        let text = spec_text();
+        let parse = parse_spec(&text);
+        let decls = &parse.decls;
+        let bindings = binding_rows(decls);
+        let bounds = bound_rows(decls);
+
+        let rows = walk_inventory(decls);
+        assert_eq!(
+            bindings.len(),
+            rows.iter()
+                .filter(|r| matches!(r.leaf, WalkedLeaf::Text { .. }))
+                .count()
+        );
+        assert_eq!(
+            bounds.len(),
+            rows.iter()
+                .filter(|r| matches!(
+                    r.leaf,
+                    WalkedLeaf::Collection {
+                        enum_domain_key: false
+                    }
+                ))
+                .count()
+        );
+
+        for name in &decls.inventory {
+            let decl = decls.s_decl(name).unwrap();
+            let line = text.lines().nth(decl.line - 1).unwrap();
+            let id = schema_ident(name);
+            let n_coll = root_field_types(line)
+                .iter()
+                .filter(|t| ["Set[", "List[", "Map["].iter().any(|p| t.starts_with(p)))
+                .count();
+            assert_eq!(
+                bounds
+                    .iter()
+                    .filter(|b| b.schema_id == id && b.path.segments().len() == 1)
+                    .count(),
+                n_coll,
+                "{name} bounds"
+            );
+            assert_eq!(
+                bindings
+                    .iter()
+                    .filter(|b| b.schema_id == id && b.path.segments().len() == 1)
+                    .count(),
+                line.matches("Text<").count(),
+                "{name} bindings"
+            );
+        }
+    }
+
+    /// Binding policies at root and nested paths (all static, no dependent
+    /// sibling fields) and bound max-items tiers (default, whole-root,
+    /// per-path) under the uniform v0 disposition.
+    #[test]
+    fn build_binding_bound_spot_checks() {
+        let parse = parse_spec(&spec_text());
+        let bindings = binding_rows(&parse.decls);
+        let bounds = bound_rows(&parse.decls);
+        let joined = |p: &FeaturePath| {
+            p.segments()
+                .iter()
+                .map(Id::as_str)
+                .collect::<Vec<_>>()
+                .join("/")
+        };
+
+        assert!(bindings.iter().all(|b| b.dependent_policy_field.is_none()));
+        for (schema, path, policy) in [
+            ("source_span", "raw_text", StringPolicy::RawSource),
+            ("mech_obs_payload", "fields", StringPolicy::SemanticJa),
+            (
+                "unicode_policy_manifest",
+                "unicode_version",
+                StringPolicy::IdentifierAscii,
+            ),
+            ("source_graph", "spans/raw_text", StringPolicy::RawSource),
+            (
+                "gloss_template",
+                "literal_parts",
+                StringPolicy::TemplateLiteral,
+            ),
+            ("residual", "diagnostic", StringPolicy::DiagnosticText),
+        ] {
+            let row = bindings
+                .iter()
+                .find(|b| b.schema_id.as_str() == schema && joined(&b.path) == path)
+                .unwrap_or_else(|| panic!("missing binding {schema} {path}"));
+            assert_eq!(row.policy, policy, "{schema} {path}");
+        }
+
+        assert!(
+            bounds
+                .iter()
+                .all(|b| b.overflow_disposition == BoundOverflowDisposition::RejectWithDiagnostic)
+        );
+        for (schema, path, max) in [
+            ("schema_registry", "schema_entries", DEFAULT_MAX_ITEMS),
+            ("closure_output", "match_hashes", 1 << 20),
+            ("source_graph", "spans", 1 << 20),
+            (
+                "region_closure_certificate",
+                "added_member_batches",
+                1 << 20,
+            ),
+            ("report_trace_index", "rows", 1 << 20),
+        ] {
+            let row = bounds
+                .iter()
+                .find(|b| b.schema_id.as_str() == schema && joined(&b.path) == path)
+                .unwrap_or_else(|| panic!("missing bound {schema} {path}"));
+            assert_eq!(row.max_items, UInt::from(max), "{schema} {path}");
+        }
+    }
+
+    /// Step-4 enum-domain Map exemption: flagged keys yield no bound row.
+    #[test]
+    fn build_bound_enum_domain_exemption() {
+        let mut decls = synthetic(
+            "E Color = red | green | blue\n\
+             S Board(cells:Map[Color,UInt],open:Map[Id,UInt])",
+        );
+        decls.inventory = vec!["Board".to_string()];
+        let rows = bound_rows(&decls);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].path.segments()[0].as_str(), "open");
+    }
+
+    /// v0 assembly: real spec-contract and bound-manifest hashes, per-field
+    /// §-anchor placeholders, set sizes match the row builders, and the
+    /// composed records roundtrip through canonical bytes.
+    #[test]
+    fn build_v0_registry_assembly_roundtrip() {
+        let text = spec_text();
+        let parse = parse_spec(&text);
+        let decls = &parse.decls;
+        let (registry, manifest) = build_v0_registry(decls, &text);
+
+        assert_eq!(registry.spec_contract_hash, Hash::of_bytes(text.as_bytes()));
+        let manifest_bytes = canonical_payload_bytes(&manifest).unwrap();
+        assert_eq!(
+            registry.schema_bound_manifest_hash,
+            Hash::of_bytes(&manifest_bytes)
+        );
+        let anchor =
+            |p: &str| Hash::of_bytes(text.lines().find(|l| l.starts_with(p)).unwrap().as_bytes());
+        assert_eq!(registry.rust_type_manifest_hash, anchor("### 1.1 "));
+        assert_eq!(
+            registry.generated_json_schema_manifest_hash,
+            anchor("### 1.1 ")
+        );
+        assert_eq!(registry.canonicalization_policy_hash, anchor("### 1.5 "));
+        assert_eq!(
+            manifest.generator_static_bound_policy_hash,
+            anchor("### 6.1 ")
+        );
+        assert_eq!(manifest.parser_bound_policy_hash, anchor("### 6.2 "));
+        assert_eq!(manifest.closure_bound_policy_hash, anchor("### 7.1 "));
+
+        assert_eq!(registry.schema_entries.len(), decls.inventory.len());
+        assert_eq!(
+            registry.string_policy_bindings.len(),
+            binding_rows(decls).len()
+        );
+        assert_eq!(
+            registry.source_support_aliases.len(),
+            alias_rows(decls).len()
+        );
+        assert_eq!(
+            manifest.schema_collection_bounds.len(),
+            bound_rows(decls).len()
+        );
+
+        assert_eq!(
+            from_canonical_bytes::<SchemaRegistry>(&canonical_payload_bytes(&registry).unwrap())
+                .unwrap(),
+            registry
+        );
+        assert_eq!(
+            from_canonical_bytes::<SchemaBoundManifest>(&manifest_bytes).unwrap(),
+            manifest
+        );
     }
 
     /// Alias priority: default-table order picks source_regions over
