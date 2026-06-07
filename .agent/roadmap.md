@@ -118,27 +118,42 @@ rule.
   per-family row counts vs independent line scan, binding spot-checks,
   composed from_canonical_bytes roundtrip. Read: §1.1 bound paragraphs, §1.2
   hash conventions, §1.4, §1.5. Test: `cargo test -p ckc-schema build`
-- [ ] M0.0.3.4.4 registry checker step 4, structural families. check.rs
-  check_registry(text, &SchemaRegistry, &SchemaBoundManifest) ->
-  CheckReport: bound coverage (exactly one SchemaCollectionBound per walked
-  collection path, enum-domain Map exemption); §1.2 hash-field convention
-  applicability (suffix defaults artifact-ref/digest + authored
-  raw-bytes/field-specific exception list; unclassified path rejects); §1.2
-  source-support/role rule via schema_has_source_support. Expect spec-defect
-  fallout; SPEC.md corrections in-scope. Tests: real SPEC + built registry
-  clean; perturbations (dropped bound row, wrong role, unclassified hash
-  field) reject. Read: §1.1 step 4, §1.2.
+- [ ] M0.0.3.4.4 structural coverage checkers. check.rs
+  check_registry(text, &SchemaRegistry, &SchemaBoundManifest) -> CheckReport
+  (peer of check_spec; CheckIssue code=referential_integrity_error): bound
+  coverage — exactly one SchemaCollectionBound per walk_inventory Collection
+  leaf (enum_domain_key exempt) and zero bound rows off the walk; §1.2
+  source-support/role rule — schema_has_source_support or registered alias
+  vs SchemaEntry.schema_role non-semantic set. Tests: real SPEC +
+  build_v0_registry clean; perturbations (dropped/extra bound row, wrong
+  role) reject. Read: §1.1 step 4 + bound paragraphs, §1.2 role rule.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.5 producer mapping + step 5 + gate (completes
-  T-Registry-Referential-Integrity). check.rs: §3.2 producer_mapping_error
-  (every inventory payload named in a stage-producer TTable
-  emitted-artifacts cell or the control-emission rule's authored allowlist);
-  §1.1/§6.2 local-bound dispatch coverage (local bound objects lacking
-  BoundOverflowDisposition, e.g. CollectBound, must carry a defined
-  consuming-algorithm dispatch; §6.2 reading = its bound lines only);
-  registry-declared schema_ids feed symtab duplicate rejection (steps 1-2);
-  step-5 ok/sorted diagnostics (code=referential_integrity_error). Expect
-  spec-defect fallout; SPEC.md corrections in-scope. Gate test
+- [ ] M0.0.3.4.5 hash-field convention checker. check.rs: classify every
+  walk_inventory HashNamed leaf per §1.2 — suffix defaults (*_hash/*_hashes
+  artifact-ref, *_digest named-payload digest) overridden by an authored
+  raw-bytes/field-specific exception table (spec_contract_hash,
+  rust_type_hash, canonicalization_policy_hash, ToolRecord
+  executable/fingerprint families, …; one-line rationale per row);
+  unclassified path rejects. Expect spec-defect fallout; SPEC.md
+  corrections in-scope. Tests: real SPEC clean, exception spot-checks,
+  unclassified-suffix perturbation rejects. Read: §1.2 hash conventions.
+  Test: `cargo test -p ckc-schema check`
+- [ ] M0.0.3.4.6 producer-mapping checker. check.rs §3.2 reverse coverage:
+  every SpecDecls.inventory payload named in a stage-producer TTable
+  emitted-artifacts cell (reuse resolve_artifact_cell name handling) or in
+  the authored control-emission allowlist (ProducerManifest,
+  ValidationManifest, ToolchainManifest, EnvironmentProfile, ToolRecord,
+  FiniteFixtureManifest + FrozenConstant/ParsedQuantity/DiagnosticTag rows);
+  missing mapping emits producer_mapping_error. Expect spec-defect fallout;
+  SPEC.md corrections in-scope. Tests: real SPEC clean; unmapped-payload
+  perturbation rejects. Read: §3.2 producer table + control-emission rule.
+  Test: `cargo test -p ckc-schema check`
+- [ ] M0.0.3.4.7 local-bound dispatch + steps 1-2/5 + gate (completes
+  T-Registry-Referential-Integrity). check.rs: local bound objects lacking
+  BoundOverflowDisposition (e.g. CollectBound, dispatch defined beside §6.2
+  collect) must name a consuming-algorithm dispatch — §6.2 reading = its
+  bound lines only; registry-declared schema_ids feed symtab duplicate
+  rejection (steps 1-2); step-5 ok/sorted diagnostics. Gate test
   `crates/ckc-schema/tests/t_registry_referential_integrity.rs`: clean over
   real SPEC + built registry; perturbations (dropped bound row, wrong role,
   duplicate entry, unmapped payload) reject.

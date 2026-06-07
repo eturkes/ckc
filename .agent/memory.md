@@ -247,12 +247,14 @@ technically derivable but easily forgotten under token pressure.
   registry-adjacent units, e.g. M0.0.4 schema equivalence walks the same
   surfaces; re-grep after SPEC edits): 227 S-decls spec-wide, ~75 §3.1
   inventory roots, 366 collection fields, 459 hash-named fields, 61 Text
-  fields in S-decl lines. Split heuristic learned from the m0.0.3.4
-  rebalance (3→5 sub-units before any implementation began): a unit that
-  both implements a nontrivial algorithm AND authors a per-inventory-row
-  table is two units; a checker family that classifies hundreds of paths
-  (hash-field conventions) dominates its unit and gets grouped with at most
-  two slim siblings.
+  fields in S-decl lines. Split heuristic (m0.0.3.4 rebalances, 3→5 then
+  user-directed 5→7, both pre-implementation): a unit that both implements
+  a nontrivial algorithm AND authors a per-inventory-row table is two
+  units; a checker family that authors a per-path/per-name table or
+  expects spec-defect fallout (hash-field conventions, producer mapping)
+  is its OWN unit; only table-free set-comparison families pair up.
+  Calibration points: authored-table units ran 87% (.4.2), fallout-bearing
+  checker ran 82% (.3.3).
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
