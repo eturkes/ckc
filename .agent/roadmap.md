@@ -128,15 +128,30 @@ rule.
   build_v0_registry clean; perturbations (dropped/extra bound row, wrong
   role) reject. Read: §1.1 step 4 + bound paragraphs, §1.2 role rule.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.5 hash-field convention checker. check.rs: classify every
-  walk_inventory HashNamed leaf per §1.2 — suffix defaults (*_hash/*_hashes
-  artifact-ref, *_digest named-payload digest) overridden by an authored
-  raw-bytes/field-specific exception table (spec_contract_hash,
-  rust_type_hash, canonicalization_policy_hash, ToolRecord
-  executable/fingerprint families, …; one-line rationale per row);
-  unclassified path rejects. Expect spec-defect fallout; SPEC.md
-  corrections in-scope. Tests: real SPEC clean, exception spot-checks,
-  unclassified-suffix perturbation rejects. Read: §1.2 hash conventions.
+- [ ] M0.0.3.4.5.1 hash-field classifier + authored table. check.rs:
+  HashFieldClass {ArtifactRef, NamedPayloadDigest, RawRecordedBytes,
+  FieldSpecific, Unresolved} + classify_hash_fields over walk_inventory
+  HashNamed rows (260 paths/171 terminal names at split time) — suffix
+  defaults (*_hash/*_hashes ArtifactRef, *_digest NamedPayloadDigest)
+  overridden by an authored terminal-name exception table, one-line
+  rationale per row (spec_contract_hash, rust_type_hash,
+  canonicalization_policy_hash, executable/fingerprint families, …);
+  defect-suspect names (digest semantics under *_hash, conventionless
+  inputs) get Unresolved rows — .5.2's burn-down list; SPEC.md stays
+  untouched this unit. Tests (check_hash_* fns): real-SPEC totality (every
+  HashNamed row classifies), per-class counts, default + exception
+  spot-checks. Read: §1.2 hash conventions.
+  Test: `cargo test -p ckc-schema check_hash`
+- [ ] M0.0.3.4.5.2 hash-convention resolution + checker wiring. Burn down
+  every Unresolved row: reclassify with rationale where §1.2 already covers
+  the field, else correct SPEC.md per field (rename to convention suffix or
+  define the computation beside the field; mind hash-cascade radius, memory
+  2026-06-01) — expect spec-defect fallout; wire classify_hash_fields into
+  check_registry: Unresolved or unclassified path emits
+  referential_integrity_error. Tests: real SPEC + build_v0_registry clean
+  with empty Unresolved class; synthetic unclassified-suffix +
+  lingering-Unresolved perturbations reject. Read: §1.2 hash conventions +
+  each Unresolved field's S-decl context.
   Test: `cargo test -p ckc-schema check`
 - [ ] M0.0.3.4.6 producer-mapping checker. check.rs §3.2 reverse coverage:
   every SpecDecls.inventory payload named in a stage-producer TTable

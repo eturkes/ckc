@@ -254,7 +254,13 @@ technically derivable but easily forgotten under token pressure.
   expects spec-defect fallout (hash-field conventions, producer mapping)
   is its OWN unit; only table-free set-comparison families pair up.
   Calibration points: authored-table units ran 87% (.4.2), fallout-bearing
-  checker ran 82% (.3.3).
+  checker ran 82% (.3.3). Corollary (m0.0.3.4.5 split 1→2, user-directed
+  pre-implementation): a unit stacking BOTH patterns — authored table AND
+  spec-defect fallout — over a large surface (hash-named walk: 260 paths,
+  171 distinct terminal names) exceeds the window; split along the
+  SPEC-edit boundary (classify + author table, defects → Unresolved rows /
+  burn down Unresolved with SPEC corrections + wiring) so the
+  unpredictable-fallout half starts from a committed, bounded list.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no
@@ -288,6 +294,10 @@ technically derivable but easily forgotten under token pressure.
   identically. After writing any file that must contain literal
   backslash-escape text, verify with `grep -nP '\t'`/`cat -A` and patch via
   a python heredoc composing `chr(92)` explicitly.
+- [2026-06-07] A session closed leaving untracked scratch
+  (crates/ckc-schema/tests/tmp_dump.rs, a HashNamed-path dump probe). Run
+  `git status` before the closing commit and reconcile every stray path —
+  stage it, delete it, or gitignore it; scratch probes belong under /tmp.
 - [2026-06-01] Hash-record recurrence (the generic "verify against actual
   output" lesson alone did not prevent it): a fabricated placeholder short
   hash went into a roadmap line + commit message instead of the real commit
