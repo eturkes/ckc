@@ -1265,20 +1265,20 @@ mod tests {
         assert!(table.contains(SymbolKind::UnionAlternative, "JudgmentKind.SourceGraph"));
     }
 
-    /// Synthetic §13 block: duplicate schema under a divergent anchor,
+    /// Synthetic §97 block: duplicate schema under a divergent anchor,
     /// dangling field type, dangling string policy, dangling union
     /// alternatives, dangling `§`/`A.N` references. Issues stay sorted.
     #[test]
     fn check_duplicate_and_dangling_refs_reject() {
         let text = format!(
-            "{}\n## 13. Synthetic\n\n```text\nS SchemaRegistry(x:Id)\n\
+            "{}\n## 97. Synthetic\n\n```text\nS SchemaRegistry(x:Id)\n\
              S Dangle(a:NoSuchType,b:Text<no_such_policy>)\n\
              E BadUnion = ok:NoSuchPayload | Whoops\n```\n\nSee §99.9 and A.99.\n",
             spec_text()
         );
         let report = check_spec(&text);
         for needle in [
-            "duplicate schema `SchemaRegistry` declared under `1.1` and `13`",
+            "duplicate schema `SchemaRegistry` declared under `1.1` and `97`",
             "unresolved type `NoSuchType`",
             "unresolved string policy or sibling field `Text<no_such_policy>`",
             "unresolved type `NoSuchPayload`",
@@ -1294,7 +1294,7 @@ mod tests {
         }
         assert_eq!(report.issues.len(), 7);
         assert!(report.issues.windows(2).all(|w| w[0] <= w[1]));
-        assert!(report.issues.iter().all(|i| i.anchor == "13"));
+        assert!(report.issues.iter().all(|i| i.anchor == "97"));
     }
 
     /// Bijection perturbations: renaming one `E BuiltinName` variant breaks

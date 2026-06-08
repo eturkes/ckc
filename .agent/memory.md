@@ -385,6 +385,22 @@ technically derivable but easily forgotten under token pressure.
   consuming crate; cross-crate-shared diagnostics (Residual family) land in
   ckc-core. (M0.0.4/.5/.6 not yet built — planning inference from their
   roadmap lines; confirm the agreement API when M0.0.4 lands.)
+- [2026-06-08] A SPEC.md prose-only edit can break the implemented
+  spec-parsing checkers — run `cargo test --workspace` after any SPEC.md edit.
+  Two non-obvious couplings a token-efficiency compression pass tripped (both
+  easily forgotten under token pressure): (a) the §6.2 builtin-definition
+  parser (spec.rs) splits a co-defined line on the literal ` and ` separator
+  (commas occur inside definition prose, so splitting on commas is impossible),
+  so a global `and`->`,` substitution silently drops every builtin after the
+  first and breaks the BuiltinName<->§6.2-definition bijection under
+  T-Registry-Referential-Integrity; keep ` and ` joining co-defined builtins
+  (`normalize_context and ctx_compatible: §8.1.`). (b) check.rs
+  `check_duplicate_and_dangling_refs_reject` splices the real spec onto a
+  synthetic section block, so that block's section number must stay above the
+  spec's range (moved 13->97 when the spec gained a real §13; a real section
+  colliding with it emits a spurious duplicate section_anchor). Standalone
+  synthetic-spec tests that do not splice the real spec (build.rs, the §3.1
+  mini in check.rs) tolerate any number.
 
 ## Mistakes
 

@@ -1,14 +1,14 @@
 # CKC — Staged Proof-Carrying Compiler for Japanese Clinical Text Conflict Review
 
-Audience: autonomous coding, extraction, retrieval, formal-methods, compiler, verification, reporting, UI, evaluation, and assurance agents.
+Audience: autonomous coding, extraction, retrieval, formal-methods, compiler, verification, reporting, UI, evaluation, assurance agents.
 
-CKC is a staged, proof-carrying compiler for Japanese clinical text. It ingests permission-tracked source editions, constructs a byte-stable `SourceGraph`, admits deterministic semantic generators and finite resources, derives exact finite licensed readings, projects them into CKC Normal Form, checks the M0 conflict and factual-inconsistency predicates, and emits source-grounded review candidates with replayable certificates.
+CKC: ingests permission-tracked source editions, builds byte-stable `SourceGraph`, admits deterministic semantic generators + finite resources, derives exact finite licensed readings, projects to CKC Normal Form, checks M0 conflict + factual-inconsistency predicates, emits source-grounded review candidates + replayable certificates.
 
-M0 authority is limited to formalization-QA and clinical-text quality review. Clinical advice, patient-care authority, regulated CDS authority, SaMD authority, deployment claims, and production clinical language require `G-S3`.
+M0 authority: formalization-QA + clinical-text quality review only. Clinical/patient-care/regulated-CDS/SaMD/deployment/production-clinical-language authority requires `G-S3`.
 
-Durable M0 assets are schemas, canonical bytes, source graphs, source permissions, extraction manifests, mechanical observations, admitted generators, terminology resources, semantic policy sets, licensed reading sets, AIRCore records, CKC Normal Form objects, proof DAGs, M0 theorems, verifier witnesses, certificates, reports, replay manifests, and replay checks. Code is replaceable.
+Durable M0 assets: schemas, canonical bytes, source graphs + permissions, extraction manifests, mechanical observations, admitted generators, terminology resources, semantic policy sets, licensed reading sets, AIRCore records, CKC Normal Form objects, proof DAGs, M0 theorems, verifier witnesses, certificates, reports, replay manifests/checks. Code replaceable.
 
-The M0 semantic source of truth is:
+M0 semantic source of truth:
 
 ```text
 SourceGraph
@@ -20,13 +20,15 @@ SourceGraph
 + Certificate
 ```
 
-Natural-language rationales, prompts, retrieved passages, model outputs, and UI explanations are annotations. Japanese and English glosses are deterministic views with `authority = view_only`.
+NL rationales, prompts, retrieved passages, model outputs, UI explanations = annotations. Japanese/English glosses = deterministic views, `authority = view_only`.
 
-Notation. Structural declarations use these forms: `S Name(field:Type,field:Type?,fieldN:TypeN)` for records; `E Name = a | b | c` for enums, alias domains, and tagged unions; `E Name = tag:PayloadType | tag(field:Type,fieldN:TypeN) | bare_tag` for payload-bearing tagged unions, where `tag:PayloadType?` marks the tag's payload optional; `T C1 | C2` then rows `v1 | v2` for compact tables. Optional fields use `?`. Containers are `Set[T]`, `List[T]`, and `Map[K,V]`. A type expression `A|B` appears only inside a named `E` union or in prose that immediately names the corresponding union schema. `Text<P>` uses a statically declared `StringPolicy`; `Text<policy>` is a dependent text field whose sibling field named `policy:StringPolicy` supplies the normalization policy and whose dependency is recorded in `SchemaRegistry`. Dense punctuation is used only inside structural declarations, enum declarations, and compact tables. Prose, §6.2 grammar token spacing, canonical diagnostic-text templates, string-policy folds, and CLI command vectors keep ordinary significant spaces.
+Reusable set — `AcceptedGeneratorBase`, `TerminologyResourceSet`, `SemanticPolicySet` — = CKC optimization locus: describe corpus with fewest reusable components, each written/verified once then reused deterministically. M0 minimality descriptive only (§10); compression/reuse-payoff/MDL verdicts gated (`G-MDL`, `G-EMIN`); §13 frames optimization, IR design space, corpus scale, theoretical limits, open verification problem as research tracks not weakening the kernel.
+
+Notation. `S Name(field:Type,field:Type?,fieldN:TypeN)` records; `E Name = a | b | c` enums/alias domains/tagged unions; `E Name = tag:PayloadType | tag(field:Type,fieldN:TypeN) | bare_tag` payload-bearing tagged unions, `tag:PayloadType?` marks tag payload optional; `T C1 | C2` then rows `v1 | v2` compact tables. Optional `?`. Containers `Set[T]`, `List[T]`, `Map[K,V]`. Type expr `A|B` only inside named `E` union or prose immediately naming that union schema. `Text<P>` uses statically declared `StringPolicy`; `Text<policy>` = dependent text field whose sibling `policy:StringPolicy` supplies normalization policy, dependency recorded in `SchemaRegistry`. Dense punctuation only in structural/enum declarations + compact tables. Prose, §6.2 grammar token spacing, canonical diagnostic-text templates, string-policy folds, CLI command vectors keep significant spaces.
 
 ## 0. Agent operating contract
 
-Autonomous agents build CKC as a sequence of small, committed deliverables. Each session loads exactly the bounded reading slice named in §11.4 for its selected build unit, plus earlier accepted repository artifacts, implements that one deliverable, runs that deliverable’s acceptance gate, commits the artifacts, and ends. §11.4 is the authoritative loading rule; full-spec loading is reserved for specification-maintenance work. The next session relies on repository state and this specification.
+Agents build CKC as sequence of small committed deliverables. Each session: load §11.4 reading slice for its build unit + earlier accepted artifacts, implement that one deliverable, run its acceptance gate, commit, end. §11.4 = authoritative loading rule; full-spec loading reserved for spec-maintenance. Next session relies on repo state + this spec.
 
 Implementation invariants:
 
@@ -43,13 +45,13 @@ explicit residuals for unsupported constructions;
 calibrated evidence before empirical thresholds.
 ```
 
-Facts defined in a table are referenced by row key elsewhere. A later section cites the row key and treats the table row as the normative source.
+Facts defined in a table referenced by row key; later citation treats that row as normative source.
 
 ## 1. Canonical data model
 
 ### 1.1 Schema authority
 
-The executable schema authority for accepted artifacts is the repository `SchemaRegistry`.
+Executable schema authority for accepted artifacts = repo `SchemaRegistry`:
 
 ```text
 S SchemaRegistry(registry_id:Id,registry_version:Id,spec_contract_hash:Hash,rust_type_manifest_hash:Hash,generated_json_schema_manifest_hash:Hash,canonicalization_policy_hash:Hash,schema_bound_manifest_hash:Hash,schema_entries:Set[SchemaEntry],string_policy_bindings:Set[StringPolicyBinding],source_support_aliases:Set[SourceSupportAlias])
@@ -71,9 +73,9 @@ S SchemaCollectionBound(schema_id:Id,path:FeaturePath,max_items:UInt,overflow_di
 E BoundOverflowDisposition = reject_with_diagnostic | emit_residual | emit_ambiguity | emit_incoherence
 ```
 
-`canonicalization_policy_hash` stores the accepted `UnicodePolicyManifest` envelope `artifact_hash` (§1.4). The §1.5 canonical-bytes grammar is fixed by `spec_contract_hash`.
+`canonicalization_policy_hash` stores accepted `UnicodePolicyManifest` envelope `artifact_hash` (§1.4). §1.5 canonical-bytes grammar fixed by `spec_contract_hash`.
 
-`HandleBoundOverflow(bound, subject_hash, candidate_members, producer_id) -> invalid | residual | ambiguity | incoherence` is the total dispatch for every overflow of a `SchemaCollectionBound`. `candidate_members` is the canonical finite sequence considered for insertion into the bounded collection. The checker need only retain the first `bound.max_items + 1` members by `canonical_sort_key` to prove overflow; call this retained sequence `overflow_members`. `overflow_member_hash(x)` is `x.artifact_hash` for an enveloped artifact and otherwise `sha256(canonical_payload_bytes(x))`. `overflow_source_regions` is the canonical union of source-support projections of `subject_hash` and `overflow_members`; unresolved projections contribute `{}`. `overflow_proof_roots` is the canonical union of proof roots available from the same inputs. The canonical diagnostic text is exactly `bound_overflow schema=<schema_id> path=<feature_path> max=<max_items> observed=<observed_count> producer=<producer_id>`, where `<feature_path>` is `/` joined and `<observed_count> = |overflow_members|`.
+`HandleBoundOverflow(bound, subject_hash, candidate_members, producer_id) -> invalid | residual | ambiguity | incoherence` = total dispatch for every `SchemaCollectionBound` overflow. `candidate_members` = canonical finite sequence considered for insertion into bounded collection. Checker retains first `bound.max_items + 1` members by `canonical_sort_key` to prove overflow; = `overflow_members`. `overflow_member_hash(x)` = `x.artifact_hash` for enveloped artifact, else `sha256(type_tagged_payload_bytes(x))` (§1.5). `overflow_source_regions` = canonical union of source-support projections of `subject_hash` + `overflow_members`; unresolved projections contribute `{}`. `overflow_proof_roots` = canonical union of proof roots from same inputs. Canonical diagnostic text = exactly `bound_overflow schema=<schema_id> path=<feature_path> max=<max_items> observed=<observed_count> producer=<producer_id>`, `<feature_path>` `/`-joined, `<observed_count> = |overflow_members|`.
 
 ```text
 Bound overflow emission convention: every emitted Diagnostic uses subject_hash=subject_hash, source_regions=overflow_source_regions, text=canonical diagnostic text. reject_with_diagnostic emits only the diagnostic artifact and leaves the bounded-collection artifact absent.
@@ -84,15 +86,15 @@ emit_ambiguity | ambiguity | Ambiguity(class=multiple_readings,alternatives={ove
 emit_incoherence | incoherence | Incoherence(class=incompatible_generator_outputs,subject_hashes={subject_hash} ∪ {overflow_member_hash(m) | m in overflow_members},source_regions=overflow_source_regions,proof_roots=overflow_proof_roots) | bound_overflow_incoherence
 ```
 
-A schema-valid producer must call `HandleBoundOverflow` before accepting any collection whose declared `SchemaCollectionBound.max_items` is exceeded. Local bound objects that lack `BoundOverflowDisposition` must define their own dispatch at the consuming algorithm; absent such a definition is a registry error under `T-Registry-Referential-Integrity`.
+Schema-valid producer must call `HandleBoundOverflow` before accepting any collection exceeding declared `SchemaCollectionBound.max_items`. Local bound objects lacking `BoundOverflowDisposition` must define own dispatch at consuming algorithm; absent definition = registry error under `T-Registry-Referential-Integrity`.
 
-Rust types are the source for generated JSON Schema. This document is the design authority for creating and revising the registry. M0 is greenfield v0: accepted artifacts carry exactly the v0 field set. A schema revision is accepted when the Rust type hash, generated JSON Schema hash, canonicalization policy hash, and spec contract hash agree under `T-Schema-Equivalence`.
+Rust types = source for generated JSON Schema; this doc = design authority for creating/revising registry. M0 greenfield v0: accepted artifacts carry exactly v0 field set. Schema revision accepted when Rust type hash, generated JSON Schema hash, canonicalization policy hash, spec contract hash agree under `T-Schema-Equivalence`.
 
-`T-Schema-Equivalence` is the revision check: for each `SchemaEntry`, canonicalize the Rust type manifest, generated JSON Schema, union-alternative set, string-policy bindings, source-support aliases, collection bounds, and canonicalization policy; accept exactly when all hashes equal the `SchemaRegistry` fields and every changed field is covered by a new `schema_version`.
+`T-Schema-Equivalence` (revision check): per `SchemaEntry`, canonicalize Rust type manifest, generated JSON Schema, union-alternative set, string-policy bindings, source-support aliases, collection bounds, canonicalization policy; accept iff all hashes equal `SchemaRegistry` fields and every changed field covered by new `schema_version`.
 
-When prose notation, Rust types, and generated JSON Schema differ during implementation, the acceptance gate uses the current `SchemaRegistry` and emits `schema_authority_mismatch`.
+When prose notation, Rust types, generated JSON Schema differ during implementation, acceptance gate uses current `SchemaRegistry`, emits `schema_authority_mismatch`.
 
-`T-Registry-Referential-Integrity` is the total registry check:
+`T-Registry-Referential-Integrity` (total registry check):
 
 ```text
 1 Build a symbol table from every schema_id, enum name, enum variant, tagged-union alternative,
@@ -112,26 +114,26 @@ When prose notation, Rust types, and generated JSON Schema differ during impleme
 
 ### 1.2 Artifact envelope
 
-Every accepted payload is stored in an artifact envelope.
+Every accepted payload stored in artifact envelope:
 
 ```text
 S ArtifactEnvelope<T>(artifact_hash:Hash,schema_id:Id,schema_version:Id,schema_hash:Hash,canonicalization_policy_hash:Hash,producer_manifest_hash:Hash,replay_manifest_hash:Hash,accepted_effect_row:Set[Effect],payload:T)
 ```
 
-`artifact_hash = sha256(canonical_payload_bytes(payload))`. The envelope’s `artifact_hash` field is outside the payload hash input. The content-addressed store path is derived from `artifact_hash`.
+`artifact_hash = sha256(canonical_payload_bytes(payload))`. Envelope `artifact_hash` field outside payload hash input. Store path derived from `artifact_hash`.
 
-Hash-valued field convention: a field named `*_hash` or `*_hashes` that points at an accepted artifact stores the referenced envelope `artifact_hash`. A field named `*_digest` stores `sha256(canonical_payload_bytes(named_payload))` with the named payload defined beside the field. A hash field whose input is raw source bytes, executable bytes, an external manifest, or an index fingerprint stores `sha256(exact_recorded_bytes)` together with the manifest that supplies those bytes. A schema entry with a hash-valued field and no applicable convention or field-specific computation is invalid under `T-Registry-Referential-Integrity`.
+Hash-valued field convention: `*_hash`/`*_hashes` pointing at accepted artifact stores referenced envelope `artifact_hash`. `*_digest` stores `sha256(canonical_payload_bytes(named_payload))`, named payload defined beside field. Hash field whose input = raw source/executable bytes/external manifest/index fingerprint stores `sha256(exact_recorded_bytes)` + manifest supplying those bytes. Schema entry with hash-valued field and no applicable convention or field-specific computation = invalid under `T-Registry-Referential-Integrity`.
 
-Every accepted envelope contains `accepted_effect_row`; accepted semantic envelopes use `{}`. A payload-level `accepted_effect_row`, when present, must equal the envelope value.
+Every accepted envelope contains `accepted_effect_row`; accepted semantic envelopes use `{}`. Payload-level `accepted_effect_row`, when present, = envelope value.
 
-Every semantically derived accepted payload exposes proof roots and source support either by the canonical field names below or by one schema-defined alias in the alias table. The alias is proof-visible and is treated as the canonical source-support projection for that schema.
+Every semantically derived accepted payload exposes proof roots + source support via canonical field names below or one schema-defined alias. Alias proof-visible, = canonical source-support projection for that schema.
 
 ```text
 proof_roots: Set[ProofId]
 source_support: Set[RegionId]
 ```
 
-Source-support alias rows use these fixed field-name defaults unless a row names a narrower `FeaturePath`:
+Alias rows use these fixed field-name defaults unless row names narrower `FeaturePath`:
 
 ```text
 source_region_id                  -> singleton_region
@@ -143,9 +145,9 @@ subject_hash                      -> inherited_subject
 closed_members                    -> closed_region_members
 ```
 
-`singleton_region` projects one `RegionId`; `region_set` projects `Set[RegionId]`; `inherited_subject` resolves the referenced artifact and uses its canonical support projection; `closed_region_members` resolves through the owning `SourceRegion.region_id`.
+`singleton_region` projects one `RegionId`; `region_set` projects `Set[RegionId]`; `inherited_subject` resolves referenced artifact + uses its canonical support projection; `closed_region_members` resolves through owning `SourceRegion.region_id`.
 
-A schema that has neither a canonical source-support field nor a registered alias must have `SchemaEntry.schema_role` in `{source_only,schema_control,replay_control,environment_control,admission_control,evidence_discovery,view_only,proof_structure}`; otherwise `T-Registry-Referential-Integrity` rejects it. `proof_structure` marks kernel/proof payloads whose source support is proof-DAG-inherited (`ProofNode.support_digest`) rather than payload-projected.
+Schema with neither canonical source-support field nor registered alias must have `SchemaEntry.schema_role` in `{source_only,schema_control,replay_control,environment_control,admission_control,evidence_discovery,view_only,proof_structure}`; else `T-Registry-Referential-Integrity` rejects. `proof_structure` marks kernel/proof payloads with proof-DAG-inherited source support (`ProofNode.support_digest`), not payload-projected.
 
 ### 1.3 Scalars
 
@@ -165,7 +167,7 @@ List[T]     finite ordered collection
 Map[K,V]    finite map encoded by canonical key order
 ```
 
-Accepted payloads use JSON objects, arrays, strings, and booleans. Integers and rationals are encoded as strings or typed objects. Optional fields are represented by omission. Union alternatives are represented by tagged objects.
+Accepted payloads use JSON objects, arrays, strings, booleans. Integers/rationals = strings or typed objects. Optional fields = omission. Union alternatives = tagged objects.
 
 ```text
 S Rational(num:Int,den:UInt)
@@ -182,7 +184,7 @@ percent values are converted exactly by denominator multiplication by 100;
 quantities, thresholds, units, metrics, and scores that affect accepted semantics use Rational.
 ```
 
-JSON numeric tokens are reserved for nonsemantic adapter-local files.
+JSON numeric tokens reserved for nonsemantic adapter-local files.
 
 ### 1.4 String policies
 
@@ -254,11 +256,11 @@ view_text:
 S UnicodePolicyManifest(manifest_id:Id,unicode_version:Text<identifier_ascii>,normalization_table_hash:Hash,punctuation_table_hash:Hash,policy_test_hash:Hash)
 ```
 
-`T-Unicode-Idempotency` checks that every string policy is idempotent and byte-stable.
+`T-Unicode-Idempotency` checks every string policy is idempotent + byte-stable.
 
 ### 1.5 Canonical JSON bytes
 
-Canonical payload bytes are produced by this serializer:
+Canonical payload bytes serializer:
 
 ```text
 object:
@@ -296,11 +298,11 @@ tagged union:
   constructor tags are unique within the union schema.
 ```
 
-Canonicalization is type-guided. Schema validation rejects duplicate object fields, unknown required fields, JSON nulls, JSON numeric tokens in accepted semantic payloads, duplicate map keys, and duplicate union tags. `canonical_payload_bytes` is a deterministic injection over schema-valid typed payloads because record field names, union tags, collection encodings, string policies, exact integer/rational encodings, and optional-field omission are fixed by schema.
+Canonicalization type-guided. Schema validation rejects: duplicate object fields, unknown required fields, JSON nulls, JSON numeric tokens in accepted semantic payloads, duplicate map keys, duplicate union tags. `canonical_payload_bytes` = deterministic injection over schema-valid payloads of one declared type (field names, union tags, collection encodings, string policies, exact integer/rational encodings, optional-field omission all schema-fixed). Not injective across types: records carry no type tag, so field-isomorphic schemas (`PredAtom`/`NegPredAtom`, `MatchClassVar`/`VarTerm`, `RegionOfTerm`/`BoundAddress`/`TermValue`, `TableRowReading`/`NFDecisionRow`) share bytes for equal field values. Cross-type identity always via `canonical_sort_key`; `declared_type_id` prefix discriminates.
 
-`canonical_sort_key(x) = (declared_type_id, canonical_payload_bytes(x))` for inline values, where `declared_type_id` is the `SchemaRegistry` `symbol_id` of the value's declared type. Accepted object references sort by referenced `artifact_hash`, then `schema_id`, then declared reference field name.
+`canonical_sort_key(x) = (declared_type_id, canonical_payload_bytes(x))` inline; `declared_type_id` = `SchemaRegistry` `symbol_id` of declared type. Accepted object references sort by referenced `artifact_hash`, then `schema_id`, then declared reference field name. `type_tagged_payload_bytes(x)` = canonical encoding of `(declared_type_id, canonical_payload_bytes(x))`; any inline (non-enveloped) value hashed for cross-type identity or dedup uses `sha256(type_tagged_payload_bytes(x))` not `sha256(canonical_payload_bytes(x))`, so field-isomorphic payloads of different types never collide.
 
-Tie-breaking for deterministic operations uses this priority order:
+Tie-break priority order (deterministic operations):
 
 ```text
 1 declared semantic key;
@@ -310,14 +312,14 @@ Tie-breaking for deterministic operations uses this priority order:
 5 schema_id.
 ```
 
-`source_order_key` is:
+`source_order_key`:
 
 ```text
 (source_edition_hash, page_or_zero, reading_order, bbox_top, bbox_left,
  bbox_bottom, bbox_right, node_id, char_start, char_end, anchor_id)
 ```
 
-Missing source-order fields use the type’s canonical minimum value and retain an extraction diagnostic.
+Missing source-order fields use the type's canonical minimum and retain an extraction diagnostic.
 
 ### 1.6 Replay manifests
 
@@ -337,7 +339,7 @@ S EnvironmentProfile(profile_id:Id,os_family:Id,architecture:Id,locale_policy:Te
 S ValidationManifest(manifest_id:Id,validator_id:Id,validated_artifact_hashes:Set[Hash],check_ids:Set[Id],diagnostic_hashes:Set[Hash],replay_manifest_hash:Hash)
 ```
 
-Replay identity compares a well-founded issuance stratum of canonical payload hashes, envelope fields, proof roots, certificate hashes, report hashes, and replay-check hashes. Wall-clock timestamps are evidence metadata with `Effect = Clock`; accepted semantic replay uses logical time. A `ReplayManifest.expected_output_hashes` set names one closed prior stratum. It excludes the manifest payload itself, excludes any artifact whose payload or envelope `replay_manifest_hash` equals that manifest hash, excludes the enclosing `ReplayIdentityCheck` payload, and excludes every `Certificate` whose `replay_identity_hashes` contains that enclosing check. Payload and envelope `replay_manifest_hash` fields therefore name lower-stratum producer manifests; audit manifests that list output hashes are referenced by the subsequent `ReplayIdentityCheck`. A later stratum may certify the replay check. For the demo, `RM-PRODUCER-BASE` is the lower-stratum producer manifest used by emitted artifacts, `RM-DEMO-CORE` audits outputs through `ReviewReport` and all certificates except `report_replay`, `RIC-DEMO-CORE` checks that set, and `CERT-report_replay` then references the report and `RIC-DEMO-CORE`. Appendix A.10 enumerates the outer fixture inventory and remains the replay authority for `ckc demo m0`.
+Replay identity compares a well-founded issuance stratum of: canonical payload hashes, envelope fields, proof roots, certificate hashes, report hashes, replay-check hashes. Wall-clock timestamps = evidence metadata, `Effect = Clock`; accepted replay uses logical time. `ReplayManifest.expected_output_hashes` names one closed prior stratum, excluding: the manifest payload; any artifact whose payload/envelope `replay_manifest_hash` = that manifest hash; the enclosing `ReplayIdentityCheck` payload; every `Certificate` whose `replay_identity_hashes` contains that check. `replay_manifest_hash` names lower-stratum producer manifests; audit manifests listing output hashes are referenced by the later `ReplayIdentityCheck`; a later stratum may certify the check. Demo: `RM-PRODUCER-BASE` = producer manifest for emitted artifacts; `RM-DEMO-CORE` audits outputs through `ReviewReport` and all certificates except `report_replay`; `RIC-DEMO-CORE` checks that set; `CERT-report_replay` references the report and `RIC-DEMO-CORE`. A.10 enumerates the outer fixture inventory, replay authority for `ckc demo m0`.
 
 `ReplayIdentity` is total:
 
@@ -356,7 +358,7 @@ Replay identity compares a well-founded issuance stratum of canonical payload ha
 
 ### 1.7 Total-function convention
 
-Every operation that consumes accepted bytes is a total deterministic function over schema-valid canonical payloads. It must return exactly one of these named outcomes:
+Every operation consuming accepted bytes = total deterministic function over schema-valid canonical payloads. Returns exactly one named outcome:
 
 ```text
 success(value_hashes)
@@ -367,27 +369,27 @@ unsupported(diagnostic_hashes)
 invalid(diagnostic_hashes)
 ```
 
-`OperationResult[T]` is the typed implementation generic for this convention:
+`OperationResult[T]` = typed implementation generic:
 
 ```text
 E OperationResult[T] = success:List[T] | residual:Set[Hash] | ambiguity:Set[Hash] | incoherence:Set[Hash] | unsupported:Set[Hash] | invalid:Set[Hash]
 ```
 
-`success` carries one or more canonical values or accepted payload hashes of type `T`; the other variants carry the hashes named above. The persisted `Outcome` enum uses `ok` for `success` and the same names for non-success statuses. Any function body that can call `HandleBoundOverflow` must either return `OperationResult[T]` or map the overflow status to one of its explicitly declared variants before returning.
+`success` carries ≥1 canonical values or accepted payload hashes of type `T`; other variants carry hashes above. Persisted `Outcome` uses `ok` for `success`, same names otherwise. Any body that can call `HandleBoundOverflow` must return `OperationResult[T]` or map the overflow status to a declared variant before returning.
 
-The outcome order for selecting one primary status from multiple emitted facts is:
+Primary-status selection order from multiple emitted facts:
 
 ```text
 invalid > incoherence > unsupported > ambiguity > residual > success
 ```
 
-All emitted residuals, ambiguities, incoherences, and diagnostics are artifacts with canonical bytes. Algorithms may emit several non-success artifacts, but they must choose the primary status by the fixed order above and sort emitted artifact hashes by `canonical_sort_key`. A schema error is `invalid`; a schema-valid but outside-M0 construction is `unsupported` or a typed residual; a semantic collision in accepted inputs is `incoherence`; multiple admissible interpretations are `ambiguity`; absence of a required license, policy, permission, evidence object, or counterexample suite is a typed `Residual`.
+All emitted residuals/ambiguities/incoherences/diagnostics are artifacts with canonical bytes. Algorithms may emit several non-success artifacts but pick primary status by the fixed order and sort emitted hashes by `canonical_sort_key`. Schema error = `invalid`; schema-valid but outside-M0 = `unsupported` or typed residual; semantic collision in accepted inputs = `incoherence`; multiple admissible interpretations = `ambiguity`; absent required license/policy/permission/evidence object/counterexample suite = typed `Residual`.
 
-Every accepted algorithm depends only on canonical bytes, sorted enumerations, declared inputs, and recorded manifests; map iteration order, thread interleaving, wall-clock time, random seeds, locale, platform floating-point behavior, and external service state enter only as proposal or gated evidence metadata. Accepted semantic replay excludes those metadata dependencies.
+Every accepted algorithm depends only on canonical bytes, sorted enumerations, declared inputs, recorded manifests; map iteration order, thread interleaving, wall-clock time, random seeds, locale, platform float behavior, external service state enter only as proposal/gated evidence metadata. Accepted semantic replay excludes those metadata dependencies.
 
 ## 2. Canonical vocabulary
 
-This section is the canonical definition location for shared CKC vocabulary. Schema-local enums are defined once at their consuming schema site.
+Canonical definition location for shared CKC vocabulary. Schema-local enums defined once at their consuming site.
 
 ```text
 E Effect = Inference | Extract | Verify | Compile | IO | Network | Clock
@@ -448,42 +450,42 @@ E IncoherenceClass = functional_key_collision | mutually_exclusive_term_mapping 
 Gate names are canonical:
 
 ```text
-E Gate = G-EXTRACTOR-ADAPTER | G-RET-PARITY | G-PORTFOLIO | G-AIR-FULL | G-REBIND | G-EMIN | G-MDL | G-SELF-IMPROVE | G-PROB | G-WORLD-MODEL | G-LIVE-PATIENT | G-S3
+E Gate = G-EXTRACTOR-ADAPTER | G-RET-PARITY | G-PORTFOLIO | G-AIR-FULL | G-REBIND | G-EMIN | G-MDL | G-RUNTIME-ORACLE | G-SELF-IMPROVE | G-PROB | G-WORLD-MODEL | G-LIVE-PATIENT | G-S3
 ```
 
 ### 2.1 Shared vocabulary consumers
 
-Every shared enum variant reaches M0 through an emitting or consuming site. Variants outside this table are local to the schema section that defines them and carry their consumer immediately beside that schema.
+Every shared enum variant reaches M0 via an emitting/consuming site. Variants outside this table are local to their defining schema section, carrying their consumer beside that schema.
 
 ```text
 T Vocabulary | M0 consumer or emitter
-Effect | Proposal, replay, and admission records carry all declared effects; accepted semantic payloads discharge to {} under §6.4 and certificates check the discharge in §9.2.
-Authority | Source, mechanical, admitted, compiler, verifier, evidence-discovery, and view artifacts carry the matching authority field at their defining schema.
-SourceClass | Source ingestion emits it; §8.6 consumes guideline and package_insert; metadata and report paths preserve other.
-SourceNodeKind and SourceEdgeKind | SourceGraph construction emits them; §4.3 closure and §7.2 matching consume them for regions, table headers, captions, footnotes, continuations, and cross-references.
-GeneratorProfile | §7.1 dispatches obs_pattern, term_resource, sem_rule, bridge, residual, and gloss generators at their declared stages.
+Effect | Proposal/replay/admission records carry all declared effects; accepted semantic payloads discharge to {} per §6.4; certificates check discharge in §9.2.
+Authority | Source, mechanical, admitted, compiler, verifier, evidence-discovery, view artifacts carry matching authority field at defining schema.
+SourceClass | Source ingestion emits; §8.6 consumes guideline, package_insert; metadata/report paths preserve other.
+SourceNodeKind and SourceEdgeKind | SourceGraph construction emits; §4.3 closure and §7.2 matching consume for regions, table headers, captions, footnotes, continuations, cross-references.
+GeneratorProfile | §7.1 dispatches obs_pattern, term_resource, sem_rule, bridge, residual, gloss generators at declared stages.
 AirType | §6.3 AIR keys type the eight reading kinds; §7.3 finite-set identity consumes every demanded key.
-BindingStatus | §5.2 consumes exact, synonym, ambiguous, and unmapped in terminology closure, ambiguity, and residual construction.
-TerminologyRelationKind | §5.2 consumes exact, synonym, unit_equivalent, section_equivalent, action_kind_equivalent, and mutually_exclusive; §8.2 consumes contraindication_target through ActionTargetRelation rows.
-Direction | §8.3 direction groups, §8.5 conflict predicates, §8.6 package-insert factual predicates, and §7.5 gloss rendering consume all six directions.
-ClaimTier | §3.4 computes S0-S3; §9.1 and §9.2 check theorem and certificate claim records.
-M0CertificateClass | §9.2 defines one certificate verification obligation for each class.
-VerifierResult | §9.1 emits valid, invalid, and unsupported.
-ReplayIdentityOutcome | §1.6 replay emits all outcomes; §8.6 consumes replay_identity_mismatch.
-Outcome | Closure, AIRCore, admission, generator evaluation, and diagnostics consume ok plus every non-success status.
-ReviewClassification | §8.7 and §9.3 report construction consume all classifications.
-ConflictKind and FactualInconsistencyKind | §8.5 and §8.6 define the unique theorem builder for each kind.
-ResidualClass | §7.3 emits no_license; §6.2 and §8.1 emit unsupported_construction; §4.3 emits unsupported_cross_reference and unsupported_table_structure; §5.2 emits missing_terminology; §5.3, §8.2, §8.3, and §8.6 emit missing_policy; §6.4 emits missing_counterexample_suite; §4.1 and §9.3 emit permission_limited; §4.2 emits extraction_uncertain; §9.1 emits verifier_unsupported; §3.3 and §12 emit deferred_gate_required.
+BindingStatus | §5.2 consumes exact, synonym, ambiguous, unmapped in terminology closure, ambiguity, residual.
+TerminologyRelationKind | §5.2 consumes exact, synonym, unit_equivalent, section_equivalent, action_kind_equivalent, mutually_exclusive; §8.2 consumes contraindication_target via ActionTargetRelation rows.
+Direction | §8.3 direction groups, §8.5 conflict predicates, §8.6 package-insert factual predicates, §7.5 gloss rendering consume all six.
+ClaimTier | §3.4 computes S0-S3; §9.1, §9.2 check theorem and certificate claim records.
+M0CertificateClass | §9.2 defines one certificate verification obligation per class.
+VerifierResult | §9.1 emits valid, invalid, unsupported.
+ReplayIdentityOutcome | §1.6 replay emits all; §8.6 consumes replay_identity_mismatch.
+Outcome | Closure, AIRCore, admission, generator evaluation, diagnostics consume ok plus every non-success status.
+ReviewClassification | §8.7 and §9.3 report construction consume all.
+ConflictKind and FactualInconsistencyKind | §8.5 and §8.6 define the unique theorem builder per kind.
+ResidualClass | §7.3 emits no_license; §6.2 and §8.1 emit unsupported_construction; §4.3 emits unsupported_cross_reference and unsupported_table_structure; §5.2 emits missing_terminology; §5.3, §8.2, §8.3, §8.6 emit missing_policy; §6.4 emits missing_counterexample_suite; §4.1 and §9.3 emit permission_limited; §4.2 emits extraction_uncertain; §9.1 emits verifier_unsupported; §3.3 and §12 emit deferred_gate_required.
 AmbiguityClass | §7.3 emits multiple_readings; §5.2 emits multiple_terms.
-IncoherenceClass | §5.2 emits functional_key_collision, mutually_exclusive_term_mapping, and endpoint-form incompatible_generator_outputs; §5.3 and §8.2 emit incompatible_generator_outputs.
-Gate | §3.3 defines the trigger and evidence object for each gate; §12 consumes every gate through GateEvidenceRef.
+IncoherenceClass | §5.2 emits functional_key_collision, mutually_exclusive_term_mapping, endpoint-form incompatible_generator_outputs; §5.3 and §8.2 emit incompatible_generator_outputs.
+Gate | §3.3 defines the trigger and evidence object per gate; §12 consumes every gate through GateEvidenceRef.
 ```
 
 ## 3. M0 scope, stages, gates, and claim tiers
 
 ### 3.1 M0 pipeline
 
-M0 delivers deterministic review candidates for the five M0 conflict kinds and five M0 factual-inconsistency kinds in §2.
+M0 = deterministic review candidates for the five M0 conflict kinds and five M0 factual-inconsistency kinds (§2).
 
 ```text
 SourceEdition
@@ -505,7 +507,7 @@ SourceEdition
 -> ReplayIdentityCheck
 ```
 
-M0 required artifact payloads use this inclusion criterion: every payload that is emitted by an M0 canonical command, consumed by a later M0 command, referenced from a certificate, or controls schema, replay, admission, environment, or validation is listed here. Evidence objects deferred behind §3.3 gates are listed in §12.
+Inclusion criterion for required artifact payloads: every payload emitted by an M0 canonical command, consumed by a later M0 command, referenced from a certificate, or controlling schema/replay/admission/environment/validation. Evidence objects deferred behind §3.3 gates: see §12.
 
 ```text
 SchemaRegistry
@@ -606,9 +608,9 @@ Stage  80: residuals, ambiguities, incoherences, and coverage diagnostics.
 Stage  90: finite-checker witnesses, certificates, reports, replay identity, and demo orchestration.
 ```
 
-Generator stages are strictly stratified. A generator may read license, terminology-closure, and resolution-theorem premises only from lower stages. Kernel stages 50 and 90 are implemented by fixed compiler functions.
+Generator stages strictly stratified. A generator reads license, terminology-closure, resolution-theorem premises only from lower stages. Kernel stages 50, 90 = fixed compiler functions.
 
-Stage producers are fixed:
+Stage producers fixed:
 
 ```text
 T Stage | Producing operation | Generator profiles or builders | Emitted accepted artifacts
@@ -640,33 +642,34 @@ T Stage | Producing operation | Generator profiles or builders | Emitted accepte
 90 | DemoM0 | fixture orchestrator | Appendix A accepted artifact inventory
 ```
 
-`BuildTerminologyClosure` and `BuildDiagnostics` are named CloseM0-internal suboperations: their canonical user-facing command is `ckc close`, and they also have direct test harness entry points inside their owning build units. `SemanticPolicySet` is accepted only through `DischargeProposal`; CloseM0 reads the admitted artifact through `ClosureInput.semantic_policy_set_hash` and does not produce another `SemanticPolicySet`. `CloseM0` and `DemoM0` are orchestration operations at stage 90; semantic artifacts inside their output retain the numeric stage of the producing suboperation. A stage may read only artifacts from earlier stages except for the fixed stage-50 and stage-90 kernel builders, which read completed finite snapshots by hash. Same-stage recursion is invalid. Admission and proposal trace artifacts (`ProposalProvenanceManifest`, `ProposalRecord`, `RetrievalProposalTrace`, `CounterexampleSuite`, `MaterializedConsequenceManifest`, `AdmissionRecord`, and `EffectDischargeRecord`) are accepted replay-control artifacts emitted by `DischargeProposal` before the stage that consumes the admitted subject; they are included in replay output sets but are not recursive semantic stage inputs unless an accepted artifact explicitly references their hash.
+`BuildTerminologyClosure`, `BuildDiagnostics` = CloseM0-internal suboperations: canonical command `ckc close`, plus direct test-harness entry points in owning build units. `SemanticPolicySet` accepted only via `DischargeProposal`; CloseM0 reads it through `ClosureInput.semantic_policy_set_hash`, produces no new `SemanticPolicySet`. `CloseM0`, `DemoM0` = stage-90 orchestration; semantic artifacts in their output retain producing suboperation's numeric stage. A stage reads only earlier-stage artifacts except fixed stage-50/90 kernel builders, which read completed finite snapshots by hash. Same-stage recursion invalid. Admission/proposal trace artifacts (`ProposalProvenanceManifest`, `ProposalRecord`, `RetrievalProposalTrace`, `CounterexampleSuite`, `MaterializedConsequenceManifest`, `AdmissionRecord`, `EffectDischargeRecord`) = accepted replay-control artifacts emitted by `DischargeProposal` before the consuming stage; included in replay output sets but not recursive semantic stage inputs unless an accepted artifact references their hash.
 
-Cross-cutting control emissions are fixed. `ProducerManifest` is emitted by each canonical command wrapper and has the same stage as the wrapped operation. `ValidationManifest` is emitted by each acceptance-gate runner and has the same stage as the validated operation; the demo emits the schema, runtime-manifest, fixture-manifest, policy-admission, closure, verifier, report, and replay validation manifests named in Appendix A.10. `ToolchainManifest` and `EnvironmentProfile` are authored inputs accepted by `ValidateRuntimeManifests`, and `ToolRecord` rows are accepted environment-control rows within `ToolchainManifest`. `FiniteFixtureManifest` is an authored input accepted by `LoadFiniteFixtureManifest`, and its `FrozenConstant`, `ParsedQuantity`, and `DiagnosticTag` rows are accepted fixture-control rows within that manifest. Semantic-policy duplicate-key quarantine validation is performed when `DischargeProposal` accepts a `SemanticPolicySet` candidate; the policy-admission `ValidationManifest.diagnostic_hashes` records quarantined keys and diagnostics.
+Cross-cutting control emissions fixed. `ProducerManifest`: emitted by each canonical command wrapper, same stage as wrapped op. `ValidationManifest`: emitted by each acceptance-gate runner, same stage as validated op; demo emits the schema, runtime-manifest, fixture-manifest, policy-admission, closure, verifier, report, replay validation manifests (Appendix A.10). `ToolchainManifest`, `EnvironmentProfile` = authored inputs accepted by `ValidateRuntimeManifests`; `ToolRecord` rows = accepted environment-control rows within `ToolchainManifest`. `FiniteFixtureManifest` = authored input accepted by `LoadFiniteFixtureManifest`; its `FrozenConstant`, `ParsedQuantity`, `DiagnosticTag` rows = accepted fixture-control rows within it. Semantic-policy duplicate-key quarantine validation runs when `DischargeProposal` accepts a `SemanticPolicySet` candidate; policy-admission `ValidationManifest.diagnostic_hashes` records quarantined keys and diagnostics.
 
-Every valid §3.1 payload names at least one producing or accepting operation in this §3.2 stage-producer table or in the cross-cutting control-emission rule above. A missing mapping emits `producer_mapping_error` under `T-Registry-Referential-Integrity`.
+Every valid §3.1 payload names ≥1 producing/accepting operation in this §3.2 stage-producer table or the cross-cutting control-emission rule. Missing mapping emits `producer_mapping_error` under `T-Registry-Referential-Integrity`.
 
 ### 3.3 Gates
 
-This table is the canonical gate definition. Each gated capability is represented in M0 only by its trigger, named evidence object, and claim boundary.
+Canonical gate definition. Each gated capability in M0 = trigger + named evidence object + claim boundary.
 
 ```text
 T Gate | Trigger | Required evidence object | Claims enabled
-G-EXTRACTOR-ADAPTER | A source extraction adapter changes SourceGraph-affecting output. | ExtractorAdapterRecord | extractor soundness for the declared source profile
-G-RET-PARITY | Retrieval quality, dense retrieval, late interaction, reranking, graph retrieval, or non-oracle retrieval is claimed. | RetrievalParityReport | retrieval-quality claims
-G-PORTFOLIO | Independent backend agreement is claimed. | VerifierPortfolioReport | portfolio verification claims
-G-AIR-FULL | A non-identity AIR abstraction domain is accepted. | AIRDomainRecord | abstract-interpretation claims beyond finite-set identity
-G-REBIND | Proof transport across source editions is claimed. | RebindingEvidence | rebinding claims
-G-EMIN | Coverage, compression, generator-reuse, or scientific efficacy claims are made. | BenchmarkRelease and EMinReport | S2 research measurements
-G-MDL | MDL, Pareto, or compression-payoff optimization claims are made. | MDLEvidence | calibrated compression/payoff claims
+G-EXTRACTOR-ADAPTER | Source extraction adapter changes SourceGraph-affecting output. | ExtractorAdapterRecord | extractor soundness for declared source profile
+G-RET-PARITY | Retrieval quality, dense retrieval, late interaction, reranking, graph retrieval, or non-oracle retrieval claimed. | RetrievalParityReport | retrieval-quality claims
+G-PORTFOLIO | Independent backend agreement claimed. | VerifierPortfolioReport | portfolio verification claims
+G-AIR-FULL | Non-identity AIR abstraction domain accepted. | AIRDomainRecord | abstract-interpretation claims beyond finite-set identity
+G-REBIND | Proof transport across source editions claimed. | RebindingEvidence | rebinding claims
+G-EMIN | Coverage, compression, generator-reuse, or scientific efficacy claims made. | BenchmarkRelease and EMinReport | S2 research measurements
+G-MDL | MDL, Pareto, or compression-payoff optimization claims made. | MDLEvidence | calibrated compression/payoff claims
+G-RUNTIME-ORACLE | Layered IR pipeline, intermediate-IR layering, between-layer model call, or runtime (non-development-time) model pipeline benchmarked/claimed to improve natural-language-to-target fidelity. | RuntimeOracleReport | layered-pipeline / runtime-oracle fidelity claims
 G-SELF-IMPROVE | Automated improvement modifies accepted generators, resources, passes, or policies. | SelfImprovementEvidence | proof-carrying self-improvement claims
 G-PROB | Probabilistic facts, risks, weights, stochastic transitions, or rewards affect accepted outputs. | ProbabilisticProfileRecord | probabilistic claims
 G-WORLD-MODEL | World-model, latent-state, image-derived, or multimodal observations affect accepted outputs. | WorldModelProfileRecord | world-model or multimodal claims
 G-LIVE-PATIENT | Live or deidentified patient data enters CKC. | GovernedPatientDataProfile | patient-data handling claims
-G-S3 | Clinical, regulatory, patient-care, CDS, SaMD, or deployment authority is claimed. | S3AssuranceEvidence | clinical/regulatory authority
+G-S3 | Clinical, regulatory, patient-care, CDS, SaMD, or deployment authority claimed. | S3AssuranceEvidence | clinical/regulatory authority
 ```
 
-Gate diagnostics preserve all accepted S0/S1 artifacts whose replay and proof checks remain valid. When a §3.3 trigger is present and the required evidence object is absent, the gate checker emits `Residual(class=deferred_gate_required)` with a `GateEvidenceRef`-shaped diagnostic stub.
+Gate diagnostics preserve all accepted S0/S1 artifacts whose replay and proof checks stay valid. §3.3 trigger present + required evidence object absent → gate checker emits `Residual(class=deferred_gate_required)` with a `GateEvidenceRef`-shaped diagnostic stub.
 
 ### 3.4 Claim tiers
 
@@ -685,15 +688,15 @@ S3:
   The deployment profile has gated clinical/regulatory assurance evidence.
 ```
 
-Allowed M0 wording is: `candidate`, `review candidate`, `formalization-QA`, `text-quality analysis`, `source-grounded`, `proof-carrying`, `replayable`, `licensed by admitted generators`, and `requires human adjudication`.
+Allowed M0 wording: `candidate`, `review candidate`, `formalization-QA`, `text-quality analysis`, `source-grounded`, `proof-carrying`, `replayable`, `licensed by admitted generators`, `requires human adjudication`.
 
-Every report phrase using this vocabulary is emitted from an admitted template literal part under §9.3. The wording gate checks template literal IDs and renderer provenance rather than arbitrary free text. S2 wording requires `G-EMIN` or `G-MDL` evidence as applicable. S3 wording requires `G-S3` evidence.
+Each report phrase using this vocabulary emitted from an admitted template literal part (§9.3). Wording gate checks template literal IDs + renderer provenance, not free text. S2 wording requires `G-EMIN`, `G-MDL`, or `G-RUNTIME-ORACLE` evidence as applicable. S3 wording requires `G-S3` evidence.
 
 ```text
 S ClaimRecord(claim_id:Id,subject_hash:Hash,tier:ClaimTier,evidence_hashes:Set[Hash],falsification_criterion:Text<diagnostic_text>,wording_gate_result:Outcome)
 ```
 
-`T-Claim-Tiering` computes the strongest tier supported by present evidence:
+`T-Claim-Tiering` = strongest tier supported by present evidence:
 
 ```text
 1 S0 holds when replay identity passes and all proof roots check.
@@ -707,7 +710,7 @@ S ClaimRecord(claim_id:Id,subject_hash:Hash,tier:ClaimTier,evidence_hashes:Set[H
 
 ### 3.5 Source-corpus method disposition
 
-Canonical map: each row assigns one corpus unit one slot. `m=m0_core` means core realization by cited sections; `d=deferred_contract` means only through the named §12 gate; `x=scope_excluded` means clinical/regulatory/deployment/live-patient/broad-ontology authority outside M0. Gate aliases: `Ex=ExtractorAdapterRecord@G-EXTRACTOR-ADAPTER`, `Ret=RetrievalParityReport@G-RET-PARITY`, `Port=VerifierPortfolioReport@G-PORTFOLIO`, `Air=AIRDomainRecord@G-AIR-FULL`, `Reb=RebindingEvidence@G-REBIND`, `Bench=BenchmarkRelease@G-EMIN`, `Emin=BenchmarkRelease|EMinReport@G-EMIN`, `EM=EMinReport@G-EMIN`, `MDL=MDLEvidence@G-MDL`, `SI=SelfImprovementEvidence@G-SELF-IMPROVE`, `Prob=ProbabilisticProfileRecord@G-PROB`, `WM=WorldModelProfileRecord@G-WORLD-MODEL`, `Pat=GovernedPatientDataProfile@G-LIVE-PATIENT`, `S3=S3AssuranceEvidence@G-S3`. Table shorthands: `SrcGraph=SourceGraph`, `TermResourceSet=TerminologyResourceSet`, `RecMetadata=RecommendationMetadata`, `canon.=canonical`, `det.=deterministic`.
+Canonical map: each row = one corpus unit, one slot. `m=m0_core`=core realization by cited sections; `d=deferred_contract`=only via named §12 gate; `x=scope_excluded`=clinical/regulatory/deployment/live-patient/broad-ontology authority outside M0. Gate aliases: `Ex=ExtractorAdapterRecord@G-EXTRACTOR-ADAPTER`, `Ret=RetrievalParityReport@G-RET-PARITY`, `Port=VerifierPortfolioReport@G-PORTFOLIO`, `Air=AIRDomainRecord@G-AIR-FULL`, `Reb=RebindingEvidence@G-REBIND`, `Bench=BenchmarkRelease@G-EMIN`, `Emin=BenchmarkRelease|EMinReport@G-EMIN`, `EM=EMinReport@G-EMIN`, `MDL=MDLEvidence@G-MDL`, `SI=SelfImprovementEvidence@G-SELF-IMPROVE`, `Prob=ProbabilisticProfileRecord@G-PROB`, `WM=WorldModelProfileRecord@G-WORLD-MODEL`, `Pat=GovernedPatientDataProfile@G-LIVE-PATIENT`, `S3=S3AssuranceEvidence@G-S3`. Shorthands: `SrcGraph=SourceGraph`, `TermResourceSet=TerminologyResourceSet`, `RecMetadata=RecommendationMetadata`, `canon.=canonical`, `det.=deterministic`.
 
 ```text
 E DispositionSlot = m0_core | deferred_contract | scope_excluded
@@ -716,120 +719,120 @@ E DispositionSlot = m0_core | deferred_contract | scope_excluded
 ```text
 T Unit|S|Disposition
 C1.1 CQL/ELM|m|CQL library/parameter/context/retrieve model,ANTLR4 surface,ELM XML/JSON AST,idempotency by canonical ELM tree-diff,null/3-valued/interval/terminology ops->§6.1,§6.2,§8.1,§8.3;executable CQL equivalence/Z3 encodings->Port(cql|smt);clinical execution->S3.
-C1.2 FHIR Clinical Reasoning|m|Library,ActivityDefinition,PlanDefinition,Measure,relatedAction,selection/required/cardinality behavior->ActionReading,NFNorm,source support,report links;FHIR $apply/RequestOrchestration runtime and underspecified concurrency->Port(fhirpath|model_checker)/S3.
+C1.2 FHIR Clinical Reasoning|m|Library,ActivityDefinition,PlanDefinition,Measure,relatedAction,selection/required/cardinality behavior->ActionReading,NFNorm,source support,report links;FHIR $apply/RequestOrchestration runtime,underspecified concurrency->Port(fhirpath|model_checker)/S3.
 C1.3 CPG-on-FHIR/CQF packaging|m|L1 narrative→L4 executable enablement,CPGRecommendation/Strategy/Pathway/CaseFeature metadata,EBMonFHIR provenance->CKC stages/claim tiers/RecMetadata;L3/L4 executable package conformance->Bench/Port/S3.
-C1.4 FHIRPath/StructureMap|m|FHIRPath collection navigation,exists/all/repeat,type ops and StructureMap unidirectional rule groups->FeaturePath,ClassPred,FieldConstraint,TemplateBinding;FHIR instance transformation/equivalence->Port(fhirpath);S3 for clinical execution.
-C1.5 FHIR Terminology Services|m|CodeSystem,ValueSet,ConceptMap and $lookup/$validate-code/$expand/$subsumes/$translate/$closure reduce in M0 to finite TermResourceSet,binding status,functional keys,closure;live service parity/version drift->Ret/Reb.
+C1.4 FHIRPath/StructureMap|m|FHIRPath collection navigation,exists/all/repeat,type ops,StructureMap unidirectional rule groups->FeaturePath,ClassPred,FieldConstraint,TemplateBinding;FHIR instance transformation/equivalence->Port(fhirpath);S3 clinical execution.
+C1.5 FHIR Terminology Services|m|CodeSystem,ValueSet,ConceptMap,$lookup/$validate-code/$expand/$subsumes/$translate/$closure reduce in M0 to finite TermResourceSet,binding status,functional keys,closure;live service parity/version drift->Ret/Reb.
 C1.6 CDS Hooks|x|Hook context,cards,suggestions,override links,EHR workflow invocation=CDS deployment behavior->S3;M0 emits static review reports only.
 C1.7 SMART App Launch/Backend Services|x|OAuth2/OIDC,launch context,scopes,backend authorization,production data access=deployment/patient-data authority->Pat/S3.
 C1.8 openEHR ADL/AQL/GDL2|m|ADL archetype constraints,AQL query shape,GDL2 rule form inform finite domains,premises,source-grounded action/condition licenses;openEHR runtime/AQL patient query->Pat.
 C1.9 DMN/FEEL decision tables|m|Decision-table rows,FEEL scalar guards,null-sensitive residuals,hit-policy-style output exclusivity->TableReading,NFDecisionTable,table_outputs_compatible;engine conformance->Port.
-C1.10 BPMN/BPM+ Health/ePath|m|Process ordering,branching,parallelism,pathway decomposition and ePath data-element thinking->stage stratification,temporal order preservation,workflow residuals;process execution/care-pathway deployment->S3.
+C1.10 BPMN/BPM+ Health/ePath|m|Process ordering,branching,parallelism,pathway decomposition,ePath data-element thinking->stage stratification,temporal order preservation,workflow residuals;process execution/care-pathway deployment->S3.
 C2.1 Minds/GRADE|m|Minds Manual/GRADE CQ/PICO/SR/EtD,recommendation direction/strength/certainty,COI/AGREE trace,Japanese modality phrases,no XML schema->SrcGraph recommendation nodes,RecMetadata,Direction,det. glosses.
-C2.2 FHIR JP Core|d|Japan-realm FHIR profile validation,CodeableConcept binding and patient context enter only through Pat;profile terminology identifiers may be admitted as finite resources;Clinical Reasoning bindings remain non-M0.
-C2.3 SS-MIX2|d|HL7-v2-like standardized-storage export parsing,orders/labs/patient context,message conversion and EHR-derived facts->Pat;M0 reviews source text without SS-MIX2 data.
+C2.2 FHIR JP Core|d|Japan-realm FHIR profile validation,CodeableConcept binding,patient context enter only via Pat;profile terminology identifiers may be admitted as finite resources;Clinical Reasoning bindings non-M0.
+C2.3 SS-MIX2|d|HL7-v2-like standardized-storage export parsing,orders/labs/patient context,message conversion,EHR-derived facts->Pat;M0 reviews source text without SS-MIX2 data.
 C2.4 MEDIS standard masters|m|HOT,YJ,JAN,JLAC10/11,disease/procedure/standard drug masters=finite terminology resources with system/version/code functional keys,residuals for unmapped surfaces,version-pin drift->Reb.
 C2.5 PMDA package inserts/reports/safety|m|Electronic package-insert XML sections,contraindication/dose/safety-information provenance,Japanese-only binding text,package-insert-vs-guideline predicates=core M0 objects;database-derived safety signals->Prob/Pat.
-C2.6 ICD Japanese modification/ICD-11 mapping|m|ICD-10-JP code equality and ICD-11 post-coordination/OWL-aligned mappings enter as admitted terminology bindings/relations;dual-coding/split-merge transition impact->Reb.
+C2.6 ICD Japanese modification/ICD-11 mapping|m|ICD-10-JP code equality,ICD-11 post-coordination/OWL-aligned mappings enter as admitted terminology bindings/relations;dual-coding/split-merge transition impact->Reb.
 C2.7 DPC/K/YJ/receipt crosswalks|m|DPC/PDPS,K codes,YJ/receipt/e-prescription crosswalks enter as finite terminology mappings with reimbursement-granularity residuals;claims analytics/billing validation->Pat/S3.
 C2.8 MedDRA/J/JADER|d|MedDRA/J PT/LLT/SMQ adverse-event terminology may be admitted as finite bindings;JADER spontaneous-report risk/no denominator/duplicate-bias signal handling->Prob/Pat.
-C2.9 OMOP CDM/OHDSI Japan|d|OMOP tables,Standard Concept IDs,ATLAS Cohort JSON,Japanese vocabulary mapping gaps and cohort diagnostics->Pat/Emin;no M0 patient-cohort authority.
-C2.10 MID-NET/NDB/RWE|d|MID-NET/NDB/J-MID/RWE datasets serve empirical validation/evaluation substrates,not M0 knowledge sources->Pat,Bench,S3 as applicable.
+C2.9 OMOP CDM/OHDSI Japan|d|OMOP tables,Standard Concept IDs,ATLAS Cohort JSON,Japanese vocabulary mapping gaps,cohort diagnostics->Pat/Emin;no M0 patient-cohort authority.
+C2.10 MID-NET/NDB/RWE|d|MID-NET/NDB/J-MID/RWE datasets=empirical validation/evaluation substrates,not M0 knowledge sources->Pat,Bench,S3 as applicable.
 C3.1 OWL profiles|m|OWL EL/RL/QL/DL semantics dispositioned as finite M0 union-find/relation indexing;EL/RL classification,owl:Nothing justifications,open-world/UNA caveats,ELK/HermiT/Pellet/RDFox evidence->Air/Port.
-C3.2 SHACL validation|m|SHACL Core closed-world node/property shapes map to SchemaRegistry,JSON Schema,policy keys and gate evidence validation;SHACL-SPARQL/Rules recursion/inference->Air/Port with portability residuals.
-C3.3 RDF named graphs/TriG|m|RDF Dataset/TriG/N-Quads/source-scoped graph convention maps to immutable SourceEdition,SrcGraph,source regions and proof-rooted payloads;RDF-star/PROV-O annotations remain source-only unless admitted.
-C3.4 SKOS/FHIR ValueSet/ConceptMap|m|SKOS labels/broader/exactMatch and FHIR ValueSet/ConceptMap/version/binding-strength governance->Concept,TerminologyBinding,TerminologyRelation,binding status,functional keys;broaderTransitive/subsumption->Air.
+C3.2 SHACL validation|m|SHACL Core closed-world node/property shapes map to SchemaRegistry,JSON Schema,policy keys,gate evidence validation;SHACL-SPARQL/Rules recursion/inference->Air/Port with portability residuals.
+C3.3 RDF named graphs/TriG|m|RDF Dataset/TriG/N-Quads/source-scoped graph convention maps to immutable SourceEdition,SrcGraph,source regions,proof-rooted payloads;RDF-star/PROV-O annotations source-only unless admitted.
+C3.4 SKOS/FHIR ValueSet/ConceptMap|m|SKOS labels/broader/exactMatch,FHIR ValueSet/ConceptMap/version/binding-strength governance->Concept,TerminologyBinding,TerminologyRelation,binding status,functional keys;broaderTransitive/subsumption->Air.
 C3.5 OBO/ROBOT/ODK/DOSDP|d|ROBOT profile validation,ODK release workflows,DOSDP ontology-generation templates may propose resources;accepted ontology output/effects require Air/Port/Reb/SI,not M0 silent import.
-C3.6 BFO/DOLCE upper ontology|x|Upper-ontology commitment is outside M0 formalization-QA;only finite admitted policies/relations or an Air evidence object may carry ontology-derived commitments.
-C3.7 MIREOT modular imports|d|MIREOT/locality-style ontology import,conservative module extraction and imported-axiom provenance->Air/Port/Reb before any accepted output effect.
-C3.8 ontology alignment/repair|d|LogMap/AgreementMakerLight-style mappings,coherence repair and automated merge proposals may create candidate resources;accepted changes->admission/SI/Reb with incoherence reporting.
-C3.9 Japanese entity linking/normalization|m|Japanese NEL over J-MeSH/MEDIS/ICD/YJ/HOT surfaces enters as proposal trace plus finite terminology admission;ambiguous/unmapped/normalization-drift results emit Ambiguity/Residual/Reb.
-C3.10 terminology diff/change impact|d|Versioned ontology/terminology structural and semantic diffs,added/deprecated codes,parent changes and proof-impact analysis->Reb;M0 records versioned resources and exact resource hashes.
-C4.1 Lean 4|m|Lean 4/Mathlib/Aesop/grind proof-by-reflection discipline,small kernel,Decidable computation and CSLib reusable LTS/reduction-system patterns inform core checker obligations;external Lean proof claims->Port(lean).
-C4.2 Rocq|d|Rocq/Coq Stdlib,MathComp,Iris,MetaCoq secondary proof ecosystem agreement and extracted checker evidence->Port(rocq).
-C4.3 Isabelle/HOL|d|Isabelle/HOL,AFP,Sledgehammer,Nitpick/TLAPS audit and proof reconstruction->Port(isabelle) with independent TCB manifest.
-C4.4 TLA+/PlusCal|d|TLA+/PlusCal,TLC explicit-state,Apalache SMT-bounded and TLAPS pipeline/convergence/idempotency model-checking->Port(tla)/EM;M0 preserves det. replay.
-C4.5 Alloy/Forge|m|Alloy/Forge finite relational counterexamples,scope-bounded instance search and negative-control thinking->CounterexampleSuite,bounded domains,rejected/forbidden payload checks;solver claims->Port(alloy).
-C4.6 Why3/WhyML|d|Why3/WhyML VC generation and SMT-backed executable specification agreement->Port(why3).
+C3.6 BFO/DOLCE upper ontology|x|Upper-ontology commitment outside M0 formalization-QA;only finite admitted policies/relations or an Air evidence object may carry ontology-derived commitments.
+C3.7 MIREOT modular imports|d|MIREOT/locality-style ontology import,conservative module extraction,imported-axiom provenance->Air/Port/Reb before any accepted output effect.
+C3.8 ontology alignment/repair|d|LogMap/AgreementMakerLight-style mappings,coherence repair,automated merge proposals may create candidate resources;accepted changes->admission/SI/Reb with incoherence reporting.
+C3.9 Japanese entity linking/normalization|m|Japanese NEL over J-MeSH/MEDIS/ICD/YJ/HOT surfaces enters as proposal trace + finite terminology admission;ambiguous/unmapped/normalization-drift results emit Ambiguity/Residual/Reb.
+C3.10 terminology diff/change impact|d|Versioned ontology/terminology structural+semantic diffs,added/deprecated codes,parent changes,proof-impact analysis->Reb;M0 records versioned resources,exact resource hashes.
+C4.1 Lean 4|m|Lean 4/Mathlib/Aesop/grind proof-by-reflection discipline,small kernel,Decidable computation,CSLib reusable LTS/reduction-system patterns inform core checker obligations;external Lean proof claims->Port(lean).
+C4.2 Rocq|d|Rocq/Coq Stdlib,MathComp,Iris,MetaCoq secondary proof ecosystem agreement,extracted checker evidence->Port(rocq).
+C4.3 Isabelle/HOL|d|Isabelle/HOL,AFP,Sledgehammer,Nitpick/TLAPS audit,proof reconstruction->Port(isabelle) with independent TCB manifest.
+C4.4 TLA+/PlusCal|d|TLA+/PlusCal,TLC explicit-state,Apalache SMT-bounded,TLAPS pipeline/convergence/idempotency model-checking->Port(tla)/EM;M0 preserves det. replay.
+C4.5 Alloy/Forge|m|Alloy/Forge finite relational counterexamples,scope-bounded instance search,negative-control thinking->CounterexampleSuite,bounded domains,rejected/forbidden payload checks;solver claims->Port(alloy).
+C4.6 Why3/WhyML|d|Why3/WhyML VC generation,SMT-backed executable specification agreement->Port(why3).
 C4.7 F*|d|F*/Low* verified service or extraction claims->Port/S3;not an M0 semantic authority path.
-C4.8 dependent/refinement-type IR schemas|m|Dependent/refinement-style obligations become SchemaRegistry types,FeaturePath constraints,finite enums,collection bounds and residuals;solver-backed refinement proofs->Port.
-C4.9 proof by reflection|m|M0 theorem truth is proof-by-reflection: kernel finite checker re-evaluates executable predicates over canon. finite artifacts; external tactics only supply optional witnesses.
-C4.10 proof certificates/traces|m|ProofDAG,VerifierWitness,Certificate and external LFSC/Alethe/DRAT/LRAT-style certificates are durable payload shapes;M0 accepts only internally replayed finite_checked certificates.
-C4.11 CrossHair|d|CrossHair/Python contract symbolic execution for adapters and harnesses->Port(crosshair)/Ex,never core semantics.
-C4.12 SAW/Crucible/Cryptol|d|SAW/Crucible/Cryptol binary,cryptographic and implementation-equivalence claims->Port(saw)/S3 supply-chain evidence.
-C4.13 typed functional substrate|m|Rust-owned pure functions,algebraic enums,total pattern matches,no hidden effects and canon. serialization=implementation substrate;other typed FP substrates require Port.
-C4.14 memory-safe systems languages|m|Rust is the accepted production substrate;Ada/SPARK or other memory-safe backend evidence routes through VerifierPortfolioReport/S3,not parallel core semantics.
-C5.1 SMT-LIB/Z3/cvc5/Bitwuzla|m|SMT-LIB scripts,logic selection,QF_LIA/BV/DT/string fragments,external models/unsat cores/proofs represented by ConstraintCoreWitness and Port(smt);internal finite checking remains authoritative.
-C5.2 SAT/MaxSAT repair search|m|SAT/MaxSAT weighted/partial repair-set search,DRAT/LRAT-checkable unsat evidence and deterministic tie-breaks represented by RepairSetSearchTrace;accepted semantic edits still->admission.
-C5.3 MUS/MCS/UNSAT core|m|MUS/MCS/group-MUS deletion-minimal cores and solver unsat cores localize contradictions;M0 emits internal deletion-minimal cores,optional external proofs->Port(sat|smt).
-C5.4 Datalog/RDFox materialization|m|Pure Datalog semi-naive stratified materialization with stage snapshots/duplicate collapse=the M0 closure engine;Datalog± existentials,aggregation variants,RDFox proof claims->Air/Port(datalog).
-C5.5 OWL reasoners|d|ELK,HermiT,Pellet/RDFox EL/DL/RL classification,justifications,ontology consistency and axiom pinpointing->Air/Port(owl_reasoner).
-C5.6 ASP defaults/exceptions|d|clingo stable-model semantics,negation-as-failure,strong negation,choice/aggregate/weak constraints and clinical exception encodings->Air/Port(asp);grounding blowup becomes residual/limitation evidence.
+C4.8 dependent/refinement-type IR schemas|m|Dependent/refinement-style obligations become SchemaRegistry types,FeaturePath constraints,finite enums,collection bounds,residuals;solver-backed refinement proofs->Port.
+C4.9 proof by reflection|m|M0 theorem truth is proof-by-reflection: kernel finite checker re-evaluates executable predicates over canon. finite artifacts;external tactics supply optional witnesses only.
+C4.10 proof certificates/traces|m|ProofDAG,VerifierWitness,Certificate,external LFSC/Alethe/DRAT/LRAT-style certificates=durable payload shapes;M0 accepts only internally replayed finite_checked certificates.
+C4.11 CrossHair|d|CrossHair/Python contract symbolic execution for adapters/harnesses->Port(crosshair)/Ex,never core semantics.
+C4.12 SAW/Crucible/Cryptol|d|SAW/Crucible/Cryptol binary,cryptographic,implementation-equivalence claims->Port(saw)/S3 supply-chain evidence.
+C4.13 typed functional substrate|m|Rust-owned pure functions,algebraic enums,total pattern matches,no hidden effects,canon. serialization=implementation substrate;other typed FP substrates require Port.
+C4.14 memory-safe systems languages|m|Rust=accepted production substrate;Ada/SPARK or other memory-safe backend evidence routes through VerifierPortfolioReport/S3,not parallel core semantics.
+C5.1 SMT-LIB/Z3/cvc5/Bitwuzla|m|SMT-LIB scripts,logic selection,QF_LIA/BV/DT/string fragments,external models/unsat cores/proofs represented by ConstraintCoreWitness,Port(smt);internal finite checking authoritative.
+C5.2 SAT/MaxSAT repair search|m|SAT/MaxSAT weighted/partial repair-set search,DRAT/LRAT-checkable unsat evidence,deterministic tie-breaks represented by RepairSetSearchTrace;accepted semantic edits still->admission.
+C5.3 MUS/MCS/UNSAT core|m|MUS/MCS/group-MUS deletion-minimal cores,solver unsat cores localize contradictions;M0 emits internal deletion-minimal cores,optional external proofs->Port(sat|smt).
+C5.4 Datalog/RDFox materialization|m|Pure Datalog semi-naive stratified materialization with stage snapshots/duplicate collapse=M0 closure engine;Datalog± existentials,aggregation variants,RDFox proof claims->Air/Port(datalog).
+C5.5 OWL reasoners|d|ELK,HermiT,Pellet/RDFox EL/DL/RL classification,justifications,ontology consistency,axiom pinpointing->Air/Port(owl_reasoner).
+C5.6 ASP defaults/exceptions|d|clingo stable-model semantics,negation-as-failure,strong negation,choice/aggregate/weak constraints,clinical exception encodings->Air/Port(asp);grounding blowup becomes residual/limitation evidence.
 C5.7 CP-SAT/MiniZinc/OR-Tools|d|MiniZinc,OR-Tools CP-SAT,global constraints,LCG scheduling/optimization search->EM,MDL,S3 or Port(cp_sat|minizinc);non-unique optima require deterministic tie-break manifest.
 C5.8 TLC/Apalache|d|TLC/Apalache bounded model-checking counterexample traces for pipeline properties outside replay tests->Port(model_checker|tla).
-C5.9 e-graphs/equality saturation|d|egg/egglog e-class congruence,equality saturation and proof extraction beyond fixed NF rewrite system->Air/Port(egraph);bounded saturation required.
+C5.9 e-graphs/equality saturation|d|egg/egglog e-class congruence,equality saturation,proof extraction beyond fixed NF rewrite system->Air/Port(egraph);bounded saturation required.
 C5.10 PRISM/Storm|d|PRISM/Storm DTMC/CTMC/MDP,PCTL/CSL/reward model-checking for probabilistic policy/risk models->Prob backend_family={prism_mc|storm}/Port(prob_model_checker).
-C5.11 Prolog/s(CASP)|m|Goal-directed justification trees and tabling-inspired proof parentage inform ProofDAG/VerifierWitness;SWI-Prolog/s(CASP) execution claims->Port(prolog).
+C5.11 Prolog/s(CASP)|m|Goal-directed justification trees,tabling-inspired proof parentage inform ProofDAG/VerifierWitness;SWI-Prolog/s(CASP) execution claims->Port(prolog).
 C5.12 probabilistic logic programming|d|ProbLog/ProbLog2,cplint,PRISM(Sato),DeepProbLog,smProbLog,ProbEC use distribution semantics;exact inference as WMC compiled to SDD/d-DNNF/checkable circuits->Prob backend/circuit fields,never M0 weights.
-C6.1 defeasible logic|m|Strict/defeasible/defeater rules,superiority,ambiguity variants and PROLEG-style Japanese exception reasoning reduce to finite admitted ResolutionTheorem{exception,priority,scope,supersession,reconciliation}.
-C6.2 deontic logic|m|Obligation,prohibition,permission,avoidance,recommendation and contrary-to-duty/reparation chains reduce to Direction/normative groups plus admitted policies;full modal proof theory->Air/Port.
+C6.1 defeasible logic|m|Strict/defeasible/defeater rules,superiority,ambiguity variants,PROLEG-style Japanese exception reasoning reduce to finite admitted ResolutionTheorem{exception,priority,scope,supersession,reconciliation}.
+C6.2 deontic logic|m|Obligation,prohibition,permission,avoidance,recommendation,contrary-to-duty/reparation chains reduce to Direction/normative groups + admitted policies;full modal proof theory->Air/Port.
 C6.3 Dung argumentation|d|Abstract attack/defeat graph grounded/preferred/stable semantics beyond finite resolution membership->Air(argumentation_dung)/Emin.
-C6.4 ASPIC+/Carneades|d|Structured clinical argument graphs,schemes,premise/exception attacks and argument-strength displays->Air(aspic|carneades),EM,S3;not core theorem truth.
-C6.5 assumption-based argumentation|d|Assumption provenance,contrary mapping and dispute calculus beyond proof roots->Air(assumption_based).
-C6.6 paraconsistent logic|m|Inconsistent guideline sets produce review candidates,residuals,incoherences without explosive inference;no paraconsistent consequence closure is added to M0.
-C6.7 event calculus|d|Event Calculus/ProbEC longitudinal Initiates/Terminates/HoldsAt patient-event reasoning->WM/Pat and Prob for uncertain events;not text-only M0.
-C6.8 Allen interval algebra|m|M0 interval non-emptiness/STN-like finite numeric/temporal support closure implements the deterministic subset;full 13-relation Allen IA,ORD-Horn/STNU->AIRDomainRecord/Port(smt).
+C6.4 ASPIC+/Carneades|d|Structured clinical argument graphs,schemes,premise/exception attacks,argument-strength displays->Air(aspic|carneades),EM,S3;not core theorem truth.
+C6.5 assumption-based argumentation|d|Assumption provenance,contrary mapping,dispute calculus beyond proof roots->Air(assumption_based).
+C6.6 paraconsistent logic|m|Inconsistent guideline sets produce review candidates,residuals,incoherences without explosive inference;no paraconsistent consequence closure added to M0.
+C6.7 event calculus|d|Event Calculus/ProbEC longitudinal Initiates/Terminates/HoldsAt patient-event reasoning->WM/Pat,Prob for uncertain events;not text-only M0.
+C6.8 Allen interval algebra|m|M0 interval non-emptiness/STN-like finite numeric/temporal support closure implements deterministic subset;full 13-relation Allen IA,ORD-Horn/STNU->AIRDomainRecord/Port(smt).
 C6.9 LTL/MTL/STL|d|LTL/MTL/STL patient-timeline monitors,STL robustness,CT-STL/TEL-style temporal specifications->WM,Pat,Port(model_checker|smt).
-C6.10 MCDA|d|AHP,weighted-sum,ELECTRE/PROMETHEE/TOPSIS,GRADE EtD preference tradeoffs->MDL.preference_model_family,EM,S3;rankings are never M0 proof objects.
-C7.1 hybrid retrieval|m|BM25/BM25+/BM25F sparse baseline,Lucene/Pyserini/Anserini fingerprints,kuromoji/sudachi/mecab_unidic analyzer baselines,RRF(k=60)/weighted fusion,dense recall and reranking are RetrievalProposalTrace fields;retrieval quality->Ret with qrels/metrics.
+C6.10 MCDA|d|AHP,weighted-sum,ELECTRE/PROMETHEE/TOPSIS,GRADE EtD preference tradeoffs->MDL.preference_model_family,EM,S3;rankings never M0 proof objects.
+C7.1 hybrid retrieval|m|BM25/BM25+/BM25F sparse baseline,Lucene/Pyserini/Anserini fingerprints,kuromoji/sudachi/mecab_unidic analyzer baselines,RRF(k=60)/weighted fusion,dense recall,reranking=RetrievalProposalTrace fields;retrieval quality->Ret with qrels/metrics.
 C7.2 multilingual biomedical embeddings/rerankers|m|BGE-M3,Multilingual-E5,Jina,MedCPT,JMedRoBERTa,BioBERT/PubMedBERT outputs=evidence-discovery proposal traces with model manifests;quality/clinical use gated;licenses recorded in manifests.
-C7.3 ColBERT/late interaction|m|ColBERT/JaColBERT/PLAID MaxSim token evidence and compression/centroid parameters enter late_interaction_family/manifests;acceptance depends on source-grounded discharge and Ret metrics.
-C7.4 recommendation-level segmentation|m|CQ,recommendation,PICO,EtD,evidence-table and GRADE strength/certainty segmentation=SrcGraph node kinds,RecMetadata and retrieval segment granularity;extractor quality->Ex/Ret.
+C7.3 ColBERT/late interaction|m|ColBERT/JaColBERT/PLAID MaxSim token evidence,compression/centroid parameters enter late_interaction_family/manifests;acceptance depends on source-grounded discharge,Ret metrics.
+C7.4 recommendation-level segmentation|m|CQ,recommendation,PICO,EtD,evidence-table,GRADE strength/certainty segmentation=SrcGraph node kinds,RecMetadata,retrieval segment granularity;extractor quality->Ex/Ret.
 C7.5 layout-aware Japanese PDF/table extraction|m|Yomitoku,MinerU,Marker,LayoutLMv3,DocLayout-YOLO,table-transformer/OCR outputs become SrcGraph/MechObs facts only after byte-stable extraction;adapter quality,vertical text,round-trip checks->Ex.
-C7.6 GraphRAG|m|MS GraphRAG,HippoRAG,LightRAG graph traversal/community summaries enter as proposal trace/source-region evidence;entity drift/hallucinated triples require fixed terminology and Ret.
-C7.7 query decomposition/routing|m|LangGraph/LlamaIndex/Self-RAG-style decomposition hashes and routing decisions are ProposalProvenance/RetrievalProposalTrace fields;routing quality gated by Ret/EM.
+C7.6 GraphRAG|m|MS GraphRAG,HippoRAG,LightRAG graph traversal/community summaries enter as proposal trace/source-region evidence;entity drift/hallucinated triples require fixed terminology,Ret.
+C7.7 query decomposition/routing|m|LangGraph/LlamaIndex/Self-RAG-style decomposition hashes,routing decisions=ProposalProvenanceManifest/RetrievalProposalTrace fields;routing quality gated by Ret/EM.
 C7.8 citation-grounded generation|m|Inline/post-hoc citation,Anthropic Citations-style span ranges,ALCE/LongBench-Cite citation precision map to source regions/proof roots;citations remain evidence until discharge.
 C7.9 Japanese-English cross-lingual alignment|m|BGE-M3/multilingual-E5,mDPR,J-MeSH↔MeSH,MEDIS↔ICD,MedDRA/J↔EN mappings enter finite terminology/gloss/view-only resources with version pins;translation quality->Ret/Reb.
-C7.10 RAG evaluation|d|RAGAS,TruLens,ARES,ALCE citation precision,faithfulness/context recall and MEMERAG Japanese calibration->Ret/EMin metric_family fields;judge outputs are not M0 proof.
-C8.1 closed frontier model ensembles|m|GPT-5.5/Claude Opus/Gemini-class closed LLM outputs are ProposalProvenance(generator_family=closed_frontier_llm) plus structured-output/prompt/model manifests;non-determinism and PHI/API constraints->Pat/S3/EM.
-C8.2 domain medical models|m|Med-Gemini,MedGemma,Meditron,GatorTron,LLaVA-Med,JMedLLM,UTH-BERT/JMedRoBERTa outputs=ProposalProvenance(domain_medical_model) for NER/normalization/embedding;no native verification.
-C8.3 proof models/environments|m|DeepSeek-Prover,Kimina,LeanDojo/ReProver/Leanstral suggestions=ProposalProvenance(proof_model);checker acceptance uses internal finite checks or Port(lean).
+C7.10 RAG evaluation|d|RAGAS,TruLens,ARES,ALCE citation precision,faithfulness/context recall,MEMERAG Japanese calibration->Ret/Emin metric_family fields;judge outputs not M0 proof.
+C8.1 closed frontier model ensembles|m|GPT-5.5/Claude Opus/Gemini-class closed LLM outputs=ProposalProvenanceManifest(generator_family=closed_frontier_llm) + structured-output/prompt/model manifests;non-determinism,PHI/API constraints->Pat/S3/EM.
+C8.2 domain medical models|m|Med-Gemini,MedGemma,Meditron,GatorTron,LLaVA-Med,JMedLLM,UTH-BERT/JMedRoBERTa outputs=ProposalProvenanceManifest(domain_medical_model) for NER/normalization/embedding;no native verification.
+C8.3 proof models/environments|m|DeepSeek-Prover,Kimina,LeanDojo/ReProver/Leanstral suggestions=ProposalProvenanceManifest(proof_model);checker acceptance uses internal finite checks or Port(lean).
 C8.4 constrained decoding|m|xgrammar/Outlines/Guidance/JSONSchemaBench-style grammar-state artifacts/token masks=evidence-discovery proposal aids;GeneratorGrammarArtifact/T-GEN-Static remains acceptance authority;semantic dictionary constraints require post-check.
-C8.5 tool-calling agents|m|MCP/function-calling/code-execution agents connected to Lean/SMT/terminology tools are ProposalProvenance(tool_calling_agent) with effect rows;DischargeProposal admits only effect-free accepted artifacts.
-C8.6 self-consistency/convergence|d|k-run self-consistency,dominant canonical hash,ATP/embedding clusters,ASR/idempotency/convergence metrics->EMin;det. replay remains S0.
-C8.7 retrieval-augmented autoformalization|m|LeanDojo/ReProver-style premise retrieval and clinical ontology exemplar retrieval=proposal trace;generated IR accepted only by discharge and proof checking.
-C8.8 critique/adjudication|m|Critic-defender-judge,NLI contradiction checks and independent model-family critique feed ReviewerRecord/AdmissionRecord;judge/model bias metrics->EM/S3,not theorem truth.
-C8.9 program-aided language models|m|PAL/Python/CQL/SQL/FHIRPath executable intermediates are program_aided_lm proposals;execution-output equivalence requires counterexample-suite discharge or Port,with sandbox effects kept out.
+C8.5 tool-calling agents|m|MCP/function-calling/code-execution agents connected to Lean/SMT/terminology tools=ProposalProvenanceManifest(tool_calling_agent) with effect rows;DischargeProposal admits only effect-free accepted artifacts.
+C8.6 self-consistency/convergence|d|k-run self-consistency,dominant canonical hash,ATP/embedding clusters,ASR/idempotency/convergence metrics->Emin;det. replay remains S0.
+C8.7 retrieval-augmented autoformalization|m|LeanDojo/ReProver-style premise retrieval,clinical ontology exemplar retrieval=proposal trace;generated IR accepted only by discharge,proof checking.
+C8.8 critique/adjudication|m|Critic-defender-judge,NLI contradiction checks,independent model-family critique feed ReviewerRecord/AdmissionRecord;judge/model bias metrics->EM/S3,not theorem truth.
+C8.9 program-aided language models|m|PAL/Python/CQL/SQL/FHIRPath executable intermediates=program_aided_lm proposals;execution-output equivalence requires counterexample-suite discharge or Port,sandbox effects kept out.
 C8.10 verifier-guided decoding/repair|m|Baldur/Goedel/HTPS/PRM-style bounded repair loops may propose artifacts;accepted changes require det. suite discharge/admission;loop metrics->EM/SI.
-C8.11 LoRA/QLoRA adapters|d|LoRA/QLoRA/DoRA/full-finetune/prompt or retrieval-index updates->SelfImprovementEvidence.adapter_family plus Bench/EM holdout,catastrophic-forgetting,safety-regression evidence.
-C8.12 world models/patient trajectory|d|JEPA,latent-dynamics,ETHOS/Foresight/EHRWorld tokenized-EHR and multimodal trajectory predictors->WorldModelProfileRecord.family,Pat/S3;causal/counterfactual claims need causal_design evidence.
-C9.1 gold guideline-to-IR corpus|d|Clinician/formalist adjudicated source_passage/CQ/recommendation corpus with Cohen/Fleiss/Krippendorff/γ agreement,split stratification and gold IR conformance->BenchmarkRelease.
-C9.2 semantic equivalence/idempotency/convergence|m|Canonical bytes,NF idempotency,replay identity and fixture convergence=M0 acceptance gates;empirical AST isomorphism,logical equivalence,round-trip and convergence->EMin.
+C8.11 LoRA/QLoRA adapters|d|LoRA/QLoRA/DoRA/full-finetune/prompt or retrieval-index updates->SelfImprovementEvidence.adapter_family + Bench/EM holdout,catastrophic-forgetting,safety-regression evidence.
+C8.12 world models/patient trajectory|d|JEPA,latent-dynamics,ETHOS/Foresight/EHRWorld tokenized-EHR,multimodal trajectory predictors->WorldModelProfileRecord.world_model_family,Pat/S3;causal/counterfactual claims need causal_design evidence.
+C9.1 gold guideline-to-IR corpus|d|Clinician/formalist adjudicated source_passage/CQ/recommendation corpus with Cohen/Fleiss/Krippendorff/γ agreement,split stratification,gold IR conformance->BenchmarkRelease.
+C9.2 semantic equivalence/idempotency/convergence|m|Canonical bytes,NF idempotency,replay identity,fixture convergence=M0 acceptance gates;empirical AST isomorphism,logical equivalence,round-trip,convergence->Emin.
 C9.3 contradiction/collision benchmark|m|Synthetic/real cross-guideline direct/action/temporal/threshold/epistemic cases seed Appendix A/T-Conflict-Fixtures/T-Factual-Fixtures;external clinician utility->Bench/EM.
-C9.4 CQL/FHIR/DMN conformance suites|m|Inferno,FHIR $validate,CQL-to-ELM,DMN/FEEL and JP Core/JAMISDP conformance suites=CounterexampleSuite/admission inputs;external standard conformance->Ex/Port/S3.
-C9.5 metamorphic/property-based tests|m|Paraphrase invariance,idempotency,merge commutativity,eligibility monotonicity and property generators extend acceptance gates/counterexample suites;empirical MR violation rates->EM.
-C9.6 shadow-mode/silent trial|d|Shadow-mode production logs,AUROC/calibration/lead-time/alert-volume endpoints and stopping rules require patient data and deployment authority->Pat/S3.
-C9.7 alert fatigue/tiered alerts|d|Hard-stop/soft-stop/informational tiering,override reason taxonomy and alert-governance metrics require deployment usability authority->S3;M0 may carry strength/actionability metadata only.
-C9.8 CDS Five Rights|x|Right information/person/channel/format/time is CDS deployment configuration->S3;M0 produces static review artifacts and no channel/timing authority.
+C9.4 CQL/FHIR/DMN conformance suites|m|Inferno,FHIR $validate,CQL-to-ELM,DMN/FEEL,JP Core/JAMISDP conformance suites=CounterexampleSuite/admission inputs;external standard conformance->Ex/Port/S3.
+C9.5 metamorphic/property-based tests|m|Paraphrase invariance,idempotency,merge commutativity,eligibility monotonicity,property generators extend acceptance gates/counterexample suites;empirical MR violation rates->EM.
+C9.6 shadow-mode/silent trial|d|Shadow-mode production logs,AUROC/calibration/lead-time/alert-volume endpoints,stopping rules require patient data,deployment authority->Pat/S3.
+C9.7 alert fatigue/tiered alerts|d|Hard-stop/soft-stop/informational tiering,override reason taxonomy,alert-governance metrics require deployment usability authority->S3;M0 may carry strength/actionability metadata only.
+C9.8 CDS Five Rights|x|Right information/person/channel/format/time=CDS deployment configuration->S3;M0 produces static review artifacts,no channel/timing authority.
 C9.9 human factors/ISO user-centered design|d|ISO 9241-210/62366 use specification,HFMEA,URRA,NASA-TLX/SUS/usability tests govern UI/deployment evidence->S3;M0 UI renders static proof artifacts.
-C9.10 explanation quality|m|Traceability,citation precision,proof readability,controlled-NL faithfulness,clinical actionability and deterministic glosses map to report fields/falsification criteria;human/LLM judge metrics->EM/S3.
-C9.11 equity/subgroup/calibration|d|Subgroup,external validation,calibration,Brier/ICI/fairness metrics and Japanese-population validation->EM/S3;no M0 demographic claim.
-C9.12 implementation science|d|CFIR,NASSS,RE-AIM adoption/maintenance/reimbursement and workflow embedding->S3;not IR construction authority.
+C9.10 explanation quality|m|Traceability,citation precision,proof readability,controlled-NL faithfulness,clinical actionability,deterministic glosses map to report fields/falsification criteria;human/LLM judge metrics->EM/S3.
+C9.11 equity/subgroup/calibration|d|Subgroup,external validation,calibration,Brier/ICI/fairness metrics,Japanese-population validation->EM/S3;no M0 demographic claim.
+C9.12 implementation science|d|CFIR,NASSS,RE-AIM adoption/maintenance/reimbursement,workflow embedding->S3;not IR construction authority.
 C10.1 GSN/SACM assurance cases|d|GSN,SACM,OntoGSN,Assurance 2.0,D-Case goal/strategy/solution/defeater graphs->S3AssuranceEvidence.assurance_case_family.
-C10.2 ISO 14971/62304/62366|d|Risk management,software lifecycle,usability engineering and AI/ML hazard-taxonomy mappings->S3 risk/software/usability files.
-C10.3 FDA/PMDA/IMDRF CDS/SaMD|d|FDA CDS,PMDA SaMD,IMDRF MLMD/GMLP/N81 classification,IDATEN/PCCP change protocols and transparency/independent-review claims->S3 jurisdiction/change fields.
-C10.4 NIST AI RMF/ISO 42001|d|AI RMF Govern/Map/Measure/Manage,GenAI risk profile and ISO/IEC 42001 controls->S3 ai_management_system/control-map evidence.
-C10.5 APPI/medical privacy|d|APPI special-care data,cross-border transfer,NGMIA anonymized/pseudonymized medical info,certified processors->Pat privacy_regime/deidentification fields and sometimes S3.
+C10.2 ISO 14971/62304/62366|d|Risk management,software lifecycle,usability engineering,AI/ML hazard-taxonomy mappings->S3 risk/software/usability files.
+C10.3 FDA/PMDA/IMDRF CDS/SaMD|d|FDA CDS,PMDA SaMD,IMDRF MLMD/GMLP/N81 classification,IDATEN/PCCP change protocols,transparency/independent-review claims->S3 jurisdiction/change fields.
+C10.4 NIST AI RMF/ISO 42001|d|AI RMF Govern/Map/Measure/Manage,GenAI risk profile,ISO/IEC 42001 controls->S3 ai_management_system/control-map evidence.
+C10.5 APPI/medical privacy|d|APPI special-care data,cross-border transfer,NGMIA anonymized/pseudonymized medical info,certified processors->Pat privacy_regime/deidentification fields,sometimes S3.
 C10.6 STRIDE/LINDDUN/Zero Trust|d|STRIDE,LINDDUN,Zero Trust,OWASP LLM/MITRE ATLAS threat models->S3 threat_model_families/security evidence.
 C10.7 de-identification/PPRL|d|k-anonymity,l-diversity,t-closeness,DP,PPRL/Bloom-filter linkage,secure on-site analysis->Pat deidentification_family/record_linkage fields.
 C10.8 SBOM/AIBOM/reproducible supply chain|d|SPDX 3.0 AI/Dataset profiles,CycloneDX,in-toto/SLSA,Sigstore/Rekor provenance->S3 sbom/aibom/reproducible-build evidence;M0 keeps toolchain manifests/hashes.
-C10.9 knowledge CI/CD|d|GitOps,FSH/SUSHI/IG Publisher,semver,canary/blue-green,rollback and IDATEN/PACMP deployment authority->S3;M0 keeps immutable source editions/replay.
-C10.10 observability/audit/continuous verification|d|OpenTelemetry/Langfuse,FHIR AuditEvent/IHE BALP,hash-chain logs and continuous verification->S3 observability;M0 replay is offline and static.
-C10.11 drift monitoring|d|PSI/KS/Wasserstein/ADWIN/KSWIN plus ontology/terminology structural/semantic diff for model,rule,ontology,terminology drift->Reb,SI,S3.
+C10.9 knowledge CI/CD|d|GitOps,FSH/SUSHI/IG Publisher,semver,canary/blue-green,rollback,IDATEN/PACMP deployment authority->S3;M0 keeps immutable source editions/replay.
+C10.10 observability/audit/continuous verification|d|OpenTelemetry/Langfuse,FHIR AuditEvent/IHE BALP,hash-chain logs,continuous verification->S3 observability;M0 replay offline,static.
+C10.11 drift monitoring|d|PSI/KS/Wasserstein/ADWIN/KSWIN + ontology/terminology structural/semantic diff for model,rule,ontology,terminology drift->Reb,SI,S3.
 C10.12 incident response/post-market surveillance|d|Detect/triage/contain/CAPA/PMS,IMDRF AET,PMDA fuguai/JADER,AIID/ATLAS reports->S3 incident/post-market evidence.
 ```
 
-Agent-language form DNA is incorporated by form rather than clinical semantics:
+Agent-language form DNA incorporated by form, not clinical semantics:
 
 ```text
 T Form unit|S|Disposition
@@ -861,30 +864,23 @@ E AllowedArtifact = source_bytes | source_graph | quoted_snippets | offsets_only
 S CorpusDocument(doc_id:Id,source_edition_hash:Hash,title_ja:Text<semantic_ja>,title_en:Text<semantic_en>?,content_hash:Hash,extraction_manifest_hash:Hash)
 ```
 
-A source edition is immutable; revisions create a new `SourceEdition`. Cross-edition proof transport requires `G-REBIND`.
+`SourceEdition` immutable; revisions create a new one. Cross-edition proof transport requires `G-REBIND`.
 
 Permission semantics:
 
 ```text
-redistributable:
-  reports may include every artifact kind listed in allowed_artifacts.
-
-reconstructable:
-  reports carry enough offsets, hashes, source-region IDs, and derived labels to reconstruct
-  reviewed evidence under the holder's access terms.
-
-restricted_internal_only:
-  accepted internal artifacts may be checked and replayed; exported reports carry only artifact
-  hashes, source-region IDs, and derived labels allowed by allowed_artifacts.
-
-permission_limited emission:
-  report build emits Residual(class=permission_limited) when a requested report view requires
-  an artifact kind absent from SourcePermissionRecord.allowed_artifacts.
+redistributable: reports may include every artifact in allowed_artifacts.
+reconstructable: reports carry offsets, hashes, source-region IDs, derived labels to
+  reconstruct reviewed evidence under holder's access terms.
+restricted_internal_only: accepted internal artifacts may be checked/replayed; exported
+  reports carry only artifact hashes, source-region IDs, derived labels in allowed_artifacts.
+permission_limited emission: report build emits Residual(class=permission_limited) when a
+  requested view requires an artifact kind absent from SourcePermissionRecord.allowed_artifacts.
 ```
 
 ### 4.2 SourceGraph schemas
 
-A `SourceGraph` is a finite directed graph over source structure, text anchors, and table layout. Every accepted SourceGraph semantic fact lives in typed node, edge, span, anchor, or region payloads inside the graph.
+`SourceGraph` = finite directed graph over source structure, text anchors, table layout. Every accepted semantic fact lives in typed node/edge/span/anchor/region payloads.
 
 ```text
 S SourceGraph(graph_id:Id,source_edition_hash:Hash,nodes:Set[SourceNode],edges:Set[SourceEdge],spans:Set[SourceSpan],anchors:Set[SourceAnchor],root_node_id:Id,extraction_manifest_hash:Hash)
@@ -906,27 +902,21 @@ E Lang = ja | en | other
 S BBox(top:Rational,left:Rational,bottom:Rational,right:Rational)
 ```
 
-`SourceNodeAttrs.label` is a structural label emitted by the extractor, such as a section role or table role. Source text is stored only in `SourceSpan` and `SourceAnchor`.
+`SourceNodeAttrs.label` = structural extractor label (section/table role). Source text stored only in `SourceSpan`/`SourceAnchor`.
 
 SourceGraph validation:
 
 ```text
-P-SG-total-text:
-  Every accepted textual unit from a registered source has a SourceSpan and SourceAnchor
-  or an extraction_uncertain residual.
-
-P-SG-total-support:
-  Every accepted theorem support is a finite SourceRegion.
-
-P-SG-canonical:
-  The same ExtractionManifest and source bytes produce identical SourceGraph canonical bytes.
-
-P-SG-permission:
-  Accepted M0 reports store source-region IDs rather than source quotations; any artifact
-  that stores raw source text is allowed by SourcePermissionRecord.allowed_artifacts.
+P-SG-total-text: every accepted textual unit from a registered source has a SourceSpan and
+  SourceAnchor or an extraction_uncertain residual.
+P-SG-total-support: every accepted theorem support is a finite SourceRegion.
+P-SG-canonical: same ExtractionManifest and source bytes produce identical SourceGraph
+  canonical bytes.
+P-SG-permission: accepted M0 reports store source-region IDs not quotations; any artifact
+  storing raw source text is in SourcePermissionRecord.allowed_artifacts.
 ```
 
-Textual units include running text, headings, tables, cells, footnotes, captions, appendices, recommendation statements, explicit cross-reference labels, and figure text only when extracted as text.
+Textual units: running text, headings, tables, cells, footnotes, captions, appendices, recommendation statements, explicit cross-reference labels, and figure text only when extracted as text.
 
 ### 4.3 Source regions and closure
 
@@ -936,44 +926,40 @@ E RegionMember = node:Id | span:Id | cell:Id | anchor:Id
 S SourceRegion(region_id:RegionId,source_edition_hash:Hash,seed_members:Set[RegionMember],closed_members:Set[RegionMember],closure_certificate_hash:Hash)
 ```
 
-`source_region_closure(SourceGraph S, Set[RegionMember] seed) -> OperationResult[SourceRegion]` is deterministic and total over schema-valid inputs:
+`source_region_closure(SourceGraph S, Set[RegionMember] seed) -> OperationResult[SourceRegion]`: deterministic, total over schema-valid inputs:
 
 ```text
-1 Validate that every seed member exists in S. A missing seed emits
-  Residual(class=unsupported_construction) with code=missing_region_member.
-2 Compute the finite universe U of region members addressable from S:
-  nodes, spans, anchors, table-cell IDs recorded in spans, and derived cell addresses.
+1 Validate every seed member exists in S. Missing seed → Residual(class=unsupported_construction),
+  code=missing_region_member.
+2 Compute finite universe U of region members addressable from S: nodes, spans, anchors,
+  table-cell IDs recorded in spans, derived cell addresses.
 3 R := seed.
-4 Repeat until R is unchanged:
-     for each member m in R by canonical_sort_key:
-       add containing node, span, cell, and anchor addresses;
+4 Repeat until R unchanged; for each m in R by canonical_sort_key:
+       add containing node, span, cell, anchor addresses;
        add containing heading, section, paragraph, list, list_item, table, row, column,
-         and document nodes through contains edges;
-       add row and column header cells for each table cell;
-       add table caption for each table member;
-       add footnote body and target for each footnote marker or footnote body through footnote_of edges;
-       add explicit cross-reference target for each crossref_targets edge;
+         document nodes via contains edges;
+       add row and column header cells per table cell;
+       add table caption per table member;
+       add footnote body and target per footnote marker/body via footnote_of edges;
+       add cross-reference target per crossref_targets edge;
        add continuation targets needed for a complete sentence, recommendation, table row, or caption;
        add adjacent span only when a continuation edge links it.
-5 If any required table coordinate, header target, caption target, footnote target, continuation
-  target, or cross-reference target is absent, emit the earliest residual by source_order_key:
-  unsupported_table_structure for table/caption/footnote/continuation failure and
-  unsupported_cross_reference for cross-reference failure.
-6 Require R ⊆ U at every iteration. If a derived member is outside U, emit
-  unsupported_table_structure.
-7 Before accepting the SourceRegion, check the `SourceRegion.seed_members` and
-  `SourceRegion.closed_members` SchemaCollectionBound rows; on overflow call
-  `HandleBoundOverflow` and return its exact status.
-8 Return success(SourceRegion with closed_members sorted by canonical_sort_key).
+5 If any required table coordinate, header, caption, footnote, continuation, or cross-reference
+  target absent, emit earliest residual by source_order_key: unsupported_table_structure for
+  table/caption/footnote/continuation failure; unsupported_cross_reference for cross-reference failure.
+6 Require R ⊆ U every iteration. Derived member outside U → unsupported_table_structure.
+7 Before accepting, check `SourceRegion.seed_members` and `SourceRegion.closed_members`
+  SchemaCollectionBound rows; on overflow call `HandleBoundOverflow`, return its exact status.
+8 Return success(SourceRegion, closed_members sorted by canonical_sort_key).
 ```
 
-Termination follows from finite `U`: every successful iteration strictly increases `R`, and `R` can increase at most `|U| - |seed|` times before the fixed point.
+Terminates: `U` finite; each successful iteration strictly grows `R`, at most `|U|-|seed|` times before fixed point.
 
 ```text
 S RegionClosureCertificate(seed_members_digest:Hash,source_graph_hash:Hash,possible_member_count:UInt,iterations:UInt,added_member_batches:List[Set[RegionMember]],residual_hashes:Set[Hash])
 ```
 
-`seed_members_digest = sha256(canonical_payload_bytes(seed_members))` over the referencing `SourceRegion.seed_members` value. The certificate is accepted before the `SourceRegion` that references it through `closure_certificate_hash`, so the reference direction is acyclic. An interpretation region is admissible when its certificate is valid: the seed digest matches, replaying the closure over the certified `SourceGraph` reproduces `added_member_batches`, and `seed_members` plus the union of the batches equals `closed_members`.
+`seed_members_digest = sha256(canonical_payload_bytes(seed_members))` over referencing `SourceRegion.seed_members`. Certificate accepted before the `SourceRegion` referencing it via `closure_certificate_hash` (acyclic). Interpretation region admissible when certificate valid: seed digest matches, replaying closure over certified `SourceGraph` reproduces `added_member_batches`, and `seed_members` ∪ batches = `closed_members`.
 
 ### 4.4 Extraction and mechanical observations
 
@@ -991,11 +977,11 @@ E MechObsKind = text_node | anchor_span | token | table_cell | table_edge | capt
 S MechObsPayload(obs_id:Id,kind:MechObsKind,source_region_id:RegionId,anchor_id:Id?,raw_text:Text<raw_source>?,nfkc_text:Text<source_nfkc>?,normalized_text:Text<semantic_ja>?,fields:Map[Id,Text<semantic_ja>],analyzer_manifest_hash:Hash?,authority:Authority)
 ```
 
-`ExtractionManifest.input_bytes_hash` stores `sha256(exact_recorded_bytes)` of the extraction-adapter input; the owning manifest supplies those bytes (§1.2 raw-recorded convention).
+`ExtractionManifest.input_bytes_hash` = `sha256(exact_recorded_bytes)` of extraction-adapter input; owning manifest supplies those bytes (§1.2 raw-recorded convention).
 
-Mechanical observation authority invariant: `MechanicalLexicon.authority = MechObsPayload.authority = mechanical_authority`. `LexiconEntry` rows are stored inline in the owning lexicon; a `lex_surface_hit` observation records the matched entry's `concept_candidate`.
+Authority invariant: `MechanicalLexicon.authority = MechObsPayload.authority = mechanical_authority`. `LexiconEntry` rows inline in owning lexicon; `lex_surface_hit` observation records matched entry's `concept_candidate`.
 
-Mechanical observation emission and consumers:
+Emission and consumers:
 
 ```text
 T MechObsKind | Emission site | M0 consumer
@@ -1014,7 +1000,7 @@ modality_marker | one per deontic or recommendation cue | norm-license generator
 negation_marker | one per explicit negation cue | negative condition, contraindication, and avoid/against generators
 ```
 
-Accepted `MechObsPayload` objects guarantee the following optional-field presence by kind. These guarantees are schema-visible and may be used by `T-GEN-Static` when assigning optional source fields to required template targets.
+Accepted `MechObsPayload` guarantee optional-field presence by kind; schema-visible, usable by `T-GEN-Static` when assigning optional source fields to required template targets:
 
 ```text
 T MechObsKind | Optional fields guaranteed present
@@ -1028,15 +1014,15 @@ modality_marker | anchor_id, normalized_text
 negation_marker | anchor_id, normalized_text
 ```
 
-M0 uses deterministic fixture extraction for source bytes already available to the test corpus. Claims about additional extraction adapters require `G-EXTRACTOR-ADAPTER`.
+M0 uses deterministic fixture extraction for source bytes already in the test corpus. Additional extraction adapters require `G-EXTRACTOR-ADAPTER`.
 
-`ObserveMech(SourceGraph, AnalyzerManifest, MechanicalLexicon*) -> OperationResult[Set[MechObsPayload]]` is pure over its declared inputs. It enumerates spans and anchors by `source_order_key`, applies lexicon and surface recognizers in manifest order, canonicalizes observations, and collapses duplicates by artifact hash. If a textual unit required by `P-SG-total-text` has no stable anchor or has conflicting byte offsets, the operation emits `Residual(class=extraction_uncertain)` and preserves every observation whose support remains closed and permission-valid. At every MechObsPayload output bound, `ObserveMech` calls `HandleBoundOverflow` and returns the exact overflow status. `T-Mech-Determinism` validates repeated-run byte identity.
+`ObserveMech(SourceGraph, AnalyzerManifest, MechanicalLexicon*) -> OperationResult[Set[MechObsPayload]]`: pure over declared inputs. Enumerates spans/anchors by `source_order_key`, applies lexicon and surface recognizers in manifest order, canonicalizes, collapses duplicates by artifact hash. Textual unit required by `P-SG-total-text` with no stable anchor or conflicting byte offsets → `Residual(class=extraction_uncertain)`, preserving every observation whose support stays closed and permission-valid. At every MechObsPayload output bound, calls `HandleBoundOverflow`, returns exact overflow status. `T-Mech-Determinism` validates repeated-run byte identity.
 
 ## 5. Admitted terminology and semantic policies
 
 ### 5.1 Terminology resources
 
-Terminology resources are admitted finite resources or consequences of `term_resource` generators.
+Admitted finite resources or consequences of `term_resource` generators.
 
 ```text
 S TerminologyResourceSet(resource_set_id:Id,concepts:Set[Concept],bindings:Set[TerminologyBinding],relations:Set[TerminologyRelation],admission_record_hashes:Set[Hash],accepted_effect_row:Set[Effect])
@@ -1050,7 +1036,7 @@ S TerminologyRelation(relation_id:Id,kind:TerminologyRelationKind,from_concept_i
 
 ### 5.2 Terminology closure and functional keys
 
-Terminology closure is an accepted finite index produced from a `TerminologyResourceSet`.
+Accepted finite index from a `TerminologyResourceSet`.
 
 ```text
 S TerminologyClosure(closure_id:Id,terminology_resource_set_hash:Hash,representative_map:Map[Id,Id],equivalence_classes:Set[ConceptEquivalenceClass],normalized_relations:Set[TerminologyRelation],surface_index:Set[SurfaceIndexEntry],code_key_index:Set[FunctionalKeyIndexEntry],surface_key_index:Set[FunctionalKeyIndexEntry],incoherence_hashes:Set[Hash],proof_roots:Set[ProofId])
@@ -1064,44 +1050,44 @@ S FunctionalKeyIndexEntry(key_kind:FunctionalKeyKind,system:Id,version_or_empty:
 E FunctionalKeyKind = code_key | surface_key
 ```
 
-`BuildTerminologyClosure(TerminologyResourceSet T) -> OperationResult[TerminologyClosure]` is total over schema-valid `T`:
+`BuildTerminologyClosure(TerminologyResourceSet T) -> OperationResult[TerminologyClosure]` total over schema-valid `T`:
 
 ```text
-1 Validate that every relation endpoint names an existing Concept. A failing endpoint emits
-  Incoherence(class=incompatible_generator_outputs) with code=missing_concept_endpoint and is omitted
+1 Validate every relation endpoint names an existing Concept. Failing endpoint emits
+  Incoherence(class=incompatible_generator_outputs) with code=missing_concept_endpoint, omitted
   from normalized_relations.
-2 For each binding:
-     if status in {exact,synonym,ambiguous}, require concept_id to name an existing Concept;
-     if status=unmapped, require concept_id to be absent;
-     otherwise emit Incoherence(class=incompatible_generator_outputs) with code=bad_binding_endpoint.
+2 Per binding:
+     status in {exact,synonym,ambiguous} => require concept_id names existing Concept;
+     status=unmapped => require concept_id absent;
+     else emit Incoherence(class=incompatible_generator_outputs) with code=bad_binding_endpoint.
 3 Build union-find classes over Concept IDs using TerminologyRelation.kind in
   {exact, synonym, unit_equivalent, section_equivalent, action_kind_equivalent}.
-4 The representative of each class is the minimum concept_id by canonical_sort_key.
-5 Replace every relation endpoint by its representative and collapse duplicate relations.
-6 Build surface_index[surface] = canonical set of representative concepts for bindings
+4 Representative of each class = min concept_id by canonical_sort_key.
+5 Replace every relation endpoint by its representative, collapse duplicate relations.
+6 surface_index[surface] = canonical set of representative concepts for bindings
   with status in {exact, synonym, ambiguous} and valid concept_id.
-7 Build code_key for every binding with status in {exact, synonym} and code present:
+7 code_key for every binding with status in {exact, synonym} and code present:
      (system, version_or_empty, code).
-8 Build surface_key for every binding with status = exact and code absent:
+8 surface_key for every binding with status = exact and code absent:
      (system, version_or_empty, surface).
-9 A functional_key_collision exists when one code_key or surface_key maps to more than
-  one representative concept.
-10 A mutually_exclusive_term_mapping exists when one surface maps to two representative
+9 functional_key_collision exists when one code_key or surface_key maps to >1
+  representative concept.
+10 mutually_exclusive_term_mapping exists when one surface maps to two representative
   concepts connected by mutually_exclusive in either direction after representative replacement.
-11 Emit Incoherence for each collision or mutually exclusive mapping, record the hashes in
-  TerminologyClosure.incoherence_hashes, and retain the finite closure for residual reporting.
+11 Emit Incoherence per collision or mutually exclusive mapping, record hashes in
+  TerminologyClosure.incoherence_hashes, retain the finite closure for residual reporting.
 12 Check every TerminologyClosure collection bound; on overflow call `HandleBoundOverflow` and
-  return its exact status, otherwise return success(TerminologyClosure) with the §1.7 primary
+  return its exact status, else return success(TerminologyClosure) with the §1.7 primary
   status raised to incoherence when step 11 emitted incoherence artifacts.
 ```
 
-Bindings with `status = ambiguous` participate in `surface_index` and produce `Ambiguity(class=multiple_terms)` when a semantic generator demands a single concept. They participate in ambiguity indexing rather than functional-key satisfaction. Bindings with `status = unmapped` require an absent `concept_id` in the canonical payload and produce `Residual(class=missing_terminology)` when a semantic generator demands a concept. A payload with `status = unmapped` and a present `concept_id` is `invalid_payload`; the checker emits only the schema diagnostic for that binding.
+`status = ambiguous`: participate in `surface_index`, produce `Ambiguity(class=multiple_terms)` when a generator demands a single concept; ambiguity indexing, not functional-key satisfaction. `status = unmapped`: `concept_id` absent, produce `Residual(class=missing_terminology)` when a generator demands a concept. `status = unmapped` with present `concept_id` = `invalid_payload`; checker emits only the schema diagnostic for that binding.
 
-M0 terminology reasoning is exactly union-find plus finite relation indexing. OWL/SKOS classification, e-graph saturation, ontology alignment repair, and terminology parity claims require §3.3 gates.
+M0 terminology reasoning = union-find plus finite relation indexing. OWL/SKOS classification, e-graph saturation, ontology alignment repair, terminology parity claims require §3.3 gates.
 
 ### 5.3 Semantic policy set
 
-Every M0 semantic judgment outside the fixed §8 core is an admitted finite input in `SemanticPolicySet`. `DischargeProposal` is the only operation that accepts a `SemanticPolicySet`; CloseM0 reads it through `ClosureInput.semantic_policy_set_hash` and never produces a replacement policy set. Absence of a required policy fact yields `Residual(class=missing_policy)` or `unsupported` exactly where the consuming algorithm states it.
+Every M0 semantic judgment outside the fixed §8 core = admitted finite input in `SemanticPolicySet`. `DischargeProposal` is the only operation accepting a `SemanticPolicySet`; CloseM0 reads it via `ClosureInput.semantic_policy_set_hash`, never produces a replacement. Absent required policy fact yields `Residual(class=missing_policy)` or `unsupported` exactly where the consuming algorithm states.
 
 ```text
 S SemanticPolicySet(policy_set_id:Id,action_slot_specs:Set[ActionSlotSpec],action_target_relations:Set[ActionTargetRelation],output_exclusions:Set[OutputExclusion],metadata_singleton_keys:Set[MetadataKey],admission_record_hashes:Set[Hash],accepted_effect_row:Set[Effect])
@@ -1117,7 +1103,7 @@ S OutputExclusion(output_slot_id:Id,left_value:ReadingRef,right_value:ReadingRef
 E MetadataKey = bibliographic_identity | publisher | society | edition_label | publication_date | access_date | license_or_permission_ref | source_class
 ```
 
-Policy-set admission validation sorts rows by canonical payload bytes and rejects duplicate rows with different payload bytes under these semantic keys. Policy consumers canonicalize concept IDs through the stage-20 `TerminologyClosure` before lookup; admission-time duplicate-key validation uses the declared candidate concept IDs and records any quarantined lookup key in `ValidationManifest.diagnostic_hashes` of the policy-admission manifest for the accepted policy set.
+Admission validation sorts rows by canonical payload bytes, rejects duplicate rows with different payload bytes under these semantic keys. Consumers canonicalize concept IDs through stage-20 `TerminologyClosure` before lookup; admission-time duplicate-key validation uses declared candidate concept IDs, records any quarantined lookup key in `ValidationManifest.diagnostic_hashes` of the policy-admission manifest for the accepted policy set.
 
 ```text
 ActionSlotSpec key = slot_id.
@@ -1130,13 +1116,13 @@ OutputExclusion key = (output_slot_id, value_a, value_b, symmetric),
 Metadata singleton key = metadata key literal.
 ```
 
-`ActionTargetRelation.relation_kind` is proof-visible. M0 target-overlap policy uses `contraindication_target`; other terminology relation kinds keep their §5.2 consumers. Duplicate semantic keys with different payload bytes emit `Incoherence(class=incompatible_generator_outputs)` during `DischargeProposal` and are retained as quarantined rows in the accepted `SemanticPolicySet`. Quarantined rows are recorded through `ValidationManifest.diagnostic_hashes` and `ClosureOutput.incoherence_hashes` and are unavailable for normal policy lookup. All non-quarantined rows remain usable in the same policy set. A consumer that explicitly queries a quarantined key propagates the recorded incoherence; a consumer that queries an absent non-quarantined key emits `Residual(class=missing_policy)`. This retention rule lets the single demo `SemanticPolicySet` contain the dose-collision fixture while the main theorem fixture continues to use the route and administration-speed rows.
+`ActionTargetRelation.relation_kind` proof-visible. M0 target-overlap policy uses `contraindication_target`; other terminology relation kinds keep their §5.2 consumers. Duplicate semantic keys with different payload bytes emit `Incoherence(class=incompatible_generator_outputs)` during `DischargeProposal`, retained as quarantined rows in the accepted `SemanticPolicySet`. Quarantined rows recorded via `ValidationManifest.diagnostic_hashes` and `ClosureOutput.incoherence_hashes`, unavailable for normal lookup. Non-quarantined rows remain usable in the same policy set. Consumer querying a quarantined key propagates the recorded incoherence; querying an absent non-quarantined key emits `Residual(class=missing_policy)`. Retention lets the single demo `SemanticPolicySet` contain the dose-collision fixture while the main theorem fixture uses the route and administration-speed rows.
 
 ## 6. CKC-GEN-core and admission
 
 ### 6.1 Generator form
 
-`CKC-GEN-core` is the accepted M0 generator language: a finite, stratified, proof-producing relational transducer language.
+`CKC-GEN-core` = accepted M0 generator language: finite, stratified, proof-producing relational transducer language.
 
 ```text
 S CKCGen(generator_id:Id,profile:GeneratorProfile,stage:Int,sort:Id,scope:ClassPred,vars:List[TypedVar],premises:List[Premise],head:Head,admission_record_hash:Hash,replay_manifest_hash:Hash,accepted_effect_row:Set[Effect])
@@ -1157,7 +1143,7 @@ residual: stage 80, emits Residual, Ambiguity, Incoherence, and Diagnostic paylo
 gloss: stage 70, emits GlossTemplate or deterministic GlossView helpers.
 ```
 
-Every `FiniteVarDomain` variant names one finite relation enumerated by §7.1. `FrozenConstant`, `ParsedQuantity`, and `DiagnosticTag` are finite fixture relations loaded from the `ClosureInput` manifest and recorded in `ClosureBoundCertificate.finite_domain_cardinalities`.
+Every `FiniteVarDomain` variant names one finite relation enumerated by §7.1. `FrozenConstant`, `ParsedQuantity`, `DiagnosticTag` = finite fixture relations loaded from the `ClosureInput` manifest, recorded in `ClosureBoundCertificate.finite_domain_cardinalities`.
 
 ```text
 S FiniteFixtureManifest(manifest_id:Id,frozen_constants:Set[FrozenConstant],parsed_quantities:Set[ParsedQuantity],diagnostic_tags:Set[DiagnosticTag],replay_manifest_hash:Hash)
@@ -1211,9 +1197,9 @@ E BuiltinName = support_of | support_union | within_support | source_region_clos
 E Head = (pattern PatternObsTemplate) | (license LicenseTemplate) | (theorem ResolutionTheoremTemplate) | (residual ResidualTemplate) | (ambiguity AmbiguityTemplate) | (incoherence IncoherenceTemplate) | (gloss GlossTemplate) | (diagnostic DiagnosticTemplate)
 ```
 
-The s-expression grammar above is display notation. The parser emits canonical JSON tagged objects with the schemas below, applies §1 string policies, validates field paths against the target schema, and serializes by §1.5.
+S-expr grammar = display notation. Parser emits canonical JSON tagged objects (schemas below), applies §1 string policies, validates field paths vs target schema, serializes by §1.5.
 
-`ckc gen check` also emits an agent-facing grammar artifact for proposal decoders. The artifact has `authority = evidence_discovery_only` and `accepted_effect_row = {}`. It supports constrained decoding and authoring diagnostics; accepted CKC-GEN semantics are determined by canonical tagged JSON, SchemaRegistry validation, and `T-GEN-Static`.
+`ckc gen check` also emits agent-facing grammar artifact for proposal decoders: `authority = evidence_discovery_only`, `accepted_effect_row = {}`. Supports constrained decoding + authoring diagnostics; accepted CKC-GEN semantics fixed by canonical tagged JSON, SchemaRegistry validation, `T-GEN-Static`.
 
 ```text
 S GeneratorGrammarArtifact(grammar_id:Id,grammar_version:Id,nonterminal_schema_map:Set[NonterminalSchemaEntry],production_schema_map:Set[ProductionSchemaEntry],first_follow_sets:Set[FirstFollowSet],parser_state_machine:ParserStateMachine,valid_next_token_masks:Set[ValidNextTokenMask],authority:Authority,replay_manifest_hash:Hash,accepted_effect_row:Set[Effect])
@@ -1239,20 +1225,20 @@ S TokenClass(token_class_id:Id,lexical_policy:StringPolicy?)
 S ValidNextTokenMask(state_id:Id,token_classes:Set[TokenClass])
 ```
 
-The artifact stores its derived grammar structures inline; decoders and `T-GEN-Grammar-Evidence` read them directly. The display grammar, its production families, and the finite token-class table (token-class ids, literal token bytes, lexical policies) are fixed §6.2 specification content committed by `spec_contract_hash`: `grammar_id`/`grammar_version` name that grammar, and the emitting run's `SchemaRegistry` binding rides `replay_manifest_hash`. `lr_items_digest = sha256(canonical_payload_bytes(items))` over the state's LR(1) item set encoded as `Set[LRItem]`; `LRItem` mirrors the `ProductionSchemaEntry` production key plus a dot position and one lookahead token class.
+Artifact stores derived grammar structures inline; decoders + `T-GEN-Grammar-Evidence` read them directly. Display grammar, production families, finite token-class table (token-class ids, literal token bytes, lexical policies) = fixed §6.2 content committed by `spec_contract_hash`. `grammar_id`/`grammar_version` name that grammar; emitting run's `SchemaRegistry` binding rides `replay_manifest_hash`. `lr_items_digest = sha256(canonical_payload_bytes(items))` over state's LR(1) item set as `Set[LRItem]`; `LRItem` = `ProductionSchemaEntry` production key + dot position + one lookahead token class.
 
-`FIRST(N)` is the least fixed point of token classes that can begin a derivation from nonterminal `N`; `FOLLOW(N)` is the least fixed point of token classes that can immediately follow `N` in any derivation from the CKCGen start symbol. The grammar is finite, so both fixed points terminate by monotone growth over the finite token-class universe. The parser state machine is the canonical LR(1) item automaton built from the display grammar with states sorted by canonical item-set bytes (the `lr_items_digest` input). `ValidNextTokenMask(state)` is exactly the union of transition token classes leaving the state and reduction lookahead token classes in that state.
+`FIRST(N)` = least fixed point of token classes beginning a derivation from `N`; `FOLLOW(N)` = least fixed point of token classes immediately following `N` in any derivation from CKCGen start symbol. Grammar finite → both terminate by monotone growth over finite token-class universe. Parser state machine = canonical LR(1) item automaton from display grammar, states sorted by canonical item-set bytes (`lr_items_digest` input). `ValidNextTokenMask(state)` = union of transition token classes leaving state + reduction lookahead token classes in state.
 
-`ParseCKCGen(input_bytes) -> OperationResult[CKCGen]` is total:
+`ParseCKCGen(input_bytes) -> OperationResult[CKCGen]` total:
 
 ```text
-1 Decode input as UTF-8; decoder failure emits Diagnostic(code=parse_utf8_error).
-2 Tokenize by the finite token-class table; an unmatched byte span emits Diagnostic(code=parse_token_error).
-3 Traverse ParserStateMachine deterministically. On a missing transition or reduction, emit
-  Diagnostic(code=parse_unexpected_token) with ValidNextTokenMask for the current state.
-4 On acceptance, build tagged JSON objects using ProductionSchemaEntry.constructor_tag.
-5 Validate the tagged JSON against SchemaRegistry and return success(canonical CKCGen bytes), or return
-  invalid with the first schema diagnostic by canonical field-path order.
+1 Decode input UTF-8; decoder failure → Diagnostic(code=parse_utf8_error).
+2 Tokenize by finite token-class table; unmatched byte span → Diagnostic(code=parse_token_error).
+3 Traverse ParserStateMachine deterministically. Missing transition/reduction → emit
+  Diagnostic(code=parse_unexpected_token) with ValidNextTokenMask for current state.
+4 On acceptance, build tagged JSON via ProductionSchemaEntry.constructor_tag.
+5 Validate tagged JSON vs SchemaRegistry; return success(canonical CKCGen bytes), else
+  invalid with first schema diagnostic by canonical field-path order.
 ```
 
 Display-grammar nonterminal coverage:
@@ -1288,7 +1274,7 @@ PatternObsTemplate, LicenseTemplate, ResolutionTheoremTemplate, ResidualTemplate
 GlossTemplate | GlossTemplate | gloss-template object
 ```
 
-`T-GEN-Grammar-Evidence` validates the evidence-discovery grammar artifact: every nonterminal in the display grammar resolves to one tagged JSON schema, every schema alternative resolves to one grammar production family, every FIRST and FOLLOW set equals the least fixed point above, every parser-state token mask equals the artifact's own deterministic valid-next-token relation, `authority = evidence_discovery_only`, and `accepted_effect_row = {}`. This check certifies constrained-decoding support only. `T-GEN-Static` is the sole acceptance authority for CKC-GEN-core artifacts.
+`T-GEN-Grammar-Evidence` validates evidence-discovery grammar artifact: every display-grammar nonterminal resolves to one tagged JSON schema, every schema alternative to one production family, every FIRST/FOLLOW set equals the least fixed point above, every parser-state token mask equals artifact's own deterministic valid-next-token relation, `authority = evidence_discovery_only`, `accepted_effect_row = {}`. Certifies constrained-decoding support only. `T-GEN-Static` = sole acceptance authority for CKC-GEN-core artifacts.
 
 Generator leaf forms:
 
@@ -1419,24 +1405,24 @@ S IncoherenceTemplate(incoherence_class:IncoherenceClass,subject_hashes:Set[Term
 S DiagnosticTemplate(code:Id,subject_hash:Term?,source_regions:Set[RegionExpr],text:Term)
 ```
 
-`GlossTemplate` in a `Head` is the accepted artifact schema in §7.5. M0 gloss generators instantiate literal templates; dynamic gloss rendering is performed by §7.5.
+`GlossTemplate` in `Head` = accepted artifact schema §7.5. M0 gloss generators instantiate literal templates; dynamic gloss rendering by §7.5.
 
-Pattern constraints sort by `(path, op, canonical value bytes)`. Template bindings sort by `path` inside a head template, and each path appears once. Sequence items preserve declared order; maps and sets use §1.5 canonical order.
+Pattern constraints sort by `(path, op, canonical value bytes)`. Template bindings sort by `path` inside a head template, each path once. Sequence items preserve declared order; maps/sets use §1.5 canonical order.
 
-Template type checking is structural:
+Template type checking structural:
 
 ```text
-TermValue is valid when the evaluated term type is assignable to the target field type.
-RegionValue is valid only for RegionId, Set[RegionId], or source-support aliases.
-ReadingTemplateValue is valid when its ReadingTemplate.reading_kind names the target Reading schema or one member schema of a target Reading union.
-ListTemplateValue is valid when every element is valid for the list element type and list cardinality bounds hold.
-SetTemplateValue and MapTemplateValue use the declared element or value type and §1.5 canonical collection rules.
-Assignment from an optional source type `T?` to an optional target `T?` is valid when `T` is assignable.
-Assignment from an optional source type `T?` to a required target `T` is valid exactly when the static environment proves the source path is present.
-Presence is proved by a premise field constraint that resolves the same path (`has`, `eq`, `in`, `intersects`, or `count`), by an accepted `MechObsKind` optional-field guarantee in §4.4, or by a schema-required field on the source payload.
+TermValue valid iff evaluated term type assignable to target field type.
+RegionValue valid only for RegionId, Set[RegionId], or source-support aliases.
+ReadingTemplateValue valid iff its ReadingTemplate.reading_kind names target Reading schema or one member schema of a target Reading union.
+ListTemplateValue valid iff every element valid for list element type and list cardinality bounds hold.
+SetTemplateValue/MapTemplateValue use declared element/value type + §1.5 canonical collection rules.
+Optional source `T?` → optional target `T?`: valid iff `T` assignable.
+Optional source `T?` → required target `T`: valid iff static environment proves source path present.
+Presence proved by: a premise field constraint resolving same path (`has`/`eq`/`in`/`intersects`/`count`), an accepted `MechObsKind` optional-field guarantee §4.4, or a schema-required field on source payload.
 ```
 
-A `ReadingTemplateValue` constructs a reading payload before assignment. Micro-example: a head field `NormReading.temporal:List[TemporalReading]` accepts `ListTemplateValue([ReadingTemplateValue(TemporalReading{temporal_kind=prompt,value="速やかに",raw_anchor_id=<anchor>} )])` and rejects a raw `TermValue` whose term evaluates to `MechObsPayload`.
+`ReadingTemplateValue` constructs reading payload before assignment. Micro-example: head field `NormReading.temporal:List[TemporalReading]` accepts `ListTemplateValue([ReadingTemplateValue(TemporalReading{temporal_kind=prompt,value="速やかに",raw_anchor_id=<anchor>} )])`, rejects raw `TermValue` whose term evaluates to `MechObsPayload`.
 
 ```text
 E EvalScalar = id:Id | hash:Hash | uint:UInt | int:Int | rational:Rational | text:TextLiteral | enum:EnumLiteral
@@ -1446,40 +1432,40 @@ E EvalValue = scalar:EvalScalar | literal:Literal | artifact_ref:Hash | tuple:Li
 E TermEval = value:EvalValue | unsupported:DiagnosticRef | residual:Set[Hash] | ambiguity:Set[Hash] | incoherence:Set[Hash] | invalid:Set[Hash]
 ```
 
-`eval_term(term, environment) -> TermEval` is total:
+`eval_term(term, environment) -> TermEval` total:
 
 ```text
-VarTerm: return value(environment value) for the declared variable, or unsupported if unbound.
-LiteralTerm: return value(literal).
-FieldTerm: resolve the base variable, traverse FeaturePath over the schema-validated payload,
-  and return unsupported on absent required fields or type mismatch.
-TupleTerm: evaluate items in declared order; return the first non-value TermEval status by the
-  §1.7 primary-status order, otherwise return value(tuple).
-SetTerm: evaluate items in canonical term-byte order; return the first non-value TermEval status by
-  the §1.7 primary-status order; otherwise canonicalize as a set, call `HandleBoundOverflow` when the
-  applicable SchemaBoundManifest row overflows and return that exact overflow status, otherwise
-  return value(canonical set).
+VarTerm: value(environment value) for declared var, else unsupported if unbound.
+LiteralTerm: value(literal).
+FieldTerm: resolve base var, traverse FeaturePath over schema-validated payload;
+  unsupported on absent required fields or type mismatch.
+TupleTerm: eval items declared order; return first non-value TermEval status by
+  §1.7 primary-status order, else value(tuple).
+SetTerm: eval items canonical term-byte order; return first non-value TermEval status by
+  §1.7 primary-status order; else canonicalize as set, call `HandleBoundOverflow` when
+  applicable SchemaBoundManifest row overflows and return that exact overflow status, else
+  value(canonical set).
 ```
 
 ```text
 E ClassPredEval = bool:Bool | unsupported:DiagnosticRef
 ```
 
-`eval_class_pred(pred, payload) -> ClassPredEval` is total:
+`eval_class_pred(pred, payload) -> ClassPredEval` total:
 
 ```text
 true: true.
 false: false.
-has path: true iff FeaturePath resolves to a present field.
-eq path literal: true iff the path resolves and canonical value bytes equal the literal bytes.
-neq path literal: true iff the path is absent or canonical value bytes differ.
-in path set: true iff the resolved value is a member of the canonical set.
-intersects path set: true iff the resolved finite collection intersection is nonempty.
-count path Cmp UInt: true iff the resolved finite collection cardinality satisfies the comparator.
-and list: an empty list returns true; otherwise evaluate in declared order and return false at the
-  first false; unsupported propagates only when no earlier false decides the result.
-or list: an empty list returns false; otherwise evaluate in declared order and return true at the
-  first true; unsupported propagates only when no earlier true decides the result.
+has path: true iff FeaturePath resolves to present field.
+eq path literal: true iff path resolves and canonical value bytes = literal bytes.
+neq path literal: true iff path absent or canonical value bytes differ.
+in path set: true iff resolved value ∈ canonical set.
+intersects path set: true iff resolved finite collection intersection nonempty.
+count path Cmp UInt: true iff resolved finite collection cardinality satisfies comparator.
+and list: empty → true; else eval declared order, return false at first false;
+  unsupported propagates only when no earlier false decides.
+or list: empty → false; else eval declared order, return true at first true;
+  unsupported propagates only when no earlier true decides.
 not p: boolean negation of p; unsupported propagates.
 ```
 
@@ -1491,27 +1477,27 @@ S Environment(bindings:Map[Var,EvalValue])
 E PremiseEval = environments:Set[Environment] | unsupported:DiagnosticRef | residual:Set[Hash] | ambiguity:Set[Hash] | incoherence:Set[Hash] | invalid:Set[Hash]
 ```
 
-`eval_premise(premise, environment, snapshot) -> PremiseEval` is total. A premise that evaluates to boolean true returns `environments({environment})`; boolean false returns `environments({})`; unsupported returns `unsupported`. Relation-valued premises enumerate the relevant finite snapshot relation by canonical order, extend `environment` with each candidate binding, filter candidates by their pattern schema and `eval_class_pred`, and return the canonical set of surviving environments. `member` reads `ClassMember`; `capture` reads `Match.captures`; `rel` resolves a finite named relation from `TerminologyClosure`, `SemanticPolicySet`, or `FiniteFixtureManifest`; an unknown `RelationName` returns `unsupported`. Equality, inequality, and membership premises evaluate their terms first; a non-value `TermEval` result is mapped to the same `PremiseEval` status, and value results compare canonical bytes by the true/false mapping above. `builtin` dispatches by `BuiltinName` and binds `OutputVars` in declared order; builtin unsupported, residual, ambiguity, incoherence, and invalid outcomes are mapped to the same `PremiseEval` status. `collect`, `empty`, `seq`, and `bounded-path` use the bounded algorithms in this section and propagate their explicit residual, ambiguity, incoherence, invalid, or unsupported result.
+`eval_premise(premise, environment, snapshot) -> PremiseEval` total. Boolean-true premise → `environments({environment})`; false → `environments({})`; unsupported → `unsupported`. Relation-valued premises: enumerate relevant finite snapshot relation by canonical order, extend `environment` with each candidate binding, filter by pattern schema + `eval_class_pred`, return canonical set of surviving environments. `member` reads `ClassMember`; `capture` reads `Match.captures`; `rel` resolves finite named relation from `TerminologyClosure`/`SemanticPolicySet`/`FiniteFixtureManifest`, unknown `RelationName` → `unsupported`. Equality/inequality/membership premises eval terms first; non-value `TermEval` maps to same `PremiseEval` status, value results compare canonical bytes per true/false mapping above. `builtin` dispatches by `BuiltinName`, binds `OutputVars` declared order; builtin unsupported/residual/ambiguity/incoherence/invalid map to same `PremiseEval` status. `collect`/`empty`/`seq`/`bounded-path` use bounded algorithms in this section, propagate their explicit residual/ambiguity/incoherence/invalid/unsupported result.
 
-`T-GEN-Static` validates these schemas by this total procedure:
+`T-GEN-Static` validates these schemas by total procedure:
 
 ```text
-1 Parse display syntax to tagged JSON through `ParseCKCGen` and canonicalize it.
-2 Validate every grammar object against its schema.
-3 Resolve each FeaturePath against the declared domain or head target schema.
-4 Check that each variable reference is declared and every head variable is bound by a positive premise.
-5 Check that each RoleName, RelationName, enum variant, builtin name, production family, and schema id resolves to exactly one definition.
-6 Check that each FieldConstraint value has the type required by its path and operator, and that each TemplateValue is assignable to the target head field type under the structural rules above.
-7 Check that every RegionExpr, sequence, disjunction expansion, and AxisRegex has a finite static bound recorded in SchemaBoundManifest or the local bound object.
-8 Check that every CollectBound.max_items is finite; for any SchemaCollectionBound overflow during static checking, call `HandleBoundOverflow` and return its primary status.
-9 Check stage stratification, builtin support, accepted-effect purity, and source grounding.
-10 When a GeneratorGrammarArtifact is emitted, run `T-GEN-Grammar-Evidence` and record its result as evidence-discovery diagnostics; CKC-GEN acceptance depends on steps 1-9.
-11 Emit canonical CKCGen bytes on success or a typed Diagnostic on the primary non-success outcome.
+1 Parse display syntax to tagged JSON via `ParseCKCGen`, canonicalize.
+2 Validate every grammar object vs its schema.
+3 Resolve each FeaturePath vs declared domain or head target schema.
+4 Check each variable reference declared and every head variable bound by a positive premise.
+5 Check each RoleName, RelationName, enum variant, builtin name, production family, schema id resolves to exactly one definition.
+6 Check each FieldConstraint value has type required by its path+operator, and each TemplateValue assignable to target head field type under structural rules above.
+7 Check every RegionExpr, sequence, disjunction expansion, AxisRegex has finite static bound in SchemaBoundManifest or local bound object.
+8 Check every CollectBound.max_items finite; on any SchemaCollectionBound overflow during static check, call `HandleBoundOverflow` and return its primary status.
+9 Check stage stratification, builtin support, accepted-effect purity, source grounding.
+10 When GeneratorGrammarArtifact emitted, run `T-GEN-Grammar-Evidence`, record result as evidence-discovery diagnostics; CKC-GEN acceptance depends on steps 1-9.
+11 Emit canonical CKCGen bytes on success or typed Diagnostic on primary non-success outcome.
 ```
 
-`empty LicensePattern Q` is evaluated by first enumerating every environment that satisfies the premise list `Q` over lower-stage snapshots, using the same left-to-right environment extension as ordinary premises. For each resulting environment, the `LicensePattern` is instantiated with that environment and queried against the completed lower-stage license relation. The premise is true exactly when the total canonical set of matching licenses over all such environments has cardinality zero; it is false when the set is nonempty; it propagates the primary non-success outcome emitted by any premise in `Q`. This makes correlated absence queries explicit. Example: `empty LicensePattern{air_type=air.norm,slot_key=renal_adjustment} [(member c class_renal)]` succeeds only when no lower-stage norm license for `renal_adjustment` exists in any environment that is a member of `class_renal`.
+`empty LicensePattern Q`: enumerate every environment satisfying premise list `Q` over lower-stage snapshots, same left-to-right environment extension as ordinary premises. For each, instantiate `LicensePattern` with that environment, query against completed lower-stage license relation. True iff total canonical set of matching licenses over all such environments has cardinality zero; false when nonempty; propagates primary non-success outcome from any premise in `Q`. Makes correlated absence queries explicit. Example: `empty LicensePattern{air_type=air.norm,slot_key=renal_adjustment} [(member c class_renal)]` succeeds only when no lower-stage norm license for `renal_adjustment` exists in any environment that is member of `class_renal`.
 
-`collect` sorts matches by canonical payload bytes. When `CollectBound.max_items` overflows, M0 local dispatch is exact: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=collect_bound_overflow)`, and return `residual`; the collected value remains unbound.
+`collect` sorts matches by canonical payload bytes. On `CollectBound.max_items` overflow, M0 local dispatch exact: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=collect_bound_overflow)`, return `residual`; collected value stays unbound.
 
 Region, sequence, and path evaluation:
 
@@ -1519,61 +1505,61 @@ Region, sequence, and path evaluation:
 E RegionEval = region:SourceRegion | unsupported:DiagnosticRef | residual:Set[Hash] | ambiguity:Set[Hash] | incoherence:Set[Hash] | invalid:Set[Hash]
 
 eval_region(region_expr, environment, snapshot) -> RegionEval is total.
-eval_region(RegionLiteral r): return region(r) when it resolves; otherwise unsupported.
-eval_region(RegionOfTerm t): resolve t to an artifact with source_support, source_region_id, or a source-support alias and return the closed region; otherwise unsupported. A non-value TermEval result is returned as the corresponding RegionEval status.
-eval_region(RegionClosure seeds): check the `RegionClosure.seeds` SchemaBoundManifest row, call `HandleBoundOverflow` on overflow and return its status, otherwise call source_region_closure on resolved seeds and map its residual to RegionEval.residual.
-eval_region(RegionUnion regions): check the `RegionUnion.regions` SchemaBoundManifest row, call `HandleBoundOverflow` on overflow and return its status, otherwise call source_region_closure on the union of evaluated region members and map its residual to RegionEval.residual.
+eval_region(RegionLiteral r): region(r) when it resolves, else unsupported.
+eval_region(RegionOfTerm t): resolve t to artifact with source_support, source_region_id, or source-support alias, return closed region, else unsupported. Non-value TermEval → corresponding RegionEval status.
+eval_region(RegionClosure seeds): check `RegionClosure.seeds` SchemaBoundManifest row, call `HandleBoundOverflow` on overflow and return its status, else call source_region_closure on resolved seeds and map its residual to RegionEval.residual.
+eval_region(RegionUnion regions): check `RegionUnion.regions` SchemaBoundManifest row, call `HandleBoundOverflow` on overflow and return its status, else call source_region_closure on union of evaluated region members and map its residual to RegionEval.residual.
 
 seq(region, items, bindings):
-  1 Require |items| and |bindings| to satisfy SchemaBoundManifest; on overflow call `HandleBoundOverflow` for the corresponding `SeqItem` or `RoleBinding` bound and return its primary status.
-  2 Evaluate region to a closed SourceRegion.
-  3 For each SeqItem in declared order, enumerate observations inside the region that match item.pattern,
+  1 Require |items|,|bindings| satisfy SchemaBoundManifest; on overflow call `HandleBoundOverflow` for corresponding `SeqItem`/`RoleBinding` bound and return its primary status.
+  2 Evaluate region to closed SourceRegion.
+  3 For each SeqItem declared order, enumerate observations inside region matching item.pattern,
      sorted by source_order_key then canonical payload bytes.
-  4 Enumerate the finite Cartesian product of candidate observations in declared item order.
-  5 Require the source_order_key gap between consecutive selected observations to be within
-     [min_gap,max_gap] for the later SeqItem.
-  6 Bind each item.role to the selected observation when role is present.
-  7 Check every RoleBinding value against the bound role value.
-  8 Return true for the first canonical satisfying sequence; return false when enumeration is exhausted;
-     return unsupported only for unresolved regions, roles, or type errors.
+  4 Enumerate finite Cartesian product of candidate observations in declared item order.
+  5 Require source_order_key gap between consecutive selected observations within
+     [min_gap,max_gap] for later SeqItem.
+  6 Bind each item.role to selected observation when role present.
+  7 Check every RoleBinding value vs bound role value.
+  8 Return true for first canonical satisfying sequence; false when enumeration exhausted;
+     unsupported only for unresolved regions, roles, or type errors.
 
 bounded-path(axis_regex, start, end, max_len):
-  1 Resolve start and end to SourceGraph node, span, cell, or anchor addresses.
-  2 Require every AxisStep.max_repeat, AxisRegex.max_total_steps, and max_len to be finite and
-     max_total_steps <= max_len when both are present; if AxisRegex.steps or any path-candidate collection overflows its SchemaBoundManifest row, call `HandleBoundOverflow` and return its primary status.
+  1 Resolve start,end to SourceGraph node, span, cell, or anchor addresses.
+  2 Require every AxisStep.max_repeat, AxisRegex.max_total_steps, max_len finite and
+     max_total_steps <= max_len when both present; if AxisRegex.steps or any path-candidate collection overflows its SchemaBoundManifest row, call `HandleBoundOverflow` and return its primary status.
   3 Enumerate paths through SourceEdge values matching AxisStep.edge_kind and AxisStep.direction,
      sorted by edge source_order_key then edge_id.
-  4 Enforce each AxisStep repeat bounds, AxisRegex.max_total_steps, and max_len.
-  5 Return true for the first canonical path reaching end; return false when the finite search is exhausted;
-     return unsupported only for unresolved addresses or invalid bounds.
+  4 Enforce each AxisStep repeat bounds, AxisRegex.max_total_steps, max_len.
+  5 Return true for first canonical path reaching end; false when finite search exhausted;
+     unsupported only for unresolved addresses or invalid bounds.
 ```
 
-Builtin definitions and total unsupported and overflow conditions:
+Builtin definitions, total unsupported and overflow conditions:
 
 ```text
 E BuiltinEval = outputs:List[EvalValue] | bool:Bool | unsupported:DiagnosticRef | residual:Set[Hash] | ambiguity:Set[Hash] | incoherence:Set[Hash] | invalid:Set[Hash]
 
-support_of(x): returns the canonical source-support projection for x; unsupported when x has no
+support_of(x): canonical source-support projection for x; unsupported when x has no
   source-support field or alias.
-support_union(S): evaluates every region in S and returns source_region_closure over the union of
-  members; unsupported when any member is not a region.
+support_union(S): eval every region in S, return source_region_closure over union of
+  members; unsupported when any member not a region.
 within_support(a,b): true iff a.closed_members ⊆ b.closed_members; unsupported for unresolved regions.
 source_region_closure: §4.3.
-canonical_set: §1.5 set canonicalization; when the target set has a SchemaBoundManifest row and candidate cardinality exceeds it, return the exact `HandleBoundOverflow` outcome for that row.
+canonical_set: §1.5 set canonicalization; when target set has SchemaBoundManifest row and candidate cardinality exceeds it, return exact `HandleBoundOverflow` outcome for that row.
 proof_visible_signature: §7.2.
 unit_normalize: replace unit concepts by terminology representatives linked by unit_equivalent;
-  unequal unlinked units return unsupported.
+  unequal unlinked units → unsupported.
 normalize_context and ctx_compatible: §8.1.
 normalize_action and same_normalized_action: §8.2.
 consequents_compatible: §8.3.
 theorem_minimize and dependency_minimize: §8.7.
 ```
 
-Builtins are pure, total over supported inputs, byte-stable, and I/O-free. Unsupported inputs return `BuiltinEval.unsupported` with a diagnostic payload whose code is the builtin name plus `_unsupported`. Any builtin body that calls `HandleBoundOverflow` returns the exact overflow status in `BuiltinEval`; no overflow outcome escapes the declared codomain. Builtin output variables are bound in the order declared by `OutputVars`; arity mismatch is a static diagnostic.
+Builtins pure, total over supported inputs, byte-stable, I/O-free. Unsupported inputs → `BuiltinEval.unsupported` with diagnostic payload code = builtin name + `_unsupported`. Any builtin body calling `HandleBoundOverflow` returns exact overflow status in `BuiltinEval`; no overflow outcome escapes declared codomain. Builtin output variables bound in order declared by `OutputVars`; arity mismatch = static diagnostic.
 
 ### 6.3 Readings and licenses
 
-GRADE/Minds recommendation metadata is carried as proof-visible annotation. M0 theorem predicates consume `direction`; reports and glosses consume recommendation metadata when present.
+GRADE/Minds recommendation metadata = proof-visible annotation. M0 theorem predicates consume `direction`; reports/glosses consume recommendation metadata when present.
 
 ```text
 E RecommendationStrength = strong | weak | conditional | good_practice | ungraded
@@ -1601,7 +1587,7 @@ S TemporalReading(temporal_kind:Id,value:Text<semantic_ja>,raw_anchor_id:Id)
 
 S NormReading(context:ContextExpr,direction:Direction,action:ActionReading,temporal:List[TemporalReading],original_modality_phrase_ja:Text<semantic_ja>?,recommendation_metadata:RecommendationMetadata?)
 
-S FactualReading(subject:ReadingRef,predicate_id:Id,value:ReadingRef,context:ContextExpr,strict:Bool)
+S FactualReading(subject:ReadingRef?,consequent:FactualConsequent,context:ContextExpr,strict:Bool)
 
 S TableReading(table_id:Id,input_variable_id:Id,unit_id:Id?,rows:List[TableRowReading])
 
@@ -1612,15 +1598,15 @@ S AIRKey(air_type:AirType,support_region_id:RegionId,slot_key:Id)
 S License(license_id:Id,air_key:AIRKey,reading:Reading,generator_hash:Hash,source_support:Set[RegionId],proof_roots:Set[ProofId],accepted_effect_row:Set[Effect])
 ```
 
-Each license supplies one candidate reading for one AIR key. `slot_key` is the generator-declared semantic key for alternatives of the same fact. It is proof-visible. Distinct rows of one table are represented inside one `TableReading`; one table contributes one AIR key for the table reading.
+License = one candidate reading per AIR key. `slot_key` = generator-declared semantic key for alternatives of one fact; proof-visible. Distinct table rows live in one `TableReading`; one table → one AIR key.
 
-`ReadingRef.reading_digest = sha256(canonical_payload_bytes(reading))` over the referenced `Reading` value: readings live inline in licenses, policies, and witnesses, so a reference names canonical reading bytes, never an envelope. Consumers resolve a `ReadingRef` against the finite reading set in scope at the consuming algorithm.
+`ReadingRef.reading_digest = sha256(canonical_payload_bytes(reading))` over the referenced `Reading`; readings inline in licenses/policies/witnesses, so a ref names reading bytes, not an envelope. Resolve a `ReadingRef` against the finite reading set in scope at the consuming algorithm.
 
-`NormReading` represents modality by `(direction, original_modality_phrase_ja)`. Theorem predicates consume `direction`; gloss rendering consumes both the direction and the preserved source phrase when a template requests it.
+`NormReading` modality = `(direction, original_modality_phrase_ja)`. Theorem predicates consume `direction`; gloss rendering consumes both when a template requests.
 
 ### 6.4 Proposal records and discharge
 
-Proposal mechanisms include LLMs, retrieval, prompt programs, structured decoding, grammar-constrained decoding, verifier-guided repair, and human-authored fixtures. They produce proposal records with trace authority. Accepted semantic authority begins only at discharged artifacts created by `DischargeProposal`.
+Proposal mechanisms (LLMs, retrieval, prompt programs, structured/grammar-constrained decoding, verifier-guided repair, human fixtures) → proposal records with trace authority. Accepted semantic authority begins only at `DischargeProposal` discharged artifacts.
 
 ```text
 S ProposalProvenanceManifest(manifest_id:Id,generator_family:ProposalGeneratorFamily,model_or_tool_id:Id,model_version:Text<identifier_ascii>?,prompt_template_hash:Hash?,structured_output_schema_hash:Hash?,decoding_policy_hash:Hash?,tool_manifest_hashes:Set[Hash],input_context_hashes:Set[Hash],output_bytes_hash:Hash,authority:Authority,replay_manifest_hash:Hash)
@@ -1630,11 +1616,11 @@ E ProposalGeneratorFamily = closed_frontier_llm | domain_medical_model | proof_m
 S ProposalRecord(proposal_id:Id,proposed_subject_digest:Hash?,proposal_kind:Id,proposal_bytes_hash:Hash,proposal_provenance_hashes:Set[Hash],evidence_hashes:Set[Hash],proposal_effect_row:Set[Effect])
 ```
 
-Proposal provenance authority invariant: `ProposalProvenanceManifest.authority = evidence_discovery_only`. Model, prompt, structured-output, function-calling, tool, verifier-feedback, self-consistency, adapter, and world-model details affect accepted semantics only through deterministic discharge or a §3.3 gate.
+Proposal provenance authority invariant: `ProposalProvenanceManifest.authority = evidence_discovery_only`. Model/prompt/structured-output/function-calling/tool/verifier-feedback/self-consistency/adapter/world-model details affect accepted semantics only via deterministic discharge or a §3.3 gate.
 
-Pre-acceptance digest convention: proposal subjects exist before acceptance, so §6.4 records name them with `*_digest` fields storing `sha256(canonical_payload_bytes(payload))` over the canonical candidate payload that `DischargeProposal` steps 1-4 produce from the recorded candidate bytes. `ProposalRecord.proposed_subject_digest` (absent exactly when those steps reject the bytes), `ReviewerRecord.reviewed_subject_digest`, and `MaterializedConsequenceManifest.candidate_digest` digest that candidate payload. `MaterializedConsequenceManifest.emitted_payload_digests` digests each payload materialized at step 6. `CounterexampleSuite.required_output_digests` and `CounterexampleSuite.forbidden_output_digests` digest suite-authored expected payloads and compare against `emitted_payload_digests` at step 9. When step 12 constructs an accepted artifact, its envelope `artifact_hash` equals `candidate_digest`.
+Pre-acceptance digest convention: §6.4 `*_digest` = `sha256(canonical_payload_bytes(payload))` over the canonical candidate payload that `DischargeProposal` steps 1-4 produce from recorded candidate bytes. `ProposalRecord.proposed_subject_digest` (absent exactly when steps 1-4 reject bytes), `ReviewerRecord.reviewed_subject_digest`, `MaterializedConsequenceManifest.candidate_digest` digest that candidate payload. `emitted_payload_digests` digests each payload materialized at step 6. `CounterexampleSuite.required_output_digests`/`forbidden_output_digests` digest suite-authored expected payloads, compared vs `emitted_payload_digests` at step 9. Step-12 accepted artifact: envelope `artifact_hash` = `candidate_digest`.
 
-Retrieval, reranking, graph traversal, query decomposition, and citation-grounded generation enter M0 only through proposal trace objects. These traces have `authority = evidence_discovery_only`; they are consumed by `DischargeProposal` as evidence hashes and by §3.3 research gates for retrieval-quality claims.
+Retrieval, reranking, graph traversal, query decomposition, citation-grounded generation enter M0 only via proposal traces with `authority = evidence_discovery_only`; consumed by `DischargeProposal` as evidence hashes and by §3.3 research gates for retrieval-quality claims.
 
 ```text
 S RetrievalProposalTrace(trace_id:Id,query_hash:Hash,query_decomposition_hash:Hash?,segment_granularity:RetrievalSegmentGranularity,sparse_retriever_family:SparseRetrieverFamily?,sparse_retriever_manifest_hash:Hash?,dense_retriever_family:DenseRetrieverFamily?,dense_retriever_manifest_hash:Hash?,late_interaction_family:LateInteractionFamily?,late_interaction_manifest_hash:Hash?,graph_retrieval_manifest_hash:Hash?,fusion_policy_family:FusionPolicyFamily?,fusion_policy_hash:Hash?,reranker_family:RerankerFamily?,reranker_manifest_hash:Hash?,japanese_analyzer_family:JapaneseAnalyzerFamily?,candidate_region_ids:List[RegionId],cited_region_ids:Set[RegionId],score_record_hashes:Set[Hash],index_fingerprint_hashes:Set[Hash],authority:Authority,accepted_effect_row:Set[Effect])
@@ -1654,9 +1640,9 @@ E RerankerFamily = cross_encoder | bge_reranker | cohere_rerank | medcpt_reranke
 E JapaneseAnalyzerFamily = kuromoji | sudachi | mecab_ipadic | mecab_unidic | fugashi | sentencepiece | xlm_roberta_tokenizer | other
 ```
 
-Retrieval trace authority invariant: `RetrievalProposalTrace.authority = evidence_discovery_only`. `RetrievalProposalTrace.score_record_hashes` stores `sha256(exact_recorded_bytes)` of the score records emitted by the named retriever, fusion, and reranker stages; the trace's `*_manifest_hash` fields name the manifests that supply those bytes.
+Retrieval trace authority invariant: `RetrievalProposalTrace.authority = evidence_discovery_only`. `score_record_hashes` = `sha256(exact_recorded_bytes)` of score records from named retriever/fusion/reranker stages; `*_manifest_hash` fields name the supplying manifests.
 
-`T-Retrieval-Proposal-Trace` checks that every candidate and cited region resolves in SourceGraph, every named retrieval/analyzer/reranker family resolves to the local enums above, every index fingerprint is replayable, every fusion or reranking score is trace metadata rather than accepted semantics, and every retrieval-quality claim carries `G-RET-PARITY` evidence.
+`T-Retrieval-Proposal-Trace`: every candidate/cited region resolves in SourceGraph; every named retrieval/analyzer/reranker family resolves to local enums above; every index fingerprint replayable; every fusion/reranking score is trace metadata, not accepted semantics; every retrieval-quality claim carries `G-RET-PARITY` evidence.
 
 ```text
 E AdmissionDecision = accept | ambiguity | residual | escalate | reject
@@ -1680,6 +1666,8 @@ S AdmissionRecord(subject_hash:Hash,subject_kind:Id,decision:AdmissionDecision,r
 S AcceptedGeneratorBase(base_id:Id,generator_hashes:Set[Hash],admission_record_hashes:Set[Hash],accepted_effect_row:Set[Effect])
 ```
 
+`AcceptedGeneratorBase` + admitted `TerminologyResourceSet` + `SemanticPolicySet` = reusable-component set whose minimality vs corpus coverage is CKC's long-run optimization target (intro, §10, §13). M0: compactness reported descriptively only; reuse/compression/MDL verdicts gated by `G-MDL`, `G-EMIN`.
+
 Admission-decision consumers:
 
 ```text
@@ -1701,7 +1689,7 @@ reject:
   records a negative admission decision and preserves deterministic diagnostics as the durable output.
 ```
 
-Reviewer authority invariant: `ReviewerRecord.authority = admitted_authority`. `ReviewerRole` is report-visible only. All role variants are consumed generically by admission trace rendering and leave accepted semantics unchanged. `reviewer_id` names the reviewing person or automated checker; `rationale` carries the reviewer's justification inline under `diagnostic_text`.
+Reviewer authority invariant: `ReviewerRecord.authority = admitted_authority`. `ReviewerRole` report-visible only; all variants consumed generically by admission trace rendering, accepted semantics unchanged. `reviewer_id` names reviewer/automated checker; `rationale` = justification inline under `diagnostic_text`.
 
 `DischargeProposal(proposal, candidate_bytes, admission_context) -> OperationResult[EffectDischargeRecord]`:
 
@@ -1741,7 +1729,7 @@ S ClosureInput(source_graph_hash:Hash,mech_obs_hashes:Set[Hash],accepted_generat
 S ClosureOutput(closure_input_hash:Hash,pattern_obs_hashes:Set[Hash],match_hashes:Set[Hash],match_class_hashes:Set[Hash],class_member_hashes:Set[Hash],terminology_closure_hash:Hash,license_hashes:Set[Hash],resolution_theorem_hashes:Set[Hash],licensed_reading_set_hashes:Set[Hash],air_core_hashes:Set[Hash],nf_hashes:Set[Hash],gloss_template_hashes:Set[Hash],gloss_view_hashes:Set[Hash],witness_context_hashes:Set[Hash],conflict_hashes:Set[Hash],factual_inconsistency_hashes:Set[Hash],residual_hashes:Set[Hash],ambiguity_hashes:Set[Hash],incoherence_hashes:Set[Hash],diagnostic_hashes:Set[Hash],verifier_witness_hashes:Set[Hash],symbol_source_map_hashes:Set[Hash],constraint_core_witness_hashes:Set[Hash],repair_set_search_trace_hashes:Set[Hash],certificate_hashes:Set[Hash],claim_record_hashes:Set[Hash],report_trace_index_hashes:Set[Hash],claim_tier_summary_hashes:Set[Hash],wording_gate_record_hashes:Set[Hash],review_report_hashes:Set[Hash],replay_manifest_hashes:Set[Hash],replay_identity_hashes:Set[Hash],proof_node_hashes:Set[Hash],proof_dag_hash:Hash,closure_bound_certificate_hash:Hash)
 ```
 
-M0 closure is stratified finite materialization. `ClosureOutput` enumerates every CloseM0-produced accepted artifact class from stages -10 through 90 except `TerminologyResourceSet` artifacts; the admitted set and any stage-10 fragments are excluded as a class and remain reachable through `ClosureInput`, `TerminologyClosure.terminology_resource_set_hash`, and Appendix A.10, which declares the demo stage-10 fragment set empty. It also excludes admitted stage -40 inputs such as `ReportQuestionTemplate`, `AcceptedGeneratorBase`, and `SemanticPolicySet`; runtime, schema, environment, and fixture-control inputs; and row types stored inside manifests. Other excluded artifacts remain reachable through `ClosureInput`, manifest fields, or Appendix A.10.
+M0 closure = stratified finite materialization. `ClosureOutput` enumerates every CloseM0 accepted artifact class, stages -10..90, except `TerminologyResourceSet`; admitted set + stage-10 fragments excluded as a class, reachable via `ClosureInput`, `TerminologyClosure.terminology_resource_set_hash`, Appendix A.10 (demo stage-10 fragment set empty). Also excludes admitted stage -40 inputs (`ReportQuestionTemplate`, `AcceptedGeneratorBase`, `SemanticPolicySet`), runtime/schema/environment/fixture-control inputs, and manifest-stored row types. Other excluded artifacts reachable via `ClosureInput`, manifest fields, or A.10.
 
 ```text
 1 Initialize R[-30] from SourceGraph payloads and R[-20] from MechObsPayload payloads.
@@ -1768,15 +1756,15 @@ M0 closure is stratified finite materialization. `ClosureOutput` enumerates ever
   call the local `closure_bound_overflow` dispatch before accepting a payload whose bound is exceeded.
 ```
 
-Same-stage recursion is represented by adding an intermediate stage. Stratified negation uses `empty` only over fully materialized lower-stage relations.
+Same-stage recursion = add intermediate stage. Stratified negation: `empty` only over fully materialized lower-stage relations.
 
 ```text
 S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt)
 ```
 
-The certificate restates only bounds recorded nowhere else; schema collection bounds ride `closure_input_hash` through `ClosureInput.schema_bound_manifest_hash`. Bound-map keys: `generator_env_bounds` and `generator_materialized_counts` are keyed by accepted generator envelope `artifact_hash`; `collect_bounds`, `sequence_bounds`, `axis_path_bounds`, and `context_clause_bounds` are keyed by `sha256(canonical_payload_bytes(form))` over the bounded collect, seq, bounded-path, or context-clause form.
+Certificate restates only bounds recorded nowhere else; schema collection bounds ride `closure_input_hash` via `ClosureInput.schema_bound_manifest_hash`. Bound-map keys: `generator_env_bounds`, `generator_materialized_counts` keyed by accepted generator envelope `artifact_hash`; `collect_bounds`, `sequence_bounds`, `axis_path_bounds`, `context_clause_bounds` keyed by `sha256(canonical_payload_bytes(form))` over the bounded collect/seq/bounded-path/context-clause form.
 
-`closure_bound_overflow` is the local dispatch for `ClosureBoundCertificate` map bounds that lack `BoundOverflowDisposition`: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=closure_bound_overflow)`, include the overflowing bound key in the canonical diagnostic text, and reject the overflowing materialized payload from accepted output.
+`closure_bound_overflow` = local dispatch for `ClosureBoundCertificate` map bounds lacking `BoundOverflowDisposition`: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=closure_bound_overflow)`, include overflowing bound key in canonical diagnostic text, reject overflowing materialized payload from accepted output.
 
 Termination argument:
 
@@ -1813,6 +1801,8 @@ S MatchClass(match_class_id:Id,class_signature_hash:Hash,member_match_ids:Set[Id
 S ClassMember(match_id:Id,match_class_id:Id)
 ```
 
+`ProofNode` digest fields (§1.2 convention): `payload_digest = sha256(canonical_payload_bytes(conclusion_payload))` over the node's concluded payload, where `conclusion_hash` = that payload's accepted-envelope `artifact_hash` when one exists, else = `payload_digest` for inline-only conclusion; `support_digest = sha256(canonical_payload_bytes(node_source_support))` over the proof-DAG-inherited `Set[RegionId]` the node carries (canonical source-support projection §1.2 routes through `proof_structure` payloads); `environment_digest = sha256(canonical_payload_bytes(satisfying_environment))` over the `Environment` (§6.2) that fired the generator. `environment_digest` present exactly for `GEN_OBS`, `GEN_SEM`; `support_digest` absent only for rules carrying no source support (`REPLAY`, `CERT`).
+
 Proof-rule consumers and side conditions:
 
 ```text
@@ -1834,13 +1824,13 @@ REPLAY | ReplayManifest, ReplayIdentityCheck | Replay manifest inputs resolve an
 CERT | Certificate | Certificate-class obligation in §9.2 verifies for the subject.
 ```
 
-Each `JudgmentKind` variant is the conclusion kind of the corresponding semantically derived, verifier, report, replay, or certificate artifact schema named in §3.1 and §3.2. Source-only, schema-control, replay-control, admission-control, environment-control, and evidence-discovery artifacts have their proof obligations at their named acceptance gates in §11.3 and are referenced from ProofNodes through `premise_artifact_hashes` when they support a semantic conclusion.
+Each `JudgmentKind` variant = conclusion kind of the corresponding semantically derived / verifier / report / replay / certificate artifact schema named in §3.1, §3.2. Source-only, schema-control, replay-control, admission-control, environment-control, evidence-discovery artifacts have proof obligations at their named acceptance gates in §11.3, referenced from ProofNodes via `premise_artifact_hashes` when supporting a semantic conclusion.
 
-The proof checker verifies rule side conditions by re-reading accepted inputs and proof-visible payload fields. It is independent of proposal traces. A proof node is invalid when any premise proof is missing, when a premise artifact hash does not match its accepted envelope, or when the conclusion hash differs from recomputed canonical payload bytes.
+Proof checker verifies rule side conditions by re-reading accepted inputs and proof-visible payload fields; independent of proposal traces. Node invalid when: any premise proof missing, OR a premise artifact hash ≠ its accepted envelope, OR conclusion hash ≠ recomputed canonical payload bytes.
 
-Node identity is `proof_id` inside the DAG payload; DAG identity is the envelope `artifact_hash` (§1.2). Checker identity is envelope provenance through `producer_manifest_hash`, and per-subject check outcomes are stage-90 `VerifierWitness` artifacts. The reverse dependency index is the in-memory inversion of `premise_proof_ids`; `proof_nodes` is its single canonical representation.
+Node identity = `proof_id` inside DAG payload; DAG identity = envelope `artifact_hash` (§1.2). Checker identity = envelope provenance via `producer_manifest_hash`; per-subject check outcomes = stage-90 `VerifierWitness` artifacts. Reverse dependency index = in-memory inversion of `premise_proof_ids`; `proof_nodes` = its single canonical representation.
 
-`proof_visible_signature(Match m)` returns the canonical bytes of:
+`proof_visible_signature(Match m)` = canonical bytes of:
 
 ```text
 match_shape;
@@ -1854,7 +1844,7 @@ source section path IDs;
 bounded path summaries.
 ```
 
-`BuildMatches` sorts candidate matches by `source_order_key`, then `proof_visible_signature`, then canonical payload bytes. `MatchClass` is the quotient of `Match` by proof-visible signature equality. `T-Quotient-Invariance` checks that proof-invisible layout perturbations preserve class signatures.
+`BuildMatches` sorts candidate matches by `source_order_key`, then `proof_visible_signature`, then canonical payload bytes. `MatchClass` = quotient of `Match` by proof-visible signature equality. `T-Quotient-Invariance` checks proof-invisible layout perturbations preserve class signatures.
 
 ### 7.3 Licensed reading sets and AIRCore
 
@@ -1889,7 +1879,7 @@ AIRCore finite-set identity algorithm:
 4 If |L| > 1, emit AIRCoreRecord(status=ambiguity) and Ambiguity(class=multiple_readings).
 ```
 
-M0 AIR `domain_kind` is `finite_set_identity`. Non-identity AIR domains require `G-AIR-FULL`.
+M0 AIR `domain_kind` = `finite_set_identity`. Non-identity AIR domains require `G-AIR-FULL`.
 
 ### 7.4 CKC Normal Form
 
@@ -1919,16 +1909,20 @@ NormReading -> NFNorm:
   temporal, original_modality_phrase_ja, and RecommendationMetadata.
 
 FactualReading -> NFFactualRule:
-  copy source_class; copy context; set strict from FactualReading.strict; encode the consequent as
-  SlotEqAtom(slot_id=predicate_id,value=value) plus the subject context when the subject is not
-  already present in context.
+  copy source_class; set strict from FactualReading.strict; copy context, adding subject as a
+  context atom when subject present and not already in context; normalize FactualReading.consequent
+  through §5.2 representatives and §8.1 atom normalization, copy as NFFactualRule.consequent (a
+  FactualConsequent whose constraints = finite Set[ContextAtom] sorted by canonical bytes). One
+  licensed strict fact may carry several QuantityConstraintAtom, TemporalConstraintAtom, or SlotEqAtom
+  consequents: NF-Q1 carries systolic_bp < 90 and systolic_bp >= 90 as two QuantityConstraintAtom;
+  NF-R1, NF-R2 carry one SlotEqAtom each.
 
 TableReading -> NFDecisionTable:
   copy source_class, table_id, input_variable_id, unit_id, and rows in source row order.
 
 SourceEdition metadata -> NFMetadataClaim:
-  for every MetadataKey present in the SourceEdition and demanded by SemanticPolicySet or the
-  fixture manifest, create exactly one metadata claim with semantic_ja-normalized value.
+  for every MetadataKey present in SourceEdition and demanded by SemanticPolicySet or fixture manifest,
+  create exactly one metadata claim with semantic_ja-normalized value.
 ```
 
 Normal Form algorithm:
@@ -1948,7 +1942,7 @@ Normal Form algorithm:
 12 Compute semantic_digest = sha256(canonical_payload_bytes(nf_payload)).
 ```
 
-The digest boundary is intentionally limited to `nf_payload`. Source support and proof roots remain proof-visible fields on `CKCNormalForm`, but they are outside `semantic_digest`; this makes semantic equivalence insensitive to commutative antecedent ordering and to proof-DAG root identity changes that preserve the same NF payload bytes.
+`semantic_digest` covers only `nf_payload`; `source_support`/`proof_roots` stay proof-visible on `CKCNormalForm` but outside `semantic_digest`, so equivalence ignores commutative-antecedent reordering and proof-root changes preserving NF payload bytes.
 
 Worked digest example:
 
@@ -1974,7 +1968,7 @@ Every rewrite has a proof or compiler rule reference.
 
 ### 7.5 Deterministic glosses
 
-A gloss is a deterministic view over CKC Normal Form. Its authority is exactly `view_only`, and theorem/checker semantics come from the referenced NF and ProofDAG.
+Gloss = deterministic view over CKC Normal Form. Authority exactly `view_only`; theorem/checker semantics come from referenced NF and ProofDAG.
 
 ```text
 S GlossTemplate(template_id:Id,nf_kind:NFKind,lang:Lang,literal_parts:List[Text<template_literal>],slots:List[GlossSlotSpec],renderer_id:Id)
@@ -2011,11 +2005,11 @@ combined_slot_digest differs from the recomputed ordered slot digests.
 
 ## 8. Conflict and factual-inconsistency semantics
 
-This section defines the M0 mathematical core. The kernel finite checker uses these predicates exactly. Unless shown as an explicit parameter, predicates read the accepted `TerminologyResourceSet T`, `SemanticPolicySet P`, `SourceGraph S`, and `ProofDAG D` from `KernelFiniteCheckInput`.
+M0 mathematical core; kernel finite checker uses these predicates exactly. Unless an explicit parameter, predicates read accepted `TerminologyResourceSet T`, `SemanticPolicySet P`, `SourceGraph S`, `ProofDAG D` from `KernelFiniteCheckInput`.
 
 ### 8.1 Context satisfiability and compatibility
 
-M0 contexts are finite disjunctions of finite conjunctions. `true` is encoded as one empty `ContextClause`; `false` is encoded as `clauses = {}`.
+M0 contexts = finite disjunctions of finite conjunctions. `true` = one empty `ContextClause`; `false` = `clauses = {}`.
 
 ```text
 S ContextExpr(clauses:Set[ContextClause])
@@ -2041,7 +2035,7 @@ S TemporalLiteralAtom(variable_id:Id,value:Text<semantic_ja>)
 S TemporalInterval(lower:Rational?,lower_closed:Bool,upper:Rational?,upper_closed:Bool,unit_id:Id)
 ```
 
-Generator admission normalizes context syntax to this language. Disjunction expansion uses declared finite bounds. Bound excess calls `HandleBoundOverflow` for the `ContextExpr.clauses` or local disjunction-expansion bound; M0 context-generation local dispatch uses `emit_residual` and therefore emits `Residual(class=unsupported_construction)` with `Diagnostic(code=context_bound_overflow)`.
+Generator admission normalizes context syntax to this language. Disjunction expansion uses declared finite bounds. Bound excess calls `HandleBoundOverflow` for `ContextExpr.clauses` or the local disjunction-expansion bound; M0 context-generation local dispatch uses `emit_residual` → `Residual(class=unsupported_construction)` with `Diagnostic(code=context_bound_overflow)`.
 
 ```text
 E ContextNormalizeResult = normalized:ContextExpr | unsupported:DiagnosticRef
@@ -2079,15 +2073,15 @@ S WitnessAssignment(variable_id:Id,value:WitnessAssignmentValue)
 2 If either normalized context has clauses = {}, return incompatible.
 3 Enumerate clause pairs (a,b) by canonical_sort_key(a), then canonical_sort_key(b).
 4 For each pair, C := union(a.atoms, b.atoms) and check C by finite_constraint_check(C).
-5 Return compatible(WitnessContext) for the first satisfiable pair. The witness atoms are exactly the canonical duplicate-free union of the two normalized clauses; the witness assignments contain exactly the variables used by those atoms and the deterministic rational/text/readings selected by `finite_constraint_check`; source_support and proof_roots are the canonical unions of the accepted operands that contributed the selected clauses.
-6 Record unsupported diagnostics but keep checking later pairs, because a later satisfiable pair
-  proves compatibility of the disjunction.
+5 Return compatible(WitnessContext) for the first satisfiable pair. Witness atoms = canonical duplicate-free union of the two normalized clauses; witness assignments = exactly the variables used by those atoms plus the deterministic rational/text/readings selected by `finite_constraint_check`; source_support and proof_roots = canonical unions of accepted operands contributing the selected clauses.
+6 Record unsupported diagnostics but keep checking later pairs (a later satisfiable pair
+  proves disjunction compatibility).
 7 Return unsupported with the first diagnostic by canonical_sort_key when no pair is satisfiable
   and at least one pair is unsupported.
 8 Return incompatible when every pair is checked and inconsistent.
 ```
 
-`finite_constraint_check(C)` is total over every M0 atom kind. It first names atoms by sorting canonical atom bytes and assigning `a0`, `a1`, then increasing suffixes in order. It then branches as follows:
+`finite_constraint_check(C)` total over every M0 atom kind. First names atoms by sorting canonical atom bytes, assigning `a0`, `a1`, then increasing suffixes in order. Then branches:
 
 ```text
 PredAtom and NegPredAtom:
@@ -2129,9 +2123,9 @@ Mixed temporal numeric/literal groups:
   with code=temporal_mixed_numeric_literal.
 ```
 
-For rational interval witness selection with disequality points, choose the first candidate from this deterministic list that lies in the interval and is not excluded: finite closed lower bound, finite open lower bound plus 1, finite closed upper bound, finite open upper bound minus 1, midpoint `(lower+upper)/2` when both bounds are finite and unequal, 0, then `excluded_point+1` for excluded points in canonical order. Density of rationals guarantees one exists whenever the interval-minus-finite-set is nonempty. Thus `x < 90 ∧ x <= 90` has canonical witness `89`.
+Rational interval witness selection with disequality points: first candidate from this deterministic list lying in the interval and not excluded: finite closed lower bound, finite open lower bound plus 1, finite closed upper bound, finite open upper bound minus 1, midpoint `(lower+upper)/2` when both bounds finite and unequal, 0, then `excluded_point+1` for excluded points in canonical order. One exists whenever interval-minus-finite-set is nonempty. Thus `x < 90 ∧ x <= 90` has canonical witness `89`.
 
-`finite_constraint_check(C)` returns a structured result. `result=satisfiable` carries the canonical witness assignment. `result=inconsistent` carries an inclusion-minimal named core under the fixed deletion order, and may also carry an external solver core when the replayed solver proof is present. The internal core is authoritative for M0.
+`finite_constraint_check(C)` structured result: `result=satisfiable` carries the canonical witness assignment; `result=inconsistent` carries an inclusion-minimal named core under the fixed deletion order, plus an external solver core when the replayed solver proof is present. Internal core authoritative for M0.
 
 ```text
 E FiniteConstraintResult = satisfiable | inconsistent | unsupported
@@ -2143,7 +2137,7 @@ S NamedConstraintAtom(atom_id:Id,atom:ContextAtom,source_region_ids:Set[RegionId
 S ConstraintCoreWitness(named_atoms:Set[NamedConstraintAtom],core_atom_ids:Set[Id],internal_minimality_order_hash:Hash,external_backend_core_hash:Hash?,proof_roots:Set[ProofId])
 ```
 
-A `WitnessContext` is canonical for the selected clause pair: its atom set is the duplicate-free union of the pair after normalization, and deleting any atom changes the represented conjunction. `left_clause_digest`/`right_clause_digest` name the selected pair: each is `sha256(canonical_payload_bytes(clause))` over the corresponding normalized `ContextClause`, an in-memory normalization value, never an accepted artifact. Selection determinism rides the payload fields themselves; the kernel checker re-evaluates `ctx_compatible` directly. Inconsistent cores are minimized by deterministic deletion: traverse atoms in canonical order, remove an atom when inconsistency is preserved, and stop after one complete pass over the sorted list. For monotone inconsistency, this fixed deletion pass yields an inclusion-minimal core for that traversal because any atom that was necessary in a superset remains necessary after later deletions.
+`WitnessContext` canonical for the selected clause pair: atom set = duplicate-free union of the pair after normalization; deleting any atom changes the represented conjunction. `left_clause_digest`/`right_clause_digest` name the pair: each = `sha256(canonical_payload_bytes(clause))` over the corresponding normalized `ContextClause`, an in-memory value, never an accepted artifact. Kernel checker re-evaluates `ctx_compatible` directly. Inconsistent cores minimized by deterministic deletion: traverse atoms in canonical order, remove an atom when inconsistency is preserved, stop after one complete pass over the sorted list (inclusion-minimal for that traversal under monotone inconsistency). `ConstraintCoreWitness.internal_minimality_order_hash = sha256(canonical_payload_bytes(O))` over `List[Id]` `O` of `NamedConstraintAtom.atom_id` values in that fixed canonical deletion-traversal order; `external_backend_core_hash`, when present, = `sha256(exact_recorded_bytes)` of the replayed external solver core under the §1.2 raw-recorded convention.
 
 ### 8.2 Action normalization and sameness
 
@@ -2252,11 +2246,11 @@ normative_contraindicating = {contraindicate}
 normative_negative = {contraindicate, avoid, against}
 ```
 
-Normative consequents are incompatible exactly when one direction is in `normative_positive`, the other direction is in `normative_negative`, and `same_normalized_action(left.action,right.action,T,P) = same`. The rule is symmetric by unordered pair enumeration. The conflict predicates partition negative directions explicitly: `contraindication_vs_recommendation` uses `normative_contraindicating`, `recommendation_for_vs_against` uses `normative_against`, and the general consequent-compatibility and package-insert factual predicates use `normative_negative`.
+Normative consequents incompatible exactly when one direction ∈ `normative_positive`, the other ∈ `normative_negative`, and `same_normalized_action(left.action,right.action,T,P) = same`. Symmetric by unordered pair enumeration. Conflict predicates partition negative directions: `contraindication_vs_recommendation` uses `normative_contraindicating`, `recommendation_for_vs_against` uses `normative_against`, general consequent-compatibility and package-insert factual predicates use `normative_negative`.
 
-Strict factual consequents are incompatible when `finite_constraint_check(left.constraints ∪ right.constraints)` is inconsistent.
+Strict factual consequents incompatible when `finite_constraint_check(left.constraints ∪ right.constraints)` is inconsistent.
 
-Table consequents are evaluated by `table_outputs_compatible(left,right,SemanticPolicySet P)`:
+Table consequents evaluated by `table_outputs_compatible(left,right,SemanticPolicySet P)`:
 
 ```text
 1 If output_slot_id differs, return compatible.
@@ -2268,7 +2262,7 @@ Table consequents are evaluated by `table_outputs_compatible(left,right,Semantic
 6 Return residual with Residual(class=missing_policy) when output values differ and no row matches.
 ```
 
-`consequents_compatible(left,right,T,P) -> ConsequentCompatibility` is the builtin named in §6.2:
+`consequents_compatible(left,right,T,P) -> ConsequentCompatibility` = builtin named in §6.2:
 
 ```text
 1 If both inputs are NormConsequent, evaluate same_normalized_action(left.action,right.action,T,P).
@@ -2296,7 +2290,7 @@ strict_factual_self_check(rule) -> StrictFactualSelfCheck:
   unsupported returns unsupported(first diagnostic by canonical_sort_key).
 ```
 
-A strict factual rule whose consequent is self-inconsistent is a single-subject inconsistency. It emits `numeric_threshold_empty_intersection` when the minimal core is numeric or temporal interval-empty; otherwise it emits `Incoherence(class=incompatible_generator_outputs)` with the strict rule hash as subject. It is not an operand of pairwise `strict_consequents_jointly_contradictory`.
+Strict factual rule with self-inconsistent consequent = single-subject inconsistency. Emits `numeric_threshold_empty_intersection` when the minimal core is numeric or temporal interval-empty; otherwise emits `Incoherence(class=incompatible_generator_outputs)` with the strict rule hash as subject. Not an operand of pairwise `strict_consequents_jointly_contradictory`.
 
 ### 8.4 Resolution set
 
@@ -2306,7 +2300,7 @@ E ResolutionTheoremKind = exception | priority | scope_limitation | supersession
 S ResolutionTheorem(theorem_id:Id,kind:ResolutionTheoremKind,applies_to:Set[Hash],context:ContextExpr,source_support:Set[RegionId],proof_roots:Set[ProofId])
 ```
 
-`context_from` is total and deterministic over `ContextCompatibility` results:
+`context_from` total/deterministic over `ContextCompatibility`:
 
 ```text
 context_from(compatible(WitnessContext W)) = ContextExpr{clauses={ContextClause{atoms=W.atoms}}}
@@ -2314,30 +2308,30 @@ context_from(incompatible) = ContextExpr{clauses={}}
 context_from(unsupported(_)) = ContextExpr{clauses={}}
 ```
 
-When a caller already has the `WitnessContext` payload `W`, `context_from(W)` abbreviates `context_from(compatible(W))`. The non-compatible cases return the canonical false context so that no resolution theorem can be selected from an absent compatibility witness; §8.5 and §8.6 call `ResolutionSet` only after `ctx_compatible(input)=compatible(W)`.
+Given payload `W`, `context_from(W)` = `context_from(compatible(W))`. Non-compatible cases return canonical false context. §8.5/§8.6 call `ResolutionSet` only after `ctx_compatible(input)=compatible(W)`.
 
-`resolution_subject_ids(x)` is the canonical set of hashes by which a resolution theorem may name an operand:
+`resolution_subject_ids(x)` = canonical hash set naming an operand:
 
 ```text
 x.artifact_hash;
 x.semantic_digest when x is CKCNormalForm;
-every License hash that contributes to x through parent_air_core_hashes -> AIRCoreRecord -> LicensedReadingSet.license_hashes.
+every License hash contributing to x via parent_air_core_hashes -> AIRCoreRecord -> LicensedReadingSet.license_hashes.
 ```
 
-`ResolutionSet(left,right,W)` is the canonical set of admitted `ResolutionTheorem` objects such that:
+`ResolutionSet(left,right,W)` = canonical set of admitted `ResolutionTheorem` s.t.:
 
 ```text
 theorem.applies_to = {a,b} for some a in resolution_subject_ids(left) and b in resolution_subject_ids(right);
 ctx_compatible(theorem.context, context_from(W)) = compatible(_).
 ```
 
-This keying lets a stage-40 resolution theorem name license hashes while stage-60 theorem builders consume NF operands. A pair is unresolved when `ResolutionSet(left,right,W) = {}`.
+Keying lets stage-40 theorems name license hashes while stage-60 builders consume NF operands. Pair unresolved when `ResolutionSet(left,right,W) = {}`.
 
-Every `ResolutionTheoremKind` variant has the same M0 resolving force after admission: `exception`, `priority`, `scope_limitation`, `supersession`, and `explicit_reconciliation` all enter `ResolutionSet` when `applies_to` and `context` match. The `kind` field is proof-visible and report-visible.
+All `ResolutionTheoremKind` variants (`exception`, `priority`, `scope_limitation`, `supersession`, `explicit_reconciliation`) have equal M0 resolving force: enter `ResolutionSet` when `applies_to`+`context` match. `kind` proof- and report-visible.
 
 ### 8.5 M0 conflict predicates
 
-Each conflict theorem references its parent NF objects, witness, and proof roots. Pair-based predicates enumerate unordered pairs of distinct accepted operands by canonical pair key `(min(hash), max(hash), conflict_kind)`. Single-subject predicates enumerate by key `(subject_hash, conflict_kind)`. A pair predicate only fires when each operand satisfies the self-consistency guard named by that predicate; self-inconsistent operands are reported by the single-subject predicate that detects the incoherence and are excluded from pairwise closure. For pair-based conflict kinds, `ConflictTheorem.witness_hash` is the accepted `WitnessContext` artifact hash produced for the selected compatible operand pair `W`.
+Conflict theorems reference parent NF objects, witness, proof roots. Pair predicates enumerate unordered distinct accepted-operand pairs by key `(min(hash), max(hash), conflict_kind)`. Single-subject predicates key `(subject_hash, conflict_kind)`. A pair predicate fires only when each operand passes its named self-consistency guard; self-inconsistent operands are reported by the detecting single-subject predicate and excluded from pairwise closure. For pair kinds, `ConflictTheorem.witness_hash` = accepted `WitnessContext` hash for the selected compatible pair `W`.
 
 Single-subject keying rules:
 
@@ -2351,7 +2345,7 @@ terminology_mapping_incoherence.right_artifact_hash is omitted.
 terminology_mapping_incoherence.witness_hash = sha256(canonical set of referenced terminology incoherence hashes).
 ```
 
-The terminology predicate emits one theorem per `TerminologyClosure` containing at least one `functional_key_collision` or `mutually_exclusive_term_mapping` incoherence. The theorem references all such incoherence hashes in its witness and source-region union; individual incoherence artifacts remain independently reportable.
+Terminology predicate: one theorem per `TerminologyClosure` holding ≥1 `functional_key_collision` or `mutually_exclusive_term_mapping` incoherence; references all such incoherence hashes in witness + source-region union; individual incoherences stay independently reportable.
 
 ```text
 contraindication_vs_recommendation:
@@ -2394,11 +2388,11 @@ terminology_mapping_incoherence:
   reference the complete canonical set of corresponding Incoherence diagnostics.
 ```
 
-Unsupported action, context, consequent, or policy coverage emits a typed residual instead of a theorem.
+Unsupported action/context/consequent/policy coverage → typed residual, not theorem.
 
 ### 8.6 M0 factual-inconsistency predicates
 
-Pair-based factual-inconsistency predicates use the same unordered distinct-pair enumeration as §8.5. Single-subject factual-inconsistency predicates enumerate by key `(subject_hash, factual_inconsistency_kind)`. A row, norm, or metadata claim whose own guard, context, action normalization, or required policy is unsupported or self-inconsistent emits the typed residual or incoherence named by its producer and is excluded from pairwise factual-inconsistency theorem construction. The overlap between `package_insert_vs_guideline_unresolved_conflict` and conflict kinds such as `contraindication_vs_recommendation` is intentional: the same NF pair may produce one conflict theorem and one factual-inconsistency theorem under two proof-visible lenses.
+Pair predicates use the §8.5 unordered distinct-pair enumeration. Single-subject predicates key `(subject_hash, factual_inconsistency_kind)`. A row/norm/metadata claim whose own guard/context/action-normalization/required-policy is unsupported or self-inconsistent emits its producer's typed residual or incoherence and is excluded from pairwise construction. Overlap of `package_insert_vs_guideline_unresolved_conflict` with kinds like `contraindication_vs_recommendation` is intended: one NF pair may yield one conflict + one factual-inconsistency theorem under two proof-visible lenses.
 
 ```text
 table_value_disagreement:
@@ -2435,9 +2429,9 @@ proof_or_certificate_replay_failure:
   emit FactualInconsistencyTheorem(kind=proof_or_certificate_replay_failure).
 ```
 
-If `metadata_key` is absent from `metadata_singleton_keys`, source metadata comparison emits `Residual(class=missing_policy)`.
+`metadata_key` absent from `metadata_singleton_keys` → `Residual(class=missing_policy)`.
 
-`FactualInconsistencyTheorem.missing_evidence` is computed as follows:
+`FactualInconsistencyTheorem.missing_evidence`:
 
 ```text
 table_value_disagreement -> {}.
@@ -2447,9 +2441,9 @@ source_metadata_disagreement -> {} when metadata_singleton_keys contains the key
 proof_or_certificate_replay_failure -> {replay_identity_pass} for replay_identity_mismatch and {valid_certificate_proof_root} for a failed proof root.
 ```
 
-The set is sorted by identifier bytes and hashed only through the theorem payload; an empty set is encoded as `[]`.
+Sorted by identifier bytes, hashed only through theorem payload; empty set encoded `[]`.
 
-`FactualInconsistencyTheorem.witness_hash` bindings are fixed by kind: `table_value_disagreement` and `package_insert_vs_guideline_unresolved_conflict` use the accepted `WitnessContext` artifact hash `W` from the compatible guard/context check; `gloss_semantic_drift`, `source_metadata_disagreement`, and `proof_or_certificate_replay_failure` omit `witness_hash` because the field is optional and their evidence is carried by the referenced gloss, metadata, replay, certificate, diagnostic, and verifier artifacts.
+`FactualInconsistencyTheorem.witness_hash` by kind: `table_value_disagreement`, `package_insert_vs_guideline_unresolved_conflict` use accepted `WitnessContext` hash `W` from the compatible guard/context check; `gloss_semantic_drift`, `source_metadata_disagreement`, `proof_or_certificate_replay_failure` omit it (optional; evidence carried by referenced gloss/metadata/replay/certificate/diagnostic/verifier artifacts).
 
 ### 8.7 Theorem, diagnostic, and minimization schemas
 
@@ -2469,9 +2463,9 @@ S Diagnostic(diagnostic_id:Id,code:Id,subject_hash:Hash?,source_regions:Set[Regi
 S DiagnosticRef(diagnostic_hash:Hash)
 ```
 
-`Incoherence.subject_hashes` members are subject-identity hashes: the envelope `artifact_hash` for an enveloped subject, otherwise `sha256(canonical_payload_bytes(subject))`. §1.1 `overflow_member_hash` instantiates this rule.
+`Incoherence.subject_hashes` members are subject-identity hashes: envelope `artifact_hash` if enveloped, else `sha256(type_tagged_payload_bytes(subject))` (§1.5), whose `declared_type_id` prefix keeps field-isomorphic subjects of differing declared types distinct. §1.1 `overflow_member_hash` instantiates this.
 
-Review-classification assignment is total and fixed:
+Review-classification assignment total/fixed:
 
 ```text
 ConflictTheorem.classification = candidate.
@@ -2483,7 +2477,7 @@ ReplayIdentityCheck with replay_identity_mismatch and failed certificate proof r
 Coverage diagnostics point to an unmet demanded AIR key and use residual.
 ```
 
-The theorem builders reject any theorem payload whose stored `classification` differs from these assignments.
+Theorem builders reject any payload whose stored `classification` differs.
 
 Computed theorem fields:
 
@@ -2500,7 +2494,7 @@ review_question_ja and review_question_en:
   rendered only from admitted report-question templates under §9.3 wording-gate rules.
 ```
 
-Micro-example: if `N1` and `N3` satisfy the recommendation-for-vs-against antecedents and `ResolutionSet(N1,N3,W)={RT-R1}`, the pair key is recorded in the non-firing fixture list and no `ConflictTheorem` payload exists. If the same antecedents hold with `ResolutionSet={}`, the emitted theorem stores `missing_resolution_class=unresolved_pair`.
+Micro-example: `N1`,`N3` satisfy recommendation-for-vs-against antecedents with `ResolutionSet(N1,N3,W)={RT-R1}` → pair key recorded in non-firing fixture list, no `ConflictTheorem` payload. Same antecedents with `ResolutionSet={}` → theorem stores `missing_resolution_class=unresolved_pair`.
 
 `theorem_minimize` and `dependency_minimize` use deterministic deletion:
 
@@ -2510,7 +2504,7 @@ Micro-example: if `N1` and `N3` satisfy the recommendation-for-vs-against antece
 3 Return the final set.
 ```
 
-This minimization is canonical for CKC M0. It yields an inclusion-minimal witness under the fixed deletion order. Constraint contradictions additionally emit `ConstraintCoreWitness`; when an SMT unsat core is replayable, the theorem stores both the external core and the internal deletion-minimal core. Repair-set search is represented by a proof-visible diagnostic trace and affects accepted semantics only through admitted edits.
+Canonical for CKC M0: inclusion-minimal witness under fixed deletion order. Constraint contradictions also emit `ConstraintCoreWitness`; when an SMT unsat core is replayable, theorem stores both external core and internal deletion-minimal core. Repair-set search = proof-visible diagnostic trace; affects accepted semantics only via admitted edits.
 
 ```text
 S RepairSetSearchTrace(trace_id:Id,conflict_or_inconsistency_hash:Hash,candidate_dependency_hashes:Set[Hash],objective:RepairObjective,returned_sets:Set[Set[Hash]],exactness:RepairSearchExactness,replay_manifest_hash:Hash,proof_roots:Set[ProofId])
@@ -2523,7 +2517,7 @@ E RepairSearchExactness = exact | bounded_exact | heuristic_diagnostic_only
 
 ### 9.1 Kernel finite checker
 
-The kernel finite checker validates M0 theorems by re-evaluating §8 over canonical NF, resource, policy, SourceGraph, and ProofDAG inputs.
+Kernel finite checker validates M0 theorems by re-evaluating §8 over canonical NF, resource, policy, SourceGraph, ProofDAG inputs.
 
 ```text
 S KernelFiniteCheckInput(subject_hash:Hash,subject_kind:KernelSubjectKind,proof_dag_hash:Hash,source_graph_hash:Hash,accepted_generator_base_hash:Hash,terminology_resource_set_hash:Hash,semantic_policy_set_hash:Hash,schema_registry_hash:Hash)
@@ -2537,7 +2531,7 @@ S SymbolSourceMap(rows:Set[SymbolSourceMapRow])
 S SymbolSourceMapRow(symbol_id:Id,symbol_kind:Id,defining_section_anchor:Id,defining_artifact_hash:Hash?)
 ```
 
-`SymbolSourceMap` is an accepted schema-control artifact emitted by `kernel_finite_checker`. `VerifierWitness.subject_hash` is the checked subject's envelope `artifact_hash` (the `KernelFiniteCheckInput.subject_hash` value); the full check-input set is pinned by `replay_manifest_hash`. Dispatch re-evaluation compares recomputed values against the subject's stored witness artifacts in place; outcomes ride `result` and `diagnostic_hashes`, never a separate persisted payload. `VerifierWitness.symbol_source_map_hash` is the referenced `SymbolSourceMap` artifact hash. `SymbolSourceMap.rows` is the sorted set of `{symbol_id, symbol_kind, defining_section_anchor, defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, and gate referenced while checking the subject. Section anchors are the stable headings in this specification, encoded as identifier strings such as `section-8-5`. Artifact-backed symbols include their accepted artifact hash; specification-only symbols omit it.
+`SymbolSourceMap`: accepted schema-control artifact from `kernel_finite_checker`. `VerifierWitness.subject_hash` = checked subject's envelope `artifact_hash` (= `KernelFiniteCheckInput.subject_hash`); full check-input set pinned by `replay_manifest_hash`. Dispatch re-evaluation compares recomputed values against subject's stored witness artifacts in place; outcomes ride `result`+`diagnostic_hashes`, no separate persisted payload. `VerifierWitness.symbol_source_map_hash` = referenced `SymbolSourceMap` hash. `SymbolSourceMap.rows` = sorted set of `{symbol_id,symbol_kind,defining_section_anchor,defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, gate referenced while checking subject. Section anchors = stable headings, encoded as identifier strings e.g. `section-8-5`. Artifact-backed symbols include accepted artifact hash; specification-only symbols omit it.
 
 `kernel_finite_checker` checks:
 
@@ -2562,29 +2556,29 @@ S SymbolSourceMapRow(symbol_id:Id,symbol_kind:Id,defining_section_anchor:Id,defi
 18 replay identity for referenced certificates and reports.
 ```
 
-Dispatch by `KernelSubjectKind` is exhaustive:
+Dispatch by `KernelSubjectKind`, exhaustive:
 
 ```text
 conflict_theorem:
-  valid iff the corresponding §8.5 predicate re-evaluates true and every witness/minimality claim checks.
+  valid iff corresponding §8.5 predicate re-evaluates true and every witness/minimality claim checks.
 
 factual_inconsistency_theorem:
-  valid iff the corresponding §8.6 predicate re-evaluates true and every witness/minimality claim checks.
+  valid iff corresponding §8.6 predicate re-evaluates true and every witness/minimality claim checks.
 
 residual, ambiguity, incoherence, diagnostic:
-  valid iff the named producer condition replays and the payload class matches the fixed assignment in §8.7.
+  valid iff named producer condition replays and payload class matches fixed §8.7 assignment.
 
 certificate:
-  valid, invalid, or unsupported exactly as returned by `VerifyCertificate` in §9.2 over the subject certificate.
+  valid, invalid, or unsupported exactly as `VerifyCertificate` (§9.2) returns over subject certificate.
 
 review_report:
-  valid iff `BuildReviewReport` in §9.3 recomputes the same canonical report bytes and every item classification matches the fixed report assignment; invalid for a mismatch; unsupported only when the report necessarily references a gated capability without valid gate evidence.
+  valid iff `BuildReviewReport` (§9.3) recomputes same canonical report bytes and every item classification matches fixed report assignment; invalid on mismatch; unsupported only when report necessarily references a gated capability without valid gate evidence.
 
 replay_identity_check:
-  valid iff `ReplayIdentity` in §1.6 recomputes the same `ReplayIdentityCheck` canonical payload and outcome; invalid for a byte or outcome mismatch; unsupported iff replay is unsupported for the same absent toolchain or permissioned-source reason recorded in the payload.
+  valid iff `ReplayIdentity` (§1.6) recomputes same `ReplayIdentityCheck` canonical payload and outcome; invalid on byte/outcome mismatch; unsupported iff replay unsupported for the same absent-toolchain or permissioned-source reason recorded in payload.
 ```
 
-Failed checks produce `invalid`. Unsupported predicate fragments produce `unsupported` and `Residual(class=verifier_unsupported)`.
+Failed checks → `invalid`. Unsupported predicate fragments → `unsupported` + `Residual(class=verifier_unsupported)`.
 
 ### 9.2 Certificates
 
@@ -2592,7 +2586,7 @@ Failed checks produce `invalid`. Unsupported predicate fragments produce `unsupp
 S Certificate(certificate_id:Id,certificate_class:M0CertificateClass,subject_hash:Hash,proof_root_ids:Set[ProofId],replay_identity_hashes:Set[Hash],verifier_witness_hashes:Set[Hash],claim_record_hashes:Set[Hash],issued_at_logical_time:UInt,accepted_effect_row:Set[Effect])
 ```
 
-Logical time is assigned by `CanonicalIssuanceOrder(run)`:
+Logical time assigned by `CanonicalIssuanceOrder(run)`:
 
 ```text
 1 Collect every accepted ReviewerRecord, AdmissionRecord, Certificate, and other accepted payload
@@ -2613,7 +2607,7 @@ Logical time is assigned by `CanonicalIssuanceOrder(run)`:
   Certificate.issued_at_logical_time, or the schema-declared logical-time field of the payload.
 ```
 
-The assignment is replay-stable because the graph edges are accepted artifact references and all tie keys are canonical bytes or declared stage/operation identifiers. Reviewer records therefore precede the admission records that cite them, and every certificate follows the logical-time-bearing records and certificates reachable through its cited evidence.
+Replay-stable: edges = accepted artifact references, tie keys = canonical bytes or declared stage/operation ids. Reviewer records precede admission records citing them; each certificate follows logical-time-bearing records/certificates reachable through its cited evidence.
 
 Certificate classes:
 
@@ -2637,9 +2631,9 @@ report_replay:
   ReviewReport and ReplayIdentityCheck canonicalize and replay.
 ```
 
-`IssueCertificate(subject_hash, certificate_class, proof_roots, replay_checks, verifier_witnesses, claim_records, run_manifest) -> OperationResult[Certificate]` is total: validate all inputs, select the branch obligation for `certificate_class`, call `VerifyCertificate` on the candidate certificate bytes, emit the certificate exactly when verification returns `valid`, return `unsupported` for a gated subject without evidence, and return `invalid` for failed common or branch checks.
+`IssueCertificate(subject_hash, certificate_class, proof_roots, replay_checks, verifier_witnesses, claim_records, run_manifest) -> OperationResult[Certificate]` total: validate all inputs, select branch obligation for `certificate_class`, call `VerifyCertificate` on candidate certificate bytes, emit certificate exactly when verification = `valid`, return `unsupported` for gated subject without evidence, return `invalid` for failed common/branch checks.
 
-`VerifyCertificate(Certificate C) -> VerifierResult` is total:
+`VerifyCertificate(Certificate C) -> VerifierResult` total:
 
 ```text
 1 Validate C schema, canonical bytes, logical-time monotonicity within the run manifest, and
@@ -2686,20 +2680,20 @@ S WordingGateRecord(record_id:Id,template_hashes:Set[Hash],literal_part_digests:
 Computed report fields:
 
 ```text
-`ReportTraceIndex`, `ClaimTierSummary`, and `WordingGateRecord` are accepted view-control artifacts emitted by `BuildReviewReport`. `ReviewReport.trace_hash`, `ReviewReport.claim_tier_summary_hash`, and `ReviewReport.wording_gate_hash` store the corresponding artifact hashes.
+`ReportTraceIndex`, `ClaimTierSummary`, `WordingGateRecord`: accepted view-control artifacts from `BuildReviewReport`. `ReviewReport.trace_hash`/`claim_tier_summary_hash`/`wording_gate_hash` store the corresponding artifact hashes.
 
-ReportTraceIndex rows are sorted {item_id,item_kind,source_region_ids,nf_hashes,theorem_hashes,witness_hash,verifier_witness_hashes,certificate_hashes,proof_root_ids}.
+ReportTraceIndex rows sorted {item_id,item_kind,source_region_ids,nf_hashes,theorem_hashes,witness_hash,verifier_witness_hashes,certificate_hashes,proof_root_ids}.
 
-ClaimTierSummary rows are sorted {tier,item_ids,claim_record_hashes} for S0,S1,S2,S3.
+ClaimTierSummary rows sorted {tier,item_ids,claim_record_hashes} for S0,S1,S2,S3.
 
-The WordingGateRecord names every accepted ReportQuestionTemplate and GlossTemplate whose literal parts appear in the report: `template_hashes` stores those envelope hashes, and each member of `literal_part_digests` stores `sha256(canonical_payload_bytes(literal_parts))` over one named template's `literal_parts` list.
+WordingGateRecord names every accepted ReportQuestionTemplate and GlossTemplate whose literal parts appear in the report: `template_hashes` stores those envelope hashes; each `literal_part_digests` member = `sha256(canonical_payload_bytes(literal_parts))` over one named template's `literal_parts` list.
 
-ReportItem.certificate_depth is the greatest class in this order among valid certificate_hashes attached to the item:
+ReportItem.certificate_depth = greatest class in this order among valid certificate_hashes attached to the item:
 source_graph < mech_observed < admitted_base < closed_nf < finite_checked < report_replay.
-The item stores the class, not a count. A theorem item normally stores finite_checked. A report item may store report_replay only when the report_replay certificate belongs to a prior issuance stratum; the certificate that certifies the current ReviewReport is outside the report payload and is attached by the later §1.6 stratum.
+Item stores class, not count. Theorem item normally stores finite_checked. Report item stores report_replay only when that report_replay certificate belongs to a prior issuance stratum; the certificate certifying the current ReviewReport is outside the report payload, attached by the later §1.6 stratum.
 ```
 
-Wording is mechanically total because every `review_question_ja`, `review_question_en`, and report-level explanatory sentence is rendered from admitted `ReportQuestionTemplate` or `GlossTemplate` literal parts plus deterministic slot renderers. The wording gate validates template IDs, literal-part digests, renderer IDs, and claim-tier vocabulary; arbitrary `view_text` without a template provenance record is `invalid_payload`. Allowed M0 wording is the §3.4 vocabulary plus source labels, artifact identifiers, section labels, and deterministic slot renderings.
+Wording mechanically total: every `review_question_ja`, `review_question_en`, report-level explanatory sentence rendered from admitted `ReportQuestionTemplate`/`GlossTemplate` literal parts plus deterministic slot renderers. Wording gate validates template IDs, literal-part digests, renderer IDs, claim-tier vocabulary; arbitrary `view_text` without template provenance record → `invalid_payload`. Allowed M0 wording = §3.4 vocabulary plus source labels, artifact identifiers, section labels, deterministic slot renderings.
 
 Report item kind consumers:
 
@@ -2713,7 +2707,7 @@ replay_failure: emitted for replay_identity_mismatch or failed certificate proof
 coverage_diagnostic: emitted for declared coverage targets whose demanded AIR key remains represented by a coverage report item rather than a theorem, residual, ambiguity, or incoherence report item.
 ```
 
-Report item classification is fixed by `ReportItemKind`:
+Report item classification fixed by `ReportItemKind`:
 
 ```text
 conflict_candidate -> candidate.
@@ -2737,9 +2731,9 @@ Report item ordering:
 5 item_id.
 ```
 
-Every report item links to exact Japanese source regions, deterministic glosses when available, NF payloads, proof roots, witness payloads, prior-stratum certificate payloads, claim tier, and falsification criterion. The report_replay certificate that certifies the current ReviewReport is excluded from this report payload and appears in the later issuance stratum defined by §1.6.
+Every report item links to exact Japanese source regions, deterministic glosses when available, NF payloads, proof roots, witness payloads, prior-stratum certificate payloads, claim tier, falsification criterion. The report_replay certificate certifying the current ReviewReport is excluded from this report payload, appears in the later §1.6 issuance stratum.
 
-`BuildReviewReport(inputs, permission_records) -> OperationResult[ReviewReport]` is total:
+`BuildReviewReport(inputs, permission_records) -> OperationResult[ReviewReport]` total:
 
 ```text
 1 Select valid ConflictTheorem and FactualInconsistencyTheorem artifacts by verifier witness.
@@ -2761,7 +2755,7 @@ Every report item links to exact Japanese source regions, deterministic glosses 
 
 ### 9.4 UI
 
-The UI renders verified static report artifacts. Accepted CKC artifacts are created only by canonical CLI/build commands and validated artifact writers.
+UI renders verified static report artifacts. Accepted CKC artifacts created only by canonical CLI/build commands and validated artifact writers.
 
 Required M0 views:
 
@@ -2773,16 +2767,21 @@ conflict detail;
 factual inconsistency detail;
 residual and ambiguity list;
 proof and certificate detail;
-replay manifest.
+replay manifest;
+derivation trace (source text to CKC Normal Form).
 ```
 
-The UI uses formalization-QA and text-quality language. Every claim links to source regions and artifact hashes.
+UI uses formalization-QA and text-quality language. Every claim links to source regions and artifact hashes.
+
+Derivation-trace view: deterministic `view_only` rendering over already-proof-visible artifacts; for a selected source region walks `SourceGraph -> MechObsPayload -> PatternObs -> Match -> License -> AIRCoreRecord -> CKCNormalForm` along the `ProofDAG`, showing each intermediate representation and the rule producing it down to the most compact accepted form (the `semantic_digest` of the CKC Normal Form payload). Adds no semantics: every node shown is an accepted artifact carrying its own proof roots. When the §13.2 layered-IR track is exercised, the same view extends through the additional IR stages recorded in a `RuntimeOracleReport` down to the compiled target language.
 
 ## 10. Evaluation and calibration
 
-M0 evaluation is replay and deterministic fixture checking through the acceptance gates in §11.3. M0 reports may display deterministic counts already derivable from accepted artifact sets: theorem counts by M0 kind, residual count, ambiguity count, incoherence count, certificate count, and replay outcome count. These counts are report annotations derived from accepted semantic facts.
+M0 evaluation = replay + deterministic fixture checking through §11.3 acceptance gates. M0 reports may display deterministic counts derivable from accepted artifact sets: theorem counts by M0 kind, residual, ambiguity, incoherence, certificate, replay-outcome, demanded-AIR-key, no_license-residual, multiple_readings-ambiguity, accepted-generator counts, plus the unused-generator and per-generator marginal-coverage figures below. Report annotations derived from accepted semantic facts.
 
-Empirical thresholds, precision, recall, retrieval quality, compression payoff, generalization, and clinical performance metrics require the relevant §3.3 evidence object.
+Component-economy accounting: two annotations instrumenting reusability deterministically. Unused-generator set = `AcceptedGeneratorBase.generator_hashes` minus union of every accepted theorem's `minimal_generator_dependency_set`; admitted generators no accepted result depends on. Per-generator marginal coverage, via deterministic license deletion under §8.1/§8.7: for each accepted generator, count of demanded AIR keys whose `ok` AIRCore reading is lost when that generator's licenses are removed. Both = exact functions of accepted artifact set, per-source-set accounting facts, not optimality/compression/coverage-of-clinical-knowledge claims; minimum-description-length, Pareto, reuse-payoff, corpus-coverage verdicts stay gated behind `G-MDL`/`G-EMIN` (§3.3), framed as research track in §13.1.
+
+Empirical thresholds, precision, recall, retrieval quality, compression payoff, generalization, clinical-performance metrics require the relevant §3.3 evidence object.
 
 Top M0 assurance claim:
 
@@ -2797,7 +2796,7 @@ Regulated profiles require `G-S3`.
 
 ### 11.1 Canonical CLI
 
-The CLI surface is namespaced. These are the sole canonical command names.
+CLI surface is namespaced. Sole canonical command names:
 
 ```text
 ckc schema check
@@ -2852,7 +2851,7 @@ ckc replay | ReplayIdentity | ReplayManifest, ReplayIdentityCheck
 ckc demo m0 | DemoM0 | every Appendix A accepted artifact and replay check
 ```
 
-Command wrapper convention: every command is a total deterministic wrapper returning `OperationResult`. `CheckSchemaRegistry` runs `T-Registry-Referential-Integrity` and `T-Schema-Equivalence`; `ValidateRuntimeManifests` accepts authored `ToolchainManifest` and `EnvironmentProfile` payloads and validates embedded `ToolRecord` rows; `LoadFiniteFixtureManifest` accepts the authored `FiniteFixtureManifest` and validates embedded `FrozenConstant`, `ParsedQuantity`, and `DiagnosticTag` rows; `IngestSourceEdition` validates §4.1 schemas and permissions; `BuildSourceGraph` emits the §4.2 graph and P-SG diagnostics; `BuildAIRCore`, `BuildNormalForm`, `BuildGloss`, `BuildM0Theorems`, `IssueCertificate`, `BuildReviewReport`, and `ReplayIdentity` are the algorithms named in §§7.3-9.3 and §1.6; `CloseM0` is §7.1 over one `ClosureInput`. `BuildTerminologyClosure` and `BuildDiagnostics` are explicit CloseM0-internal suboperations and therefore use `ckc close` as their canonical command surface. A command whose wrapper only orchestrates earlier operations returns the §1.7 primary status over the called operations' emitted artifacts. `ckc demo m0` invokes `DemoM0`, the fixture orchestrator named in §3.2 and calls `ckc runtime validate`, `ckc fixture load`, and the other canonical command wrappers needed to produce Appendix A.10.
+Command wrapper convention: every command is a total deterministic wrapper returning `OperationResult`. `CheckSchemaRegistry` runs `T-Registry-Referential-Integrity` and `T-Schema-Equivalence`; `ValidateRuntimeManifests` accepts authored `ToolchainManifest`/`EnvironmentProfile` payloads, validates embedded `ToolRecord` rows; `LoadFiniteFixtureManifest` accepts authored `FiniteFixtureManifest`, validates embedded `FrozenConstant`,`ParsedQuantity`,`DiagnosticTag` rows; `IngestSourceEdition` validates §4.1 schemas/permissions; `BuildSourceGraph` emits §4.2 graph + P-SG diagnostics; `BuildAIRCore`,`BuildNormalForm`,`BuildGloss`,`BuildM0Theorems`,`IssueCertificate`,`BuildReviewReport`,`ReplayIdentity` = algorithms named in §§7.3-9.3 and §1.6; `CloseM0` = §7.1 over one `ClosureInput`. `BuildTerminologyClosure`/`BuildDiagnostics` are explicit CloseM0-internal suboperations, use `ckc close` as canonical command surface. A wrapper that only orchestrates earlier operations returns §1.7 primary status over called operations' emitted artifacts. `ckc demo m0` invokes `DemoM0` (the §3.2 fixture orchestrator), calls `ckc runtime validate`,`ckc fixture load`, and the other canonical command wrappers needed to produce Appendix A.10.
 
 ### 11.2 Repository layout
 
@@ -2883,11 +2882,11 @@ Command wrapper convention: every command is a total deterministic wrapper retur
 └── runs/
 ```
 
-Rust owns accepted semantics, canonical bytes, schema registry, closure, finite checking, certificates, reports, and replay. External workers may produce proposal artifacts through explicit manifests; accepted artifacts are materialized by Rust commands. A crate is created by the first build unit that uses it, so the listed layout is a reserved namespace rather than mandatory upfront scaffold.
+Rust owns accepted semantics, canonical bytes, schema registry, closure, finite checking, certificates, reports, replay. External workers may produce proposal artifacts through explicit manifests; accepted artifacts materialized by Rust commands. A crate is created by the first build unit using it; listed layout = reserved namespace, not mandatory upfront scaffold.
 
 ### 11.3 Build-unit table and acceptance gates
 
-This table is the single canonical build plan and test-family list. Each row is one committable deliverable for one bounded agent session. Each row carries exactly one acceptance gate; each acceptance gate appears in exactly one row. Later units may rely on accepted artifacts from earlier units.
+Single canonical build plan and test-family list. Each row = one committable deliverable for one bounded agent session, carrying exactly one acceptance gate; each acceptance gate appears in exactly one row. Later units may rely on earlier units' accepted artifacts.
 
 ```text
 T Unit|Deliverable|Depends on|Acceptance gate
@@ -2934,12 +2933,12 @@ M0.6.5|LoadFiniteFixtureManifest,FiniteFixtureManifest row validation,end-to-end
 GATED.1|One deferred §3.3 gate evidence object/GateEvidenceRef validation with named backend/baseline enums,selected explicitly per implementation session|M0.6.5|T-Gate-Evidence-Contract
 ```
 
-Acceptance-gate names resolve through this canonical obligation table. Each gate returns exactly one §1.7 outcome and emits sorted diagnostics on non-success.
+Acceptance-gate names resolve through this canonical obligation table. Each gate returns exactly one §1.7 outcome, emits sorted diagnostics on non-success.
 
 ```text
 T Acceptance gate|Canonical obligation
 T-Unicode-Idempotency|§1.4 string-policy idempotency/byte-stability over UnicodePolicyManifest fixtures.
-T-Canonical-Bytes|§1.5 serializer injection,canonical_sort_key totality,tagged-union encoding,repeated hash identity.
+T-Canonical-Bytes|§1.5 per-type serializer injection,declared_type_id-keyed inline identity (type_tagged_payload_bytes),canonical_sort_key totality,tagged-union encoding,repeated hash identity.
 T-Registry-Referential-Integrity|§1.1 symbol,FeaturePath,enum,schema,bound,builtin,certificate,CLI,section-anchor resolution.
 T-Schema-Equivalence|§1.1 schema revision hashes,string-policy bindings,source-support aliases,union alternatives,collection bounds agree.
 T-Replay-Manifest-Boundary|§1.6 ReplayManifest canonical fields,stratum boundary exclusion,ProducerManifest/ToolchainManifest/EnvironmentProfile hashes validate.
@@ -2983,7 +2982,7 @@ T-Gate-Evidence-Contract|§12 common gate evidence validity/the selected gate-sp
 
 ### 11.4 Required-reading map
 
-Each build unit has one bounded, sufficient reading slice. An agent implementing a row loads the sections listed for that row, plus every earlier row’s accepted repository artifacts. Appendix slices are fixture obligations.
+Each build unit has one bounded, sufficient reading slice. An agent implementing a row loads the listed sections plus every earlier row's accepted repository artifacts. Appendix slices = fixture obligations.
 
 ```text
 T Unit|Required sections|Required Appendix A slice
@@ -3030,7 +3029,7 @@ M0.6.5|§11.1,§11.3,all prior sections by artifact hash,Appendix A all|Appendix
 GATED.1|§3.3,§3.4,§12 including local evidence enums,the specific consuming section that triggered the gate|Appendix slice named by the selected gate fixture when one exists
 ```
 
-The first complete command target is:
+First complete command target:
 
 ```text
 ckc demo m0 --out runs/m0
@@ -3048,7 +3047,7 @@ S GateEvidenceRef(gate:Gate,evidence_object_hash:Hash,subject_hash:Hash,replay_i
 S GateEvidenceCommon(evidence_id:Id,gate:Gate,subject_hash:Hash,evidence_input_hashes:Set[Hash],schema_registry_hash:Hash,validation_manifest_hash:Hash,replay_manifest_hash:Hash,replay_identity_hash:Hash,enabled_claims:Set[Id],limitation_ids:Set[Id],falsification_criteria_hash:Hash,proof_roots:Set[ProofId],accepted_effect_row:Set[Effect])
 ```
 
-A gate evidence object is valid when:
+Gate evidence object valid when:
 
 ```text
 1 Schema validates under SchemaRegistry.
@@ -3060,7 +3059,7 @@ A gate evidence object is valid when:
 7 Missing or invalid evidence emits Residual(class=deferred_gate_required).
 ```
 
-`ValidateGateEvidenceRef(ref) -> OperationResult[GateEvidenceCommon]`: resolve `ref.gate`, load `ref.evidence_object_hash`, require the §3.3 evidence type, `object.common.subject_hash = ref.subject_hash`, `object.common.replay_identity_hash = ref.replay_identity_hash`, and `ref.enabled_claims ⊆ object.common.enabled_claims`; then apply common and gate-specific checks.
+`ValidateGateEvidenceRef(ref) -> OperationResult[GateEvidenceCommon]`: resolve `ref.gate`, load `ref.evidence_object_hash`, require §3.3 evidence type, `object.common.subject_hash = ref.subject_hash`, `object.common.replay_identity_hash = ref.replay_identity_hash`, `ref.enabled_claims ⊆ object.common.enabled_claims`; then apply common and gate-specific checks.
 
 Gate interfaces:
 
@@ -3070,7 +3069,7 @@ S ExtractorAdapterRecord(common:GateEvidenceCommon,source_profile_id:Id,extracto
 E ExtractorFamily = deterministic_fixture | yomitoku | mineru | marker | layoutlmv3 | doclayout_yolo | table_transformer | paddleocr | tesseract | other
 ```
 
-`G-EXTRACTOR-ADAPTER`: source-profile extractor soundness. Interface `SourceEdition -> ExtractionManifest -> SourceGraph -> MechObsPayload*`; evidence proves byte-stable graph construction, text totality, reading order, layout/table support, caption/footnote/cross-reference closure, round-trip rendering comparison when source images are used, and residuals.
+`G-EXTRACTOR-ADAPTER`: source-profile extractor soundness. Interface `SourceEdition -> ExtractionManifest -> SourceGraph -> MechObsPayload*`; evidence proves byte-stable graph construction, text totality, reading order, layout/table support, caption/footnote/cross-reference closure, round-trip render comparison when source images used, residuals.
 
 ```text
 S RetrievalParityReport(common:GateEvidenceCommon,corpus_hash:Hash,query_set_hash:Hash,qrels_hash:Hash,reference_implementation:RetrievalReferenceImplementation?,sparse_baseline_family:SparseRetrieverFamily?,sparse_index_fingerprint_hash:Hash?,dense_baseline_family:DenseRetrieverFamily?,dense_index_fingerprint_hash:Hash?,late_interaction_baseline_family:LateInteractionFamily?,late_interaction_index_fingerprint_hash:Hash?,graph_index_fingerprint_hash:Hash?,fusion_policy_family:FusionPolicyFamily?,fusion_policy_hash:Hash?,reranker_family:RerankerFamily?,reranker_manifest_hash:Hash?,japanese_analyzer_family:JapaneseAnalyzerFamily?,analyzer_manifest_hashes:Set[Hash],segmentation_policy_hash:Hash,metric_records:Set[RetrievalMetricRecord],citation_precision_record_hash:Hash?,failure_slice_hashes:Set[Hash])
@@ -3080,7 +3079,7 @@ S RetrievalMetricRecord(metric_id:Id,metric_name:Id,metric_family:EvaluationMetr
 E RetrievalReferenceImplementation = pyserini | anserini_lucene | opensearch | elasticsearch | vespa | qdrant | weaviate | other
 ```
 
-`G-RET-PARITY`: retrieval-quality claims only. Interface `RetrievalProposalTrace* -> RetrievalParityReport -> ClaimRecord`; traces propose regions, while accepted artifacts still require `DischargeProposal` and proof checking. A falsifiable sparse baseline names BM25/Lucene-family implementation, analyzer family, index fingerprint, qrels, and metric manifest; hybrid, dense, late-interaction, graph, and reranking claims add their named family fields rather than replacing the sparse baseline.
+`G-RET-PARITY`: retrieval-quality claims only. Interface `RetrievalProposalTrace* -> RetrievalParityReport -> ClaimRecord`; traces propose regions, accepted artifacts still require `DischargeProposal` and proof checking. Falsifiable sparse baseline names BM25/Lucene-family implementation, analyzer family, index fingerprint, qrels, metric manifest; hybrid/dense/late-interaction/graph/reranking claims add their named family fields, not replacing the sparse baseline.
 
 ```text
 S VerifierPortfolioReport(common:GateEvidenceCommon,theorem_or_pipeline_hashes:Set[Hash],backend_records:Set[VerifierBackendRecord],agreement_matrix_hash:Hash,proof_translation_hashes:Set[Hash],unsupported_fragment_hashes:Set[Hash],divergence_diagnostic_hashes:Set[Hash])
@@ -3090,7 +3089,7 @@ S VerifierBackendRecord(backend_id:Id,backend_family:VerifierBackendFamily,backe
 E VerifierBackendFamily = lean | rocq | isabelle | why3 | smt | sat | datalog | asp | prolog | owl_reasoner | model_checker | tla | alloy | cp_sat | minizinc | prob_model_checker | egraph | cql | fhirpath | saw | crosshair | other
 ```
 
-`G-PORTFOLIO`: independent-backend agreement. Interface `KernelFiniteCheckInput -> backend translations -> VerifierPortfolioReport -> ClaimRecord`; M0 validity remains the internal kernel result unless a later gated profile elevates portfolio agreement.
+`G-PORTFOLIO`: independent-backend agreement. Interface `KernelFiniteCheckInput -> backend translations -> VerifierPortfolioReport -> ClaimRecord`; M0 validity stays the internal kernel result unless a later gated profile elevates portfolio agreement.
 
 ```text
 S AIRDomainRecord(common:GateEvidenceCommon,domain_id:Id,domain_family:AIRDomainFamily,domain_kind:Id,carrier_schema_hash:Hash,order_definition_hash:Hash,join_definition_hash:Hash,meet_definition_hash:Hash?,bottom_hash:Hash?,top_hash:Hash?,alpha_definition_hash:Hash,gamma_definition_hash:Hash,soundness_theorem_hashes:Set[Hash],widening_policy_hash:Hash?,termination_bound_hash:Hash,counterexample_suite_hash:Hash)
@@ -3106,7 +3105,7 @@ S RebindingEvidence(common:GateEvidenceCommon,old_source_edition_hash:Hash,new_s
 E VersionDiffFamily = source_text | terminology_version | ontology_axiom | fhir_artifact | code_crosswalk | guideline_supersession | other
 ```
 
-`G-REBIND`: source-edition, terminology-version, and ontology-version proof transport. Interface `old artifact + new SourceGraph + alignment -> RebindingEvidence -> transported or residual artifact`.
+`G-REBIND`: source-edition, terminology-version, ontology-version proof transport. Interface `old artifact + new SourceGraph + alignment -> RebindingEvidence -> transported or residual artifact`.
 
 ```text
 S BenchmarkRelease(common:GateEvidenceCommon,release_id:Id,corpus_profile_id:Id,item_granularity:BenchmarkItemGranularity,source_permission_hashes:Set[Hash],item_hashes:Set[Hash],split_manifest_hash:Hash,stratification_manifest_hash:Hash,annotation_schema_hash:Hash,adjudication_protocol_hash:Hash,adjudication_metric_families:Set[AdjudicationMetricFamily],clinician_reviewer_hashes:Set[Hash],formalist_reviewer_hashes:Set[Hash],inter_annotator_agreement_hashes:Set[Hash],gold_ir_hashes:Set[Hash],gold_ir_conformance_hashes:Set[Hash],conformance_suite_hashes:Set[Hash],contradiction_fixture_hashes:Set[Hash],negative_control_hashes:Set[Hash])
@@ -3122,7 +3121,7 @@ E AdjudicationMetricFamily = cohens_kappa | fleiss_kappa | krippendorff_alpha | 
 E EvaluationMetricFamily = recall_at_k | mrr | ndcg | faithfulness | citation_precision | citation_recall | semantic_equivalence | idempotency | convergence | metamorphic_violation | auroc | calibration | subgroup_fairness | override_rate | other
 ```
 
-`G-EMIN`: S2 research measurements, contradiction benchmarks, convergence, conformance, and corpus evaluation. Interface `BenchmarkRelease + replayed run -> EMinReport -> ClaimRecord`.
+`G-EMIN`: S2 research measurements, contradiction benchmarks, convergence, conformance, corpus evaluation. Interface `BenchmarkRelease + replayed run -> EMinReport -> ClaimRecord`.
 
 ```text
 S MDLEvidence(common:GateEvidenceCommon,model_class_hash:Hash,corpus_hash:Hash,preference_model_family:PreferenceModelFamily,baseline_description_length:Rational,candidate_description_length:Rational,residual_description_length:Rational,scoring_rule_hash:Hash,pareto_front_hash:Hash,calibration_record_hash:Hash?,heldout_record_hash:Hash?)
@@ -3130,7 +3129,7 @@ S MDLEvidence(common:GateEvidenceCommon,model_class_hash:Hash,corpus_hash:Hash,p
 E PreferenceModelFamily = none | weighted_sum | ahp | electre | promethee | topsis | grade_etd | other
 ```
 
-`G-MDL`: calibrated compression, payoff, model-selection, and preference tradeoffs. Interface `candidate artifact set -> MDLEvidence -> ClaimRecord`; M0 theorem truth ignores compression score.
+`G-MDL`: calibrated compression, payoff, model-selection, preference tradeoffs. Interface `candidate artifact set -> MDLEvidence -> ClaimRecord`; M0 theorem truth ignores compression score.
 
 ```text
 S SelfImprovementEvidence(common:GateEvidenceCommon,parent_artifact_hashes:Set[Hash],proposed_child_artifact_hashes:Set[Hash],change_set_hash:Hash,adapter_family:ModelAdapterFamily,counterexample_suite_hash:Hash,materialized_consequence_manifest_hash:Hash,regression_suite_hash:Hash,heldout_delta_hash:Hash?,catastrophic_forgetting_check_hash:Hash?,safety_regression_check_hash:Hash?,reviewer_record_hashes:Set[Hash],rollback_manifest_hash:Hash)
@@ -3148,7 +3147,7 @@ E ProbabilisticBackendFamily = problog | cplint | prism_sato | deepproblog | smp
 E ProbabilisticEvidenceArtifactKind = sdd | d_dnnf | bdd | mtbdd | weighted_model_count_circuit | markov_chain | mdp | proof_log | other
 ```
 
-`G-PROB`: probabilistic facts, risks, stochastic transitions, weights, and rewards. Interface `probabilistic evidence -> ProbabilisticProfileRecord -> ClaimRecord`; deterministic M0 predicates ignore probability fields. ProbLog/cplint/ProbEC-style exact-inference claims record the distribution-semantics backend and a checkable SDD/d-DNNF/WMC artifact when claimed; PRISM/Storm model-checking claims record the model-checker backend and transition/reward model artifact.
+`G-PROB`: probabilistic facts, risks, stochastic transitions, weights, rewards. Interface `probabilistic evidence -> ProbabilisticProfileRecord -> ClaimRecord`; deterministic M0 predicates ignore probability fields. ProbLog/cplint/ProbEC-style exact-inference claims record distribution-semantics backend and a checkable SDD/d-DNNF/WMC artifact when claimed; PRISM/Storm model-checking claims record model-checker backend and transition/reward model artifact.
 
 ```text
 S WorldModelProfileRecord(common:GateEvidenceCommon,observation_modality_set:Set[Id],world_model_family:WorldModelFamily,latent_state_schema_hash:Hash,transition_model_hash:Hash?,multimodal_encoder_manifest_hash:Hash?,trajectory_dataset_hash:Hash?,rollout_horizon_bound_hash:Hash?,causal_design_manifest_hash:Hash?,validation_protocol_hash:Hash,safety_boundary_hash:Hash,unsupported_projection_hashes:Set[Hash])
@@ -3156,7 +3155,7 @@ S WorldModelProfileRecord(common:GateEvidenceCommon,observation_modality_set:Set
 E WorldModelFamily = observation_generative | latent_dynamics | jepa_encoder | tokenized_ehr_transformer | multimodal_encoder | other
 ```
 
-`G-WORLD-MODEL`: latent state, trajectory, image-derived, and multimodal claims. Interface `world observation -> WorldModelProfileRecord -> gated feature artifact`; M0 source-text review remains independent.
+`G-WORLD-MODEL`: latent state, trajectory, image-derived, multimodal claims. Interface `world observation -> WorldModelProfileRecord -> gated feature artifact`; M0 source-text review stays independent.
 
 ```text
 S GovernedPatientDataProfile(common:GateEvidenceCommon,data_source_profile_id:Id,data_model_family:PatientDataModelFamily,privacy_regime_family:PrivacyRegimeFamily,data_use_authority_hash:Hash,consent_or_optout_policy_hash:Hash?,cross_border_transfer_profile_hash:Hash?,privacy_law_assessment_hash:Hash,deidentification_family:DeidentificationFamily?,deidentification_profile_hash:Hash?,record_linkage_profile_hash:Hash?,dataset_bom_hash:Hash?,access_control_profile_hash:Hash,audit_log_profile_hash:Hash,data_minimization_hash:Hash,retention_policy_hash:Hash,breach_response_hash:Hash)
@@ -3180,11 +3179,51 @@ E ThreatModelFamily = stride | linddun | zero_trust | mitre_atlas | owasp_llm | 
 E RegulatoryJurisdictionFamily = japan_pmda | us_fda | eu_mdr_ivdr_ai_act | imdrf | other
 ```
 
-`G-S3`: clinical, patient-care, CDS, SaMD, deployment, regulatory, safety, cybersecurity, privacy, usability, alert-governance, implementation-science, and post-market authority. Interface `deployment profile -> S3AssuranceEvidence -> S3 ClaimRecord`. Without `G-S3`, M0 outputs remain formalization-QA and text-quality review candidates.
+`G-S3`: clinical, patient-care, CDS, SaMD, deployment, regulatory, safety, cybersecurity, privacy, usability, alert-governance, implementation-science, post-market authority. Interface `deployment profile -> S3AssuranceEvidence -> S3 ClaimRecord`. Without `G-S3`, M0 outputs stay formalization-QA and text-quality review candidates.
+
+```text
+S RuntimeOracleReport(common:GateEvidenceCommon,pipeline_id:Id,target_language_family:RuntimeTargetFamily,deterministic_oracle_hash:Hash,stage_records:List[LayeredPipelineStageRecord],between_layer_model_families:Set[ProposalGeneratorFamily],direct_translation_baseline_hash:Hash?,weak_model_baseline_hash:Hash?,fidelity_metric_records:Set[EvaluationMetricRecord],idempotency_record_hashes:Set[Hash],convergence_record_hashes:Set[Hash],ablation_record_hashes:Set[Hash],divergence_case_hashes:Set[Hash])
+
+S LayeredPipelineStageRecord(stage_index:UInt,input_ir_schema_hash:Hash,output_ir_schema_hash:Hash,transform_kind:LayeredTransformKind,model_family:ProposalGeneratorFamily?,stage_manifest_hash:Hash,stage_output_digest:Hash)
+
+E RuntimeTargetFamily = ckc_normal_form | lean | rocq | isabelle | smtlib | datalog | asp | egraph | symbolic_math | bespoke_dsl | other
+
+E LayeredTransformKind = deterministic_compile | model_call | retrieval_augmented | constrained_decode | verifier_repair | human_fixture | other
+```
+
+`G-RUNTIME-ORACLE`: layered-IR pipeline and runtime-oracle fidelity measurement. Interface `source text -> ordered IR stages (optionally between-layer model calls) -> target language -> RuntimeOracleReport -> ClaimRecord`. Candidate NL-to-target pipeline as first-class replayable object: `stage_records` = ordered IR layers, each naming input/output IR schema, `transform_kind` (`deterministic_compile`, `model_call`, retrieval, constrained decode, verifier repair) and `model_family` for a between-layer model call; `deterministic_oracle_hash` names the accepted CKC Normal Form / kernel result scored against; `direct_translation_baseline_hash`, `weak_model_baseline_hash` exhibit the hypothesis that a weak model fails direct clinical-text-to-target translation but succeeds through a specific staged setup; `ablation_record_hashes` = combinatorial search over stage compositions; `idempotency_record_hashes`, `convergence_record_hashes`, `fidelity_metric_records` quantify stability/accuracy. Never elevates a model-bearing pipeline to accepted M0 semantics: accepted artifacts stay deterministic kernel output; a layered/runtime-AI pipeline is admissible at runtime only as separately gated, replayed S2 evidence, per §6.4 proposal/runtime separation.
+
+## 13. Roadmap, theoretical scope, and open problems
+
+Non-normative for M0: no acceptance gate, no M0 obligation. Core §§1-12 is the first milestone. Research tracks produce evidence only through §3.3 gates; none weakens the kernel; accepted M0 semantics = kernel output.
+
+### 13.1 Reusability and minimum description length as the optimization target
+
+Aim: fewest reusable components — clinical-language-to-IR mapping verified once, reused deterministically. Reusable-component set = `AcceptedGeneratorBase + TerminologyResourceSet + SemanticPolicySet`; target = its size/overlap vs licensed corpus coverage. M0 instruments descriptively via §10 component-economy annotations → deterministic gradient. Optimization verdict (one base more compact/reusable/lower-description-length) is a calibrated S2 claim gated by `G-MDL` and `G-EMIN`. Automated base improvement additionally gated by `G-SELF-IMPROVE`; accepted improved artifacts stay effect-free, proof-carrying.
+
+### 13.2 The intermediate-representation design space and the layered-IR / runtime-oracle track
+
+M0 commits to a single accepted IR (CKC-GEN-core licenses to AIRCore to CKC Normal Form) checked by proof-by-reflection; external IR/proof-assistant/solver/agent languages dispositioned in §3.5, admitted only as gated portfolio evidence (`G-PORTFOLIO`, `G-AIR-FULL`). Open: whether the most reusable/accurate mapping uses a different IR, pre-existing IRs/proof-assistants/agent-languages, newly invented IRs, or several IR layers with model calls between them — a combinatorial search. `G-RUNTIME-ORACLE` (§12) is its replayable home: `RuntimeOracleReport` records an ordered IR-stage pipeline with optional between-layer model calls, scored against the kernel oracle, with direct-translation/weak-model baselines and ablations — mechanism for the hypothesis that a weak local model fails direct clinical-text-to-target (e.g. Lean) translation but succeeds through a specific staged setup. Promoted to runtime use only when such evidence proves it; until then proposal-only (§6.4), accepted M0 output stays deterministic.
+
+### 13.3 Corpus scale
+
+`ckc demo m0` runs over the single finite Appendix A fixture. First external deliverable: headless processing of a large corpus of publicly retrievable Japanese clinical guidelines into a review report. Staged bridge: layout-aware extraction of public guideline PDFs via `G-EXTRACTOR-ADAPTER`; autonomous retrieval/segmentation quality via `G-RET-PARITY`; cross-edition transport on revision via `G-REBIND`; corpus-scale coverage/contradiction measurements are S2 under `G-EMIN`. Immutable permission-tracked source editions + replayable artifacts scale the same deterministic pipeline from one fixture to a corpus without changing acceptance authority. Only publicly accessible, autonomously retrievable sources with no patient-data/security considerations are in scope before `G-LIVE-PATIENT`, `G-S3`.
+
+### 13.4 Theoretical scope and limits
+
+Reducing clinical knowledge to a small axiom set is a research direction, not assumed. M0 is finite and decidable: contexts finite disjunctions of finite conjunctions, AIR finite-set identity, `finite_constraint_check` decides linear rational and interval constraints, theorem truth proof-by-reflection over canonical finite artifacts. Finiteness escapes classical limits — Gödel incompleteness and undecidability of rich first-order/arithmetic theories apply to recursively axiomatized systems strong enough to encode arithmetic, not a fixed finite decidable fragment. As scope grows, expressive fragments (full temporal logics, first-order ontologies, quantified arithmetic, defeasible/argumentation closures) can become undecidable or incomplete; no complete consistent finite axiomatization assumed. Hence richer-reasoning, optimality, full-coverage claims are gated (`G-AIR-FULL`, `G-PORTFOLIO`, `G-EMIN`, `G-MDL`) not asserted; accepted core stays decidable and mechanically replayable.
+
+### 13.5 The open verification problem
+
+Open, resolved empirically: what counts as adequate evidence that a clinical-language-to-IR mapping is correct and reusable. M0 supplies operational verification of M0 artifacts — schema/canonical-byte validity, proof-by-reflection by the kernel finite checker, certificates, replay identity — plus generator discharge against counterexample suites; not claimed final. Candidate signals, each gated: replay identity + proof-checking (S0); admission + counterexample-suite discharge (S1); multi-backend portfolio agreement (`G-PORTFOLIO`); non-identity abstract-domain soundness (`G-AIR-FULL`); cross-edition rebinding stability (`G-REBIND`); benchmark fidelity, semantic equivalence, idempotency, convergence (`G-EMIN`); compression/description-length payoff (`G-MDL`); layered-pipeline runtime-oracle fidelity (`G-RUNTIME-ORACLE`). Which combination is adequate is left open, itself a benchmarkable S2 question; each signal kept replayable.
+
+### 13.6 Visualization
+
+§9.4 derivation-trace view renders, deterministically and `view_only`, the path from a source region through each IR (`SourceGraph -> MechObsPayload -> PatternObs -> Match -> License -> AIRCoreRecord -> CKCNormalForm`) along the `ProofDAG` to the most compact accepted form. When the §13.2 layered-IR track is exercised, the trace extends through the additional IR stages recorded in a `RuntimeOracleReport` to the compiled target. Presentation layer over already-proof-visible artifacts; adds no semantics.
 
 ## Appendix A. Worked M0 example: sepsis and beta-lactam
 
-This is the canonical M0 fixture. It is finite and mechanically checkable. All identifiers are fixture identifiers. Shorthand expands to this specification’s schemas by replacing concept names with `TermReading` references, quantity surfaces with exact `Rational` values, support labels with closed `SourceRegion` hashes, and Japanese surfaces with declared string policies. In Appendix A: `GDL=SRC-GDL`, `PI=SRC-PI`, `Ux=REG-Ux`, `Lx=LIC-Lx`, `Nx=NF-Nx`, `C=adult_population ∧ suspected(sepsis)`, `H=history(anaphylaxis_to(beta_lactam_antibacterial))`, `AB=administer(beta_lactam_antibacterial)`, and `supp(Ux)=source_support=closure(REG-Ux)`.
+Canonical M0 fixture; finite, mechanically checkable. All IDs are fixture IDs. Shorthand expands to spec schemas: concept names→`TermReading` refs, quantity surfaces→exact `Rational`, support labels→closed `SourceRegion` hashes, Japanese surfaces→declared string policies. In Appendix A: `GDL=SRC-GDL`, `PI=SRC-PI`, `Ux=REG-Ux`, `Lx=LIC-Lx`, `Nx=NF-Nx`, `C=adult_population ∧ suspected(sepsis)`, `H=history(anaphylaxis_to(beta_lactam_antibacterial))`, `AB=administer(beta_lactam_antibacterial)`, `supp(Ux)=source_support=closure(REG-Ux)`.
 
 ### A.1 Fixture sources, permissions, and regions
 
@@ -3225,7 +3264,7 @@ U26 GDL "βラクタム系抗菌薬の投与量を高用量とする。"
 U27 GDL "βラクタム系抗菌薬の投与量を標準用量とする。"
 ```
 
-`U18` has no `crossref_targets` edge. `U19` has table-like surface text with no output column and no header relation. `U22` has conflicting byte offsets. These force typed residuals rather than source drop.
+`U18`: no `crossref_targets` edge. `U19`: table-like surface, no output column, no header relation. `U22`: conflicting byte offsets. Force typed residuals, not source drop.
 
 ### A.2 Mechanical observations
 
@@ -3258,6 +3297,8 @@ MO-ANCH-SPEED anchor_span raw="通常速度" src=U11.
 MO-LEX-ROUTINE lex_surface_hit surface="通常速度" concept_candidate=routine_administration src=U11.
 MO-ANCH-CFZ anchor_span raw="セファゾリン" src=U12.
 MO-LEX-CFZ lex_surface_hit surface="セファゾリン" concept_candidate=cefazolin src=U12.
+MO-ANCH-BLA-U13 anchor_span raw="βラクタム系抗菌薬" src=U13.
+MO-LEX-BLA-U13 lex_surface_hit surface="βラクタム系抗菌薬" concept_candidate=beta_lactam_antibacterial src=U13.
 MO-XREF-MISSING crossref_surface raw="表99" target=missing src=U18.
 MO-CELL-MALFORMED-GUARD table_cell row=DTR-MALFORMED-R1 column=guard raw="収縮期血圧 < 80" src=U19.
 MO-LEX-UNK lex_surface_hit surface="未知薬Y" concept_candidate=unmapped src=U20.
@@ -3272,7 +3313,7 @@ MO-LEX-DOSE-HIGH lex_surface_hit surface="高用量" concept_candidate=high_dose
 MO-LEX-DOSE-STD lex_surface_hit surface="標準用量" concept_candidate=standard_dose src=U27.
 ```
 
-Mechanical observations assert only surfaces and layout facts, not clinical truth.
+MOs assert only surfaces and layout facts, not clinical truth.
 
 ### A.3 Admitted terminology and policy fixtures
 
@@ -3294,7 +3335,7 @@ binding exact "高用量" -> high_dose.
 binding exact "標準用量" -> standard_dose.
 ```
 
-The duplicate exact `薬剤X` functional key triggers `functional_key_collision`; its mutually exclusive targets trigger `mutually_exclusive_term_mapping`.
+Duplicate exact `薬剤X` functional key triggers `functional_key_collision`; its mutually exclusive targets trigger `mutually_exclusive_term_mapping`.
 
 ```text
 ActionSlotSpec route: value_kind=route_concept, discriminates_action_identity=true, normalization=concept_representative.
@@ -3307,7 +3348,7 @@ OutputExclusion source_node_state source_node_present source_node_absent symmetr
 metadata_singleton_keys={publication_date}.
 ```
 
-The duplicate `dose` policy rows share a semantic key and differ in payload bytes, so policy validation emits `Incoherence(class=incompatible_generator_outputs)` and quarantines the duplicate dose key. The single demo `SemanticPolicySet` still contains every row above. Main theorem fixtures query only non-quarantined route, administration-speed, target-relation, output-exclusion, and metadata rows; the dose-policy-collision fixture positively exercises quarantine within the same policy set.
+Duplicate `dose` policy rows share a semantic key, differ in payload bytes → policy validation emits `Incoherence(class=incompatible_generator_outputs)` and quarantines the duplicate dose key. The single demo `SemanticPolicySet` still contains every row above. Main theorem fixtures query only non-quarantined route, administration-speed, target-relation, output-exclusion, metadata rows; dose-policy-collision fixture exercises quarantine within the same policy set.
 
 ### A.4 Pattern observations and generator origin
 
@@ -3345,7 +3386,7 @@ LIC-L8 | gen_norm_route_iv | PO-P8, MO-LEX-IV, MO-LEX-RAPID | NF-N4
 LIC-L9 | gen_norm_route_oral | PO-P8, MO-LEX-ORAL, MO-LEX-RAPID | NF-N5
 LIC-L10 | gen_norm_speed_routine | PO-P9, MO-LEX-IV, MO-LEX-ROUTINE | NF-N6
 LIC-L11 | gen_norm_cefazolin | PO-P10, MO-LEX-CFZ | NF-N7
-LIC-L12 | gen_norm_beta_lactam_class | PO-P10, MO-LEX-BLA-U1 from U13 | NF-N8
+LIC-L12 | gen_norm_beta_lactam_class | PO-P10, MO-LEX-BLA-U13 | NF-N8
 LIC-L13a | gen_ambiguous_permit | PO-P16, MO-MOD-PERMIT | AIR ambiguity only
 LIC-L13b | gen_ambiguous_avoid | PO-P16, MO-MOD-AVOID | AIR ambiguity only
 ```
@@ -3358,7 +3399,7 @@ premises=[(mobs m_drug MechObsPattern{kind=lex_surface_hit,field_constraints=[co
 head=(license LicenseTemplate{air_key=AIRKeyTemplate{air_type=air.norm,support_region=RegionOfTerm{term=FieldTerm{base=m_drug,path=[source_region_id]}},slot_key=LiteralTerm{literal=IdLiteral{value=n1}}},reading=ReadingTemplate{reading_kind=NormReading,field_bindings=[{path=[direction],value=TermValue{term=LiteralTerm{literal=EnumLiteral{enum_name=Direction,variant=for}}}},{path=[action,action_kind],value=TermValue{term=LiteralTerm{literal=IdLiteral{value=administer}}}},{path=[action,target],value=TermValue{term=LiteralTerm{literal=IdLiteral{value=beta_lactam_antibacterial}}}},{path=[temporal],value=ListTemplateValue{values=[ReadingTemplateValue{reading=ReadingTemplate{reading_kind=TemporalReading,field_bindings=[{path=[temporal_kind],value=TermValue{term=LiteralTerm{literal=IdLiteral{value=prompt}}}},{path=[value],value=TermValue{term=FieldTerm{base=m_temporal,path=[normalized_text]}}},{path=[raw_anchor_id],value=TermValue{term=FieldTerm{base=m_temporal,path=[anchor_id]}}}]}}]}}]},source_support={RegionOfTerm{term=FieldTerm{base=m_drug,path=[source_region_id]}}},proof_roots={}})
 ```
 
-`T-GEN-Static` checks the pattern schemas, role bindings, finite `seq` gaps, enum literals, and head field paths before materialization.
+`T-GEN-Static` checks pattern schemas, role bindings, finite `seq` gaps, enum literals, head field paths before materialization.
 
 ### A.5 Semantic licenses, AIRCore, and residual/ambiguity materialization
 
@@ -3402,7 +3443,7 @@ INC-incompatible-generator-outputs: duplicate dose ActionSlotSpec rows differ ->
 
 ### A.6 Normal Form
 
-Every NF object below is the deterministic projection of the named `AIRCoreRecord` or metadata builder.
+Each NF object below = deterministic projection of the named `AIRCoreRecord` or metadata builder.
 
 ```text
 N1=NFNorm(L1): source_class=guideline; dir=for; action=AB; ctx=C; temporal=prompt; original_modality_phrase_ja="推奨する"; supp(U1).
@@ -3421,11 +3462,11 @@ NF-M1=NFMetadataClaim(SRC-GDL): bid="敗血症抗菌薬ガイド fixture"; key=p
 NF-M2=NFMetadataClaim(SRC-PI): bid="敗血症抗菌薬ガイド fixture"; key=publication_date; value="2025-12-01".
 ```
 
-`NF(NF(x))=NF(x)` for all listed NF objects. Reordering conjunction atoms in N1,N3,N4,N5,N6,N7,N8 preserves `semantic_digest`; reordering NF-T1 rows changes it.
+`NF(NF(x))=NF(x)` for all listed. Reordering conjunction atoms in N1,N3,N4,N5,N6,N7,N8 preserves `semantic_digest`; reordering NF-T1 rows changes it.
 
 ### A.7 Expected M0 theorem witnesses
 
-Conflict candidates are exactly this closure. Pair entries have compatible context, empty `ResolutionSet`, and the stated action/consequent witness. The dedicated N1 vs N3 pair has a nonempty `ResolutionSet={RT-R1}` and is therefore a suppressed negative-control row rather than a conflict theorem. NF-Q1 fails `strict_factual_self_check` and appears only in CT-C4; no other NF pair satisfies a §8.5 pair predicate.
+Conflict candidates = exactly this closure. Pair entries have compatible context, empty `ResolutionSet`, stated action/consequent witness. Dedicated N1 vs N3 pair has nonempty `ResolutionSet={RT-R1}` → suppressed negative-control row, not a conflict theorem. NF-Q1 fails `strict_factual_self_check`, appears only in CT-C4; no other NF pair satisfies a §8.5 pair predicate.
 
 ```text
 CT-C1a contraindication_vs_recommendation: N1 vs N2; same action AB; ctx witness C ∧ H; ResolutionSet={}.
@@ -3478,11 +3519,11 @@ For `N1`, the Japanese gloss template renders:
 成人かつ敗血症が疑われる場合には、βラクタム系抗菌薬の投与を推奨する。
 ```
 
-The gloss stores ordered slot digests for `context adult_population; context suspected(sepsis); action administer; target beta_lactam_antibacterial; direction for.` A stale gloss fixture with the same `(nf_hash, lang, template_id)` and a different target rendering triggers FI-F3. A missing template unit fixture returns unsupported and emits a gloss diagnostic, not an accepted `GlossView`.
+Gloss stores ordered slot digests for `context adult_population; context suspected(sepsis); action administer; target beta_lactam_antibacterial; direction for.` Stale gloss fixture with same `(nf_hash, lang, template_id)` and different target rendering triggers FI-F3. Missing template unit fixture returns unsupported, emits a gloss diagnostic, not an accepted `GlossView`.
 
 ### A.9 Admission and discharge witnesses
 
-Fixture ProposalRecord rows use proposal_provenance_hashes={} unless a row states otherwise.
+Fixture ProposalRecord rows use proposal_provenance_hashes={} unless stated otherwise.
 
 ```text
 PR-PG1: Proposal subject_kind=CKCGen proposal_kind=CKCGen candidate=gen_norm_recommend_beta_lactam; CES-PG1 requires LIC-L1 and forbids residual classes {unsupported_construction,missing_terminology}; DischargeProposal materializes LIC-L1, matches required_output_digests, emits zero forbidden payloads, AdmissionDecision=accept; EffectDischargeRecord.accepted_effect_row={}
@@ -3524,4 +3565,4 @@ ActionSameness witness hashes AW-AS1..AW-AS4; ClaimRecord hashes for every theor
 ReportTraceIndex hash, ClaimTierSummary hash, WordingGateRecord hash, and ReviewReport hash sorted by §9.3 with trace_hash, claim_tier_summary_hash, and wording_gate_hash; ReplayManifest{RM-PRODUCER-BASE,RM-DEMO-CORE} where emitted artifacts point at RM-PRODUCER-BASE and RM-DEMO-CORE.expected_output_hashes exclude RM-DEMO-CORE, RIC-DEMO-CORE, and CERT-report_replay by §1.6; ReplayIdentityCheck outcomes: replay_identity_pass for non-mutated run, replay_identity_mismatch for deliberate replay-failure fixture, replay_identity_unsupported for permission-limited source-byte replay unit fixture.
 ```
 
-The accepted artifact set emitted by `ckc demo m0` is exactly the set listed above. The emitted `RetrievalProposalTrace` set is `{}` because the fixture uses authored proposals. The emitted stage-10 `TerminologyResourceSet` fragment set is `{}` because the fixture admits no `term_resource` generator and the single admitted `TerminologyResourceSet` enters through `ClosureInput`. The emitted `ResolutionTheorem` set is `{RT-R1}` and the N1 vs N3 suppressed-pair fixture proves its consumer path. The emitted `RepairSetSearchTrace` set is `{}` because the fixture executes no repair-set search. Stale internal artifacts, raw source quotations disallowed by permission, and unsupported gated claims appear only through the listed residuals, diagnostics, verifier witnesses, and replay checks.
+Accepted artifact set emitted by `ckc demo m0` = exactly the set above. Emitted `RetrievalProposalTrace` set = `{}` (fixture uses authored proposals). Emitted stage-10 `TerminologyResourceSet` fragment set = `{}` (no `term_resource` generator admitted; single admitted `TerminologyResourceSet` enters via `ClosureInput`). Emitted `ResolutionTheorem` set = `{RT-R1}`; N1 vs N3 suppressed-pair fixture proves its consumer path. Emitted `RepairSetSearchTrace` set = `{}` (no repair-set search). Stale internal artifacts, permission-disallowed raw quotations, and unsupported gated claims appear only through the listed residuals, diagnostics, verifier witnesses, replay checks.
