@@ -179,7 +179,7 @@ rule.
   VerifierWitness §9.1; the §1.2 alias row inherited_input is a cascade
   site). Procedure per .2.1.1. Read: §1.2 hash conventions + §4.3/§4.4 +
   each name's S-decl context. Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.2.1 hash-defect burn-down: §6.2 grammar family. Resolve 8
+- [x] M0.0.3.4.5.2.2.1 66% 132K/200K hash-defect burn-down: §6.2 grammar family. Resolve 8
   names sharing one digest-semantics fix (payloads are not accepted
   artifacts; expect *_digest renames + payload-byte definitions beside the
   §6.2 grammar-artifact schemas): constrained_decoder_contract_hash,

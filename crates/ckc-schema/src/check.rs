@@ -326,11 +326,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "tool/analyzer configuration bytes recorded by the enclosing manifest",
     ),
     (
-        "constrained_decoder_contract_hash",
-        HashFieldClass::Unresolved,
-        "contract payload undefined (§6.2 grammar artifact)",
-    ),
-    (
         "content_hash",
         HashFieldClass::RawRecordedBytes,
         "raw document content bytes; sibling extraction_manifest_hash names the supplier",
@@ -339,11 +334,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "dense_retriever_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external dense-retriever manifest bytes (evidence-discovery trace)",
-    ),
-    (
-        "display_grammar_hash",
-        HashFieldClass::Unresolved,
-        "display-grammar byte source undefined; spec-internal notation is outside the §1.2 raw-recorded list",
     ),
     (
         "emitted_payload_hashes",
@@ -364,21 +354,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external_backend_core_hash",
         HashFieldClass::RawRecordedBytes,
         "replayed external-solver core bytes; the recorded solver proof is the supplying manifest (§8.1)",
-    ),
-    (
-        "first_follow_sets_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash: Set[FirstFollowSet] payload is not an accepted artifact (§6.2)",
-    ),
-    (
-        "first_set_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash over FIRST token classes (§6.2)",
-    ),
-    (
-        "follow_set_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash over FOLLOW token classes (§6.2)",
     ),
     (
         "forbidden_output_hashes",
@@ -439,11 +414,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "normalization_table_hash",
         HashFieldClass::RawRecordedBytes,
         "Unicode normalization-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
-    ),
-    (
-        "parser_state_machine_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash: ParserStateMachine payload is not an accepted artifact (§6.2)",
     ),
     (
         "permission_evidence_hash",
@@ -571,19 +541,9 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "subject-identity hashes defined beside §8.7 Incoherence: envelope artifact_hash for enveloped subjects, else canonical-payload digest; §1.1 overflow_member_hash instantiates the rule",
     ),
     (
-        "tagged_json_schema_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash: the canonical tagged JSON schema payload is not an accepted artifact (§6.2)",
-    ),
-    (
         "tagged_union_alternatives_hash",
         HashFieldClass::FieldSpecific,
         "§1.1 T-Schema-Equivalence canonicalizes the union-alternative set; M0.0.4 implements",
-    ),
-    (
-        "valid_next_token_masks_hash",
-        HashFieldClass::Unresolved,
-        "digest semantics under *_hash: Set[ValidNextTokenMask] payload is not an accepted artifact (§6.2)",
     ),
     (
         "witness_hash",
@@ -1371,7 +1331,7 @@ mod tests {
 
     /// Totality + per-class path counts over the real SPEC: suffix
     /// defaults make every HashNamed walk row classify. Counts track the
-    /// .5.2.x burn-down (.5.2.1.1 + .5.2.1.2 done: 13 names); .5.2.3.2
+    /// .5.2.x burn-down (.5.2.1.x + .5.2.2.1 done: 21 names); .5.2.3.2
     /// finalizes with an empty Unresolved class.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
@@ -1383,18 +1343,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 251);
+        assert_eq!(rows.len(), 244);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 164);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 80);
+        assert_eq!(names.len(), 157);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 76);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
         assert_eq!(count(HashFieldClass::ArtifactRef), 168);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 10);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 11);
         assert_eq!(count(HashFieldClass::RawRecordedBytes), 28);
         assert_eq!(count(HashFieldClass::FieldSpecific), 12);
-        assert_eq!(count(HashFieldClass::Unresolved), 33);
+        assert_eq!(count(HashFieldClass::Unresolved), 25);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1523,8 +1483,8 @@ mod tests {
             ),
             (
                 "generator_grammar_artifact",
-                "nonterminal_schema_map/first_set_hash",
-                HashFieldClass::Unresolved,
+                "parser_state_machine/states/lr_items_digest",
+                HashFieldClass::NamedPayloadDigest,
             ),
             (
                 "closure_output",
@@ -1585,11 +1545,6 @@ mod tests {
             (
                 "verifier_witness",
                 "witness_payload_hash",
-                HashFieldClass::Unresolved,
-            ),
-            (
-                "generator_grammar_artifact",
-                "parser_state_machine_hash",
                 HashFieldClass::Unresolved,
             ),
         ] {

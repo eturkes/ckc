@@ -1215,28 +1215,32 @@ The s-expression grammar above is display notation. The parser emits canonical J
 `ckc gen check` also emits an agent-facing grammar artifact for proposal decoders. The artifact has `authority = evidence_discovery_only` and `accepted_effect_row = {}`. It supports constrained decoding and authoring diagnostics; accepted CKC-GEN semantics are determined by canonical tagged JSON, SchemaRegistry validation, and `T-GEN-Static`.
 
 ```text
-S GeneratorGrammarArtifact(grammar_id:Id,grammar_version:Id,display_grammar_hash:Hash,tagged_json_schema_hash:Hash,nonterminal_schema_map:Set[NonterminalSchemaEntry],production_schema_map:Set[ProductionSchemaEntry],first_follow_sets_hash:Hash,parser_state_machine_hash:Hash,valid_next_token_masks_hash:Hash,constrained_decoder_contract_hash:Hash,authority:Authority,replay_manifest_hash:Hash,accepted_effect_row:Set[Effect])
+S GeneratorGrammarArtifact(grammar_id:Id,grammar_version:Id,nonterminal_schema_map:Set[NonterminalSchemaEntry],production_schema_map:Set[ProductionSchemaEntry],first_follow_sets:Set[FirstFollowSet],parser_state_machine:ParserStateMachine,valid_next_token_masks:Set[ValidNextTokenMask],authority:Authority,replay_manifest_hash:Hash,accepted_effect_row:Set[Effect])
 
-S NonterminalSchemaEntry(nonterminal:Id,schema_id:Id,schema_version:Id,first_set_hash:Hash,follow_set_hash:Hash)
+S NonterminalSchemaEntry(nonterminal:Id,schema_id:Id,schema_version:Id)
 
 S ProductionSchemaEntry(production_family_id:Id,nonterminal:Id,tagged_union_alternative:Id,schema_id:Id,constructor_tag:Id)
 
 S FirstFollowSet(nonterminal:Id,first_token_classes:Set[TokenClass],follow_token_classes:Set[TokenClass],nullable:Bool)
 
-S ParserStateMachine(machine_id:Id,grammar_hash:Hash,start_state_id:Id,accepting_state_ids:Set[Id],states:Set[ParserState],transitions:Set[ParserTransition],reductions:Set[ParserReduction])
+S ParserStateMachine(machine_id:Id,start_state_id:Id,accepting_state_ids:Set[Id],states:Set[ParserState],transitions:Set[ParserTransition],reductions:Set[ParserReduction])
 
-S ParserState(state_id:Id,lr_items_hash:Hash)
+S ParserState(state_id:Id,lr_items_digest:Hash)
+
+S LRItem(production_family_id:Id,tagged_union_alternative:Id,dot_position:UInt,lookahead:TokenClass)
 
 S ParserTransition(from_state_id:Id,token_class:TokenClass,to_state_id:Id)
 
 S ParserReduction(state_id:Id,lookahead:TokenClass,production_family_id:Id)
 
-S TokenClass(token_class_id:Id,literal_bytes_hash:Hash?,lexical_policy:StringPolicy?)
+S TokenClass(token_class_id:Id,lexical_policy:StringPolicy?)
 
 S ValidNextTokenMask(state_id:Id,token_classes:Set[TokenClass])
 ```
 
-`FIRST(N)` is the least fixed point of token classes that can begin a derivation from nonterminal `N`; `FOLLOW(N)` is the least fixed point of token classes that can immediately follow `N` in any derivation from the CKCGen start symbol. The grammar is finite, so both fixed points terminate by monotone growth over the finite token-class universe. The parser state machine is the canonical LR(1) item automaton built from the display grammar with states sorted by canonical item-set bytes. `ValidNextTokenMask(state)` is exactly the union of transition token classes leaving the state and reduction lookahead token classes in that state.
+The artifact stores its derived grammar structures inline; decoders and `T-GEN-Grammar-Evidence` read them directly. The display grammar, its production families, and the finite token-class table (token-class ids, literal token bytes, lexical policies) are fixed §6.2 specification content committed by `spec_contract_hash`: `grammar_id`/`grammar_version` name that grammar, and the emitting run's `SchemaRegistry` binding rides `replay_manifest_hash`. `lr_items_digest = sha256(canonical_payload_bytes(items))` over the state's LR(1) item set encoded as `Set[LRItem]`; `LRItem` mirrors the `ProductionSchemaEntry` production key plus a dot position and one lookahead token class.
+
+`FIRST(N)` is the least fixed point of token classes that can begin a derivation from nonterminal `N`; `FOLLOW(N)` is the least fixed point of token classes that can immediately follow `N` in any derivation from the CKCGen start symbol. The grammar is finite, so both fixed points terminate by monotone growth over the finite token-class universe. The parser state machine is the canonical LR(1) item automaton built from the display grammar with states sorted by canonical item-set bytes (the `lr_items_digest` input). `ValidNextTokenMask(state)` is exactly the union of transition token classes leaving the state and reduction lookahead token classes in that state.
 
 `ParseCKCGen(input_bytes) -> OperationResult[CKCGen]` is total:
 
