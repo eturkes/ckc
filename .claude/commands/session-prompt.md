@@ -47,7 +47,7 @@ test suite.
 Right before staging, run `.agent/compaction.sh`; in the same roadmap edit that
 marks the unit `[x]`, append its `NN% NNNK/200K` output to the unit's line.
 Stage everything and make one commit covering work + roadmap, with the unit id
-in the subject (e.g. `feat(m0.1.2): …`) — review sessions locate their ranges
+as the scope (e.g. `m0.1.2: …`) — review sessions locate their ranges
 by these ids.
 
 ### Splitting (when a unit overruns)
