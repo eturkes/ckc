@@ -231,7 +231,7 @@ rule.
   SPEC.md corrections in-scope. Tests: real SPEC clean; unmapped-payload
   perturbation rejects. Read: §3.2 producer table + control-emission rule.
   Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.7 local-bound dispatch + steps 1-2/5 + gate (completes
+- [x] M0.0.3.4.7 84% 169K/200K local-bound dispatch + steps 1-2/5 + gate (completes
   T-Registry-Referential-Integrity). check.rs: local bound objects lacking
   BoundOverflowDisposition (e.g. CollectBound, dispatch defined beside §6.2
   collect) must name a consuming-algorithm dispatch — §6.2 reading = its

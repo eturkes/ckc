@@ -9,7 +9,11 @@
 //! [`check_registry`] rejects `Unresolved` rows. §3.2 reverse producer
 //! coverage (M0.0.3.4.6): [`producer_mapping_issues`] requires every §3.1
 //! payload to be named by a stage-table emission or the control-emission
-//! rule. Each issue carries [`CheckIssue::CODE`] or
+//! rule. §1.1 steps 1-5 (M0.0.3.4.7):
+//! [`check_registry_referential_integrity`] composes [`check_spec`] and
+//! [`check_registry`] into the total gate, adding the §1.1 local-bound
+//! dispatch rule ([`check_local_bound_dispatch`]) and step-1-2 registry
+//! schema_id uniqueness. Each issue carries [`CheckIssue::CODE`] or
 //! [`CheckIssue::PRODUCER_MAPPING`]; the §8.7 `Diagnostic` artifact
 //! wrapper lands with its consuming unit.
 //!
@@ -73,9 +77,12 @@ impl CheckReport {
     }
 }
 
-/// Runs §1.1 steps 1-3 over raw SPEC.md text: parse, build the symbol
-/// table, resolve every reference. Step 4 lives in [`check_registry`];
-/// step-5 composition lands with M0.0.3.4.7.
+/// Pure-SPEC referential checks: §1.1 steps 1-3 (parse, build the symbol
+/// table, resolve every reference), the §3.2 producer-coverage rule, and
+/// the §1.1 local-bound-object dispatch rule. Step 4 (built registry +
+/// manifest) lives in [`check_registry`];
+/// [`check_registry_referential_integrity`] composes both into the §1.1
+/// step-5 total check.
 pub fn check_spec(text: &str) -> CheckReport {
     let parse = parse_spec(text);
     let decls = &parse.decls;
@@ -118,6 +125,7 @@ pub fn check_spec(text: &str) -> CheckReport {
     check_consumer_table(decls, &table, &mut push);
     check_inventory(decls, &table, &mut push);
     check_anchor_refs(text, &table, &mut push);
+    check_local_bound_dispatch(decls, text, &mut push);
 
     for (line, message) in producer_mapping_issues(decls) {
         issues.push(CheckIssue {
@@ -143,11 +151,30 @@ fn enclosing_anchor(decls: &SpecDecls, line: usize) -> String {
         .map_or_else(|| "title".to_string(), |s| s.anchor.clone())
 }
 
-/// §1.1 step-4 bound coverage, the §1.2 source-support/role rule, and the
-/// §1.2 hash-field conventions over a built registry+manifest pair: every
-/// walked hash leaf must classify to a non-`Unresolved`
-/// [`HashFieldClass`]. Peer of [`check_spec`]: same issue type and
-/// ordering. Step-1-2/5 composition (.4.7) remains.
+/// §1.1 steps 1-5: the total `T-Registry-Referential-Integrity` check.
+/// Composes [`check_spec`] (steps 1-3, the §3.2 producer-coverage rule,
+/// and the §1.1 local-bound dispatch rule) with [`check_registry`] (step-4
+/// bound coverage, the §1.2 hash/role conventions, and step-1-2 registry
+/// schema_id uniqueness) into one sorted report; an empty report is the
+/// step-5 `ok`, and a failing registry emits diagnostics only.
+pub fn check_registry_referential_integrity(
+    text: &str,
+    registry: &SchemaRegistry,
+    manifest: &SchemaBoundManifest,
+) -> CheckReport {
+    let mut issues = check_spec(text).issues;
+    issues.extend(check_registry(text, registry, manifest).issues);
+    issues.sort();
+    issues.dedup();
+    CheckReport { issues }
+}
+
+/// Built-registry checks: §1.1 step-4 bound coverage, the §1.2
+/// source-support/role rule, the §1.2 hash-field conventions (every walked
+/// hash leaf classifies to a non-`Unresolved` [`HashFieldClass`]), and the
+/// §1.1 step-1-2 schema_id uniqueness over the generated registry. Peer of
+/// [`check_spec`]: same issue type and ordering;
+/// [`check_registry_referential_integrity`] composes the two.
 pub fn check_registry(
     text: &str,
     registry: &SchemaRegistry,
@@ -252,8 +279,20 @@ fn check_registry_with(
         .iter()
         .map(|a| a.schema_id.as_str())
         .collect();
+    // §1.1 steps 1-2 over the generated registry: each schema_id is
+    // declared by exactly one SchemaEntry. The registry feeds the symbol
+    // table alongside the spec; every v0 entry shares one schema_version,
+    // so a repeated schema_id (rather than a divergent anchor) marks the
+    // duplicate redeclaration.
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
     for e in &registry.schema_entries {
         let id = e.schema_id.as_str();
+        if !seen.insert(id) {
+            push(
+                line_of(id),
+                format!("registry declares schema_id `{id}` in multiple SchemaEntry rows"),
+            );
+        }
         let Some(decl) = inv.get(id).copied() else {
             push(
                 inv_line,
@@ -952,6 +991,36 @@ fn producer_mapping_issues(decls: &SpecDecls) -> Vec<(usize, String)> {
             )
         })
         .collect()
+}
+
+/// §1.1 local-bound-object rule: a bound-bearing S-decl (one with a
+/// `max_items` field) that lacks a `BoundOverflowDisposition` field is a
+/// *local* bound object — `SchemaCollectionBound` carries a disposition
+/// and routes overflow through `HandleBoundOverflow`, so it is exempt.
+/// Each local bound object (M0: `CollectBound`) must name its own overflow
+/// dispatch at the consuming algorithm; the dispatch is the
+/// `<schema_ident>_overflow` diagnostic code defined beside the form (§6.2
+/// `collect` -> `collect_bound_overflow`), and its absence from the spec
+/// is a registry error.
+fn check_local_bound_dispatch(decls: &SpecDecls, text: &str, push: &mut impl FnMut(usize, String)) {
+    for d in &decls.s_decls {
+        let is_bound = d.fields.iter().any(|f| f.name == "max_items");
+        let has_disposition = d.fields.iter().any(
+            |f| matches!(&f.ty, TypeExpr::Name { name, .. } if name == "BoundOverflowDisposition"),
+        );
+        if is_bound && !has_disposition {
+            let dispatch = format!("{}_overflow", schema_ident(&d.name).as_str());
+            if !text.contains(&dispatch) {
+                push(
+                    d.line,
+                    format!(
+                        "local bound object `{}` names no overflow dispatch `{dispatch}`",
+                        d.name
+                    ),
+                );
+            }
+        }
+    }
 }
 
 /// §11.1 command table: every pipeline operation resolves to a §3.2 stage
