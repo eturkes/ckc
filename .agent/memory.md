@@ -304,7 +304,16 @@ technically derivable but easily forgotten under token pressure.
   the foundation unit and keeping the algorithm+gate solo; mechanical
   canonical_record! clusters stay light (3-4 records/unit) because each
   record still costs a descriptor-agreement reconciliation against its
-  spec-derived S-decl.
+  spec-derived S-decl. Seventh corollary (m0.0.6 split 1→3, user-directed
+  pre-implementation): a CLI/contract row whose gate checks a runtime surface
+  against a SPEC table an earlier unit already extracts (§11.1 `command_table`
+  from m0.0.3.2-.3) reuses that extraction — author a runtime model+parser the
+  gate proves bijects with the table, never a re-authored copy; split by
+  deliverable layer (surface-model+parser / diagnostic-writer+repo-layout /
+  contract-checker+gate), pairing the two light table-free deliverables and
+  keeping the fallout-bearing gate solo. CLI command/operation types are
+  CLI-internal (absent from §3.1 inventory) → no descriptor/registry
+  registration, agreement gates untouched (unlike m0.0.5's schema rows).
 - [2026-06-08] A missing/renamed `bare_enum!` variant surfaces its first
   rustc/RA diagnostic (E0599) at ckc-core canon.rs — the macro-definition
   site — not the real use site. Grep the variant name across crates before
@@ -326,7 +335,9 @@ technically derivable but easily forgotten under token pressure.
   first unchecked unit that cannot fit — the next bare §11.3 row. Applied
   2026-06-08: .2.3.2 verified wiring-only (burn-down 42/42 committed) →
   target M0.0.4; 2026-06-08(2): .4.7 verified bounded check+gate (fits,
-  already detailed) and .4.1-.4 sized last session → target M0.0.5.
+  already detailed) and .4.1-.4 sized last session → target M0.0.5; 2026-06-08(3): chain
+  .4.7/.4.1-4/.5.1-4 all detailed-and-fitting → target M0.0.6 (next bare
+  row, split 1→3).
 
 ## Mistakes
 

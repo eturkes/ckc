@@ -361,7 +361,52 @@ rule.
   dangling producer/toolchain/environment hash, manifest self-inclusion)
   reject. Read: §1.6 boundary rule + ReplayIdentity steps, A.10 RM-*/RIC-*.
   Gate: `cargo test -p ckc-store --test t_replay_manifest_boundary`
-- [ ] M0.0.6
+- [ ] M0.0.6.1 ckc-cli crate + argv parser + CanonicalCommand model. New
+  crate `crates/ckc-cli` (add to workspace members; deps ckc-core,
+  ckc-schema): `src/command.rs` CanonicalCommand — one variant per §11.1
+  command-table row[0] (21 names `ckc schema check`…`ckc demo m0`), parsed
+  from `ckc <namespace> <verb>` argv (2-token `ckc close`/`ckc replay`,
+  3-token `ckc demo m0`); CloseM0-internal BuildTerminologyClosure/
+  BuildDiagnostics are not variants (they route through `ckc close`). The
+  command→operation→artifact authority stays the SPEC §11.1 table (.6.3
+  proves the enum bijects with ckc-schema `command_table` over parsed
+  SpecDecls), never a re-authored const. CLI model is CLI-internal (absent
+  from §3.1 inventory) → no registry/descriptor registration,
+  descriptor_agreement + T-Schema-Equivalence untouched; plain enum
+  (bare_enum! only if canonical bytes wanted). Tests: parse round-trip for
+  all 21 names, unknown/misspelled + CloseM0-internal-name rejection. Read:
+  §11.1 command surface + command-to-operation map.
+  Test: `cargo test -p ckc-cli command`
+- [ ] M0.0.6.2 structured diagnostic writer + repository layout check.
+  `crates/ckc-cli/src/diagnostic.rs`: CLI-boundary writer serializing a
+  command wrapper's §1.7 OperationResult + a sorted ckc-schema CheckReport
+  (CheckIssue rows) to canonical bytes via ckc-core canon.rs emitters —
+  reuse, never redefine, outcome.rs OperationResult/Outcome. `src/layout.rs`:
+  §11.2 reserved-namespace check — present `crates/*` directory names ⊆ the
+  15 reserved crate names (ckc-cli…ckc-report), SPEC.md + crates/ present;
+  crate-on-first-use convention → membership only (absent reserved crates and
+  extra non-crate top-level entries like Cargo.toml/.agent are not errors).
+  Tests: writer determinism + sorted-output spot-check; layout accepts the
+  real repo, rejects a synthetic `crates/ckc-bogus`. Read: §11.2 layout
+  (reuse existing OperationResult/CheckReport).
+  Test: `cargo test -p ckc-cli diagnostic layout`
+- [ ] M0.0.6.3 T-CLI-Contract checker + gate (completes T-CLI-Contract).
+  `crates/ckc-cli/src/check.rs`: check_cli_contract(parser surface,
+  &SpecDecls) — the ckc-cli CanonicalCommand surface bijects with §11.1
+  `command_table` row[0]; each command names exactly one wrapper row with a
+  non-empty primary emitted-artifact set (operation cell may be compound,
+  e.g. `BuildMatches and BuildMatchClasses`); CloseM0-internal suboperations
+  BuildTerminologyClosure/BuildDiagnostics resolve via `ckc close`, never as
+  top-level commands; emit ckc-schema CheckReport/CheckIssue,
+  code=cli_contract_error. Distinct from ckc-schema check_command_table
+  (operations→§3.2 stage, T-Registry-Referential-Integrity); this checks the
+  runtime surface vs §11.1. Expect spec-defect fallout; SPEC.md corrections
+  in-scope. Gate `crates/ckc-cli/tests/t_cli_contract.rs`: clean over the
+  real §11.1 table + parser; perturbations (spec command absent from parser,
+  parser name absent from §11.1, empty artifact set, CloseM0-internal
+  suboperation promoted to a top-level command) reject. Read: §11.1 wrapper
+  convention + command table, §11.3 T-CLI-Contract.
+  Gate: `cargo test -p ckc-cli --test t_cli_contract`
 - [ ] review M0.0
 - [ ] M0.1.1
 - [ ] M0.1.2
