@@ -408,7 +408,37 @@ rule.
   convention + command table, §11.3 T-CLI-Contract.
   Gate: `cargo test -p ckc-cli --test t_cli_contract`
 - [ ] review M0.0
-- [ ] M0.1.1
+- [ ] M0.1.1.1 ckc-source crate + source/permission/corpus schemas. New crate
+  `crates/ckc-source` (add to workspace members; dep ckc-core): §4.1 records via
+  canonical_record! — SourceEdition, SourcePermissionRecord
+  (allowed_artifacts:Set[AllowedArtifact]), CorpusDocument; §4.1 enums via
+  bare_enum! — RedistributionStatus, AllowedArtifact; SourceClass (§2 vocabulary,
+  first consumer) via bare_enum! in ckc-core beside outcome.rs. Add ckc-core Text
+  policy markers for the §1.4 policies these fields first use (semantic_ja,
+  semantic_en, raw_source) so descriptor emission resolves. Append
+  source_descriptors() and wire into ckc-schema descriptor_agreement; reconcile
+  rust-emitted vs spec-derived (SPEC authority). These §3.1 inventory rows are
+  already covered by the spec-derived registry/bounds/hash-class/producer-map
+  (M0.0.3/.4) — no build.rs/checker edit. Tests: per-record roundtrip +
+  optional-field omission, enum id/from_id, descriptor_agreement green. Read: §4.1
+  schemas, §2 SourceClass, §1.4 policy ids. Test: `cargo test -p ckc-source`
+- [ ] M0.1.1.2 Residual schema + permission residual projection + gate (completes
+  T-Source-Permission). ckc-core scalar.rs: RegionId, ProofId §1.3 Id-newtypes
+  (first consumer — §1.2 envelope deferred proof_roots/source_support) +
+  CanonicalType. ckc-core shared diagnostics: ResidualClass via bare_enum! (11
+  variants), Residual via canonical_record! (source_regions:Set[RegionId],
+  proof_roots:Set[ProofId], diagnostic:Text<diagnostic_text> — add that policy
+  marker); append descriptors + reconcile agreement. ckc-source
+  `src/permission.rs`: permission residual projection — over a
+  SourcePermissionRecord and a requested AllowedArtifact view set, emit
+  Residual(class=permission_limited) per kind absent from allowed_artifacts (§4.1
+  rule; full §9.3 report-build integration defers to M0.6.3). Gate
+  `crates/ckc-source/tests/t_source_permission.rs` (T-Source-Permission): A.1
+  SRC-GDL (reconstructable) / SRC-PI (restricted_internal_only) fixtures — allowed
+  views project clean, a source_bytes view over SRC-PI yields permission_limited
+  (A.10 expectation); perturbations (disallowed kind admitted, missing residual)
+  reject. Read: §4.1 permission semantics, §8.7 Residual, §9.3 step 6.
+  Gate: `cargo test -p ckc-source --test t_source_permission`
 - [ ] M0.1.2
 - [ ] M0.1.3
 - [ ] review M0.1

@@ -337,7 +337,22 @@ technically derivable but easily forgotten under token pressure.
   target M0.0.4; 2026-06-08(2): .4.7 verified bounded check+gate (fits,
   already detailed) and .4.1-.4 sized last session → target M0.0.5; 2026-06-08(3): chain
   .4.7/.4.1-4/.5.1-4 all detailed-and-fitting → target M0.0.6 (next bare
-  row, split 1→3).
+  row, split 1→3); 2026-06-08(4): chain .4.7/.4.1-4/.5.1-4/.6.1-3 all
+  detailed-and-fitting → target M0.1.1 (first bare M0.1 row, split 1→2
+  along schema-layer / Residual+projection+gate).
+- [2026-06-08] From M0.1 on, implementing a §3.1-inventory schema in Rust
+  needs NO build.rs/registry/checker edit: build_v0_registry, spec-derived
+  descriptors, hash-classification, and producer-mapping all parse SPEC.md,
+  so they already cover every inventory row (whole-spec coverage since
+  M0.0.3/.4). The only rust-side cost per new type is its
+  CanonicalType/descriptor() emission appended to the crate's descriptor
+  registry + keeping ckc-schema descriptor_agreement green (rust-emitted ==
+  spec-derived; fix the rust side, SPEC is authority). New §2-vocabulary
+  enums land in ckc-core beside outcome.rs (first-consumer rule, e.g.
+  SourceClass at SourceEdition); §-section-local enums/records land in the
+  consuming crate; cross-crate-shared diagnostics (Residual family) land in
+  ckc-core. (M0.0.4/.5/.6 not yet built — planning inference from their
+  roadmap lines; confirm the agreement API when M0.0.4 lands.)
 
 ## Mistakes
 
