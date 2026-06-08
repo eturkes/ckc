@@ -47,6 +47,13 @@ pub enum WalkedLeaf {
     /// Field named `*_hash`/`*_hashes`/`*_digest`/`*_digests` (§1.2 conventions; .4.4
     /// classifies applicability).
     HashNamed,
+    /// Field outside the `HashNamed` suffixes whose type reaches `Hash`
+    /// through pure container structure (`Hash`, `Set[Hash]`,
+    /// `Map[Hash,V]`, …). §1.2 demands a field-specific computation for
+    /// these; check.rs classifies them via its exception table. Union
+    /// interiors are invisible to the walk (`HashLiteral.value` rides the
+    /// M0.0.4.4 union fork).
+    HashValued,
 }
 
 /// One row of the §3.1 type-graph walk.
@@ -140,6 +147,22 @@ fn is_hash_named(field: &str) -> bool {
         || field.ends_with("_digests")
 }
 
+/// `Hash` reachable through containers and non-S-decl generic arguments
+/// only; an S-decl-typed field is never itself hash-valued (its hash
+/// fields get their own recursion rows).
+fn is_hash_valued(decls: &SpecDecls, ty: &TypeExpr) -> bool {
+    match ty {
+        TypeExpr::Name { name, arg } => {
+            name == "Hash"
+                || (decls.s_decl(name).is_none()
+                    && arg.as_deref().is_some_and(|a| is_hash_valued(decls, a)))
+        }
+        TypeExpr::Optional(x) | TypeExpr::Set(x) | TypeExpr::List(x) => is_hash_valued(decls, x),
+        TypeExpr::Map(k, v) => is_hash_valued(decls, k) || is_hash_valued(decls, v),
+        TypeExpr::Text(_) => false,
+    }
+}
+
 /// Replaces the enclosing decl's generic parameter; the binding was itself
 /// substituted at the call site, so one level suffices.
 fn substitute(ty: &TypeExpr, binding: Option<(&str, &TypeExpr)>) -> TypeExpr {
@@ -205,6 +228,12 @@ fn walk_sdecl(
                 schema_id: schema_id.clone(),
                 path: FeaturePath::new(path.clone()),
                 leaf: WalkedLeaf::HashNamed,
+            });
+        } else if is_hash_valued(decls, &ty) {
+            out.push(WalkedPath {
+                schema_id: schema_id.clone(),
+                path: FeaturePath::new(path.clone()),
+                leaf: WalkedLeaf::HashValued,
             });
         }
         if let Some(enum_domain_key) = collection_flag(decls, strip_optional(&ty)) {
@@ -712,6 +741,28 @@ mod tests {
         );
     }
 
+    /// Hash-valued fields outside the naming suffixes get `HashValued`
+    /// rows (bare, Set, and Map-key positions); suffix-named fields and
+    /// S-decl-typed fields with interior hash fields stay out.
+    #[test]
+    fn build_hash_valued_rows() {
+        let decls = synthetic(
+            "S Root(bounds:Map[Hash,UInt],alts:Set[Hash],fingerprint:Hash,inner:Inner)\n\
+             S Inner(payload_digest:Hash)",
+        );
+        assert_eq!(
+            walk_schema(&decls, "Root"),
+            [
+                row("root", &["bounds"], WalkedLeaf::HashValued),
+                row("root", &["bounds"], COLL),
+                row("root", &["alts"], WalkedLeaf::HashValued),
+                row("root", &["alts"], COLL),
+                row("root", &["fingerprint"], WalkedLeaf::HashValued),
+                row("root", &["inner", "payload_digest"], WalkedLeaf::HashNamed),
+            ]
+        );
+    }
+
     /// Cyclic S-decl pair terminates via the visit-stack cut; rows from the
     /// first expansion survive.
     #[test]
@@ -839,6 +890,7 @@ mod tests {
         assert!(count(&|l| matches!(l, WalkedLeaf::Collection { .. })) > 200);
         assert!(count(&|l| matches!(l, WalkedLeaf::Text { .. })) > 30);
         assert!(count(&|l| matches!(l, WalkedLeaf::HashNamed)) > 200);
+        assert!(count(&|l| matches!(l, WalkedLeaf::HashValued)) > 10);
         assert_eq!(
             count(&|l| matches!(
                 l,

@@ -1774,7 +1774,7 @@ Same-stage recursion is represented by adding an intermediate stage. Stratified 
 S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt)
 ```
 
-The certificate restates only bounds recorded nowhere else; schema collection bounds ride `closure_input_hash` through `ClosureInput.schema_bound_manifest_hash`.
+The certificate restates only bounds recorded nowhere else; schema collection bounds ride `closure_input_hash` through `ClosureInput.schema_bound_manifest_hash`. Bound-map keys: `generator_env_bounds` and `generator_materialized_counts` are keyed by accepted generator envelope `artifact_hash`; `collect_bounds`, `sequence_bounds`, `axis_path_bounds`, and `context_clause_bounds` are keyed by `sha256(canonical_payload_bytes(form))` over the bounded collect, seq, bounded-path, or context-clause form.
 
 `closure_bound_overflow` is the local dispatch for `ClosureBoundCertificate` map bounds that lack `BoundOverflowDisposition`: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=closure_bound_overflow)`, include the overflowing bound key in the canonical diagnostic text, and reject the overflowing materialized payload from accepted output.
 
@@ -2692,7 +2692,7 @@ ReportTraceIndex rows are sorted {item_id,item_kind,source_region_ids,nf_hashes,
 
 ClaimTierSummary rows are sorted {tier,item_ids,claim_record_hashes} for S0,S1,S2,S3.
 
-The WordingGateRecord names every accepted ReportQuestionTemplate and GlossTemplate whose literal parts appear in the report.
+The WordingGateRecord names every accepted ReportQuestionTemplate and GlossTemplate whose literal parts appear in the report: `template_hashes` stores those envelope hashes, and each member of `literal_part_digests` stores `sha256(canonical_payload_bytes(literal_parts))` over one named template's `literal_parts` list.
 
 ReportItem.certificate_depth is the greatest class in this order among valid certificate_hashes attached to the item:
 source_graph < mech_observed < admitted_base < closed_nf < finite_checked < report_replay.

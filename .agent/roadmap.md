@@ -212,7 +212,7 @@ rule.
   role-table + count cascade; classify any newly walked fields
   in-session). Procedure per .2.1.1. Read: §1.2 hash conventions + §6.4.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.3.2 literal_part_digests + checker wiring. Resolve
+- [x] M0.0.3.4.5.2.3.2 84% 168K/200K literal_part_digests + checker wiring. Resolve
   WordingGateRecord.literal_part_digests (§9.3): extend the build.rs
   HashNamed suffix set (when no earlier sub-unit already did) or rename in
   SPEC. Wire classify_hash_fields into check_registry: Unresolved or

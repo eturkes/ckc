@@ -3,9 +3,10 @@
 //! diagnostics. §1.1 step 4 (M0.0.3.4.4): [`check_registry`] validates a
 //! built registry+manifest pair — two-sided bound coverage over the §3.1
 //! type-graph walk and the §1.2 source-support/role rule. §1.2 hash
-//! conventions (M0.0.3.4.5.1): [`classify_hash_fields`] assigns every
-//! walked `HashNamed` row a [`HashFieldClass`] via suffix defaults plus
-//! the authored [`HASH_FIELD_EXCEPTIONS`] table. Every issue carries
+//! conventions (M0.0.3.4.5): [`classify_hash_fields`] assigns every
+//! walked `HashNamed`/`HashValued` row a [`HashFieldClass`] via suffix
+//! defaults plus the authored [`HASH_FIELD_EXCEPTIONS`] table;
+//! [`check_registry`] rejects `Unresolved` rows. Every issue carries
 //! [`CheckIssue::CODE`] (`referential_integrity_error`); the §8.7
 //! `Diagnostic` artifact wrapper lands with its consuming unit.
 //!
@@ -123,15 +124,27 @@ fn enclosing_anchor(decls: &SpecDecls, line: usize) -> String {
         .map_or_else(|| "title".to_string(), |s| s.anchor.clone())
 }
 
-/// §1.1 step-4 bound coverage and the §1.2 source-support/role rule over a
-/// built registry+manifest pair. Peer of [`check_spec`]: same issue type
-/// and ordering. [`classify_hash_fields`] wiring (.5.2), the §3.2
-/// producer-mapping checker (.4.6), and step-1-2/5 composition (.4.7)
-/// remain.
+/// §1.1 step-4 bound coverage, the §1.2 source-support/role rule, and the
+/// §1.2 hash-field conventions over a built registry+manifest pair: every
+/// walked hash leaf must classify to a non-`Unresolved`
+/// [`HashFieldClass`]. Peer of [`check_spec`]: same issue type and
+/// ordering. The §3.2 producer-mapping checker (.4.6) and step-1-2/5
+/// composition (.4.7) remain.
 pub fn check_registry(
     text: &str,
     registry: &SchemaRegistry,
     manifest: &SchemaBoundManifest,
+) -> CheckReport {
+    check_registry_with(text, registry, manifest, HASH_FIELD_EXCEPTIONS)
+}
+
+/// [`check_registry`] over an explicit hash-exception table (perturbation
+/// tests inject lingering-`Unresolved` rows here).
+fn check_registry_with(
+    text: &str,
+    registry: &SchemaRegistry,
+    manifest: &SchemaBoundManifest,
+    exceptions: &[(&str, HashFieldClass, &str)],
 ) -> CheckReport {
     let parse = parse_spec(text);
     let decls = &parse.decls;
@@ -195,6 +208,23 @@ pub fn check_registry(
         }
     }
 
+    // §1.2 hash conventions: an `Unresolved` classification means no
+    // convention or field-specific computation applies — the schema entry
+    // is invalid.
+    for r in classify_with(decls, exceptions) {
+        if r.class == HashFieldClass::Unresolved {
+            let schema = r.schema_id.as_str();
+            push(
+                line_of(schema),
+                format!(
+                    "hash-valued field `{schema}/{}` resolves to no §1.2 convention or \
+                     field-specific computation",
+                    joined(&r.path)
+                ),
+            );
+        }
+    }
+
     // §1.2 role rule: a schema with neither source-support exposure over
     // its direct fields nor a registered alias must keep a non-semantic
     // `schema_role`.
@@ -246,10 +276,11 @@ pub enum HashFieldClass {
     RawRecordedBytes,
     /// Field-specific computation defined beside the field in its section.
     FieldSpecific,
-    /// No §1.2 convention or field-specific computation applies — spec
-    /// defect; M0.0.3.4.5.2 burns these down with SPEC corrections, then
-    /// wires the class into [`check_registry`] as
-    /// `referential_integrity_error`.
+    /// No §1.2 convention or field-specific computation applies —
+    /// [`check_registry`] rejects every such path as
+    /// `referential_integrity_error`. Reached by `HashValued` rows
+    /// without an exception row and by suffix drift between build.rs
+    /// `is_hash_named` and [`classify_hash_fields`]'s defaults.
     Unresolved,
 }
 
@@ -263,24 +294,29 @@ pub struct ClassifiedHashField {
 
 /// Suffix defaults (§1.2): `*_hash`/`*_hashes` reference accepted
 /// artifacts; `*_digest`/`*_digests` digest a payload named beside the
-/// field.
+/// field; any other terminal (`HashValued` rows, or suffix drift between
+/// build.rs `is_hash_named` and this map) is `Unresolved` pending an
+/// exception row.
 fn hash_suffix_default(terminal: &str) -> HashFieldClass {
-    if terminal.ends_with("_digest") || terminal.ends_with("_digests") {
+    if terminal.ends_with("_hash") || terminal.ends_with("_hashes") {
+        HashFieldClass::ArtifactRef
+    } else if terminal.ends_with("_digest") || terminal.ends_with("_digests") {
         HashFieldClass::NamedPayloadDigest
     } else {
-        HashFieldClass::ArtifactRef
+        HashFieldClass::Unresolved
     }
 }
 
 /// Authored terminal-name exceptions to the suffix defaults, sorted; rows
 /// are (terminal field name, class, one-line rationale). Every walked
 /// terminal name is judged against its S-decl context (.5.1.1 a-l,
-/// .5.1.2 m-z); a name absent here means the suffix default survived
-/// judgment. .5.2.x burned down all 42 Unresolved rows via SPEC
-/// corrections; .5.2.3.2 wires an empty-Unresolved invariant into
-/// [`check_registry`]. The plural `*_digests` suffix joined the walk with
-/// the §6.4 renames; WordingGateRecord.literal_part_digests (§9.3) rides
-/// its default pending .5.2.3.2's §9.3 review.
+/// .5.1.2 m-z; .5.2.x burned down all 42 Unresolved rows via SPEC
+/// corrections); a suffix-named terminal absent here means the default
+/// survived judgment — WordingGateRecord.literal_part_digests rides
+/// NamedPayloadDigest with its payload defined beside the field (§9.3).
+/// `HashValued` terminals (no suffix, default Unresolved) each REQUIRE a
+/// row naming the §1.2 field-specific computation; the §7.1 bound-map
+/// key sentence anchors the ClosureBoundCertificate family.
 pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
     (
         "actual_output_hashes",
@@ -293,6 +329,21 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external extraction-adapter manifest bytes; the owning ExtractionManifest supplies them",
     ),
     (
+        "alternatives",
+        HashFieldClass::ArtifactRef,
+        "§7.3/§8.7 Ambiguity alternatives store the competing accepted reading envelope hashes under a collective name",
+    ),
+    (
+        "applies_to",
+        HashFieldClass::FieldSpecific,
+        "§8.4 resolution_subject_ids fixes members: operand artifact_hash, CKCNormalForm semantic_digest, or contributing License hashes",
+    ),
+    (
+        "axis_path_bounds",
+        HashFieldClass::NamedPayloadDigest,
+        "§7.1 bound-map keys digest the bounded bounded-path form's canonical bytes",
+    ),
+    (
         "build_input_hashes",
         HashFieldClass::RawRecordedBytes,
         "toolchain build-input bytes recorded by the owning ToolchainManifest",
@@ -301,6 +352,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "class_signature_hash",
         HashFieldClass::FieldSpecific,
         "sha256 over §7.2 proof_visible_signature canonical bytes",
+    ),
+    (
+        "collect_bounds",
+        HashFieldClass::NamedPayloadDigest,
+        "§7.1 bound-map keys digest the bounded collect form's canonical bytes",
     ),
     (
         "config_hash",
@@ -313,6 +369,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "raw document content bytes; sibling extraction_manifest_hash names the supplier",
     ),
     (
+        "context_clause_bounds",
+        HashFieldClass::NamedPayloadDigest,
+        "§7.1 bound-map keys digest the bounded context-clause form's canonical bytes",
+    ),
+    (
         "decoding_policy_hash",
         HashFieldClass::RawRecordedBytes,
         "external decoding-policy configuration bytes (§6.4 evidence-discovery provenance)",
@@ -321,6 +382,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "dense_retriever_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external dense-retriever manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "diagnostics",
+        HashFieldClass::ArtifactRef,
+        "CKCNormalForm.diagnostics stores accepted Diagnostic envelope hashes under a collective name (§7.4)",
     ),
     (
         "environment_variable_hashes",
@@ -353,6 +419,16 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "§1.1 T-Schema-Equivalence, registry-wide manifest level; M0.0.4 implements",
     ),
     (
+        "generator_env_bounds",
+        HashFieldClass::ArtifactRef,
+        "§7.1 bound-map keys are accepted generator envelope hashes",
+    ),
+    (
+        "generator_materialized_counts",
+        HashFieldClass::ArtifactRef,
+        "§7.1 bound-map keys are accepted generator envelope hashes",
+    ),
+    (
         "graph_retrieval_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external graph-retrieval manifest bytes (evidence-discovery trace)",
@@ -381,6 +457,16 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "late_interaction_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external late-interaction manifest bytes (evidence-discovery trace)",
+    ),
+    (
+        "minimal_generator_dependency_set",
+        HashFieldClass::ArtifactRef,
+        "§8.7 dependency_minimize returns an inclusion-minimal subset of accepted generator envelope hashes",
+    ),
+    (
+        "minimal_theorem_set",
+        HashFieldClass::ArtifactRef,
+        "§8.7 theorem_minimize returns an inclusion-minimal subset of accepted theorem envelope hashes",
     ),
     (
         "normalization_table_hash",
@@ -433,6 +519,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external reranker manifest bytes (evidence-discovery trace)",
     ),
     (
+        "returned_sets",
+        HashFieldClass::ArtifactRef,
+        "§8.7 repair-set sets draw from candidate_dependency_hashes (accepted envelope hashes); diagnostic-only trace",
+    ),
+    (
         "rust_type_hash",
         HashFieldClass::FieldSpecific,
         "§1.1 T-Schema-Equivalence canonicalize-and-compare computation; M0.0.4 implements",
@@ -446,6 +537,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "score_record_hashes",
         HashFieldClass::RawRecordedBytes,
         "recorded external score-record bytes; the trace's *_manifest_hash fields name the suppliers (§6.4 keeps scores evidence-only)",
+    ),
+    (
+        "sequence_bounds",
+        HashFieldClass::NamedPayloadDigest,
+        "§7.1 bound-map keys digest the bounded seq form's canonical bytes",
     ),
     (
         "source_hash",
@@ -489,21 +585,30 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
     ),
 ];
 
-/// Classifies every `HashNamed` row of the §3.1 walk: authored exception
-/// by terminal field name, else suffix default. Total — every row gets a
-/// class. .5.2 wires Unresolved rows into [`check_registry`].
+/// Classifies every `HashNamed` and `HashValued` row of the §3.1 walk:
+/// authored exception by terminal field name, else suffix default. Total —
+/// every row gets a class; `Unresolved` rejects via [`check_registry`].
 pub fn classify_hash_fields(decls: &SpecDecls) -> Vec<ClassifiedHashField> {
+    classify_with(decls, HASH_FIELD_EXCEPTIONS)
+}
+
+/// [`classify_hash_fields`] over an explicit exception table (perturbation
+/// tests inject `Unresolved` rows here).
+fn classify_with(
+    decls: &SpecDecls,
+    exceptions: &[(&str, HashFieldClass, &str)],
+) -> Vec<ClassifiedHashField> {
     walk_inventory(decls)
         .into_iter()
-        .filter(|r| r.leaf == WalkedLeaf::HashNamed)
+        .filter(|r| matches!(r.leaf, WalkedLeaf::HashNamed | WalkedLeaf::HashValued))
         .map(|r| {
             let terminal = r
                 .path
                 .segments()
                 .last()
-                .expect("HashNamed path is nonempty")
+                .expect("hash-leaf path is nonempty")
                 .as_str();
-            let class = HASH_FIELD_EXCEPTIONS
+            let class = exceptions
                 .iter()
                 .find(|(name, _, _)| *name == terminal)
                 .map_or_else(|| hash_suffix_default(terminal), |(_, class, _)| *class);
@@ -970,7 +1075,7 @@ fn numeric_anchor(chars: &[char], pos: usize) -> Option<(String, usize)> {
 
 #[cfg(test)]
 mod tests {
-    use ckc_core::scalar::UInt;
+    use ckc_core::scalar::{Hash, UInt};
 
     use crate::bounds::SchemaCollectionBound;
     use crate::build::build_v0_registry;
@@ -1257,35 +1362,93 @@ mod tests {
         );
     }
 
+    /// §1.2 hash-convention perturbations: a hash-valued field outside
+    /// the naming suffixes with no exception row (synthetic mini-spec)
+    /// and a lingering `Unresolved` exception row over the real SPEC
+    /// both reject.
+    #[test]
+    fn check_registry_hash_perturbations_reject() {
+        let mini = "### 3.1 Synthetic\n\n```text\nRoot\n```\n\n\
+                    ```text\nS Root(root_id:Id,fingerprint:Hash)\n```\n";
+        let h = Hash::of_bytes(b"");
+        let registry = SchemaRegistry {
+            registry_id: Id::new("r").unwrap(),
+            registry_version: Id::new("v0").unwrap(),
+            spec_contract_hash: h.clone(),
+            rust_type_manifest_hash: h.clone(),
+            generated_json_schema_manifest_hash: h.clone(),
+            canonicalization_policy_hash: h.clone(),
+            schema_bound_manifest_hash: h,
+            schema_entries: BTreeSet::new(),
+            string_policy_bindings: BTreeSet::new(),
+            source_support_aliases: BTreeSet::new(),
+        };
+        let empty_manifest = SchemaBoundManifest {
+            manifest_id: Id::new("m").unwrap(),
+            schema_collection_bounds: BTreeSet::new(),
+        };
+        let report = check_registry(mini, &registry, &empty_manifest);
+        assert_eq!(
+            messages(&report),
+            [
+                "hash-valued field `root/fingerprint` resolves to no §1.2 convention or field-specific computation"
+            ]
+        );
+        assert_eq!(report.issues[0].anchor, "3.1");
+
+        let text = spec_text();
+        let decls = parse_spec(&text).decls;
+        let (registry, manifest) = build_v0_registry(&decls, &text);
+        let report = check_registry_with(
+            &text,
+            &registry,
+            &manifest,
+            &[("subject_hash", HashFieldClass::Unresolved, "perturbation")],
+        );
+        assert!(!report.is_clean());
+        assert!(
+            report
+                .issues
+                .iter()
+                .all(|i| i.message.contains("resolves to no §1.2 convention"))
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.message.contains("subject_hash"))
+        );
+    }
+
     fn terminal(row: &ClassifiedHashField) -> &str {
         row.path.segments().last().unwrap().as_str()
     }
 
-    /// Totality + per-class path counts over the real SPEC: suffix
-    /// defaults make every HashNamed walk row classify. The .5.2.x
-    /// burn-down is complete (42 of 42 names; Unresolved empty);
-    /// .5.2.3.2 wires the empty-class invariant into check_registry.
+    /// Totality + final per-class path counts over the real SPEC (240
+    /// HashNamed + 14 HashValued paths). The .5.2.x burn-down is complete
+    /// (42 of 42 names); Unresolved is empty and [`check_registry`]
+    /// rejects any recurrence.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
         let text = spec_text();
         let decls = parse_spec(&text).decls;
         let rows = classify_hash_fields(&decls);
-        let hash_named = walk_inventory(&decls)
+        let hash_leaves = walk_inventory(&decls)
             .into_iter()
-            .filter(|r| r.leaf == WalkedLeaf::HashNamed)
+            .filter(|r| matches!(r.leaf, WalkedLeaf::HashNamed | WalkedLeaf::HashValued))
             .count();
-        assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 240);
+        assert_eq!(rows.len(), hash_leaves);
+        assert_eq!(rows.len(), 254);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 154);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 76);
+        assert_eq!(names.len(), 166);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 84);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
-        assert_eq!(count(HashFieldClass::ArtifactRef), 171);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 22);
+        assert_eq!(count(HashFieldClass::ArtifactRef), 180);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 26);
         assert_eq!(count(HashFieldClass::RawRecordedBytes), 35);
-        assert_eq!(count(HashFieldClass::FieldSpecific), 12);
+        assert_eq!(count(HashFieldClass::FieldSpecific), 13);
         assert_eq!(count(HashFieldClass::Unresolved), 0);
     }
 
@@ -1473,6 +1636,26 @@ mod tests {
                 "wording_gate_record",
                 "literal_part_digests",
                 HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "closure_bound_certificate",
+                "collect_bounds",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "closure_bound_certificate",
+                "generator_env_bounds",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "resolution_theorem",
+                "applies_to",
+                HashFieldClass::FieldSpecific,
+            ),
+            (
+                "review_report",
+                "report_items/minimal_theorem_set",
+                HashFieldClass::ArtifactRef,
             ),
             (
                 "admission_context",
