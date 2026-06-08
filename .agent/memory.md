@@ -287,6 +287,10 @@ technically derivable but easily forgotten under token pressure.
   in the primary-section unit with the second site's context loaded.
   Judgment sweeps split lexicographically; burn-downs split by section at
   ≈5 heterogeneous fixes per session.
+- [2026-06-08] A missing/renamed `bare_enum!` variant surfaces its first
+  rustc/RA diagnostic (E0599) at ckc-core canon.rs — the macro-definition
+  site — not the real use site. Grep the variant name across crates before
+  debugging ckc-core.
 - [2026-06-07] `.claude/settings.json` carries the CLAUDE.md-mandated
   `permissions.deny` `Read()` list (VCS/build/dep internals, lockfiles,
   LICENSE). Verified live: permission rules hot-reload mid-session (no

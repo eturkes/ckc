@@ -321,16 +321,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "sha256 over §7.2 proof_visible_signature canonical bytes",
     ),
     (
-        "closed_region_hash",
-        HashFieldClass::Unresolved,
-        "mutual artifact refs with SourceRegion.closure_certificate_hash are unconstructible under content addressing",
-    ),
-    (
-        "closure_certificate_hash",
-        HashFieldClass::Unresolved,
-        "circular counterpart of RegionClosureCertificate.closed_region_hash",
-    ),
-    (
         "config_hash",
         HashFieldClass::RawRecordedBytes,
         "tool/analyzer configuration bytes recorded by the enclosing manifest",
@@ -359,11 +349,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "emitted_payload_hashes",
         HashFieldClass::Unresolved,
         "materialization-sandbox payload hashes; referents are not accepted artifacts and the computation is undefined (§6.4)",
-    ),
-    (
-        "entry_hashes",
-        HashFieldClass::Unresolved,
-        "MechanicalLexicon entries have no schema; referents are not accepted artifacts",
     ),
     (
         "environment_variable_hashes",
@@ -431,9 +416,9 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "§1.2 names index fingerprints explicitly; §6.4 requires replayable fingerprints",
     ),
     (
-        "input_hash",
-        HashFieldClass::Unresolved,
-        "divergent computations under one name: ExtractionManifest raw source bytes vs VerifierWitness accepted-artifact ref; the §1.2 inherited_input alias assumes the latter",
+        "input_bytes_hash",
+        HashFieldClass::RawRecordedBytes,
+        "raw extraction-adapter input bytes; the owning ExtractionManifest supplies them (§4.4)",
     ),
     (
         "late_interaction_manifest_hash",
@@ -561,11 +546,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "score records have no schema; referents are not accepted artifacts (§6.4 keeps scores evidence-only)",
     ),
     (
-        "seed_region_hash",
-        HashFieldClass::Unresolved,
-        "no seed-region artifact exists: closure input is a bare RegionMember set and the output SourceRegion is the closed region (§4.3)",
-    ),
-    (
         "slot_value_hash",
         HashFieldClass::Unresolved,
         "resolved slot value is an NF sub-payload, not an accepted artifact; §7.5 step 6 defines only slot_digest",
@@ -599,11 +579,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "tagged_union_alternatives_hash",
         HashFieldClass::FieldSpecific,
         "§1.1 T-Schema-Equivalence canonicalizes the union-alternative set; M0.0.4 implements",
-    ),
-    (
-        "termination_argument_hash",
-        HashFieldClass::Unresolved,
-        "the termination argument is spec prose (§4.3/§7.1), not a payload; byte source undefined",
     ),
     (
         "valid_next_token_masks_hash",
@@ -1396,8 +1371,8 @@ mod tests {
 
     /// Totality + per-class path counts over the real SPEC: suffix
     /// defaults make every HashNamed walk row classify. Counts track the
-    /// .5.2.x burn-down (.5.2.1.1 done: 7 names); .5.2.3.2 finalizes with
-    /// an empty Unresolved class.
+    /// .5.2.x burn-down (.5.2.1.1 + .5.2.1.2 done: 13 names); .5.2.3.2
+    /// finalizes with an empty Unresolved class.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
         let text = spec_text();
@@ -1408,18 +1383,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 255);
+        assert_eq!(rows.len(), 251);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 167);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 82);
+        assert_eq!(names.len(), 164);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 80);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
-        assert_eq!(count(HashFieldClass::ArtifactRef), 166);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 9);
-        assert_eq!(count(HashFieldClass::RawRecordedBytes), 27);
+        assert_eq!(count(HashFieldClass::ArtifactRef), 168);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 10);
+        assert_eq!(count(HashFieldClass::RawRecordedBytes), 28);
         assert_eq!(count(HashFieldClass::FieldSpecific), 12);
-        assert_eq!(count(HashFieldClass::Unresolved), 41);
+        assert_eq!(count(HashFieldClass::Unresolved), 33);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1529,19 +1504,23 @@ mod tests {
             (
                 "source_region",
                 "closure_certificate_hash",
-                HashFieldClass::Unresolved,
+                HashFieldClass::ArtifactRef,
             ),
             (
                 "region_closure_certificate",
-                "closed_region_hash",
-                HashFieldClass::Unresolved,
+                "seed_members_digest",
+                HashFieldClass::NamedPayloadDigest,
             ),
             (
                 "extraction_manifest",
-                "input_hash",
-                HashFieldClass::Unresolved,
+                "input_bytes_hash",
+                HashFieldClass::RawRecordedBytes,
             ),
-            ("verifier_witness", "input_hash", HashFieldClass::Unresolved),
+            (
+                "verifier_witness",
+                "subject_hash",
+                HashFieldClass::ArtifactRef,
+            ),
             (
                 "generator_grammar_artifact",
                 "nonterminal_schema_map/first_set_hash",
@@ -1606,11 +1585,6 @@ mod tests {
             (
                 "verifier_witness",
                 "witness_payload_hash",
-                HashFieldClass::Unresolved,
-            ),
-            (
-                "region_closure_certificate",
-                "termination_argument_hash",
                 HashFieldClass::Unresolved,
             ),
             (

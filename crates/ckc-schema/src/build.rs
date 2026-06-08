@@ -92,7 +92,6 @@ pub const SOURCE_SUPPORT_ALIAS_DEFAULTS: &[(&str, SourceSupportAliasKind)] = &[
     ),
     ("source_region_ids", SourceSupportAliasKind::RegionSet),
     ("subject_hash", SourceSupportAliasKind::InheritedSubject),
-    ("input_hash", SourceSupportAliasKind::InheritedInput),
     (
         "closed_members",
         SourceSupportAliasKind::ClosedRegionMembers,
@@ -258,23 +257,13 @@ fn type_walk(
     }
 }
 
-/// §1.2 alias-default suppressions: walked paths whose hash field stores
-/// raw recorded bytes (§1.2 raw-bytes convention), which no alias kind can
-/// resolve to an artifact's support projection. Keys are
-/// (schema_id, `/`-joined path).
-pub const ALIAS_EXCEPTIONS: &[(&str, &str)] = &[
-    // §4.4: sha256 of the exact extraction input bytes, not an envelope
-    // reference, so inherited_input does not apply.
-    ("extraction_manifest", "input_hash"),
-];
-
 /// §1.2 `SourceSupportAlias` rows over the §3.1 inventory, in inventory
 /// order. A schema with a direct canonical `source_support` field
 /// registers no alias; otherwise its registered row is the
 /// highest-priority fixed-default field-name match over walked field
 /// paths — priority by ([`SOURCE_SUPPORT_ALIAS_DEFAULTS`] order, then walk
-/// order), minus [`ALIAS_EXCEPTIONS`]. One row per schema: §1.2 names one
-/// schema-defined alias as the canonical projection.
+/// order). One row per schema: §1.2 names one schema-defined alias as the
+/// canonical projection.
 pub fn alias_rows(decls: &SpecDecls) -> Vec<SourceSupportAlias> {
     let mut out = Vec::new();
     for name in &decls.inventory {
@@ -313,14 +302,9 @@ fn alias_candidates(
     for f in &decl.fields {
         let mut path = prefix.to_vec();
         path.push(Id::new(&f.name).expect("S-decl field name is a valid Id"));
-        let joined = path.iter().map(Id::as_str).collect::<Vec<_>>().join("/");
-        let excepted = ALIAS_EXCEPTIONS
+        if let Some(idx) = SOURCE_SUPPORT_ALIAS_DEFAULTS
             .iter()
-            .any(|(s, p)| *s == schema_id.as_str() && *p == joined);
-        if !excepted
-            && let Some(idx) = SOURCE_SUPPORT_ALIAS_DEFAULTS
-                .iter()
-                .position(|(n, _)| *n == f.name)
+            .position(|(n, _)| *n == f.name)
         {
             out.push((idx, path.clone(), SOURCE_SUPPORT_ALIAS_DEFAULTS[idx].1));
         }
@@ -380,8 +364,8 @@ pub const SCHEMA_ROLES: &[(&str, SchemaRole)] = &[
     ("source_edition", SchemaRole::SourceOnly),
     ("source_permission_record", SchemaRole::SourceOnly),
     ("corpus_document", SchemaRole::SourceOnly),
-    // §3.2 IngestSourceEdition output; input_hash is raw recorded bytes
-    // (see ALIAS_EXCEPTIONS), so no support projection.
+    // §3.2 IngestSourceEdition output; input_bytes_hash records raw
+    // extraction-input bytes, so no support projection.
     ("extraction_manifest", SchemaRole::SourceOnly),
     ("source_graph", SchemaRole::SourceOnly),
     ("source_region", SchemaRole::SourceOnly),
@@ -961,7 +945,7 @@ mod tests {
             // source_regions beats subject_hash by default-table order.
             ("residual", "source_regions", RegionSet),
             ("diagnostic", "source_regions", RegionSet),
-            ("verifier_witness", "input_hash", InheritedInput),
+            ("verifier_witness", "subject_hash", InheritedSubject),
             ("certificate", "subject_hash", InheritedSubject),
             ("admission_record", "subject_hash", InheritedSubject),
             (
@@ -1001,7 +985,7 @@ mod tests {
                 .join("/");
             assert_eq!((joined.as_str(), row.alias_kind), (path, kind), "{schema}");
         }
-        // Canonical source_support field or raw-bytes exception -> no row.
+        // Canonical source_support field or no default-named field -> no row.
         for absent in [
             "license",
             "ckc_normal_form",

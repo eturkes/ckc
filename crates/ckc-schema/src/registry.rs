@@ -35,7 +35,6 @@ bare_enum! {
         SingletonRegion = "singleton_region",
         RegionSet = "region_set",
         InheritedSubject = "inherited_subject",
-        InheritedInput = "inherited_input",
         ClosedRegionMembers = "closed_region_members",
     }
 }

@@ -171,7 +171,7 @@ rule.
   deliverable — checker wiring waits for .2.3.2. Read: §1.2 hash
   conventions + each name's S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.1.2 hash-defect burn-down: §4.x cluster. Resolve 6 names:
+- [x] M0.0.3.4.5.2.1.2 74% 147K/200K hash-defect burn-down: §4.x cluster. Resolve 6 names:
   §4.3 family (closed_region_hash + closure_certificate_hash mutual-ref
   cycle, seed_region_hash, termination_argument_hash — second site
   ClosureBoundCertificate §7.1, one fix covers both), §4.4 entry_hashes

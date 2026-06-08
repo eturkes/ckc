@@ -62,7 +62,7 @@ S StringPolicyBinding(schema_id:Id,path:FeaturePath,policy:StringPolicy,dependen
 
 S SourceSupportAlias(schema_id:Id,path:FeaturePath,alias_kind:SourceSupportAliasKind)
 
-E SourceSupportAliasKind = singleton_region | region_set | inherited_subject | inherited_input | closed_region_members
+E SourceSupportAliasKind = singleton_region | region_set | inherited_subject | closed_region_members
 
 S SchemaBoundManifest(manifest_id:Id,schema_collection_bounds:Set[SchemaCollectionBound])
 
@@ -140,11 +140,10 @@ source_regions                    -> region_set
 exact_japanese_source_regions     -> region_set
 source_region_ids                 -> region_set
 subject_hash                      -> inherited_subject
-input_hash                        -> inherited_input
 closed_members                    -> closed_region_members
 ```
 
-`singleton_region` projects one `RegionId`; `region_set` projects `Set[RegionId]`; `inherited_subject` and `inherited_input` resolve the referenced artifact and use its canonical support projection; `closed_region_members` resolves through the owning `SourceRegion.region_id`.
+`singleton_region` projects one `RegionId`; `region_set` projects `Set[RegionId]`; `inherited_subject` resolves the referenced artifact and uses its canonical support projection; `closed_region_members` resolves through the owning `SourceRegion.region_id`.
 
 A schema that has neither a canonical source-support field nor a registered alias must have `SchemaEntry.schema_role` in `{source_only,schema_control,replay_control,environment_control,admission_control,evidence_discovery,view_only,proof_structure}`; otherwise `T-Registry-Referential-Integrity` rejects it. `proof_structure` marks kernel/proof payloads whose source support is proof-DAG-inherited (`ProofNode.support_digest`) rather than payload-projected.
 
@@ -970,26 +969,30 @@ S SourceRegion(region_id:RegionId,source_edition_hash:Hash,seed_members:Set[Regi
 Termination follows from finite `U`: every successful iteration strictly increases `R`, and `R` can increase at most `|U| - |seed|` times before the fixed point.
 
 ```text
-S RegionClosureCertificate(seed_region_hash:Hash,source_graph_hash:Hash,possible_member_count:UInt,iterations:UInt,added_member_batches:List[Set[RegionMember]],residual_hashes:Set[Hash],closed_region_hash:Hash,termination_argument_hash:Hash)
+S RegionClosureCertificate(seed_members_digest:Hash,source_graph_hash:Hash,possible_member_count:UInt,iterations:UInt,added_member_batches:List[Set[RegionMember]],residual_hashes:Set[Hash])
 ```
 
-An interpretation region is admissible when it has a valid `RegionClosureCertificate`.
+`seed_members_digest = sha256(canonical_payload_bytes(seed_members))` over the referencing `SourceRegion.seed_members` value. The certificate is accepted before the `SourceRegion` that references it through `closure_certificate_hash`, so the reference direction is acyclic. An interpretation region is admissible when its certificate is valid: the seed digest matches, replaying the closure over the certified `SourceGraph` reproduces `added_member_batches`, and `seed_members` plus the union of the batches equals `closed_members`.
 
 ### 4.4 Extraction and mechanical observations
 
 ```text
-S ExtractionManifest(manifest_id:Id,source_edition_hash:Hash,adapter_manifest_hash:Hash,input_hash:Hash,output_graph_hash:Hash,diagnostics_hashes:Set[Hash],replay_manifest_hash:Hash)
+S ExtractionManifest(manifest_id:Id,source_edition_hash:Hash,adapter_manifest_hash:Hash,input_bytes_hash:Hash,output_graph_hash:Hash,diagnostics_hashes:Set[Hash],replay_manifest_hash:Hash)
 
 S AnalyzerManifest(analyzer_id:Id,analyzer_name:Id,analyzer_version:Text<identifier_ascii>,config_hash:Hash,replay_manifest_hash:Hash)
 
-S MechanicalLexicon(lexicon_id:Id,entry_hashes:Set[Hash],authority:Authority)
+S MechanicalLexicon(lexicon_id:Id,entries:Set[LexiconEntry],authority:Authority)
+
+S LexiconEntry(surface:Text<source_nfkc>,concept_candidate:Id)
 
 E MechObsKind = text_node | anchor_span | token | table_cell | table_edge | caption_edge | footnote_surface | crossref_surface | lex_surface_hit | quantity_surface | temporal_surface | modality_marker | negation_marker
 
 S MechObsPayload(obs_id:Id,kind:MechObsKind,source_region_id:RegionId,anchor_id:Id?,raw_text:Text<raw_source>?,nfkc_text:Text<source_nfkc>?,normalized_text:Text<semantic_ja>?,fields:Map[Id,Text<semantic_ja>],analyzer_manifest_hash:Hash?,authority:Authority)
 ```
 
-Mechanical observation authority invariant: `MechanicalLexicon.authority = MechObsPayload.authority = mechanical_authority`.
+`ExtractionManifest.input_bytes_hash` stores `sha256(exact_recorded_bytes)` of the extraction-adapter input; the owning manifest supplies those bytes (§1.2 raw-recorded convention).
+
+Mechanical observation authority invariant: `MechanicalLexicon.authority = MechObsPayload.authority = mechanical_authority`. `LexiconEntry` rows are stored inline in the owning lexicon; a `lex_surface_hit` observation records the matched entry's `concept_candidate`.
 
 Mechanical observation emission and consumers:
 
@@ -1759,7 +1762,7 @@ M0 closure is stratified finite materialization. `ClosureOutput` enumerates ever
 Same-stage recursion is represented by adding an intermediate stage. Stratified negation uses `empty` only over fully materialized lower-stage relations.
 
 ```text
-S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],schema_collection_bounds_hash:Hash,stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt,termination_argument_hash:Hash)
+S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],schema_collection_bounds_hash:Hash,stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt)
 ```
 
 `closure_bound_overflow` is the local dispatch for `ClosureBoundCertificate` map bounds that lack `BoundOverflowDisposition`: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=closure_bound_overflow)`, include the overflowing bound key in the canonical diagnostic text, and reject the overflowing materialized payload from accepted output.
@@ -2514,14 +2517,14 @@ S KernelFiniteCheckInput(subject_hash:Hash,subject_kind:KernelSubjectKind,proof_
 
 E KernelSubjectKind = conflict_theorem | factual_inconsistency_theorem | residual | ambiguity | incoherence | diagnostic | certificate | review_report | replay_identity_check
 
-S VerifierWitness(witness_id:Id,input_hash:Hash,result:VerifierResult,checked_predicates:Set[Id],witness_payload_hash:Hash?,diagnostic_hashes:Set[Hash],symbol_source_map_hash:Hash,replay_manifest_hash:Hash,proof_roots:Set[ProofId])
+S VerifierWitness(witness_id:Id,subject_hash:Hash,result:VerifierResult,checked_predicates:Set[Id],witness_payload_hash:Hash?,diagnostic_hashes:Set[Hash],symbol_source_map_hash:Hash,replay_manifest_hash:Hash,proof_roots:Set[ProofId])
 
 S SymbolSourceMap(rows:Set[SymbolSourceMapRow])
 
 S SymbolSourceMapRow(symbol_id:Id,symbol_kind:Id,defining_section_anchor:Id,defining_artifact_hash:Hash?)
 ```
 
-`SymbolSourceMap` is an accepted schema-control artifact emitted by `kernel_finite_checker`. `VerifierWitness.symbol_source_map_hash` is the referenced `SymbolSourceMap` artifact hash. `SymbolSourceMap.rows` is the sorted set of `{symbol_id, symbol_kind, defining_section_anchor, defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, and gate referenced while checking the subject. Section anchors are the stable headings in this specification, encoded as identifier strings such as `section-8-5`. Artifact-backed symbols include their accepted artifact hash; specification-only symbols omit it.
+`SymbolSourceMap` is an accepted schema-control artifact emitted by `kernel_finite_checker`. `VerifierWitness.subject_hash` is the checked subject's envelope `artifact_hash` (the `KernelFiniteCheckInput.subject_hash` value); the full check-input set is pinned by `replay_manifest_hash`. `VerifierWitness.symbol_source_map_hash` is the referenced `SymbolSourceMap` artifact hash. `SymbolSourceMap.rows` is the sorted set of `{symbol_id, symbol_kind, defining_section_anchor, defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, and gate referenced while checking the subject. Section anchors are the stable headings in this specification, encoded as identifier strings such as `section-8-5`. Artifact-backed symbols include their accepted artifact hash; specification-only symbols omit it.
 
 `kernel_finite_checker` checks:
 
