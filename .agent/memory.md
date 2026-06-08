@@ -32,8 +32,8 @@ technically derivable but easily forgotten under token pressure.
   fresh agent completes AND commits it within one context window with margin;
   if it would need compaction, split it. One conceptual deliverable + one gate
   per item; prefer more, smaller items. SPEC §11.3 rows are pre-sized to this
-  rule; the split fallback is operationalized in the `/session` command
-  (`.claude/commands/session.md`) → "Splitting".
+  rule; the split fallback is operationalized in the `/session-prompt` command
+  (`.claude/commands/session-prompt.md`) → "Splitting".
 - [2026-05-28] Non-interactive `Bash` tool invocations do NOT source
   `~/.bashrc`. Any tool needed across Bash calls must live in the base PATH
   (which includes `~/.cargo/bin`, `~/.local/bin`, `~/.local/share/pnpm/bin`)
