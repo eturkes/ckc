@@ -188,7 +188,7 @@ rule.
   valid_next_token_masks_hash. Procedure per .2.1.1. Read: §1.2 hash
   conventions + §6.2 grammar-artifact schemas.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.2.2 hash-defect burn-down: §6.3-§7.x cluster. Resolve 6
+- [x] M0.0.3.4.5.2.2.2 58% 115K/200K hash-defect burn-down: §6.3-§7.x cluster. Resolve 6
   names: reading_hash (§6.3), schema_collection_bounds_hash (§7.1),
   ProofNode/ProofDAG trio checker_hashes + reverse_dependency_index_hash +
   canonical_bytes_hash (§7.2, two shared S-decls; canonical_bytes_hash is

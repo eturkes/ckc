@@ -306,16 +306,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "pre-acceptance candidate payload hash; §6.4 never defines the computation; equals artifact_hash only on accept",
     ),
     (
-        "canonical_bytes_hash",
-        HashFieldClass::Unresolved,
-        "self-referential: a payload field cannot store the hash of bytes that include itself; envelope artifact_hash already records identity",
-    ),
-    (
-        "checker_hashes",
-        HashFieldClass::Unresolved,
-        "referent undefined: verifier-witness artifacts vs checker executable bytes (§7.2)",
-    ),
-    (
         "class_signature_hash",
         HashFieldClass::FieldSpecific,
         "sha256 over §7.2 proof_visible_signature canonical bytes",
@@ -461,11 +451,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "free-text reviewer rationale is neither an accepted artifact nor recorded bytes with a named supplier (§6.4)",
     ),
     (
-        "reading_hash",
-        HashFieldClass::Unresolved,
-        "Reading values are License sub-payloads, not accepted artifacts; digest computation undefined (§6.3)",
-    ),
-    (
         "required_output_hashes",
         HashFieldClass::Unresolved,
         "compared byte-for-byte with emitted_payload_hashes (§6.4 step 9), inheriting its undefined sandbox-payload computation",
@@ -474,11 +459,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "reranker_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external reranker manifest bytes (evidence-discovery trace)",
-    ),
-    (
-        "reverse_dependency_index_hash",
-        HashFieldClass::Unresolved,
-        "reverse-dependency index has no schema and is not an accepted artifact; computation undefined (§7.2)",
     ),
     (
         "reviewed_subject_hash",
@@ -506,19 +486,9 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "§1.1 T-Schema-Equivalence, registry-wide manifest level; M0.0.4 implements",
     ),
     (
-        "schema_collection_bounds_hash",
-        HashFieldClass::Unresolved,
-        "names the SchemaCollectionBound set, a SchemaBoundManifest sub-payload, not the manifest artifact; computation undefined (§7.1)",
-    ),
-    (
         "score_record_hashes",
         HashFieldClass::Unresolved,
         "score records have no schema; referents are not accepted artifacts (§6.4 keeps scores evidence-only)",
-    ),
-    (
-        "slot_value_hash",
-        HashFieldClass::Unresolved,
-        "resolved slot value is an NF sub-payload, not an accepted artifact; §7.5 step 6 defines only slot_digest",
     ),
     (
         "source_hash",
@@ -1331,7 +1301,7 @@ mod tests {
 
     /// Totality + per-class path counts over the real SPEC: suffix
     /// defaults make every HashNamed walk row classify. Counts track the
-    /// .5.2.x burn-down (.5.2.1.x + .5.2.2.1 done: 21 names); .5.2.3.2
+    /// .5.2.x burn-down (through .5.2.2.2: 27 of 42 names done); .5.2.3.2
     /// finalizes with an empty Unresolved class.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
@@ -1343,18 +1313,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 244);
+        assert_eq!(rows.len(), 236);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 157);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 76);
+        assert_eq!(names.len(), 152);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 74);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
         assert_eq!(count(HashFieldClass::ArtifactRef), 168);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 11);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 13);
         assert_eq!(count(HashFieldClass::RawRecordedBytes), 28);
         assert_eq!(count(HashFieldClass::FieldSpecific), 12);
-        assert_eq!(count(HashFieldClass::Unresolved), 25);
+        assert_eq!(count(HashFieldClass::Unresolved), 15);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1457,11 +1427,6 @@ mod tests {
                 HashFieldClass::ArtifactRef,
             ),
             (
-                "proof_dag",
-                "proof_nodes/canonical_bytes_hash",
-                HashFieldClass::Unresolved,
-            ),
-            (
                 "source_region",
                 "closure_certificate_hash",
                 HashFieldClass::ArtifactRef,
@@ -1539,8 +1504,8 @@ mod tests {
             ),
             (
                 "semantic_policy_set",
-                "output_exclusions/left_value/reading_hash",
-                HashFieldClass::Unresolved,
+                "output_exclusions/left_value/reading_digest",
+                HashFieldClass::NamedPayloadDigest,
             ),
             (
                 "verifier_witness",

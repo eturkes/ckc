@@ -1584,7 +1584,7 @@ S RecommendationMetadata(clinical_question_id:Id?,recommendation_id:Id?,strength
 ```text
 E Reading = TermReading | ConditionReading | ActionReading | CueReading | QuantityReading | TemporalReading | NormReading | FactualReading | TableReading
 
-S ReadingRef(reading_hash:Hash)
+S ReadingRef(reading_digest:Hash)
 
 S TermReading(concept_id:Id,binding_status:BindingStatus,surface_anchor_id:Id)
 
@@ -1612,6 +1612,8 @@ S License(license_id:Id,air_key:AIRKey,reading:Reading,generator_hash:Hash,sourc
 ```
 
 Each license supplies one candidate reading for one AIR key. `slot_key` is the generator-declared semantic key for alternatives of the same fact. It is proof-visible. Distinct rows of one table are represented inside one `TableReading`; one table contributes one AIR key for the table reading.
+
+`ReadingRef.reading_digest = sha256(canonical_payload_bytes(reading))` over the referenced `Reading` value: readings live inline in licenses, policies, and witnesses, so a reference names canonical reading bytes, never an envelope. Consumers resolve a `ReadingRef` against the finite reading set in scope at the consuming algorithm.
 
 `NormReading` represents modality by `(direction, original_modality_phrase_ja)`. Theorem predicates consume `direction`; gloss rendering consumes both the direction and the preserved source phrase when a template requests it.
 
@@ -1766,8 +1768,10 @@ M0 closure is stratified finite materialization. `ClosureOutput` enumerates ever
 Same-stage recursion is represented by adding an intermediate stage. Stratified negation uses `empty` only over fully materialized lower-stage relations.
 
 ```text
-S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],schema_collection_bounds_hash:Hash,stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt)
+S ClosureBoundCertificate(closure_input_hash:Hash,finite_domain_cardinalities:Map[Id,UInt],generator_env_bounds:Map[Hash,UInt],generator_materialized_counts:Map[Hash,UInt],collect_bounds:Map[Hash,UInt],sequence_bounds:Map[Hash,UInt],axis_path_bounds:Map[Hash,UInt],context_clause_bounds:Map[Hash,UInt],stage_bounds:Map[Int,UInt],kernel_builder_bounds:Map[Id,UInt],total_materialized_payloads:UInt)
 ```
+
+The certificate restates only bounds recorded nowhere else; schema collection bounds ride `closure_input_hash` through `ClosureInput.schema_bound_manifest_hash`.
 
 `closure_bound_overflow` is the local dispatch for `ClosureBoundCertificate` map bounds that lack `BoundOverflowDisposition`: emit `Residual(class=unsupported_construction)`, emit `Diagnostic(code=closure_bound_overflow)`, include the overflowing bound key in the canonical diagnostic text, and reject the overflowing materialized payload from accepted output.
 
@@ -1793,9 +1797,9 @@ E ProofRule = SOURCE | MECH_OBS | GEN_OBS | MATCH | CLASS | GEN_SEM | AIR_FSET |
 
 E JudgmentKind = SourceGraph | SourceRegion | MechObsPayload | PatternObs | Match | MatchClass | Member | License | Resolution | LicensedReadingSet | AIRCore | NF | WitnessContext | Conflict | FactualInconsistency | Residual | Ambiguity | Incoherence | Diagnostic | GlossTemplate | GlossView | VerifierWitness | SymbolSourceMap | ConstraintCoreWitness | RepairSetSearchTrace | Certificate | ClaimRecord | ReportTraceIndex | ClaimTierSummary | WordingGateRecord | ReviewReport | ReplayManifest | ReplayIdentityCheck
 
-S ProofNode(proof_id:Id,rule:ProofRule,conclusion_kind:JudgmentKind,conclusion_hash:Hash,source_graph_hash:Hash,generator_hash:Hash?,stage:Int?,environment_digest:Hash?,support_digest:Hash?,payload_digest:Hash,premise_proof_ids:Set[ProofId],premise_artifact_hashes:Set[Hash],checker_hashes:Set[Hash],canonical_bytes_hash:Hash)
+S ProofNode(proof_id:Id,rule:ProofRule,conclusion_kind:JudgmentKind,conclusion_hash:Hash,source_graph_hash:Hash,generator_hash:Hash?,stage:Int?,environment_digest:Hash?,support_digest:Hash?,payload_digest:Hash,premise_proof_ids:Set[ProofId],premise_artifact_hashes:Set[Hash])
 
-S ProofDAG(proof_dag_id:Id,proof_nodes:Set[ProofNode],roots:Set[ProofId],reverse_dependency_index_hash:Hash,canonical_bytes_hash:Hash)
+S ProofDAG(proof_dag_id:Id,proof_nodes:Set[ProofNode],roots:Set[ProofId])
 
 S PatternObs(pattern_id:Id,kind:Id,stage:Int,support_region_id:RegionId,roles:Map[Id,Id],relation:Id?,grounding:Set[Id],generator_hash:Hash,status:Outcome,proof_roots:Set[ProofId])
 
@@ -1830,6 +1834,8 @@ CERT | Certificate | Certificate-class obligation in §9.2 verifies for the subj
 Each `JudgmentKind` variant is the conclusion kind of the corresponding semantically derived, verifier, report, replay, or certificate artifact schema named in §3.1 and §3.2. Source-only, schema-control, replay-control, admission-control, environment-control, and evidence-discovery artifacts have their proof obligations at their named acceptance gates in §11.3 and are referenced from ProofNodes through `premise_artifact_hashes` when they support a semantic conclusion.
 
 The proof checker verifies rule side conditions by re-reading accepted inputs and proof-visible payload fields. It is independent of proposal traces. A proof node is invalid when any premise proof is missing, when a premise artifact hash does not match its accepted envelope, or when the conclusion hash differs from recomputed canonical payload bytes.
+
+Node identity is `proof_id` inside the DAG payload; DAG identity is the envelope `artifact_hash` (§1.2). Checker identity is envelope provenance through `producer_manifest_hash`, and per-subject check outcomes are stage-90 `VerifierWitness` artifacts. The reverse dependency index is the in-memory inversion of `premise_proof_ids`; `proof_nodes` is its single canonical representation.
 
 `proof_visible_signature(Match m)` returns the canonical bytes of:
 
@@ -1974,7 +1980,7 @@ S GlossSlotSpec(slot_name:Id,nf_path:FeaturePath,renderer_id:Id,required:Bool)
 
 S GlossView(gloss_id:Id,nf_hash:Hash,lang:Lang,template_id:Id,slot_bindings:List[GlossSlotBinding],combined_slot_digest:Hash,rendered_text:Text<view_text>,authority:Authority,proof_roots:Set[ProofId])
 
-S GlossSlotBinding(slot_name:Id,nf_path:FeaturePath,slot_value_hash:Hash,slot_digest:Hash,rendered_fragment:Text<view_text>)
+S GlossSlotBinding(slot_name:Id,nf_path:FeaturePath,slot_digest:Hash,rendered_fragment:Text<view_text>)
 ```
 
 Gloss authority invariant: `GlossView.authority = view_only`.
