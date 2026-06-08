@@ -245,9 +245,9 @@ technically derivable but easily forgotten under token pressure.
   elements).
 - [2026-06-07] Registry-surface sizing constants (calibrate splits of
   registry-adjacent units, e.g. M0.0.4 schema equivalence walks the same
-  surfaces; re-grep after SPEC edits): 229 S-decls spec-wide, 74 §3.1
-  inventory roots, 367 collection fields, 433 hash-named fields, 63 Text
-  fields in S-decl lines (2026-06-08 re-grep, post-.5.2.2.3; counts are
+  surfaces; re-grep after SPEC edits): 229 S-decls spec-wide, 75 §3.1
+  inventory roots, 367 collection fields, 431 hash-named fields, 64 Text
+  fields in S-decl lines (2026-06-08 re-grep, post-.5.2.3.1; counts are
   `grep '^S '`-scoped: S-decl lines; `Set[|List[|Map[`;
   `_hash|_hashes|_digest|_digests` before `:`; `Text<`).
   Split heuristic (m0.0.3.4 rebalances, 3→5 then

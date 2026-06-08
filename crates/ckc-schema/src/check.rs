@@ -237,8 +237,8 @@ pub fn check_registry(
 pub enum HashFieldClass {
     /// `*_hash`/`*_hashes` naming an accepted artifact's envelope hash.
     ArtifactRef,
-    /// `*_digest`: sha256 of canonical payload bytes of a payload defined
-    /// beside the field.
+    /// `*_digest`/`*_digests`: sha256 of canonical payload bytes of a
+    /// payload defined beside the field.
     NamedPayloadDigest,
     /// `sha256(exact_recorded_bytes)` of raw-source/executable/external-
     /// manifest/index-fingerprint bytes, supplied by an accompanying
@@ -262,9 +262,10 @@ pub struct ClassifiedHashField {
 }
 
 /// Suffix defaults (§1.2): `*_hash`/`*_hashes` reference accepted
-/// artifacts; `*_digest` digests a payload named beside the field.
+/// artifacts; `*_digest`/`*_digests` digest a payload named beside the
+/// field.
 fn hash_suffix_default(terminal: &str) -> HashFieldClass {
-    if terminal.ends_with("_digest") {
+    if terminal.ends_with("_digest") || terminal.ends_with("_digests") {
         HashFieldClass::NamedPayloadDigest
     } else {
         HashFieldClass::ArtifactRef
@@ -275,10 +276,11 @@ fn hash_suffix_default(terminal: &str) -> HashFieldClass {
 /// are (terminal field name, class, one-line rationale). Every walked
 /// terminal name is judged against its S-decl context (.5.1.1 a-l,
 /// .5.1.2 m-z); a name absent here means the suffix default survived
-/// judgment. Unresolved rows are .5.2's burn-down list. Outside HashNamed
-/// coverage entirely: WordingGateRecord.literal_part_digests (§9.3) ends
-/// `_digests`, a suffix §1.2 never names — .5.2 resolves it with the
-/// SPEC-edit batch.
+/// judgment. .5.2.x burned down all 42 Unresolved rows via SPEC
+/// corrections; .5.2.3.2 wires an empty-Unresolved invariant into
+/// [`check_registry`]. The plural `*_digests` suffix joined the walk with
+/// the §6.4 renames; WordingGateRecord.literal_part_digests (§9.3) rides
+/// its default pending .5.2.3.2's §9.3 review.
 pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
     (
         "actual_output_hashes",
@@ -291,19 +293,9 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external extraction-adapter manifest bytes; the owning ExtractionManifest supplies them",
     ),
     (
-        "admission_decision_hash",
-        HashFieldClass::Unresolved,
-        "AdmissionDecision is an enum, not an artifact; intended referent (cf. admission_record_hash elsewhere) undefined",
-    ),
-    (
         "build_input_hashes",
         HashFieldClass::RawRecordedBytes,
         "toolchain build-input bytes recorded by the owning ToolchainManifest",
-    ),
-    (
-        "candidate_hash",
-        HashFieldClass::Unresolved,
-        "pre-acceptance candidate payload hash; §6.4 never defines the computation; equals artifact_hash only on accept",
     ),
     (
         "class_signature_hash",
@@ -321,14 +313,14 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "raw document content bytes; sibling extraction_manifest_hash names the supplier",
     ),
     (
+        "decoding_policy_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external decoding-policy configuration bytes (§6.4 evidence-discovery provenance)",
+    ),
+    (
         "dense_retriever_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external dense-retriever manifest bytes (evidence-discovery trace)",
-    ),
-    (
-        "emitted_payload_hashes",
-        HashFieldClass::Unresolved,
-        "materialization-sandbox payload hashes; referents are not accepted artifacts and the computation is undefined (§6.4)",
     ),
     (
         "environment_variable_hashes",
@@ -344,11 +336,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external_backend_core_hash",
         HashFieldClass::RawRecordedBytes,
         "replayed external-solver core bytes; the recorded solver proof is the supplying manifest (§8.1)",
-    ),
-    (
-        "forbidden_output_hashes",
-        HashFieldClass::Unresolved,
-        "hashes of payloads that must never exist; no convention covers hypothetical payloads (§6.4 suite comparison)",
     ),
     (
         "fusion_policy_hash",
@@ -386,6 +373,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "raw extraction-adapter input bytes; the owning ExtractionManifest supplies them (§4.4)",
     ),
     (
+        "input_context_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "recorded generator input-context bytes (§6.4 evidence-discovery provenance)",
+    ),
+    (
         "late_interaction_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external late-interaction manifest bytes (evidence-discovery trace)",
@@ -394,6 +386,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "normalization_table_hash",
         HashFieldClass::RawRecordedBytes,
         "Unicode normalization-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
+    ),
+    (
+        "output_bytes_hash",
+        HashFieldClass::RawRecordedBytes,
+        "raw generator output bytes (§6.4 proposal_bytes_hash family)",
     ),
     (
         "permission_evidence_hash",
@@ -406,19 +403,14 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "policy test-vector file bytes; UnicodePolicyManifest supplies them (M0.0.1 policy_vectors.json)",
     ),
     (
+        "prompt_template_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external prompt-template bytes (§6.4 evidence-discovery provenance)",
+    ),
+    (
         "proposal_bytes_hash",
         HashFieldClass::RawRecordedBytes,
         "recorded pre-discharge candidate bytes (§6.4 DischargeProposal candidate_bytes input)",
-    ),
-    (
-        "proposal_provenance_hashes",
-        HashFieldClass::Unresolved,
-        "ProposalProvenanceManifest is S-decl'd but absent from the §3.1 inventory, so referents are not accepted artifacts",
-    ),
-    (
-        "proposed_subject_hash",
-        HashFieldClass::Unresolved,
-        "pre-acceptance proposed-subject payload hash; computation undefined (§6.4; family: candidate_hash)",
     ),
     (
         "punctuation_table_hash",
@@ -436,29 +428,9 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "recorded retrieval-query bytes; the trace's retriever manifests supply the issuing context (§6.4)",
     ),
     (
-        "rationale_hash",
-        HashFieldClass::Unresolved,
-        "free-text reviewer rationale is neither an accepted artifact nor recorded bytes with a named supplier (§6.4)",
-    ),
-    (
-        "required_output_hashes",
-        HashFieldClass::Unresolved,
-        "compared byte-for-byte with emitted_payload_hashes (§6.4 step 9), inheriting its undefined sandbox-payload computation",
-    ),
-    (
         "reranker_manifest_hash",
         HashFieldClass::RawRecordedBytes,
         "external reranker manifest bytes (evidence-discovery trace)",
-    ),
-    (
-        "reviewed_subject_hash",
-        HashFieldClass::Unresolved,
-        "review precedes acceptance, so the reviewed subject is the pre-acceptance candidate; computation undefined (§6.4; family: candidate_hash)",
-    ),
-    (
-        "reviewer_identity_hash",
-        HashFieldClass::Unresolved,
-        "identity byte-source undefined; no §1.2 convention covers hashed-identity fields (§6.4)",
     ),
     (
         "rust_type_hash",
@@ -472,8 +444,8 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
     ),
     (
         "score_record_hashes",
-        HashFieldClass::Unresolved,
-        "score records have no schema; referents are not accepted artifacts (§6.4 keeps scores evidence-only)",
+        HashFieldClass::RawRecordedBytes,
+        "recorded external score-record bytes; the trace's *_manifest_hash fields name the suppliers (§6.4 keeps scores evidence-only)",
     ),
     (
         "source_hash",
@@ -491,6 +463,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "specification-document bytes (sha256 over SPEC.md, built by .4.3); §1.1 compares it under T-Schema-Equivalence",
     ),
     (
+        "structured_output_schema_hash",
+        HashFieldClass::RawRecordedBytes,
+        "external constrained-decoding schema bytes (§6.4 evidence-discovery provenance)",
+    ),
+    (
         "subject_hashes",
         HashFieldClass::FieldSpecific,
         "subject-identity hashes defined beside §8.7 Incoherence: envelope artifact_hash for enveloped subjects, else canonical-payload digest; §1.1 overflow_member_hash instantiates the rule",
@@ -499,6 +476,11 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "tagged_union_alternatives_hash",
         HashFieldClass::FieldSpecific,
         "§1.1 T-Schema-Equivalence canonicalizes the union-alternative set; M0.0.4 implements",
+    ),
+    (
+        "tool_manifest_hashes",
+        HashFieldClass::RawRecordedBytes,
+        "external function-calling tool manifest bytes (§6.4 evidence-discovery provenance)",
     ),
     (
         "witness_hash",
@@ -1280,9 +1262,9 @@ mod tests {
     }
 
     /// Totality + per-class path counts over the real SPEC: suffix
-    /// defaults make every HashNamed walk row classify. Counts track the
-    /// .5.2.x burn-down (through .5.2.2.3: 31 of 42 names done); .5.2.3.2
-    /// finalizes with an empty Unresolved class.
+    /// defaults make every HashNamed walk row classify. The .5.2.x
+    /// burn-down is complete (42 of 42 names; Unresolved empty);
+    /// .5.2.3.2 wires the empty-class invariant into check_registry.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
         let text = spec_text();
@@ -1293,18 +1275,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 234);
+        assert_eq!(rows.len(), 240);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 150);
-        assert_eq!(names.iter().filter(|n| **n < "m").count(), 74);
+        assert_eq!(names.len(), 154);
+        assert_eq!(names.iter().filter(|n| **n < "m").count(), 76);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
-        assert_eq!(count(HashFieldClass::ArtifactRef), 168);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 15);
-        assert_eq!(count(HashFieldClass::RawRecordedBytes), 28);
+        assert_eq!(count(HashFieldClass::ArtifactRef), 171);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 22);
+        assert_eq!(count(HashFieldClass::RawRecordedBytes), 35);
         assert_eq!(count(HashFieldClass::FieldSpecific), 12);
-        assert_eq!(count(HashFieldClass::Unresolved), 11);
+        assert_eq!(count(HashFieldClass::Unresolved), 0);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1476,6 +1458,41 @@ mod tests {
                 "conflict_theorem",
                 "witness_hash",
                 HashFieldClass::FieldSpecific,
+            ),
+            (
+                "materialized_consequence_manifest",
+                "candidate_digest",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "counterexample_suite",
+                "forbidden_output_digests",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "wording_gate_record",
+                "literal_part_digests",
+                HashFieldClass::NamedPayloadDigest,
+            ),
+            (
+                "admission_context",
+                "admission_record_hash",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "proposal_record",
+                "proposal_provenance_hashes",
+                HashFieldClass::ArtifactRef,
+            ),
+            (
+                "proposal_provenance_manifest",
+                "output_bytes_hash",
+                HashFieldClass::RawRecordedBytes,
+            ),
+            (
+                "retrieval_proposal_trace",
+                "score_record_hashes",
+                HashFieldClass::RawRecordedBytes,
             ),
             (
                 "witness_context",

@@ -201,7 +201,7 @@ rule.
   witness_payload_hash (§9.1 VerifierWitness, sole spec mention).
   Procedure per .2.1.1. Read: §1.2 hash conventions + §8.1 + §9.1 S-decl
   context. Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.3.1 hash-defect burn-down: §6.4 pre-acceptance cluster.
+- [x] M0.0.3.4.5.2.3.1 78% 157K/200K hash-defect burn-down: §6.4 pre-acceptance cluster.
   Resolve the 11 remaining names (admission_decision_hash, candidate_hash,
   emitted_payload_hashes, forbidden_output_hashes,
   proposal_provenance_hashes, proposed_subject_hash, rationale_hash,

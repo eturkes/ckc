@@ -543,6 +543,7 @@ TerminologyResourceSet
 TerminologyClosure
 SemanticPolicySet
 ResolutionTheorem
+ProposalProvenanceManifest
 ProposalRecord
 RetrievalProposalTrace
 AdmissionContext
@@ -615,7 +616,7 @@ T Stage | Producing operation | Generator profiles or builders | Emitted accepte
 -40 | ValidateRuntimeManifests | replay and environment-control builders | ToolchainManifest, EnvironmentProfile, runtime manifest diagnostics
 -40 | LoadFiniteFixtureManifest | fixture-control builders | FiniteFixtureManifest, fixture manifest diagnostics
 -40 | ParseCKCGen | parser builders | CKCGen, GeneratorGrammarArtifact, parse diagnostics
--40 | DischargeProposal | admission builders | ProposalRecord, RetrievalProposalTrace, AdmissionContext, ReviewerRecord, AdmissionRecord, EffectDischargeRecord, CounterexampleSuite, MaterializedConsequenceManifest, admitted CKCGen, admitted TerminologyResourceSet, admitted SemanticPolicySet, admitted GlossTemplate, ReportQuestionTemplate, AcceptedGeneratorBase
+-40 | DischargeProposal | admission builders | ProposalProvenanceManifest, ProposalRecord, RetrievalProposalTrace, AdmissionContext, ReviewerRecord, AdmissionRecord, EffectDischargeRecord, CounterexampleSuite, MaterializedConsequenceManifest, admitted CKCGen, admitted TerminologyResourceSet, admitted SemanticPolicySet, admitted GlossTemplate, ReportQuestionTemplate, AcceptedGeneratorBase
 -30 | IngestSourceEdition | source builders | SourceEdition, SourcePermissionRecord, CorpusDocument, ExtractionManifest
 -30 | BuildSourceGraph | source builders | SourceGraph, SourceSpan, SourceAnchor, source diagnostics
 -30 | source_region_closure | source builders | SourceRegion, RegionClosureCertificate
@@ -639,7 +640,7 @@ T Stage | Producing operation | Generator profiles or builders | Emitted accepte
 90 | DemoM0 | fixture orchestrator | Appendix A accepted artifact inventory
 ```
 
-`BuildTerminologyClosure` and `BuildDiagnostics` are named CloseM0-internal suboperations: their canonical user-facing command is `ckc close`, and they also have direct test harness entry points inside their owning build units. `SemanticPolicySet` is accepted only through `DischargeProposal`; CloseM0 reads the admitted artifact through `ClosureInput.semantic_policy_set_hash` and does not produce another `SemanticPolicySet`. `CloseM0` and `DemoM0` are orchestration operations at stage 90; semantic artifacts inside their output retain the numeric stage of the producing suboperation. A stage may read only artifacts from earlier stages except for the fixed stage-50 and stage-90 kernel builders, which read completed finite snapshots by hash. Same-stage recursion is invalid. Admission and proposal trace artifacts (`ProposalRecord`, `RetrievalProposalTrace`, `CounterexampleSuite`, `MaterializedConsequenceManifest`, `AdmissionRecord`, and `EffectDischargeRecord`) are accepted replay-control artifacts emitted by `DischargeProposal` before the stage that consumes the admitted subject; they are included in replay output sets but are not recursive semantic stage inputs unless an accepted artifact explicitly references their hash.
+`BuildTerminologyClosure` and `BuildDiagnostics` are named CloseM0-internal suboperations: their canonical user-facing command is `ckc close`, and they also have direct test harness entry points inside their owning build units. `SemanticPolicySet` is accepted only through `DischargeProposal`; CloseM0 reads the admitted artifact through `ClosureInput.semantic_policy_set_hash` and does not produce another `SemanticPolicySet`. `CloseM0` and `DemoM0` are orchestration operations at stage 90; semantic artifacts inside their output retain the numeric stage of the producing suboperation. A stage may read only artifacts from earlier stages except for the fixed stage-50 and stage-90 kernel builders, which read completed finite snapshots by hash. Same-stage recursion is invalid. Admission and proposal trace artifacts (`ProposalProvenanceManifest`, `ProposalRecord`, `RetrievalProposalTrace`, `CounterexampleSuite`, `MaterializedConsequenceManifest`, `AdmissionRecord`, and `EffectDischargeRecord`) are accepted replay-control artifacts emitted by `DischargeProposal` before the stage that consumes the admitted subject; they are included in replay output sets but are not recursive semantic stage inputs unless an accepted artifact explicitly references their hash.
 
 Cross-cutting control emissions are fixed. `ProducerManifest` is emitted by each canonical command wrapper and has the same stage as the wrapped operation. `ValidationManifest` is emitted by each acceptance-gate runner and has the same stage as the validated operation; the demo emits the schema, runtime-manifest, fixture-manifest, policy-admission, closure, verifier, report, and replay validation manifests named in Appendix A.10. `ToolchainManifest` and `EnvironmentProfile` are authored inputs accepted by `ValidateRuntimeManifests`, and `ToolRecord` rows are accepted environment-control rows within `ToolchainManifest`. `FiniteFixtureManifest` is an authored input accepted by `LoadFiniteFixtureManifest`, and its `FrozenConstant`, `ParsedQuantity`, and `DiagnosticTag` rows are accepted fixture-control rows within that manifest. Semantic-policy duplicate-key quarantine validation is performed when `DischargeProposal` accepts a `SemanticPolicySet` candidate; the policy-admission `ValidationManifest.diagnostic_hashes` records quarantined keys and diagnostics.
 
@@ -1626,10 +1627,12 @@ S ProposalProvenanceManifest(manifest_id:Id,generator_family:ProposalGeneratorFa
 
 E ProposalGeneratorFamily = closed_frontier_llm | domain_medical_model | proof_model | constrained_decoder | tool_calling_agent | self_consistency_sampler | rag_autoformalizer | critique_judge | program_aided_lm | verifier_guided_repair | adapter_finetune | world_model | human_fixture | other
 
-S ProposalRecord(proposal_id:Id,proposed_subject_hash:Hash,proposal_kind:Id,proposal_bytes_hash:Hash,proposal_provenance_hashes:Set[Hash],evidence_hashes:Set[Hash],proposal_effect_row:Set[Effect])
+S ProposalRecord(proposal_id:Id,proposed_subject_digest:Hash?,proposal_kind:Id,proposal_bytes_hash:Hash,proposal_provenance_hashes:Set[Hash],evidence_hashes:Set[Hash],proposal_effect_row:Set[Effect])
 ```
 
 Proposal provenance authority invariant: `ProposalProvenanceManifest.authority = evidence_discovery_only`. Model, prompt, structured-output, function-calling, tool, verifier-feedback, self-consistency, adapter, and world-model details affect accepted semantics only through deterministic discharge or a §3.3 gate.
+
+Pre-acceptance digest convention: proposal subjects exist before acceptance, so §6.4 records name them with `*_digest` fields storing `sha256(canonical_payload_bytes(payload))` over the canonical candidate payload that `DischargeProposal` steps 1-4 produce from the recorded candidate bytes. `ProposalRecord.proposed_subject_digest` (absent exactly when those steps reject the bytes), `ReviewerRecord.reviewed_subject_digest`, and `MaterializedConsequenceManifest.candidate_digest` digest that candidate payload. `MaterializedConsequenceManifest.emitted_payload_digests` digests each payload materialized at step 6. `CounterexampleSuite.required_output_digests` and `CounterexampleSuite.forbidden_output_digests` digest suite-authored expected payloads and compare against `emitted_payload_digests` at step 9. When step 12 constructs an accepted artifact, its envelope `artifact_hash` equals `candidate_digest`.
 
 Retrieval, reranking, graph traversal, query decomposition, and citation-grounded generation enter M0 only through proposal trace objects. These traces have `authority = evidence_discovery_only`; they are consumed by `DischargeProposal` as evidence hashes and by §3.3 research gates for retrieval-quality claims.
 
@@ -1651,24 +1654,24 @@ E RerankerFamily = cross_encoder | bge_reranker | cohere_rerank | medcpt_reranke
 E JapaneseAnalyzerFamily = kuromoji | sudachi | mecab_ipadic | mecab_unidic | fugashi | sentencepiece | xlm_roberta_tokenizer | other
 ```
 
-Retrieval trace authority invariant: `RetrievalProposalTrace.authority = evidence_discovery_only`.
+Retrieval trace authority invariant: `RetrievalProposalTrace.authority = evidence_discovery_only`. `RetrievalProposalTrace.score_record_hashes` stores `sha256(exact_recorded_bytes)` of the score records emitted by the named retriever, fusion, and reranker stages; the trace's `*_manifest_hash` fields name the manifests that supply those bytes.
 
 `T-Retrieval-Proposal-Trace` checks that every candidate and cited region resolves in SourceGraph, every named retrieval/analyzer/reranker family resolves to the local enums above, every index fingerprint is replayable, every fusion or reranking score is trace metadata rather than accepted semantics, and every retrieval-quality claim carries `G-RET-PARITY` evidence.
 
 ```text
 E AdmissionDecision = accept | ambiguity | residual | escalate | reject
 
-S AdmissionContext(context_id:Id,frozen_fixture_hashes:Set[Hash],schema_registry_hash:Hash,accepted_base_hash:Hash,counterexample_suite_hash:Hash?,admission_decision_hash:Hash,reviewer_record_hashes:Set[Hash])
+S AdmissionContext(context_id:Id,frozen_fixture_hashes:Set[Hash],schema_registry_hash:Hash,accepted_base_hash:Hash,counterexample_suite_hash:Hash?,admission_record_hash:Hash,reviewer_record_hashes:Set[Hash])
 
-S ReviewerRecord(reviewer_record_id:Id,reviewer_role:ReviewerRole,reviewer_identity_hash:Hash,reviewed_subject_hash:Hash,decision:AdmissionDecision,rationale_hash:Hash,source_region_ids:Set[RegionId],logical_time:UInt,authority:Authority)
+S ReviewerRecord(reviewer_record_id:Id,reviewer_role:ReviewerRole,reviewer_id:Id,reviewed_subject_digest:Hash,decision:AdmissionDecision,rationale:Text<diagnostic_text>,source_region_ids:Set[RegionId],logical_time:UInt,authority:Authority)
 
 E ReviewerRole = formalist | clinician_reviewer | curator | automated_checker
 
 E ProofParentPolicy = admitted_artifact_only
 
-S CounterexampleSuite(suite_id:Id,subject_kind:Id,fixture_input_hashes:Set[Hash],required_output_hashes:Set[Hash],forbidden_output_hashes:Set[Hash],max_materialized_payloads:UInt,expected_residual_classes:Set[ResidualClass])
+S CounterexampleSuite(suite_id:Id,subject_kind:Id,fixture_input_hashes:Set[Hash],required_output_digests:Set[Hash],forbidden_output_digests:Set[Hash],max_materialized_payloads:UInt,expected_residual_classes:Set[ResidualClass])
 
-S MaterializedConsequenceManifest(candidate_hash:Hash,fixture_input_hashes:Set[Hash],emitted_payload_hashes:Set[Hash],emitted_residual_classes:Set[ResidualClass],emitted_incoherence_classes:Set[IncoherenceClass],closure_bound_certificate_hash:Hash,proof_node_hashes:Set[Hash],status:Outcome)
+S MaterializedConsequenceManifest(candidate_digest:Hash,fixture_input_hashes:Set[Hash],emitted_payload_digests:Set[Hash],emitted_residual_classes:Set[ResidualClass],emitted_incoherence_classes:Set[IncoherenceClass],closure_bound_certificate_hash:Hash,proof_node_hashes:Set[Hash],status:Outcome)
 
 S EffectDischargeRecord(proposal_hash:Hash,discharged_artifact_hash:Hash?,proposal_effect_row:Set[Effect],accepted_effect_row:Set[Effect],deterministic_check_hashes:Set[Hash],materialized_consequence_manifest_hash:Hash,admission_record_hash:Hash,proof_parent_policy:ProofParentPolicy)
 
@@ -1698,7 +1701,7 @@ reject:
   records a negative admission decision and preserves deterministic diagnostics as the durable output.
 ```
 
-Reviewer authority invariant: `ReviewerRecord.authority = admitted_authority`. `ReviewerRole` is report-visible only. All role variants are consumed generically by admission trace rendering and leave accepted semantics unchanged.
+Reviewer authority invariant: `ReviewerRecord.authority = admitted_authority`. `ReviewerRole` is report-visible only. All role variants are consumed generically by admission trace rendering and leave accepted semantics unchanged. `reviewer_id` names the reviewing person or automated checker; `rationale` carries the reviewer's justification inline under `diagnostic_text`.
 
 `DischargeProposal(proposal, candidate_bytes, admission_context) -> OperationResult[EffectDischargeRecord]`:
 
@@ -1713,14 +1716,14 @@ Reviewer authority invariant: `ReviewerRecord.authority = admitted_authority`. `
 8 If proposal.proposal_kind is one of {CKCGen, TerminologyResourceSet, SemanticPolicySet, GlossTemplate}
   and admission_context.counterexample_suite_hash is absent, set status=residual and emit
   Residual(class=missing_counterexample_suite).
-9 If a suite is present, compare emitted payload hashes with required_output_hashes and
-  forbidden_output_hashes, and require emitted_residual_classes = expected_residual_classes;
+9 If a suite is present, compare emitted_payload_digests with required_output_digests and
+  forbidden_output_digests, and require emitted_residual_classes = expected_residual_classes;
   required missing, forbidden present, or residual-class mismatch sets status=incoherence.
 10 If emitted payload count exceeds CounterexampleSuite.max_materialized_payloads, use the local
   `counterexample_suite_bound_overflow` dispatch: set status=residual, emit
   Residual(class=unsupported_construction), emit Diagnostic(code=counterexample_suite_bound_overflow),
   and accept no candidate artifact from this proposal.
-11 Read the recorded AdmissionDecision.
+11 Read the recorded AdmissionDecision through admission_context.admission_record_hash.
 12 Construct an accepted artifact exactly when static checks pass, materialization status is ok,
   suite comparison passes, AdmissionDecision=accept, and accepted_effect_row can be {}.
 13 Store proposal artifacts only in trace and AdmissionRecord; accepted proof parents reference
@@ -3482,7 +3485,7 @@ The gloss stores ordered slot digests for `context adult_population; context sus
 Fixture ProposalRecord rows use proposal_provenance_hashes={} unless a row states otherwise.
 
 ```text
-PR-PG1: Proposal subject_kind=CKCGen proposal_kind=CKCGen candidate=gen_norm_recommend_beta_lactam; CES-PG1 requires LIC-L1 and forbids residual classes {unsupported_construction,missing_terminology}; DischargeProposal materializes LIC-L1, matches required_output_hashes, emits zero forbidden payloads, AdmissionDecision=accept; EffectDischargeRecord.accepted_effect_row={}
+PR-PG1: Proposal subject_kind=CKCGen proposal_kind=CKCGen candidate=gen_norm_recommend_beta_lactam; CES-PG1 requires LIC-L1 and forbids residual classes {unsupported_construction,missing_terminology}; DischargeProposal materializes LIC-L1, matches required_output_digests, emits zero forbidden payloads, AdmissionDecision=accept; EffectDischargeRecord.accepted_effect_row={}
 PR-PG2: Proposal candidate=gen_missing_suite_fixture; AdmissionContext.counterexample_suite_hash absent; DischargeProposal emits Residual(missing_counterexample_suite) and leaves accepted generators unchanged.
 PR-PG3 collect_overflow_fixture: CES-PG3 expects Residual(unsupported_construction); CollectBound.max_items=1 and two matching licenses; materialization emits that residual.
 PR-PG4 gated_patient_probabilistic_fixture: CES-PG4 expects Residual(deferred_gate_required); proposal makes patient-data and probabilistic claim from U23; absent GovernedPatientDataProfile and ProbabilisticProfileRecord emit that residual.

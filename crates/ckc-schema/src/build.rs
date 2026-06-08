@@ -44,7 +44,7 @@ pub enum WalkedLeaf {
     /// `Text<policy>` site; `policy` is the raw parameter (a §1.4 policy id
     /// or a dependent sibling-field name — .4.3 resolves which).
     Text { policy: String },
-    /// Field named `*_hash`/`*_hashes`/`*_digest` (§1.2 conventions; .4.4
+    /// Field named `*_hash`/`*_hashes`/`*_digest`/`*_digests` (§1.2 conventions; .4.4
     /// classifies applicability).
     HashNamed,
 }
@@ -134,7 +134,10 @@ pub fn walk_schema(decls: &SpecDecls, root: &str) -> Vec<WalkedPath> {
 }
 
 fn is_hash_named(field: &str) -> bool {
-    field.ends_with("_hash") || field.ends_with("_hashes") || field.ends_with("_digest")
+    field.ends_with("_hash")
+        || field.ends_with("_hashes")
+        || field.ends_with("_digest")
+        || field.ends_with("_digests")
 }
 
 /// Replaces the enclosing decl's generic parameter; the binding was itself
@@ -402,6 +405,13 @@ pub const SCHEMA_ROLES: &[(&str, SchemaRole)] = &[
     // §5.3 admitted policy artifact; semantic keys carry no support.
     ("semantic_policy_set", SchemaRole::AdmissionControl),
     ("resolution_theorem", SchemaRole::Semantic),
+    // §6.4 authority = evidence_discovery_only (proposal generator
+    // provenance: model/prompt/tool details stay outside accepted
+    // semantics).
+    (
+        "proposal_provenance_manifest",
+        SchemaRole::EvidenceDiscovery,
+    ),
     // §6.4 admission machinery; §3.2 "accepted replay-control artifacts"
     // names replay-inclusion behavior, not the registry role.
     ("proposal_record", SchemaRole::AdmissionControl),

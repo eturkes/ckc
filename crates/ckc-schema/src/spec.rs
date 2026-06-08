@@ -754,7 +754,7 @@ mod tests {
         let stage_table = d.tables_in("3.2").find(|t| t.header[0] == "Stage").unwrap();
         assert!(stage_table.rows.iter().any(|r| r[1] == "CloseM0"));
 
-        assert_eq!(d.inventory.len(), 74);
+        assert_eq!(d.inventory.len(), 75);
         assert_eq!(d.inventory[0], "SchemaRegistry");
         assert_eq!(d.inventory.last().unwrap(), "ReplayIdentityCheck");
 
