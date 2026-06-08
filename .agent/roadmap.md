@@ -439,7 +439,82 @@ completion via `.agent/compaction.sh`; splitting a unit replaces its line with
   (A.10 expectation); perturbations (disallowed kind admitted, missing residual)
   reject. Read: §4.1 permission semantics, §8.7 Residual, §9.3 step 6.
   Gate: `cargo test -p ckc-source --test t_source_permission`
-- [ ] M0.1.2
+- [ ] M0.1.2.1 node/edge skeleton schemas + kind enums. New ckc-source
+  `src/graph.rs` (lib.rs `pub mod graph;`): §4.2 records via canonical_record! —
+  SourceNode, SourceNodeAttrs (label:Text<semantic_ja>?, table_id:Id?), SourceEdge
+  (from/to:Id), SourceEdgeAttrs (role:Id?, table_id:Id?,
+  row_index/column_index/reading_order:UInt?); §2-vocabulary enums via bare_enum!
+  in ckc-core beside outcome.rs — SourceNodeKind (21 variants), SourceEdgeKind (8
+  variants), first consumer SourceNode.kind/SourceEdge.kind (SourceClass
+  precedent). Append enum descriptors to core_descriptors(), records to
+  source_descriptors(); keep ckc-schema descriptor_agreement green (rust-emitted ==
+  spec-derived, SPEC authority). §3.1 inventory rows already covered by the
+  spec-derived registry/bounds/hash-class/producer-map (M0.0.3/.4) — no
+  build.rs/checker edit. Tests: per-record roundtrip + optional-field omission,
+  enum id/from_id, descriptor_agreement green. Read: §4.2 node/edge schemas, §2
+  SourceNodeKind/SourceEdgeKind + §2.1 consumers row.
+  Test: `cargo test -p ckc-source graph`
+- [ ] M0.1.2.2 span/anchor/geometry schemas + source ordering. ckc-source
+  graph.rs: §4.2 records via canonical_record! — SourceSpan (16 fields:
+  section_path:List[Text<semantic_ja>], page/bbox/table_cell_id optional,
+  char_start/char_end:UInt, raw_text:Text<raw_source>, nfkc_text:Text<source_nfkc>,
+  search_text:Text<semantic_ja>, display_text:Text<view_text>, language:Lang,
+  reading_order:UInt), SourceAnchor, BBox (top/left/bottom/right:Rational); Lang
+  via bare_enum! in graph.rs (§4.2-local). Add ckc-core Text policy markers
+  source_nfkc, view_text (§1.4; raw_source/semantic_ja from M0.1.1.1) so descriptor
+  emission resolves. ckc-core canon.rs beside canonical_sort_key: SourceOrderView
+  (optional source-order fields) + source_order_key -> the §1.5 11-tuple
+  (source_edition_hash, page_or_zero, reading_order, bbox top/left/bottom/right,
+  node_id, char_start, char_end, anchor_id) bytes, missing field = type canonical
+  minimum; ckc-source impls the view per SourceSpan/SourceAnchor (ckc-core cannot
+  dep ckc-source). Append descriptors to source_descriptors(); keep
+  descriptor_agreement green. Tests: per-record roundtrip + optional-omission, Lang
+  id/from_id, source_order_key tuple + missing-field-minimum spot-checks, agreement
+  green. Read: §4.2 SourceSpan/SourceAnchor/BBox/Lang, §1.4 source_nfkc/view_text,
+  §1.5 source_order_key. Test: `cargo test -p ckc-source graph`
+- [ ] M0.1.2.3 fixture leaf content (A.1 corpus). New ckc-source `src/fixture.rs`
+  (lib.rs `pub mod fixture;`): author SourceSpan + SourceAnchor + leaf SourceNode
+  (sentence + table-cell kinds) for A.1 units U1-U27 — raw/nfkc/search/display text
+  per unit, char offsets, reading_order, language; SRC-PI unit U2 flagged for the
+  .5 permission check; U22 conflicting-offsets unit gets no stable span (drives
+  extraction_uncertain in .5). Extract A.1 strings programmatically from SPEC.md
+  (memory 2026-06-07 fullwidth/ASCII trap). Constructors
+  fixture_spans()/fixture_anchors()/fixture_leaf_nodes() for .4 assembly. Tests:
+  leaf-content roundtrip, source_order_key ascending over fixture_spans(), expected
+  per-unit counts. Read: §4.2, A.1 U1-U27, A.2 src= references.
+  Test: `cargo test -p ckc-source fixture`
+- [ ] M0.1.2.4 SourceGraph container + structure wiring + assembly. ckc-source
+  graph.rs: SourceGraph via canonical_record! (graph_id:Id,
+  source_edition_hash:Hash, nodes/edges/spans/anchors:Set, root_node_id:Id,
+  extraction_manifest_hash:Hash) + descriptor + agreement. fixture.rs: container
+  SourceNode values (document/section/heading/table/row/column/cell/caption/
+  footnote/cross_reference_anchor) + every SourceEdge across the 8 SourceEdgeKind
+  (contains, precedes, table_coordinate, header_of, caption_of, footnote_of,
+  continuation, crossref_targets) wiring U1-U27 incl. table U3 (rows/columns/cells/
+  header), caption U15->U3, footnote U16, crossref U14->U3, dangling U18; assemble
+  fixture_source_graph() (root_node_id, four Sets, source_edition_hash = A.1
+  SRC-GDL edition hash, extraction_manifest_hash = fixture-literal Hash —
+  ExtractionManifest schema defers to M0.2.1). Append descriptor; keep agreement
+  green. Tests: assembled-graph roundtrip, P-SG-canonical byte-stability (re-derive
+  identical canonical bytes). Read: §4.2 SourceGraph/SourceEdgeKind, §4.4
+  extraction_manifest_hash note, A.1 U3/U14-U16/U18 structure.
+  Test: `cargo test -p ckc-source fixture`
+- [ ] M0.1.2.5 P-SG predicates + gate (completes T-SourceGraph-Canonical). New
+  ckc-source `src/check.rs`: validate_source_graph(&SourceGraph,
+  &Set[SourcePermissionRecord]) -> OperationResult emitting sorted §8.7
+  Residual/diagnostics — P-SG-total-text (every A.1 textual unit has a SourceSpan +
+  SourceAnchor or a Residual(class=extraction_uncertain), U22), P-SG-total-support
+  (vacuous pre-theorem; full SourceRegion check lands with §4.3 in M0.1.3),
+  P-SG-canonical (re-derived SourceGraph canonical bytes identical), P-SG-permission
+  (any raw_source-bearing artifact's source allowed by
+  SourcePermissionRecord.allowed_artifacts — SRC-PI source_graph disallowed). Reuse
+  ckc-core Residual/ResidualClass + ckc-source permission projection (M0.1.1.2).
+  Gate `crates/ckc-source/tests/t_sourcegraph_canonical.rs` (T-SourceGraph-
+  Canonical): the .4 fixture over SRC-GDL/SRC-PI permissions validates clean +
+  byte-stable; perturbations (textual unit missing span without residual, mutated
+  raw_text, SRC-PI raw-text artifact disallowed, reordered Set breaking canonical
+  bytes) reject. Read: §4.2 P-SG predicates, §4.1 allowed_artifacts, §8.7 Residual.
+  Gate: `cargo test -p ckc-source --test t_sourcegraph_canonical`
 - [ ] M0.1.3
 - [ ] review M0.1
 - [ ] M0.2.1

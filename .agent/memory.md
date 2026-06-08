@@ -314,6 +314,23 @@ technically derivable but easily forgotten under token pressure.
   keeping the fallout-bearing gate solo. CLI command/operation types are
   CLI-internal (absent from §3.1 inventory) → no descriptor/registry
   registration, agreement gates untouched (unlike m0.0.5's schema rows).
+  Eighth corollary (m0.1.2 split 1→5, user-directed pre-implementation): a
+  schema unit whose deliverable also authors a FULL-corpus fixture (A.1
+  U1-U27 SourceGraph + table/caption/footnote/crossref substructure) is
+  ≈5 units — the fixture alone is ≥2: split leaf-content (per-unit
+  spans/anchors/leaf nodes, an authored ~85% table) from
+  structure-wiring+assembly (container nodes + all edge kinds + the
+  SourceGraph value), and keep the predicate+gate unit solo; schemas split
+  3-4 records/unit as usual. Applies to every later fixture-extending unit
+  (m0.1.3 closure, m0.2 mech-obs grow this same SourceGraph). Two durable
+  design facts surfaced: (a) a §1.5 sort key reading a downstream-crate
+  record (source_order_key over ckc-source SourceSpan/SourceAnchor) lives in
+  ckc-core as a fn over a ckc-core view struct (SourceOrderView, optional
+  fields, missing = type canonical minimum) with the downstream crate impl'ing
+  the view — ckc-core cannot dep ckc-source; (b) the M0.1 enum-placement rule
+  resolves source enums case-by-case, not by name family: SourceNodeKind/
+  SourceEdgeKind are §2 vocabulary → ckc-core beside outcome.rs, but Lang is
+  §4.2-local → ckc-source.
 - [2026-06-08] A missing/renamed `bare_enum!` variant surfaces its first
   rustc/RA diagnostic (E0599) at ckc-core canon.rs — the macro-definition
   site — not the real use site. Grep the variant name across crates before
@@ -339,7 +356,8 @@ technically derivable but easily forgotten under token pressure.
   .4.7/.4.1-4/.5.1-4 all detailed-and-fitting → target M0.0.6 (next bare
   row, split 1→3); 2026-06-08(4): chain .4.7/.4.1-4/.5.1-4/.6.1-3 all
   detailed-and-fitting → target M0.1.1 (first bare M0.1 row, split 1→2
-  along schema-layer / Residual+projection+gate).
+  along schema-layer / Residual+projection+gate); 2026-06-08(5): chain
+  extends through .1.1.1-2 → target M0.1.2 (next bare row, split 1→5).
 - [2026-06-08] From M0.1 on, implementing a §3.1-inventory schema in Rust
   needs NO build.rs/registry/checker edit: build_v0_registry, spec-derived
   descriptors, hash-classification, and producer-mapping all parse SPEC.md,
