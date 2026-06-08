@@ -363,7 +363,15 @@ technically derivable but easily forgotten under token pressure.
   +contains / relational-closure+residuals / cert-admissibility+fixture+gate
   — a deferred cross-cutting op (HandleBoundOverflow, first consumer here)
   and its prerequisite §8.7 schema family each become their own sub-unit
-  ahead of the closure that consumes them).
+  ahead of the closure that consumes them); 2026-06-08(7): chain extends
+  through .1.3.1-6 → target M0.2.1 (next bare row, first M0.2 §11.3 row,
+  split 1→3: ckc-observe-crate+Authority+extraction/analyzer-manifests /
+  lexicon+payload+MechObsKind / fixtures+authority-invariant+gate). New-crate
+  creation pairs with the §2 Authority enum (first consumer → ckc-core) as the
+  foundation sub-unit (M0.1.2.1 §2-enum+skeleton precedent); MechObsKind is
+  §4.4 schema-local → ckc-observe; ExtractionManifest folds in per M0.1.2.4's
+  defer; mechanical-schema 3-4-records/unit rule holds (5 records → schema unit
+  splits 2+3, gate solo).
 - [2026-06-08] From M0.1 on, implementing a §3.1-inventory schema in Rust
   needs NO build.rs/registry/checker edit: build_v0_registry, spec-derived
   descriptors, hash-classification, and producer-mapping all parse SPEC.md,

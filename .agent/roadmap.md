@@ -595,7 +595,52 @@ completion via `.agent/compaction.sh`; splitting a unit replaces its line with
   §8.7 Residual, A.1 U14-U19, A.10 source-region expectations.
   Gate: cargo test -p ckc-source --test t_region_closure
 - [ ] review M0.1
-- [ ] M0.2.1
+- [ ] M0.2.1.1 ckc-observe crate + Authority enum + extraction/analyzer manifest schemas.
+  New crate `crates/ckc-observe` (add to workspace members; dep ckc-core): §4.4 manifest
+  records via canonical_record! in `src/manifest.rs` (lib.rs `pub mod manifest;`) —
+  ExtractionManifest (manifest_id:Id, source_edition_hash/adapter_manifest_hash/
+  input_bytes_hash/output_graph_hash:Hash, diagnostics_hashes:Set[Hash],
+  replay_manifest_hash:Hash), AnalyzerManifest (analyzer_id/analyzer_name:Id,
+  analyzer_version:Text<identifier_ascii>, config_hash/replay_manifest_hash:Hash). Authority
+  (§2 vocabulary, first consumer) via bare_enum! in ckc-core beside outcome.rs — 7 variants
+  source_authority|mechanical_authority|admitted_authority|compiler_authority|
+  verifier_authority|evidence_discovery_only|view_only. Append Authority descriptor to
+  core_descriptors(); add observe_descriptors() (ExtractionManifest, AnalyzerManifest) and
+  wire into ckc-schema descriptor_agreement; reconcile rust-emitted vs spec-derived (SPEC
+  authority). §3.1 inventory rows already covered by the spec-derived registry/bounds/
+  hash-class/producer-map (M0.0.3/.4) — no build.rs/checker edit. Tests: per-record
+  roundtrip, Authority id/from_id, descriptor_agreement green. Read: §4.4 ExtractionManifest/
+  AnalyzerManifest, §2 Authority, §1.6 replay_manifest_hash. Test: `cargo test -p ckc-observe`
+- [ ] M0.2.1.2 mechanical-lexicon + observation-payload schemas + MechObsKind. ckc-observe
+  `src/manifest.rs`: §4.4 records via canonical_record! — MechanicalLexicon (lexicon_id:Id,
+  entries:Set[LexiconEntry], authority:Authority), LexiconEntry (surface:Text<source_nfkc>,
+  concept_candidate:Id), MechObsPayload (obs_id:Id, kind:MechObsKind,
+  source_region_id:RegionId, anchor_id:Id?, raw_text:Text<raw_source>?,
+  nfkc_text:Text<source_nfkc>?, normalized_text:Text<semantic_ja>?,
+  fields:Map[Id,Text<semantic_ja>], analyzer_manifest_hash:Hash?, authority:Authority);
+  MechObsKind (§4.4 schema-local, 13 variants text_node…negation_marker) via bare_enum! beside
+  MechObsPayload. Reuse ckc-core RegionId (M0.1.1.2), Authority (M0.2.1.1), Text markers
+  source_nfkc/raw_source/semantic_ja (M0.1.x). Append MechObsKind + 3 record descriptors to
+  observe_descriptors(); keep ckc-schema descriptor_agreement green. §3.1 inventory rows already
+  covered (M0.0.3/.4) — no build.rs/checker edit. Tests: per-record roundtrip + MechObsPayload
+  optional-field omission, MechObsKind id/from_id, descriptor_agreement green. Read: §4.4
+  MechanicalLexicon/LexiconEntry/MechObsPayload/MechObsKind, §1.4 source_nfkc/raw_source/
+  semantic_ja. Test: `cargo test -p ckc-observe`
+- [ ] M0.2.1.3 fixture recognizer manifests + authority invariant + gate (completes
+  T-Mech-Manifest). New ckc-observe `src/fixture.rs` (lib.rs `pub mod fixture;`):
+  fixture_analyzer_manifest() (AnalyzerManifest) + fixture_mechanical_lexicon()
+  (authority=mechanical_authority, one LexiconEntry per A.2 lex_surface_hit surface incl.
+  表在感染→{superficial_infection,device_infection}); extract A.2 surfaces programmatically from
+  SPEC.md (memory 2026-06-07 fullwidth/ASCII trap). New `src/check.rs`:
+  validate_mech_manifests(&AnalyzerManifest, &MechanicalLexicon, &Set[MechObsPayload]) ->
+  OperationResult, sorted §1.7 diagnostics — authority invariant (MechanicalLexicon.authority =
+  every MechObsPayload.authority = mechanical_authority), replay-field presence
+  (AnalyzerManifest.replay_manifest_hash, MechObsPayload.analyzer_manifest_hash); a small
+  MechObsPayload sample suffices (full A.2 set rides M0.2.2). Gate
+  `crates/ckc-observe/tests/t_mech_manifest.rs` (T-Mech-Manifest): fixtures + sample validate
+  clean; perturbations (non-mechanical authority, lexicon authority≠payload authority, missing
+  replay_manifest_hash) reject. Read: §4.4 authority invariant + manifest replay fields, §1.7,
+  A.2 lex_surface_hit surfaces. Gate: `cargo test -p ckc-observe --test t_mech_manifest`
 - [ ] M0.2.2
 - [ ] review M0.2
 - [ ] M0.3.1
