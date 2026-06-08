@@ -241,7 +241,74 @@ rule.
   real SPEC + built registry; perturbations (dropped bound row, wrong role,
   duplicate entry, unmapped payload) reject.
   Gate: `cargo test -p ckc-schema --test t_registry_referential_integrity`
-- [ ] M0.0.4
+- [ ] M0.0.4.1 type-descriptor model + spec derivation. New
+  `crates/ckc-core/src/descriptor.rs`: TypeExprRepr (mirrors spec.rs
+  TypeExpr: name/optional/set/list/map + text {static StringPolicy id |
+  dependent sibling field}), AltRepr (bare/typed/sexp/type_ref/alias),
+  TypeDescriptor {type_id, record fields | enum alternatives}, Canonical
+  impls via canon.rs macros. New `crates/ckc-schema/src/descriptor.rs`:
+  derive_descriptors(&SpecDecls) — full table over S-decls + E-decls
+  (229+116 at split; TypeExpr/EDecl conversion; Text param in
+  StringPolicy ids → static, else dependent); per-inventory-entry
+  union-transparent reachable closure (walker visited-set pattern but
+  traversing E alternatives, unlike the leaf walk); rust_type_manifest =
+  full sorted descriptor table, per-entry rust_type_hash = sha256 over
+  the entry's sorted closure canonical bytes, manifest hash over table
+  bytes. Tests: S/E count totality, schema_registry + text_literal
+  closure spot-checks, determinism + descriptor roundtrip. Read: §1.1
+  equivalence paragraphs, §1.3, §1.5.
+  Test: `cargo test -p ckc-schema descriptor`
+- [ ] M0.0.4.2 Rust-side descriptor emission + agreement. ckc-core
+  descriptor.rs: trait CanonicalType { fn type_expr() -> TypeExprRepr }
+  for scalars/composites (bool, Id, Hash, UInt, Int, Rational,
+  FeaturePath, Text<P> via policy markers, Option/BTreeSet/Vec/BTreeMap);
+  canonical_record!/bare_enum! additionally emit fn descriptor() per
+  invocation (field names + CanonicalType::type_expr); explicit
+  per-crate registries core_descriptors()/schema_descriptors() (later
+  units append their types). Agreement test in ckc-schema: rust-emitted
+  == spec-derived for every implemented type (UnicodePolicyManifest,
+  Outcome, OperationResult, registry+bounds family); reconcile drift by
+  fixing the Rust side — SPEC is authority. Read: §1.3, §1.5; canon.rs
+  macro section. Test: `cargo test -p ckc-schema descriptor_agreement`
+- [ ] M0.0.4.3 generated JSON Schema. New
+  `crates/ckc-schema/src/json_schema.rs`: per-entry canonical JSON
+  Schema document from descriptors (draft 2020-12; $defs over the entry
+  closure): §1.3 string+pattern for Id/Hash/UInt/Int, Rational object
+  schema, Text → string + x-ckc-string-policy annotation (dependent →
+  sibling field name), Set/List → array, Map → object | pair-array per
+  §1.5, Optional → omitted from required, non-bare E → oneOf
+  {tag,value}/bare-tag forms, bare E → string enum; collection bounds
+  stay out of the docs (T-Schema-Equivalence canonicalizes
+  SchemaBoundManifest separately). Canonical document bytes via direct
+  ObjectEmitter recursion (or a small canon.rs JSON-value emitter).
+  generated_json_schema_hash per entry; manifest = sorted (schema_id,
+  hash) pairs + manifest hash. Tests: every entry generates, full-doc
+  byte spot-check on a small entry, determinism. Read: §1.1 equivalence
+  paragraphs, §1.3, §1.4 policy ids, §1.5.
+  Test: `cargo test -p ckc-schema json_schema`
+- [ ] M0.0.4.4 registry rewiring + T-Schema-Equivalence gate. build.rs:
+  replace placeholders — per-entry rust_type_hash/
+  generated_json_schema_hash from the M0.0.4.1/.3 manifests;
+  tagged_union_alternatives_hash = Some(sha256 over the entry's sorted
+  reachable non-bare-alternative E descriptors), None when the closure
+  reaches none; rust_type_manifest_hash/
+  generated_json_schema_manifest_hash; canonicalization_policy_hash =
+  sha256(canonical_payload_bytes(accepted §1.4 UnicodePolicyManifest
+  fixture, ckc-core policy.rs)) per §1.2 ArtifactRef + envelope
+  artifact_hash definition. Design fork (decide + one-line SPEC
+  clarification): union-interior Text sites — FeaturePath-through-union
+  addressing for StringPolicyBinding rows (TextLiteral.value,
+  dependent_policy_field=policy) vs type-level dependent binding via
+  descriptors with binding rows staying walk-scoped. check.rs
+  check_schema_equivalence: recompute-and-compare every §1.1-listed
+  input; any disagreement → schema_authority_mismatch (v0 has no
+  version-bump path); sorted CheckReport. Fallout: build.rs placeholder
+  tests + registry-pinning tests. Gate
+  `crates/ckc-schema/tests/t_schema_equivalence.rs`: real SPEC +
+  build_v0_registry clean; perturbations (mutated entry hash, dropped
+  binding row, stale manifest/policy hash, mutated union set) reject.
+  Read: §1.1, §1.2, §1.4 fixture, §6.2 TextLiteral.
+  Gate: `cargo test -p ckc-schema --test t_schema_equivalence`
 - [ ] M0.0.5
 - [ ] M0.0.6
 - [ ] review M0.0

@@ -289,7 +289,11 @@ technically derivable but easily forgotten under token pressure.
   (termination_argument_hash §4.3+§7.1, input_hash §4.4+§9.1) resolve once
   in the primary-section unit with the second site's context loaded.
   Judgment sweeps split lexicographically; burn-downs split by section at
-  ≈5 heterogeneous fixes per session.
+  ≈5 heterogeneous fixes per session. Fifth corollary (m0.0.4 split 1→4,
+  user-directed pre-implementation): a multi-artifact equivalence unit
+  splits along artifact-layer boundaries — model+spec-derivation /
+  second-source agreement / generated-format / rewiring+checker+gate —
+  keeping the fallout-bearing rewiring+gate layer solo.
 - [2026-06-08] A missing/renamed `bare_enum!` variant surfaces its first
   rustc/RA diagnostic (E0599) at ckc-core canon.rs — the macro-definition
   site — not the real use site. Grep the variant name across crates before
@@ -302,6 +306,15 @@ technically derivable but easily forgotten under token pressure.
   dependency questions. Keep run/cert/golden/fixture trees readable as
   debugging surfaces; extend the deny list when new generated/vendored trees
   appear.
+
+- [2026-06-08] The recurring pre-implementation split directive ("the
+  upcoming unit is too large") names its target by the too-large property,
+  not by roadmap position: first verify the first unchecked unit's
+  remaining surface against code state (gates green, prerequisites
+  complete, NN% calibration); when it verifiably fits, the target is the
+  first unchecked unit that cannot fit — the next bare §11.3 row. Applied
+  2026-06-08: .2.3.2 verified wiring-only (burn-down 42/42 committed) →
+  target M0.0.4.
 
 ## Mistakes
 
