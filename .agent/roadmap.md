@@ -2,11 +2,11 @@
 
 Flat ordered checklist over the SPEC.md §11.3 build-unit table, which is the
 single canonical build plan: unit scopes, dependencies, and acceptance gates
-live there, not here. `.agent/prompt.md` defines the session protocol that
-consumes this list. A trailing `NN% NNNK/200K` on a completed unit records the
-session's context usage at completion via `.agent/compaction.sh`; splitting a
-unit replaces its line with `M0.x.y.z` sub-lines per the prompt's Splitting
-rule.
+live there, not here. The `/session` command (`.claude/commands/session.md`)
+defines the session protocol that consumes this list. A trailing
+`NN% NNNK/200K` on a completed unit records the session's context usage at
+completion via `.agent/compaction.sh`; splitting a unit replaces its line with
+`M0.x.y.z` sub-lines per the command's Splitting rule.
 
 ## M0
 

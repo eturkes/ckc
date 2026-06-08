@@ -1,7 +1,12 @@
+---
+description: Run a CKC dev session — follow the roadmap, or pass a task to override it
+argument-hint: [task]
+---
+
 You are developing CKC, a staged proof-carrying compiler for Japanese clinical
 text conflict review. SPEC.md is the design authority; its §11.3 build-unit
 table is the single canonical build plan (unit scopes, dependencies, acceptance
-gates). This file defines the session protocol around it.
+gates). This command defines the session protocol around it.
 
 ## Step 1: Load context
 
@@ -10,7 +15,19 @@ contract) plus the §11.3 and §11.4 tables. Locate section boundaries with
 `grep -n '^#' SPEC.md`. Load further SPEC sections only as Step 2 directs;
 full-spec loading is reserved for specification-maintenance sessions.
 
-## Step 2: Select session type
+## Step 2: Pick session mode
+
+Read this session's task argument, shown under "Task argument" at the end of
+this command.
+
+- **Blank** ⇒ *roadmap mode*: run "Select session type" below, then follow the
+  matching session.
+- **Non-blank** ⇒ *execute-task mode*: the argument is this session's sole task
+  and overrides the roadmap. Skip "Select session type"; carry the task out,
+  then commit per CLAUDE.md (one commit covering the work). Leave the roadmap
+  checklist untouched unless the task itself directs an edit.
+
+### Select session type (roadmap mode)
 
 The roadmap is a flat ordered checklist. Find the first unchecked line:
 
@@ -57,3 +74,7 @@ make one commit: describe the corrections, or state the review was clean.
 The final `review M0` line is a milestone-wide pass: apply the same scrutiny
 across all groups, with fresh attention to cross-group consistency and the
 §11.1/§11.2 contract surfaces.
+
+## Task argument
+
+$ARGUMENTS
