@@ -309,7 +309,58 @@ rule.
   binding row, stale manifest/policy hash, mutated union set) reject.
   Read: §1.1, §1.2, §1.4 fixture, §6.2 TextLiteral.
   Gate: `cargo test -p ckc-schema --test t_schema_equivalence`
-- [ ] M0.0.5
+- [ ] M0.0.5.1 envelope + store foundation. New crate `crates/ckc-store` (add
+  to workspace members; dep ckc-core): `src/envelope.rs` ArtifactEnvelope<T:
+  Canonical> — §1.2 9-field generic envelope (artifact_hash, schema_id,
+  schema_version, schema_hash, canonicalization_policy_hash,
+  producer_manifest_hash, replay_manifest_hash, accepted_effect_row:Set[Effect],
+  payload:T); manual Canonical via ObjectEmitter (canonical_record! is
+  non-generic) + strict Deserialize; constructor sets artifact_hash =
+  Hash::of_bytes(canonical_payload_bytes(payload)) (field outside its own hash
+  input). `src/store.rs` content-addressed path from artifact_hash (archive CAS
+  layout). Effect enum (§2) via bare_enum! in ckc-core beside outcome.rs. Defer
+  §1.2 proof_roots/source_support projection to its first semantic consumer
+  (control payloads role-exempt). Register new descriptors; keep
+  descriptor_agreement/T-Schema-Equivalence green. Tests: envelope roundtrip
+  (from_canonical_bytes over UnicodePolicyManifest), artifact_hash = payload
+  hash independent of envelope fields, store-path determinism, Effect
+  id/from_id. Read: §1.2, §2 Effect, §1.5; canon.rs ObjectEmitter.
+  Test: `cargo test -p ckc-store`
+- [ ] M0.0.5.2 runtime manifests + ValidateRuntimeManifests. ckc-store
+  `src/manifest.rs`: ToolchainManifest, ToolRecord (executable_hash/config_hash
+  optional), EnvironmentProfile (network_policy/clock_policy:Effect) via
+  canonical_record! (sets for tool_records/*_hashes). ValidateRuntimeManifests
+  (`ckc runtime validate`, §11.1: accept authored ToolchainManifest +
+  EnvironmentProfile, validate embedded ToolRecord rows) -> OperationResult,
+  sorted §1.7 diagnostics. Register descriptors; keep agreement green. Tests:
+  per-record roundtrip + optional-omission; validate accepts a well-formed
+  fixture, rejects a malformed ToolRecord (invalid). Read: §1.6 toolchain/
+  environment rows, §11.1 runtime-validate wrapper, §1.7.
+  Test: `cargo test -p ckc-store manifest`
+- [ ] M0.0.5.3 replay/producer manifests. ckc-store `src/manifest.rs`:
+  ProducerManifest, ReplayManifest, ReplayIdentityCheck, ValidationManifest via
+  canonical_record! (sets for *_hashes/accepted_effect_row); ReplayIdentity-
+  Outcome enum (§2) via bare_enum! at the ReplayIdentityCheck site
+  (schema-local). Register descriptors; keep agreement green. Tests: per-record
+  roundtrip; ReplayIdentityOutcome id/from_id; §1.6 canonical-field presence.
+  Read: §1.6 producer/replay/validation rows, §2 ReplayIdentityOutcome.
+  Test: `cargo test -p ckc-store replay`
+- [ ] M0.0.5.4 replay stratum boundary skeleton + gate. ckc-store
+  `src/replay.rs`: over a generic stratum-member view (artifact_hash,
+  replay_manifest_hash?, replay_identity_hashes, is_replay_check — no §9.2
+  Certificate dep; full ReplayIdentity recompute is M0.6.4), decide whether
+  ReplayManifest.expected_output_hashes is a closed prior issuance stratum under
+  the §1.6 boundary rule (exclude the manifest payload, members whose
+  replay_manifest_hash equals that manifest hash, the enclosing
+  ReplayIdentityCheck, and replay-checks/certificates citing it); validate
+  referenced ProducerManifest/ToolchainManifest/EnvironmentProfile hashes
+  resolve. Sorted §1.7 diagnostics. Gate
+  `crates/ckc-store/tests/t_replay_manifest_boundary.rs`
+  (T-Replay-Manifest-Boundary): synthetic RM-PRODUCER-BASE/RM-DEMO-CORE-shaped
+  stratum (A.10 boundary note) clean; perturbations (included excluded member,
+  dangling producer/toolchain/environment hash, manifest self-inclusion)
+  reject. Read: §1.6 boundary rule + ReplayIdentity steps, A.10 RM-*/RIC-*.
+  Gate: `cargo test -p ckc-store --test t_replay_manifest_boundary`
 - [ ] M0.0.6
 - [ ] review M0.0
 - [ ] M0.1.1

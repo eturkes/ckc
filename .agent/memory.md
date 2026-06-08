@@ -293,7 +293,18 @@ technically derivable but easily forgotten under token pressure.
   user-directed pre-implementation): a multi-artifact equivalence unit
   splits along artifact-layer boundaries — model+spec-derivation /
   second-source agreement / generated-format / rewiring+checker+gate —
-  keeping the fallout-bearing rewiring+gate layer solo.
+  keeping the fallout-bearing rewiring+gate layer solo. Sixth corollary
+  (m0.0.5 split 1→4, user-directed pre-implementation): a multi-schema
+  runtime/replay foundation row (generic envelope + 7 manifest records + 2
+  ops + boundary algorithm + new ckc-store crate + gate) splits along
+  data-substrate layers — generic-envelope+store foundation /
+  runtime-manifest cluster+ValidateRuntimeManifests / replay-manifest
+  cluster / boundary-algorithm+gate — isolating the manual-Canonical generic
+  envelope (first non-canonical_record! type, ObjectEmitter-hand-written) as
+  the foundation unit and keeping the algorithm+gate solo; mechanical
+  canonical_record! clusters stay light (3-4 records/unit) because each
+  record still costs a descriptor-agreement reconciliation against its
+  spec-derived S-decl.
 - [2026-06-08] A missing/renamed `bare_enum!` variant surfaces its first
   rustc/RA diagnostic (E0599) at ckc-core canon.rs — the macro-definition
   site — not the real use site. Grep the variant name across crates before
@@ -314,7 +325,8 @@ technically derivable but easily forgotten under token pressure.
   complete, NN% calibration); when it verifiably fits, the target is the
   first unchecked unit that cannot fit — the next bare §11.3 row. Applied
   2026-06-08: .2.3.2 verified wiring-only (burn-down 42/42 committed) →
-  target M0.0.4.
+  target M0.0.4; 2026-06-08(2): .4.7 verified bounded check+gate (fits,
+  already detailed) and .4.1-.4 sized last session → target M0.0.5.
 
 ## Mistakes
 
