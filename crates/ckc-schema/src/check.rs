@@ -6,9 +6,12 @@
 //! conventions (M0.0.3.4.5): [`classify_hash_fields`] assigns every
 //! walked `HashNamed`/`HashValued` row a [`HashFieldClass`] via suffix
 //! defaults plus the authored [`HASH_FIELD_EXCEPTIONS`] table;
-//! [`check_registry`] rejects `Unresolved` rows. Every issue carries
-//! [`CheckIssue::CODE`] (`referential_integrity_error`); the §8.7
-//! `Diagnostic` artifact wrapper lands with its consuming unit.
+//! [`check_registry`] rejects `Unresolved` rows. §3.2 reverse producer
+//! coverage (M0.0.3.4.6): [`producer_mapping_issues`] requires every §3.1
+//! payload to be named by a stage-table emission or the control-emission
+//! rule. Each issue carries [`CheckIssue::CODE`] or
+//! [`CheckIssue::PRODUCER_MAPPING`]; the §8.7 `Diagnostic` artifact
+//! wrapper lands with its consuming unit.
 //!
 //! Checked references: S-decl field types and E-decl alternative/sexp
 //! argument types (generic-arity and string-policy aware); tagged-union
@@ -37,19 +40,25 @@ use crate::symtab::{
     operation_tokens, reading_table, rule_table, stage_table, unit_table,
 };
 
-/// One referential-integrity finding. Ordering (line, anchor, message) is
-/// the canonical report order.
+/// One checker finding. Ordering (line, anchor, message) is the canonical
+/// report order.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CheckIssue {
     pub line: usize,
     /// Enclosing section anchor of the offending reference.
     pub anchor: String,
     pub message: String,
+    /// [`Self::CODE`] for resolution/registry issues,
+    /// [`Self::PRODUCER_MAPPING`] for §3.2 coverage issues.
+    pub code: &'static str,
 }
 
 impl CheckIssue {
-    /// §1.1 step 5 diagnostic code shared by every issue.
+    /// §1.1 step 5 diagnostic code shared by resolution/registry issues.
     pub const CODE: &'static str = "referential_integrity_error";
+    /// §3.2: a §3.1 payload names no producing operation or control
+    /// emission.
+    pub const PRODUCER_MAPPING: &'static str = "producer_mapping_error";
 }
 
 /// Sorted issues; empty means the spec resolves (§1.1 step-5 `ok`).
@@ -76,6 +85,7 @@ pub fn check_spec(text: &str) -> CheckReport {
             line,
             anchor: enclosing_anchor(decls, line),
             message,
+            code: CheckIssue::CODE,
         });
     };
 
@@ -109,6 +119,15 @@ pub fn check_spec(text: &str) -> CheckReport {
     check_inventory(decls, &table, &mut push);
     check_anchor_refs(text, &table, &mut push);
 
+    for (line, message) in producer_mapping_issues(decls) {
+        issues.push(CheckIssue {
+            line,
+            anchor: enclosing_anchor(decls, line),
+            message,
+            code: CheckIssue::PRODUCER_MAPPING,
+        });
+    }
+
     issues.sort();
     issues.dedup();
     CheckReport { issues }
@@ -128,8 +147,7 @@ fn enclosing_anchor(decls: &SpecDecls, line: usize) -> String {
 /// §1.2 hash-field conventions over a built registry+manifest pair: every
 /// walked hash leaf must classify to a non-`Unresolved`
 /// [`HashFieldClass`]. Peer of [`check_spec`]: same issue type and
-/// ordering. The §3.2 producer-mapping checker (.4.6) and step-1-2/5
-/// composition (.4.7) remain.
+/// ordering. Step-1-2/5 composition (.4.7) remains.
 pub fn check_registry(
     text: &str,
     registry: &SchemaRegistry,
@@ -161,6 +179,7 @@ fn check_registry_with(
             line,
             anchor: enclosing_anchor(decls, line),
             message,
+            code: CheckIssue::CODE,
         });
     };
 
@@ -881,6 +900,60 @@ fn check_stage_table(decls: &SpecDecls, table: &SymbolTable, push: &mut impl FnM
     }
 }
 
+/// §3.2 cross-cutting control-emission rule: payloads accepted as command
+/// wrapper/gate-runner emissions, authored inputs, or control rows within
+/// them, rather than stage-producer emissions.
+const CONTROL_EMISSIONS: [&str; 9] = [
+    "DiagnosticTag",
+    "EnvironmentProfile",
+    "FiniteFixtureManifest",
+    "FrozenConstant",
+    "ParsedQuantity",
+    "ProducerManifest",
+    "ToolRecord",
+    "ToolchainManifest",
+    "ValidationManifest",
+];
+
+/// §3.2 reverse coverage: every §3.1 inventory payload is named in a
+/// stage-table emitted-artifacts cell or by [`CONTROL_EMISSIONS`]. Cell
+/// handling extends [`resolve_artifact_cell`] token shape to qualified
+/// mentions: any type-shaped token names its payload (`admitted CKCGen`,
+/// `TerminologyResourceSet fragments`, `ResolutionTheorem artifacts` are
+/// emission mappings; item-level reading would drop them). Returns
+/// `(line, message)` rows for [`CheckIssue::PRODUCER_MAPPING`] issues,
+/// attributed to the §3.1 block like [`check_inventory`].
+fn producer_mapping_issues(decls: &SpecDecls) -> Vec<(usize, String)> {
+    // A missing stage table is check_stage_table's finding.
+    let Some(t) = stage_table(decls) else {
+        return Vec::new();
+    };
+    let emitted: BTreeSet<&str> = t
+        .rows
+        .iter()
+        .flat_map(|r| r[3].split([',', ' ']))
+        .filter(|s| is_type_name(s))
+        .collect();
+    let line = decls
+        .sections
+        .iter()
+        .find(|s| s.anchor == "3.1")
+        .map_or(0, |s| s.line);
+    decls
+        .inventory
+        .iter()
+        .filter(|name| {
+            !emitted.contains(name.as_str()) && !CONTROL_EMISSIONS.contains(&name.as_str())
+        })
+        .map(|name| {
+            (
+                line,
+                format!("payload `{name}` names no §3.2 producing operation or control emission"),
+            )
+        })
+        .collect()
+}
+
 /// §11.1 command table: every pipeline operation resolves to a §3.2 stage
 /// operation (or a `T-*` acceptance gate); primary emitted artifacts
 /// resolve.
@@ -1187,6 +1260,7 @@ mod tests {
     /// Column-check sensitivity: a renamed §3.2 emitted artifact and a
     /// renamed §11.1 pipeline operation each produce exactly the targeted
     /// issue (the cell checks scan real rows rather than skipping them).
+    /// The renamed artifact additionally unmaps its payload.
     #[test]
     fn check_table_cell_perturbations_reject() {
         let artifact = spec_text().replace(
@@ -1200,7 +1274,10 @@ mod tests {
                 .iter()
                 .map(|i| i.message.as_str())
                 .collect::<Vec<_>>(),
-            ["unresolved artifact name `AnalyzerManifezt`"]
+            [
+                "payload `AnalyzerManifest` names no §3.2 producing operation or control emission",
+                "unresolved artifact name `AnalyzerManifezt`"
+            ]
         );
 
         let operation =
@@ -1214,6 +1291,21 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["unresolved pipeline operation `Replay`"]
         );
+    }
+
+    /// §3.2 reverse coverage: dequalifying a payload's only stage-table
+    /// mention to prose rejects with `producer_mapping_error` (and nothing
+    /// else — the prose cell itself stays resolution-clean).
+    #[test]
+    fn check_producer_mapping_unmapped_payload_rejects() {
+        let text = spec_text().replace("| obs_pattern | PatternObs", "| obs_pattern | patterns");
+        let report = check_spec(&text);
+        assert_eq!(
+            messages(&report),
+            ["payload `PatternObs` names no §3.2 producing operation or control emission"]
+        );
+        assert_eq!(report.issues[0].code, CheckIssue::PRODUCER_MAPPING);
+        assert_eq!(report.issues[0].anchor, "3.1");
     }
 
     fn messages(report: &CheckReport) -> Vec<&str> {

@@ -221,7 +221,7 @@ rule.
   build_v0_registry clean; synthetic unclassified-suffix +
   lingering-Unresolved perturbations reject. Read: §1.2 hash conventions,
   §9.3 WordingGateRecord. Test: `cargo test -p ckc-schema check`
-- [ ] M0.0.3.4.6 producer-mapping checker. check.rs §3.2 reverse coverage:
+- [x] M0.0.3.4.6 50% 100K/200K producer-mapping checker. check.rs §3.2 reverse coverage:
   every SpecDecls.inventory payload named in a stage-producer TTable
   emitted-artifacts cell (reuse resolve_artifact_cell name handling) or in
   the authored control-emission allowlist (ProducerManifest,
