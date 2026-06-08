@@ -357,7 +357,13 @@ technically derivable but easily forgotten under token pressure.
   row, split 1→3); 2026-06-08(4): chain .4.7/.4.1-4/.5.1-4/.6.1-3 all
   detailed-and-fitting → target M0.1.1 (first bare M0.1 row, split 1→2
   along schema-layer / Residual+projection+gate); 2026-06-08(5): chain
-  extends through .1.1.1-2 → target M0.1.2 (next bare row, split 1→5).
+  extends through .1.1.1-2 → target M0.1.2 (next bare row, split 1→5); 2026-06-08(6): chain extends
+  through .1.2.1-5 → target M0.1.3 (next bare row, split 1→6: §8.7
+  diagnostic-family / region-schemas / HandleBoundOverflow / closure-engine
+  +contains / relational-closure+residuals / cert-admissibility+fixture+gate
+  — a deferred cross-cutting op (HandleBoundOverflow, first consumer here)
+  and its prerequisite §8.7 schema family each become their own sub-unit
+  ahead of the closure that consumes them).
 - [2026-06-08] From M0.1 on, implementing a §3.1-inventory schema in Rust
   needs NO build.rs/registry/checker edit: build_v0_registry, spec-derived
   descriptors, hash-classification, and producer-mapping all parse SPEC.md,

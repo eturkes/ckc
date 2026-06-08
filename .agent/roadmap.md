@@ -515,7 +515,85 @@ completion via `.agent/compaction.sh`; splitting a unit replaces its line with
   raw_text, SRC-PI raw-text artifact disallowed, reordered Set breaking canonical
   bytes) reject. Read: §4.2 P-SG predicates, §4.1 allowed_artifacts, §8.7 Residual.
   Gate: `cargo test -p ckc-source --test t_sourcegraph_canonical`
-- [ ] M0.1.3
+- [ ] M0.1.3.1 §8.7 diagnostic family schemas. Extend ckc-core's shared-diagnostics
+  module (beside Residual/ResidualClass, M0.1.1.2; `diagnostic.rs`): Diagnostic
+  (subject_hash:Hash? optional), DiagnosticRef, Ambiguity (alternatives:Set[Hash]),
+  Incoherence (subject_hashes:Set[Hash]) via canonical_record! (all source_regions:
+  Set[RegionId], proof_roots:Set[ProofId]); AmbiguityClass (multiple_readings|
+  multiple_terms), IncoherenceClass (functional_key_collision|
+  mutually_exclusive_term_mapping|incompatible_generator_outputs) via bare_enum!.
+  Append descriptors to core_descriptors(); keep ckc-schema descriptor_agreement green
+  (rust-emitted == spec-derived, SPEC authority). §3.1 inventory rows already covered by
+  the spec-derived registry/bounds/hash-class/producer-map (M0.0.3/.4) — no
+  build.rs/checker edit. Tests: per-record roundtrip + Diagnostic optional-omission, enum
+  id/from_id, agreement green. Read: §8.7 schemas, §2 AmbiguityClass/IncoherenceClass.
+  Test: cargo test -p ckc-core diagnostic
+- [ ] M0.1.3.2 §4.3 region schemas. New ckc-source `src/region.rs` (lib.rs
+  `pub mod region;`): RegionMember tagged union (node:Id|span:Id|cell:Id|anchor:Id) —
+  first source-domain union, hand-written {tag,value} Canonical + strict Deserialize +
+  descriptor (AltRepr typed alternatives), following outcome.rs Outcome; SourceRegion
+  (region_id:RegionId from M0.1.1.2, seed_members/closed_members:Set[RegionMember],
+  closure_certificate_hash:Hash), RegionClosureCertificate (added_member_batches:
+  List[Set[RegionMember]], residual_hashes:Set[Hash]) via canonical_record!. Append
+  descriptors to source_descriptors(); keep descriptor_agreement green. §3.1 inventory
+  rows already covered (M0.0.3/.4) — no build.rs/checker edit. Tests: per-record
+  roundtrip, RegionMember tag-encoding spot-check, agreement green. Read: §4.3 schemas,
+  §1.5 union rule. Test: cargo test -p ckc-source region
+- [ ] M0.1.3.3 HandleBoundOverflow dispatch (first §8.7 overflow consumer). New ckc-schema
+  `src/overflow.rs` (lib.rs `pub mod overflow;`): handle_bound_overflow(
+  &SchemaCollectionBound, subject_hash:Hash, candidate_members, producer_id:Id) ->
+  internal primary (invalid|residual|ambiguity|incoherence) + the disposition's exact
+  emitted artifacts (M0.1.3.1 Diagnostic + Residual/Ambiguity/Incoherence per the §1.1
+  table); overflow_members = first max_items+1 by canonical_sort_key, overflow_member_hash
+  = artifact_hash else sha256(canonical_payload_bytes), canonical text `bound_overflow
+  schema=<schema_id> path=<feature_path> max=<max_items> observed=<count>
+  producer=<producer_id>` (`/`-joined path); overflow_source_regions/overflow_proof_roots
+  = {} (§1.2 projection deferred to its first semantic consumer; "unresolved projections
+  contribute {}"). Algorithm-internal (absent from §3.1 inventory) — no
+  descriptor/registry edit. Tests: each BoundOverflowDisposition arm emits the table's
+  primary+artifacts+code over a synthetic overflowing bound, diagnostic-text byte
+  spot-check, overflow_members retention count. Read: §1.1 HandleBoundOverflow + emission
+  table, §8.7 disposition artifacts. Test: cargo test -p ckc-schema overflow
+- [ ] M0.1.3.4 source_region_closure engine + contains-closure + certificate construction.
+  ckc-source dep ckc-schema (add); new `src/closure.rs` (lib.rs `pub mod closure;`):
+  source_region_closure(&SourceGraph, seed:Set[RegionMember], &SchemaBoundManifest) ->
+  OperationResult[SourceRegion] over §4.3 steps 1 (missing seed -> Residual(class=
+  unsupported_construction, code=missing_region_member)), 2 (finite universe U), 3-4 own
+  node/span/cell/anchor + contains-edge heading/section/paragraph/list/list_item/table/
+  row/column/document ancestors, 6 (R⊆U), 7 (SourceRegion seed_members/closed_members
+  bounds via handle_bound_overflow), 8 (closed_members sorted by canonical_sort_key);
+  build RegionClosureCertificate (possible_member_count=|U|, iterations,
+  added_member_batches, seed_members_digest=sha256(canonical_payload_bytes(seed)),
+  residual_hashes). Tests over fixture_source_graph() (M0.1.2.4): clean containment
+  closure from U1/U17 span seeds reaches exact closed_members + finite-U termination,
+  missing-seed residual, certificate batches ∪ seed = closed_members. Read: §4.3 steps
+  1-8, §4.2 contains edge, §1.1 overflow convention. Test: cargo test -p ckc-source closure
+- [ ] M0.1.3.5 relational closure + table/caption/footnote/cross-reference residuals.
+  closure.rs step-4 relational expansion — table_coordinate/header_of row+column header
+  cells per table cell, caption_of table caption, footnote_of body+target,
+  crossref_targets target, continuation targets + continuation-linked adjacent span — and
+  step-5 earliest-by-source_order_key residual: unsupported_table_structure (table/
+  caption/footnote/continuation failure), unsupported_cross_reference (crossref failure);
+  step-6 out-of-U contribution. Tests over fixture_source_graph(): U3 table closure (cells
+  -> row/column headers, caption U15 -> U3), U14 crossref -> U3, U16 footnote, U18 dangling
+  crossref -> unsupported_cross_reference, U19 unformatted table ->
+  unsupported_table_structure. Read: §4.3 steps 4-6, §4.2 edge kinds, §8.7 Residual, A.1
+  U14-U19. Test: cargo test -p ckc-source closure
+- [ ] M0.1.3.6 certificate admissibility + region fixture + gate (completes
+  T-Region-Closure). ckc-source `src/check.rs`: validate_region_certificate(
+  &RegionClosureCertificate, &SourceRegion, &SourceGraph) -> admissible iff
+  seed_members_digest matches, replaying source_region_closure over the certified graph
+  reproduces added_member_batches, and seed_members ∪ batches = closed_members. fixture.rs:
+  fixture_source_regions() — seeds + closed SourceRegion + RegionClosureCertificate for
+  the gate units (clean U1/U17 + table U3/caption U15/crossref U14/footnote U16 + residual
+  U18/U19); exhaustive REG-U1..U27 demo enumeration rides M0.6.5. Gate
+  `crates/ckc-source/tests/t_region_closure.rs` (T-Region-Closure): clean closures reach
+  exact closed_members with admissible certificates, U18 -> unsupported_cross_reference,
+  U19 -> unsupported_table_structure; perturbations (missing seed member, tampered
+  added_member_batches breaking admissibility, dropped required header/caption/footnote/
+  crossref target, unsorted closed_members) reject. Read: §4.3 certificate admissibility,
+  §8.7 Residual, A.1 U14-U19, A.10 source-region expectations.
+  Gate: cargo test -p ckc-source --test t_region_closure
 - [ ] review M0.1
 - [ ] M0.2.1
 - [ ] M0.2.2
