@@ -391,16 +391,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "external late-interaction manifest bytes (evidence-discovery trace)",
     ),
     (
-        "left_clause_hash",
-        HashFieldClass::Unresolved,
-        "normalized clause is not an accepted artifact; hashing rule undefined (§8.1; family: right_clause_hash)",
-    ),
-    (
-        "minimality_proof_hash",
-        HashFieldClass::Unresolved,
-        "no minimality-proof schema exists and §8.1 ctx_compatible never constructs one; intended referent undefined",
-    ),
-    (
         "normalization_table_hash",
         HashFieldClass::RawRecordedBytes,
         "Unicode normalization-table bytes; UnicodePolicyManifest supplies them (M0.0.1 table fingerprint)",
@@ -471,11 +461,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "identity byte-source undefined; no §1.2 convention covers hashed-identity fields (§6.4)",
     ),
     (
-        "right_clause_hash",
-        HashFieldClass::Unresolved,
-        "normalized clause is not an accepted artifact; hashing rule undefined (§8.1; family: left_clause_hash)",
-    ),
-    (
         "rust_type_hash",
         HashFieldClass::FieldSpecific,
         "§1.1 T-Schema-Equivalence canonicalize-and-compare computation; M0.0.4 implements",
@@ -519,11 +504,6 @@ pub const HASH_FIELD_EXCEPTIONS: &[(&str, HashFieldClass, &str)] = &[
         "witness_hash",
         HashFieldClass::FieldSpecific,
         "§8.5/§8.6 fix the binding per kind: WitnessContext/ConstraintCoreWitness artifact refs, except terminology_mapping_incoherence digests the referenced incoherence-hash set",
-    ),
-    (
-        "witness_payload_hash",
-        HashFieldClass::Unresolved,
-        "referent undefined: sole spec mention is the S-decl field itself (§9.1)",
     ),
 ];
 
@@ -1301,7 +1281,7 @@ mod tests {
 
     /// Totality + per-class path counts over the real SPEC: suffix
     /// defaults make every HashNamed walk row classify. Counts track the
-    /// .5.2.x burn-down (through .5.2.2.2: 27 of 42 names done); .5.2.3.2
+    /// .5.2.x burn-down (through .5.2.2.3: 31 of 42 names done); .5.2.3.2
     /// finalizes with an empty Unresolved class.
     #[test]
     fn check_hash_real_spec_totality_and_counts() {
@@ -1313,18 +1293,18 @@ mod tests {
             .filter(|r| r.leaf == WalkedLeaf::HashNamed)
             .count();
         assert_eq!(rows.len(), hash_named);
-        assert_eq!(rows.len(), 236);
+        assert_eq!(rows.len(), 234);
 
         let names: BTreeSet<&str> = rows.iter().map(terminal).collect();
-        assert_eq!(names.len(), 152);
+        assert_eq!(names.len(), 150);
         assert_eq!(names.iter().filter(|n| **n < "m").count(), 74);
 
         let count = |class: HashFieldClass| rows.iter().filter(|r| r.class == class).count();
         assert_eq!(count(HashFieldClass::ArtifactRef), 168);
-        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 13);
+        assert_eq!(count(HashFieldClass::NamedPayloadDigest), 15);
         assert_eq!(count(HashFieldClass::RawRecordedBytes), 28);
         assert_eq!(count(HashFieldClass::FieldSpecific), 12);
-        assert_eq!(count(HashFieldClass::Unresolved), 15);
+        assert_eq!(count(HashFieldClass::Unresolved), 11);
     }
 
     /// Exception-table hygiene: rows sorted and unique, each names a
@@ -1499,18 +1479,13 @@ mod tests {
             ),
             (
                 "witness_context",
-                "right_clause_hash",
-                HashFieldClass::Unresolved,
+                "right_clause_digest",
+                HashFieldClass::NamedPayloadDigest,
             ),
             (
                 "semantic_policy_set",
                 "output_exclusions/left_value/reading_digest",
                 HashFieldClass::NamedPayloadDigest,
-            ),
-            (
-                "verifier_witness",
-                "witness_payload_hash",
-                HashFieldClass::Unresolved,
             ),
         ] {
             assert_eq!(

@@ -2062,7 +2062,7 @@ E ContextNormalizeResult = normalized:ContextExpr | unsupported:DiagnosticRef
 ```text
 E ContextCompatibility = compatible:WitnessContext | incompatible | unsupported:DiagnosticRef
 
-S WitnessContext(left_clause_hash:Hash,right_clause_hash:Hash,atoms:Set[ContextAtom],assignments:Set[WitnessAssignment],minimality_proof_hash:Hash,source_support:Set[RegionId],proof_roots:Set[ProofId])
+S WitnessContext(left_clause_digest:Hash,right_clause_digest:Hash,atoms:Set[ContextAtom],assignments:Set[WitnessAssignment],source_support:Set[RegionId],proof_roots:Set[ProofId])
 
 E WitnessAssignmentValue = reading_ref:ReadingRef | rational:Rational | text:Text<semantic_ja>
 
@@ -2140,7 +2140,7 @@ S NamedConstraintAtom(atom_id:Id,atom:ContextAtom,source_region_ids:Set[RegionId
 S ConstraintCoreWitness(named_atoms:Set[NamedConstraintAtom],core_atom_ids:Set[Id],internal_minimality_order_hash:Hash,external_backend_core_hash:Hash?,proof_roots:Set[ProofId])
 ```
 
-A `WitnessContext` is canonical for the selected clause pair: its atom set is the duplicate-free union of the pair after normalization, and deleting any atom changes the represented conjunction. `minimality_proof_hash` records the selected pair key, normalized atom hashes, deterministic witness assignments, source-support hash, and proof-root hash. Inconsistent cores are minimized by deterministic deletion: traverse atoms in canonical order, remove an atom when inconsistency is preserved, and stop after one complete pass over the sorted list. For monotone inconsistency, this fixed deletion pass yields an inclusion-minimal core for that traversal because any atom that was necessary in a superset remains necessary after later deletions.
+A `WitnessContext` is canonical for the selected clause pair: its atom set is the duplicate-free union of the pair after normalization, and deleting any atom changes the represented conjunction. `left_clause_digest`/`right_clause_digest` name the selected pair: each is `sha256(canonical_payload_bytes(clause))` over the corresponding normalized `ContextClause`, an in-memory normalization value, never an accepted artifact. Selection determinism rides the payload fields themselves; the kernel checker re-evaluates `ctx_compatible` directly. Inconsistent cores are minimized by deterministic deletion: traverse atoms in canonical order, remove an atom when inconsistency is preserved, and stop after one complete pass over the sorted list. For monotone inconsistency, this fixed deletion pass yields an inclusion-minimal core for that traversal because any atom that was necessary in a superset remains necessary after later deletions.
 
 ### 8.2 Action normalization and sameness
 
@@ -2527,14 +2527,14 @@ S KernelFiniteCheckInput(subject_hash:Hash,subject_kind:KernelSubjectKind,proof_
 
 E KernelSubjectKind = conflict_theorem | factual_inconsistency_theorem | residual | ambiguity | incoherence | diagnostic | certificate | review_report | replay_identity_check
 
-S VerifierWitness(witness_id:Id,subject_hash:Hash,result:VerifierResult,checked_predicates:Set[Id],witness_payload_hash:Hash?,diagnostic_hashes:Set[Hash],symbol_source_map_hash:Hash,replay_manifest_hash:Hash,proof_roots:Set[ProofId])
+S VerifierWitness(witness_id:Id,subject_hash:Hash,result:VerifierResult,checked_predicates:Set[Id],diagnostic_hashes:Set[Hash],symbol_source_map_hash:Hash,replay_manifest_hash:Hash,proof_roots:Set[ProofId])
 
 S SymbolSourceMap(rows:Set[SymbolSourceMapRow])
 
 S SymbolSourceMapRow(symbol_id:Id,symbol_kind:Id,defining_section_anchor:Id,defining_artifact_hash:Hash?)
 ```
 
-`SymbolSourceMap` is an accepted schema-control artifact emitted by `kernel_finite_checker`. `VerifierWitness.subject_hash` is the checked subject's envelope `artifact_hash` (the `KernelFiniteCheckInput.subject_hash` value); the full check-input set is pinned by `replay_manifest_hash`. `VerifierWitness.symbol_source_map_hash` is the referenced `SymbolSourceMap` artifact hash. `SymbolSourceMap.rows` is the sorted set of `{symbol_id, symbol_kind, defining_section_anchor, defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, and gate referenced while checking the subject. Section anchors are the stable headings in this specification, encoded as identifier strings such as `section-8-5`. Artifact-backed symbols include their accepted artifact hash; specification-only symbols omit it.
+`SymbolSourceMap` is an accepted schema-control artifact emitted by `kernel_finite_checker`. `VerifierWitness.subject_hash` is the checked subject's envelope `artifact_hash` (the `KernelFiniteCheckInput.subject_hash` value); the full check-input set is pinned by `replay_manifest_hash`. Dispatch re-evaluation compares recomputed values against the subject's stored witness artifacts in place; outcomes ride `result` and `diagnostic_hashes`, never a separate persisted payload. `VerifierWitness.symbol_source_map_hash` is the referenced `SymbolSourceMap` artifact hash. `SymbolSourceMap.rows` is the sorted set of `{symbol_id, symbol_kind, defining_section_anchor, defining_artifact_hash?}` for every predicate, enum variant, schema id, policy row key, terminology relation kind, proof rule, and gate referenced while checking the subject. Section anchors are the stable headings in this specification, encoded as identifier strings such as `section-8-5`. Artifact-backed symbols include their accepted artifact hash; specification-only symbols omit it.
 
 `kernel_finite_checker` checks:
 

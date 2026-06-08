@@ -195,7 +195,7 @@ rule.
   self-referential), slot_value_hash (§7.5). Procedure per .2.1.1. Read:
   §1.2 hash conventions + each name's S-decl context.
   Test: `cargo test -p ckc-schema check_hash`
-- [ ] M0.0.3.4.5.2.2.3 hash-defect burn-down: §8.1/§9.1 cluster. Resolve 4
+- [x] M0.0.3.4.5.2.2.3 51% 102K/200K hash-defect burn-down: §8.1/§9.1 cluster. Resolve 4
   names: left_clause_hash + right_clause_hash (one normalized-clause fix),
   minimality_proof_hash (§8.1 ctx_compatible constructs none),
   witness_payload_hash (§9.1 VerifierWitness, sole spec mention).
