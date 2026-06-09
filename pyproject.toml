@@ -1,0 +1,6 @@
+# pyproject.toml — uv-managed Python project (SPEC §5-6). Dependencies, the `ckc`
+# console-script entrypoint, [build-system], and uv.lock are authored by their
+# build units (e.g. ckc-cli, adapter/runner units).
+[project]
+name = "ckc"
+version = "0.0.0"

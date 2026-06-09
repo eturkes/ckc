@@ -1,0 +1,6 @@
+# Cargo.toml — Rust workspace root (SPEC §5-6). Member crates and their manifests
+# are authored by their build units (core-ids -> crates/ckc-core,
+# smt-emit -> crates/ckc-smt, corecli -> crates/ckc-core-cli); resolver/edition
+# and Cargo.lock are established then.
+[workspace]
+members = []

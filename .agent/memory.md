@@ -23,7 +23,16 @@ technically derivable but easily forgotten under token pressure.
 
 ## Lessons
 
-(empty — populated as new development surfaces durable, non-redundant lessons.)
+- [2026-06-09] Work-unit sizing calibration (transferred from `archive/spec02`
+  roadmap `NN%` annotations + memory corollaries, which hold the full detail).
+  Target one conceptual deliverable + one gate per unit, finishable AND
+  committable in one context window with margin; prefer more, smaller units.
+  Empirical anchors: canonical JSON is a three-unit deliverable (writer core /
+  sort-keys+collections / unions+strict-reading+hash; the last ran 86%); a unit
+  that both implements a nontrivial algorithm AND authors a per-row table splits
+  in two; registry entry *types* alone fit one unit (~69%); crate-foundation
+  units run hot (~81%). Used to size the M1 seed batch. Calibrate finer JIT
+  splits from the actual `NN%` of neighbouring units once they exist.
 
 ## Mistakes
 

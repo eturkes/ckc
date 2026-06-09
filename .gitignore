@@ -1,0 +1,20 @@
+# Agent/tooling artifacts (Headroom leaves .serena/; see CLAUDE.md)
+.serena/
+
+# Rust build output (Cargo.lock is committed, not ignored)
+target/
+
+# Python (uv.lock is committed, not ignored)
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Generated corpus inputs and run outputs (SPEC §6); commit only when license-safe
+/corpus/raw/*
+!/corpus/raw/.gitkeep
+/runs/*
+!/runs/.gitkeep
