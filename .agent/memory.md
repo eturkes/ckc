@@ -55,6 +55,13 @@ technically derivable but easily forgotten under token pressure.
   so the set persists across fresh checkouts. Apply this whenever a needed
   Serena LSP isn't enabled.
 
+- [2026-06-10] No gate enforces `rustfmt` or `clippy` — unit gates are
+  `cargo test`, which ignores both — so `core-ids` landed fmt-dirty and
+  `core-strings` folded the one-time reformatting into its commit. Always run
+  `cargo fmt` and `cargo clippy --workspace --all-targets -- -D warnings` before
+  staging a Rust unit, so drift and lints never accumulate for the `review` line
+  to sweep.
+
 ## Mistakes
 
 (empty — populated as sessions record after-the-fact corrections.)
