@@ -43,7 +43,7 @@ JIT-split notes for their Implement sessions.
   `view_text`) as deterministic normalizers. Files:
   `crates/ckc-core/src/strings.rs`. Reading: SPEC §10. Gate:
   `cargo test -p ckc-core`.
-- [ ] core-canon-writer: canonical JSON writer core — byte-sorted object fields,
+- [x] core-canon-writer 64% 127K/200K: canonical JSON writer core — byte-sorted object fields,
   optional-omit, null/unknown rejection, integers as decimal strings, rationals
   as exact-reduced objects, strings under declared policy. Files:
   `crates/ckc-core/src/canon.rs`. Reading: SPEC §10, §9. Gate:
