@@ -71,6 +71,21 @@ technically derivable but easily forgotten under token pressure.
   variant/field region with `replace_content` instead. Recurs with the
   derive-heavy enums and envelope/IR structs still ahead.
 
+- [2026-06-10] M1 sizing recalibration (the core-canon-hash overrun plus a
+  backlog sweep). The spec02 "canonical JSON = three units" anchor undercounted:
+  its third unit (unions + strict-reading + hash, 86% in spec02) was projected to
+  overrun a 200K window here, so canonical JSON is FIVE units — writer /
+  collections / unions / strict-reader / hash, each ~62-66%. The seed batch
+  likewise under-decomposed every unit that stacks a crate-foundation (~81%
+  alone), a five-layer/recursive type family, or an (algorithm + second authored
+  artifact) pair: core-ir (~120%+: IRBundle = five field-rich layers), smt-emit
+  (>100%: new crate + CompiledArtifact + SMT emission + assertion_map), and
+  corecli (~115-130%: new crate + full-surface schema export + six ops) all
+  projected over one window and were pre-split into `<id>.z` lines. Rule: split
+  such stacks BEFORE scheduling; reserve JIT-splitting for fine calibration of
+  hot-but-fitting single-deliverable units (~70-85%, one gate: core-enums-
+  envelope, core-plans, core-registry-types, registry-validate, registry-seed).
+
 ## Mistakes
 
 (empty — populated as sessions record after-the-fact corrections.)
