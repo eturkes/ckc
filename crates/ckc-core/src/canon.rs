@@ -3,9 +3,11 @@
 //! [`canonical_payload_bytes`] is the single authority that turns a typed value
 //! into the deterministic UTF-8 bytes hashed into an artifact's `content_hash`.
 //! `core-canon-writer` delivered the scalar + object writer core,
-//! `core-canon-collections` added the array, set, and map rules, and
-//! `core-canon-unions` adds tagged unions; strict reading and the content hash
-//! itself are layered on by later units.
+//! `core-canon-collections` added the array, set, and map rules,
+//! `core-canon-unions` added tagged unions, and `core-canon-reader` adds the
+//! strict inverse ([`read_canonical`], [`CanonRead`], [`CanonReadError`]) that
+//! admits only these bytes; the content hash itself is layered on by a later
+//! unit.
 //!
 //! ```text
 //! object   field names sorted by UTF-8 byte order; duplicate names rejected
@@ -384,6 +386,474 @@ pub fn emit_union<V: Canonical>(out: &mut Vec<u8>, tag: &str, value: &V) -> Resu
     obj.finish(out)
 }
 
+// ---------------------------------------------------------------------------
+// Strict canonical reading (SPEC §10) — the writer's inverse
+// ---------------------------------------------------------------------------
+
+/// Failure while strictly reading canonical bytes (SPEC §10). Every variant
+/// marks an encoding the writer never produces, so [`read_canonical`] admits
+/// exactly the canonical form and nothing else.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CanonReadError {
+    /// A structural byte was missing or wrong; the `&str` names what was
+    /// expected (e.g. `":"`, `"}"`, `"["`).
+    Syntax(&'static str),
+    /// Input ended in the middle of a value.
+    Eof,
+    /// Bytes remained after the top-level value (canonical bytes are exact).
+    Trailing,
+    /// A non-canonical JSON token sat where a value was expected — a bare number,
+    /// or `null`/`true`/`false`. Canonical form encodes integers as strings and
+    /// rationals as objects and never emits null or booleans.
+    Token,
+    /// A string was not in canonical form: a shorthand or non-minimal escape, an
+    /// unescaped control byte, or invalid UTF-8. The `&str` notes which.
+    Str(&'static str),
+    /// An integer string was not canonical decimal (leading zero, `+`, or `-0`).
+    Integer(String),
+    /// An object carried a field no type expected (also how a duplicate or an
+    /// out-of-order field surfaces — it appears where none belongs).
+    UnknownField(String),
+    /// A required field was absent, or the next field did not match it.
+    MissingField(&'static str),
+    /// Set or map elements were not strictly ascending by [`canonical_sort_key`]
+    /// (covering both mis-ordering and a repeated element).
+    Unsorted,
+    /// A rational object was not exact-reduced with a positive denominator.
+    RationalNotReduced,
+    /// A string under a declared policy was not already normalized to that
+    /// policy's canonical bytes.
+    Unnormalized(StringPolicy),
+    /// A parsed value failed its own grammar (`Id`, `Hash`, or a string policy).
+    Policy(ValidationError),
+}
+
+impl fmt::Display for CanonReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CanonReadError::Syntax(w) => write!(f, "expected {w}"),
+            CanonReadError::Eof => write!(f, "unexpected end of input"),
+            CanonReadError::Trailing => write!(f, "trailing bytes after canonical value"),
+            CanonReadError::Token => write!(f, "non-canonical JSON token at a value position"),
+            CanonReadError::Str(w) => write!(f, "non-canonical string: {w}"),
+            CanonReadError::Integer(s) => write!(f, "non-canonical integer string: {s:?}"),
+            CanonReadError::UnknownField(n) => write!(f, "unexpected object field: {n:?}"),
+            CanonReadError::MissingField(n) => write!(f, "missing object field: {n:?}"),
+            CanonReadError::Unsorted => write!(f, "set/map elements not strictly ascending"),
+            CanonReadError::RationalNotReduced => write!(f, "rational not exact-reduced"),
+            CanonReadError::Unnormalized(p) => write!(f, "string not normalized under {p:?}"),
+            CanonReadError::Policy(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for CanonReadError {}
+
+impl From<ValidationError> for CanonReadError {
+    fn from(e: ValidationError) -> Self {
+        CanonReadError::Policy(e)
+    }
+}
+
+/// Re-emitting a value just read can in principle surface a writer error; fold it
+/// into the reader's domain so the ordering checks (which re-emit each element to
+/// derive its sort key) compose with `?`.
+impl From<CanonError> for CanonReadError {
+    fn from(e: CanonError) -> Self {
+        match e {
+            CanonError::Policy(v) => CanonReadError::Policy(v),
+            CanonError::DuplicateField(n) | CanonError::DuplicateMapKey(n) => {
+                CanonReadError::UnknownField(n)
+            }
+        }
+    }
+}
+
+/// A cursor over canonical bytes that [`CanonRead`] implementations pull from.
+/// Callers normally go through [`read_canonical`] rather than driving it.
+pub struct Reader<'a> {
+    input: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Reader<'a> {
+    /// Open a cursor at the first byte of `input`.
+    pub fn new(input: &'a [u8]) -> Self {
+        Reader { input, pos: 0 }
+    }
+
+    /// The next byte without consuming it.
+    fn peek(&self) -> Option<u8> {
+        self.input.get(self.pos).copied()
+    }
+
+    /// Consume and return the next byte, or fail at end of input.
+    fn bump(&mut self) -> Result<u8, CanonReadError> {
+        let b = self.peek().ok_or(CanonReadError::Eof)?;
+        self.pos += 1;
+        Ok(b)
+    }
+
+    /// Consume `b`, or fail with `ctx` naming what was expected.
+    fn expect(&mut self, b: u8, ctx: &'static str) -> Result<(), CanonReadError> {
+        if self.peek() == Some(b) {
+            self.pos += 1;
+            Ok(())
+        } else {
+            Err(CanonReadError::Syntax(ctx))
+        }
+    }
+
+    /// True once every byte has been consumed.
+    fn at_end(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+}
+
+/// Strictly read a `T` from canonical bytes, requiring the whole input to be
+/// consumed (SPEC §10): the inverse of [`canonical_payload_bytes`]. Any
+/// deviation from the writer's encoding is rejected with a [`CanonReadError`].
+pub fn read_canonical<T: CanonRead>(bytes: &[u8]) -> Result<T, CanonReadError> {
+    let mut r = Reader::new(bytes);
+    let value = T::read(&mut r)?;
+    if !r.at_end() {
+        return Err(CanonReadError::Trailing);
+    }
+    Ok(value)
+}
+
+/// Type-guided strict reading (SPEC §10): the inverse of [`Canonical`]. A value
+/// pulls exactly its canonical bytes from the [`Reader`], rejecting every other
+/// encoding; composite values drive their fields through [`ObjectReader`].
+pub trait CanonRead: Sized {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError>;
+}
+
+/// Classify a wrong leading byte where a value was expected: a bare number,
+/// `null`, `true`, or `false` start is a non-canonical [`CanonReadError::Token`];
+/// anything else is a structural mismatch against `expected`.
+fn token_or_syntax(b: u8, expected: &'static str) -> CanonReadError {
+    match b {
+        b'-' | b'0'..=b'9' | b'n' | b't' | b'f' => CanonReadError::Token,
+        _ => CanonReadError::Syntax(expected),
+    }
+}
+
+/// Read exactly four lowercase-hex digits, returning their value.
+fn read_hex4(r: &mut Reader<'_>) -> Result<u32, CanonReadError> {
+    let mut cp = 0u32;
+    for _ in 0..4 {
+        let v = match r.bump()? {
+            d @ b'0'..=b'9' => d - b'0',
+            d @ b'a'..=b'f' => d - b'a' + 10,
+            _ => return Err(CanonReadError::Str("escape needs lowercase hex")),
+        };
+        cp = cp * 16 + u32::from(v);
+    }
+    Ok(cp)
+}
+
+/// Read a canonical JSON string `"…"` and return its decoded text, admitting
+/// only the writer's minimal escaping: `\"`, `\\`, and `\u00xx` (lowercase hex)
+/// for U+0000..U+001F. Shorthand escapes (`\n`), `\u` escapes for scalars that
+/// pass through raw, uppercase hex, unescaped control bytes, and invalid UTF-8
+/// are each rejected — one representation per string.
+pub fn read_string(r: &mut Reader<'_>) -> Result<String, CanonReadError> {
+    match r.peek() {
+        Some(b'"') => r.pos += 1,
+        Some(b) => return Err(token_or_syntax(b, "\"")),
+        None => return Err(CanonReadError::Eof),
+    }
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        match r.bump()? {
+            b'"' => break,
+            b'\\' => match r.bump()? {
+                b'"' => buf.push(b'"'),
+                b'\\' => buf.push(b'\\'),
+                b'u' => {
+                    let cp = read_hex4(r)?;
+                    if cp > 0x1f {
+                        return Err(CanonReadError::Str("non-minimal \\u escape"));
+                    }
+                    buf.push(cp as u8);
+                }
+                _ => return Err(CanonReadError::Str("unknown escape")),
+            },
+            0x00..=0x1f => return Err(CanonReadError::Str("unescaped control byte")),
+            b => buf.push(b),
+        }
+    }
+    String::from_utf8(buf).map_err(|_| CanonReadError::Str("invalid UTF-8"))
+}
+
+/// Read a canonical integer: a string token holding a canonical decimal (SPEC
+/// §10 integers are decimal strings, never bare JSON numbers). A leading zero,
+/// `+`, or `-0` fails [`CanonReadError::Integer`]; a bare number fails
+/// [`CanonReadError::Token`].
+pub fn read_int(r: &mut Reader<'_>) -> Result<BigInt, CanonReadError> {
+    let s = read_string(r)?;
+    let value: BigInt = s.parse().map_err(|_| CanonReadError::Integer(s.clone()))?;
+    if value.to_string() != s {
+        return Err(CanonReadError::Integer(s));
+    }
+    Ok(value)
+}
+
+/// Read a canonical string and confirm it is already normalized under `policy`
+/// (SPEC §10 strings carry their declared policy's bytes). A string whose
+/// normalization differs, or which fails `identifier_ascii`'s grammar, is
+/// rejected.
+pub fn read_string_policy(
+    r: &mut Reader<'_>,
+    policy: StringPolicy,
+) -> Result<String, CanonReadError> {
+    let s = read_string(r)?;
+    let normalized = policy.normalize(&s)?;
+    if normalized != s {
+        return Err(CanonReadError::Unnormalized(policy));
+    }
+    Ok(s)
+}
+
+impl CanonRead for Id {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        Ok(Id::new(read_string(r)?)?)
+    }
+}
+
+impl CanonRead for Hash {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        Ok(Hash::new(read_string(r)?)?)
+    }
+}
+
+impl CanonRead for BigInt {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        read_int(r)
+    }
+}
+
+/// Inverse of the [`Canonical`] impl: read `{"den":…,"num":…}`, then confirm the
+/// parts are exact-reduced with a positive denominator — re-deriving the rational
+/// must reproduce the very parts read, else the bytes were a non-reduced or
+/// negative-denominator encoding the writer never emits.
+impl CanonRead for Rational {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let den = obj.member("den", read_int)?;
+        let num = obj.member("num", read_int)?;
+        obj.close()?;
+        let (num_s, den_s) = (num.to_string(), den.to_string());
+        let rational = Rational::new(num, den)?;
+        if rational.numer().to_string() != num_s || rational.denom().to_string() != den_s {
+            return Err(CanonReadError::RationalNotReduced);
+        }
+        Ok(rational)
+    }
+}
+
+/// Reader-side mirror of [`ObjectEmitter`]: a type pulls its fields by name in
+/// ascending byte order via [`member`](Self::member)/[`optional`](Self::optional),
+/// then [`close`](Self::close)s. Because canonical fields are byte-sorted and a
+/// type requests them in that order, any out-of-order, duplicate, or unknown
+/// field appears where none is expected and is rejected.
+pub struct ObjectReader<'a, 'r> {
+    r: &'r mut Reader<'a>,
+    started: bool,
+}
+
+impl<'a, 'r> ObjectReader<'a, 'r> {
+    /// Consume the opening `{`.
+    pub fn open(r: &'r mut Reader<'a>) -> Result<Self, CanonReadError> {
+        r.expect(b'{', "{")?;
+        Ok(ObjectReader { r, started: false })
+    }
+
+    /// Decoded name of the next member, leaving the cursor unmoved; `None` at the
+    /// closing `}`.
+    fn peek_name(&mut self) -> Result<Option<String>, CanonReadError> {
+        let save = self.r.pos;
+        if self.started {
+            match self.r.peek() {
+                Some(b'}') => return Ok(None),
+                Some(b',') => self.r.pos += 1,
+                _ => return Err(CanonReadError::Syntax(", or }")),
+            }
+        } else if self.r.peek() == Some(b'}') {
+            return Ok(None);
+        }
+        let name = read_string(self.r)?;
+        self.r.expect(b':', ":")?;
+        self.r.pos = save;
+        Ok(Some(name))
+    }
+
+    /// Consume the next member's separator, name, and `:`, returning the name.
+    fn take_name(&mut self) -> Result<String, CanonReadError> {
+        if self.started {
+            self.r.expect(b',', ",")?;
+        }
+        let name = read_string(self.r)?;
+        self.r.expect(b':', ":")?;
+        self.started = true;
+        Ok(name)
+    }
+
+    /// Read the required field `name`, which must be next in ascending order.
+    pub fn member<T>(
+        &mut self,
+        name: &'static str,
+        read: impl FnOnce(&mut Reader<'_>) -> Result<T, CanonReadError>,
+    ) -> Result<T, CanonReadError> {
+        match self.peek_name()? {
+            Some(n) if n == name => {
+                self.take_name()?;
+                read(self.r)
+            }
+            _ => Err(CanonReadError::MissingField(name)),
+        }
+    }
+
+    /// Read the optional field `name`, returning `None` when absent (SPEC §10
+    /// optional-omit). A field sorting before `name` that was never consumed is
+    /// an unknown field.
+    pub fn optional<T>(
+        &mut self,
+        name: &'static str,
+        read: impl FnOnce(&mut Reader<'_>) -> Result<T, CanonReadError>,
+    ) -> Result<Option<T>, CanonReadError> {
+        match self.peek_name()? {
+            Some(n) if n == name => {
+                self.take_name()?;
+                Ok(Some(read(self.r)?))
+            }
+            Some(n) if n.as_str() < name => Err(CanonReadError::UnknownField(n)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Consume the closing `}`, rejecting any unexpected trailing field.
+    pub fn close(mut self) -> Result<(), CanonReadError> {
+        match self.peek_name()? {
+            None => self.r.expect(b'}', "}"),
+            Some(n) => Err(CanonReadError::UnknownField(n)),
+        }
+    }
+}
+
+/// Shared `[…]` framing: read elements with `read` until `]`, requiring single
+/// `,` separators and rejecting a trailing comma.
+fn read_bracketed<T>(
+    r: &mut Reader<'_>,
+    mut read: impl FnMut(&mut Reader<'_>) -> Result<T, CanonReadError>,
+) -> Result<Vec<T>, CanonReadError> {
+    r.expect(b'[', "[")?;
+    let mut items = Vec::new();
+    if r.peek() == Some(b']') {
+        r.pos += 1;
+        return Ok(items);
+    }
+    loop {
+        items.push(read(r)?);
+        match r.bump()? {
+            b']' => break,
+            b',' => {}
+            _ => return Err(CanonReadError::Syntax(", or ]")),
+        }
+    }
+    Ok(items)
+}
+
+/// Read a canonical array `[…]`, each element via `T::read`, preserving order
+/// (SPEC §10 arrays keep their semantic order).
+pub fn read_array<T: CanonRead>(r: &mut Reader<'_>) -> Result<Vec<T>, CanonReadError> {
+    read_bracketed(r, T::read)
+}
+
+/// Read a canonical set: an array strictly ascending by [`canonical_sort_key`]
+/// with no repeats (SPEC §10). The writer's [`emit_set`] sorts and dedups, so
+/// any mis-ordering or duplicate is non-canonical and rejected.
+pub fn read_set<T: CanonRead + Canonical>(r: &mut Reader<'_>) -> Result<Vec<T>, CanonReadError> {
+    let mut prev: Option<Vec<u8>> = None;
+    read_bracketed(r, |r| {
+        let item = T::read(r)?;
+        let key = canonical_sort_key(&item)?;
+        if prev.as_ref().is_some_and(|p| key <= *p) {
+            return Err(CanonReadError::Unsorted);
+        }
+        prev = Some(key);
+        Ok(item)
+    })
+}
+
+/// Read a canonical map (SPEC §10), the inverse of [`emit_map`]. An
+/// identifier_ascii key type reads the object form (member names are the keys);
+/// any other key type reads the pair-array form `[{"key":K,"value":V},…]`. Keys
+/// must be strictly ascending by [`canonical_sort_key`] in both forms, so
+/// mis-ordering and duplicate keys are rejected.
+pub fn read_map<K: MapKey + CanonRead, V: CanonRead>(
+    r: &mut Reader<'_>,
+) -> Result<Vec<(K, V)>, CanonReadError> {
+    let mut prev: Option<Vec<u8>> = None;
+    if K::IDENTIFIER_ASCII {
+        r.expect(b'{', "{")?;
+        let mut entries = Vec::new();
+        if r.peek() == Some(b'}') {
+            r.pos += 1;
+            return Ok(entries);
+        }
+        loop {
+            let key = K::read(r)?;
+            let key_bytes = canonical_sort_key(&key)?;
+            if prev.as_ref().is_some_and(|p| key_bytes <= *p) {
+                return Err(CanonReadError::Unsorted);
+            }
+            prev = Some(key_bytes);
+            r.expect(b':', ":")?;
+            let value = V::read(r)?;
+            entries.push((key, value));
+            match r.bump()? {
+                b'}' => break,
+                b',' => {}
+                _ => return Err(CanonReadError::Syntax(", or }")),
+            }
+        }
+        Ok(entries)
+    } else {
+        read_bracketed(r, |r| {
+            let mut obj = ObjectReader::open(r)?;
+            let key: K = obj.member("key", K::read)?;
+            let value: V = obj.member("value", V::read)?;
+            obj.close()?;
+            let key_bytes = canonical_sort_key(&key)?;
+            if prev.as_ref().is_some_and(|p| key_bytes <= *p) {
+                return Err(CanonReadError::Unsorted);
+            }
+            prev = Some(key_bytes);
+            Ok((key, value))
+        })
+    }
+}
+
+/// Read a canonical tagged union `{"tag":…,"value":…}` (SPEC §10), the inverse
+/// of [`emit_union`]: exactly the members `tag` (an identifier_ascii string) then
+/// `value`. `read_value` receives the decoded tag to pick the payload reader.
+/// Any other shape — missing, extra, reordered, or misnamed members, or a
+/// non-identifier tag — is rejected.
+pub fn read_union<V>(
+    r: &mut Reader<'_>,
+    read_value: impl FnOnce(&str, &mut Reader<'_>) -> Result<V, CanonReadError>,
+) -> Result<(String, V), CanonReadError> {
+    let mut obj = ObjectReader::open(r)?;
+    let tag = obj.member("tag", |r| {
+        read_string_policy(r, StringPolicy::IdentifierAscii)
+    })?;
+    let value = obj.member("value", |r| read_value(&tag, r))?;
+    obj.close()?;
+    Ok((tag, value))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,6 +1012,7 @@ mod tests {
 
     /// A structured (non-identifier_ascii) map key: its canonical form is an
     /// object, so [`emit_map`] must fall to the SPEC §10 pair-array form.
+    #[derive(Debug, PartialEq)]
     struct Span {
         lo: i64,
         hi: i64,
@@ -695,6 +1166,325 @@ mod tests {
         assert!(matches!(
             emit_union(&mut out, "Bad Tag", &BigInt::from(1)),
             Err(CanonError::Policy(ValidationError::StringPolicy(_)))
+        ));
+    }
+
+    // -----------------------------------------------------------------------
+    // Strict reader (SPEC §10) — the writer's inverse
+    // -----------------------------------------------------------------------
+
+    /// Read a `T` from the whole of `bytes`, requiring full consumption: the
+    /// free-function analogue of [`read_canonical`] for the collection, union,
+    /// and policy-string readers that are not [`CanonRead`] impls.
+    fn read_all<T>(
+        bytes: &[u8],
+        read: impl FnOnce(&mut Reader<'_>) -> Result<T, CanonReadError>,
+    ) -> Result<T, CanonReadError> {
+        let mut r = Reader::new(bytes);
+        let value = read(&mut r)?;
+        if !r.at_end() {
+            return Err(CanonReadError::Trailing);
+        }
+        Ok(value)
+    }
+
+    /// Assert `value` survives a canonical write -> read round trip unchanged.
+    fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
+        let bytes = canonical_payload_bytes(&value).unwrap();
+        let got: T = read_canonical(&bytes).unwrap();
+        assert_eq!(got, value, "round trip changed the value");
+    }
+
+    impl CanonRead for Span {
+        fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+            let mut obj = ObjectReader::open(r)?;
+            let hi = obj.member("hi", read_int)?;
+            let lo = obj.member("lo", read_int)?;
+            obj.close()?;
+            Ok(Span {
+                lo: lo.to_string().parse().unwrap(),
+                hi: hi.to_string().parse().unwrap(),
+            })
+        }
+    }
+
+    /// A record with a required and an optional field, exercising the
+    /// [`ObjectEmitter`]/[`ObjectReader`] member/optional symmetry.
+    #[derive(Debug, PartialEq)]
+    struct Rec {
+        count: BigInt,
+        label: Option<Id>,
+    }
+
+    impl Canonical for Rec {
+        fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+            let mut o = ObjectEmitter::new();
+            o.member("count", |b| {
+                emit_int(b, &self.count);
+                Ok(())
+            })?;
+            o.optional("label", self.label.as_ref(), |b, v: &Id| {
+                v.emit_canonical(b)
+            })?;
+            o.finish(out)
+        }
+    }
+
+    impl CanonRead for Rec {
+        fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+            let mut obj = ObjectReader::open(r)?;
+            let count = obj.member("count", read_int)?;
+            let label = obj.optional("label", Id::read)?;
+            obj.close()?;
+            Ok(Rec { count, label })
+        }
+    }
+
+    #[test]
+    fn round_trips_scalars_and_records() {
+        round_trip(Id::new("pipe.layered_ckcir_to_smt").unwrap());
+        round_trip(
+            Hash::new("sha256:0000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap(),
+        );
+        for n in [0_i64, -42, 1_000_000] {
+            round_trip(BigInt::from(n));
+        }
+        round_trip("123456789012345678901234567890".parse::<BigInt>().unwrap());
+        round_trip(Rational::from_parts("2", "4").unwrap());
+        round_trip(Rational::from_parts("3", "-2").unwrap());
+        round_trip(Rec {
+            count: BigInt::from(7),
+            label: Some(Id::new("pipe.x").unwrap()),
+        });
+        round_trip(Rec {
+            count: BigInt::from(0),
+            label: None,
+        });
+    }
+
+    #[test]
+    fn round_trips_collections_and_unions() {
+        // array — semantic order preserved verbatim
+        let arr = vec![
+            Id::new("c").unwrap(),
+            Id::new("a").unwrap(),
+            Id::new("b").unwrap(),
+        ];
+        let mut bytes = Vec::new();
+        emit_array(&mut bytes, &arr).unwrap();
+        assert_eq!(read_all(&bytes, read_array::<Id>).unwrap(), arr);
+
+        // set — writer sorts and dedups; the canonical bytes read back ascending
+        let set = [
+            Id::new("c").unwrap(),
+            Id::new("a").unwrap(),
+            Id::new("b").unwrap(),
+            Id::new("a").unwrap(),
+        ];
+        let mut bytes = Vec::new();
+        emit_set(&mut bytes, &set).unwrap();
+        assert_eq!(
+            read_all(&bytes, read_set::<Id>).unwrap(),
+            vec![
+                Id::new("a").unwrap(),
+                Id::new("b").unwrap(),
+                Id::new("c").unwrap(),
+            ]
+        );
+
+        // identifier-keyed map — object form, members ascending by key
+        let imap = [
+            (Id::new("b").unwrap(), BigInt::from(2)),
+            (Id::new("a").unwrap(), BigInt::from(1)),
+        ];
+        let mut bytes = Vec::new();
+        emit_map(&mut bytes, imap.iter().map(|(k, v)| (k, v))).unwrap();
+        assert_eq!(
+            read_all(&bytes, read_map::<Id, BigInt>).unwrap(),
+            vec![
+                (Id::new("a").unwrap(), BigInt::from(1)),
+                (Id::new("b").unwrap(), BigInt::from(2)),
+            ]
+        );
+
+        // structured-keyed map — pair-array form, pairs ascending by key bytes
+        let smap = [
+            (Span { lo: 5, hi: 9 }, Id::new("y").unwrap()),
+            (Span { lo: 1, hi: 2 }, Id::new("x").unwrap()),
+        ];
+        let mut bytes = Vec::new();
+        emit_map(&mut bytes, smap.iter().map(|(k, v)| (k, v))).unwrap();
+        assert_eq!(
+            read_all(&bytes, read_map::<Span, Id>).unwrap(),
+            vec![
+                (Span { lo: 1, hi: 2 }, Id::new("x").unwrap()),
+                (Span { lo: 5, hi: 9 }, Id::new("y").unwrap()),
+            ]
+        );
+
+        // union — the decoded tag selects the payload reader
+        let mut bytes = Vec::new();
+        emit_union(
+            &mut bytes,
+            "rational",
+            &Rational::from_parts("2", "4").unwrap(),
+        )
+        .unwrap();
+        let (tag, value) = read_all(&bytes, |r| read_union(r, |_, r| Rational::read(r))).unwrap();
+        assert_eq!(tag, "rational");
+        assert_eq!(value, Rational::from_parts("1", "2").unwrap());
+    }
+
+    #[test]
+    fn rejects_trailing_bytes_null_and_bare_numbers() {
+        // bytes left over after a complete value
+        assert_eq!(
+            read_canonical::<Id>(br#""a"x"#),
+            Err(CanonReadError::Trailing)
+        );
+        // null / booleans are never canonical
+        assert_eq!(read_canonical::<Id>(b"null"), Err(CanonReadError::Token));
+        // a bare number where an integer string is required
+        assert_eq!(read_canonical::<BigInt>(b"42"), Err(CanonReadError::Token));
+        // bare numbers inside a rational object (parts are integer strings)
+        assert_eq!(
+            read_canonical::<Rational>(br#"{"den":4,"num":2}"#),
+            Err(CanonReadError::Token)
+        );
+    }
+
+    #[test]
+    fn rejects_non_canonical_strings() {
+        // a JSON shorthand escape (canonical form uses the six-byte u-escape)
+        assert!(matches!(
+            read_canonical::<Id>(&[b'"', 0x5c, b'n', b'"']),
+            Err(CanonReadError::Str(_))
+        ));
+        // a u-escape for a scalar that must pass through raw (uppercase 'A')
+        assert!(matches!(
+            read_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'4', b'1', b'"']),
+            Err(CanonReadError::Str(_))
+        ));
+        // a u-escape written with uppercase hex digits
+        assert!(matches!(
+            read_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'0', b'A', b'"']),
+            Err(CanonReadError::Str(_))
+        ));
+        // an unescaped control byte
+        assert!(matches!(
+            read_canonical::<Id>(&[b'"', 0x01, b'"']),
+            Err(CanonReadError::Str(_))
+        ));
+        // invalid UTF-8
+        assert!(matches!(
+            read_canonical::<Id>(&[b'"', 0xff, b'"']),
+            Err(CanonReadError::Str(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_non_canonical_integers_and_rationals() {
+        // leading zero, explicit +, and -0 are non-canonical decimals
+        for s in [r#""007""#, r#""+1""#, r#""-0""#] {
+            assert!(matches!(
+                read_canonical::<BigInt>(s.as_bytes()),
+                Err(CanonReadError::Integer(_))
+            ));
+        }
+        // 2/4 reduces to 1/2, so its written parts are non-canonical
+        assert_eq!(
+            read_canonical::<Rational>(br#"{"den":"4","num":"2"}"#),
+            Err(CanonReadError::RationalNotReduced)
+        );
+        // a negative denominator is non-canonical (sign rides the numerator)
+        assert_eq!(
+            read_canonical::<Rational>(br#"{"den":"-2","num":"1"}"#),
+            Err(CanonReadError::RationalNotReduced)
+        );
+    }
+
+    #[test]
+    fn rejects_object_field_violations() {
+        // a field no type expects (also how dupes / mis-order surface)
+        assert_eq!(
+            read_canonical::<Rec>(br#"{"count":"1","zzz":"2"}"#),
+            Err(CanonReadError::UnknownField("zzz".to_string()))
+        );
+        // a required field absent (only the optional present)
+        assert_eq!(
+            read_canonical::<Rec>(br#"{"label":"x"}"#),
+            Err(CanonReadError::MissingField("count"))
+        );
+    }
+
+    #[test]
+    fn rejects_set_and_map_misordering() {
+        // set elements descending
+        assert_eq!(
+            read_all(br#"["b","a"]"#, read_set::<Id>),
+            Err(CanonReadError::Unsorted)
+        );
+        // a repeated set element
+        assert_eq!(
+            read_all(br#"["a","a"]"#, read_set::<Id>),
+            Err(CanonReadError::Unsorted)
+        );
+        // map keys descending
+        assert_eq!(
+            read_all(br#"{"b":"1","a":"2"}"#, read_map::<Id, BigInt>),
+            Err(CanonReadError::Unsorted)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_unions() {
+        // value member missing
+        assert_eq!(
+            read_all(br#"{"tag":"x"}"#, |r| read_union(r, |_, r| BigInt::read(r))),
+            Err(CanonReadError::MissingField("value"))
+        );
+        // an extra member after value
+        assert_eq!(
+            read_all(br#"{"tag":"x","value":"1","z":"2"}"#, |r| read_union(
+                r,
+                |_, r| BigInt::read(r)
+            )),
+            Err(CanonReadError::UnknownField("z".to_string()))
+        );
+        // members reordered: tag is not first
+        assert_eq!(
+            read_all(br#"{"value":"1","tag":"x"}"#, |r| read_union(r, |_, r| {
+                BigInt::read(r)
+            })),
+            Err(CanonReadError::MissingField("tag"))
+        );
+        // a tag outside identifier_ascii
+        assert!(matches!(
+            read_all(br#"{"tag":"X","value":"1"}"#, |r| read_union(r, |_, r| {
+                BigInt::read(r)
+            })),
+            Err(CanonReadError::Policy(ValidationError::StringPolicy(_)))
+        ));
+    }
+
+    #[test]
+    fn rejects_unnormalized_policy_strings() {
+        // semantic_en would fold and trim this, so the raw bytes are non-canonical
+        assert_eq!(
+            read_all(br#""  Hi  ""#, |r| read_string_policy(
+                r,
+                StringPolicy::SemanticEn
+            )),
+            Err(CanonReadError::Unnormalized(StringPolicy::SemanticEn))
+        );
+        // identifier_ascii rejects the space outright
+        assert!(matches!(
+            read_all(br#""Bad Id""#, |r| read_string_policy(
+                r,
+                StringPolicy::IdentifierAscii
+            )),
+            Err(CanonReadError::Policy(ValidationError::StringPolicy(_)))
         ));
     }
 }

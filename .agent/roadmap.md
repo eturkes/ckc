@@ -60,7 +60,7 @@ in `.agent/memory.md`).
   `identifier_ascii`), reusing the existing writer machinery; the canon.rs/lib.rs
   docs that defer unions are updated. Files: `crates/ckc-core/src/{canon.rs,
   lib.rs}`. Reading: SPEC §10. Gate: `cargo test -p ckc-core canon::`.
-- [ ] core-canon-reader: strict canonical reading — the writer's inverse
+- [x] core-canon-reader 69% 137K/200K (post-compaction): strict canonical reading — the writer's inverse
   (`read_canonical`/`CanonReadError`) admits only canonical bytes, rejecting
   non-canonical object fields (order/dupes/unknowns), JSON null, bare numeric
   tokens for integers/rationals, non-reduced rationals, set/map mis-ordering, and

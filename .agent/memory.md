@@ -101,6 +101,29 @@ technically derivable but easily forgotten under token pressure.
   Recurs most sharply on `core-canon-reader`, whose `StrictReader`/`strict_read`
   the stale view already shows as existing.
 
+- [2026-06-10] Editing-tool string parameters decode `\uXXXX` Unicode escapes,
+  and only those — `\n`, `\"`, `\xNN` pass through literally. So writing source
+  that must contain a literal `\uXXXX` (e.g. a byte/raw-string test asserting that an uppercase-A escape is
+  non-canonical) through `replace_content`/`Edit`/`Write` silently decodes it:
+  the A-escape collapses to the byte `A`, and a C0-control escape collapses to a
+  real newline, corrupting both code and comments.
+  The corrupted forms often still compile (`br#""A""#` is valid Rust), so only a
+  test failure or a read-back catches code damage while comment damage ships
+  silently. When edit content must carry a literal backslash-u (or any
+  `\uXXXX`), express the bytes without that substring — a byte-array literal with
+  `0x5c` for the backslash, e.g. `&[b'"', 0x5c, b'u', b'0', b'0', b'4', b'1',
+  b'"']` — and read the region back after writing. Recurs in any unit whose tests
+  assert on escape syntax (the canonical string reader/writer, later wire
+  parsers).
+
+- [2026-06-10] core-canon-reader confirms a writer-inverse unit is a full window
+  on its own. Even after the M1 split carved strict-reading out from unions and
+  hash, the `CanonRead` trait mirror + per-type impls + streaming `ObjectReader`
+  + the round-trip-and-rejection test matrix overran one context (compaction
+  landed mid-unit; the resumed session finished at 69%). Schedule any
+  inverse-of-a-writer unit (the later IR / registry / store parsers) alone, never
+  co-located with its writer or a sibling deliverable.
+
 ## Mistakes
 
 (empty — populated as sessions record after-the-fact corrections.)
