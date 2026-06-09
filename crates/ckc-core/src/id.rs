@@ -17,8 +17,8 @@ use num_bigint::BigInt;
 use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
 
-/// Construction/validation failure for a SPEC §9 value type. The variant names
-/// the offending type; the message carries the diagnostic detail.
+/// Construction/validation failure for a SPEC §9–§10 contract. The variant names
+/// the offending type or policy; the message carries the diagnostic detail.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationError {
     /// An [`Id`] violated `[a-z][a-z0-9_.:-]*`.
@@ -27,6 +27,9 @@ pub enum ValidationError {
     Hash(String),
     /// A [`Rational`] had a non-integer part or a zero denominator.
     Rational(String),
+    /// A string failed its declared [`crate::StringPolicy`] (SPEC §10), e.g.
+    /// `identifier_ascii` received bytes outside `[a-z0-9_:./-]+`.
+    StringPolicy(String),
 }
 
 impl fmt::Display for ValidationError {
@@ -35,6 +38,7 @@ impl fmt::Display for ValidationError {
             ValidationError::Id(m) => write!(f, "invalid Id: {m}"),
             ValidationError::Hash(m) => write!(f, "invalid Hash: {m}"),
             ValidationError::Rational(m) => write!(f, "invalid Rational: {m}"),
+            ValidationError::StringPolicy(m) => write!(f, "invalid string policy: {m}"),
         }
     }
 }
@@ -53,7 +57,11 @@ impl Id {
         let mut chars = value.chars();
         match chars.next() {
             Some(c) if c.is_ascii_lowercase() => {}
-            _ => return Err(ValidationError::Id(format!("must start with [a-z]: {value:?}"))),
+            _ => {
+                return Err(ValidationError::Id(format!(
+                    "must start with [a-z]: {value:?}"
+                )));
+            }
         }
         for c in chars {
             if !(c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '.' | ':' | '-'))
@@ -250,7 +258,16 @@ mod tests {
     #[test]
     fn id_rejects_invalid() {
         for s in [
-            "", "0x", "Foo", "_lead", ".lead", "-lead", ":lead", "has space", "a/b", "café",
+            "",
+            "0x",
+            "Foo",
+            "_lead",
+            ".lead",
+            "-lead",
+            ":lead",
+            "has space",
+            "a/b",
+            "café",
         ] {
             assert!(
                 matches!(Id::new(s), Err(ValidationError::Id(_))),

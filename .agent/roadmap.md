@@ -38,7 +38,7 @@ JIT-split notes for their Implement sessions.
   den) value types with validation. Files: `crates/ckc-core/{Cargo.toml,
   src/lib.rs,src/id.rs}`, `Cargo.toml`. Reading: SPEC §9, §5. Gate:
   `cargo test -p ckc-core`.
-- [ ] core-strings: the seven string policies (`raw_source`, `source_nfkc`,
+- [x] core-strings 55% 109K/200K: the seven string policies (`raw_source`, `source_nfkc`,
   `semantic_ja`, `semantic_en`, `identifier_ascii`, `diagnostic_text`,
   `view_text`) as deterministic normalizers. Files:
   `crates/ckc-core/src/strings.rs`. Reading: SPEC §10. Gate:
