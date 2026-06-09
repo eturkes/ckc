@@ -20,7 +20,7 @@ completion via `.agent/compaction.sh`; splitting a unit replaces its line with
   manual impls for bool, `Id`, `Hash`, `UInt`, `Int`, `Rational`, `Text<P>`
   reusing `to_decimal`/`as_str`; reconcile with existing serde Serialize
   impls so canonical bytes have one authority. Prior art:
-  archive/phase0-research-kernel serializer. Read: §1.5 grammar.
+  archive/spec01 serializer. Read: §1.5 grammar.
   Test: `cargo test -p ckc-core canon`
 - [x] M0.0.2.2 47% 93K/200K sort keys + collections in `canon.rs`:
   `canonical_sort_key(x) = (TYPE_ID, canonical_payload_bytes(x))`; `Set[T]`

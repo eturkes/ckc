@@ -7,14 +7,16 @@ technically derivable but easily forgotten under token pressure.
 
 ## Project history
 
-- [2026-06-07] Branch restructure: `archive/phase0-research-kernel` holds the
+- [2026-06-07] Branch restructure: `archive/spec01` holds the
   complete Phase-0 implementation of the previous 864-line SPEC (13 reviewed
   top-level tasks: schema v0, NF, CAS store, fixtures, terminology/e-graph,
   retrieval, compiler targets, certificates, conflict detection, CLI,
   report/UI, replay) plus its full agent memory, including a known-issues
   backlog and Phase-0-specific lessons pruned from this file. Current `main`
   is an orphan root developing the reworked M0 SPEC; the two histories share
-  no commits. Consult the archive for prior art — canonical-bytes serializer,
+  no commits; `main` is slated to archive next as `archive/spec02`
+  (`archive/specNN` numbers superseded-SPEC implementations in sequence).
+  Consult the archive for prior art — canonical-bytes serializer,
   golden-test harness (`golden_suite!`), CAS store layout,
   emitter/witness/certificate patterns — and for any pre-restructure question.
 
