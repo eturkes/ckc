@@ -62,6 +62,15 @@ technically derivable but easily forgotten under token pressure.
   staging a Rust unit, so drift and lints never accumulate for the `review` line
   to sweep.
 
+- [2026-06-10] Serena `replace_symbol_body` on a Rust item spans its preceding
+  doc comment AND outer attributes (`#[derive(...)]`): the body you supply
+  replaces all of them, so omitting them deletes them. Dropped a
+  `#[derive(Debug, Clone, PartialEq, Eq)]` off an enum this way and broke the
+  build (no `Debug` for `.unwrap()` in tests). Always include the leading `///`
+  lines and every `#[...]` attribute in the replacement body, or edit the inner
+  variant/field region with `replace_content` instead. Recurs with the
+  derive-heavy enums and envelope/IR structs still ahead.
+
 ## Mistakes
 
 (empty — populated as sessions record after-the-fact corrections.)
