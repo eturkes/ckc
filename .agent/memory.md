@@ -86,6 +86,21 @@ technically derivable but easily forgotten under token pressure.
   hot-but-fitting single-deliverable units (~70-85%, one gate: core-enums-
   envelope, core-plans, core-registry-types, registry-validate, registry-seed).
 
+- [2026-06-10] Serena's symbol layer can surface stale `archive/spec02` symbols
+  for files at paths spec02 also used. On a clean `main` at HEAD,
+  `get_symbols_overview` of `crates/ckc-core/src/canon.rs` listed `emit_union`,
+  `StrictReader`, `strict_read`, `StrictError`, `StrictReason` — none present in
+  the committed 649-line file; they are spec02's later-unit code at the same
+  path (cache populated under spec02, not invalidated by the orphan-root
+  restructure). Risk: symbol reads show phantom symbols, so a session may think a
+  unit is already done, and symbol-level edits (`replace_symbol_body`,
+  `insert_*_symbol`) may target stale offsets. Confirm real contents with Read
+  (or raw grep) before trusting a symbol overview or symbol-editing any file that
+  also existed under `archive/spec02` (canon.rs, ir.rs, registry.rs, …); prefer
+  `replace_content` (regex over actual bytes, cache-independent) for such edits.
+  Recurs most sharply on `core-canon-reader`, whose `StrictReader`/`strict_read`
+  the stale view already shows as existing.
+
 ## Mistakes
 
 (empty — populated as sessions record after-the-fact corrections.)
