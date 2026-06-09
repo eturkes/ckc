@@ -1,5 +1,8 @@
-# Agent/tooling artifacts (Headroom leaves .serena/; see CLAUDE.md)
-.serena/
+# Headroom introduces .serena/: project.yml is the tracked LSP config, while
+# cache/, project.local.yml, and memories/ are ignored. See CLAUDE.md.
+.serena/cache/
+.serena/project.local.yml
+.serena/memories/
 
 # Rust build output (Cargo.lock is committed, not ignored)
 target/

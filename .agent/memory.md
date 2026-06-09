@@ -41,6 +41,19 @@ technically derivable but easily forgotten under token pressure.
   such messages from a file: write the message, then `git commit -F <path>` (one
   flag + one path survives the rewrite), and `rm` the temp file after. Plain
   single-`-m` ASCII commits are unaffected.
+- [2026-06-09] Enabling a Serena LSP language that isn't set up yet. Symptom: a
+  Serena symbolic tool (`get_symbols_overview`/`find_symbol`/reference lookups)
+  errors `Active languages: ['bash']`. Fix: add the language to
+  `.serena/project.yml` `languages:` (list it first = default/fallback LS). The
+  MCP server reads `project.yml` only at startup (`--project-from-cwd`), so the
+  edit applies only after a Serena reconnect, which you cannot trigger from a
+  tool — ask the user to `/mcp` reconnect serena (or restart Claude), then
+  verify with a symbol/reference call (first call may lag during indexing).
+  Confirm the LS binary exists first; for rust, Serena launches the rustup
+  toolchain's `rust-analyzer` directly, so `rustup update` already keeps it
+  current (no `~/.local/bin/upgrade` line). `.serena/project.yml` is git-tracked
+  so the set persists across fresh checkouts. Apply this whenever a needed
+  Serena LSP isn't enabled.
 
 ## Mistakes
 
