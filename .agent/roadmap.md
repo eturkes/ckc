@@ -67,7 +67,7 @@ in `.agent/memory.md`).
   non-`{tag,value}` unions; round-trip tested against `canonical_payload_bytes`.
   Files: `crates/ckc-core/src/{canon.rs,lib.rs}`. Reading: SPEC §10, §9. Gate:
   `cargo test -p ckc-core canon::`.
-- [ ] core-canon-hash: envelope hash invariants in new `hash.rs` — add the `sha2`
+- [x] core-canon-hash 65% 130K/200K: envelope hash invariants in new `hash.rs` — add the `sha2`
   dep; `content_hash<T: Canonical> = sha256(canonical_payload_bytes)` wrapped as
   the `Hash` value type, plus `canonicalization_policy_hash` over the policy
   descriptor. Files: `crates/ckc-core/src/{hash.rs,lib.rs}`,
