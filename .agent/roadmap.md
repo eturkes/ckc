@@ -48,7 +48,7 @@ JIT-split notes for their Implement sessions.
   as exact-reduced objects, strings under declared policy. Files:
   `crates/ckc-core/src/canon.rs`. Reading: SPEC §10, §9. Gate:
   `cargo test -p ckc-core`.
-- [ ] core-canon-collections: canonical collections — semantic-ordered arrays,
+- [x] core-canon-collections 62% 124K/200K: canonical collections — semantic-ordered arrays,
   sets sorted by `canonical_sort_key`, maps (identifier_ascii keys -> sorted
   objects; other keys -> sorted key/value arrays). Files:
   `crates/ckc-core/src/canon.rs`. Reading: SPEC §10. Gate:
