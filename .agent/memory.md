@@ -33,6 +33,14 @@ technically derivable but easily forgotten under token pressure.
   in two; registry entry *types* alone fit one unit (~69%); crate-foundation
   units run hot (~81%). Used to size the M1 seed batch. Calibrate finer JIT
   splits from the actual `NN%` of neighbouring units once they exist.
+- [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose
+  values carry non-ASCII (`§`, em-dash `—`): args get dropped/split, leaving a
+  bare space git reads as a pathspec ("pathspec ' ' did not match any file(s)"),
+  so `git add` stages but the commit never lands — and RTK still prints
+  "ok N files changed" from the add step, masking the failure. Always commit
+  such messages from a file: write the message, then `git commit -F <path>` (one
+  flag + one path survives the rewrite), and `rm` the temp file after. Plain
+  single-`-m` ASCII commits are unaffected.
 
 ## Mistakes
 
