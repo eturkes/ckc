@@ -55,7 +55,7 @@ in `.agent/memory.md`).
   objects; other keys -> sorted key/value arrays). Files:
   `crates/ckc-core/src/canon.rs`. Reading: SPEC §10. Gate:
   `cargo test -p ckc-core`.
-- [ ] core-canon-unions: tagged-union emission — `emit_union` writes a sum value
+- [x] core-canon-unions 46% 92K/200K: tagged-union emission — `emit_union` writes a sum value
   as `{tag,value}` (byte-ordered via `ObjectEmitter`; `tag` normalized through
   `identifier_ascii`), reusing the existing writer machinery; the canon.rs/lib.rs
   docs that defer unions are updated. Files: `crates/ckc-core/src/{canon.rs,
