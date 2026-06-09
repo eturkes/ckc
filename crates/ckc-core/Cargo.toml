@@ -1,0 +1,15 @@
+# ckc-core — durable typed core (SPEC §5): IDs, value types, enums, envelope,
+# canonical JSON, hashes, IR, plans, registry. This unit (core-ids) seeds the
+# crate with the Id/Hash/Rational value types (SPEC §9).
+[package]
+name = "ckc-core"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+serde.workspace = true
+num-bigint.workspace = true
+num-rational.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

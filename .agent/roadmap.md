@@ -32,7 +32,7 @@ Lessons (canonical JSON is a three-unit deliverable; an "implements algorithm
 AND authors a table" unit splits in two). `corecli` and `core-ir` carry
 JIT-split notes for their Implement sessions.
 
-- [ ] core-ids: `ckc-core` crate skeleton + workspace wiring (edition 2024,
+- [x] core-ids 48% 96K/200K: `ckc-core` crate skeleton + workspace wiring (edition 2024,
   resolver, root `Cargo.toml` member, `Cargo.lock`); `Id` (`[a-z][a-z0-9_.:-]*`),
   `Hash` (`sha256:`+64hex), exact-reduced `Rational` (gcd-normalized, positive
   den) value types with validation. Files: `crates/ckc-core/{Cargo.toml,
