@@ -15,7 +15,7 @@ next plan session removes their checklists (git history retains them).
 ## V1 spine — plan e6523e9
 
 - [x] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
-  num-rational), lib.rs wiring with unsafe forbidden, and value types Id ([a-z][a-z0-9_.:-]*), Hash
+  num-rational), lib.rs wiring with unsafe forbidden, and value types Id (`[a-z][a-z0-9_.:-]*`), Hash
   (sha256: plus 64 lowercase hex), exact-reduced Rational (positive denominator, decimal-string
   num/den repr) with ValidationError, serde via try_from/into String, Display/FromStr;
   acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Gate:

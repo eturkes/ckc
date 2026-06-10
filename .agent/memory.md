@@ -42,6 +42,14 @@ technically derivable but easily forgotten under token pressure.
   toolchain's `rust-analyzer` directly, so `rustup update` already keeps it
   current. `.serena/project.yml` is git-tracked so the set persists across fresh
   checkouts. Apply this whenever a needed Serena LSP isn't enabled.
+- [2026-06-10] Markdown authoring: wrap regexes/grammars in backticks — bare
+  adjacent bracket groups (`[a-z][a-z0-9_.:-]*`) parse as Marksman reference
+  links and emit phantom-label warnings. Verify markdown fixes with grep for
+  bare `][` outside code spans; serena `get_diagnostics_for_file` is useless
+  there — it routes non-code files to the fallback LS (first entry in
+  `.serena/project.yml` `languages:`, currently rust-analyzer), which emits
+  pages of phantom syntax errors. Marksman diagnostics reach the session only
+  via the harness new-diagnostics channel.
 - [2026-06-10] Serena `replace_symbol_body` on a Rust item spans its preceding
   doc comment AND outer attributes (`#[derive(...)]`): the body you supply
   replaces all of them, so omitting them deletes them. Dropped a
