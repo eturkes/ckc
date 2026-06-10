@@ -20,8 +20,18 @@
 //! longest-match over span `search_text` (semantic_ja, the surface normal
 //! form) — minting one [`TerminologyBinding`] per (segment, candidate
 //! set); singleton sets bind `exact`/`synonym`, shared surfaces bind
-//! `ambiguous` with a `terminology_ambiguous` record (§5). The statement
-//! builder (`stage-normalize.1d`) completes the stage's first half.
+//! `ambiguous` with a `terminology_ambiguous` record (§5).
+//!
+//! [`clinical_ir`] (`stage-normalize.1d`) is the statement builder: the
+//! binding core re-run per segment (byte-equal to [`bind_segments`]),
+//! then at most one [`ClinicalStatement`] per recommendation segment from
+//! the slot readings — binding codes split by namespace (`pop.*`
+//! population, `drug.*` action target, else condition) and span-text
+//! scans for verbs, modality phrases (reading = (direction, strength);
+//! `implies_action` the kind fallback), and certainty phrases. Slot
+//! misses and ambiguities withhold the statement as §7.4 records;
+//! ambiguous certainty keeps it, certainty-free. Exception clause
+//! attachment (`stage-normalize.1e`) completes the stage's first half.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -29,9 +39,10 @@ use std::fmt;
 use serde::Deserialize;
 
 use ckc_core::{
-    BindingStatus, Certainty, ClinicalSegment, DiagnosticCode, DiagnosticRecord, Direction, Hash,
-    Id, Outcome, QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan,
-    Strength, StringPolicy, TerminologyBinding, hash_bytes,
+    Action, BindingStatus, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
+    DiagnosticCode, DiagnosticRecord, Direction, Hash, Id, Outcome, QuantityInterval, SegmentIr,
+    SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength, StringPolicy, TerminologyBinding,
+    hash_bytes,
 };
 
 use crate::shell::static_id;
@@ -479,9 +490,7 @@ fn scan<'s>(text: &str, surfaces: &[&'s str]) -> Vec<&'s str> {
 }
 
 /// Drop later duplicates in place, keeping first occurrences in order —
-/// the reading-list hygiene the statement builder (`stage-normalize.1d`)
-/// applies to every slot.
-#[expect(dead_code)]
+/// the reading-list hygiene [`build_statement`] applies to every slot.
 fn dedup_keep_first<T: PartialEq>(items: &mut Vec<T>) {
     let mut i = 0;
     while i < items.len() {
@@ -611,6 +620,324 @@ fn ambiguity(surface: &str, alternatives: &[Id], region_ids: &[Id]) -> Diagnosti
         outcome: Outcome::Ambiguity,
         payload: vec![(static_id("detail"), detail)],
         region_ids: region_ids.to_vec(),
+        artifact_hashes: vec![],
+    }
+}
+
+/// SPEC §5 statement building (`stage-normalize.1d`): run the binding core
+/// per recommendation and exception segment in document order — bindings
+/// and binding diagnostics byte-equal to [`bind_segments`] — and build at
+/// most one [`ClinicalStatement`] per recommendation segment. Exception
+/// segments bind only (clause attachment is `stage-normalize.1e`), so
+/// every statement ships `exceptions: []`.
+///
+/// Slot readings per segment: its `exact`/`synonym` binding codes split by
+/// namespace — `pop.*` population, `drug.*` action target, else condition
+/// (ambiguous bindings contribute nothing) — plus scans over its span
+/// texts for action verbs, modality phrases, and certainty phrases. A
+/// modality reading is the (direction, strength) pair only;
+/// `implies_action` ids collect separately as the kind fallback (kinds =
+/// verbs if any verb matched, else implied). Every list dedupes keeping
+/// first occurrences. The slot rule ([`slot_diag`] records, grounded in
+/// the segment's regions): zero modality readings or zero kinds →
+/// `semantic_slot_missing`; zero targets → `terminology_unmapped`; more
+/// than one distinct modality/kind/target reading →
+/// `terminology_ambiguous` — each withholds the statement while bindings
+/// and diagnostics still emit. Ambiguous certainty records
+/// `terminology_ambiguous` but keeps the statement with no certainty.
+/// Diagnostics accumulate in document order, binding diagnostics before
+/// the owning segment's slot diagnostics.
+///
+/// Kept statements mint `stmt.<k>` counting kept statements:
+/// population/condition as [`ContextAtom::Concept`] sets (interval
+/// lowering is `stage-normalize.2`), the action from the single kind and
+/// target, modality/strength from the single reading, and
+/// `source_segment_ids = {segment}`.
+pub fn clinical_ir(
+    graph: &SourceGraph,
+    segments: &SegmentIr,
+    lexicon: &Lexicon,
+) -> (ClinicalIr, Vec<DiagnosticRecord>) {
+    let index = GraphIndex::new(graph);
+    let concepts = ConceptTable::new(lexicon);
+    let tables = StatementTables::new(lexicon);
+
+    let mut bindings: Vec<TerminologyBinding> = Vec::new();
+    let mut statements: Vec<ClinicalStatement> = Vec::new();
+    let mut diagnostics: Vec<DiagnosticRecord> = Vec::new();
+    for segment in &segments.segments {
+        if !matches!(
+            segment.kind,
+            SegmentKind::Recommendation | SegmentKind::Exception
+        ) {
+            continue;
+        }
+        let spans = index.segment_spans(segment);
+        let (mut b, mut d) = bind_segment(&spans, &concepts, &lexicon.system, bindings.len());
+        diagnostics.append(&mut d);
+        if segment.kind == SegmentKind::Recommendation
+            && let Some(statement) = build_statement(
+                segment,
+                &spans,
+                &b,
+                &tables,
+                statements.len(),
+                &mut diagnostics,
+            )
+        {
+            statements.push(statement);
+        }
+        bindings.append(&mut b);
+    }
+    (
+        ClinicalIr {
+            bindings,
+            statements,
+        },
+        diagnostics,
+    )
+}
+
+/// Verb, modality, and certainty scan tables built once per
+/// [`clinical_ir`] run; every scan list is [`longest_first`]-ordered.
+struct StatementTables<'a> {
+    verb_surfaces: Vec<&'a str>,
+    /// Verb surface → the action kinds carrying it (one surface may serve
+    /// several actions; lexicon order).
+    verbs: HashMap<&'a str, Vec<&'a Id>>,
+    modality_surfaces: Vec<&'a str>,
+    modality: HashMap<&'a str, &'a LexiconModality>,
+    certainty_surfaces: Vec<&'a str>,
+    certainty: HashMap<&'a str, Certainty>,
+}
+
+impl<'a> StatementTables<'a> {
+    fn new(lexicon: &'a Lexicon) -> StatementTables<'a> {
+        let mut verbs: HashMap<&'a str, Vec<&'a Id>> = HashMap::new();
+        for action in &lexicon.actions {
+            for surface in &action.surfaces {
+                verbs.entry(surface).or_default().push(&action.action_id);
+            }
+        }
+        let modality: HashMap<&'a str, &'a LexiconModality> = lexicon
+            .modality
+            .iter()
+            .map(|m| (m.surface.as_str(), m))
+            .collect();
+        let certainty: HashMap<&'a str, Certainty> = lexicon
+            .certainty
+            .iter()
+            .map(|c| (c.surface.as_str(), c.value))
+            .collect();
+        StatementTables {
+            verb_surfaces: longest_first(verbs.keys().copied().collect()),
+            verbs,
+            modality_surfaces: longest_first(modality.keys().copied().collect()),
+            modality,
+            certainty_surfaces: longest_first(certainty.keys().copied().collect()),
+            certainty,
+        }
+    }
+}
+
+/// The per-segment statement builder behind [`clinical_ir`]: read the §5
+/// slots from the segment's fresh `bindings` and scans over its `spans`,
+/// apply the slot rule pushing records onto `diagnostics`, and mint
+/// `stmt.<next>` when every required slot reads single.
+fn build_statement(
+    segment: &ClinicalSegment,
+    spans: &[(&SourceSpan, Vec<&Id>)],
+    bindings: &[TerminologyBinding],
+    tables: &StatementTables<'_>,
+    next: usize,
+    diagnostics: &mut Vec<DiagnosticRecord>,
+) -> Option<ClinicalStatement> {
+    let mut population: Vec<Id> = Vec::new();
+    let mut condition: Vec<Id> = Vec::new();
+    let mut targets: Vec<Id> = Vec::new();
+    for binding in bindings {
+        if !matches!(
+            binding.status,
+            BindingStatus::Exact | BindingStatus::Synonym
+        ) {
+            continue;
+        }
+        let code = binding.code.clone();
+        if code.as_str().starts_with("pop.") {
+            population.push(code);
+        } else if code.as_str().starts_with("drug.") {
+            targets.push(code);
+        } else {
+            condition.push(code);
+        }
+    }
+
+    let mut verbs: Vec<Id> = Vec::new();
+    let mut readings: Vec<(Direction, Strength)> = Vec::new();
+    let mut implied: Vec<Id> = Vec::new();
+    let mut certainties: Vec<Certainty> = Vec::new();
+    for (span, _) in spans {
+        for surface in scan(&span.search_text, &tables.verb_surfaces) {
+            verbs.extend(tables.verbs[surface].iter().map(|&id| id.clone()));
+        }
+        for surface in scan(&span.search_text, &tables.modality_surfaces) {
+            let phrase = tables.modality[surface];
+            readings.push((phrase.direction, phrase.strength));
+            implied.extend(phrase.implies_action.clone());
+        }
+        for surface in scan(&span.search_text, &tables.certainty_surfaces) {
+            certainties.push(tables.certainty[surface]);
+        }
+    }
+    for list in [
+        &mut population,
+        &mut condition,
+        &mut targets,
+        &mut verbs,
+        &mut implied,
+    ] {
+        dedup_keep_first(list);
+    }
+    dedup_keep_first(&mut readings);
+    dedup_keep_first(&mut certainties);
+    let kinds = if verbs.is_empty() { implied } else { verbs };
+
+    let mut withheld = false;
+    match readings.len() {
+        1 => {}
+        0 => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::SemanticSlotMissing,
+                Outcome::Residual,
+                "no modality phrase".to_owned(),
+                segment,
+            ));
+        }
+        _ => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::TerminologyAmbiguous,
+                Outcome::Ambiguity,
+                ambiguous_detail(
+                    "modality",
+                    readings
+                        .iter()
+                        .map(|(d, s)| format!("{} {}", d.as_str(), s.as_str())),
+                ),
+                segment,
+            ));
+        }
+    }
+    match kinds.len() {
+        1 => {}
+        0 => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::SemanticSlotMissing,
+                Outcome::Residual,
+                "no action kind".to_owned(),
+                segment,
+            ));
+        }
+        _ => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::TerminologyAmbiguous,
+                Outcome::Ambiguity,
+                ambiguous_detail("kind", kinds.iter().map(|k| k.to_string())),
+                segment,
+            ));
+        }
+    }
+    match targets.len() {
+        1 => {}
+        0 => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::TerminologyUnmapped,
+                Outcome::Residual,
+                "no action target".to_owned(),
+                segment,
+            ));
+        }
+        _ => {
+            withheld = true;
+            diagnostics.push(slot_diag(
+                DiagnosticCode::TerminologyAmbiguous,
+                Outcome::Ambiguity,
+                ambiguous_detail("target", targets.iter().map(|t| t.to_string())),
+                segment,
+            ));
+        }
+    }
+    let certainty = match certainties.as_slice() {
+        [] => None,
+        [one] => Some(*one),
+        _ => {
+            diagnostics.push(slot_diag(
+                DiagnosticCode::TerminologyAmbiguous,
+                Outcome::Ambiguity,
+                ambiguous_detail(
+                    "certainty",
+                    certainties.iter().map(|c| c.as_str().to_owned()),
+                ),
+                segment,
+            ));
+            None
+        }
+    };
+    if withheld {
+        return None;
+    }
+
+    // Concept-atom canonical bytes order by concept id (id chars never
+    // escape), so an id sort yields canonical set order.
+    population.sort();
+    condition.sort();
+    Some(ClinicalStatement {
+        statement_id: Id::new(format!("stmt.{next}")).expect("counter ids match the Id grammar"),
+        population: population.into_iter().map(ContextAtom::Concept).collect(),
+        condition: condition.into_iter().map(ContextAtom::Concept).collect(),
+        action: Action::new(kinds[0].clone(), targets[0].clone()),
+        modality: readings[0].0,
+        strength: readings[0].1,
+        certainty,
+        exceptions: vec![],
+        source_segment_ids: vec![segment.segment_id.clone()],
+    })
+}
+
+/// Render an ambiguous-slot detail: the distinct readings sorted by their
+/// rendered bytes, comma-joined.
+fn ambiguous_detail(slot: &str, values: impl Iterator<Item = String>) -> String {
+    let mut values: Vec<String> = values.collect();
+    values.sort();
+    format!("ambiguous {slot}: {}", values.join(", "))
+}
+
+/// One slot record of [`build_statement`] (§7.4): the detail and the
+/// owning segment in the payload, grounded in the segment's regions.
+fn slot_diag(
+    code: DiagnosticCode,
+    outcome: Outcome,
+    detail: String,
+    segment: &ClinicalSegment,
+) -> DiagnosticRecord {
+    let detail = StringPolicy::DiagnosticText
+        .normalize(&detail)
+        .expect("diagnostic_text is infallible");
+    let mut region_ids = segment.region_ids.clone();
+    region_ids.sort();
+    region_ids.dedup();
+    DiagnosticRecord {
+        code,
+        outcome,
+        payload: vec![
+            (static_id("detail"), detail),
+            (static_id("segment"), segment.segment_id.to_string()),
+        ],
+        region_ids,
         artifact_hashes: vec![],
     }
 }
@@ -1182,6 +1509,286 @@ mod tests {
                 &[],
                 &["r.0", "r.1"],
             )]
+        );
+    }
+
+    // --- clinical_ir ---
+
+    /// Extract → segment → derive ClinicalIR over `html` under `lexicon`.
+    fn derived(html: &[u8], lexicon: &Lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) {
+        let source = extracted(html);
+        let segments = segment(&source, &producer()).unwrap();
+        clinical_ir(&source.payload, &segments.payload, lexicon)
+    }
+
+    // The statement builder's binding core reproduces bind_segments
+    // byte-for-byte on every committed fixture: same bindings, same
+    // (empty) diagnostics.
+    #[test]
+    fn clinical_ir_bindings_equal_bind_segments() {
+        let lexicon = load_lexicon(&committed()).unwrap();
+        for name in [
+            "v1_guideline_a.html",
+            "v1_guideline_b.html",
+            "v1_control.html",
+        ] {
+            let source = extracted(&fixture(name));
+            let segments = segment(&source, &producer()).unwrap();
+            let (bindings, diagnostics) =
+                bind_segments(&source.payload, &segments.payload, &lexicon);
+            let (ir, ir_diagnostics) = clinical_ir(&source.payload, &segments.payload, &lexicon);
+            assert_eq!(ir.bindings, bindings, "{name}");
+            assert_eq!(ir_diagnostics, diagnostics, "{name}");
+        }
+    }
+
+    // The two single-recommendation fixtures build their statements,
+    // pinned from observed output: in guideline_b the verb 投与 matches
+    // inside 投与しないこと and the two contraindicate phrases dedupe to
+    // one (contraindicate, strong) reading; in control no verb matches
+    // and the kind arrives via 禁忌's implies_action.
+    #[test]
+    fn committed_fixtures_build_statements() {
+        let lexicon = load_lexicon(&committed()).unwrap();
+        let statement = |population: &str, condition: &[&str]| ClinicalStatement {
+            statement_id: id("stmt.0"),
+            population: vec![ContextAtom::Concept(id(population))],
+            condition: condition
+                .iter()
+                .map(|c| ContextAtom::Concept(id(c)))
+                .collect(),
+            action: Action::new(id("act.administer"), id("drug.abx_a")),
+            modality: Direction::Contraindicate,
+            strength: Strength::Strong,
+            certainty: None,
+            exceptions: vec![],
+            source_segment_ids: vec![id("seg.2")],
+        };
+        let cases = [
+            (
+                "v1_guideline_b.html",
+                statement("pop.adult", &["cond.pregnancy", "cond.sepsis"]),
+            ),
+            ("v1_control.html", statement("pop.child", &["cond.sepsis"])),
+        ];
+        for (name, want) in cases {
+            let (ir, diagnostics) = derived(&fixture(name), &lexicon);
+            assert!(
+                diagnostics.is_empty(),
+                "{name} derives diagnostic-free, got {diagnostics:?}"
+            );
+            assert_eq!(ir.statements, vec![want], "{name}");
+        }
+    }
+
+    // One inline case per withhold class — the statement is withheld
+    // while the segment's bindings still emit, one §7.4 record naming the
+    // slot: 考慮してもよい classifies the segment recommendation while the
+    // inline lexicon omits it from modality (zero modality readings); no
+    // verb and no implies_action (zero kinds); no drug.* binding (zero
+    // targets); two distinct (direction, strength) readings (ambiguous
+    // modality, values sorted and rendered "<direction> <strength>").
+    #[test]
+    fn slot_misses_withhold_statement() {
+        let drug_and_verb = concat!(
+            "system: ckc.lex\n",
+            "concepts:\n",
+            "  - id: drug.x\n",
+            "    surface: [薬X]\n",
+            "actions:\n",
+            "  - id: act.give\n",
+            "    surface: [投与する]\n",
+        );
+        let cases: [(String, &str, DiagnosticCode, Outcome, &str); 4] = [
+            (
+                format!("{drug_and_verb}modality: []\ncertainty: []\n"),
+                "<p>薬Xを投与する。考慮してもよい。</p>",
+                DiagnosticCode::SemanticSlotMissing,
+                Outcome::Residual,
+                "no modality phrase",
+            ),
+            (
+                concat!(
+                    "system: ckc.lex\n",
+                    "concepts:\n",
+                    "  - id: drug.x\n",
+                    "    surface: [薬X]\n",
+                    "actions: []\n",
+                    "modality:\n",
+                    "  - surface: 推奨する\n",
+                    "    direction: for\n",
+                    "    strength: strong\n",
+                    "certainty: []\n",
+                )
+                .to_owned(),
+                "<p>薬Xを推奨する。</p>",
+                DiagnosticCode::SemanticSlotMissing,
+                Outcome::Residual,
+                "no action kind",
+            ),
+            (
+                concat!(
+                    "system: ckc.lex\n",
+                    "concepts:\n",
+                    "  - id: cond.a\n",
+                    "    surface: [甲]\n",
+                    "actions:\n",
+                    "  - id: act.give\n",
+                    "    surface: [投与する]\n",
+                    "modality:\n",
+                    "  - surface: 推奨する\n",
+                    "    direction: for\n",
+                    "    strength: strong\n",
+                    "certainty: []\n",
+                )
+                .to_owned(),
+                "<p>甲に投与するを推奨する。</p>",
+                DiagnosticCode::TerminologyUnmapped,
+                Outcome::Residual,
+                "no action target",
+            ),
+            (
+                format!(
+                    concat!(
+                        "{}modality:\n",
+                        "  - surface: 推奨する\n",
+                        "    direction: for\n",
+                        "    strength: strong\n",
+                        "  - surface: 提案する\n",
+                        "    direction: for\n",
+                        "    strength: weak\n",
+                        "certainty: []\n",
+                    ),
+                    drug_and_verb
+                ),
+                "<p>薬Xを投与するを推奨する。提案する。</p>",
+                DiagnosticCode::TerminologyAmbiguous,
+                Outcome::Ambiguity,
+                "ambiguous modality: for strong, for weak",
+            ),
+        ];
+        for (yaml, body, code, outcome, detail) in cases {
+            let lexicon = load_lexicon(yaml.as_bytes()).unwrap();
+            let html = format!("<!DOCTYPE html><html><body>{body}</body></html>");
+            let (ir, diagnostics) = derived(html.as_bytes(), &lexicon);
+            assert!(ir.statements.is_empty(), "{detail}: statement withheld");
+            assert_eq!(ir.bindings.len(), 1, "{detail}: binding still emits");
+            let [diag] = diagnostics.as_slice() else {
+                panic!("{detail}: one record, got {diagnostics:?}");
+            };
+            assert_eq!(diag.code, code, "{detail}");
+            assert_eq!(diag.outcome, outcome, "{detail}");
+            assert_eq!(
+                diag.payload,
+                vec![
+                    (id("detail"), detail.to_owned()),
+                    (id("segment"), "seg.0".to_owned()),
+                ],
+            );
+            assert_eq!(diag.region_ids, vec![id("r.0")], "{detail}");
+            assert!(diag.artifact_hashes.is_empty(), "{detail}");
+        }
+    }
+
+    // Certainty paths: one phrase reads Some; two distinct phrases record
+    // ambiguous certainty while the statement stays KEPT, certainty-free.
+    #[test]
+    fn certainty_reads_and_ambiguity_keeps_statement() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: drug.x\n",
+                "    surface: [薬X]\n",
+                "actions:\n",
+                "  - id: act.give\n",
+                "    surface: [投与する]\n",
+                "modality:\n",
+                "  - surface: 推奨する\n",
+                "    direction: for\n",
+                "    strength: strong\n",
+                "certainty:\n",
+                "  - surface: 確実性は高い\n",
+                "    value: high\n",
+                "  - surface: 確実性は低い\n",
+                "    value: low\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let derive = |sentence: &str| {
+            let html = format!("<!DOCTYPE html><html><body><p>{sentence}</p></body></html>");
+            derived(html.as_bytes(), &lexicon)
+        };
+
+        let (ir, diagnostics) = derive("薬Xを投与するを推奨する。確実性は高い。");
+        assert!(diagnostics.is_empty(), "got {diagnostics:?}");
+        let [statement] = ir.statements.as_slice() else {
+            panic!("one statement, got {:?}", ir.statements);
+        };
+        assert_eq!(statement.certainty, Some(Certainty::High));
+
+        let (ir, diagnostics) = derive("薬Xを投与するを推奨する。確実性は高いが確実性は低い。");
+        let [diag] = diagnostics.as_slice() else {
+            panic!("one record, got {diagnostics:?}");
+        };
+        assert_eq!(diag.code, DiagnosticCode::TerminologyAmbiguous);
+        assert_eq!(diag.outcome, Outcome::Ambiguity);
+        assert_eq!(
+            diag.payload,
+            vec![
+                (id("detail"), "ambiguous certainty: high, low".to_owned()),
+                (id("segment"), "seg.0".to_owned()),
+            ],
+        );
+        let [statement] = ir.statements.as_slice() else {
+            panic!("statement kept, got {:?}", ir.statements);
+        };
+        assert_eq!(statement.certainty, None);
+        assert_eq!(statement.statement_id, id("stmt.0"));
+    }
+
+    // Within a segment, binding diagnostics precede slot diagnostics: the
+    // shared surface binds ambiguous first (contributing to no slot), then
+    // the slot rule reports the modality, kind, and target misses in
+    // order; bind_segments reproduces exactly the binding prefix.
+    #[test]
+    fn binding_diagnostics_precede_slot_diagnostics() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: x.b\n",
+                "    surface: [甲]\n",
+                "  - id: x.a\n",
+                "    surface: [乙, 甲]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let source =
+            extracted("<!DOCTYPE html><html><body><p>甲を推奨する。</p></body></html>".as_bytes());
+        let segments = segment(&source, &producer()).unwrap();
+        let (bindings, bind_diags) = bind_segments(&source.payload, &segments.payload, &lexicon);
+        let (ir, diagnostics) = clinical_ir(&source.payload, &segments.payload, &lexicon);
+        assert_eq!(ir.bindings, bindings);
+        assert!(ir.statements.is_empty());
+        assert_eq!(diagnostics[..1], bind_diags[..]);
+        let details: Vec<&str> = diagnostics
+            .iter()
+            .map(|d| d.payload[0].1.as_str())
+            .collect();
+        assert_eq!(
+            details,
+            vec![
+                "ambiguous surface 甲: x.a x.b",
+                "no modality phrase",
+                "no action kind",
+                "no action target",
+            ]
         );
     }
 }

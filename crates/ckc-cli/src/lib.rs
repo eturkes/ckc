@@ -27,7 +27,12 @@
 //! ([`normalize::bind_segments`]): recommendation/exception spans scanned
 //! longest-match for concept mentions, singleton candidate sets binding
 //! `exact`/`synonym`, shared surfaces binding `ambiguous` with a
-//! `terminology_ambiguous` Ambiguity record.
+//! `terminology_ambiguous` Ambiguity record. `stage-normalize.1d` adds
+//! statement building ([`normalize::clinical_ir`]): the binding core run
+//! per segment, slot readings (binding namespaces; verb, modality, and
+//! certainty scans) building at most one §5 ClinicalStatement per
+//! recommendation segment, misses and ambiguities withholding it as §7.4
+//! records.
 #![forbid(unsafe_code)]
 
 pub mod extract;

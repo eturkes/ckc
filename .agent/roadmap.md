@@ -307,8 +307,8 @@ next plan session removes their checklists (git history retains them).
   candidate-set logic with binding_id = bind.<next + local index>; bind_segments shrinks to the
   rec/exc loop over these. Reading: normalize.rs in full (edit target). Consumes
   stage-normalize.1b. Gate: `cargo test -p ckc-cli normalize::` with the test module untouched.
-  53% 105K/200K _
-- [ ] stage-normalize.1d: Recommendation statements: pub clinical_ir(graph: &SourceGraph,
+  53% 105K/200K e3c4d7f
+- [x] stage-normalize.1d: Recommendation statements: pub clinical_ir(graph: &SourceGraph,
   segments: &SegmentIr, lexicon: &Lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) running the
   .1c binding core per recommendation/exception segment in document order (bindings and binding
   diagnostics byte-equal to bind_segments — assert equality in a test), then building at most
@@ -344,7 +344,7 @@ next plan session removes their checklists (git history retains them).
   segment recommendation while an inline lexicon omits it from modality -> zero modality
   readings) and both certainty paths. Reading: SPEC §8.3 normalize row, §5 statement contract;
   normalize.rs (edit target). Consumes stage-normalize.1c core. Gate: `cargo test -p ckc-cli
-  normalize::`.
+  normalize::`. 68% 136K/200K _
 - [ ] stage-normalize.1e: Exception clauses completing clinical_ir: an exception segment's
   exact/synonym binding codes become ContextAtom::Concept atoms sorted+deduped in
   ExceptionClause {exception_id = exc.<k> counting attached clauses, atoms, region_ids = the

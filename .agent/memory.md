@@ -112,11 +112,12 @@ technically derivable but easily forgotten under token pressure.
   current. `.serena/project.yml` is git-tracked so the set persists across fresh
   checkouts. Apply this whenever a needed Serena LSP isn't enabled.
 - [2026-06-10] Headroom-compressed Reads re-wrap long prose lines, so an Edit
-  old_string assembled from a Read of wrapped markdown (roadmap.md item lines
-  especially) can miss the file's real wrap points and fail to match. Before
-  editing such files, print the target lines raw (`sed -n`/grep) and anchor
-  old_string on those verified bytes; the Edit error's `\uXXXX` hint points the
-  wrong way. Recurs in every closing commit that edits roadmap.md.
+  old_string assembled from a Read of wrapped prose — markdown (roadmap.md item
+  lines especially) AND Rust `//!`/`///` doc blocks (lib.rs) — can miss the
+  file's real wrap points and fail to match. Before editing such files, print
+  the target lines raw (`sed -n`/grep) and anchor old_string on those verified
+  bytes; the Edit error's `\uXXXX` hint points the wrong way. Recurs in every
+  closing commit that edits roadmap.md.
 - [2026-06-10] Markdown authoring: wrap regexes/grammars in backticks — bare
   adjacent bracket groups (`[a-z][a-z0-9_.:-]*`) parse as Marksman reference
   links and emit phantom-label warnings. Verify markdown fixes with grep for
