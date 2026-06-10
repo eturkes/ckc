@@ -20,6 +20,15 @@ git history (46d95e2 and earlier).
   scored by objective gates; CKC's deterministic gates and replay manifests are the standing
   mitigation. The clinical-text fallback entry below stays authoritative for its visible
   case.
+- [2026-06-11] Lexgate guards the durable tree: `bash .agent/lexgate.sh` with modes `hook`
+  (write-time, wired in settings.json), `pre-commit` (installed in .git/hooks; `install`
+  restores it), `sweep` (review sessions run it), `check` (when it reports missing parts,
+  stop and ask the user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only,
+  gitignored, Read-denied, user-maintained; a clean session treats the gate as pass/fail
+  only and a failure as rewording work on the cited lines (the gate cites file:line and
+  never echoes matches). docs/ and corpus/fixtures/ are the sanctioned containers; consult
+  them via read-only subagents instructed to answer in project vocabulary without verbatim
+  quotes.
 
 ## Lessons
 

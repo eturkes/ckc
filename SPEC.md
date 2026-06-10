@@ -120,7 +120,7 @@ assembling the full harness before the first end-to-end result.
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
 | V1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.v1_spine` + §8 checklist |
-| V2 comparison | Direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report. First thesis measurement (claim 1; claim 3's optimization objective via the compactness frontier). | `ckc run --experiment exp.v2_compare` + §9 acceptance |
+| V2 comparison | Direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report. First thesis measurement (claim 1; claim 3's optimization objective via the compactness front). | `ckc run --experiment exp.v2_compare` + §9 acceptance |
 | V3 weak-model PoC | Translation-route comparison under a weak local model (laptop CPU, grammar-constrained, recorded I/O): six routes (§10 table) scored on the V2 evaluator (claim 2); plus the build-once amortization experiment (claim 3). | `ckc run --experiment exp.v3_routes` / `exp.v3_amortize` + §10 |
 | V4 autoresearch PoC | Bounded autoresearch loop (§11) over declared surfaces against a locked evaluator, optimizing lift, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.v4_loop` + §11 |
 | V5 sources | Public corpus ingestion: fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks. | §12 contract, elaborated at V4 acceptance |
@@ -762,7 +762,7 @@ Scope:
   provenance, plus threshold-conflict and factual-conflict cases for the V2 conflict kinds.
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
-  `compactness_frontier.json` join the trace exports — the frontier doubles as the
+  `compactness_front.json` join the trace exports — the front doubles as the
   mapping-minimization view (claim 3's optimization objective, measured deterministically here).
 - Path visualizations per §7.1 (per-finding chain; cross-document component convergence).
 - Metrics per §7.3 over both pipelines; the per-metric layered-minus-direct deltas are the
@@ -824,7 +824,7 @@ Committed direction:
 - Amortization experiment (`exp.v3_amortize`, claim 3): fixture set A builds mappings and
   admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: deterministic coverage of B,
-  accuracy versus gold, mapping-set size versus coverage on the compactness frontier, and
+  accuracy versus gold, mapping-set size versus coverage on the compactness front, and
   apply-phase model-call count (zero) against a model-per-document baseline. Apply-phase path
   graphs (§7.1) contain zero model nodes — the runtime removal made visible.
 - Wording: route results are locked measurements (s0/s1 raw rows); runtime-oracle fidelity
@@ -852,7 +852,7 @@ Committed direction:
   surfaces; an attempt editing locked surfaces classifies as `unauthorized` (diagnostic
   `unauthorized_surface_edit`) and stays unscored.
 - Objectives: §7.3 lift, route quality, amortized coverage, and reuse — promotion requires
-  (improvement on at least one objective, or frontier membership), every objective within
+  (improvement on at least one objective, or front membership), every objective within
   regression thresholds, schema validity, trace completeness, and replay success.
 - Ledger: every attempt, whatever its AttemptClassification (§4.4), lands in append-only
   `experiment_ledger.jsonl` (+ derived CSV/MD) with a run-local PromotionDecision (§4.4);
@@ -861,7 +861,7 @@ Committed direction:
   loop; exhaustion stops the loop with `Residual(budget_exhausted)`, preserving completed and
   partial evidence.
 - Authority: run-local promotion changes ledgers/reports only. Registry/status promotion carries
-  from/to status, evidence and replay hashes, rollback, and applicable gates (`G-SELF-IMPROVE`);
+  from/to status, evidence and replay hashes, rollback, and applicable gates (`G-AUTO-PROMOTE`);
   evaluator-identity changes (fixtures, gold, schemas, metrics, evaluator code, thresholds)
   score only in a separate `G-EVALUATOR-MIGRATION` experiment.
 - Mapping-gap repair (council pattern): unmapped/ambiguous residuals from new documents seed
@@ -970,7 +970,7 @@ stand on their own.
 | `G-EVALUATOR-MIGRATION` | Changes to fixtures/gold/schemas/metrics/evaluator code for future scoring. | `EvaluatorMigrationEvidence` |
 | `G-MDL` | Calibrated compression/Pareto/model-selection claims. | `MDLEvidence` |
 | `G-RUNTIME-ORACLE` | Runtime-model-call or IR-stage oracle fidelity claims. | `RuntimeOracleReport` |
-| `G-SELF-IMPROVE` | Automated registry/status promotion of accepted generators, prompts, policies, compilers, verifier adapters, metric/report code. | `SelfImprovementEvidence` |
+| `G-AUTO-PROMOTE` | Automated registry/status promotion of accepted generators, prompts, policies, compilers, verifier adapters, metric/report code. | `AutoPromotionEvidence` |
 | `G-PROB` | Probabilistic semantics affecting accepted outputs. | `ProbabilisticProfileRecord` |
 | `G-WORLD-MODEL` | Latent-state/multimodal observations affecting outputs. | `WorldModelProfileRecord` |
 | `G-LIVE-PATIENT` | Any patient-derived data entering CKC. | `GovernedPatientDataProfile` |
