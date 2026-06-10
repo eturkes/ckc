@@ -28,6 +28,9 @@ pub enum ValidationError {
     Hash(String),
     /// A [`Rational`] had a non-integer part or a zero denominator.
     Rational(String),
+    /// A string failed its declared [`crate::StringPolicy`] (SPEC §4.2), e.g.
+    /// `identifier_ascii` received bytes outside `[a-z0-9_:./-]+`.
+    StringPolicy(String),
 }
 
 impl fmt::Display for ValidationError {
@@ -36,6 +39,7 @@ impl fmt::Display for ValidationError {
             ValidationError::Id(m) => write!(f, "invalid Id: {m}"),
             ValidationError::Hash(m) => write!(f, "invalid Hash: {m}"),
             ValidationError::Rational(m) => write!(f, "invalid Rational: {m}"),
+            ValidationError::StringPolicy(m) => write!(f, "invalid string policy: {m}"),
         }
     }
 }

@@ -19,13 +19,13 @@ next plan session removes their checklists (git history retains them).
   (sha256: plus 64 lowercase hex), exact-reduced Rational (positive denominator, decimal-string
   num/den repr) with ValidationError, serde via try_from/into String, Display/FromStr;
   acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Gate:
-  `cargo test -p ckc-core`. 34% 67K/200K _
-- [ ] core-strings: StringPolicy enum (Copy, snake_case serde) with the seven policies raw_source,
+  `cargo test -p ckc-core`. 34% 67K/200K 10bf054
+- [x] core-strings: StringPolicy enum (Copy, snake_case serde) with the seven policies raw_source,
   source_nfkc, semantic_ja, semantic_en, identifier_ascii, diagnostic_text, view_text as
   deterministic normalizers: pipeline NFKC, whitespace fold to single U+0020 trimmed, CJK
   punctuation fold (U+3001 to comma, U+3002 to period), ASCII lowercase for semantic_en; only
   identifier_ascii ([a-z0-9_:./-]+) fallible; per-policy exact-output and idempotence tests. Reading: SPEC §4.2. Consumes core-ids ValidationError and crate skeleton. Gate: `cargo
-  test -p ckc-core`.
+  test -p ckc-core`. 30% 60K/200K _
 - [ ] core-canon-writer: Canonical JSON writer core in a canon module: Canonical trait and
   canonical_payload_bytes as the single byte authority; emit_string with the fixed minimal escape
   set, emit_int as quoted decimal (never bare number tokens), emit_string_policy; ObjectEmitter
