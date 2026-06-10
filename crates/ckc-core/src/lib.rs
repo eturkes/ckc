@@ -6,7 +6,8 @@
 //! [`Hash`], and [`Rational`]; `core-strings` adds the SPEC §4.2
 //! [`StringPolicy`] normalizers; `core-canon-writer` opens the SPEC §4.3
 //! canonical JSON writer ([`Canonical`], [`canonical_payload_bytes`],
-//! [`ObjectEmitter`]).
+//! [`ObjectEmitter`]), and `core-canon-collections` adds the array/set/map
+//! rules ([`emit_array`], [`emit_set`], [`emit_map`], [`MapKey`]).
 #![forbid(unsafe_code)]
 
 mod canon;
@@ -14,8 +15,8 @@ mod id;
 mod strings;
 
 pub use canon::{
-    CanonError, Canonical, ObjectEmitter, canonical_payload_bytes, emit_int, emit_string,
-    emit_string_policy,
+    CanonError, Canonical, MapKey, ObjectEmitter, canonical_payload_bytes, canonical_sort_key,
+    emit_array, emit_int, emit_map, emit_set, emit_string, emit_string_policy,
 };
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use strings::StringPolicy;

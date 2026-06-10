@@ -2,9 +2,9 @@
 //!
 //! [`canonical_payload_bytes`] is the single authority that turns a typed value
 //! into the deterministic UTF-8 bytes hashed into an artifact's `content_hash`.
-//! This unit delivers the writer core; semantic collections (arrays, sets,
-//! maps), tagged unions, strict reading, and the content hash itself are
-//! layered on by later units.
+//! `core-canon-writer` delivered the scalar + object writer core and
+//! `core-canon-collections` adds the array, set, and map rules; tagged unions,
+//! strict reading, and the content hash itself are layered on by later units.
 //!
 //! ```text
 //! object   field names sorted by UTF-8 byte order; duplicate names rejected
@@ -12,6 +12,9 @@
 //! string   declared StringPolicy applied, then JSON-escaped (UTF-8 passthrough)
 //! integer  decimal string, e.g. "42" (bare JSON number tokens are never emitted)
 //! rational {"den":"<den>","num":"<num>"} with den positive and parts reduced
+//! array    elements in given semantic order
+//! set      elements sorted by canonical_sort_key, byte-identical dups collapsed
+//! map      identifier_ascii keys -> sorted object; else sorted {"key","value"} pairs
 //! ```
 //!
 //! Canonical string escaping is minimal and fixed: escape U+0022 `"` as `\"`,
@@ -19,6 +22,7 @@
 //! scalar passes through as its raw UTF-8 bytes (shorthand escapes such as `\n`
 //! are non-canonical). One representation per string.
 
+use std::borrow::Cow;
 use std::fmt;
 
 use num_bigint::BigInt;
@@ -31,6 +35,10 @@ pub enum CanonError {
     /// Two object members shared a field name; an object holds at most one value
     /// per name, so the canonical form would be undefined.
     DuplicateField(String),
+    /// Two map entries shared a key; a map binds each key once, so the canonical
+    /// value would be ambiguous. Carries the object member name (identifier_ascii
+    /// form) or the key's canonical bytes (pair-array form).
+    DuplicateMapKey(String),
     /// A string field failed its declared [`StringPolicy`]; only
     /// `identifier_ascii` can reject its input.
     Policy(ValidationError),
@@ -40,6 +48,7 @@ impl fmt::Display for CanonError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CanonError::DuplicateField(name) => write!(f, "duplicate object field: {name:?}"),
+            CanonError::DuplicateMapKey(key) => write!(f, "duplicate map key: {key:?}"),
             CanonError::Policy(e) => write!(f, "string policy: {e}"),
         }
     }
@@ -153,12 +162,23 @@ impl ObjectEmitter {
         }
     }
 
-    /// Sort buffered members by field-name bytes, reject duplicate names, and
-    /// append the object to `out`.
-    pub fn finish(mut self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+    /// Sort buffered members by field-name bytes, reject duplicate names with
+    /// [`CanonError::DuplicateField`], and append the object to `out`.
+    pub fn finish(self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        self.finish_with(out, CanonError::DuplicateField)
+    }
+
+    /// [`finish`](Self::finish) with a caller-chosen duplicate-name error, so a
+    /// map in object form reports [`CanonError::DuplicateMapKey`] for a repeated
+    /// key while a record reports a duplicate field.
+    fn finish_with(
+        mut self,
+        out: &mut Vec<u8>,
+        duplicate: impl FnOnce(String) -> CanonError,
+    ) -> Result<(), CanonError> {
         self.members.sort_by(|a, b| a.0.cmp(&b.0));
         if let Some(w) = self.members.windows(2).find(|w| w[0].0 == w[1].0) {
-            return Err(CanonError::DuplicateField(w[0].0.clone()));
+            return Err(duplicate(w[0].0.clone()));
         }
         out.push(b'{');
         for (i, (name, value)) in self.members.iter().enumerate() {
@@ -207,6 +227,138 @@ impl Canonical for Rational {
         emit_int(out, self.numer());
         out.push(b'}');
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Canonical collections (SPEC §4.3)
+// ---------------------------------------------------------------------------
+
+/// SPEC §4.3 `canonical_sort_key`: the total order [`emit_set`] and pair-array
+/// [`emit_map`] sort by. For CKC it is exactly the element's
+/// [`canonical_payload_bytes`]; within a Rust-homogeneous collection those bytes
+/// are injective, so their byte-lexicographic order is total and deterministic,
+/// and no separate type tag is needed (every element shares one type).
+pub fn canonical_sort_key<T: Canonical>(x: &T) -> Result<Vec<u8>, CanonError> {
+    canonical_payload_bytes(x)
+}
+
+/// Frame `items` as a canonical JSON array `[…]`, writing each through `emit`
+/// with `,` separators. Shared core of [`emit_array`], [`emit_set`], and the
+/// pair-array map form.
+fn emit_bracketed<T>(
+    out: &mut Vec<u8>,
+    items: impl IntoIterator<Item = T>,
+    mut emit: impl FnMut(&mut Vec<u8>, T) -> Result<(), CanonError>,
+) -> Result<(), CanonError> {
+    out.push(b'[');
+    for (i, item) in items.into_iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        emit(out, item)?;
+    }
+    out.push(b']');
+    Ok(())
+}
+
+/// SPEC §4.3 array: elements in their given semantic order, each emitted through
+/// [`Canonical`]. Order is preserved verbatim; callers needing order-free set
+/// semantics use [`emit_set`].
+pub fn emit_array<'a, T: Canonical + 'a>(
+    out: &mut Vec<u8>,
+    items: impl IntoIterator<Item = &'a T>,
+) -> Result<(), CanonError> {
+    emit_bracketed(out, items, |b, item| item.emit_canonical(b))
+}
+
+/// SPEC §4.3 set: an array sorted by [`canonical_sort_key`] with byte-identical
+/// duplicates collapsed (a set holds each element once; canonical bytes are
+/// injective, so byte-equal means equal). Input order never affects the result.
+pub fn emit_set<'a, T: Canonical + 'a>(
+    out: &mut Vec<u8>,
+    items: impl IntoIterator<Item = &'a T>,
+) -> Result<(), CanonError> {
+    let mut keys: Vec<Vec<u8>> = items
+        .into_iter()
+        .map(canonical_sort_key)
+        .collect::<Result<_, _>>()?;
+    keys.sort_unstable();
+    keys.dedup();
+    // A sort key is the element's own canonical bytes, emitted verbatim.
+    emit_bracketed(out, keys, |b, k| {
+        b.extend_from_slice(&k);
+        Ok(())
+    })
+}
+
+/// A type usable as a SPEC §4.3 map key. `IDENTIFIER_ASCII` is a type-level
+/// promise that every value's canonical form is an identifier_ascii JSON
+/// string; it picks the map encoding for the whole map (even when empty), so it
+/// must not vary by value.
+pub trait MapKey: Canonical {
+    /// `true` selects the object form (keys as sorted member names); `false`
+    /// selects the pair-array form for structured/other keys.
+    const IDENTIFIER_ASCII: bool;
+
+    /// The unquoted object-form member name: `Some` exactly when
+    /// `IDENTIFIER_ASCII`. The default suits non-identifier keys.
+    fn key_str(&self) -> Option<Cow<'_, str>> {
+        None
+    }
+}
+
+/// `Id` grammar `[a-z][a-z0-9_.:-]*` ⊂ identifier_ascii `[a-z0-9_:./-]+`.
+impl MapKey for Id {
+    const IDENTIFIER_ASCII: bool = true;
+    fn key_str(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(self.as_str()))
+    }
+}
+
+/// `Hash` form `sha256:` + lowercase hex stays within identifier_ascii.
+impl MapKey for Hash {
+    const IDENTIFIER_ASCII: bool = true;
+    fn key_str(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(self.as_str()))
+    }
+}
+
+/// SPEC §4.3 map. identifier_ascii keys (`K::IDENTIFIER_ASCII`) encode as an
+/// object with members sorted by key-name bytes; all other keys encode as an
+/// array of `{"key":K,"value":V}` pairs sorted by [`canonical_sort_key`] of the
+/// key. Duplicate keys are rejected in both forms (a map binds each key once),
+/// and an empty map keeps its type-guided form (`{}` vs `[]`).
+pub fn emit_map<'a, K: MapKey + 'a, V: Canonical + 'a>(
+    out: &mut Vec<u8>,
+    entries: impl IntoIterator<Item = (&'a K, &'a V)>,
+) -> Result<(), CanonError> {
+    if K::IDENTIFIER_ASCII {
+        let mut obj = ObjectEmitter::new();
+        for (k, v) in entries {
+            let name = k.key_str().expect("IDENTIFIER_ASCII MapKey yields key_str");
+            obj.member(name.as_ref(), |b| v.emit_canonical(b))?;
+        }
+        obj.finish_with(out, CanonError::DuplicateMapKey)
+    } else {
+        let mut pairs: Vec<(Vec<u8>, &V)> = entries
+            .into_iter()
+            .map(|(k, v)| Ok((canonical_sort_key(k)?, v)))
+            .collect::<Result<_, CanonError>>()?;
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        if let Some(w) = pairs.windows(2).find(|w| w[0].0 == w[1].0) {
+            return Err(CanonError::DuplicateMapKey(
+                String::from_utf8_lossy(&w[0].0).into_owned(),
+            ));
+        }
+        emit_bracketed(out, pairs, |b, (key, v)| {
+            b.extend_from_slice(b"{\"key\":");
+            b.extend_from_slice(&key);
+            b.extend_from_slice(b",\"value\":");
+            v.emit_canonical(b)?;
+            b.push(b'}');
+            Ok(())
+        })
     }
 }
 
@@ -363,6 +515,135 @@ mod tests {
         assert_eq!(
             emitted(|out| o.finish(out).unwrap()),
             r#"{"count":"7","id":"pipe.x","label":"hello","ratio":{"den":"2","num":"1"}}"#
+        );
+    }
+
+    /// A structured (non-identifier_ascii) map key: its canonical form is an
+    /// object, so [`emit_map`] must fall to the SPEC §4.3 pair-array form.
+    struct Span {
+        lo: i64,
+        hi: i64,
+    }
+
+    impl Canonical for Span {
+        fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+            let mut o = ObjectEmitter::new();
+            o.member("hi", |b| {
+                emit_int(b, &BigInt::from(self.hi));
+                Ok(())
+            })?;
+            o.member("lo", |b| {
+                emit_int(b, &BigInt::from(self.lo));
+                Ok(())
+            })?;
+            o.finish(out)
+        }
+    }
+
+    impl MapKey for Span {
+        const IDENTIFIER_ASCII: bool = false;
+    }
+
+    #[test]
+    fn arrays_preserve_semantic_order() {
+        let items = [
+            Id::new("c").unwrap(),
+            Id::new("a").unwrap(),
+            Id::new("b").unwrap(),
+        ];
+        // Order is meaningful: it is kept verbatim, never sorted.
+        assert_eq!(
+            emitted(|o| emit_array(o, &items).unwrap()),
+            r#"["c","a","b"]"#
+        );
+        let empty: [Id; 0] = [];
+        assert_eq!(emitted(|o| emit_array(o, &empty).unwrap()), "[]");
+    }
+
+    #[test]
+    fn sets_sort_and_collapse_by_canonical_bytes() {
+        let items = [
+            Id::new("c").unwrap(),
+            Id::new("a").unwrap(),
+            Id::new("b").unwrap(),
+            Id::new("a").unwrap(),
+        ];
+        // Sorted by canonical bytes; the repeated "a" collapses to one element.
+        assert_eq!(
+            emitted(|o| emit_set(o, &items).unwrap()),
+            r#"["a","b","c"]"#
+        );
+        // The order is byte-lexicographic over canonical bytes, not numeric:
+        // "10" precedes "9" because '1' (0x31) sorts before '9' (0x39).
+        let nums = [BigInt::from(9), BigInt::from(10)];
+        assert_eq!(emitted(|o| emit_set(o, &nums).unwrap()), r#"["10","9"]"#);
+        let empty: [Id; 0] = [];
+        assert_eq!(emitted(|o| emit_set(o, &empty).unwrap()), "[]");
+    }
+
+    #[test]
+    fn identifier_keyed_maps_emit_sorted_objects() {
+        let entries = [
+            (Id::new("b").unwrap(), BigInt::from(2)),
+            (Id::new("a").unwrap(), BigInt::from(1)),
+        ];
+        // identifier_ascii keys -> object, members sorted by key-name bytes.
+        assert_eq!(
+            emitted(|o| emit_map(o, entries.iter().map(|(k, v)| (k, v))).unwrap()),
+            r#"{"a":"1","b":"2"}"#
+        );
+        // An empty identifier-keyed map keeps the object form.
+        assert_eq!(
+            emitted(|o| emit_map(o, std::iter::empty::<(&Id, &BigInt)>()).unwrap()),
+            "{}"
+        );
+        // A repeated key is ambiguous and rejected.
+        let dup = [
+            (Id::new("k").unwrap(), BigInt::from(1)),
+            (Id::new("k").unwrap(), BigInt::from(2)),
+        ];
+        let mut out = Vec::new();
+        assert!(matches!(
+            emit_map(&mut out, dup.iter().map(|(k, v)| (k, v))),
+            Err(CanonError::DuplicateMapKey(k)) if k == "k"
+        ));
+    }
+
+    #[test]
+    fn structured_keyed_maps_emit_sorted_pair_arrays() {
+        let entries = [
+            (Span { lo: 5, hi: 9 }, Id::new("y").unwrap()),
+            (Span { lo: 1, hi: 2 }, Id::new("x").unwrap()),
+        ];
+        // Non-identifier keys -> array of {"key","value"} pairs sorted by the
+        // key's canonical bytes ({"hi":"2",…} precedes {"hi":"9",…}).
+        assert_eq!(
+            emitted(|o| emit_map(o, entries.iter().map(|(k, v)| (k, v))).unwrap()),
+            r#"[{"key":{"hi":"2","lo":"1"},"value":"x"},{"key":{"hi":"9","lo":"5"},"value":"y"}]"#
+        );
+        // An empty structured-keyed map keeps the pair-array form.
+        assert_eq!(
+            emitted(|o| emit_map(o, std::iter::empty::<(&Span, &Id)>()).unwrap()),
+            "[]"
+        );
+        // Byte-identical keys are rejected here too.
+        let dup = [
+            (Span { lo: 1, hi: 2 }, Id::new("x").unwrap()),
+            (Span { lo: 1, hi: 2 }, Id::new("y").unwrap()),
+        ];
+        let mut out = Vec::new();
+        assert!(matches!(
+            emit_map(&mut out, dup.iter().map(|(k, v)| (k, v))),
+            Err(CanonError::DuplicateMapKey(_))
+        ));
+    }
+
+    #[test]
+    fn canonical_sort_key_is_payload_bytes() {
+        let id = Id::new("pipe.x").unwrap();
+        assert_eq!(
+            canonical_sort_key(&id).unwrap(),
+            canonical_payload_bytes(&id).unwrap()
         );
     }
 }

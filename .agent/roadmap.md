@@ -32,12 +32,13 @@ next plan session removes their checklists (git history retains them).
   sorting members by UTF-8 name bytes, omitting absent optionals, rejecting duplicates; Rational as
   reduced {den,num} object; CanonError; exact-byte assertion tests. Reading: SPEC §4.3.
   Consumes core-ids value types, core-strings policies. Gate: `cargo test -p ckc-core canon::`.
-  43% 86K/200K _
-- [ ] core-canon-collections: Canonical collections over the writer core: emit_array in semantic
+  43% 86K/200K 1adc76b
+- [x] core-canon-collections: Canonical collections over the writer core: emit_array in semantic
   order; canonical_sort_key from element canonical bytes; emit_set sorted byte-lexicographically
   with byte-identical duplicates collapsed; MapKey trait whose const IDENTIFIER_ASCII picks the map
   form for the whole map; emit_map as sorted object for identifier_ascii keys and as key/value pair
   array sorted by key bytes otherwise, duplicates rejected in both forms. Reading: SPEC §4.3. Consumes core-canon-writer core. Gate: `cargo test -p ckc-core canon::`.
+  41% 82K/200K _
 - [ ] core-canon-unions: Tagged-union and fieldless-enum emission: emit_union producing exactly
   {tag,value} with identifier_ascii tags via ObjectEmitter, tag byte-sorted before value; fieldless
   enums emitted as identifier_ascii strings. Reading:
