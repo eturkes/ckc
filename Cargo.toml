@@ -1,0 +1,9 @@
+# CKC workspace (SPEC §3). Remaining crates land with their V1 units:
+# crates/{ckc-smt,ckc-cli}.
+[workspace]
+resolver = "3"
+members = ["crates/ckc-core"]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
