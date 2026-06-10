@@ -47,11 +47,11 @@ technically derivable but easily forgotten under token pressure.
   Code's search sub-request forces it; sessions on pre-Fable models (through 2026-06-09) searched
   fine. The error arrives INLINE in an ok-looking result (is_error unset), so read result bodies.
   Heals only via a Claude Code update or a non-Mythos-lineage model — re-test on either change and
-  drop this clause when healed. The same 400 threatens ANY API-level tool forcing: Workflow
-  agent() `schema` is described as forcing a StructuredOutput call, and workflow subagents inherit
-  the fable model, so the next plan session runs a one-agent schema canary BEFORE its judge-panel
-  fan-out and, on a 400, falls back to prompt-requested JSON text parsed and validated in the main
-  session. Working channels: general web search = WebFetch on
+  drop this clause when healed. Workflow agent() `schema` is verified UNAFFECTED: a live
+  two-agent canary on fable (no-schema control plus schema probe; the probe returned a validated
+  object and self-reported claude-fable-5) shows StructuredOutput forcing rides a non-tool_choice
+  path, so plan-session judge panels use `schema` as designed. Working channels: general web
+  search = WebFetch on
   `https://lite.duckduckgo.com/lite/?q=<query>` (Anthropic egress passes DDG's bot wall; sandbox
   curl to DDG gets a block page); crates.io via curl with a `-A` user-agent header (403 without
   one) — detail https://crates.io/api/v1/crates/NAME, search .../crates?q=<terms>&sort=relevance;
