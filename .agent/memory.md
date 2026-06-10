@@ -35,6 +35,15 @@ git history.
   them via read-only subagents instructed to answer in project vocabulary without verbatim
   quotes.
 
+- [2026-06-11] LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
+  whose concrete syntax gets hand-authored or byte-pinned in-repo (active: rust,
+  bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets: lean4,
+  alloy, egglog) — compendium-catalogued families whose registry presence is YAML data carry
+  no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server (2026-05 audit); Isabelle's LSP and any Python LSP land only with
+  their adoption decisions (§13 additional-targets row; §12 adapter boundary). dolmen-lsp
+  deploys as a standalone copied binary with the opam tree removed — rebuild recipe in its
+  plugin README.
+
 ## Lessons
 
 - Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus three

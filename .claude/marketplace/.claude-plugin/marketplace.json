@@ -18,7 +18,9 @@
       "lspServers": {
         "vscode-json": {
           "command": "vscode-json-language-server",
-          "args": ["--stdio"],
+          "args": [
+            "--stdio"
+          ],
           "extensionToLanguage": {
             ".json": "json",
             ".jsonc": "jsonc"
@@ -36,7 +38,9 @@
       "lspServers": {
         "yaml": {
           "command": "yaml-language-server",
-          "args": ["--stdio"],
+          "args": [
+            "--stdio"
+          ],
           "extensionToLanguage": {
             ".yaml": "yaml",
             ".yml": "yaml"
@@ -54,7 +58,9 @@
       "lspServers": {
         "marksman": {
           "command": "marksman",
-          "args": ["server"],
+          "args": [
+            "server"
+          ],
           "extensionToLanguage": {
             ".md": "markdown",
             ".markdown": "markdown"
@@ -72,7 +78,10 @@
       "lspServers": {
         "taplo": {
           "command": "taplo",
-          "args": ["lsp", "stdio"],
+          "args": [
+            "lsp",
+            "stdio"
+          ],
           "extensionToLanguage": {
             ".toml": "toml"
           }
@@ -89,46 +98,12 @@
       "lspServers": {
         "vscode-html": {
           "command": "vscode-html-language-server",
-          "args": ["--stdio"],
+          "args": [
+            "--stdio"
+          ],
           "extensionToLanguage": {
             ".html": "html",
             ".htm": "html"
-          }
-        }
-      }
-    },
-    {
-      "name": "css-lsp",
-      "description": "CSS LSP via vscode-css-language-server (from vscode-langservers-extracted)",
-      "version": "1.0.0",
-      "source": "./plugins/css-lsp",
-      "category": "development",
-      "strict": false,
-      "lspServers": {
-        "vscode-css": {
-          "command": "vscode-css-language-server",
-          "args": ["--stdio"],
-          "extensionToLanguage": {
-            ".css": "css",
-            ".scss": "scss",
-            ".less": "less"
-          }
-        }
-      }
-    },
-    {
-      "name": "svelte-lsp",
-      "description": "Svelte LSP via svelteserver",
-      "version": "1.0.0",
-      "source": "./plugins/svelte-lsp",
-      "category": "development",
-      "strict": false,
-      "lspServers": {
-        "svelte": {
-          "command": "svelteserver",
-          "args": ["--stdio"],
-          "extensionToLanguage": {
-            ".svelte": "svelte"
           }
         }
       }
@@ -143,27 +118,11 @@
       "lspServers": {
         "lean4": {
           "command": "lake",
-          "args": ["serve"],
+          "args": [
+            "serve"
+          ],
           "extensionToLanguage": {
             ".lean": "lean4"
-          }
-        }
-      }
-    },
-    {
-      "name": "turtle-lsp",
-      "description": "Turtle/RDF LSP via Stardog turtle-language-server",
-      "version": "1.0.0",
-      "source": "./plugins/turtle-lsp",
-      "category": "development",
-      "strict": false,
-      "lspServers": {
-        "turtle": {
-          "command": "turtle-language-server",
-          "args": ["--stdio"],
-          "extensionToLanguage": {
-            ".ttl": "turtle",
-            ".nt": "turtle"
           }
         }
       }
@@ -204,23 +163,6 @@
       }
     },
     {
-      "name": "prolog-lsp",
-      "description": "SWI-Prolog LSP via jamesnvc/lsp_server pack",
-      "version": "1.0.0",
-      "source": "./plugins/prolog-lsp",
-      "category": "development",
-      "strict": false,
-      "lspServers": {
-        "prolog": {
-          "command": "prolog-lsp",
-          "extensionToLanguage": {
-            ".pl": "prolog",
-            ".pro": "prolog"
-          }
-        }
-      }
-    },
-    {
       "name": "dolmen-lsp",
       "description": "Dolmen LSP for SMT-LIB, TPTP, DIMACS, Zipperposition",
       "version": "1.0.0",
@@ -237,22 +179,6 @@
             ".p": "tptp",
             ".tptp": "tptp",
             ".zf": "zf"
-          }
-        }
-      }
-    },
-    {
-      "name": "souffle-lsp",
-      "description": "Soufflé Datalog LSP via jdaridis/souffle-lsp-plugin",
-      "version": "1.0.0",
-      "source": "./plugins/souffle-lsp",
-      "category": "development",
-      "strict": false,
-      "lspServers": {
-        "souffle": {
-          "command": "souffle-lsp",
-          "extensionToLanguage": {
-            ".dl": "souffle"
           }
         }
       }
