@@ -2,24 +2,15 @@
 
 Flat ordered checklist consumed by the /session-prompt command. SPEC.md is the
 design authority; its §2 is the build plan. Completed lines gain `[x]` plus a
-trailing `NN% NNNK/200K` annotation from `.agent/compaction.sh`. An empty tail
-means: author the next units from the current SPEC milestone.
+trailing `NN% NNNK/200K` (`/1M` in review sessions) annotation from
+`.agent/compaction.sh`. An empty tail means: author the next units from the
+current SPEC milestone.
 
-- [x] boilerplate: minimal repository skeleton per SPEC §3 — .gitignore already sufficient; root
-  Cargo workspace (resolver 3, edition 2024) seeded with an empty crates/ckc-core member
-  (user-approved deviation: every cargo command rejects a memberless virtual workspace, so the
-  sole stub member replaced "no member crates yet"); corpus/{fixtures,lexicon,gold}/ and
-  registry/ directories. Reading: SPEC §3. Gate: `cargo test --workspace` runs clean and the
-  tree commits clean. 25% 51K/200K
-- [x] plan-v1: author the V1 build units into this roadmap from SPEC §8.7 (dependency order;
-  memory sizing anchors), run as a planning
-  workflow per this command. Reading: SPEC §2, §4, §8. Gate: forward units authored below this
-  line. 58% 115K/200K
 - [ ] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
   num-rational), lib.rs wiring with unsafe forbidden, and value types Id ([a-z][a-z0-9_.:-]*), Hash
   (sha256: plus 64 lowercase hex), exact-reduced Rational (positive denominator, decimal-string
   num/den repr) with ValidationError, serde via try_from/into String, Display/FromStr;
-  acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Fills the boilerplate stub crate. Gate:
+  acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Gate:
   `cargo test -p ckc-core`.
 - [ ] core-strings: StringPolicy enum (Copy, snake_case serde) with the seven policies raw_source,
   source_nfkc, semantic_ja, semantic_en, identifier_ascii, diagnostic_text, view_text as
@@ -123,12 +114,10 @@ means: author the next units from the current SPEC milestone.
   stage's declared input artifact kinds are produced by predecessors; typed validation errors;
   inline-fixture tests including chain violations and dangling refs. Reading: SPEC §8.4; §3
   registry-check invariant. Consumes core-registry.1 types. Gate: `cargo test -p ckc-core`.
-- [ ] review v1-kernel: Multi-agent review workflow over the kernel group, core-ids ..
-  core-registry.2 (16 units, crate ckc-core: value types, string policies, canonical writer/reader,
-  hashing, enums/envelope/records, grounding, IR layers, plans, registry types and validation),
-  commit range since plan-v1; audit axes: bugs, SPEC conformance, CLAUDE.md/memory conformance,
-  inconsistencies, token-inefficiency, obsolescence. Reading: SPEC §4.1-§4.6, §5, §7.4. Gate: Every finding on the
-  six axes triaged to a fix commit or a recorded roadmap candidate.
+- [ ] review v1-kernel: Review of the kernel group, core-ids .. core-registry.2 (16 units, crate
+  ckc-core: value types, string policies, canonical writer/reader, hashing, enums/envelope/records,
+  grounding, IR layers, plans, registry types and validation), commit range since plan-v1. Reading:
+  SPEC §4.1-§4.6, §5, §7.4. Gate: every finding triaged to a fix commit or a recorded roadmap candidate.
 - [ ] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
   corpus/fixtures/ (guideline_a with CQ heading, recommendation and exception sentences, definitions
   table, evidence list; guideline_b contraindication; control with disjoint child age interval),
@@ -248,13 +237,11 @@ means: author the next units from the current SPEC milestone.
   matching hashes yield ok; re-run-equals-prior idempotency test over a fixture run. Closes §8.5
   item 8. Reading: SPEC §4.6 replay semantics, §8.3 layout, §7.4 replay codes. Consumes
   cli-runner.4.1 manifests and the complete run pipeline. Gate: `cargo test --workspace`.
-- [ ] review v1-pipeline: Multi-agent review workflow over the pipeline group, fixtures-v1 ..
-  cli-runner.4.2 (15 units: corpus/lexicon/gold/registry data, ckc-cli foundation and stages,
-  ckc-smt planning/emission, Z3 verification, runner, trace, report and replay), commit range since
-  review v1-kernel, with one sample exp.v1_spine run as evidence; audit axes: bugs, SPEC
-  conformance, CLAUDE.md/memory conformance, inconsistencies, token-inefficiency, obsolescence.
-  Reading: SPEC §4.4, §6, §7.1, §7.2, §8.1-§8.4, §8.6 worked thread as oracle. Gate: Every finding
-  on the six axes triaged to a fix commit or a recorded roadmap candidate.
+- [ ] review v1-pipeline: Review of the pipeline group, fixtures-v1 .. cli-runner.4.2 (15 units:
+  corpus/lexicon/gold/registry data, ckc-cli foundation and stages, ckc-smt planning/emission, Z3
+  verification, runner, trace, report and replay), commit range since review v1-kernel, with one
+  sample exp.v1_spine run as evidence. Reading: SPEC §4.4, §6, §7.1, §7.2, §8.1-§8.4, §8.6 worked
+  thread as oracle. Gate: every finding triaged to a fix commit or a recorded roadmap candidate.
 - [ ] acceptance-v1: Dedicated acceptance session for the V1 milestone: execute §8.5 items 1-9 in
   order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.v1_spine --out
   runs/v1 with outcome ok and strict-read artifact set; assertion-map audit; group.v1_conflict

@@ -3,17 +3,23 @@ description: Run a CKC dev session — follow the roadmap, or pass a task to ove
 argument-hint: [task]
 ---
 
-You are developing CKC. The project specification (`SPEC.md`, once authored) is
-the design authority; `.agent/roadmap.md` is the canonical build plan — a flat
-ordered checklist of build units and review lines. This command defines the
-session protocol around them.
+You are developing CKC. The project specification (`SPEC.md`) is the design
+authority; `.agent/roadmap.md` is the canonical build plan — a flat ordered
+checklist of build units and review lines. This command defines the session
+protocol around them.
+
+Context sizing: every session runs in a 200K context window, except Review
+sessions, which run at 1M — a review's value comes from holding as much of the
+codebase as possible coherently in one context. Any session that marks a
+roadmap line `[x]` runs `.agent/compaction.sh` right before staging and appends
+its `NN% NNNK/200K` (1M sessions: `/1M`) output to that line.
 
 ## Step 1: Load context
 
-Read `.agent/memory.md` and `.agent/roadmap.md` (when present). When a specification exists,
-read its Operating contract and Build plan sections (§1–§2; locate boundaries
-with `grep -n '^#' SPEC.md`), and load further sections only as Step 2 directs;
-full-specification loading is reserved for specification-maintenance sessions.
+Read `.agent/memory.md` and `.agent/roadmap.md`. Read SPEC.md's Operating
+contract and Build plan sections (§1–§2; locate boundaries with `grep -n '^#'
+SPEC.md`), and load further sections only as Step 2 directs; full-specification
+loading is reserved for specification-maintenance sessions.
 
 ## Step 2: Pick session mode
 
@@ -29,51 +35,47 @@ this command.
 
 ### Select session type (roadmap mode)
 
-`.agent/roadmap.md` absent → **Bootstrap**. Otherwise the roadmap is a flat ordered checklist;
-find the first unchecked line:
+The roadmap is a flat ordered checklist; find the first unchecked line:
 
-- A build-unit line → **Implement**.
+- A planning line — its deliverable is authoring roadmap units (`plan-v<n>`,
+  elaboration) → **Plan**.
+- Any other build-unit line → **Implement**.
 - A review line (`review …`) → **Review**.
 - A line marked `user-selected` → stop and confirm scope with the user first.
-- No unchecked line → backlog exhausted; report and stop.
+- No unchecked line → the tail is empty: author the next units from the current
+  SPEC milestone as a **Plan** session (when the next milestone's contract
+  section is still compact, that is an elaboration session per SPEC §1, whose
+  spec diff reaches the user before units are seeded).
 
-## Bootstrap session
+## Plan session
 
-Create `.agent/roadmap.md` and make one commit — that is the whole session. The file opens with
-a short header stating: it is a flat ordered checklist consumed by this command; `SPEC.md` is
-the design authority and its §2 the build plan; completed lines gain `[x]` plus a trailing
-`NN% NNNK/200K` annotation from `.agent/compaction.sh`; an empty tail means *author the next
-units from the current SPEC milestone*. After the header, exactly these seed lines:
-
-```text
-- [ ] boilerplate: minimal repository skeleton per SPEC §3 — extend .gitignore as needed, root
-  Cargo workspace stub (no member crates yet), corpus/{fixtures,lexicon,gold}/ and registry/
-  directories. Reading: SPEC §3. Gate: `cargo test --workspace` runs clean on the empty
-  workspace and the tree commits clean.
-- [ ] plan-v1: author the V1 build units into this roadmap from SPEC §8.7 (dependency order;
-  memory sizing anchors), run as a planning
-  workflow per this command. Reading: SPEC §2, §4, §8. Gate: forward units authored below this
-  line.
-```
-
-## Dynamic workflows (planning and review)
-
-In roadmap mode, planning (unit splitting) and review tasks run as **dynamic
-workflows**: the moment you reach the task, author a script inline and pass it
-to the `Workflow` tool. This command's instruction is your standing opt-in to
-multi-agent orchestration — call `Workflow` directly, no confirmation needed.
-There are no saved workflows; every script is written fresh for the task at
-hand. Subagent model and effort (fable/max) come from the user's global Claude
-settings, so omit per-call `model`.
+Planning — authoring roadmap units — is the one task that runs as a **dynamic
+workflow**: unit authoring is a discrete task that divides cleanly among
+subagents without loading the main context. The moment you reach the task,
+author a script inline and pass it to the `Workflow` tool; this command's
+instruction is your standing opt-in to multi-agent orchestration — call
+`Workflow` directly, no confirmation needed. There are no saved workflows;
+every script is written fresh for the task at hand. Subagent model and effort
+(fable/max) come from the user's global Claude settings, so omit per-call
+`model`. A judge-panel shape fits: fan out agents that each propose a full
+decomposition from a different boundary (specification-section family, artifact
+layer, deliverable type), score the candidates with parallel judges against the
+memory.md sizing anchors and neighbouring units' `NN%` annotations, and return
+the winner as structured unit specs (use the `schema` option). Each unit line
+is one conceptual deliverable with explicit file paths, real identifiers, its
+reading slice, and exactly one gate command.
 
 Division of labor: the workflow fans out reading and analysis and returns
-structured findings (use the `schema` option); the main session owns every
-mutation — corrections, roadmap edits — and the single closing commit. Keep
-finders read-only (`agentType: 'Explore'`, or `isolation: 'worktree'` for any
-agent that must write); when the workflow returns, `git status` and reconcile
-every stray path before staging — Explore agents are edit-restricted but still
-hold `Bash`, so a verifier can mutate the tree. Implement sessions otherwise
-stay single-context; only their split fallback escalates to a workflow.
+structured results; the main session owns every mutation — roadmap edits, spec
+edits — and the single closing commit. Keep finders read-only (`agentType:
+'Explore'`); when the workflow returns, `git status` and reconcile every stray
+path before staging — Explore agents are edit-restricted but still hold `Bash`,
+so a finder can mutate the tree. From the result the main session authors the
+unit lines into the roadmap, marks the planning line `[x]`, and commits.
+
+Every other session type stays single-context: ad-hoc read-only subagent
+lookups (`docs/`) remain available everywhere, and the `Workflow`
+tool is reserved for planning.
 
 ## Implement session
 
@@ -82,48 +84,48 @@ its roadmap line names — plus earlier accepted repository artifacts as needed.
 Read `git show HEAD` to match the previous unit's patterns. Implement the unit's
 deliverable; run its acceptance gate until green; run the full test suite.
 
-Right before staging, run `.agent/compaction.sh`; in the same roadmap edit that
-marks the unit `[x]`, append its `NN% NNNK/200K` output to the unit's line.
-Stage everything and make one commit covering work + roadmap, with the unit id
-as the scope (e.g. `<unit-id>: …`) — review sessions locate their ranges by
-these ids.
+Mark the unit `[x]`, stage everything, and make one commit covering work +
+roadmap, with the unit id as the scope (e.g. `<unit-id>: …`) — review sessions
+locate their ranges by these ids.
 
 ### Splitting (when a unit overruns)
 
 A unit must be finishable AND committable within one context window with margin
-to spare; if mid-work you project otherwise, stop implementing. Produce the
-split through a dynamic workflow (judge-panel shape): fan out agents that each
-propose a full decomposition from a different boundary (specification-section
-family, artifact layer, deliverable type), score the candidates with parallel
-judges against the sizing constraints, and return the winner as structured
-sub-line specs. Each sub-line is one conceptual deliverable with explicit file
-paths, real identifiers from the existing codebase, and exactly one gate command
-(the unit's full gate lands on the final sub-line; give earlier sub-lines
-narrower test commands); calibrate granularity from neighbouring units' `NN%`
-annotations. From the result the main session replaces the unit's roadmap line
-with the `<unit-id>.1`, `<unit-id>.2`, … sub-lines, commits the split plan, and
-ends the session.
+to spare; if mid-work you project otherwise, stop implementing and author the
+split in-session — splitting is a normal single-context task. Decompose at the
+cleanest boundary (specification-section family, artifact layer, deliverable
+type). Each sub-line is one conceptual deliverable with explicit file paths,
+real identifiers from the existing codebase, and exactly one gate command (the
+unit's full gate lands on the final sub-line; give earlier sub-lines narrower
+test commands); calibrate granularity from neighbouring units' `NN%`
+annotations. Replace the unit's roadmap line with the `<unit-id>.1`,
+`<unit-id>.2`, … sub-lines, commit the split plan, and end the session.
 
 ## Review session
 
-The preceding group's lines are all `[x]`. Recover the range: `git log
---oneline --reverse` from the previous review commit (or the root commit) to
-HEAD, and `git show` the group's unit commits to bound the review scope.
+The preceding group's lines are all `[x]`. Review sessions run single-context
+at 1M: hold the recovered range, its artifacts, and the implicated spec
+sections together in your own context and analyze them coherently yourself —
+the 1M window exists precisely so the codebase stays whole instead of
+fragmenting across subagents.
 
-Run the review through a dynamic workflow (dimensions → find → adversarially
-verify → synthesize): fan out one read-only finder per scrutiny dimension —
-bugs and incorrect logic, specification non-conformance, CLAUDE.md/memory
-non-conformance, inconsistencies, token-inefficiency, obsolescence — over the
-recovered range; pass each finding to an independent skeptic prompted to refute
-it, and keep only survivors; synthesize them into a deduplicated, file-sorted
-list (use the `schema` option). The scope centers on the group; carry any
-project-wide finding you hit, and scale the pool to the range.
+Recover the range: `git log --oneline --reverse` from the previous review
+commit (or the root commit) to HEAD, and `git show` the group's unit commits to
+bound the review scope; read the touched artifacts in full.
 
-From the workflow result the main session makes the corrections, marks the
-review line `[x]`, and makes one commit: describe the corrections, or state the
-review was clean.
+Beyond trivial bug fixes, the review is a holistic analysis of codebase
+cohesion and overall project direction, scrutinized along: bugs and incorrect
+logic, specification non-conformance, CLAUDE.md/memory non-conformance,
+inconsistencies, token-inefficiency, obsolescence. Specification improvements
+are in scope: when the analysis exposes a better contract or design, edit
+SPEC.md in the same session (contract-affecting amendments reach the user
+first, per SPEC §1). The scope centers on the group; carry any project-wide
+finding you hit.
 
-A milestone-wide review line widens the finder pool and adds
+Make the corrections, mark the review line `[x]`, and make one commit: describe
+the corrections, or state the review was clean.
+
+A milestone-wide review line widens scope to the whole milestone and adds
 cross-group-consistency and contract-surface dimensions.
 
 ## Task argument

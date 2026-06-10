@@ -89,8 +89,9 @@ Working style (Fable 5):
   actions, and genuine scope changes to the user, and proceed on everything else.
 - Audit every progress claim against a tool result from the current session; report failures with
   their output, and state verified results plainly.
-- Verify substantial work with fresh-context subagents (review lines run as workflows per the
-  session command); prefer read-only finders and keep all mutations in the main session.
+- Review lines audit their range single-context in a 1M window (every other session runs 200K);
+  planning lines fan out to subagent workflows per the session command. Subagents stay
+  read-only; all mutations land in the main session.
 - Record transferable lessons in `.agent/memory.md` when they generalize beyond the current unit;
   update or delete entries that have drifted.
 - Lead final reports with the outcome, in plain sentences a reader without your working context
@@ -131,9 +132,7 @@ consumed by the session command. Units are authored incrementally from the curre
 spec section; an empty tail means "author the next units from the current milestone", and a
 milestone is complete only when its acceptance checklist passes in a dedicated acceptance
 session. Lines marked `user-selected` get scope confirmation from the user before work begins.
-V1 carries a suggested seed decomposition in §8.7. A fresh main bootstraps through the session
-command's cold-start ladder — roadmap init → `boilerplate` → `plan-v1` — and normal roadmap flow
-begins once `plan-v1` seeds the V1 units.
+V1 carries a suggested seed decomposition in §8.7.
 
 Conservation rule: deferred capabilities remain represented — each appears in a
 milestone contract (§9–§13), the registry backlog (§14), or a gate (§15). Elaboration sessions
@@ -178,7 +177,7 @@ Runtime metadata stays outside content hashes.
 Accepted artifacts carry envelopes (§4.4); streams (events, diagnostics) are runtime evidence.
 ```
 
-Repository layout (target state; built up by the bootstrap ladder and V1 units):
+Repository layout (target state; built up by the V1 units):
 
 ```text
 .
@@ -943,7 +942,7 @@ V3 adds `prompts|schemas` (the schema export feeds V3's grammar constraints); V4
 
 `docs/` is the committed research compendium — ten method-category deep-research
 reports plus the agent-language catalogue. Registry-seeding and elaboration units mine it through
-read-only subagent workflows and cite `file §section` in registry notes; main sessions keep their
+read-only subagents and cite `file §section` in registry notes; main sessions keep their
 own context lean.
 
 ## §15 Gates
