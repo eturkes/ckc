@@ -69,6 +69,10 @@ macro_rules! fieldless_enum {
     };
 }
 
+/// Crate-visible so sibling modules (envelope) define their own §4.4-style
+/// value sets through the same generator.
+pub(crate) use fieldless_enum;
+
 fieldless_enum! {
     /// SPEC §4.4 operation outcome. Variants are declared in ascending
     /// severity — `ok < residual < ambiguity < unsupported < incoherence <

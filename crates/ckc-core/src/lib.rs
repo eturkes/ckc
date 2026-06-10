@@ -15,11 +15,15 @@
 //! policy version ([`content_hash`], [`hash_bytes`],
 //! [`canonicalization_policy_hash`]). `core-enums-envelope.1` adds the SPEC
 //! §4.4 fieldless enum family ([`Outcome`] severity-ordered) with the §7.4
-//! [`DiagnosticRecord`] and the §4.4 [`TotalOperationResult`].
+//! [`DiagnosticRecord`] and the §4.4 [`TotalOperationResult`];
+//! `core-enums-envelope.2` wraps payloads in the §4.4 [`ArtifactEnvelope`]
+//! and frames §4.6 [`EventRecord`]s and diagnostics as canonical JSONL
+//! ([`write_jsonl`], [`read_jsonl`]).
 #![forbid(unsafe_code)]
 
 mod canon;
 mod enums;
+mod envelope;
 mod hash;
 mod id;
 mod strings;
@@ -34,6 +38,10 @@ pub use enums::{
     AttemptClassification, Authority, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord,
     Direction, Origin, Outcome, PromotionDecision, PromotionScope, ReviewClassification,
     TotalOperationResult,
+};
+pub use envelope::{
+    ArtifactEnvelope, Effect, EnvelopeError, EventRecord, Producer, SCHEMA_VERSION, jsonl_line,
+    read_jsonl, write_jsonl,
 };
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};

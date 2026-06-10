@@ -66,15 +66,15 @@ next plan session removes their checklists (git history retains them).
   V1-V2 set, structured payload, region/artifact refs, exactly one Outcome); TotalOperationResult
   with operation_id, outcome, and the five hash-list buckets; canonical round-trips and
   severity-ordering tests. Reading: SPEC §4.4 enum and outcome tables, §7.4. Consumes the canon
-  stack and core-canon-hash. Gate: `cargo test -p ckc-core enums::`. 59% 118K/200K _
-- [ ] core-enums-envelope.2: Artifact envelope and event records in an envelope module:
+  stack and core-canon-hash. Gate: `cargo test -p ckc-core enums::`. 59% 118K/200K a27a723
+- [x] core-enums-envelope.2: Artifact envelope and event records in an envelope module:
   ArtifactEnvelope with the §4.4 field table (schema_version ckc.1, schema_id, artifact_id/kind,
   producer triple, input_hashes, content_hash, canonicalization_policy_hash, origin, authority,
   accepted_effects, trace_refs, diagnostics, runtime_metadata excluded from content hash, payload)
   with authority and accepted_effects invariants; EventRecord with the §4.6 events.jsonl fields;
   JSONL serialization for both streams; envelope-invariant and round-trip tests. Reading: SPEC §4.4
   envelope table, §4.6. Consumes core-enums-envelope.1 enums and DiagnosticRecord, canon stack,
-  core-canon-hash. Gate: `cargo test -p ckc-core`.
+  core-canon-hash. Gate: `cargo test -p ckc-core`. 64% 128K/200K _
 - [ ] core-grounding: Source grounding types in a grounding module: SourceDocument (source family,
   provenance synthetic/public, raw/content hashes, data_class default none), SourceGraph with the
   §4.5 node kinds (document through CQ and recommendation), SourceSpan (node, offsets,
