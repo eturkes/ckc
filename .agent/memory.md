@@ -59,6 +59,14 @@ technically derivable but easily forgotten under token pressure.
   unauthenticated. Meta-rule this entry reinforces: the session that FIRST hits an
   environment/tool failure records it to memory in that same session — the registry.1 session hit
   this 400 hours before stage-extract re-discovered it, and the gap cost two more dead calls.
+- [2026-06-10] Turn-halting `API Error: <ConnectionTerminated error_code:0, last_stream_id:N,
+  additional_data:None>` is Python h2's GOAWAY(NO_ERROR) event repr reaching the CLI through
+  Headroom (uvicorn proxy at ANTHROPIC_BASE_URL=127.0.0.1:8787; upstream client is
+  httpx/httpcore/h2): the Anthropic edge rotated the HTTP/2 connection mid-stream (observed once;
+  proxy.log hr_1781094444_000069 — 200 + 49s of SSE, then the stream died). Mid-stream POSTs are
+  SDK-unretryable, so the turn halts. Transient infrastructure race: unrelated to request content,
+  distinct from the Fable forced-tool_choice 400, no client-side prevention. Recovery: session
+  context survives — `git status` to confirm tree state, then continue the interrupted action.
 - [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose
   values carry non-ASCII (`§`, em-dash `—`): args get dropped/split, leaving a
   bare space git reads as a pathspec ("pathspec ' ' did not match any file(s)"),
