@@ -210,19 +210,53 @@ next plan session removes their checklists (git history retains them).
   Closes §8.5 item 2. Reading: SPEC §3 CLI surface, §8.4, §4.4 outcome severity. Consumes
   cli-runner.1.1 dispatch, core-registry.2, fixtures-v1 registry files. Gate: `cargo run -p ckc-cli
   -- registry check`. 60% 121K/200K _
-- [ ] stage-extract: Extract stage in an extract module of ckc-cli: choose and pin a real HTML
-  parser dependency; parse fixture HTML into SourceGraph (nodes, spans, anchors, regions; tables
-  preserving row/column/cell/header relations); emit typed extraction_uncertain and
-  table_structure_uncertain residuals on uncertainty; envelope-wrapped source_graph.json payload;
-  identical input bytes and config yield identical canonical bytes. Reading: SPEC §8.3 extract row,
-  §8.2, §4.5, §4.4, §7.4. Consumes core-grounding types, core-enums-envelope.2 envelope, fixtures-v1
-  HTML, cli-runner.1.1 crate. Gate: `cargo test -p ckc-cli extract::`.
+- [ ] stage-extract.1: Extract stage core in a new extract module of ckc-cli; tables defer to
+  stage-extract.2 (table elements ride the unknown-flow residual path until then). Dependencies
+  are decided — skip re-research: workspace scraper 0.27 with default-features = false, features
+  `["errors", "deterministic"]` (html5ever DOM; Html::errors is gated behind errors), plus direct
+  ego-tree 0.11 (scraper's arena, unexported by scraper, names NodeRef). Surface: ExtractConfig
+  {document_id, source_family, provenance, data_class, producer}, ExtractError {Utf8, Grounding,
+  Canon}, extract(html: &[u8], &ExtractConfig) -> Result<ArtifactEnvelope<SourceGraph>,
+  ExtractError>. Walk body (html5ever guarantees html/head/body): counter ids `n.<k>`/`s.<k>`/
+  `r.<k>` minted in walk order under the document root; h1-h6 drive a section stack (pop depths
+  >= level; heading text spans the section node itself — grounding.rs sanctions structural-node
+  spans); p maps to paragraph; ul/ol map to list with li children as paragraphs; every nonempty
+  trimmed textual unit gets one SourceSpan::derive span at offset 0 with strictly increasing
+  reading_order plus one {node,span} region; whitespace-only units mint nothing; anchors stay an
+  empty set (§4.5 subspan anchors belong to later stages). extraction_uncertain residuals: one
+  per Html::errors parse error (payload key detail, grounded in one memoized whole-document
+  region) and one per unknown flow element or stray text (grounded in the parent node's region).
+  graph.validate licensed by residual region node ids, then the §4.4 envelope:
+  schema.source_graph, `<document_id>.source_graph`, kind source_graph, config.producer,
+  deterministic_compiler, mechanical_authority, empty input_hashes/accepted_effects/trace_refs/
+  runtime_metadata, content_hash(&graph), canonicalization_policy_hash(). Tests on inline HTML
+  literals only: walk shape, both residual classes, byte-identical double extract plus
+  read_canonical strict-read, non-UTF8 input gives ExtractError::Utf8. Reading: SPEC §8.3 extract
+  row, §4.5, §4.4, §7.4; grounding.rs, envelope.rs and enums.rs surfaces, shell.rs static_id.
+  Consumes core-grounding, core-enums-envelope.2, cli-runner.1.1 crate. Gate: `cargo test -p
+  ckc-cli extract::`.
+- [ ] stage-extract.2: Table extraction completing the extract module: replace the table residual
+  path with a real arm — scan direct children accepting caption, colgroup, col, thead, tbody,
+  tfoot, tr (html5ever wraps bare tr in tbody), at most one caption minting a textual caption
+  node; rows flatten in document order; each cell node parents DIRECTLY to the table node with
+  attrs row and col as 0-based decimal strings plus header "true" on th, absent on td — exactly
+  the DocIr::from_graph cell contract (ir.rs TableCell/CellRole); an empty cell mints no node yet
+  still occupies its column index. Rejection — any rowspan or colspan other than "1", nested
+  table, second caption, stray non-whitespace text, unknown child element — emits one
+  table_structure_uncertain residual whose region names the table node and withholds every cell
+  while the table node stays (DocIr then withholds the table from the view). Tests: pin
+  v1_guideline_a's full node/span shape from observed output (sections, recommendation and
+  exception paragraphs, 4x2 definitions table with th header row, evidence list) and run
+  DocIr::from_graph over it; all three committed fixtures extract residual-free; rejected-table
+  inline cases withhold cells and DocIr drops the table. Reading: SPEC §8.3 extract row, §8.2;
+  ir.rs DocIr::from_graph and TableCell; extract.rs (edit target). Consumes stage-extract.1
+  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`.
 - [ ] stage-segment: Segment stage in a segment module: rule-based segmentation keyed on fixture
   structure (CQ headings, recommendation and exception sentence markers, definition table rows,
   evidence lists) producing ClinicalSegments with region refs; envelope-wrapped segments.json
   payload; segmentation_boundary_error diagnostics on misses. Reading: SPEC §8.3 segment row, §8.2
-  markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract SourceGraph, core-ir.1 types. Gate:
-  `cargo test -p ckc-cli segment::`.
+  markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract.2 SourceGraph, core-ir.1 types.
+  Gate: `cargo test -p ckc-cli segment::`.
 - [ ] stage-normalize.1: Normalize stage first half, in a normalize module: load
   corpus/lexicon/ja_core.yaml content-hash versioned; bind mentions to TerminologyBindings with
   BindingStatus mapping (ambiguous emits terminology_ambiguous ambiguity, unmapped emits

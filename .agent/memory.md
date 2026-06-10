@@ -31,6 +31,18 @@ technically derivable but easily forgotten under token pressure.
   finer from neighbouring units' actual `NN%` once they exist. Archive roadmaps mix measured lines (checked,
   `NN%` annotated) with planned-only lines (unchecked, no `NN%`); cite only
   checked lines as measured anchors — planned scopes are projections.
+- [2026-06-10] stage-extract as one unit overran 200K (compacted mid-write, zero compiles, work
+  discarded; re-scoped to stage-extract.1/.2): new-external-dep research + multi-format DOM
+  walker + table semantics + envelope plumbing + fixture-pinned tests is 2+ windows. Apply at
+  every plan/re-scope: a unit introducing an external dependency gets its tooling decision
+  researched AND pinned (exact version + features) in the roadmap line at plan time, so
+  implement sessions never research; a stage that both walks an input format and integrates
+  committed fixtures splits into walker-core (inline-literal tests) and format-completion +
+  fixture-integration; expected node/span shapes get pinned from observed output by the
+  implementing session — hand-computed expectations written before code runs anchor wrong.
+  Research tooling: the WebSearch tool currently 400s ("tool_choice forces tool use is not
+  compatible with this model"); research deps via curl against the crates.io API
+  (https://crates.io/api/v1/crates/NAME) with a `-A` user-agent header (403 without one).
 - [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose
   values carry non-ASCII (`§`, em-dash `—`): args get dropped/split, leaving a
   bare space git reads as a pathspec ("pathspec ' ' did not match any file(s)"),
