@@ -25,13 +25,14 @@ next plan session removes their checklists (git history retains them).
   deterministic normalizers: pipeline NFKC, whitespace fold to single U+0020 trimmed, CJK
   punctuation fold (U+3001 to comma, U+3002 to period), ASCII lowercase for semantic_en; only
   identifier_ascii ([a-z0-9_:./-]+) fallible; per-policy exact-output and idempotence tests. Reading: SPEC §4.2. Consumes core-ids ValidationError and crate skeleton. Gate: `cargo
-  test -p ckc-core`. 30% 60K/200K _
-- [ ] core-canon-writer: Canonical JSON writer core in a canon module: Canonical trait and
+  test -p ckc-core`. 30% 60K/200K 3813a4d
+- [x] core-canon-writer: Canonical JSON writer core in a canon module: Canonical trait and
   canonical_payload_bytes as the single byte authority; emit_string with the fixed minimal escape
   set, emit_int as quoted decimal (never bare number tokens), emit_string_policy; ObjectEmitter
   sorting members by UTF-8 name bytes, omitting absent optionals, rejecting duplicates; Rational as
   reduced {den,num} object; CanonError; exact-byte assertion tests. Reading: SPEC §4.3.
   Consumes core-ids value types, core-strings policies. Gate: `cargo test -p ckc-core canon::`.
+  43% 86K/200K _
 - [ ] core-canon-collections: Canonical collections over the writer core: emit_array in semantic
   order; canonical_sort_key from element canonical bytes; emit_set sorted byte-lexicographically
   with byte-identical duplicates collapsed; MapKey trait whose const IDENTIFIER_ASCII picks the map

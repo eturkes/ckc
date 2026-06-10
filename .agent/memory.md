@@ -50,6 +50,15 @@ technically derivable but easily forgotten under token pressure.
   lines and every `#[...]` attribute in the replacement body, or edit the inner
   variant/field region with `replace_content` instead. Recurs with derive-heavy
   enums and the envelope/IR structs.
+- [2026-06-10] RTK command rewriting can falsify tool output. Observed: `diff a
+  b` printed "[ok] Files are identical" for files that differ (cmp/sha256sum
+  disagreed; differences were single-line multibyte `§` edits), and a piped
+  `diff | grep | head` chain panicked on broken pipe. Also `grep` is rewritten
+  to `rg`, so BRE escapes (`\(`, `\|`) become regex parse errors — write
+  rg-syntax patterns. Always prove byte-equality with `cmp` or `sha256sum`,
+  never the plain `diff` wrapper; for real diffs use `git diff --no-index` or
+  `rtk proxy diff`. Critical wherever byte-compatibility with the archive is
+  the acceptance bar (canon reader/hash, future wire formats).
 - [2026-06-10] Editing-tool string parameters decode `\uXXXX` Unicode escapes,
   and only those — `\n`, `\"`, `\xNN` pass through literally. So writing source
   that must contain a literal `\uXXXX` (e.g. a byte/raw-string test asserting
