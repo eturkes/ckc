@@ -82,14 +82,14 @@ next plan session removes their checklists (git history retains them).
   validate grounding invariants (every textual unit spanned or typed residual, region refs resolve,
   identical bytes plus config give identical graph bytes); canonical round-trips. Reading: SPEC
   §4.5. Consumes core-strings policies, canon stack, core-canon-hash. Gate: `cargo test -p ckc-core
-  grounding::`. 68% 135K/200K _
-- [ ] core-ir.1: DocIR and SegmentIR layers in an ir module: layout-preserving text/table view over
+  grounding::`. 68% 135K/200K 0c416ee
+- [x] core-ir.1: DocIR and SegmentIR layers in an ir module: layout-preserving text/table view over
   SourceGraph refs with extraction diagnostics; ClinicalSegment with the seven §5 kinds (CQ,
   recommendation, evidence, exception, definition, table-row, metadata) and region refs; canonical
   impls plus the per-layer structural hash over locally indexed references (rename-stable),
   establishing the pattern core-ir.2/.3 reuse. Reading: SPEC §5 layer table and ClinicalSegment row,
   §4.3 structural-hash tail. Consumes core-grounding refs, core-canon-hash. Gate: `cargo test -p
-  ckc-core ir::`.
+  ckc-core ir::`. 72% 144K/200K _
 - [ ] core-ir.2: ClinicalIR and NormIR layers: TerminologyBinding (system ckc.lex, code,
   BindingStatus, alternatives, region refs), ClinicalStatement (population, condition, action,
   modality, strength strong/weak, certainty, exceptions, source refs), Action with normalized target

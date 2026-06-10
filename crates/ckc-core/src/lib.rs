@@ -21,6 +21,9 @@
 //! ([`write_jsonl`], [`read_jsonl`]). `core-grounding` adds the SPEC §4.5
 //! source-grounding layer ([`SourceGraph`] with its document, nodes, spans,
 //! anchors, and regions, validated by [`SourceGraph::validate`]).
+//! `core-ir.1` opens the SPEC §5 IR layers ([`DocIr`], [`SegmentIr`] with
+//! [`ClinicalSegment`]) and the §4.3 rename-stable structural-hash pattern
+//! ([`Structural`], [`structural_hash`], [`RefLocalizer`]).
 #![forbid(unsafe_code)]
 
 mod canon;
@@ -29,6 +32,7 @@ mod envelope;
 mod grounding;
 mod hash;
 mod id;
+mod ir;
 mod strings;
 
 pub use canon::{
@@ -52,4 +56,8 @@ pub use grounding::{
 };
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
+pub use ir::{
+    CellRole, ClinicalSegment, DocIr, IrError, RefLocalizer, SegmentIr, SegmentKind, Structural,
+    TableCell, TableView, TextBlock, emit_structural_ref_set, structural_hash,
+};
 pub use strings::StringPolicy;

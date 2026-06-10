@@ -464,7 +464,8 @@ pub enum RefKind {
 }
 
 impl RefKind {
-    fn as_str(self) -> &'static str {
+    /// Crate-visible so sibling error types (ir) name pools the same way.
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             RefKind::Node => "node",
             RefKind::Span => "span",

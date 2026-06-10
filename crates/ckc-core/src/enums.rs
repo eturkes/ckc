@@ -263,7 +263,8 @@ impl CanonRead for DiagText {
 /// Emit the §7.4 structured payload as a SPEC §4.3 map: [`Id`] keys in object
 /// form, values normalized under `diagnostic_text`. Numeric payload entries
 /// ride as canonical decimal strings, matching the integer byte form.
-fn emit_payload(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Result<(), CanonError> {
+/// Crate-visible so the ir module's structural emission reuses it verbatim.
+pub(crate) fn emit_payload(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Result<(), CanonError> {
     let texts: Vec<DiagText> = entries.iter().map(|(_, v)| DiagText(v.clone())).collect();
     emit_map(out, entries.iter().map(|(k, _)| k).zip(&texts))
 }
