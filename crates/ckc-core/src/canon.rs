@@ -2,9 +2,10 @@
 //!
 //! [`canonical_payload_bytes`] is the single authority that turns a typed value
 //! into the deterministic UTF-8 bytes hashed into an artifact's `content_hash`.
-//! `core-canon-writer` delivered the scalar + object writer core and
-//! `core-canon-collections` adds the array, set, and map rules; tagged unions,
-//! strict reading, and the content hash itself are layered on by later units.
+//! `core-canon-writer` delivered the scalar + object writer core,
+//! `core-canon-collections` added the array, set, and map rules, and
+//! `core-canon-unions` adds tagged unions; strict reading and the content hash
+//! itself are layered on by later units.
 //!
 //! ```text
 //! object   field names sorted by UTF-8 byte order; duplicate names rejected
@@ -15,6 +16,7 @@
 //! array    elements in given semantic order
 //! set      elements sorted by canonical_sort_key, byte-identical dups collapsed
 //! map      identifier_ascii keys -> sorted object; else sorted {"key","value"} pairs
+//! union    {"tag":<identifier_ascii>,"value":<payload>} — exactly two members
 //! ```
 //!
 //! Canonical string escaping is minimal and fixed: escape U+0022 `"` as `\"`,
@@ -362,6 +364,26 @@ pub fn emit_map<'a, K: MapKey + 'a, V: Canonical + 'a>(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tagged unions (SPEC §4.3)
+// ---------------------------------------------------------------------------
+
+/// SPEC §4.3 union: a sum value as the tagged object `{"tag":…,"value":…}` with
+/// exactly those two members. `tag` is the variant discriminant, normalized
+/// through `identifier_ascii` (so it is a controlled, escape-free identifier);
+/// `value` is the variant payload, emitted through [`Canonical`]. Field order
+/// is byte-sorted by [`ObjectEmitter`] (`tag` 0x74 < `value` 0x76), giving one
+/// fixed encoding. Fails only when `tag` violates the identifier_ascii grammar
+/// or the payload's own emission fails.
+pub fn emit_union<V: Canonical>(out: &mut Vec<u8>, tag: &str, value: &V) -> Result<(), CanonError> {
+    let mut obj = ObjectEmitter::new();
+    obj.member("tag", |b| {
+        emit_string_policy(b, StringPolicy::IdentifierAscii, tag)
+    })?;
+    obj.member("value", |b| value.emit_canonical(b))?;
+    obj.finish(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -645,5 +667,34 @@ mod tests {
             canonical_sort_key(&id).unwrap(),
             canonical_payload_bytes(&id).unwrap()
         );
+    }
+
+    #[test]
+    fn unions_emit_exactly_tag_and_value_byte_ordered() {
+        // SPEC §4.3: a sum value is the tagged object {"tag","value"} with
+        // exactly two members, byte-ordered by ObjectEmitter ("tag" before
+        // "value"). A composite payload is emitted through its Canonical impl.
+        assert_eq!(
+            emitted(
+                |o| emit_union(o, "rational", &Rational::from_parts("2", "4").unwrap()).unwrap()
+            ),
+            r#"{"tag":"rational","value":{"den":"2","num":"1"}}"#
+        );
+        // A scalar payload and a punctuated identifier_ascii tag pass through.
+        assert_eq!(
+            emitted(|o| emit_union(o, "ir.doc_segment", &BigInt::from(7)).unwrap()),
+            r#"{"tag":"ir.doc_segment","value":"7"}"#
+        );
+    }
+
+    #[test]
+    fn union_tag_must_be_identifier_ascii() {
+        // The tag is normalized through identifier_ascii; an out-of-grammar tag
+        // (uppercase and space) is rejected before any bytes are emitted.
+        let mut out = Vec::new();
+        assert!(matches!(
+            emit_union(&mut out, "Bad Tag", &BigInt::from(1)),
+            Err(CanonError::Policy(ValidationError::StringPolicy(_)))
+        ));
     }
 }

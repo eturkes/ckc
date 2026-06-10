@@ -38,12 +38,12 @@ next plan session removes their checklists (git history retains them).
   with byte-identical duplicates collapsed; MapKey trait whose const IDENTIFIER_ASCII picks the map
   form for the whole map; emit_map as sorted object for identifier_ascii keys and as key/value pair
   array sorted by key bytes otherwise, duplicates rejected in both forms. Reading: SPEC §4.3. Consumes core-canon-writer core. Gate: `cargo test -p ckc-core canon::`.
-  41% 82K/200K _
-- [ ] core-canon-unions: Tagged-union and fieldless-enum emission: emit_union producing exactly
+  41% 82K/200K 0e13c14
+- [x] core-canon-unions: Tagged-union and fieldless-enum emission: emit_union producing exactly
   {tag,value} with identifier_ascii tags via ObjectEmitter, tag byte-sorted before value; fieldless
   enums emitted as identifier_ascii strings. Reading:
   SPEC §4.3. Consumes
-  core-canon-writer core. Gate: `cargo test -p ckc-core canon::`.
+  core-canon-writer core. Gate: `cargo test -p ckc-core canon::`. 30% 61K/200K _
 - [ ] core-canon-reader: Strict canonical reader as the writer's inverse, scheduled solo: CanonRead
   trait, Reader cursor, read_canonical requiring full consumption;
   read_string/read_int/read_string_policy admitting only writer output (minimal escapes, canonical
