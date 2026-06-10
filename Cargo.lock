@@ -84,6 +84,8 @@ dependencies = [
  "ckc-core",
  "ego-tree",
  "scraper",
+ "serde",
+ "serde-saphyr",
  "tempfile",
 ]
 

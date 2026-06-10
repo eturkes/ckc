@@ -18,10 +18,16 @@
 //! `stage-segment` adds the segment stage ([`segment`]): the graph's spans
 //! classified in reading order into §5 ClinicalSegments (cq, recommendation,
 //! exception, definition, table-row, evidence, metadata), misses as
-//! `segmentation_boundary_error` residuals.
+//! `segmentation_boundary_error` residuals. `stage-normalize.1a` opens the
+//! normalize stage ([`normalize`]): the §5 lexicon authority
+//! `corpus/lexicon/ja_core.yaml` strict-loaded and validated into the typed
+//! [`normalize::Lexicon`] — semantic_ja surfaces with `surfaces[0]` the
+//! representative, §5-coherent intervals, raw-byte content hash for
+//! manifests.
 #![forbid(unsafe_code)]
 
 pub mod extract;
+pub mod normalize;
 pub mod segment;
 
 mod dispatch;

@@ -257,7 +257,7 @@ next plan session removes their checklists (git history retains them).
   payload; segmentation_boundary_error diagnostics on misses. Reading: SPEC §8.3 segment row, §8.2
   markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract.2 SourceGraph, core-ir.1 types.
   Gate: `cargo test -p ckc-cli segment::`. 69% 138K/200K 89bdf26
-- [ ] stage-normalize.1a: Lexicon loader opening a normalize module in ckc-cli: add serde and
+- [x] stage-normalize.1a: Lexicon loader opening a normalize module in ckc-cli: add serde and
   serde-saphyr workspace deps to the crate, wire `pub mod normalize` plus a lib.rs doc line;
   pub load_lexicon(bytes: &[u8]) -> Result<Lexicon, LexiconError> deserializing private
   deny_unknown_fields serde structs then validating into Lexicon {system: Id, content_hash:
@@ -274,6 +274,7 @@ next plan session removes their checklists (git history retains them).
   one rejection per Invalid class. Reading: SPEC §5 lexicon paragraph, §4.4 hash_bytes;
   corpus/lexicon/ja_core.yaml shape comment; segment.rs error and test style. Consumes
   fixtures-v1 lexicon, core-ir.2 types. Gate: `cargo test -p ckc-cli normalize::`.
+  60% 119K/200K _
 - [ ] stage-normalize.1b: Mention binding in normalize.rs: pub bind_segments(graph:
   &SourceGraph, segments: &SegmentIr, lexicon: &Lexicon) -> (Vec<TerminologyBinding>,
   Vec<DiagnosticRecord>) over recommendation and exception segments only, in document order:
