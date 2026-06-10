@@ -24,7 +24,7 @@ within its single closing commit, resolving it from commit scopes (`git log
 review commits `review-v<n>:`). At most one `_` is pending at a time;
 execute-task sessions neither fill nor create one. Usage comes from
 `.agent/compaction.sh`, run right before staging. A session that hit
-compaction records `compacted` in place of usage; whether compacted work
+compaction records `>=90% compacted/200K` in place of usage; whether compacted work
 lands at all stays the user's call, per overrun recovery.
 
 ## Step 1: Load context

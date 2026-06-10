@@ -5,8 +5,8 @@ authority, its §2 the milestone sequence. One milestone at a time: a header
 `## <milestone> — plan <hash> — review <hash>` (plan opens, review closes, the
 pair bounds the milestone's commits; acceptance adds the evidence run id per
 SPEC §1) over an ordered unit checklist. Completed items gain `[x]` plus
-trailing `NN% NNNK/200K <hash>` (context usage — `compacted` when the session
-hit compaction — then the completing commit); plan/review stamps carry no
+trailing `NN% NNNK/200K <hash>` (context usage — `>=90% compacted/200K` when
+the session hit compaction — then the completing commit); plan/review stamps carry no
 usage. A commit cannot contain its own hash, so a
 session writes `_` in its own hash slot and the next unit of roadmap work
 fills it (at most one `_` pending; resolve via commit scopes `<unit-id>:`,
@@ -162,7 +162,7 @@ next plan session removes their checklists (git history retains them).
   rejection coverage per variant — reference breaks, key/projection tampers, an interval table,
   plan breaks on a two-rule for/against fixture, stale derived fields — plus a residual-licensed
   grounding pass. Reading: SPEC §5 IR-invariant paragraph, §6 direction groups; bundle.rs and the
-  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. compacted f39e2f6
+  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. >=90% compacted/200K f39e2f6
 - [x] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
   budget) with canonical bytes and plan hash; RunManifest (plan hash, git commit,
   toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);
