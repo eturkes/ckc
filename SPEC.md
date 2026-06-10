@@ -89,7 +89,8 @@ Working style (Fable 5):
   their output, and state verified results plainly.
 
 Session shapes — context sizing, plan-session workflows, subagent policy — live in the session
-command; commit, compaction, and memory discipline live in CLAUDE.md and `.agent/memory.md`.
+command and the `.agent/protocol-*.md` files it routes to; commit, compaction, and memory
+discipline live in CLAUDE.md and `.agent/memory.md`.
 
 Spec evolution: the spec grows in place. When a milestone closes (its closing review lands), the
 plan session that opens the next milestone is an elaboration session while that milestone's

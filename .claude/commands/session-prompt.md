@@ -6,7 +6,9 @@ argument-hint: [task]
 You are developing CKC. The project specification (`SPEC.md`) is the design
 authority; `.agent/roadmap.md` is the canonical build plan — one milestone
 header over its ordered unit checklist, with closed milestones persisting as
-bare headers. This command defines the session protocol around them.
+bare headers. This command defines the session protocol around them; plan and
+review sessions continue in the `.agent/protocol-*.md` file their session
+type names below.
 
 Context sizing: every session runs in a 200K context window, except Review
 sessions, which run at 1M — a review's value comes from holding as much of the
@@ -52,53 +54,19 @@ this command.
 The current milestone is the last header in the roadmap:
 
 - Its header lacks a `review` marker and an unchecked item exists →
-  **Implement** the first unchecked item (a line marked `user-selected` → stop
-  and confirm scope with the user first).
-- Its header lacks a `review` marker and every item is checked → **Review**.
+  **Implement** the first unchecked item per the section below (a line marked
+  `user-selected` → stop and confirm scope with the user first).
+- Its header lacks a `review` marker and every item is checked → **Review**:
+  read `.agent/protocol-review.md` and follow it.
 - Its header carries a `review` marker (hash or pending `_`) → the milestone
-  is closed → **Plan** the next SPEC §2 milestone. No milestone left → fill a
+  is closed → **Plan** the next SPEC §2 milestone: read
+  `.agent/protocol-plan.md` and follow it. No milestone left → fill a
   pending `_` if one exists (one small commit), report the spec fully
   implemented, and stop.
 
-## Plan session
-
-A plan session opens the next milestone. When that milestone's contract
-section is still compact, elaborate it first per SPEC §1 — the spec diff
-reaches the user before any unit consumes it. Then author the milestone header
-and its full unit checklist.
-
-Planning is the one task that runs as a **dynamic workflow**: unit authoring
-is a discrete task that divides cleanly among subagents without loading the
-main context. Author a script inline and pass it to the `Workflow` tool; this
-command's instruction is your standing opt-in to multi-agent orchestration —
-call `Workflow` directly, no confirmation needed. There are no saved
-workflows; every script is written fresh for the task at hand. Subagent model
-and effort (fable/max) come from the user's global Claude settings, so omit
-per-call `model`. A judge-panel shape fits: fan out agents that each propose a
-full decomposition from a different boundary (specification-section family,
-artifact layer, deliverable type), score the candidates with parallel judges,
-and return the winner as structured unit specs (use the `schema` option). Keep
-finders read-only (`agentType: 'Explore'`); when the workflow returns, `git
-status` and reconcile every stray path before staging — Explore agents are
-edit-restricted but still hold `Bash`, so a finder can mutate the tree. The
-main session owns every mutation — spec edits, roadmap edits — and the closing
-commits.
-
-Calibrate unit sizing against the previous milestone's checklist, still
-present while you plan — its per-item usage annotations are ground truth for
-what fits a window — plus the memory.md sizing anchors. Each unit line is one
-conceptual deliverable with explicit file paths, real identifiers, its reading
-slice, and exactly one gate command.
-
-Closing: one commit, scoped `plan-v<n>:` — fill the previous milestone's
-pending `review _`, delete its items keeping the bare header (a closed
-milestone collapses to that one line; git history retains the rest), and
-append the new milestone header `## <milestone> — plan _` + checklist. End the
-session.
-
-Every other session type stays single-context: ad-hoc read-only subagent
+All sessions except Plan stay single-context: ad-hoc read-only subagent
 lookups (`docs/`) remain available everywhere, and the `Workflow`
-tool is reserved for planning.
+tool is reserved for plan sessions (opt-in and shape in the plan protocol).
 
 ## Implement session
 
@@ -116,31 +84,6 @@ A unit must be finishable AND committable within one context window with
 margin to spare; if mid-work you project otherwise, stop implementing, bring
 the tree to a clean state, and report the overrun — recovery (restoring to
 the last commit, re-scoping the roadmap) is always user-initiated.
-
-## Review session
-
-Every item of the current milestone is checked. Review sessions run
-single-context at 1M: hold the milestone's range, its artifacts, and the
-implicated spec sections together in your own context and analyze them
-coherently yourself — the 1M window exists precisely so the codebase stays
-whole instead of fragmenting across subagents.
-
-Recover the range from the header: `git log --oneline <plan-hash>..HEAD`, and
-`git show` the unit commits (the items' recorded hashes) to bound the scope;
-read the touched artifacts in full.
-
-Beyond trivial bug fixes, the review is a holistic analysis of codebase
-cohesion and overall project direction, scrutinized along: bugs and incorrect
-logic, specification non-conformance, CLAUDE.md/memory non-conformance,
-inconsistencies, token-inefficiency, obsolescence. Specification improvements
-are in scope: when the analysis exposes a better contract or design, edit
-SPEC.md in the same session (contract-affecting amendments reach the user
-first, per SPEC §1).
-
-Close the milestone in one commit, scoped `review-v<n>:` — fill the last
-item's pending `_`, carry the corrections (or state the review was clean), and
-mark the header `— review _`; reviews record no usage. The next roadmap-mode
-session — the plan session for the next milestone — fills the review hash.
 
 ## Task argument
 
