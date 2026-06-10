@@ -13,10 +13,13 @@
 //! [`CanonRead`], [`CanonReadError`]) that admits only the writer's bytes.
 //! `core-canon-hash` then seals a payload into its content hash and pins the
 //! policy version ([`content_hash`], [`hash_bytes`],
-//! [`canonicalization_policy_hash`]).
+//! [`canonicalization_policy_hash`]). `core-enums-envelope.1` adds the SPEC
+//! §4.4 fieldless enum family ([`Outcome`] severity-ordered) with the §7.4
+//! [`DiagnosticRecord`] and the §4.4 [`TotalOperationResult`].
 #![forbid(unsafe_code)]
 
 mod canon;
+mod enums;
 mod hash;
 mod id;
 mod strings;
@@ -26,6 +29,11 @@ pub use canon::{
     canonical_payload_bytes, canonical_sort_key, emit_array, emit_int, emit_map, emit_set,
     emit_string, emit_string_policy, emit_union, read_array, read_canonical, read_int, read_map,
     read_set, read_string, read_string_policy, read_union,
+};
+pub use enums::{
+    AttemptClassification, Authority, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord,
+    Direction, Origin, Outcome, PromotionDecision, PromotionScope, ReviewClassification,
+    TotalOperationResult,
 };
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};

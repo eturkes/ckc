@@ -31,6 +31,8 @@ pub enum ValidationError {
     /// A string failed its declared [`crate::StringPolicy`] (SPEC §4.2), e.g.
     /// `identifier_ascii` received bytes outside `[a-z0-9_:./-]+`.
     StringPolicy(String),
+    /// A token named no value of its fieldless enum (SPEC §4.4 value sets).
+    Enum(String),
 }
 
 impl fmt::Display for ValidationError {
@@ -40,6 +42,7 @@ impl fmt::Display for ValidationError {
             ValidationError::Hash(m) => write!(f, "invalid Hash: {m}"),
             ValidationError::Rational(m) => write!(f, "invalid Rational: {m}"),
             ValidationError::StringPolicy(m) => write!(f, "invalid string policy: {m}"),
+            ValidationError::Enum(m) => write!(f, "invalid enum value: {m}"),
         }
     }
 }

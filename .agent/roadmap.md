@@ -59,14 +59,14 @@ next plan session removes their checklists (git history retains them).
   value-sensitivity, and pinned-descriptor tests.
   Reading: SPEC §4.3, §4.4 canonicalization_policy_hash row. Consumes core-ids Hash and the canon stack. Gate: `cargo test -p
   ckc-core`. 36% 72K/200K c568017
-- [ ] core-enums-envelope.1: V1 enums plus result and diagnostic records in an enums module: all ten
+- [x] core-enums-envelope.1: V1 enums plus result and diagnostic records in an enums module: all ten
   §4.4 enums — Outcome with the §4.4 severity order, Origin, Authority, BindingStatus, Direction,
   ClaimTier, ReviewClassification, AttemptClassification, PromotionDecision, PromotionScope — as
   fieldless identifier_ascii canonical strings; DiagnosticRecord per §7.4 (stable code from the
   V1-V2 set, structured payload, region/artifact refs, exactly one Outcome); TotalOperationResult
   with operation_id, outcome, and the five hash-list buckets; canonical round-trips and
   severity-ordering tests. Reading: SPEC §4.4 enum and outcome tables, §7.4. Consumes the canon
-  stack and core-canon-hash. Gate: `cargo test -p ckc-core enums::`.
+  stack and core-canon-hash. Gate: `cargo test -p ckc-core enums::`. 59% 118K/200K _
 - [ ] core-enums-envelope.2: Artifact envelope and event records in an envelope module:
   ArtifactEnvelope with the §4.4 field table (schema_version ckc.1, schema_id, artifact_id/kind,
   producer triple, input_hashes, content_hash, canonicalization_policy_hash, origin, authority,

@@ -63,7 +63,10 @@ technically derivable but easily forgotten under token pressure.
   disagreed; differences were single-line multibyte `§` edits), and a piped
   `diff | grep | head` chain panicked on broken pipe. Also `grep` is rewritten
   to `rg`, so BRE escapes (`\(`, `\|`) become regex parse errors — write
-  rg-syntax patterns. Always prove byte-equality with `cmp` or `sha256sum`,
+  rg-syntax patterns. The rewrite hits standalone grep only: piped/compound
+  grep falls through to real `/usr/bin/grep`, where rg-only flags (`-g`,
+  `--type`) fail — in pipelines write plain `grep -E` syntax. Always prove
+  byte-equality with `cmp` or `sha256sum`,
   never the plain `diff` wrapper; for real diffs use `git diff --no-index` or
   `rtk proxy diff`. Critical wherever byte-compatibility with the archive is
   the acceptance bar (canon reader/hash, future wire formats).
