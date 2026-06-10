@@ -14,12 +14,12 @@ next plan session removes their checklists (git history retains them).
 
 ## V1 spine — plan e6523e9
 
-- [ ] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
+- [x] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
   num-rational), lib.rs wiring with unsafe forbidden, and value types Id ([a-z][a-z0-9_.:-]*), Hash
   (sha256: plus 64 lowercase hex), exact-reduced Rational (positive denominator, decimal-string
   num/den repr) with ValidationError, serde via try_from/into String, Display/FromStr;
   acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Gate:
-  `cargo test -p ckc-core`.
+  `cargo test -p ckc-core`. 34% 67K/200K _
 - [ ] core-strings: StringPolicy enum (Copy, snake_case serde) with the seven policies raw_source,
   source_nfkc, semantic_ja, semantic_en, identifier_ascii, diagnostic_text, view_text as
   deterministic normalizers: pipeline NFKC, whitespace fold to single U+0020 trimmed, CJK
