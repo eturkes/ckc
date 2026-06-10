@@ -51,14 +51,14 @@ next plan session removes their checklists (git history retains them).
   order; read_array/read_set/read_map/read_union enforcing strictly ascending sort keys and exact
   {tag,value} shape; CanonReadError taxonomy rejecting unknown/duplicate/misordered fields, null,
   bare numerics, non-reduced rationals; write-read round-trip tests. Reading: SPEC §4.3. Consumes core-canon-writer, core-canon-collections, core-canon-unions. Gate: `cargo test -p
-  ckc-core canon::`. 28% 55K/200K _
-- [ ] core-canon-hash: Hashing in a hash module: sha2 dep; content_hash as sha256 over
+  ckc-core canon::`. 28% 55K/200K 0353438
+- [x] core-canon-hash: Hashing in a hash module: sha2 dep; content_hash as sha256 over
   canonical_payload_bytes wrapped as Hash; hash_bytes raw-byte primitive for _hash fields declared
   over raw bytes; CanonicalizationPolicy descriptor type with pinned canonical bytes and
   canonicalization_policy_hash derived through content_hash; NIST vector, determinism,
   value-sensitivity, and pinned-descriptor tests.
   Reading: SPEC §4.3, §4.4 canonicalization_policy_hash row. Consumes core-ids Hash and the canon stack. Gate: `cargo test -p
-  ckc-core`.
+  ckc-core`. 36% 72K/200K _
 - [ ] core-enums-envelope.1: V1 enums plus result and diagnostic records in an enums module: all ten
   §4.4 enums — Outcome with the §4.4 severity order, Origin, Authority, BindingStatus, Direction,
   ClaimTier, ReviewClassification, AttemptClassification, PromotionDecision, PromotionScope — as

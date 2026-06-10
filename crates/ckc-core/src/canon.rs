@@ -6,8 +6,8 @@
 //! `core-canon-collections` added the array, set, and map rules,
 //! `core-canon-unions` added tagged unions, and `core-canon-reader` adds the
 //! strict inverse ([`read_canonical`], [`CanonRead`], [`CanonReadError`]) that
-//! admits only these bytes; the content hash itself is layered on by a later
-//! unit.
+//! admits only these bytes, and `core-canon-hash` seals them into an artifact's
+//! content hash.
 //!
 //! ```text
 //! object   field names sorted by UTF-8 byte order; duplicate names rejected

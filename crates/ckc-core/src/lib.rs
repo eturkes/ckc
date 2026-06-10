@@ -11,9 +11,13 @@
 //! `core-canon-unions` adds tagged-union emission ([`emit_union`]), and
 //! `core-canon-reader` adds the strict canonical reader ([`read_canonical`],
 //! [`CanonRead`], [`CanonReadError`]) that admits only the writer's bytes.
+//! `core-canon-hash` then seals a payload into its content hash and pins the
+//! policy version ([`content_hash`], [`hash_bytes`],
+//! [`canonicalization_policy_hash`]).
 #![forbid(unsafe_code)]
 
 mod canon;
+mod hash;
 mod id;
 mod strings;
 
@@ -23,5 +27,6 @@ pub use canon::{
     emit_string, emit_string_policy, emit_union, read_array, read_canonical, read_int, read_map,
     read_set, read_string, read_string_policy, read_union,
 };
+pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use strings::StringPolicy;
