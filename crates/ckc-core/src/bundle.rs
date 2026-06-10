@@ -18,22 +18,31 @@
 //! statements, rules, and constraints; vocabulary records (actions by
 //! normalized key, concepts by id) carry [`content_hash`] — all-vocabulary
 //! values emit verbatim in structural bytes, so their canonical bytes ARE
-//! their structural bytes. §5 IR invariants (grounding, references, policy
-//! completeness) land with `validate` in core-ir.5.
+//! their structural bytes.
+//!
+//! [`IrBundle::validate`] enforces the §5 IR invariants over a stored bundle
+//! and its source graph in a pinned order — DocIR re-derivation, grounding
+//! with residuals licensed by `extraction_uncertain` doc diagnostics,
+//! per-pool id uniqueness, support/reference resolution, key and interval
+//! coherence, the NormIR→FormalIR projection, §6 plan-pair eligibility, and
+//! re-derivation of every derived field — yielding a typed [`BundleError`].
 
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
     canonical_sort_key, emit_set, emit_string, read_set, read_string,
 };
-use crate::enums::{DiagnosticRecord, emit_payload, fieldless_enum, read_payload};
+use crate::enums::{DiagnosticCode, DiagnosticRecord, emit_payload, fieldless_enum, read_payload};
+use crate::grounding::{GroundingError, SourceGraph};
 use crate::hash::{content_hash, hash_bytes};
 use crate::id::{Hash, Id, ValidationError};
 use crate::ir::{
-    Action, ClinicalIr, ContextAtom, ContextExpr, DocIr, FormalIr, NormIr, RefLocalizer, SegmentIr,
-    Structural, emit_structural_record_set, emit_structural_ref_set, structural_hash,
+    Action, ClinicalIr, ContextAtom, ContextExpr, DocIr, FormalConstraint, FormalIr, IrError,
+    NormIr, NormRule, QuantityInterval, RefLocalizer, SegmentIr, Structural, directions_opposed,
+    emit_structural_record_set, emit_structural_ref_set, structural_hash,
 };
 
 fieldless_enum! {
@@ -251,7 +260,7 @@ impl CanonRead for IrBundle {
 /// Assemble one document's bundle from its produced layers: derive
 /// [`FormalIr`] from NormIR, the component index, the per-layer hashes, and
 /// the whole-bundle hash (module doc). Cross-reference and re-derivation
-/// invariants are `validate`'s job (core-ir.5).
+/// invariants are [`IrBundle::validate`]'s job.
 pub fn assemble(
     doc: DocIr,
     segment: SegmentIr,
@@ -497,32 +506,445 @@ fn context_atoms(expr: &ContextExpr) -> impl Iterator<Item = &ContextAtom> {
     expr.any.iter().flat_map(|c| &c.all)
 }
 
+/// A SPEC §5 IR-bundle invariant failed ([`IrBundle::validate`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BundleError {
+    /// DocIR derivation from the source graph failed outright.
+    Doc(IrError),
+    /// The stored DocIR is not the graph's derivation.
+    DocLayerMismatch,
+    /// A §4.5 grounding invariant failed (residuals licensed first).
+    Grounding(GroundingError),
+    /// Two entities in one id pool share an id.
+    Duplicate { pool: &'static str, id: Id },
+    /// A reference names an id its pool does not define.
+    Dangling { pool: &'static str, id: Id },
+    /// The named segment's region set is empty.
+    EmptySupport(Id),
+    /// The named statement or rule stores an action key that is not the
+    /// `kind:target` derivation.
+    KeyMismatch(Id),
+    /// The named constraint is missing, out of rule order, or not its rule's
+    /// projection.
+    ConstraintMismatch(Id),
+    /// A quantity interval breaks bound coherence (`rule` names the broken
+    /// bound rule).
+    Interval { var: Id, rule: &'static str },
+    /// A plan pair breaks a §6 eligibility invariant (`rule` names it).
+    PairInvalid { pair_id: Id, rule: &'static str },
+    /// The stored component index is not the layers' derivation.
+    ComponentsMismatch,
+    /// A stored layer or bundle hash does not re-derive.
+    HashMismatch,
+    /// Canonical emission failed while re-deriving.
+    Canon(CanonError),
+}
+
+impl fmt::Display for BundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BundleError::Doc(e) => write!(f, "doc layer derivation: {e}"),
+            BundleError::DocLayerMismatch => write!(f, "stored DocIR is not its graph derivation"),
+            BundleError::Grounding(e) => write!(f, "grounding: {e}"),
+            BundleError::Duplicate { pool, id } => write!(f, "duplicate {pool} id {id}"),
+            BundleError::Dangling { pool, id } => write!(f, "reference to undefined {pool} {id}"),
+            BundleError::EmptySupport(id) => write!(f, "segment {id} supports nothing"),
+            BundleError::KeyMismatch(id) => {
+                write!(f, "{id} stores an action key that is not kind:target")
+            }
+            BundleError::ConstraintMismatch(id) => write!(
+                f,
+                "constraint {id} is missing, out of rule order, or not its rule's projection"
+            ),
+            BundleError::Interval { var, rule } => write!(f, "interval over {var}: {rule}"),
+            BundleError::PairInvalid { pair_id, rule } => write!(f, "plan pair {pair_id}: {rule}"),
+            BundleError::ComponentsMismatch => {
+                write!(f, "stored components are not the layers' derivation")
+            }
+            BundleError::HashMismatch => {
+                write!(f, "a stored layer or bundle hash does not re-derive")
+            }
+            BundleError::Canon(e) => write!(f, "canonical emission: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for BundleError {}
+
+impl From<CanonError> for BundleError {
+    fn from(e: CanonError) -> Self {
+        BundleError::Canon(e)
+    }
+}
+
+impl IrBundle {
+    /// Enforce the SPEC §5 IR invariants over a stored bundle and its source
+    /// graph, in a pinned order: (1) the DocIR layer re-derives equal from
+    /// `graph`; (2) grounding holds, unspanned textual nodes licensed by the
+    /// regions of `extraction_uncertain` doc diagnostics; (3) ids are unique
+    /// per pool; (4) segment support is nonempty, then every region ref
+    /// resolves; (5) statements re-derive keys, cohere intervals, and cite
+    /// real segments; (6) rules likewise, exception refs resolving against
+    /// statement exceptions; (7) FormalIR is NormIR's total in-order
+    /// projection; (8) plan pairs are §6-eligible; (9) the component index
+    /// re-derives equal; (10) layer hashes, then the bundle hash, re-derive
+    /// equal. [`assemble`] output over a valid graph passes by construction.
+    pub fn validate(&self, graph: &SourceGraph) -> Result<(), BundleError> {
+        // (1) DocIR re-derives equal from the graph and the carried
+        // extraction diagnostics.
+        let derived =
+            DocIr::from_graph(graph, self.doc.diagnostics.clone()).map_err(BundleError::Doc)?;
+        if derived != self.doc {
+            return Err(BundleError::DocLayerMismatch);
+        }
+
+        // (2) Grounding, residual textual nodes licensed by the regions of
+        // extraction_uncertain doc diagnostics (step 1 resolved them).
+        let regions: HashMap<&Id, &[Id]> = graph
+            .regions
+            .iter()
+            .map(|r| (&r.region_id, r.node_ids.as_slice()))
+            .collect();
+        let residuals: Vec<Id> = self
+            .doc
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::ExtractionUncertain)
+            .flat_map(|d| &d.region_ids)
+            .filter_map(|region_id| regions.get(region_id))
+            .flat_map(|nodes| nodes.iter().cloned())
+            .collect();
+        graph.validate(&residuals).map_err(BundleError::Grounding)?;
+
+        // (3) Id uniqueness per pool.
+        unique(
+            "segment",
+            self.segment.segments.iter().map(|s| &s.segment_id),
+        )?;
+        unique(
+            "binding",
+            self.clinical.bindings.iter().map(|b| &b.binding_id),
+        )?;
+        let statements = &self.clinical.statements;
+        unique("statement", statements.iter().map(|s| &s.statement_id))?;
+        let exceptions = || statements.iter().flat_map(|s| &s.exceptions);
+        unique("exception", exceptions().map(|e| &e.exception_id))?;
+        unique("rule", self.norm.rules.iter().map(|r| &r.rule_id))?;
+        unique(
+            "constraint",
+            self.formal.constraints.iter().map(|c| &c.constraint_id),
+        )?;
+        unique(
+            "plan",
+            self.formal.plan.iter().flat_map(|p| {
+                [
+                    &p.pair_id,
+                    &p.context_overlap_query_id,
+                    &p.deontic_consistency_query_id,
+                ]
+            }),
+        )?;
+        unique(
+            "assumption",
+            self.assumptions.iter().map(|a| &a.assumption_id),
+        )?;
+
+        // (4) Segment support is nonempty; every region ref resolves.
+        for s in &self.segment.segments {
+            if s.region_ids.is_empty() {
+                return Err(BundleError::EmptySupport(s.segment_id.clone()));
+            }
+        }
+        let in_regions = |id: &Id| regions.contains_key(id);
+        for s in &self.segment.segments {
+            resolve("region", in_regions, &s.region_ids)?;
+        }
+        for b in &self.clinical.bindings {
+            resolve("region", in_regions, &b.region_ids)?;
+        }
+        for e in exceptions() {
+            resolve("region", in_regions, &e.region_ids)?;
+        }
+        for r in &self.norm.rules {
+            resolve("region", in_regions, &r.source_region_ids)?;
+        }
+        for a in &self.assumptions {
+            resolve("region", in_regions, &a.region_ids)?;
+        }
+        for d in &self.diagnostics {
+            resolve("region", in_regions, &d.region_ids)?;
+        }
+
+        // (5) Statements: stored action keys re-derive, interval atoms
+        // cohere, cited segments exist.
+        let segment_ids: HashSet<&Id> = self
+            .segment
+            .segments
+            .iter()
+            .map(|s| &s.segment_id)
+            .collect();
+        for s in statements {
+            check_key(&s.action, &s.statement_id)?;
+            let exception_atoms = s.exceptions.iter().flat_map(|e| &e.atoms);
+            check_atoms(
+                s.population
+                    .iter()
+                    .chain(&s.condition)
+                    .chain(exception_atoms),
+            )?;
+            resolve(
+                "segment",
+                |id| segment_ids.contains(id),
+                &s.source_segment_ids,
+            )?;
+        }
+
+        // (6) Rules: keys, context atoms, exception refs.
+        let exception_ids: HashSet<&Id> = exceptions().map(|e| &e.exception_id).collect();
+        for r in &self.norm.rules {
+            check_key(&r.action, &r.rule_id)?;
+            check_atoms(context_atoms(&r.context))?;
+            resolve(
+                "exception",
+                |id| exception_ids.contains(id),
+                &r.exception_refs,
+            )?;
+        }
+
+        // (7) FormalIR is NormIR's projection: every stored constraint names
+        // a rule and equals its projection; the sequence is total, in rule
+        // order (covers id derivation, omission, and reordering).
+        let rules: HashMap<&Id, &NormRule> =
+            self.norm.rules.iter().map(|r| (&r.rule_id, r)).collect();
+        for c in &self.formal.constraints {
+            let rule = rules.get(&c.rule_id).ok_or_else(|| BundleError::Dangling {
+                pool: "rule",
+                id: c.rule_id.clone(),
+            })?;
+            if FormalConstraint::from_rule(rule) != *c {
+                return Err(BundleError::ConstraintMismatch(c.constraint_id.clone()));
+            }
+        }
+        for (i, rule) in self.norm.rules.iter().enumerate() {
+            if self
+                .formal
+                .constraints
+                .get(i)
+                .is_none_or(|c| c.rule_id != rule.rule_id)
+            {
+                return Err(BundleError::ConstraintMismatch(
+                    FormalConstraint::from_rule(rule).constraint_id,
+                ));
+            }
+        }
+
+        // (8) Plan pairs: §6 eligibility on resolved constraints.
+        let constraints: HashMap<&Id, &FormalConstraint> = self
+            .formal
+            .constraints
+            .iter()
+            .map(|c| (&c.constraint_id, c))
+            .collect();
+        for p in &self.formal.plan {
+            let lookup = |id: &Id| {
+                constraints
+                    .get(id)
+                    .copied()
+                    .ok_or_else(|| BundleError::Dangling {
+                        pool: "constraint",
+                        id: id.clone(),
+                    })
+            };
+            let a = lookup(&p.constraint_a_id)?;
+            let b = lookup(&p.constraint_b_id)?;
+            let invalid = |rule: &'static str| BundleError::PairInvalid {
+                pair_id: p.pair_id.clone(),
+                rule,
+            };
+            if p.constraint_a_id.as_str() >= p.constraint_b_id.as_str() {
+                return Err(invalid("constraint ids not ascending"));
+            }
+            if p.action_key != a.action.key || p.action_key != b.action.key {
+                return Err(invalid("action key mismatch"));
+            }
+            if !directions_opposed(a.direction, b.direction) {
+                return Err(invalid("directions not opposed"));
+            }
+        }
+
+        // (9) The component index re-derives equal.
+        if derive_components(&self.segment, &self.clinical, &self.norm, &self.formal)?
+            != self.components
+        {
+            return Err(BundleError::ComponentsMismatch);
+        }
+
+        // (10) Layer hashes, then the bundle hash, re-derive equal.
+        let layer_hashes = LayerHashes {
+            clinical: structural_hash(&self.clinical)?,
+            doc: structural_hash(&self.doc)?,
+            formal: structural_hash(&self.formal)?,
+            norm: structural_hash(&self.norm)?,
+            segment: structural_hash(&self.segment)?,
+        };
+        if layer_hashes != self.layer_hashes {
+            return Err(BundleError::HashMismatch);
+        }
+        let bundle_hash = hash_bytes(&bundle_structural_bytes(
+            &self.doc,
+            &self.segment,
+            &self.clinical,
+            &self.norm,
+            &self.formal,
+            &self.assumptions,
+            &self.diagnostics,
+        )?);
+        if bundle_hash != self.bundle_hash {
+            return Err(BundleError::HashMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// One id pool admits each id once.
+fn unique<'a>(pool: &'static str, ids: impl Iterator<Item = &'a Id>) -> Result<(), BundleError> {
+    let mut seen: HashSet<&Id> = HashSet::new();
+    for id in ids {
+        if !seen.insert(id) {
+            return Err(BundleError::Duplicate {
+                pool,
+                id: id.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Every id in `ids` is defined in `pool`.
+fn resolve<'a>(
+    pool: &'static str,
+    defined: impl Fn(&Id) -> bool,
+    ids: impl IntoIterator<Item = &'a Id>,
+) -> Result<(), BundleError> {
+    for id in ids {
+        if !defined(id) {
+            return Err(BundleError::Dangling {
+                pool,
+                id: id.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// A stored action key equals its `kind:target` derivation (§5 action
+/// sameness rides on keys); `owner` names the holder on failure.
+fn check_key(action: &Action, owner: &Id) -> Result<(), BundleError> {
+    if Action::new(action.kind.clone(), action.target.clone()).key != action.key {
+        return Err(BundleError::KeyMismatch(owner.clone()));
+    }
+    Ok(())
+}
+
+/// Interval atoms cohere; concept atoms carry nothing checkable here.
+fn check_atoms<'a>(atoms: impl Iterator<Item = &'a ContextAtom>) -> Result<(), BundleError> {
+    for atom in atoms {
+        if let ContextAtom::Interval(q) = atom {
+            check_interval(q)?;
+        }
+    }
+    Ok(())
+}
+
+/// §5 quantity-interval coherence: at least one bound, at most one per side,
+/// and a two-sided interval is nonempty over the reals — strict `lo < hi`
+/// when either side is strict, else `lo <= hi`.
+fn check_interval(q: &QuantityInterval) -> Result<(), BundleError> {
+    let fail = |rule: &'static str| BundleError::Interval {
+        var: q.var.clone(),
+        rule,
+    };
+    let (lo, hi) = (q.ge.or(q.gt), q.le.or(q.lt));
+    if lo.is_none() && hi.is_none() {
+        return Err(fail("no bound"));
+    }
+    if q.ge.is_some() && q.gt.is_some() {
+        return Err(fail("two lower bounds"));
+    }
+    if q.le.is_some() && q.lt.is_some() {
+        return Err(fail("two upper bounds"));
+    }
+    if let (Some(lo), Some(hi)) = (lo, hi) {
+        let strict = q.gt.is_some() || q.lt.is_some();
+        if if strict { lo >= hi } else { lo > hi } {
+            return Err(fail("empty interval"));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::canon::read_canonical;
-    use crate::enums::DiagnosticCode;
-    use crate::grounding::NodeKind;
+    use crate::enums::Direction;
+    use crate::grounding::{
+        DataClass, NodeKind, Provenance, SourceDocument, SourceNode, SourceRegion, SourceSpan,
+    };
     use crate::ir::tests::{
         atom_c, atom_ge, atom_nc, binding_p, canon, diag, dnf1, id, pair_p, round_trip, rule_p,
         statement_p, structural,
     };
-    use crate::ir::{ClinicalSegment, ContextConjunct, SegmentKind, TextBlock};
+    use crate::ir::{
+        ClinicalSegment, ContextConjunct, ContradictionQueryPair, SegmentKind, Strength,
+    };
 
     fn pid(p: &str, tail: &str) -> Id {
         id(&format!("{p}{tail}"))
     }
 
-    fn doc_p(p: &str) -> DocIr {
-        DocIr {
-            document_id: pid(p, "doc.a"),
-            blocks: vec![TextBlock {
-                kind: NodeKind::Cq,
-                node_id: pid(p, "n.cq1"),
-                span_id: pid(p, "s.cq1"),
-            }],
-            tables: vec![],
-            diagnostics: vec![],
+    /// Source graph behind [`fixture_p`]: document root, CQ heading,
+    /// recommendation paragraph, exception sentence — each textual node
+    /// spanned — and one region per fixture ref target.
+    fn graph_p(p: &str) -> SourceGraph {
+        let node = |kind, tail: &str, parent: Option<&str>| SourceNode {
+            node_id: pid(p, tail),
+            kind,
+            parent_id: parent.map(|t| pid(p, t)),
+            attrs: vec![],
+        };
+        let region = |tail: &str, node_tail: &str, span_tail: &str| SourceRegion {
+            region_id: pid(p, tail),
+            node_ids: vec![pid(p, node_tail)],
+            span_ids: vec![pid(p, span_tail)],
+            anchor_ids: vec![],
+        };
+        SourceGraph {
+            document: SourceDocument {
+                document_id: pid(p, "doc.a"),
+                source_family: id("synthetic_fixture_html"),
+                provenance: Provenance::Synthetic,
+                raw_hash: hash_bytes(b"raw"),
+                content_hash: hash_bytes(b"content"),
+                data_class: DataClass::None,
+            },
+            nodes: vec![
+                node(NodeKind::Document, "n.doc", None),
+                node(NodeKind::Cq, "n.cq1", Some("n.doc")),
+                node(NodeKind::Recommendation, "n.rec", Some("n.doc")),
+                node(NodeKind::Paragraph, "n.exc", Some("n.doc")),
+            ],
+            spans: vec![
+                SourceSpan::derive(pid(p, "s.cq1"), pid(p, "n.cq1"), 0, "cq1".to_owned(), 1),
+                SourceSpan::derive(pid(p, "s.rec"), pid(p, "n.rec"), 0, "rec".to_owned(), 2),
+                SourceSpan::derive(pid(p, "s.exc"), pid(p, "n.exc"), 0, "exc".to_owned(), 3),
+            ],
+            anchors: vec![],
+            regions: vec![
+                region("r.cq1", "n.cq1", "s.cq1"),
+                region("region.a.cq1.rec", "n.rec", "s.rec"),
+                region("region.a.cq1.exc", "n.exc", "s.exc"),
+            ],
         }
     }
 
@@ -543,9 +965,9 @@ mod tests {
     }
 
     /// The §8.6 worked-rule family as one coherent document under a rename
-    /// prefix: DocIR view, the CQ + recommendation segments, the ir.rs
-    /// binding/statement/rule fixtures, one assumption, one bundle
-    /// diagnostic.
+    /// prefix: the DocIR view derived from [`graph_p`], the CQ +
+    /// recommendation segments, the ir.rs binding/statement/rule fixtures,
+    /// one assumption, one bundle diagnostic.
     fn fixture_p(
         p: &str,
     ) -> (
@@ -579,7 +1001,7 @@ mod tests {
             &format!("{p}r.cq1"),
         )];
         (
-            doc_p(p),
+            DocIr::from_graph(&graph_p(p), vec![]).unwrap(),
             segment,
             clinical,
             norm,
@@ -857,5 +1279,403 @@ mod tests {
         assert_eq!(canon(&minimal), want);
         round_trip(minimal);
         round_trip(assemble_p(""));
+    }
+
+    // ---- core-ir.5: validation ------------------------------------------
+
+    /// Re-derive the derived fields after a layer tamper so validation
+    /// reaches the targeted invariant instead of tripping on staleness.
+    fn restamp(b: &mut IrBundle) {
+        b.components = derive_components(&b.segment, &b.clinical, &b.norm, &b.formal).unwrap();
+        b.layer_hashes = LayerHashes {
+            clinical: structural_hash(&b.clinical).unwrap(),
+            doc: structural_hash(&b.doc).unwrap(),
+            formal: structural_hash(&b.formal).unwrap(),
+            norm: structural_hash(&b.norm).unwrap(),
+            segment: structural_hash(&b.segment).unwrap(),
+        };
+        b.bundle_hash = hash_bytes(
+            &bundle_structural_bytes(
+                &b.doc,
+                &b.segment,
+                &b.clinical,
+                &b.norm,
+                &b.formal,
+                &b.assumptions,
+                &b.diagnostics,
+            )
+            .unwrap(),
+        );
+    }
+
+    /// Tamper the worked bundle, restamp, validate against its graph.
+    fn tampered(mutate: impl FnOnce(&mut IrBundle)) -> BundleError {
+        let mut b = assemble_p("");
+        mutate(&mut b);
+        restamp(&mut b);
+        b.validate(&graph_p("")).unwrap_err()
+    }
+
+    /// Two opposed rules over one action plus the §8.6 worked plan pair —
+    /// the smt-emit.2 flow: assemble, fill the plan, restamp.
+    fn two_rule_bundle() -> IrBundle {
+        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+        let mut against = rule_p("");
+        against.rule_id = id("rule.b.contra1");
+        against.direction = Direction::Against;
+        norm.rules.push(against);
+        let mut b = assemble(doc, segment, clinical, norm, assumptions, diagnostics).unwrap();
+        b.formal.plan = vec![pair_p("")];
+        restamp(&mut b);
+        b
+    }
+
+    #[test]
+    fn validate_accepts_assembled_bundles() {
+        assemble_p("").validate(&graph_p("")).unwrap();
+        assemble_p("x.").validate(&graph_p("x.")).unwrap();
+        two_rule_bundle().validate(&graph_p("")).unwrap();
+    }
+
+    // §4.5 coverage degrades to typed residuals: an unspanned textual node
+    // fails grounding bare and passes once an extraction_uncertain doc
+    // diagnostic licenses its region's nodes.
+    #[test]
+    fn validate_licenses_residual_nodes() {
+        let mut graph = graph_p("");
+        graph.nodes.push(SourceNode {
+            node_id: id("n.resid"),
+            kind: NodeKind::Paragraph,
+            parent_id: Some(id("n.doc")),
+            attrs: vec![],
+        });
+        graph.regions.push(SourceRegion {
+            region_id: id("r.resid"),
+            node_ids: vec![id("n.resid")],
+            span_ids: vec![],
+            anchor_ids: vec![],
+        });
+        let (_, segment, clinical, norm, assumptions, diagnostics) = fixture_p("");
+        let doc = DocIr::from_graph(&graph, vec![]).unwrap();
+        let bare = assemble(doc, segment, clinical, norm, assumptions, diagnostics).unwrap();
+        assert_eq!(
+            bare.validate(&graph),
+            Err(BundleError::Grounding(
+                GroundingError::UnspannedTextualNode(id("n.resid"))
+            ))
+        );
+        let (_, segment, clinical, norm, assumptions, diagnostics) = fixture_p("");
+        let licensed = vec![diag(DiagnosticCode::ExtractionUncertain, "r.resid")];
+        let doc = DocIr::from_graph(&graph, licensed).unwrap();
+        assemble(doc, segment, clinical, norm, assumptions, diagnostics)
+            .unwrap()
+            .validate(&graph)
+            .unwrap();
+    }
+
+    #[test]
+    fn validate_rejects_doc_breaks() {
+        assert!(matches!(
+            tampered(|b| {
+                b.doc.diagnostics = vec![diag(DiagnosticCode::ExtractionUncertain, "r.nope")];
+            }),
+            BundleError::Doc(IrError::Dangling { .. })
+        ));
+        assert_eq!(
+            tampered(|b| {
+                b.doc.blocks.pop();
+            }),
+            BundleError::DocLayerMismatch
+        );
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_ids() {
+        let dup = |pool: &'static str, tail: &str| BundleError::Duplicate { pool, id: id(tail) };
+        assert_eq!(
+            tampered(|b| {
+                let s = b.segment.segments[0].clone();
+                b.segment.segments.push(s);
+            }),
+            dup("segment", "seg.a.cq1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let x = b.clinical.bindings[0].clone();
+                b.clinical.bindings.push(x);
+            }),
+            dup("binding", "bind.a.m1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let s = b.clinical.statements[0].clone();
+                b.clinical.statements.push(s);
+            }),
+            dup("statement", "st.a.cq1.s1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let e = b.clinical.statements[0].exceptions[0].clone();
+                b.clinical.statements[0].exceptions.push(e);
+            }),
+            dup("exception", "exc.a.cq1.e1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let r = b.norm.rules[0].clone();
+                b.norm.rules.push(r);
+            }),
+            dup("rule", "rule.a.cq1.r1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let c = b.formal.constraints[0].clone();
+                b.formal.constraints.push(c);
+            }),
+            dup("constraint", "fc.rule.a.cq1.r1")
+        );
+        assert_eq!(
+            tampered(|b| {
+                let a = b.assumptions[0].clone();
+                b.assumptions.push(a);
+            }),
+            dup("assumption", "as.a.1")
+        );
+        let mut b = two_rule_bundle();
+        let p0 = b.formal.plan[0].clone();
+        b.formal.plan.push(p0);
+        restamp(&mut b);
+        assert_eq!(
+            b.validate(&graph_p("")).unwrap_err(),
+            dup("plan", "q.v1_conflict.pair1")
+        );
+        let mut b = two_rule_bundle();
+        b.formal.plan[0].deontic_consistency_query_id =
+            b.formal.plan[0].context_overlap_query_id.clone();
+        restamp(&mut b);
+        assert_eq!(
+            b.validate(&graph_p("")).unwrap_err(),
+            dup("plan", "q.v1_conflict.pair1.overlap")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_dangling_refs() {
+        let nope = |pool: &'static str, tail: &str| BundleError::Dangling { pool, id: id(tail) };
+        let region_break = |got: BundleError| assert_eq!(got, nope("region", "r.nope"));
+        region_break(tampered(|b| {
+            b.segment.segments[0].region_ids = vec![id("r.nope")];
+        }));
+        region_break(tampered(|b| {
+            b.clinical.bindings[0].region_ids = vec![id("r.nope")];
+        }));
+        region_break(tampered(|b| {
+            b.clinical.statements[0].exceptions[0].region_ids = vec![id("r.nope")];
+        }));
+        region_break(tampered(|b| {
+            b.norm.rules[0].source_region_ids = vec![id("r.nope")];
+        }));
+        region_break(tampered(|b| {
+            b.assumptions[0].region_ids = vec![id("r.nope")];
+        }));
+        region_break(tampered(|b| {
+            b.diagnostics[0].region_ids = vec![id("r.nope")];
+        }));
+        assert_eq!(
+            tampered(|b| {
+                b.clinical.statements[0].source_segment_ids = vec![id("seg.nope")];
+            }),
+            nope("segment", "seg.nope")
+        );
+        assert_eq!(
+            tampered(|b| {
+                b.norm.rules[0].exception_refs = vec![id("exc.nope")];
+            }),
+            nope("exception", "exc.nope")
+        );
+        assert_eq!(
+            tampered(|b| {
+                b.formal.constraints[0].rule_id = id("rule.nope");
+            }),
+            nope("rule", "rule.nope")
+        );
+        let mut b = two_rule_bundle();
+        b.formal.plan[0].constraint_a_id = id("fc.rule.nope");
+        restamp(&mut b);
+        assert_eq!(
+            b.validate(&graph_p("")).unwrap_err(),
+            nope("constraint", "fc.rule.nope")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_empty_support() {
+        assert_eq!(
+            tampered(|b| b.segment.segments[0].region_ids = vec![]),
+            BundleError::EmptySupport(id("seg.a.cq1"))
+        );
+    }
+
+    #[test]
+    fn validate_rejects_key_and_projection_tampers() {
+        assert_eq!(
+            tampered(|b| b.clinical.statements[0].action.key = id("act.administer:drug.other")),
+            BundleError::KeyMismatch(id("st.a.cq1.s1"))
+        );
+        assert_eq!(
+            tampered(|b| b.norm.rules[0].action.key = id("act.administer:drug.other")),
+            BundleError::KeyMismatch(id("rule.a.cq1.r1"))
+        );
+        assert_eq!(
+            tampered(|b| b.formal.constraints[0].strength = Strength::Weak),
+            BundleError::ConstraintMismatch(id("fc.rule.a.cq1.r1"))
+        );
+        assert_eq!(
+            tampered(|b| b.formal.constraints[0].constraint_id = id("fc.wrong")),
+            BundleError::ConstraintMismatch(id("fc.wrong"))
+        );
+        // the projection is total...
+        assert_eq!(
+            tampered(|b| b.formal.constraints.clear()),
+            BundleError::ConstraintMismatch(id("fc.rule.a.cq1.r1"))
+        );
+        // ...and in rule order
+        let mut b = two_rule_bundle();
+        b.formal.constraints.swap(0, 1);
+        restamp(&mut b);
+        assert_eq!(
+            b.validate(&graph_p("")).unwrap_err(),
+            BundleError::ConstraintMismatch(id("fc.rule.a.cq1.r1"))
+        );
+    }
+
+    // The §5 interval-coherence table: bound presence, one bound per side,
+    // nonemptiness over the reals (strict lo<hi, inclusive lo<=hi).
+    #[test]
+    fn validate_rejects_incoherent_intervals() {
+        let q = |ge, gt, le, lt| QuantityInterval {
+            var: id("q.age_years"),
+            ge,
+            gt,
+            le,
+            lt,
+        };
+        let table: [(QuantityInterval, Option<&'static str>); 7] = [
+            (q(None, None, None, None), Some("no bound")),
+            (q(Some(17), Some(16), None, None), Some("two lower bounds")),
+            (q(None, None, Some(65), Some(66)), Some("two upper bounds")),
+            (q(Some(18), None, Some(17), None), Some("empty interval")),
+            (q(None, Some(18), Some(18), None), Some("empty interval")),
+            (q(Some(18), None, Some(18), None), None),
+            (q(None, Some(17), None, Some(18)), None),
+        ];
+        for (interval, want) in table {
+            let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+            norm.rules[0].context = dnf1(vec![ContextAtom::Interval(interval)]);
+            let got = assemble(doc, segment, clinical, norm, assumptions, diagnostics)
+                .unwrap()
+                .validate(&graph_p(""));
+            match want {
+                None => got.unwrap(),
+                Some(rule) => assert_eq!(
+                    got.unwrap_err(),
+                    BundleError::Interval {
+                        var: id("q.age_years"),
+                        rule
+                    }
+                ),
+            }
+        }
+        // statement atoms run the same check (population here)
+        let (doc, segment, mut clinical, norm, assumptions, diagnostics) = fixture_p("");
+        clinical.statements[0].population = vec![ContextAtom::Interval(q(None, None, None, None))];
+        assert_eq!(
+            assemble(doc, segment, clinical, norm, assumptions, diagnostics)
+                .unwrap()
+                .validate(&graph_p(""))
+                .unwrap_err(),
+            BundleError::Interval {
+                var: id("q.age_years"),
+                rule: "no bound"
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_plan_breaks() {
+        let broken = |mutate: fn(&mut ContradictionQueryPair), rule: &'static str| {
+            let mut b = two_rule_bundle();
+            mutate(&mut b.formal.plan[0]);
+            restamp(&mut b);
+            assert_eq!(
+                b.validate(&graph_p("")).unwrap_err(),
+                BundleError::PairInvalid {
+                    pair_id: id("q.v1_conflict.pair1"),
+                    rule
+                }
+            );
+        };
+        broken(
+            |p| std::mem::swap(&mut p.constraint_a_id, &mut p.constraint_b_id),
+            "constraint ids not ascending",
+        );
+        broken(
+            |p| p.constraint_a_id = p.constraint_b_id.clone(),
+            "constraint ids not ascending",
+        );
+        broken(
+            |p| p.action_key = id("act.administer:drug.other"),
+            "action key mismatch",
+        );
+        // both rules `for`: eligibility's direction half fails
+        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+        let mut second = rule_p("");
+        second.rule_id = id("rule.b.contra1");
+        norm.rules.push(second);
+        let mut b = assemble(doc, segment, clinical, norm, assumptions, diagnostics).unwrap();
+        b.formal.plan = vec![pair_p("")];
+        restamp(&mut b);
+        assert_eq!(
+            b.validate(&graph_p("")).unwrap_err(),
+            BundleError::PairInvalid {
+                pair_id: id("q.v1_conflict.pair1"),
+                rule: "directions not opposed"
+            }
+        );
+    }
+
+    // Derived fields gone stale (no restamp) are caught by re-derivation.
+    #[test]
+    fn validate_rejects_stale_derived_fields() {
+        let stale = |mutate: fn(&mut IrBundle), want: BundleError| {
+            let mut b = assemble_p("");
+            mutate(&mut b);
+            assert_eq!(b.validate(&graph_p("")).unwrap_err(), want);
+        };
+        stale(
+            |b| {
+                b.components.pop();
+            },
+            BundleError::ComponentsMismatch,
+        );
+        stale(
+            |b| b.layer_hashes.norm = hash_bytes(b"stale"),
+            BundleError::HashMismatch,
+        );
+        stale(
+            |b| b.bundle_hash = hash_bytes(b"stale"),
+            BundleError::HashMismatch,
+        );
+        // layer content tampered without restamping reaches the bundle hash
+        stale(
+            |b| {
+                b.assumptions.push(Assumption {
+                    assumption_id: id("as.a.2"),
+                    payload: vec![],
+                    region_ids: vec![],
+                });
+            },
+            BundleError::HashMismatch,
+        );
     }
 }

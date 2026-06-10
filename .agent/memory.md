@@ -21,7 +21,11 @@ technically derivable but easily forgotten under token pressure.
   core-ir.3 (FormalIR layer + IrBundle assembly + §5 validation) blew the
   window on reading+design alone, before any code landed; units extending a
   ~2K-line module pay a full-file read up front, so house new type families in
-  a fresh module. Pre-split such stacks BEFORE scheduling — mid-session overrun
+  a fresh module; even pre-split, core-ir.5 (10-invariant bundle validator +
+  per-variant rejection tests over existing fixtures) overran 200K into
+  compaction — schedule a multi-invariant validator with full rejection
+  coverage as two units (validator + acceptance path vs rejection suite) or
+  slim the pin. Pre-split such stacks BEFORE scheduling — mid-session overrun
   recovery is user-initiated: stop implementing, bring the tree clean, report;
   the user restores to the last commit and directs the re-scope. Calibrate
   finer from neighbouring units' actual `NN%` once they exist. Archive roadmaps mix measured lines (checked,

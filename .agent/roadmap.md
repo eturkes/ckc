@@ -140,8 +140,8 @@ next plan session removes their checklists (git history retains them).
   swap moves bundle_hash); bundle round-trip and canonical shape. Reading: SPEC §5
   IRBundle/component/assumption rows, §4.3 sets, §7.4 payload; ir.rs fixtures and core-ir.3
   surfaces. Consumes core-ir.1/.2/.3 layers, core-grounding regions, core-enums-envelope.1
-  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`. 85% 170K/200K _
-- [ ] core-ir.5: IRBundle validation in bundle.rs: validate(&self, graph: &SourceGraph) ->
+  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`. 85% 170K/200K 1fa9d17
+- [x] core-ir.5: IRBundle validation in bundle.rs: validate(&self, graph: &SourceGraph) ->
   Result<(), BundleError> enforcing the §5 IR invariants in this pinned order — (1) DocIr layer
   re-derives equal: DocIr::from_graph(graph, self.doc.diagnostics) == self.doc; (2) grounding:
   graph.validate with residual node ids licensed by extraction_uncertain doc diagnostics (their
@@ -162,7 +162,7 @@ next plan session removes their checklists (git history retains them).
   rejection coverage per variant — reference breaks, key/projection tampers, an interval table,
   plan breaks on a two-rule for/against fixture, stale derived fields — plus a residual-licensed
   grounding pass. Reading: SPEC §5 IR-invariant paragraph, §6 direction groups; bundle.rs and the
-  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`.
+  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. compacted _
 - [ ] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
   budget) with canonical bytes and plan hash; RunManifest (plan hash, git commit,
   toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);

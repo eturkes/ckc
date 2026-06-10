@@ -32,7 +32,10 @@
 //! [`directions_opposed`]); `core-ir.4` assembles the layers into the §5
 //! [`IrBundle`] ([`assemble`]) with the derived [`ComponentRecord`] index
 //! ([`derive_components`]), explicit [`Assumption`]s, [`LayerHashes`], and
-//! the rename-stable whole-bundle hash.
+//! the rename-stable whole-bundle hash; `core-ir.5` seals the bundle with
+//! [`IrBundle::validate`] ([`BundleError`]), enforcing the §5 grounding,
+//! reference, coherence, and re-derivation invariants against the source
+//! graph.
 #![forbid(unsafe_code)]
 
 mod bundle;
@@ -46,7 +49,8 @@ mod ir;
 mod strings;
 
 pub use bundle::{
-    Assumption, ComponentKind, ComponentRecord, IrBundle, LayerHashes, assemble, derive_components,
+    Assumption, BundleError, ComponentKind, ComponentRecord, IrBundle, LayerHashes, assemble,
+    derive_components,
 };
 pub use canon::{
     CanonError, CanonRead, CanonReadError, Canonical, MapKey, ObjectEmitter, ObjectReader, Reader,

@@ -373,7 +373,7 @@ pub struct DocIr {
     pub tables: Vec<TableView>,
     /// Extraction diagnostics carried into the layer (set semantics):
     /// `extraction_uncertain` residuals license unspanned textual nodes
-    /// (bundle validation, core-ir.3); `table_structure_uncertain` residuals
+    /// (`IrBundle::validate`); `table_structure_uncertain` residuals
     /// withhold their tables from `tables`.
     pub diagnostics: Vec<DiagnosticRecord>,
 }
@@ -558,8 +558,8 @@ impl Structural for DocIr {
 }
 
 /// SPEC §5 clinical segment: one classified unit of guideline text, grounded
-/// in §4.5 regions (set semantics; nonemptiness lands with bundle validation,
-/// core-ir.3). An independently hashable component (§5 component records).
+/// in §4.5 regions (set semantics; `IrBundle::validate` enforces
+/// nonemptiness). An independently hashable component (§5 component records).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClinicalSegment {
     pub segment_id: Id,
@@ -669,10 +669,10 @@ pub struct Action {
     pub kind: Id,
     pub target: Id,
     /// Normalized target key `kind:target` (V1; V2 joins discriminating
-    /// slots). [`new`](Self::new) derives it; bundle validation (core-ir.3)
-    /// re-checks a stored key against its derivation, the
-    /// [`SourceSpan`](crate::grounding::SourceSpan) precedent for derived
-    /// fields.
+    /// slots). [`new`](Self::new) derives it; bundle validation
+    /// (`IrBundle::validate`) re-checks a stored key against its derivation,
+    /// the [`SourceSpan`](crate::grounding::SourceSpan) precedent for
+    /// derived fields.
     pub key: Id,
 }
 
@@ -710,7 +710,7 @@ impl CanonRead for Action {
 /// (`成人 → age >= 18` yields `{ var: q.age_years, ge: 18 }`). Bounds are
 /// canonical decimal integers, each side optional and omitted when absent.
 /// Bound coherence (at least one bound, one bound per side, nonempty
-/// interval) is bundle validation (core-ir.3).
+/// interval) is `IrBundle::validate`'s job.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuantityInterval {
     pub var: Id,
@@ -1252,8 +1252,8 @@ pub fn directions_opposed(a: Direction, b: Direction) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormalConstraint {
     /// `fc.<rule_id>`, derived by [`from_rule`](Self::from_rule); bundle
-    /// validation (core-ir.5) re-checks stored values against the
-    /// derivation, like every derived field.
+    /// validation (`IrBundle::validate`) re-checks stored values against
+    /// the derivation, like every derived field.
     pub constraint_id: Id,
     pub rule_id: Id,
     pub action: Action,
@@ -1338,8 +1338,8 @@ impl Structural for FormalConstraint {
 
 /// SPEC §5/§6 contradiction-query plan slot: one conflict-eligible
 /// constraint pair — same normalized action key, [`directions_opposed`],
-/// `constraint_a_id < constraint_b_id` by id bytes (bundle validation,
-/// core-ir.5) — holding the planner-minted ids of its two §6 queries (Q1
+/// `constraint_a_id < constraint_b_id` by id bytes (`IrBundle::validate`) —
+/// holding the planner-minted ids of its two §6 queries (Q1
 /// context_overlap, Q2 deontic_consistency; §8.6 spells them
 /// `q.<group>.<pair>.overlap`/`.deontic`). Planning lands in smt-emit.2.
 #[derive(Debug, Clone, PartialEq, Eq)]
