@@ -290,17 +290,17 @@ fn shell_for(command: &Command) -> Shell {
     }
 }
 
-/// Command bodies. Every §3 command is pending at cli-runner.1.1, so each
-/// returns a typed `unsupported` total result after input validation.
-/// Implementing units replace arms in place (registry check →
-/// cli-runner.1.2, run → cli-runner.2, trace → cli-runner.3, replay →
-/// cli-runner.4.2).
+/// Command bodies. `registry check` runs against the working directory
+/// (§3 anchors `registry/` at the repository root); the remaining bodies
+/// are pending and return typed `unsupported` results after input
+/// validation, replaced in place by their units (run → cli-runner.2,
+/// trace → cli-runner.3, replay → cli-runner.4.2).
 fn execute(command: &Command, shell: &mut Shell) {
     match command {
-        Command::RegistryCheck
-        | Command::Run { .. }
-        | Command::Replay { .. }
-        | Command::Trace { .. } => shell.merge(Outcome::Unsupported),
+        Command::RegistryCheck => crate::registry_check::check(Path::new("."), shell),
+        Command::Run { .. } | Command::Replay { .. } | Command::Trace { .. } => {
+            shell.merge(Outcome::Unsupported)
+        }
     }
 }
 
@@ -392,17 +392,21 @@ mod tests {
         assert_eq!(parsed, vec![exit.result.clone()]);
     }
 
+    // Dispatch wires the registry_check body: from this test's working
+    // directory (the crate dir, no registry/ tree) the checker reports the
+    // three unreadable files. The ok path runs in registry_check::tests and
+    // the binary-level test, both rooted at the repository.
     #[test]
-    fn registry_check_is_pending_unsupported() {
+    fn registry_check_dispatches_into_the_checker() {
         let exit = run_cli(&args(&["registry", "check"]));
         assert_eq!(exit.result.operation_id, static_id(OP_REGISTRY_CHECK));
-        assert_eq!(exit.result.outcome, Outcome::Unsupported);
-        assert_eq!(exit.exit_code, 1);
-        assert!(exit.result.diagnostic_hashes.is_empty());
+        assert_eq!(exit.result.outcome, Outcome::Invalid);
+        assert_eq!(exit.exit_code, 2);
+        assert_eq!(exit.result.diagnostic_hashes.len(), 3);
         let events = streamed(&exit);
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].outcome, Outcome::Unsupported);
-        assert!(events[0].diagnostics.is_empty());
+        assert_eq!(events[0].outcome, Outcome::Invalid);
+        assert_eq!(events[0].diagnostics.len(), 3);
         assert_one_result_line(&exit);
     }
 

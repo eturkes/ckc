@@ -30,17 +30,47 @@ fn sorted_entries(dir: &Path) -> Vec<String> {
     names
 }
 
+// §8.5 item 2 end-to-end: `ckc registry check` from the repository root
+// passes against the committed registry set, streaming events to stderr and
+// exactly one ok result to stdout.
 #[test]
-fn registry_check_streams_events_and_one_result() {
-    let out = ckc(&["registry", "check"]);
-    assert_eq!(out.status.code(), Some(1));
+fn registry_check_passes_from_the_repo_root() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args(["registry", "check"])
+        .current_dir(repo_root)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
     let result = single_result(&out.stdout);
     assert_eq!(result.operation_id, "registry.check".parse().unwrap());
-    assert_eq!(result.outcome, Outcome::Unsupported);
+    assert_eq!(result.outcome, Outcome::Ok);
+    assert!(result.diagnostic_hashes.is_empty());
     let events: Vec<EventRecord> = read_jsonl(&out.stderr).unwrap();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].outcome, Outcome::Unsupported);
+    assert_eq!(events[0].outcome, Outcome::Ok);
     assert_eq!(events[0].run_id, "run.none".parse().unwrap());
+}
+
+// The same command from a root without registry files fails invalid (exit
+// 2) with one diagnostic per unreadable core file.
+#[test]
+fn registry_check_fails_invalid_off_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args(["registry", "check"])
+        .current_dir(tmp.path())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let result = single_result(&out.stdout);
+    assert_eq!(result.outcome, Outcome::Invalid);
+    assert_eq!(result.diagnostic_hashes.len(), 3);
+    let events: Vec<EventRecord> = read_jsonl(&out.stderr).unwrap();
+    assert_eq!(events[0].diagnostics.len(), 3);
 }
 
 #[test]

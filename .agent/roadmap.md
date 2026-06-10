@@ -203,13 +203,13 @@ next plan session removes their checklists (git history retains them).
   output directory, end with exactly one §4.4 total operation result; dispatch and shell tests.
   Reading: SPEC §3 crate table, CLI surface and invariants, §4.4 total result, §4.6 events. Consumes
   core-enums-envelope.1 TotalOperationResult and core-enums-envelope.2 EventRecord. Gate: `cargo
-  test -p ckc-cli`. 68% 137K/200K _
-- [ ] cli-runner.1.2: Implement ckc registry check end-to-end: load the three seeded registry files
+  test -p ckc-cli`. 68% 137K/200K adc4b18
+- [x] cli-runner.1.2: Implement ckc registry check end-to-end: load the three seeded registry files
   through core-registry.1, run core-registry.2 validation including experiment resolution and the
   stage chain, map findings to the severity-aggregated §4.4 outcome inside the cli-runner.1.1 shell.
   Closes §8.5 item 2. Reading: SPEC §3 CLI surface, §8.4, §4.4 outcome severity. Consumes
   cli-runner.1.1 dispatch, core-registry.2, fixtures-v1 registry files. Gate: `cargo run -p ckc-cli
-  -- registry check`.
+  -- registry check`. 60% 121K/200K _
 - [ ] stage-extract: Extract stage in an extract module of ckc-cli: choose and pin a real HTML
   parser dependency; parse fixture HTML into SourceGraph (nodes, spans, anchors, regions; tables
   preserving row/column/cell/header relations); emit typed extraction_uncertain and
