@@ -80,7 +80,9 @@ git history.
 - [2026-06-09] Serena symbolic tools erroring `Active languages: [...]`: add the language
   to `.serena/project.yml` `languages:` (first entry = fallback LS), then ask the user to
   /mcp-reconnect serena (config is read only at startup); verify with a symbol call (the
-  first may lag on indexing). rustup keeps rust-analyzer current.
+  first may lag on indexing). rustup keeps rust-analyzer current. Serena startup
+  regenerates project.yml to its full annotated template whenever keys are missing — track
+  the file exactly as Serena writes it; stripping it re-dirties the tree every session.
 - [2026-06-10] Headroom-compressed Reads re-wrap long prose lines (roadmap.md, Rust
   doc-comment blocks), so an Edit old_string assembled from such a Read can miss the file's
   real wrap points. Print the target lines raw (`sed -n`/grep) and anchor on those bytes;
