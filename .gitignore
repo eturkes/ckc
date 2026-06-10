@@ -17,7 +17,5 @@ __pycache__/
 .mypy_cache/
 
 # Generated corpus inputs and run outputs (SPEC §3); commit only when license-safe
-/corpus/raw/*
-!/corpus/raw/.gitkeep
-/runs/*
-!/runs/.gitkeep
+/corpus/raw/
+/runs/
