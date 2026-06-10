@@ -250,13 +250,13 @@ next plan session removes their checklists (git history retains them).
   DocIr::from_graph over it; all three committed fixtures extract residual-free; rejected-table
   inline cases withhold cells and DocIr drops the table. Reading: SPEC §8.3 extract row, §8.2;
   ir.rs DocIr::from_graph and TableCell; extract.rs (edit target). Consumes stage-extract.1
-  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`. 62% 124K/200K _
-- [ ] stage-segment: Segment stage in a segment module: rule-based segmentation keyed on fixture
+  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`. 62% 124K/200K b5a9054
+- [x] stage-segment: Segment stage in a segment module: rule-based segmentation keyed on fixture
   structure (CQ headings, recommendation and exception sentence markers, definition table rows,
   evidence lists) producing ClinicalSegments with region refs; envelope-wrapped segments.json
   payload; segmentation_boundary_error diagnostics on misses. Reading: SPEC §8.3 segment row, §8.2
   markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract.2 SourceGraph, core-ir.1 types.
-  Gate: `cargo test -p ckc-cli segment::`.
+  Gate: `cargo test -p ckc-cli segment::`. 69% 138K/200K _
 - [ ] stage-normalize.1: Normalize stage first half, in a normalize module: load
   corpus/lexicon/ja_core.yaml content-hash versioned; bind mentions to TerminologyBindings with
   BindingStatus mapping (ambiguous emits terminology_ambiguous ambiguity, unmapped emits

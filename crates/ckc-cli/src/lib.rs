@@ -9,14 +9,20 @@
 //! plus experiment-referenced gold documents strict-loaded from the
 //! invocation root and validated as one cross-referenced set, every load
 //! failure and finding a §7.4 `schema_invalid` diagnostic (§8.5 item 2).
-//! `stage-extract.1` opens the extract stage ([`extract`]): html5ever-parsed
-//! fixture HTML walked into an enveloped §4.5 [`ckc_core::SourceGraph`] —
-//! sections/paragraphs/lists spanned with {node,span} regions, parse errors
-//! and unknown flow content as `extraction_uncertain` residuals (tables ride
-//! that path until `stage-extract.2`).
+//! `stage-extract.1`/`.2` land the extract stage ([`extract`]): html5ever-
+//! parsed fixture HTML walked into an enveloped §4.5
+//! [`ckc_core::SourceGraph`] — sections/paragraphs/lists spanned with
+//! {node,span} regions, tables as literal cell grids (`row`/`col`/`header`
+//! attrs; rejected tables withheld as `table_structure_uncertain`), parse
+//! errors and unknown flow content as `extraction_uncertain` residuals.
+//! `stage-segment` adds the segment stage ([`segment`]): the graph's spans
+//! classified in reading order into §5 ClinicalSegments (cq, recommendation,
+//! exception, definition, table-row, evidence, metadata), misses as
+//! `segmentation_boundary_error` residuals.
 #![forbid(unsafe_code)]
 
 pub mod extract;
+pub mod segment;
 
 mod dispatch;
 mod registry_check;
