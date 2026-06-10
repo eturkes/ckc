@@ -1,0 +1,380 @@
+//! Command shell: the SPEC §3 CLI invariants wired once.
+//!
+//! Every `ckc` command runs inside one [`Shell`]. It owns the §3 boundary
+//! invariants — every disk write goes through the containment-guarded
+//! [`Shell::write_under`]; §4.6 events and §7.4 diagnostics leave as
+//! canonical JSONL (`logs/{events,diagnostics}.jsonl` under the output
+//! directory per the §8.3 run layout, or an events stream for stderr when
+//! the command has none); per-item outcomes fold by §4.4 severity; and
+//! [`Shell::finish`] yields exactly one §4.4 [`TotalOperationResult`].
+//! Dispatch (not the shell) parses and validates arguments.
+
+use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use ckc_core::{
+    CanonError, DiagnosticRecord, EventRecord, Hash, Id, Outcome, TotalOperationResult,
+    canonical_sort_key, content_hash, jsonl_line, write_jsonl,
+};
+
+/// Parse a compile-time-constant token as an [`Id`]; all call sites pass
+/// literals from the V1 command surface, covered by tests.
+pub(crate) fn static_id(token: &str) -> Id {
+    token
+        .parse()
+        .expect("static id token matches the Id grammar")
+}
+
+/// §4.6 `run_id` sentinel for commands with no associated run directory
+/// (run ids are runtime metadata, so the sentinel never reaches a hash).
+pub(crate) fn run_none() -> Id {
+    static_id("run.none")
+}
+
+/// Shell failure: the command body may still have succeeded, but the
+/// invariant layer could not land its evidence or result.
+#[derive(Debug)]
+pub(crate) enum ShellError {
+    /// Write target escapes the output directory, or no directory exists.
+    Containment(String),
+    Io(std::io::Error),
+    Canon(CanonError),
+}
+
+impl std::fmt::Display for ShellError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShellError::Containment(reason) => write!(f, "containment: {reason}"),
+            ShellError::Io(e) => write!(f, "io: {e}"),
+            ShellError::Canon(e) => write!(f, "canon: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ShellError {}
+
+impl From<std::io::Error> for ShellError {
+    fn from(e: std::io::Error) -> Self {
+        ShellError::Io(e)
+    }
+}
+
+impl From<CanonError> for ShellError {
+    fn from(e: CanonError) -> Self {
+        ShellError::Canon(e)
+    }
+}
+
+/// A closed command: the one total result plus the evidence streams that
+/// still need a channel (files already landed under the output directory).
+pub(crate) struct FinishedCommand {
+    pub result: TotalOperationResult,
+    /// Canonical JSONL line of `result` for stdout.
+    pub result_line: Vec<u8>,
+    /// §4.6 events JSONL for stderr when the command has no output
+    /// directory; `None` once `logs/events.jsonl` is on disk.
+    pub streamed_events: Option<Vec<u8>>,
+}
+
+/// One command's invariant context. Open it after validation, record
+/// outcomes and diagnostics while the command body runs, then [`finish`].
+///
+/// [`finish`]: Shell::finish
+pub(crate) struct Shell {
+    operation_id: Id,
+    run_id: Id,
+    out_dir: Option<PathBuf>,
+    started_at: String,
+    started: Instant,
+    outcome: Outcome,
+    diagnostics: Vec<DiagnosticRecord>,
+}
+
+impl Shell {
+    /// Open the shell. `out_dir`, when present, is the only writable root
+    /// for the whole command; `run_id` is the run-directory name or
+    /// [`run_none`].
+    pub(crate) fn open(operation_id: Id, run_id: Id, out_dir: Option<PathBuf>) -> Shell {
+        Shell {
+            operation_id,
+            run_id,
+            out_dir,
+            started_at: rfc3339_utc(SystemTime::now()),
+            started: Instant::now(),
+            outcome: Outcome::Ok,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Severity-fold a per-item outcome into the total (§4.4 `max`
+    /// aggregation; the enum order is the severity order).
+    pub(crate) fn merge(&mut self, outcome: Outcome) {
+        self.outcome = self.outcome.max(outcome);
+    }
+
+    /// Record a §7.4 diagnostic: its outcome folds into the total and the
+    /// record rides the event, `logs/diagnostics.jsonl`, and
+    /// `diagnostic_hashes`.
+    pub(crate) fn diagnostic(&mut self, diagnostic: DiagnosticRecord) {
+        self.merge(diagnostic.outcome);
+        self.diagnostics.push(diagnostic);
+    }
+
+    /// The single write primitive: every byte a command persists goes
+    /// through here. `rel` must resolve inside the output directory — the
+    /// guard is lexical (relative, normal components only) over a run
+    /// directory the dispatcher created fresh. Parent directories are
+    /// created on demand.
+    pub(crate) fn write_under(&self, rel: &str, bytes: &[u8]) -> Result<PathBuf, ShellError> {
+        let Some(root) = &self.out_dir else {
+            return Err(ShellError::Containment(format!(
+                "command has no output directory; refused write of {rel:?}"
+            )));
+        };
+        let contained = !rel.is_empty()
+            && Path::new(rel)
+                .components()
+                .all(|c| matches!(c, Component::Normal(_)));
+        if !contained {
+            return Err(ShellError::Containment(format!(
+                "write target {rel:?} escapes the output directory"
+            )));
+        }
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, bytes)?;
+        Ok(path)
+    }
+
+    /// Close the command: build the §4.6 command event (`logical_time` 0;
+    /// later units prepend stage events), land both JSONL streams, and
+    /// return exactly one §4.4 total operation result.
+    pub(crate) fn finish(self) -> Result<FinishedCommand, ShellError> {
+        let ended_at = rfc3339_utc(SystemTime::now());
+        let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+        // diagnostic_hashes and the event's diagnostics are §4.3 sets: store
+        // them in canonical sort order with byte-identical duplicates
+        // collapsed, so the structs round-trip equal through strict reads.
+        // logs/diagnostics.jsonl keeps append order (streams are evidence).
+        let mut keyed_hashes: Vec<(Vec<u8>, Hash)> = Vec::with_capacity(self.diagnostics.len());
+        let mut keyed_diags: Vec<(Vec<u8>, DiagnosticRecord)> =
+            Vec::with_capacity(self.diagnostics.len());
+        for diagnostic in &self.diagnostics {
+            let hash = content_hash(diagnostic)?;
+            keyed_hashes.push((canonical_sort_key(&hash)?, hash));
+            keyed_diags.push((canonical_sort_key(diagnostic)?, diagnostic.clone()));
+        }
+        keyed_hashes.sort_by(|a, b| a.0.cmp(&b.0));
+        keyed_hashes.dedup_by(|a, b| a.0 == b.0);
+        keyed_diags.sort_by(|a, b| a.0.cmp(&b.0));
+        keyed_diags.dedup_by(|a, b| a.0 == b.0);
+
+        let event = EventRecord {
+            event_id: static_id("event.0"),
+            run_id: self.run_id.clone(),
+            candidate_id: static_id("cli"),
+            component_id: format!("cli.{}", self.operation_id)
+                .parse()
+                .expect("cli.<operation-id> matches the Id grammar"),
+            stage: self.operation_id.clone(),
+            level: level_for(self.outcome),
+            logical_time: 0,
+            started_at: self.started_at.clone(),
+            ended_at,
+            duration_ms,
+            input_hashes: Vec::new(),
+            output_hashes: Vec::new(),
+            outcome: self.outcome,
+            diagnostics: keyed_diags.into_iter().map(|(_, d)| d).collect(),
+            budget_counters: Vec::new(),
+        };
+        let events_bytes = write_jsonl([&event])?;
+
+        let streamed_events = if self.out_dir.is_some() {
+            let diagnostics_bytes = write_jsonl(self.diagnostics.iter())?;
+            self.write_under("logs/events.jsonl", &events_bytes)?;
+            self.write_under("logs/diagnostics.jsonl", &diagnostics_bytes)?;
+            None
+        } else {
+            Some(events_bytes)
+        };
+
+        let result = TotalOperationResult {
+            operation_id: self.operation_id,
+            outcome: self.outcome,
+            value_hashes: Vec::new(),
+            diagnostic_hashes: keyed_hashes.into_iter().map(|(_, h)| h).collect(),
+            residual_hashes: Vec::new(),
+            ambiguity_hashes: Vec::new(),
+            incoherence_hashes: Vec::new(),
+        };
+        let result_line = jsonl_line(&result)?;
+        Ok(FinishedCommand {
+            result,
+            result_line,
+            streamed_events,
+        })
+    }
+}
+
+/// §4.6 `level` token from the total outcome's severity band.
+fn level_for(outcome: Outcome) -> Id {
+    let token = match outcome {
+        Outcome::Ok => "info",
+        Outcome::Residual | Outcome::Ambiguity => "warn",
+        Outcome::Unsupported | Outcome::Incoherence | Outcome::Invalid => "error",
+    };
+    static_id(token)
+}
+
+/// RFC 3339 UTC wall-clock text for §4.6 event bounds (runtime evidence,
+/// excluded from content hashes). Whole-second precision; civil date by the
+/// standard days-from-epoch conversion (Hinnant `civil_from_days`).
+fn rfc3339_utc(t: SystemTime) -> String {
+    let secs = t
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::ZERO)
+        .as_secs();
+    let days = i64::try_from(secs / 86_400).expect("u64 seconds / 86400 fits i64");
+    let (hh, mm, ss) = (secs % 86_400 / 3_600, secs % 3_600 / 60, secs % 60);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!("{year:04}-{month:02}-{day:02}T{hh:02}:{mm:02}:{ss:02}Z")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ckc_core::{DiagnosticCode, read_jsonl};
+
+    fn diag(code: DiagnosticCode, outcome: Outcome, text: &str) -> DiagnosticRecord {
+        DiagnosticRecord {
+            code,
+            outcome,
+            payload: vec![(static_id("reason"), text.to_owned())],
+            region_ids: Vec::new(),
+            artifact_hashes: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn rfc3339_epoch_and_leap_day() {
+        assert_eq!(rfc3339_utc(UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        let leap = UNIX_EPOCH + Duration::from_secs(951_827_696);
+        assert_eq!(rfc3339_utc(leap), "2000-02-29T12:34:56Z");
+    }
+
+    #[test]
+    fn severity_folds_to_max() {
+        let mut shell = Shell::open(static_id("run"), run_none(), None);
+        shell.merge(Outcome::Residual);
+        shell.diagnostic(diag(
+            DiagnosticCode::SchemaInvalid,
+            Outcome::Invalid,
+            "boom",
+        ));
+        shell.merge(Outcome::Ambiguity);
+        assert_eq!(shell.outcome, Outcome::Invalid);
+    }
+
+    #[test]
+    fn write_under_guards_containment() {
+        let root = tempfile::tempdir().unwrap();
+        let shell = Shell::open(
+            static_id("run"),
+            static_id("v1"),
+            Some(root.path().to_path_buf()),
+        );
+        for escape in ["../sibling", "/etc/passwd", "logs/../../x", ""] {
+            let err = shell.write_under(escape, b"x").unwrap_err();
+            assert!(matches!(err, ShellError::Containment(_)), "{escape:?}");
+        }
+        let landed = shell.write_under("logs/nested/file.txt", b"ok").unwrap();
+        assert_eq!(std::fs::read(landed).unwrap(), b"ok");
+
+        let homeless = Shell::open(static_id("trace"), run_none(), None);
+        let err = homeless.write_under("logs/events.jsonl", b"x").unwrap_err();
+        assert!(matches!(err, ShellError::Containment(_)));
+    }
+
+    #[test]
+    fn finish_with_out_dir_lands_streams_and_result() {
+        let root = tempfile::tempdir().unwrap();
+        let mut shell = Shell::open(
+            static_id("run"),
+            static_id("v1"),
+            Some(root.path().to_path_buf()),
+        );
+        let d = diag(DiagnosticCode::SchemaInvalid, Outcome::Invalid, "bad");
+        shell.diagnostic(d.clone());
+        shell.diagnostic(d.clone()); // byte-identical: collapses in set fields
+        let finished = shell.finish().unwrap();
+
+        assert!(finished.streamed_events.is_none());
+        let events_bytes = std::fs::read(root.path().join("logs/events.jsonl")).unwrap();
+        let events: Vec<EventRecord> = read_jsonl(&events_bytes).unwrap();
+        assert_eq!(events.len(), 1);
+        let event = &events[0];
+        assert_eq!(event.event_id, static_id("event.0"));
+        assert_eq!(event.run_id, static_id("v1"));
+        assert_eq!(event.candidate_id, static_id("cli"));
+        assert_eq!(event.component_id, static_id("cli.run"));
+        assert_eq!(event.stage, static_id("run"));
+        assert_eq!(event.level, static_id("error"));
+        assert_eq!(event.logical_time, 0);
+        assert_eq!(event.outcome, Outcome::Invalid);
+        assert_eq!(event.diagnostics, vec![d.clone()]);
+
+        // The diagnostics stream keeps append order (both records).
+        let diag_bytes = std::fs::read(root.path().join("logs/diagnostics.jsonl")).unwrap();
+        let stream: Vec<DiagnosticRecord> = read_jsonl(&diag_bytes).unwrap();
+        assert_eq!(stream, vec![d.clone(), d.clone()]);
+
+        assert_eq!(finished.result.operation_id, static_id("run"));
+        assert_eq!(finished.result.outcome, Outcome::Invalid);
+        assert_eq!(
+            finished.result.diagnostic_hashes,
+            vec![content_hash(&d).unwrap()]
+        );
+        let parsed: Vec<TotalOperationResult> = read_jsonl(&finished.result_line).unwrap();
+        assert_eq!(parsed, vec![finished.result]);
+    }
+
+    #[test]
+    fn finish_without_out_dir_streams_events() {
+        let shell = Shell::open(static_id("registry.check"), run_none(), None);
+        let finished = shell.finish().unwrap();
+        let events: Vec<EventRecord> =
+            read_jsonl(finished.streamed_events.as_deref().unwrap()).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].run_id, run_none());
+        assert_eq!(events[0].component_id, static_id("cli.registry.check"));
+        assert_eq!(events[0].level, static_id("info"));
+        assert_eq!(events[0].outcome, Outcome::Ok);
+        assert_eq!(finished.result.outcome, Outcome::Ok);
+        assert!(finished.result.diagnostic_hashes.is_empty());
+    }
+
+    #[test]
+    fn diagnostic_hashes_sort_canonically() {
+        let mut shell = Shell::open(static_id("run"), run_none(), None);
+        let a = diag(DiagnosticCode::SchemaInvalid, Outcome::Invalid, "alpha");
+        let b = diag(DiagnosticCode::SolverTimeout, Outcome::Residual, "beta");
+        shell.diagnostic(a.clone());
+        shell.diagnostic(b.clone());
+        let finished = shell.finish().unwrap();
+        let mut expected = vec![content_hash(&a).unwrap(), content_hash(&b).unwrap()];
+        expected.sort_by_key(|h| canonical_sort_key(h).unwrap());
+        assert_eq!(finished.result.diagnostic_hashes, expected);
+    }
+}

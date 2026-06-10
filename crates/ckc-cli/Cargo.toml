@@ -1,0 +1,16 @@
+# ckc-cli — the `ckc` binary (SPEC §3 crate table); built up unit by unit.
+[package]
+name = "ckc-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ckc"
+path = "src/main.rs"
+
+[dependencies]
+ckc-core = { path = "../ckc-core" }
+
+[dev-dependencies]
+tempfile.workspace = true

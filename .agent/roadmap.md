@@ -195,15 +195,15 @@ next plan session removes their checklists (git history retains them).
   the fixtures_v1 integration test loading every authored file through core-registry types and
   validation and resolving fixture and gold paths. Reading: SPEC §8.2, §5 lexicon paragraph, §8.6
   ids, §8.4. Consumes core-registry.1 types and core-registry.2 validation. Gate: `cargo test -p
-  ckc-core --test fixtures_v1`. 65% 129K/200K _
-- [ ] cli-runner.1.1: ckc-cli crate foundation: workspace member building the ckc binary; dispatch
+  ckc-core --test fixtures_v1`. 65% 129K/200K f85c716
+- [x] cli-runner.1.1: ckc-cli crate foundation: workspace member building the ckc binary; dispatch
   for the §3 four-command surface (registry check; run --experiment --out; replay; trace --run
   --finding argument shapes; commands pending implementation return typed unsupported total
   results); CLI invariants wired once: validate inputs, emit §4.6 JSONL events, write only under the
   output directory, end with exactly one §4.4 total operation result; dispatch and shell tests.
   Reading: SPEC §3 crate table, CLI surface and invariants, §4.4 total result, §4.6 events. Consumes
   core-enums-envelope.1 TotalOperationResult and core-enums-envelope.2 EventRecord. Gate: `cargo
-  test -p ckc-cli`.
+  test -p ckc-cli`. 68% 137K/200K _
 - [ ] cli-runner.1.2: Implement ckc registry check end-to-end: load the three seeded registry files
   through core-registry.1, run core-registry.2 validation including experiment resolution and the
   stage chain, map findings to the severity-aggregated §4.4 outcome inside the cli-runner.1.1 shell.

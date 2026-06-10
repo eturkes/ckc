@@ -1,8 +1,8 @@
-# CKC workspace (SPEC §3). Remaining crates land with their V1 units:
-# crates/{ckc-smt,ckc-cli}.
+# CKC workspace (SPEC §3). Remaining crate lands with its V1 unit:
+# crates/ckc-smt.
 [workspace]
 resolver = "3"
-members = ["crates/ckc-core"]
+members = ["crates/ckc-cli", "crates/ckc-core"]
 
 [workspace.package]
 edition = "2024"
@@ -20,3 +20,4 @@ num-rational = "0.4"
 serde_json = "1"
 unicode-normalization = "0.1"
 sha2 = "0.11"
+tempfile = "3"
