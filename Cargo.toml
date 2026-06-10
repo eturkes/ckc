@@ -21,3 +21,8 @@ serde_json = "1"
 unicode-normalization = "0.1"
 sha2 = "0.11"
 tempfile = "3"
+# Deterministic html5ever DOM for the extract stage; `errors` gates
+# Html::errors (stage-extract.1 pin).
+scraper = { version = "0.27", default-features = false, features = ["errors", "deterministic"] }
+# scraper's arena, unexported by scraper; names NodeRef in extract signatures.
+ego-tree = "0.11"

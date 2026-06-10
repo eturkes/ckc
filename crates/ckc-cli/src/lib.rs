@@ -9,7 +9,14 @@
 //! plus experiment-referenced gold documents strict-loaded from the
 //! invocation root and validated as one cross-referenced set, every load
 //! failure and finding a §7.4 `schema_invalid` diagnostic (§8.5 item 2).
+//! `stage-extract.1` opens the extract stage ([`extract`]): html5ever-parsed
+//! fixture HTML walked into an enveloped §4.5 [`ckc_core::SourceGraph`] —
+//! sections/paragraphs/lists spanned with {node,span} regions, parse errors
+//! and unknown flow content as `extraction_uncertain` residuals (tables ride
+//! that path until `stage-extract.2`).
 #![forbid(unsafe_code)]
+
+pub mod extract;
 
 mod dispatch;
 mod registry_check;

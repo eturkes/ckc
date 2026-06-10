@@ -209,8 +209,8 @@ next plan session removes their checklists (git history retains them).
   stage chain, map findings to the severity-aggregated §4.4 outcome inside the cli-runner.1.1 shell.
   Closes §8.5 item 2. Reading: SPEC §3 CLI surface, §8.4, §4.4 outcome severity. Consumes
   cli-runner.1.1 dispatch, core-registry.2, fixtures-v1 registry files. Gate: `cargo run -p ckc-cli
-  -- registry check`. 60% 121K/200K _
-- [ ] stage-extract.1: Extract stage core in a new extract module of ckc-cli; tables defer to
+  -- registry check`. 60% 121K/200K 9efecc2
+- [x] stage-extract.1: Extract stage core in a new extract module of ckc-cli; tables defer to
   stage-extract.2 (table elements ride the unknown-flow residual path until then). Dependencies
   are decided — skip re-research: workspace scraper 0.27 with default-features = false, features
   `["errors", "deterministic"]` (html5ever DOM; Html::errors is gated behind errors), plus direct
@@ -234,7 +234,7 @@ next plan session removes their checklists (git history retains them).
   read_canonical strict-read, non-UTF8 input gives ExtractError::Utf8. Reading: SPEC §8.3 extract
   row, §4.5, §4.4, §7.4; grounding.rs, envelope.rs and enums.rs surfaces, shell.rs static_id.
   Consumes core-grounding, core-enums-envelope.2, cli-runner.1.1 crate. Gate: `cargo test -p
-  ckc-cli extract::`.
+  ckc-cli extract::`. 70% 140K/200K _
 - [ ] stage-extract.2: Table extraction completing the extract module: replace the table residual
   path with a real arm — scan direct children accepting caption, colgroup, col, thead, tbody,
   tfoot, tr (html5ever wraps bare tr in tbody), at most one caption minting a textual caption
