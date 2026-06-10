@@ -89,15 +89,15 @@ next plan session removes their checklists (git history retains them).
   impls plus the per-layer structural hash over locally indexed references (rename-stable),
   establishing the pattern core-ir.2/.3 reuse. Reading: SPEC §5 layer table and ClinicalSegment row,
   §4.3 structural-hash tail. Consumes core-grounding refs, core-canon-hash. Gate: `cargo test -p
-  ckc-core ir::`. 72% 144K/200K _
-- [ ] core-ir.2: ClinicalIR and NormIR layers: TerminologyBinding (system ckc.lex, code,
+  ckc-core ir::`. 72% 144K/200K 81a541b
+- [x] core-ir.2: ClinicalIR and NormIR layers: TerminologyBinding (system ckc.lex, code,
   BindingStatus, alternatives, region refs), ClinicalStatement (population, condition, action,
   modality, strength strong/weak, certainty, exceptions, source refs), Action with normalized target
   key, ContextExpr as finite DNF over concept, negated-concept, and quantity-interval atoms,
   NormRule (rule_id, context, direction, action, strength, source_region_ids, optional certainty and
   exception_refs); per-layer hashes; canonical bytes pinned against the §8.6 NormRule JSON. Reading:
   SPEC §5, §8.6 NormRule example. Consumes core-ir.1 layer/hash pattern. Gate: `cargo test -p
-  ckc-core ir::`.
+  ckc-core ir::`. 72% 145K/200K _
 - [ ] core-ir.3: FormalIR layer and IRBundle: target-independent constraints, normalized
   actions/contexts, contradiction-query plan slots shaped per §6; IRBundle assembling the five
   layers with reusable component records (use sites), assumptions, diagnostics, per-layer plus

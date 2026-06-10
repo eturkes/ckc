@@ -23,7 +23,10 @@
 //! anchors, and regions, validated by [`SourceGraph::validate`]).
 //! `core-ir.1` opens the SPEC §5 IR layers ([`DocIr`], [`SegmentIr`] with
 //! [`ClinicalSegment`]) and the §4.3 rename-stable structural-hash pattern
-//! ([`Structural`], [`structural_hash`], [`RefLocalizer`]).
+//! ([`Structural`], [`structural_hash`], [`RefLocalizer`]); `core-ir.2` adds
+//! ClinicalIR and NormIR ([`ClinicalIr`] with [`ClinicalStatement`] and
+//! [`TerminologyBinding`], [`NormIr`] with [`NormRule`] guarded by
+//! [`ContextExpr`] DNF over [`ContextAtom`]s on an [`Action`]).
 #![forbid(unsafe_code)]
 
 mod canon;
@@ -57,7 +60,9 @@ pub use grounding::{
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use ir::{
-    CellRole, ClinicalSegment, DocIr, IrError, RefLocalizer, SegmentIr, SegmentKind, Structural,
-    TableCell, TableView, TextBlock, emit_structural_ref_set, structural_hash,
+    Action, CellRole, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
+    ContextConjunct, ContextExpr, DocIr, ExceptionClause, IrError, NormIr, NormRule,
+    QuantityInterval, RefLocalizer, SegmentIr, SegmentKind, Strength, Structural, TableCell,
+    TableView, TerminologyBinding, TextBlock, emit_structural_ref_set, structural_hash,
 };
 pub use strings::StringPolicy;

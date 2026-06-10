@@ -885,6 +885,18 @@ pub(crate) fn read_u64(r: &mut Reader<'_>) -> Result<u64, CanonReadError> {
     u64::try_from(&n).map_err(|_| CanonReadError::Integer(n.to_string()))
 }
 
+/// Emit an `i64` as the §4.3 decimal-string integer.
+pub(crate) fn emit_i64(out: &mut Vec<u8>, value: i64) {
+    emit_int(out, &BigInt::from(value));
+}
+
+/// Read a canonical integer and bound it to `i64`; oversized values surface
+/// as [`CanonReadError::Integer`].
+pub(crate) fn read_i64(r: &mut Reader<'_>) -> Result<i64, CanonReadError> {
+    let n = read_int(r)?;
+    i64::try_from(&n).map_err(|_| CanonReadError::Integer(n.to_string()))
+}
+
 /// Emit `entries` as a §4.3 map of identifier keys to raw-text values.
 pub(crate) fn emit_raw_map(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Result<(), CanonError> {
     let texts: Vec<RawText> = entries.iter().map(|(_, v)| RawText(v.clone())).collect();

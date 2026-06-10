@@ -1,6 +1,8 @@
-//! SPEC §5 IR layers, first pair: DocIR ([`DocIr`]) — the layout-preserving
-//! text/table view over [`SourceGraph`] refs with extraction diagnostics —
-//! and SegmentIR ([`SegmentIr`]) — the document's [`ClinicalSegment`]s.
+//! SPEC §5 IR layers: DocIR ([`DocIr`]) — the layout-preserving text/table
+//! view over [`SourceGraph`] refs with extraction diagnostics — SegmentIR
+//! ([`SegmentIr`]) — the document's [`ClinicalSegment`]s — ClinicalIR
+//! ([`ClinicalIr`]) — [`ClinicalStatement`]s plus [`TerminologyBinding`]s —
+//! and NormIR ([`NormIr`]) — [`NormRule`]s over [`ContextExpr`] guards.
 //! Layers hold references into the graph; the graph stays the byte authority.
 //!
 //! The module also defines the §4.3 structural-hash machinery the later
@@ -23,15 +25,24 @@
 //!   identifiers (enum spellings, map keys), content (text, numbers), and
 //!   content-hash fields (they address external bytes, not renameable ids)
 //!   emit verbatim, which keeps local index ids collision-free in the bytes.
+//! - Lexicon vocabulary is closed too: concept codes, action
+//!   kinds/targets/keys, quantity variables, and binding
+//!   systems/codes/alternatives emit verbatim (all-vocabulary values —
+//!   [`ContextExpr`], [`Action`] — skip [`Structural`] and embed their
+//!   canonical bytes), so structural identity means "same structure over the
+//!   same concepts" and a concept swap moves the hash.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    emit_array, emit_set, emit_string, emit_u64, read_array, read_set, read_string, read_u64,
+    emit_array, emit_i64, emit_set, emit_string, emit_u64, emit_union, read_array, read_i64,
+    read_set, read_string, read_u64, read_union,
 };
-use crate::enums::{DiagnosticCode, DiagnosticRecord, emit_payload, fieldless_enum};
+use crate::enums::{
+    BindingStatus, DiagnosticCode, DiagnosticRecord, Direction, emit_payload, fieldless_enum,
+};
 use crate::grounding::{NodeKind, RefKind, SourceGraph, SourceNode};
 use crate::hash::hash_bytes;
 use crate::id::{Hash, Id, ValidationError};
@@ -85,6 +96,20 @@ pub fn emit_structural_ref_set(
     sorted.sort_by_key(|r| r.as_str().as_bytes());
     let localized: Vec<Id> = sorted.into_iter().map(|r| ids.localize(r)).collect();
     emit_set(out, &localized)
+}
+
+/// Emit reference ids as an ordered array localized in the enclosing scope,
+/// for refs whose order is semantic ([`NormRule::source_region_ids`]).
+/// Localization follows array order, so the structural bytes see the
+/// co-reference pattern and count; the order of refs first occurring here is
+/// itself erased (always `i0, i1, …`), like every first-occurrence index.
+fn emit_structural_ref_array(
+    out: &mut Vec<u8>,
+    ids: &mut RefLocalizer,
+    refs: &[Id],
+) -> Result<(), CanonError> {
+    let localized: Vec<Id> = refs.iter().map(|r| ids.localize(r)).collect();
+    emit_array(out, &localized)
 }
 
 /// Emit an ordered run of structural values inside the enclosing scope
@@ -616,6 +641,589 @@ impl Structural for SegmentIr {
     }
 }
 
+fieldless_enum! {
+    /// SPEC §5 recommendation strength.
+    Strength {
+        Strong => "strong",
+        Weak => "weak",
+    }
+}
+
+fieldless_enum! {
+    /// SPEC §5 evidence certainty (GRADE-style four levels).
+    Certainty {
+        High => "high",
+        Moderate => "moderate",
+        Low => "low",
+        VeryLow => "very_low",
+    }
+}
+
+/// SPEC §5 action: kind + target concept + the normalized target key that
+/// carries action sameness (§5 semantic policy invariants). All three fields
+/// are lexicon vocabulary, verbatim in structural bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Action {
+    pub kind: Id,
+    pub target: Id,
+    /// Normalized target key `kind:target` (V1; V2 joins discriminating
+    /// slots). [`new`](Self::new) derives it; bundle validation (core-ir.3)
+    /// re-checks a stored key against its derivation, the
+    /// [`SourceSpan`](crate::grounding::SourceSpan) precedent for derived
+    /// fields.
+    pub key: Id,
+}
+
+impl Action {
+    /// Build an action, deriving the normalized target key.
+    pub fn new(kind: Id, target: Id) -> Action {
+        let key =
+            Id::new(format!("{kind}:{target}")).expect("two ids joined by ':' form a valid id");
+        Action { kind, target, key }
+    }
+}
+
+impl Canonical for Action {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("key", |b| self.key.emit_canonical(b))?;
+        obj.member("kind", |b| self.kind.emit_canonical(b))?;
+        obj.member("target", |b| self.target.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for Action {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let key = obj.member("key", Id::read)?;
+        let kind = obj.member("kind", Id::read)?;
+        let target = obj.member("target", Id::read)?;
+        obj.close()?;
+        Ok(Action { kind, target, key })
+    }
+}
+
+/// SPEC §5 quantity-interval guard over a lexicon-defined variable
+/// (`成人 → age >= 18` yields `{ var: q.age_years, ge: 18 }`). Bounds are
+/// canonical decimal integers, each side optional and omitted when absent.
+/// Bound coherence (at least one bound, one bound per side, nonempty
+/// interval) is bundle validation (core-ir.3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuantityInterval {
+    pub var: Id,
+    pub ge: Option<i64>,
+    pub gt: Option<i64>,
+    pub le: Option<i64>,
+    pub lt: Option<i64>,
+}
+
+impl Canonical for QuantityInterval {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        let bound = |b: &mut Vec<u8>, v: i64| {
+            emit_i64(b, v);
+            Ok(())
+        };
+        obj.optional("ge", self.ge, bound)?;
+        obj.optional("gt", self.gt, bound)?;
+        obj.optional("le", self.le, bound)?;
+        obj.optional("lt", self.lt, bound)?;
+        obj.member("var", |b| self.var.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for QuantityInterval {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let ge = obj.optional("ge", read_i64)?;
+        let gt = obj.optional("gt", read_i64)?;
+        let le = obj.optional("le", read_i64)?;
+        let lt = obj.optional("lt", read_i64)?;
+        let var = obj.member("var", Id::read)?;
+        obj.close()?;
+        Ok(QuantityInterval {
+            var,
+            ge,
+            gt,
+            le,
+            lt,
+        })
+    }
+}
+
+/// SPEC §5 context atom, a §4.3 tagged union: concept predicate, negated
+/// concept predicate, or quantity interval (V2 adds slot equality and
+/// temporal atoms). Concept ids and interval variables are lexicon
+/// vocabulary, so atoms have no [`Structural`] impl — enclosing components
+/// embed their canonical bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContextAtom {
+    Concept(Id),
+    ConceptNegated(Id),
+    Interval(QuantityInterval),
+}
+
+impl Canonical for ContextAtom {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        match self {
+            ContextAtom::Concept(c) => emit_union(out, "concept", c),
+            ContextAtom::ConceptNegated(c) => emit_union(out, "concept_negated", c),
+            ContextAtom::Interval(q) => emit_union(out, "interval", q),
+        }
+    }
+}
+
+impl CanonRead for ContextAtom {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let (_, atom) = read_union(r, |tag, r| match tag {
+            "concept" => Ok(ContextAtom::Concept(Id::read(r)?)),
+            "concept_negated" => Ok(ContextAtom::ConceptNegated(Id::read(r)?)),
+            "interval" => Ok(ContextAtom::Interval(QuantityInterval::read(r)?)),
+            other => Err(ValidationError::Enum(format!("ContextAtom has no tag {other:?}")).into()),
+        })?;
+        Ok(atom)
+    }
+}
+
+/// One DNF conjunct: a §4.3 set of [`ContextAtom`]s (sorted by canonical
+/// bytes, byte-identical duplicates collapsed — `A ∧ A = A`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextConjunct {
+    pub all: Vec<ContextAtom>,
+}
+
+impl Canonical for ContextConjunct {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("all", |b| emit_set(b, &self.all))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ContextConjunct {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let all = obj.member("all", read_set::<ContextAtom>)?;
+        obj.close()?;
+        Ok(ContextConjunct { all })
+    }
+}
+
+/// SPEC §5 context expression: finite DNF — a §4.3 set of
+/// [`ContextConjunct`]s. All-vocabulary, so no [`Structural`] impl (module
+/// doc).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextExpr {
+    pub any: Vec<ContextConjunct>,
+}
+
+impl Canonical for ContextExpr {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("any", |b| emit_set(b, &self.any))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ContextExpr {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let any = obj.member("any", read_set::<ContextConjunct>)?;
+        obj.close()?;
+        Ok(ContextExpr { any })
+    }
+}
+
+/// SPEC §5 terminology binding: one mention bound to a concept of `system`
+/// (V1: `ckc.lex`). `alternatives` carries the competing codes of an
+/// `ambiguous` binding (§4.3 set); `region_ids` ground the mention (§4.3
+/// set). System, code, and alternatives are terminology vocabulary — verbatim
+/// in structural bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminologyBinding {
+    pub binding_id: Id,
+    pub system: Id,
+    pub code: Id,
+    pub status: BindingStatus,
+    pub alternatives: Vec<Id>,
+    pub region_ids: Vec<Id>,
+}
+
+impl Canonical for TerminologyBinding {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("alternatives", |b| emit_set(b, &self.alternatives))?;
+        obj.member("binding_id", |b| self.binding_id.emit_canonical(b))?;
+        obj.member("code", |b| self.code.emit_canonical(b))?;
+        obj.member("region_ids", |b| emit_set(b, &self.region_ids))?;
+        obj.member("status", |b| self.status.emit_canonical(b))?;
+        obj.member("system", |b| self.system.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for TerminologyBinding {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let alternatives = obj.member("alternatives", read_set::<Id>)?;
+        let binding_id = obj.member("binding_id", Id::read)?;
+        let code = obj.member("code", Id::read)?;
+        let region_ids = obj.member("region_ids", read_set::<Id>)?;
+        let status = obj.member("status", BindingStatus::read)?;
+        let system = obj.member("system", Id::read)?;
+        obj.close()?;
+        Ok(TerminologyBinding {
+            binding_id,
+            system,
+            code,
+            status,
+            alternatives,
+            region_ids,
+        })
+    }
+}
+
+impl Structural for TerminologyBinding {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("alternatives", |b| emit_set(b, &self.alternatives))?;
+        obj.member("binding_id", |b| {
+            ids.localize(&self.binding_id).emit_canonical(b)
+        })?;
+        obj.member("code", |b| self.code.emit_canonical(b))?;
+        obj.member("region_ids", |b| {
+            emit_structural_ref_set(b, ids, &self.region_ids)
+        })?;
+        obj.member("status", |b| self.status.emit_canonical(b))?;
+        obj.member("system", |b| self.system.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+/// One exception clause of a [`ClinicalStatement`]: the exception's own
+/// (positive) condition atoms plus its grounding. stage-normalize.2 compiles
+/// each clause into negated conjuncts of the rule context, the clause regions
+/// joining `source_region_ids` (§5); [`NormRule::exception_refs`] cite
+/// `exception_id`s for trace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExceptionClause {
+    pub exception_id: Id,
+    /// §4.3 set; atoms are lexicon vocabulary (verbatim in structural bytes).
+    pub atoms: Vec<ContextAtom>,
+    /// §4.3 set grounding the exception text.
+    pub region_ids: Vec<Id>,
+}
+
+impl Canonical for ExceptionClause {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("atoms", |b| emit_set(b, &self.atoms))?;
+        obj.member("exception_id", |b| self.exception_id.emit_canonical(b))?;
+        obj.member("region_ids", |b| emit_set(b, &self.region_ids))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ExceptionClause {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let atoms = obj.member("atoms", read_set::<ContextAtom>)?;
+        let exception_id = obj.member("exception_id", Id::read)?;
+        let region_ids = obj.member("region_ids", read_set::<Id>)?;
+        obj.close()?;
+        Ok(ExceptionClause {
+            exception_id,
+            atoms,
+            region_ids,
+        })
+    }
+}
+
+impl Structural for ExceptionClause {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("atoms", |b| emit_set(b, &self.atoms))?;
+        obj.member("exception_id", |b| {
+            ids.localize(&self.exception_id).emit_canonical(b)
+        })?;
+        obj.member("region_ids", |b| {
+            emit_structural_ref_set(b, ids, &self.region_ids)
+        })?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5 clinical statement: the normalized reading of one recommendation —
+/// population and condition as atom sets, the action, deontic modality
+/// ([`Direction`]), strength, optional certainty, exception clauses in
+/// document order, and the source segments it normalizes (§4.3 set).
+/// Comparator/outcome/temporal slots stay V2. An independently hashable
+/// component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClinicalStatement {
+    pub statement_id: Id,
+    /// §4.3 set: who the statement covers (concepts, quantity intervals).
+    pub population: Vec<ContextAtom>,
+    /// §4.3 set: the clinical condition under which it applies.
+    pub condition: Vec<ContextAtom>,
+    pub action: Action,
+    /// Normalized deontic modality (lexicon modality phrase → direction).
+    pub modality: Direction,
+    pub strength: Strength,
+    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    pub certainty: Option<Certainty>,
+    /// Exception clauses in document order.
+    pub exceptions: Vec<ExceptionClause>,
+    /// §4.3 set: the [`ClinicalSegment`]s this statement normalizes.
+    pub source_segment_ids: Vec<Id>,
+}
+
+impl Canonical for ClinicalStatement {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("condition", |b| emit_set(b, &self.condition))?;
+        obj.member("exceptions", |b| emit_array(b, &self.exceptions))?;
+        obj.member("modality", |b| self.modality.emit_canonical(b))?;
+        obj.member("population", |b| emit_set(b, &self.population))?;
+        obj.member("source_segment_ids", |b| {
+            emit_set(b, &self.source_segment_ids)
+        })?;
+        obj.member("statement_id", |b| self.statement_id.emit_canonical(b))?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ClinicalStatement {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let action = obj.member("action", Action::read)?;
+        let certainty = obj.optional("certainty", Certainty::read)?;
+        let condition = obj.member("condition", read_set::<ContextAtom>)?;
+        let exceptions = obj.member("exceptions", read_array::<ExceptionClause>)?;
+        let modality = obj.member("modality", Direction::read)?;
+        let population = obj.member("population", read_set::<ContextAtom>)?;
+        let source_segment_ids = obj.member("source_segment_ids", read_set::<Id>)?;
+        let statement_id = obj.member("statement_id", Id::read)?;
+        let strength = obj.member("strength", Strength::read)?;
+        obj.close()?;
+        Ok(ClinicalStatement {
+            statement_id,
+            population,
+            condition,
+            action,
+            modality,
+            strength,
+            certainty,
+            exceptions,
+            source_segment_ids,
+        })
+    }
+}
+
+impl Structural for ClinicalStatement {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("condition", |b| emit_set(b, &self.condition))?;
+        obj.member("exceptions", |b| {
+            emit_structural_array(b, ids, &self.exceptions)
+        })?;
+        obj.member("modality", |b| self.modality.emit_canonical(b))?;
+        obj.member("population", |b| emit_set(b, &self.population))?;
+        obj.member("source_segment_ids", |b| {
+            emit_structural_ref_set(b, ids, &self.source_segment_ids)
+        })?;
+        obj.member("statement_id", |b| {
+            ids.localize(&self.statement_id).emit_canonical(b)
+        })?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5 ClinicalIR: the document's [`ClinicalStatement`]s and
+/// [`TerminologyBinding`]s, each list in reading/derivation order, each
+/// element an independently hashable component. CQ/PICO/EtD slots stay
+/// optional-V1, unscheduled.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClinicalIr {
+    pub bindings: Vec<TerminologyBinding>,
+    pub statements: Vec<ClinicalStatement>,
+}
+
+impl Canonical for ClinicalIr {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("bindings", |b| emit_array(b, &self.bindings))?;
+        obj.member("statements", |b| emit_array(b, &self.statements))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ClinicalIr {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let bindings = obj.member("bindings", read_array::<TerminologyBinding>)?;
+        let statements = obj.member("statements", read_array::<ClinicalStatement>)?;
+        obj.close()?;
+        Ok(ClinicalIr {
+            bindings,
+            statements,
+        })
+    }
+}
+
+impl Structural for ClinicalIr {
+    fn emit_structural(
+        &self,
+        out: &mut Vec<u8>,
+        _ids: &mut RefLocalizer,
+    ) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("bindings", |b| {
+            emit_structural_components(b, &self.bindings)
+        })?;
+        obj.member("statements", |b| {
+            emit_structural_components(b, &self.statements)
+        })?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5 norm rule: one guarded deontic constraint. The §8.6 worked rule
+/// pins the canonical bytes. An independently hashable component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NormRule {
+    pub rule_id: Id,
+    pub context: ContextExpr,
+    pub direction: Direction,
+    pub action: Action,
+    pub strength: Strength,
+    /// Ordered array, not a set (§8.6 pins `[rec, exc]`): the rule's own
+    /// regions in source order, exception regions joining as their clauses
+    /// compile in (§5).
+    pub source_region_ids: Vec<Id>,
+    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    pub certainty: Option<Certainty>,
+    /// §4.3 set of [`ExceptionClause`] ids, for trace. Empty means absent:
+    /// the writer omits an empty set and the reader rejects a present-but-
+    /// empty one, keeping one canonical encoding (§5: optional at V1).
+    pub exception_refs: Vec<Id>,
+}
+
+impl Canonical for NormRule {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("context", |b| self.context.emit_canonical(b))?;
+        obj.member("direction", |b| self.direction.emit_canonical(b))?;
+        obj.optional(
+            "exception_refs",
+            (!self.exception_refs.is_empty()).then_some(&self.exception_refs),
+            emit_set,
+        )?;
+        obj.member("rule_id", |b| self.rule_id.emit_canonical(b))?;
+        obj.member("source_region_ids", |b| {
+            emit_array(b, &self.source_region_ids)
+        })?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for NormRule {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let action = obj.member("action", Action::read)?;
+        let certainty = obj.optional("certainty", Certainty::read)?;
+        let context = obj.member("context", ContextExpr::read)?;
+        let direction = obj.member("direction", Direction::read)?;
+        let exception_refs = obj.optional("exception_refs", read_set::<Id>)?;
+        if exception_refs.as_ref().is_some_and(Vec::is_empty) {
+            return Err(CanonReadError::UnknownField("exception_refs".to_owned()));
+        }
+        let exception_refs = exception_refs.unwrap_or_default();
+        let rule_id = obj.member("rule_id", Id::read)?;
+        let source_region_ids = obj.member("source_region_ids", read_array::<Id>)?;
+        let strength = obj.member("strength", Strength::read)?;
+        obj.close()?;
+        Ok(NormRule {
+            rule_id,
+            context,
+            direction,
+            action,
+            strength,
+            source_region_ids,
+            certainty,
+            exception_refs,
+        })
+    }
+}
+
+impl Structural for NormRule {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("context", |b| self.context.emit_canonical(b))?;
+        obj.member("direction", |b| self.direction.emit_canonical(b))?;
+        obj.optional(
+            "exception_refs",
+            (!self.exception_refs.is_empty()).then_some(&self.exception_refs),
+            |b, v| emit_structural_ref_set(b, ids, v),
+        )?;
+        obj.member("rule_id", |b| ids.localize(&self.rule_id).emit_canonical(b))?;
+        obj.member("source_region_ids", |b| {
+            emit_structural_ref_array(b, ids, &self.source_region_ids)
+        })?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5 NormIR: the document's [`NormRule`]s in derivation order, each an
+/// independently hashable component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NormIr {
+    pub rules: Vec<NormRule>,
+}
+
+impl Canonical for NormIr {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("rules", |b| emit_array(b, &self.rules))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for NormIr {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let rules = obj.member("rules", read_array::<NormRule>)?;
+        obj.close()?;
+        Ok(NormIr { rules })
+    }
+}
+
+impl Structural for NormIr {
+    fn emit_structural(
+        &self,
+        out: &mut Vec<u8>,
+        _ids: &mut RefLocalizer,
+    ) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("rules", |b| emit_structural_components(b, &self.rules))?;
+        obj.finish(out)
+    }
+}
+
 /// A DocIR derivation input broke its contract ([`DocIr::from_graph`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrError {
@@ -1106,5 +1714,398 @@ mod tests {
         for other in [&kind_changed, &region_added, &duplicated] {
             assert_ne!(base_hash, structural_hash(other).unwrap());
         }
+    }
+
+    // ---- core-ir.2: ClinicalIR + NormIR ------------------------------------
+
+    fn atom_c(c: &str) -> ContextAtom {
+        ContextAtom::Concept(id(c))
+    }
+
+    fn atom_nc(c: &str) -> ContextAtom {
+        ContextAtom::ConceptNegated(id(c))
+    }
+
+    fn atom_ge(var: &str, n: i64) -> ContextAtom {
+        ContextAtom::Interval(QuantityInterval {
+            var: id(var),
+            ge: Some(n),
+            gt: None,
+            le: None,
+            lt: None,
+        })
+    }
+
+    fn dnf1(all: Vec<ContextAtom>) -> ContextExpr {
+        ContextExpr {
+            any: vec![ContextConjunct { all }],
+        }
+    }
+
+    /// The §8.6 worked rule `rule.a.cq1.r1`, local ids under prefix `p`.
+    fn rule_p(p: &str) -> NormRule {
+        NormRule {
+            rule_id: id(&format!("{p}rule.a.cq1.r1")),
+            context: dnf1(vec![
+                atom_c("cond.sepsis"),
+                atom_nc("cond.renal_severe"),
+                atom_ge("q.age_years", 18),
+            ]),
+            direction: Direction::For,
+            action: Action::new(id("act.administer"), id("drug.abx_a")),
+            strength: Strength::Strong,
+            source_region_ids: vec![
+                id(&format!("{p}region.a.cq1.rec")),
+                id(&format!("{p}region.a.cq1.exc")),
+            ],
+            certainty: None,
+            exception_refs: vec![],
+        }
+    }
+
+    /// The statement the §8.6 rule normalizes from, local ids under `p`.
+    fn statement_p(p: &str) -> ClinicalStatement {
+        ClinicalStatement {
+            statement_id: id(&format!("{p}st.a.cq1.s1")),
+            population: vec![atom_ge("q.age_years", 18)],
+            condition: vec![atom_c("cond.sepsis")],
+            action: Action::new(id("act.administer"), id("drug.abx_a")),
+            modality: Direction::For,
+            strength: Strength::Strong,
+            certainty: Some(Certainty::Moderate),
+            exceptions: vec![ExceptionClause {
+                exception_id: id(&format!("{p}exc.a.cq1.e1")),
+                atoms: vec![atom_c("cond.renal_severe")],
+                region_ids: vec![id(&format!("{p}region.a.cq1.exc"))],
+            }],
+            source_segment_ids: vec![id(&format!("{p}seg.a.cq1.rec1"))],
+        }
+    }
+
+    fn binding_p(p: &str) -> TerminologyBinding {
+        TerminologyBinding {
+            binding_id: id(&format!("{p}bind.a.m1")),
+            system: id("ckc.lex"),
+            code: id("cond.sepsis"),
+            status: BindingStatus::Exact,
+            alternatives: vec![],
+            region_ids: vec![id(&format!("{p}region.a.cq1.rec"))],
+        }
+    }
+
+    #[test]
+    fn strength_certainty_spellings() {
+        let spelled: Vec<&str> = Strength::ALL.iter().map(|&v| v.as_str()).collect();
+        assert_eq!(spelled, ["strong", "weak"]);
+        let spelled: Vec<&str> = Certainty::ALL.iter().map(|&v| v.as_str()).collect();
+        assert_eq!(spelled, ["high", "moderate", "low", "very_low"]);
+        for v in Strength::ALL {
+            round_trip(*v);
+        }
+        for v in Certainty::ALL {
+            round_trip(*v);
+        }
+    }
+
+    #[test]
+    fn action_derives_key() {
+        let action = Action::new(id("act.administer"), id("drug.abx_a"));
+        assert_eq!(action.key, id("act.administer:drug.abx_a"));
+        assert_eq!(
+            canon(&action),
+            concat!(
+                r#"{"key":"act.administer:drug.abx_a","#,
+                r#""kind":"act.administer","target":"drug.abx_a"}"#
+            )
+        );
+        round_trip(action);
+    }
+
+    // Pins the three §4.3 atom unions and the interval bound encoding.
+    #[test]
+    fn context_atom_bytes() {
+        assert_eq!(
+            canon(&atom_c("cond.sepsis")),
+            r#"{"tag":"concept","value":"cond.sepsis"}"#
+        );
+        assert_eq!(
+            canon(&atom_nc("cond.renal_severe")),
+            r#"{"tag":"concept_negated","value":"cond.renal_severe"}"#
+        );
+        assert_eq!(
+            canon(&atom_ge("q.age_years", 18)),
+            r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}"#
+        );
+        let interval = QuantityInterval {
+            var: id("q.egfr"),
+            ge: None,
+            gt: Some(-5),
+            le: None,
+            lt: Some(30),
+        };
+        assert_eq!(canon(&interval), r#"{"gt":"-5","lt":"30","var":"q.egfr"}"#);
+        round_trip(ContextAtom::Interval(interval));
+        round_trip(atom_c("cond.sepsis"));
+        round_trip(atom_nc("cond.renal_severe"));
+        assert!(matches!(
+            read_canonical::<ContextAtom>(br#"{"tag":"slot_eq","value":"x"}"#),
+            Err(CanonReadError::Policy(_))
+        ));
+    }
+
+    // Conjuncts and disjuncts are §4.3 sets: construction order is erased,
+    // byte-identical duplicates collapse.
+    #[test]
+    fn context_expr_sets() {
+        let shuffled = dnf1(vec![
+            atom_ge("q.age_years", 18),
+            atom_c("cond.sepsis"),
+            atom_nc("cond.renal_severe"),
+        ]);
+        let sorted = dnf1(vec![
+            atom_c("cond.sepsis"),
+            atom_nc("cond.renal_severe"),
+            atom_ge("q.age_years", 18),
+        ]);
+        assert_eq!(canon(&shuffled), canon(&sorted));
+        round_trip(sorted);
+        let dup = dnf1(vec![atom_c("cond.sepsis"), atom_c("cond.sepsis")]);
+        assert_eq!(
+            canon(&dup),
+            r#"{"any":[{"all":[{"tag":"concept","value":"cond.sepsis"}]}]}"#
+        );
+        let two = ContextExpr {
+            any: vec![
+                ContextConjunct {
+                    all: vec![atom_c("cond.b")],
+                },
+                ContextConjunct {
+                    all: vec![atom_c("cond.a")],
+                },
+            ],
+        };
+        let bytes = canon(&two);
+        assert!(bytes.find("cond.a").unwrap() < bytes.find("cond.b").unwrap());
+    }
+
+    // THE unit pin: the §8.6 NormRule canonical payload, byte for byte.
+    #[test]
+    fn norm_rule_spec86_bytes() {
+        let rule = rule_p("");
+        assert_eq!(
+            canon(&rule),
+            concat!(
+                r#"{"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","#,
+                r#""target":"drug.abx_a"},"context":{"any":[{"all":["#,
+                r#"{"tag":"concept","value":"cond.sepsis"},"#,
+                r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
+                r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
+                r#""direction":"for","rule_id":"rule.a.cq1.r1","#,
+                r#""source_region_ids":["region.a.cq1.rec","region.a.cq1.exc"],"#,
+                r#""strength":"strong"}"#
+            )
+        );
+        round_trip(rule);
+    }
+
+    // certainty and exception_refs emit when present, vanish when absent
+    // (§5: optional at V1); a present-but-empty exception_refs is not writer
+    // output and is rejected.
+    #[test]
+    fn norm_rule_optionals() {
+        let mut rule = rule_p("");
+        rule.certainty = Some(Certainty::Low);
+        rule.exception_refs = vec![id("exc.a.cq1.e1")];
+        let bytes = canon(&rule);
+        assert!(bytes.contains(r#""certainty":"low","context""#));
+        assert!(bytes.contains(r#""exception_refs":["exc.a.cq1.e1"],"rule_id""#));
+        round_trip(rule);
+        let doctored =
+            canon(&rule_p("")).replace(r#""rule_id""#, r#""exception_refs":[],"rule_id""#);
+        assert!(matches!(
+            read_canonical::<NormRule>(doctored.as_bytes()),
+            Err(CanonReadError::UnknownField(f)) if f == "exception_refs"
+        ));
+    }
+
+    #[test]
+    fn terminology_binding_bytes() {
+        let binding = binding_p("");
+        assert_eq!(
+            canon(&binding),
+            concat!(
+                r#"{"alternatives":[],"binding_id":"bind.a.m1","code":"cond.sepsis","#,
+                r#""region_ids":["region.a.cq1.rec"],"status":"exact","system":"ckc.lex"}"#
+            )
+        );
+        round_trip(binding);
+        let ambiguous = TerminologyBinding {
+            binding_id: id("bind.a.m2"),
+            system: id("ckc.lex"),
+            code: id("cond.flu"),
+            status: BindingStatus::Ambiguous,
+            alternatives: vec![id("cond.z"), id("cond.a")],
+            region_ids: vec![id("r.x")],
+        };
+        assert!(canon(&ambiguous).contains(r#""alternatives":["cond.a","cond.z"]"#));
+    }
+
+    #[test]
+    fn clinical_statement_bytes() {
+        let statement = statement_p("");
+        assert_eq!(
+            canon(&statement),
+            concat!(
+                r#"{"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","#,
+                r#""target":"drug.abx_a"},"certainty":"moderate","#,
+                r#""condition":[{"tag":"concept","value":"cond.sepsis"}],"#,
+                r#""exceptions":[{"atoms":[{"tag":"concept","value":"cond.renal_severe"}],"#,
+                r#""exception_id":"exc.a.cq1.e1","region_ids":["region.a.cq1.exc"]}],"#,
+                r#""modality":"for","#,
+                r#""population":[{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}],"#,
+                r#""source_segment_ids":["seg.a.cq1.rec1"],"statement_id":"st.a.cq1.s1","#,
+                r#""strength":"strong"}"#
+            )
+        );
+        round_trip(statement);
+        let mut bare = statement_p("");
+        bare.certainty = None;
+        assert!(!canon(&bare).contains("certainty"));
+        round_trip(bare);
+    }
+
+    #[test]
+    fn ir2_layers_round_trip() {
+        let clinical = ClinicalIr {
+            bindings: vec![binding_p("")],
+            statements: vec![statement_p("")],
+        };
+        assert!(canon(&clinical).starts_with(r#"{"bindings":[{"alternatives""#));
+        round_trip(clinical);
+        let norm = NormIr {
+            rules: vec![rule_p("")],
+        };
+        assert!(canon(&norm).starts_with(r#"{"rules":[{"action""#));
+        round_trip(norm);
+    }
+
+    // Structural bytes: local ids localize in canonical field order,
+    // vocabulary (concepts, action, interval vars, system/code) stays
+    // verbatim, components open fresh scopes.
+    #[test]
+    fn ir2_structural_bytes_pin() {
+        assert_eq!(
+            structural(&rule_p("")),
+            concat!(
+                r#"{"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","#,
+                r#""target":"drug.abx_a"},"context":{"any":[{"all":["#,
+                r#"{"tag":"concept","value":"cond.sepsis"},"#,
+                r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
+                r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
+                r#""direction":"for","rule_id":"i0","source_region_ids":["i1","i2"],"#,
+                r#""strength":"strong"}"#
+            )
+        );
+        assert_eq!(
+            structural(&statement_p("")),
+            concat!(
+                r#"{"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","#,
+                r#""target":"drug.abx_a"},"certainty":"moderate","#,
+                r#""condition":[{"tag":"concept","value":"cond.sepsis"}],"#,
+                r#""exceptions":[{"atoms":[{"tag":"concept","value":"cond.renal_severe"}],"#,
+                r#""exception_id":"i0","region_ids":["i1"]}],"#,
+                r#""modality":"for","#,
+                r#""population":[{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}],"#,
+                r#""source_segment_ids":["i2"],"statement_id":"i3","strength":"strong"}"#
+            )
+        );
+        assert_eq!(
+            structural(&binding_p("")),
+            concat!(
+                r#"{"alternatives":[],"binding_id":"i0","code":"cond.sepsis","#,
+                r#""region_ids":["i1"],"status":"exact","system":"ckc.lex"}"#
+            )
+        );
+        // sibling components restart at i0: per-component scopes
+        let mut second = rule_p("");
+        second.rule_id = id("rule.a.cq1.r2");
+        let norm = NormIr {
+            rules: vec![rule_p(""), second],
+        };
+        assert_eq!(structural(&norm).matches(r#""rule_id":"i0""#).count(), 2);
+    }
+
+    // §4.3: renaming every document-local id moves the content hash, never
+    // the structural hash; swapping lexicon vocabulary moves both.
+    #[test]
+    fn ir2_structural_hash_rename_stable() {
+        let mut rule = rule_p("");
+        rule.exception_refs = vec![id("exc.a.cq1.e1")];
+        let mut renamed_rule = rule_p("x.");
+        renamed_rule.exception_refs = vec![id("x.exc.a.cq1.e1")];
+        let norm = NormIr { rules: vec![rule] };
+        let renamed_norm = NormIr {
+            rules: vec![renamed_rule],
+        };
+        assert_eq!(
+            structural_hash(&norm).unwrap(),
+            structural_hash(&renamed_norm).unwrap()
+        );
+        assert_ne!(
+            content_hash(&norm).unwrap(),
+            content_hash(&renamed_norm).unwrap()
+        );
+
+        let clinical = ClinicalIr {
+            bindings: vec![binding_p("")],
+            statements: vec![statement_p("")],
+        };
+        let renamed_clinical = ClinicalIr {
+            bindings: vec![binding_p("x.")],
+            statements: vec![statement_p("x.")],
+        };
+        assert_eq!(
+            structural_hash(&clinical).unwrap(),
+            structural_hash(&renamed_clinical).unwrap()
+        );
+        assert_ne!(
+            content_hash(&clinical).unwrap(),
+            content_hash(&renamed_clinical).unwrap()
+        );
+
+        // vocabulary is structure: a concept swap moves the structural hash
+        let mut other_concept = rule_p("");
+        other_concept.context = dnf1(vec![
+            atom_c("cond.pneumonia"),
+            atom_nc("cond.renal_severe"),
+            atom_ge("q.age_years", 18),
+        ]);
+        assert_ne!(
+            structural_hash(&rule_p("")).unwrap(),
+            structural_hash(&other_concept).unwrap()
+        );
+    }
+
+    #[test]
+    fn ir2_structural_hash_sees_structure() {
+        let base = rule_p("");
+        let mut atom_dropped = rule_p("");
+        atom_dropped.context = dnf1(vec![atom_c("cond.sepsis"), atom_ge("q.age_years", 18)]);
+        let mut flipped = rule_p("");
+        flipped.direction = Direction::Against;
+        let base_hash = structural_hash(&base).unwrap();
+        for other in [&atom_dropped, &flipped] {
+            assert_ne!(base_hash, structural_hash(other).unwrap());
+        }
+        let one = NormIr {
+            rules: vec![rule_p("")],
+        };
+        let doubled = NormIr {
+            rules: vec![rule_p(""), rule_p("")],
+        };
+        assert_ne!(
+            structural_hash(&one).unwrap(),
+            structural_hash(&doubled).unwrap()
+        );
     }
 }
