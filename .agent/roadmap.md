@@ -5,8 +5,9 @@ authority, its §2 the milestone sequence. One milestone at a time: a header
 `## <milestone> — plan <hash> — review <hash>` (plan opens, review closes, the
 pair bounds the milestone's commits; acceptance adds the evidence run id per
 SPEC §1) over an ordered unit checklist. Completed items gain `[x]` plus
-trailing `NN% NNNK/200K <hash>` (context usage, then the completing commit);
-plan/review stamps carry no usage. A commit cannot contain its own hash, so a
+trailing `NN% NNNK/200K <hash>` (context usage — `compacted` when the session
+hit compaction — then the completing commit); plan/review stamps carry no
+usage. A commit cannot contain its own hash, so a
 session writes `_` in its own hash slot and the next unit of roadmap work
 fills it (at most one `_` pending; resolve via commit scopes `<unit-id>:`,
 `plan-v<n>:`, `review-v<n>:`). Closed milestones persist as bare headers; the
