@@ -35,7 +35,9 @@
 //! the rename-stable whole-bundle hash; `core-ir.5` seals the bundle with
 //! [`IrBundle::validate`] ([`BundleError`]), enforcing the §5 grounding,
 //! reference, coherence, and re-derivation invariants against the source
-//! graph.
+//! graph. `core-plans` adds the §5 run records — [`RunPlan`] whose canonical
+//! bytes hash into [`RunManifest`] via [`RunPlan::plan_hash`] — and the §4.6
+//! [`ReplayManifest`] attestation with the shared [`SolverIdentity`].
 #![forbid(unsafe_code)]
 
 mod bundle;
@@ -46,6 +48,7 @@ mod grounding;
 mod hash;
 mod id;
 mod ir;
+mod plans;
 mod strings;
 
 pub use bundle::{
@@ -80,4 +83,5 @@ pub use ir::{
     Strength, Structural, TableCell, TableView, TerminologyBinding, TextBlock, directions_opposed,
     emit_structural_ref_set, structural_hash,
 };
+pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use strings::StringPolicy;

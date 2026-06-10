@@ -162,13 +162,13 @@ next plan session removes their checklists (git history retains them).
   rejection coverage per variant — reference breaks, key/projection tampers, an interval table,
   plan breaks on a two-rule for/against fixture, stale derived fields — plus a residual-licensed
   grounding pass. Reading: SPEC §5 IR-invariant paragraph, §6 direction groups; bundle.rs and the
-  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. compacted _
-- [ ] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
+  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. compacted f39e2f6
+- [x] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
   budget) with canonical bytes and plan hash; RunManifest (plan hash, git commit,
   toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);
   ReplayManifest with the §4.6 field list; canonical round-trips. Reading: SPEC §5 RunPlan and
   RunManifest rows, §4.6 replay manifest fields. Consumes canon stack, core-canon-hash. Gate: `cargo
-  test -p ckc-core`.
+  test -p ckc-core`. 53% 106K/200K _
 - [ ] core-registry.1: Registry entry types in a registry module with a pinned serde-compatible YAML
   dependency: corpora entries (origin, authority, provenance per §8.2), candidates entries (pipeline
   and stage components: ids, kinds, determinism, input/output artifact kinds), experiments entries

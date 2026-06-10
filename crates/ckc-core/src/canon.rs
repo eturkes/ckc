@@ -909,6 +909,36 @@ pub(crate) fn read_raw_map(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, Cano
     Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
 }
 
+/// A canonical unsigned counter: the §4.3 decimal-string integer constrained
+/// to `u64`. Crate-internal wrapper so counters ride the map generics.
+pub(crate) struct Count(pub(crate) u64);
+
+impl Canonical for Count {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        emit_u64(out, self.0);
+        Ok(())
+    }
+}
+
+impl CanonRead for Count {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        Ok(Count(read_u64(r)?))
+    }
+}
+
+/// Emit `entries` as a §4.3 map of identifier keys to `u64` counter values
+/// (event `budget_counters`, plan `budget`).
+pub(crate) fn emit_u64_map(out: &mut Vec<u8>, entries: &[(Id, u64)]) -> Result<(), CanonError> {
+    let counts: Vec<Count> = entries.iter().map(|&(_, v)| Count(v)).collect();
+    emit_map(out, entries.iter().map(|(k, _)| k).zip(&counts))
+}
+
+/// Inverse of [`emit_u64_map`].
+pub(crate) fn read_u64_map(r: &mut Reader<'_>) -> Result<Vec<(Id, u64)>, CanonReadError> {
+    let entries = read_map::<Id, Count>(r)?;
+    Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -12,8 +12,8 @@ use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    canonical_payload_bytes, emit_map, emit_raw_map, emit_set, emit_string, emit_u64,
-    read_canonical, read_map, read_raw_map, read_set, read_string, read_u64,
+    canonical_payload_bytes, emit_raw_map, emit_set, emit_string, emit_u64, emit_u64_map,
+    read_canonical, read_raw_map, read_set, read_string, read_u64, read_u64_map,
 };
 use crate::enums::{Authority, DiagnosticRecord, Origin, Outcome, fieldless_enum};
 use crate::hash::{canonicalization_policy_hash, content_hash};
@@ -290,7 +290,7 @@ impl Canonical for EventRecord {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("budget_counters", |b| {
-            emit_counters(b, &self.budget_counters)
+            emit_u64_map(b, &self.budget_counters)
         })?;
         obj.member("candidate_id", |b| self.candidate_id.emit_canonical(b))?;
         obj.member("component_id", |b| self.component_id.emit_canonical(b))?;
@@ -325,13 +325,7 @@ impl Canonical for EventRecord {
 impl CanonRead for EventRecord {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let budget_counters = obj.member("budget_counters", |r| {
-            let entries = read_map::<Id, Count>(r)?;
-            Ok(entries
-                .into_iter()
-                .map(|(k, v)| (k, v.0))
-                .collect::<Vec<_>>())
-        })?;
+        let budget_counters = obj.member("budget_counters", read_u64_map)?;
         let candidate_id = obj.member("candidate_id", Id::read)?;
         let component_id = obj.member("component_id", Id::read)?;
         let diagnostics = obj.member("diagnostics", read_set::<DiagnosticRecord>)?;
@@ -365,30 +359,6 @@ impl CanonRead for EventRecord {
             budget_counters,
         })
     }
-}
-
-/// A canonical unsigned counter: the §4.3 decimal-string integer constrained
-/// to `u64`.
-struct Count(u64);
-
-impl Canonical for Count {
-    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
-        emit_u64(out, self.0);
-        Ok(())
-    }
-}
-
-impl CanonRead for Count {
-    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
-        Ok(Count(read_u64(r)?))
-    }
-}
-
-/// Emit `entries` as a §4.3 map of identifier keys to counter values
-/// (`budget_counters`).
-fn emit_counters(out: &mut Vec<u8>, entries: &[(Id, u64)]) -> Result<(), CanonError> {
-    let counts: Vec<Count> = entries.iter().map(|&(_, v)| Count(v)).collect();
-    emit_map(out, entries.iter().map(|(k, _)| k).zip(&counts))
 }
 
 /// One canonical JSONL line: the value's §4.3 canonical bytes plus the
