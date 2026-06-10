@@ -19,7 +19,9 @@ technically derivable but easily forgotten under token pressure.
   five-layer/recursive type families (IR) split into ~three units. Pre-split
   such stacks BEFORE scheduling; reserve JIT-splitting for hot-but-fitting
   single-deliverable units (~70-85%). Calibrate finer from neighbouring units'
-  actual `NN%` once they exist.
+  actual `NN%` once they exist. Archive roadmaps mix measured lines (checked,
+  `NN%` annotated) with planned-only lines (unchecked, no `NN%`); cite only
+  checked lines as measured anchors — planned scopes are projections.
 - [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose
   values carry non-ASCII (`§`, em-dash `—`): args get dropped/split, leaving a
   bare space git reads as a pathspec ("pathspec ' ' did not match any file(s)"),
