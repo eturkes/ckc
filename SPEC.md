@@ -89,21 +89,22 @@ Working style (Fable 5):
   actions, and genuine scope changes to the user, and proceed on everything else.
 - Audit every progress claim against a tool result from the current session; report failures with
   their output, and state verified results plainly.
-- Review lines audit their range single-context in a 1M window (every other session runs 200K);
-  planning lines fan out to subagent workflows per the session command. Subagents stay
-  read-only; all mutations land in the main session.
+- Milestone-closing reviews audit the whole milestone single-context in a 1M window (every other
+  session runs 200K); plan sessions fan out to subagent workflows per the session command.
+  Subagents stay read-only; all mutations land in the main session.
 - Record transferable lessons in `.agent/memory.md` when they generalize beyond the current unit;
   update or delete entries that have drifted.
 - Lead final reports with the outcome, in plain sentences a reader without your working context
   can follow.
 
-Spec evolution: the spec grows in place. When a milestone's acceptance checklist passes, run an
-elaboration session: expand the next milestone's contract section into full normative text
-(workflow-driven; mine `docs/` through subagents), present the diff to the user
-for review, then seed `.agent/roadmap.md` with that milestone's units. Elaboration sessions may
-also amend earlier sections when implementation evidence justifies it; contract-affecting
-amendments reach the user before any unit consumes them. Acceptance sessions mark the milestone
-line in the roadmap with the evidence run id and add the local tag `accept/v<n>`.
+Spec evolution: the spec grows in place. When a milestone closes (its review stamp lands), the
+plan session that opens the next milestone is an elaboration session while that milestone's
+contract section is still compact: expand it into full normative text (workflow-driven; mine
+`docs/` through subagents), present the diff to the user for review, then seed
+`.agent/roadmap.md` with the milestone's header and units. Elaboration sessions may also amend
+earlier sections when implementation evidence justifies it; contract-affecting amendments reach
+the user before any unit consumes them. Acceptance sessions mark the milestone header in the
+roadmap with the evidence run id and add the local tag `accept/v<n>`.
 
 Normative language: declarative present tense states binding contract. SHOULD marks a strong
 default whose alternative is recorded in a registry, manifest, or gate evidence. MAY marks
@@ -127,12 +128,14 @@ assembling the full harness before the first end-to-end result.
 Scope note: V1–V4 are the current PoC horizon; V5–V6 stay in this file as compact forward
 contracts so PoC decisions remain production-compatible.
 
-Roadmap protocol: `.agent/roadmap.md` is a flat ordered checklist of build units and review lines
-consumed by the session command. Units are authored incrementally from the current milestone's
-spec section; an empty tail means "author the next units from the current milestone", and a
-milestone is complete only when its acceptance checklist passes in a dedicated acceptance
-session. Lines marked `user-selected` get scope confirmation from the user before work begins.
-V1 carries a suggested seed decomposition in §8.7.
+Roadmap protocol: `.agent/roadmap.md`, consumed by the session command, carries one milestone at
+a time: a header stamped with the commits that open (`plan`) and close (`review`) it, over an
+ordered unit checklist whose completed items record context usage and commit hash; closed
+milestones persist as bare headers. The plan session that opens a milestone authors its whole
+checklist from the milestone's spec section; the milestone is complete when its acceptance item
+passes in a dedicated acceptance session and the closing review stamps the header. Lines marked
+`user-selected` get scope confirmation from the user before work begins. V1 carries a suggested
+seed decomposition in §8.7.
 
 Conservation rule: deferred capabilities remain represented — each appears in a
 milestone contract (§9–§13), the registry backlog (§14), or a gate (§15). Elaboration sessions
@@ -739,7 +742,7 @@ cli-runner.2: run orchestration over stages + run layout + total-result aggregat
 event/diagnostic emission + the strict-canonical-read run-directory test (§8.5 item 3).
 cli-runner.3: trace bundle + lineage index + ckc trace.
 cli-runner.4: report rendering + manifests + ckc replay.
-review v1-kernel / review v1-pipeline / acceptance-v1 per §1 protocol.
+acceptance-v1 per §1 protocol; the closing review stamps the milestone header.
 ```
 
 ## §9 V2 — Comparison and metrics (normative)

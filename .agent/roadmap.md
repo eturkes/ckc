@@ -1,10 +1,16 @@
 # CKC roadmap
 
-Flat ordered checklist consumed by the /session-prompt command. SPEC.md is the
-design authority; its §2 is the build plan. Completed lines gain `[x]` plus a
-trailing `NN% NNNK/200K` (`/1M` in review sessions) annotation from
-`.agent/compaction.sh`. An empty tail means: author the next units from the
-current SPEC milestone.
+Build plan consumed by the /session-prompt command; SPEC.md is the design
+authority, its §2 the milestone sequence. One milestone at a time: a header
+`## <milestone> — plan <hash>`, stamped `— review <hash>` by its closing
+review (the pair bounds the milestone's commits; acceptance adds the evidence
+run id per SPEC §1), over an ordered unit checklist. Completed items gain `[x]`
+plus trailing `NN% NNNK/200K <hash>` (context usage from
+`.agent/compaction.sh`, then the completing commit). Plan/review stamps carry
+no usage. Closed milestones persist as bare headers; the next plan session
+removes their checklists (git history retains them).
+
+## V1 spine — plan e6523e9
 
 - [ ] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
   num-rational), lib.rs wiring with unsafe forbidden, and value types Id ([a-z][a-z0-9_.:-]*), Hash
@@ -114,10 +120,6 @@ current SPEC milestone.
   stage's declared input artifact kinds are produced by predecessors; typed validation errors;
   inline-fixture tests including chain violations and dangling refs. Reading: SPEC §8.4; §3
   registry-check invariant. Consumes core-registry.1 types. Gate: `cargo test -p ckc-core`.
-- [ ] review v1-kernel: Review of the kernel group, core-ids .. core-registry.2 (16 units, crate
-  ckc-core: value types, string policies, canonical writer/reader, hashing, enums/envelope/records,
-  grounding, IR layers, plans, registry types and validation), commit range since plan-v1. Reading:
-  SPEC §4.1-§4.6, §5, §7.4. Gate: every finding triaged to a fix commit or a recorded roadmap candidate.
 - [ ] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
   corpus/fixtures/ (guideline_a with CQ heading, recommendation and exception sentences, definitions
   table, evidence list; guideline_b contraindication; control with disjoint child age interval),
@@ -237,18 +239,13 @@ current SPEC milestone.
   matching hashes yield ok; re-run-equals-prior idempotency test over a fixture run. Closes §8.5
   item 8. Reading: SPEC §4.6 replay semantics, §8.3 layout, §7.4 replay codes. Consumes
   cli-runner.4.1 manifests and the complete run pipeline. Gate: `cargo test --workspace`.
-- [ ] review v1-pipeline: Review of the pipeline group, fixtures-v1 .. cli-runner.4.2 (15 units:
-  corpus/lexicon/gold/registry data, ckc-cli foundation and stages, ckc-smt planning/emission, Z3
-  verification, runner, trace, report and replay), commit range since review v1-kernel, with one
-  sample exp.v1_spine run as evidence. Reading: SPEC §4.4, §6, §7.1, §7.2, §8.1-§8.4, §8.6 worked
-  thread as oracle. Gate: every finding triaged to a fix commit or a recorded roadmap candidate.
 - [ ] acceptance-v1: Dedicated acceptance session for the V1 milestone: execute §8.5 items 1-9 in
   order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.v1_spine --out
   runs/v1 with outcome ok and strict-read artifact set; assertion-map audit; group.v1_conflict
   semantic_contradiction with cross-document unsat core matching corpus/gold/v1_expected.yaml;
   group.v1_null semantic_no_conflict with documented_null_result from the disjoint-interval Q1
   unsat; ckc trace full chain; ckc replay hash match; report content with quoted spans resolving to
-  fixture bytes); mark the milestone line with the evidence run id and create the local tag
+  fixture bytes); mark the milestone header with the evidence run id and create the local tag
   accept/v1. Reading: SPEC §8.5, §8.1-§8.4, §8.6; §1 acceptance and tagging protocol. Consumes the
   complete built pipeline. Gate: All nine §8.5 items pass against one recorded run; roadmap
-  milestone line carries the evidence run id; local tag accept/v1 exists.
+  milestone header carries the evidence run id; local tag accept/v1 exists.
