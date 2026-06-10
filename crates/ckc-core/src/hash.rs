@@ -42,7 +42,7 @@ pub fn hash_bytes(bytes: &[u8]) -> Hash {
 /// policy version changes, so a stored value pins the policy under which an
 /// artifact was sealed.
 pub fn canonicalization_policy_hash() -> Hash {
-    content_hash(&CanonicalizationPolicy::M1).expect("policy descriptor canonicalizes")
+    content_hash(&CanonicalizationPolicy::V1).expect("policy descriptor canonicalizes")
 }
 
 /// Stable identity of the SPEC §4.3 canonical-JSON byte policy: an `id` naming the
@@ -56,10 +56,10 @@ pub struct CanonicalizationPolicy {
 }
 
 impl CanonicalizationPolicy {
-    /// The M1 canonical-JSON byte policy (SPEC §4.3).
-    pub const M1: CanonicalizationPolicy = CanonicalizationPolicy {
+    /// The V1 canonical-JSON byte policy (SPEC §4.3).
+    pub const V1: CanonicalizationPolicy = CanonicalizationPolicy {
         id: "ckc.canonical_json",
-        version: "ckc.m1",
+        version: "ckc.v1",
     };
 }
 
@@ -124,8 +124,8 @@ mod tests {
     #[test]
     fn policy_descriptor_canonical_bytes() {
         assert_eq!(
-            canonical_payload_bytes(&CanonicalizationPolicy::M1).unwrap(),
-            br#"{"id":"ckc.canonical_json","version":"ckc.m1"}"#
+            canonical_payload_bytes(&CanonicalizationPolicy::V1).unwrap(),
+            br#"{"id":"ckc.canonical_json","version":"ckc.v1"}"#
         );
     }
 
@@ -133,6 +133,6 @@ mod tests {
     fn canonicalization_policy_hash_is_stable_content_hash() {
         let h = canonicalization_policy_hash();
         assert_eq!(h, canonicalization_policy_hash());
-        assert_eq!(h, content_hash(&CanonicalizationPolicy::M1).unwrap());
+        assert_eq!(h, content_hash(&CanonicalizationPolicy::V1).unwrap());
     }
 }

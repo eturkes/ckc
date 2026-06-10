@@ -58,7 +58,7 @@ next plan session removes their checklists (git history retains them).
   canonicalization_policy_hash derived through content_hash; NIST vector, determinism,
   value-sensitivity, and pinned-descriptor tests.
   Reading: SPEC §4.3, §4.4 canonicalization_policy_hash row. Consumes core-ids Hash and the canon stack. Gate: `cargo test -p
-  ckc-core`. 36% 72K/200K _
+  ckc-core`. 36% 72K/200K c568017
 - [ ] core-enums-envelope.1: V1 enums plus result and diagnostic records in an enums module: all ten
   §4.4 enums — Outcome with the §4.4 severity order, Origin, Authority, BindingStatus, Direction,
   ClaimTier, ReviewClassification, AttemptClassification, PromotionDecision, PromotionScope — as
