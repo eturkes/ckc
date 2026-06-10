@@ -38,6 +38,11 @@
 //! graph. `core-plans` adds the §5 run records — [`RunPlan`] whose canonical
 //! bytes hash into [`RunManifest`] via [`RunPlan::plan_hash`] — and the §4.6
 //! [`ReplayManifest`] attestation with the shared [`SolverIdentity`].
+//! `core-registry.1` adds the §8.4 registry surface, strict-loaded from YAML
+//! ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
+//! [`parse_gold`]): [`CorpusEntry`], [`Candidates`] over [`PipelineEntry`]
+//! and [`StageEntry`], [`ExperimentEntry`] with [`FixtureGroup`]s, and the
+//! §8.2 [`GoldEntry`] expectations.
 #![forbid(unsafe_code)]
 
 mod bundle;
@@ -49,6 +54,7 @@ mod hash;
 mod id;
 mod ir;
 mod plans;
+mod registry;
 mod strings;
 
 pub use bundle::{
@@ -84,4 +90,9 @@ pub use ir::{
     emit_structural_ref_set, structural_hash,
 };
 pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
+pub use registry::{
+    Candidates, CorpusEntry, Determinism, ExperimentEntry, FixtureGroup, GoldEntry, PipelineEntry,
+    RegistryError, StageEntry, parse_candidates, parse_corpora, parse_experiments, parse_gold,
+    to_yaml,
+};
 pub use strings::StringPolicy;

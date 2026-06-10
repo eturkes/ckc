@@ -19,6 +19,8 @@ use crate::strings::StringPolicy;
 /// Define a fieldless SPEC §4.4 enum: variants in declaration order, an
 /// [`ALL`](Outcome::ALL) table, the `as_str`/`parse` spelling pair, and
 /// [`Canonical`]/[`CanonRead`] impls over the bare identifier_ascii string.
+/// Serde impls reuse the same spelling, so YAML surfaces (the §8.4
+/// registries) and canonical bytes agree on every value.
 macro_rules! fieldless_enum {
     (
         $(#[$meta:meta])*
@@ -64,6 +66,19 @@ macro_rules! fieldless_enum {
         impl CanonRead for $name {
             fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
                 Ok($name::parse(&read_string(r)?)?)
+            }
+        }
+
+        impl ::serde::Serialize for $name {
+            fn serialize<S: ::serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> ::serde::Deserialize<'de> for $name {
+            fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let token: String = ::serde::Deserialize::deserialize(deserializer)?;
+                $name::parse(&token).map_err(::serde::de::Error::custom)
             }
         }
     };
@@ -712,6 +727,16 @@ mod tests {
             h('a').as_str()
         );
         assert_eq!(canon(&sample_result()), want);
+    }
+
+    // Serde (the §8.4 YAML registry surface) speaks the same identifier_ascii
+    // spelling as the canonical bytes, and admits nothing else.
+    #[test]
+    fn fieldless_enum_serde_mirrors_canonical_spelling() {
+        assert_eq!(serde_json::to_string(&Outcome::Ok).unwrap(), r#""ok""#);
+        let parsed: Origin = serde_json::from_str(r#""ai_generated""#).unwrap();
+        assert_eq!(parsed, Origin::AiGenerated);
+        assert!(serde_json::from_str::<Origin>(r#""AI_GENERATED""#).is_err());
     }
 
     #[test]

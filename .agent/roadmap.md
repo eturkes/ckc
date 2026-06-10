@@ -168,15 +168,15 @@ next plan session removes their checklists (git history retains them).
   toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);
   ReplayManifest with the §4.6 field list; canonical round-trips. Reading: SPEC §5 RunPlan and
   RunManifest rows, §4.6 replay manifest fields. Consumes canon stack, core-canon-hash. Gate: `cargo
-  test -p ckc-core`. 53% 106K/200K _
-- [ ] core-registry.1: Registry entry types in a registry module with a pinned serde-compatible YAML
+  test -p ckc-core`. 53% 106K/200K 90a1654
+- [x] core-registry.1: Registry entry types in a registry module with a pinned serde-compatible YAML
   dependency: corpora entries (origin, authority, provenance per §8.2), candidates entries (pipeline
   and stage components: ids, kinds, determinism, input/output artifact kinds), experiments entries
   (fixture groups, pipeline, seed, budget, expected-outcome ref), and gold expected-outcome entries
   (group_id, expected_outcome, optional expected_conflict_kind, expected_core compared as a set,
   expected_null_result); inline-YAML loading and round-trip tests. Reading: SPEC §8.4, §8.2 corpora
   fields and gold shape. Consumes core-enums-envelope.1 enums, canon stack. Gate: `cargo test -p
-  ckc-core registry::`.
+  ckc-core registry::`. 56% 113K/200K _
 - [ ] core-registry.2: Registry validation in the registry module: per-entry required fields, Id
   grammar, cross-file resolution (experiment to pipeline, corpora, and gold expected-outcome ref;
   every referenced entry resolves and is well-formed), and the §8.4 stage-chain rule that every
