@@ -292,7 +292,7 @@ next plan session removes their checklists (git history retains them).
   sentences; ir.rs TerminologyBinding; segment.rs region resolution. Consumes
   stage-normalize.1a Lexicon, stage-segment SegmentIr. Gate: `cargo test -p ckc-cli
   normalize::`. 69% 138K/200K 23a8ccf
-- [ ] stage-normalize.1c: Behavior-frozen refactor carving the per-segment binding core out of
+- [x] stage-normalize.1c: Behavior-frozen refactor carving the per-segment binding core out of
   bind_segments so .1d statement building can call it per segment; zero public-surface change,
   zero test edits — the existing normalize:: tests are the behavior authority. Internals: struct
   GraphIndex<'a> {spans, regions} indexing the graph once, with segment_spans(&self, segment:
@@ -307,6 +307,7 @@ next plan session removes their checklists (git history retains them).
   candidate-set logic with binding_id = bind.<next + local index>; bind_segments shrinks to the
   rec/exc loop over these. Reading: normalize.rs in full (edit target). Consumes
   stage-normalize.1b. Gate: `cargo test -p ckc-cli normalize::` with the test module untouched.
+  53% 105K/200K _
 - [ ] stage-normalize.1d: Recommendation statements: pub clinical_ir(graph: &SourceGraph,
   segments: &SegmentIr, lexicon: &Lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) running the
   .1c binding core per recommendation/exception segment in document order (bindings and binding

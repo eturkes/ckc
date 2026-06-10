@@ -21,7 +21,7 @@
 //! form) — minting one [`TerminologyBinding`] per (segment, candidate
 //! set); singleton sets bind `exact`/`synonym`, shared surfaces bind
 //! `ambiguous` with a `terminology_ambiguous` record (§5). The statement
-//! builder (`stage-normalize.1c`) completes the stage's first half.
+//! builder (`stage-normalize.1d`) completes the stage's first half.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -29,9 +29,9 @@ use std::fmt;
 use serde::Deserialize;
 
 use ckc_core::{
-    BindingStatus, Certainty, DiagnosticCode, DiagnosticRecord, Direction, Hash, Id, Outcome,
-    QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength,
-    StringPolicy, TerminologyBinding, hash_bytes,
+    BindingStatus, Certainty, ClinicalSegment, DiagnosticCode, DiagnosticRecord, Direction, Hash,
+    Id, Outcome, QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan,
+    Strength, StringPolicy, TerminologyBinding, hash_bytes,
 };
 
 use crate::shell::static_id;
@@ -343,37 +343,15 @@ fn check_interval(owner: &Id, q: &QuantityInterval) -> Result<(), LexiconError> 
 /// regions (§5). A later match of a set already pending in the segment only
 /// extends `region_ids`; alternatives and region_ids store in canonical set
 /// order. Unmapped text mints nothing here — demand-side residuals are the
-/// statement builder's (`stage-normalize.1c`). Dangling region or span refs
+/// statement builder's (`stage-normalize.1d`). Dangling region or span refs
 /// are the bundle validator's domain (§5 invariants) and skip silently.
 pub fn bind_segments(
     graph: &SourceGraph,
     segments: &SegmentIr,
     lexicon: &Lexicon,
 ) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) {
-    let spans: HashMap<&Id, &SourceSpan> = graph.spans.iter().map(|s| (&s.span_id, s)).collect();
-    let regions: HashMap<&Id, &SourceRegion> =
-        graph.regions.iter().map(|r| (&r.region_id, r)).collect();
-
-    // Concept surface table. Surfaces try longest first, so the scan's
-    // first hit is the longest match; equal-length distinct surfaces cannot
-    // both match one position, so the byte tiebreak only fixes iteration
-    // order.
-    let mut candidates: HashMap<&str, Vec<&Id>> = HashMap::new();
-    for concept in &lexicon.concepts {
-        for surface in &concept.surfaces {
-            candidates
-                .entry(surface)
-                .or_default()
-                .push(&concept.concept_id);
-        }
-    }
-    let mut surfaces: Vec<&str> = candidates.keys().copied().collect();
-    surfaces.sort_by(|a, b| b.len().cmp(&a.len()).then(a.cmp(b)));
-    let representative: HashMap<&Id, &str> = lexicon
-        .concepts
-        .iter()
-        .map(|c| (&c.concept_id, c.surfaces[0].as_str()))
-        .collect();
+    let index = GraphIndex::new(graph);
+    let table = ConceptTable::new(lexicon);
 
     let mut bindings: Vec<TerminologyBinding> = Vec::new();
     let mut diagnostics: Vec<DiagnosticRecord> = Vec::new();
@@ -384,81 +362,200 @@ pub fn bind_segments(
         ) {
             continue;
         }
-        // The segment's spans and, per span, the regions naming it.
-        let mut span_regions: HashMap<&Id, Vec<&Id>> = HashMap::new();
-        for region_id in &segment.region_ids {
-            let Some(region) = regions.get(region_id) else {
-                continue;
-            };
-            for span_id in &region.span_ids {
-                span_regions.entry(span_id).or_default().push(region_id);
-            }
-        }
-        let mut segment_spans: Vec<&SourceSpan> = span_regions
-            .keys()
-            .filter_map(|span_id| spans.get(*span_id).copied())
-            .collect();
-        segment_spans.sort_by_key(|s| s.reading_order);
-
-        let mut pending: Vec<PendingBinding> = Vec::new();
-        let mut by_key: HashMap<Vec<Id>, usize> = HashMap::new();
-        for span in segment_spans {
-            let text = span.search_text.as_str();
-            let mut at = 0;
-            while at < text.len() {
-                let Some(&surface) = surfaces.iter().find(|s| text[at..].starts_with(**s)) else {
-                    at += text[at..]
-                        .chars()
-                        .next()
-                        .expect("at sits on a char boundary")
-                        .len_utf8();
-                    continue;
-                };
-                // Id byte order equals canonical set order (id chars never
-                // escape), so one sort serves the dedupe key, the
-                // byte-lowest code, and the stored alternatives.
-                let mut key: Vec<Id> = candidates[surface].iter().map(|&id| id.clone()).collect();
-                key.sort();
-                let i = *by_key.entry(key.clone()).or_insert_with(|| {
-                    pending.push(PendingBinding::open(&key, surface, &representative));
-                    pending.len() - 1
-                });
-                pending[i]
-                    .region_ids
-                    .extend(span_regions[&span.span_id].iter().map(|&id| id.clone()));
-                at += surface.len();
-            }
-        }
-
-        for p in pending {
-            let PendingBinding {
-                code,
-                status,
-                alternatives,
-                mut region_ids,
-                surface,
-            } = p;
-            let binding_id = Id::new(format!("bind.{}", bindings.len()))
-                .expect("counter ids match the Id grammar");
-            region_ids.sort();
-            region_ids.dedup();
-            if status == BindingStatus::Ambiguous {
-                diagnostics.push(ambiguity(&surface, &alternatives, &region_ids));
-            }
-            bindings.push(TerminologyBinding {
-                binding_id,
-                system: lexicon.system.clone(),
-                code,
-                status,
-                alternatives,
-                region_ids,
-            });
-        }
+        let spans = index.segment_spans(segment);
+        let (mut b, mut d) = bind_segment(&spans, &table, &lexicon.system, bindings.len());
+        bindings.append(&mut b);
+        diagnostics.append(&mut d);
     }
     (bindings, diagnostics)
 }
 
-/// One in-flight binding of [`bind_segments`]: a distinct candidate set
+/// One-pass id indexes over a [`SourceGraph`]: the span and region lookups
+/// behind [`GraphIndex::segment_spans`], built once per binding run.
+struct GraphIndex<'a> {
+    spans: HashMap<&'a Id, &'a SourceSpan>,
+    regions: HashMap<&'a Id, &'a SourceRegion>,
+}
+
+impl<'a> GraphIndex<'a> {
+    fn new(graph: &'a SourceGraph) -> GraphIndex<'a> {
+        GraphIndex {
+            spans: graph.spans.iter().map(|s| (&s.span_id, s)).collect(),
+            regions: graph.regions.iter().map(|r| (&r.region_id, r)).collect(),
+        }
+    }
+
+    /// A segment's spans, deduped and sorted by reading order — a span
+    /// named by several regions appears once — each paired with the region
+    /// ids naming it (raw accumulation; consumers sort and dedupe what
+    /// they keep). Dangling region and span refs skip silently per the
+    /// [`bind_segments`] contract.
+    fn segment_spans(&self, segment: &ClinicalSegment) -> Vec<(&'a SourceSpan, Vec<&'a Id>)> {
+        let mut span_regions: HashMap<&'a Id, Vec<&'a Id>> = HashMap::new();
+        for region_id in &segment.region_ids {
+            let Some(&region) = self.regions.get(region_id) else {
+                continue;
+            };
+            for span_id in &region.span_ids {
+                span_regions
+                    .entry(span_id)
+                    .or_default()
+                    .push(&region.region_id);
+            }
+        }
+        let mut spans: Vec<(&'a SourceSpan, Vec<&'a Id>)> = span_regions
+            .into_iter()
+            .filter_map(|(span_id, regions)| self.spans.get(span_id).map(|&span| (span, regions)))
+            .collect();
+        spans.sort_by_key(|(span, _)| span.reading_order);
+        spans
+    }
+}
+
+/// Concept surface table built once per binding run: the longest-first
+/// scan list, surface → candidate concept ids, and each concept's
+/// representative surface for exact-vs-synonym status.
+struct ConceptTable<'a> {
+    /// Scan list, ordered by [`longest_first`].
+    surfaces: Vec<&'a str>,
+    /// Surface → concepts sharing it (lexicon order).
+    candidates: HashMap<&'a str, Vec<&'a Id>>,
+    /// Concept → `surfaces[0]`, the exact-status surface.
+    representative: HashMap<&'a Id, &'a str>,
+}
+
+impl<'a> ConceptTable<'a> {
+    fn new(lexicon: &'a Lexicon) -> ConceptTable<'a> {
+        let mut candidates: HashMap<&'a str, Vec<&'a Id>> = HashMap::new();
+        for concept in &lexicon.concepts {
+            for surface in &concept.surfaces {
+                candidates
+                    .entry(surface)
+                    .or_default()
+                    .push(&concept.concept_id);
+            }
+        }
+        ConceptTable {
+            surfaces: longest_first(candidates.keys().copied().collect()),
+            candidates,
+            representative: lexicon
+                .concepts
+                .iter()
+                .map(|c| (&c.concept_id, c.surfaces[0].as_str()))
+                .collect(),
+        }
+    }
+}
+
+/// Order a surface list for [`scan`]: byte-length descending so a scan's
+/// first prefix hit is the longest match, ties ascending by bytes —
+/// equal-length distinct surfaces cannot both match one position, so the
+/// tiebreak only fixes iteration order.
+fn longest_first(mut surfaces: Vec<&str>) -> Vec<&str> {
+    surfaces.sort_by(|a, b| b.len().cmp(&a.len()).then(a.cmp(b)));
+    surfaces
+}
+
+/// Greedy left-to-right longest-match scan: the first `surfaces` entry
+/// (pre-ordered by [`longest_first`]) prefixing the cursor matches and
+/// consumes its bytes, unmatched text advances one char. Matches return
+/// in scan order, repeats kept.
+fn scan<'s>(text: &str, surfaces: &[&'s str]) -> Vec<&'s str> {
+    let mut matches = Vec::new();
+    let mut at = 0;
+    while at < text.len() {
+        let Some(&surface) = surfaces.iter().find(|s| text[at..].starts_with(**s)) else {
+            at += text[at..]
+                .chars()
+                .next()
+                .expect("at sits on a char boundary")
+                .len_utf8();
+            continue;
+        };
+        matches.push(surface);
+        at += surface.len();
+    }
+    matches
+}
+
+/// Drop later duplicates in place, keeping first occurrences in order —
+/// the reading-list hygiene the statement builder (`stage-normalize.1d`)
+/// applies to every slot.
+#[expect(dead_code)]
+fn dedup_keep_first<T: PartialEq>(items: &mut Vec<T>) {
+    let mut i = 0;
+    while i < items.len() {
+        if items[..i].contains(&items[i]) {
+            items.remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+/// The per-segment binding core (`stage-normalize.1b` semantics): scan the
+/// segment's `spans` — [`GraphIndex::segment_spans`] pairs — against
+/// `table`, minting one binding per distinct candidate set in first-match
+/// order under ids `bind.<next + local index>`, plus one ambiguity record
+/// per ambiguous binding.
+fn bind_segment(
+    spans: &[(&SourceSpan, Vec<&Id>)],
+    table: &ConceptTable<'_>,
+    system: &Id,
+    next: usize,
+) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) {
+    let mut pending: Vec<PendingBinding> = Vec::new();
+    let mut by_key: HashMap<Vec<Id>, usize> = HashMap::new();
+    for (span, regions) in spans {
+        for surface in scan(&span.search_text, &table.surfaces) {
+            // Id byte order equals canonical set order (id chars never
+            // escape), so one sort serves the dedupe key, the byte-lowest
+            // code, and the stored alternatives.
+            let mut key: Vec<Id> = table.candidates[surface]
+                .iter()
+                .map(|&id| id.clone())
+                .collect();
+            key.sort();
+            let i = *by_key.entry(key.clone()).or_insert_with(|| {
+                pending.push(PendingBinding::open(&key, surface, &table.representative));
+                pending.len() - 1
+            });
+            pending[i]
+                .region_ids
+                .extend(regions.iter().map(|&id| id.clone()));
+        }
+    }
+
+    let mut bindings: Vec<TerminologyBinding> = Vec::new();
+    let mut diagnostics: Vec<DiagnosticRecord> = Vec::new();
+    for (k, p) in pending.into_iter().enumerate() {
+        let PendingBinding {
+            code,
+            status,
+            alternatives,
+            mut region_ids,
+            surface,
+        } = p;
+        let binding_id =
+            Id::new(format!("bind.{}", next + k)).expect("counter ids match the Id grammar");
+        region_ids.sort();
+        region_ids.dedup();
+        if status == BindingStatus::Ambiguous {
+            diagnostics.push(ambiguity(&surface, &alternatives, &region_ids));
+        }
+        bindings.push(TerminologyBinding {
+            binding_id,
+            system: system.clone(),
+            code,
+            status,
+            alternatives,
+            region_ids,
+        });
+    }
+    (bindings, diagnostics)
+}
+
+/// One in-flight binding of [`bind_segment`]: a distinct candidate set
 /// first matched in the owning segment, accumulating mention regions until
 /// the segment's scan completes. `region_ids` holds raw accumulation;
 /// finalization sorts and dedupes.
