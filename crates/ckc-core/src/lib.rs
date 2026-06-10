@@ -26,7 +26,10 @@
 //! ([`Structural`], [`structural_hash`], [`RefLocalizer`]); `core-ir.2` adds
 //! ClinicalIR and NormIR ([`ClinicalIr`] with [`ClinicalStatement`] and
 //! [`TerminologyBinding`], [`NormIr`] with [`NormRule`] guarded by
-//! [`ContextExpr`] DNF over [`ContextAtom`]s on an [`Action`]).
+//! [`ContextExpr`] DNF over [`ContextAtom`]s on an [`Action`]); `core-ir.3`
+//! completes the layer stack with FormalIR ([`FormalIr`] deriving
+//! [`FormalConstraint`]s from rules, [`ContradictionQueryPair`] plan slots,
+//! [`directions_opposed`]).
 #![forbid(unsafe_code)]
 
 mod canon;
@@ -61,8 +64,9 @@ pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_has
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use ir::{
     Action, CellRole, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
-    ContextConjunct, ContextExpr, DocIr, ExceptionClause, IrError, NormIr, NormRule,
-    QuantityInterval, RefLocalizer, SegmentIr, SegmentKind, Strength, Structural, TableCell,
-    TableView, TerminologyBinding, TextBlock, emit_structural_ref_set, structural_hash,
+    ContextConjunct, ContextExpr, ContradictionQueryPair, DocIr, ExceptionClause, FormalConstraint,
+    FormalIr, IrError, NormIr, NormRule, QuantityInterval, RefLocalizer, SegmentIr, SegmentKind,
+    Strength, Structural, TableCell, TableView, TerminologyBinding, TextBlock, directions_opposed,
+    emit_structural_ref_set, structural_hash,
 };
 pub use strings::StringPolicy;

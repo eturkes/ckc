@@ -2,7 +2,9 @@
 //! view over [`SourceGraph`] refs with extraction diagnostics — SegmentIR
 //! ([`SegmentIr`]) — the document's [`ClinicalSegment`]s — ClinicalIR
 //! ([`ClinicalIr`]) — [`ClinicalStatement`]s plus [`TerminologyBinding`]s —
-//! and NormIR ([`NormIr`]) — [`NormRule`]s over [`ContextExpr`] guards.
+//! NormIR ([`NormIr`]) — [`NormRule`]s over [`ContextExpr`] guards — and
+//! FormalIR ([`FormalIr`]) — target-independent [`FormalConstraint`]s plus
+//! the [`ContradictionQueryPair`] contradiction-query plan.
 //! Layers hold references into the graph; the graph stays the byte authority.
 //!
 //! The module also defines the §4.3 structural-hash machinery the later
@@ -1224,6 +1226,250 @@ impl Structural for NormIr {
     }
 }
 
+/// SPEC §6 direction-group opposition, the direction half of conflict
+/// eligibility (the other half is action sameness via normalized keys, §5):
+/// true when one direction is in the positive group (`for`/`require`/
+/// `permit`) and the other is in the against (`against`/`avoid`) or
+/// contraindicating (`contraindicate`/`avoid`) group.
+pub fn directions_opposed(a: Direction, b: Direction) -> bool {
+    let positive =
+        |d: Direction| matches!(d, Direction::For | Direction::Require | Direction::Permit);
+    let opposing = |d: Direction| {
+        matches!(
+            d,
+            Direction::Against | Direction::Avoid | Direction::Contraindicate
+        )
+    };
+    (positive(a) && opposing(b)) || (positive(b) && opposing(a))
+}
+
+/// SPEC §5 FormalIR constraint: the target-independent projection of one
+/// [`NormRule`] — self-contained [`Action`], folded [`ContextExpr`] guard,
+/// direction, and the proof-visible strength/certainty annotations (§5:
+/// conflict logic consumes direction and normalized action/context). Source
+/// regions stay reachable through `rule_id`. An independently hashable
+/// component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormalConstraint {
+    /// `fc.<rule_id>`, derived by [`from_rule`](Self::from_rule); bundle
+    /// validation (core-ir.5) re-checks stored values against the
+    /// derivation, like every derived field.
+    pub constraint_id: Id,
+    pub rule_id: Id,
+    pub action: Action,
+    pub context: ContextExpr,
+    pub direction: Direction,
+    pub strength: Strength,
+    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    pub certainty: Option<Certainty>,
+}
+
+impl FormalConstraint {
+    /// Project a rule into its constraint: `constraint_id = fc.<rule_id>`,
+    /// every other field a straight copy — [`NormRule::context`] already
+    /// folds exceptions into negated conjuncts (§5).
+    pub fn from_rule(rule: &NormRule) -> FormalConstraint {
+        let constraint_id = Id::new(format!("fc.{}", rule.rule_id))
+            .expect("'fc.' before a valid id forms a valid id");
+        FormalConstraint {
+            constraint_id,
+            rule_id: rule.rule_id.clone(),
+            action: rule.action.clone(),
+            context: rule.context.clone(),
+            direction: rule.direction,
+            strength: rule.strength,
+            certainty: rule.certainty,
+        }
+    }
+}
+
+impl Canonical for FormalConstraint {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("constraint_id", |b| self.constraint_id.emit_canonical(b))?;
+        obj.member("context", |b| self.context.emit_canonical(b))?;
+        obj.member("direction", |b| self.direction.emit_canonical(b))?;
+        obj.member("rule_id", |b| self.rule_id.emit_canonical(b))?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for FormalConstraint {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let action = obj.member("action", Action::read)?;
+        let certainty = obj.optional("certainty", Certainty::read)?;
+        let constraint_id = obj.member("constraint_id", Id::read)?;
+        let context = obj.member("context", ContextExpr::read)?;
+        let direction = obj.member("direction", Direction::read)?;
+        let rule_id = obj.member("rule_id", Id::read)?;
+        let strength = obj.member("strength", Strength::read)?;
+        obj.close()?;
+        Ok(FormalConstraint {
+            constraint_id,
+            rule_id,
+            action,
+            context,
+            direction,
+            strength,
+            certainty,
+        })
+    }
+}
+
+impl Structural for FormalConstraint {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action", |b| self.action.emit_canonical(b))?;
+        obj.optional("certainty", self.certainty, |b, c| c.emit_canonical(b))?;
+        obj.member("constraint_id", |b| {
+            ids.localize(&self.constraint_id).emit_canonical(b)
+        })?;
+        obj.member("context", |b| self.context.emit_canonical(b))?;
+        obj.member("direction", |b| self.direction.emit_canonical(b))?;
+        obj.member("rule_id", |b| ids.localize(&self.rule_id).emit_canonical(b))?;
+        obj.member("strength", |b| self.strength.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5/§6 contradiction-query plan slot: one conflict-eligible
+/// constraint pair — same normalized action key, [`directions_opposed`],
+/// `constraint_a_id < constraint_b_id` by id bytes (bundle validation,
+/// core-ir.5) — holding the planner-minted ids of its two §6 queries (Q1
+/// context_overlap, Q2 deontic_consistency; §8.6 spells them
+/// `q.<group>.<pair>.overlap`/`.deontic`). Planning lands in smt-emit.2.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContradictionQueryPair {
+    pub pair_id: Id,
+    pub action_key: Id,
+    pub constraint_a_id: Id,
+    pub constraint_b_id: Id,
+    pub context_overlap_query_id: Id,
+    pub deontic_consistency_query_id: Id,
+}
+
+impl Canonical for ContradictionQueryPair {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action_key", |b| self.action_key.emit_canonical(b))?;
+        obj.member("constraint_a_id", |b| {
+            self.constraint_a_id.emit_canonical(b)
+        })?;
+        obj.member("constraint_b_id", |b| {
+            self.constraint_b_id.emit_canonical(b)
+        })?;
+        obj.member("context_overlap_query_id", |b| {
+            self.context_overlap_query_id.emit_canonical(b)
+        })?;
+        obj.member("deontic_consistency_query_id", |b| {
+            self.deontic_consistency_query_id.emit_canonical(b)
+        })?;
+        obj.member("pair_id", |b| self.pair_id.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ContradictionQueryPair {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let action_key = obj.member("action_key", Id::read)?;
+        let constraint_a_id = obj.member("constraint_a_id", Id::read)?;
+        let constraint_b_id = obj.member("constraint_b_id", Id::read)?;
+        let context_overlap_query_id = obj.member("context_overlap_query_id", Id::read)?;
+        let deontic_consistency_query_id = obj.member("deontic_consistency_query_id", Id::read)?;
+        let pair_id = obj.member("pair_id", Id::read)?;
+        obj.close()?;
+        Ok(ContradictionQueryPair {
+            pair_id,
+            action_key,
+            constraint_a_id,
+            constraint_b_id,
+            context_overlap_query_id,
+            deontic_consistency_query_id,
+        })
+    }
+}
+
+impl Structural for ContradictionQueryPair {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("action_key", |b| self.action_key.emit_canonical(b))?;
+        obj.member("constraint_a_id", |b| {
+            ids.localize(&self.constraint_a_id).emit_canonical(b)
+        })?;
+        obj.member("constraint_b_id", |b| {
+            ids.localize(&self.constraint_b_id).emit_canonical(b)
+        })?;
+        obj.member("context_overlap_query_id", |b| {
+            ids.localize(&self.context_overlap_query_id)
+                .emit_canonical(b)
+        })?;
+        obj.member("deontic_consistency_query_id", |b| {
+            ids.localize(&self.deontic_consistency_query_id)
+                .emit_canonical(b)
+        })?;
+        obj.member("pair_id", |b| ids.localize(&self.pair_id).emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+/// SPEC §5 FormalIR: the document's [`FormalConstraint`]s in rule order plus
+/// the contradiction-query plan (ordered array; pairs may cross documents,
+/// so [`derive`](Self::derive) leaves it for the planner, smt-emit.2).
+/// Constraints emit under per-component scopes; plan entries localize in the
+/// layer scope, so cross-pair co-reference stays in the structural bytes
+/// (module doc).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormalIr {
+    pub constraints: Vec<FormalConstraint>,
+    pub plan: Vec<ContradictionQueryPair>,
+}
+
+impl FormalIr {
+    /// Derive the layer from NormIR: one constraint per rule, in rule order;
+    /// the plan stays empty until planning (smt-emit.2).
+    pub fn derive(norm: &NormIr) -> FormalIr {
+        FormalIr {
+            constraints: norm.rules.iter().map(FormalConstraint::from_rule).collect(),
+            plan: Vec::new(),
+        }
+    }
+}
+
+impl Canonical for FormalIr {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("constraints", |b| emit_array(b, &self.constraints))?;
+        obj.member("plan", |b| emit_array(b, &self.plan))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for FormalIr {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let constraints = obj.member("constraints", read_array::<FormalConstraint>)?;
+        let plan = obj.member("plan", read_array::<ContradictionQueryPair>)?;
+        obj.close()?;
+        Ok(FormalIr { constraints, plan })
+    }
+}
+
+impl Structural for FormalIr {
+    fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("constraints", |b| {
+            emit_structural_components(b, &self.constraints)
+        })?;
+        obj.member("plan", |b| emit_structural_array(b, ids, &self.plan))?;
+        obj.finish(out)
+    }
+}
+
 /// A DocIR derivation input broke its contract ([`DocIr::from_graph`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrError {
@@ -2105,6 +2351,235 @@ mod tests {
         };
         assert_ne!(
             structural_hash(&one).unwrap(),
+            structural_hash(&doubled).unwrap()
+        );
+    }
+
+    // ---- core-ir.3: FormalIR ------------------------------------------------
+
+    fn constraint_p(p: &str) -> FormalConstraint {
+        FormalConstraint::from_rule(&rule_p(p))
+    }
+
+    /// A §8.6-style plan slot for the worked pair, local ids under prefix
+    /// `p` (constraint refs follow the `fc.<rule_id>` derivation).
+    fn pair_p(p: &str) -> ContradictionQueryPair {
+        ContradictionQueryPair {
+            pair_id: id(&format!("{p}q.v1_conflict.pair1")),
+            action_key: id("act.administer:drug.abx_a"),
+            constraint_a_id: id(&format!("fc.{p}rule.a.cq1.r1")),
+            constraint_b_id: id(&format!("fc.{p}rule.b.contra1")),
+            context_overlap_query_id: id(&format!("{p}q.v1_conflict.pair1.overlap")),
+            deontic_consistency_query_id: id(&format!("{p}q.v1_conflict.pair1.deontic")),
+        }
+    }
+
+    // §6: opposed iff one direction is positive (for/require/permit) and
+    // the other is against/avoid or contraindicate/avoid — all 36 cells.
+    #[test]
+    fn directions_opposed_truth_table() {
+        use Direction::*;
+        let positive = [For, Require, Permit];
+        let opposing = [Against, Avoid, Contraindicate];
+        for &a in Direction::ALL {
+            for &b in Direction::ALL {
+                let want = (positive.contains(&a) && opposing.contains(&b))
+                    || (positive.contains(&b) && opposing.contains(&a));
+                assert_eq!(directions_opposed(a, b), want, "{a:?} vs {b:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn formal_constraint_from_rule_projects() {
+        let rule = rule_p("");
+        let fc = FormalConstraint::from_rule(&rule);
+        assert_eq!(fc.constraint_id, id("fc.rule.a.cq1.r1"));
+        assert_eq!(fc.rule_id, rule.rule_id);
+        assert_eq!(fc.action, rule.action);
+        assert_eq!(fc.context, rule.context);
+        assert_eq!(fc.direction, rule.direction);
+        assert_eq!(fc.strength, rule.strength);
+        assert_eq!(fc.certainty, None);
+        // certainty rides along when present; the context copies verbatim —
+        // exceptions were already folded into it at normalization (§5)
+        let mut with_extras = rule_p("");
+        with_extras.certainty = Some(Certainty::Low);
+        with_extras.exception_refs = vec![id("exc.a.cq1.e1")];
+        let fc = FormalConstraint::from_rule(&with_extras);
+        assert_eq!(fc.certainty, Some(Certainty::Low));
+        assert_eq!(fc.context, with_extras.context);
+    }
+
+    // Canonical byte pins: the §8.6-derived constraint and the worked-pair
+    // plan slot; certainty vanishes when absent.
+    #[test]
+    fn ir3_canonical_bytes_pin() {
+        let fc = constraint_p("");
+        assert_eq!(
+            canon(&fc),
+            concat!(
+                r#"{"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","#,
+                r#""target":"drug.abx_a"},"constraint_id":"fc.rule.a.cq1.r1","#,
+                r#""context":{"any":[{"all":["#,
+                r#"{"tag":"concept","value":"cond.sepsis"},"#,
+                r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
+                r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
+                r#""direction":"for","rule_id":"rule.a.cq1.r1","strength":"strong"}"#
+            )
+        );
+        round_trip(fc);
+        let mut with_certainty = rule_p("");
+        with_certainty.certainty = Some(Certainty::Moderate);
+        let fc = FormalConstraint::from_rule(&with_certainty);
+        assert!(canon(&fc).contains(r#""certainty":"moderate","constraint_id""#));
+        round_trip(fc);
+
+        let pair = pair_p("");
+        assert_eq!(
+            canon(&pair),
+            concat!(
+                r#"{"action_key":"act.administer:drug.abx_a","#,
+                r#""constraint_a_id":"fc.rule.a.cq1.r1","#,
+                r#""constraint_b_id":"fc.rule.b.contra1","#,
+                r#""context_overlap_query_id":"q.v1_conflict.pair1.overlap","#,
+                r#""deontic_consistency_query_id":"q.v1_conflict.pair1.deontic","#,
+                r#""pair_id":"q.v1_conflict.pair1"}"#
+            )
+        );
+        round_trip(pair);
+    }
+
+    #[test]
+    fn formal_ir_derive_and_round_trip() {
+        let mut second = rule_p("");
+        second.rule_id = id("rule.a.cq1.r2");
+        let norm = NormIr {
+            rules: vec![rule_p(""), second.clone()],
+        };
+        let formal = FormalIr::derive(&norm);
+        assert_eq!(
+            formal.constraints,
+            vec![
+                FormalConstraint::from_rule(&norm.rules[0]),
+                FormalConstraint::from_rule(&second)
+            ]
+        );
+        assert_eq!(formal.plan, []);
+        let bytes = canon(&formal);
+        assert!(bytes.starts_with(r#"{"constraints":[{"action""#));
+        assert!(bytes.ends_with(r#""plan":[]}"#));
+        round_trip(formal);
+        round_trip(FormalIr {
+            constraints: vec![constraint_p("")],
+            plan: vec![pair_p("")],
+        });
+    }
+
+    // Structural bytes: constraints fresh-scope (constraint_id i0, rule_id
+    // i1, action/context/enums verbatim); plan ids localize i0..i4 in the
+    // layer scope with action_key verbatim.
+    #[test]
+    fn ir3_structural_bytes_pin() {
+        let formal = FormalIr {
+            constraints: vec![constraint_p("")],
+            plan: vec![pair_p("")],
+        };
+        assert_eq!(
+            structural(&formal),
+            concat!(
+                r#"{"constraints":[{"action":{"key":"act.administer:drug.abx_a","#,
+                r#""kind":"act.administer","target":"drug.abx_a"},"constraint_id":"i0","#,
+                r#""context":{"any":[{"all":["#,
+                r#"{"tag":"concept","value":"cond.sepsis"},"#,
+                r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
+                r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
+                r#""direction":"for","rule_id":"i1","strength":"strong"}],"#,
+                r#""plan":[{"action_key":"act.administer:drug.abx_a","#,
+                r#""constraint_a_id":"i0","constraint_b_id":"i1","#,
+                r#""context_overlap_query_id":"i2","deontic_consistency_query_id":"i3","#,
+                r#""pair_id":"i4"}]}"#
+            )
+        );
+        // sibling constraints restart at i0: per-component scopes
+        let mut second = rule_p("");
+        second.rule_id = id("rule.a.cq1.r2");
+        let two = FormalIr {
+            constraints: vec![constraint_p(""), FormalConstraint::from_rule(&second)],
+            plan: vec![],
+        };
+        assert_eq!(
+            structural(&two).matches(r#""constraint_id":"i0""#).count(),
+            2
+        );
+    }
+
+    // §4.3: renaming document-local ids (rule ids, plan/query ids) keeps the
+    // structural hash and moves the content hash; vocabulary swaps,
+    // co-reference collapses, direction flips, and multiplicity move the
+    // structural hash.
+    #[test]
+    fn ir3_structural_hash_rename_stable() {
+        let formal = FormalIr {
+            constraints: vec![constraint_p("")],
+            plan: vec![pair_p("")],
+        };
+        let renamed = FormalIr {
+            constraints: vec![constraint_p("x.")],
+            plan: vec![pair_p("x.")],
+        };
+        assert_eq!(
+            structural_hash(&formal).unwrap(),
+            structural_hash(&renamed).unwrap()
+        );
+        assert_ne!(
+            content_hash(&formal).unwrap(),
+            content_hash(&renamed).unwrap()
+        );
+
+        // action_key is vocabulary: swapping it moves the structural hash
+        let mut other_action = pair_p("");
+        other_action.action_key = id("act.administer:drug.abx_b");
+        let swapped = FormalIr {
+            constraints: vec![constraint_p("")],
+            plan: vec![other_action],
+        };
+        assert_ne!(
+            structural_hash(&formal).unwrap(),
+            structural_hash(&swapped).unwrap()
+        );
+        // collapsing the pair's constraint refs changes the co-reference
+        // pattern (i0,i0 vs i0,i1)
+        let mut collapsed = pair_p("");
+        collapsed.constraint_b_id = collapsed.constraint_a_id.clone();
+        let collapsed = FormalIr {
+            constraints: vec![constraint_p("")],
+            plan: vec![collapsed],
+        };
+        assert_ne!(
+            structural_hash(&formal).unwrap(),
+            structural_hash(&collapsed).unwrap()
+        );
+        // direction flips and constraint multiplicity move it too
+        let mut flipped_rule = rule_p("");
+        flipped_rule.direction = Direction::Against;
+        let flipped = FormalIr {
+            constraints: vec![FormalConstraint::from_rule(&flipped_rule)],
+            plan: vec![],
+        };
+        let derived = FormalIr::derive(&NormIr {
+            rules: vec![rule_p("")],
+        });
+        let doubled = FormalIr {
+            constraints: vec![constraint_p(""), constraint_p("")],
+            plan: vec![],
+        };
+        assert_ne!(
+            structural_hash(&derived).unwrap(),
+            structural_hash(&flipped).unwrap()
+        );
+        assert_ne!(
+            structural_hash(&derived).unwrap(),
             structural_hash(&doubled).unwrap()
         );
     }

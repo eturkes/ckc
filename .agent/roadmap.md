@@ -98,7 +98,7 @@ next plan session removes their checklists (git history retains them).
   exception_refs); per-layer hashes; canonical bytes pinned against the §8.6 NormRule JSON. Reading:
   SPEC §5, §8.6 NormRule example. Consumes core-ir.1 layer/hash pattern. Gate: `cargo test -p
   ckc-core ir::`. 72% 145K/200K cb7df1e
-- [ ] core-ir.3: FormalIR layer in ir.rs: pub fn directions_opposed over the §6 groups — positive
+- [x] core-ir.3: FormalIR layer in ir.rs: pub fn directions_opposed over the §6 groups — positive
   for/require/permit vs the against/avoid and contraindicate/avoid groups; FormalConstraint {action
   (full self-contained Action), certainty (Option, omitted when absent), constraint_id, context
   (ContextExpr), direction, rule_id, strength} with from_rule(&NormRule): constraint_id =
@@ -113,7 +113,7 @@ next plan session removes their checklists (git history retains them).
   re-exports. Tests: derive + round-trips, computed canonical and structural byte pins,
   directions_opposed truth table. Reading: SPEC §5, §6 two-query plan shape, §8.6 query ids; ir.rs
   in full (edit target; reuse core-ir.2 patterns and fixtures). Consumes core-ir.2
-  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`.
+  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`. 61% 122K/200K _
 - [ ] core-ir.4: IRBundle assembly in a new bundle module (bundle.rs): expose the ir.rs structural
   plumbing (Structural, RefLocalizer, structural_hash, emit_structural_components,
   emit_structural_record_set, emit_structural_array) and its test fixtures pub(crate); add enums.rs
