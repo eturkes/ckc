@@ -29,7 +29,9 @@ git history.
   stop and ask the user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only,
   gitignored, Read-denied, user-maintained; a clean session treats the gate as pass/fail
   only and a failure as rewording work on the cited lines (the gate cites file:line and
-  never echoes matches). docs/ and corpus/fixtures/ are the sanctioned containers; consult
+  never echoes matches). Patterns are scoped to vocabulary with no legitimate in-project
+  use (user-recalibrated 2026-06-11); when a cited line's flagged term names a legitimate
+  project component, report the hit to the user as a pattern bug instead of rewording. docs/ and corpus/fixtures/ are the sanctioned containers; consult
   them via read-only subagents instructed to answer in project vocabulary without verbatim
   quotes.
 
