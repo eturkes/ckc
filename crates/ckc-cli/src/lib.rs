@@ -23,7 +23,11 @@
 //! `corpus/lexicon/ja_core.yaml` strict-loaded and validated into the typed
 //! [`normalize::Lexicon`] — semantic_ja surfaces with `surfaces[0]` the
 //! representative, §5-coherent intervals, raw-byte content hash for
-//! manifests.
+//! manifests. `stage-normalize.1b` adds mention binding
+//! ([`normalize::bind_segments`]): recommendation/exception spans scanned
+//! longest-match for concept mentions, singleton candidate sets binding
+//! `exact`/`synonym`, shared surfaces binding `ambiguous` with a
+//! `terminology_ambiguous` Ambiguity record.
 #![forbid(unsafe_code)]
 
 pub mod extract;

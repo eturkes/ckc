@@ -1,4 +1,5 @@
-//! Normalize stage, first half: lexicon loading (SPEC §8.3 normalize row).
+//! Normalize stage, first half: lexicon loading and mention binding
+//! (SPEC §8.3 normalize row).
 //!
 //! [`load_lexicon`] strict-deserializes `corpus/lexicon/ja_core.yaml` — the
 //! §5 V1 terminology and modality authority (system `ckc.lex`) — and
@@ -8,19 +9,32 @@
 //! with `surfaces[0]` the representative, so downstream binding compares
 //! pre-folded text. Validation rejects duplicate ids (one pool across
 //! concepts and actions), empty or duplicate per-entry surface lists,
-//! duplicate modality/certainty surfaces, and intervals breaking the §5
-//! bound-coherence rule; one surface shared across concepts stays legal —
-//! it is the ambiguity source mention binding (`stage-normalize.1b`)
+//! surfaces folding empty (a zero-length surface would zero-byte-loop the
+//! binding scan), duplicate modality/certainty surfaces, and intervals
+//! breaking the §5 bound-coherence rule; one surface shared across
+//! concepts stays legal — it is the ambiguity source mention binding
 //! consumes.
+//!
+//! [`bind_segments`] is the binding pass: recommendation and exception
+//! segments scanned in document order for concept mentions —
+//! longest-match over span `search_text` (semantic_ja, the surface normal
+//! form) — minting one [`TerminologyBinding`] per (segment, candidate
+//! set); singleton sets bind `exact`/`synonym`, shared surfaces bind
+//! `ambiguous` with a `terminology_ambiguous` record (§5). The statement
+//! builder (`stage-normalize.1c`) completes the stage's first half.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use serde::Deserialize;
 
 use ckc_core::{
-    Certainty, Direction, Hash, Id, QuantityInterval, Strength, StringPolicy, hash_bytes,
+    BindingStatus, Certainty, DiagnosticCode, DiagnosticRecord, Direction, Hash, Id, Outcome,
+    QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength,
+    StringPolicy, TerminologyBinding, hash_bytes,
 };
+
+use crate::shell::static_id;
 
 /// SPEC §5 V1 lexicon: the typed, validated view of
 /// `corpus/lexicon/ja_core.yaml`.
@@ -207,6 +221,9 @@ pub fn load_lexicon(bytes: &[u8]) -> Result<Lexicon, LexiconError> {
         .into_iter()
         .map(|m| {
             let surface = semantic_ja(&m.surface);
+            if surface.is_empty() {
+                return Err(LexiconError::Invalid("empty modality surface".to_owned()));
+            }
             if !modality_pool.insert(surface.clone()) {
                 return Err(LexiconError::Invalid(format!(
                     "duplicate modality surface {surface}"
@@ -227,6 +244,9 @@ pub fn load_lexicon(bytes: &[u8]) -> Result<Lexicon, LexiconError> {
         .into_iter()
         .map(|c| {
             let surface = semantic_ja(&c.surface);
+            if surface.is_empty() {
+                return Err(LexiconError::Invalid("empty certainty surface".to_owned()));
+            }
             if !certainty_pool.insert(surface.clone()) {
                 return Err(LexiconError::Invalid(format!(
                     "duplicate certainty surface {surface}"
@@ -268,6 +288,9 @@ fn normalize_surfaces(owner: &Id, raw: &[String]) -> Result<Vec<String>, Lexicon
     let mut surfaces = Vec::with_capacity(raw.len());
     for s in raw {
         let s = semantic_ja(s);
+        if s.is_empty() {
+            return Err(LexiconError::Invalid(format!("{owner}: empty surface")));
+        }
         if !seen.insert(s.clone()) {
             return Err(LexiconError::Invalid(format!(
                 "{owner}: duplicate surface {s}"
@@ -301,6 +324,198 @@ fn check_interval(owner: &Id, q: &QuantityInterval) -> Result<(), LexiconError> 
         }
     }
     Ok(())
+}
+
+/// SPEC §5 mention binding (`stage-normalize.1b`): scan `segments`'
+/// recommendation and exception segments, in document order, for lexicon
+/// concept mentions, minting one [`TerminologyBinding`] per (segment,
+/// candidate set) under document-wide counter ids `bind.<k>`.
+///
+/// Each segment's regions resolve to their spans, scanned in reading order
+/// (a span named by several regions scans once, every naming region
+/// grounding its matches); each span's `search_text` is scanned greedy
+/// left-to-right longest-match against the concept surfaces, a match
+/// consuming its bytes. The candidate set is every concept sharing the
+/// matched surface: a singleton binds its concept — `exact` when the
+/// representative matched, else `synonym`; a multi set binds `ambiguous` to
+/// the byte-lowest candidate, every candidate an alternative, plus one
+/// `terminology_ambiguous` Ambiguity record grounded in the binding's
+/// regions (§5). A later match of a set already pending in the segment only
+/// extends `region_ids`; alternatives and region_ids store in canonical set
+/// order. Unmapped text mints nothing here — demand-side residuals are the
+/// statement builder's (`stage-normalize.1c`). Dangling region or span refs
+/// are the bundle validator's domain (§5 invariants) and skip silently.
+pub fn bind_segments(
+    graph: &SourceGraph,
+    segments: &SegmentIr,
+    lexicon: &Lexicon,
+) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) {
+    let spans: HashMap<&Id, &SourceSpan> = graph.spans.iter().map(|s| (&s.span_id, s)).collect();
+    let regions: HashMap<&Id, &SourceRegion> =
+        graph.regions.iter().map(|r| (&r.region_id, r)).collect();
+
+    // Concept surface table. Surfaces try longest first, so the scan's
+    // first hit is the longest match; equal-length distinct surfaces cannot
+    // both match one position, so the byte tiebreak only fixes iteration
+    // order.
+    let mut candidates: HashMap<&str, Vec<&Id>> = HashMap::new();
+    for concept in &lexicon.concepts {
+        for surface in &concept.surfaces {
+            candidates
+                .entry(surface)
+                .or_default()
+                .push(&concept.concept_id);
+        }
+    }
+    let mut surfaces: Vec<&str> = candidates.keys().copied().collect();
+    surfaces.sort_by(|a, b| b.len().cmp(&a.len()).then(a.cmp(b)));
+    let representative: HashMap<&Id, &str> = lexicon
+        .concepts
+        .iter()
+        .map(|c| (&c.concept_id, c.surfaces[0].as_str()))
+        .collect();
+
+    let mut bindings: Vec<TerminologyBinding> = Vec::new();
+    let mut diagnostics: Vec<DiagnosticRecord> = Vec::new();
+    for segment in &segments.segments {
+        if !matches!(
+            segment.kind,
+            SegmentKind::Recommendation | SegmentKind::Exception
+        ) {
+            continue;
+        }
+        // The segment's spans and, per span, the regions naming it.
+        let mut span_regions: HashMap<&Id, Vec<&Id>> = HashMap::new();
+        for region_id in &segment.region_ids {
+            let Some(region) = regions.get(region_id) else {
+                continue;
+            };
+            for span_id in &region.span_ids {
+                span_regions.entry(span_id).or_default().push(region_id);
+            }
+        }
+        let mut segment_spans: Vec<&SourceSpan> = span_regions
+            .keys()
+            .filter_map(|span_id| spans.get(*span_id).copied())
+            .collect();
+        segment_spans.sort_by_key(|s| s.reading_order);
+
+        let mut pending: Vec<PendingBinding> = Vec::new();
+        let mut by_key: HashMap<Vec<Id>, usize> = HashMap::new();
+        for span in segment_spans {
+            let text = span.search_text.as_str();
+            let mut at = 0;
+            while at < text.len() {
+                let Some(&surface) = surfaces.iter().find(|s| text[at..].starts_with(**s)) else {
+                    at += text[at..]
+                        .chars()
+                        .next()
+                        .expect("at sits on a char boundary")
+                        .len_utf8();
+                    continue;
+                };
+                // Id byte order equals canonical set order (id chars never
+                // escape), so one sort serves the dedupe key, the
+                // byte-lowest code, and the stored alternatives.
+                let mut key: Vec<Id> = candidates[surface].iter().map(|&id| id.clone()).collect();
+                key.sort();
+                let i = *by_key.entry(key.clone()).or_insert_with(|| {
+                    pending.push(PendingBinding::open(&key, surface, &representative));
+                    pending.len() - 1
+                });
+                pending[i]
+                    .region_ids
+                    .extend(span_regions[&span.span_id].iter().map(|&id| id.clone()));
+                at += surface.len();
+            }
+        }
+
+        for p in pending {
+            let PendingBinding {
+                code,
+                status,
+                alternatives,
+                mut region_ids,
+                surface,
+            } = p;
+            let binding_id = Id::new(format!("bind.{}", bindings.len()))
+                .expect("counter ids match the Id grammar");
+            region_ids.sort();
+            region_ids.dedup();
+            if status == BindingStatus::Ambiguous {
+                diagnostics.push(ambiguity(&surface, &alternatives, &region_ids));
+            }
+            bindings.push(TerminologyBinding {
+                binding_id,
+                system: lexicon.system.clone(),
+                code,
+                status,
+                alternatives,
+                region_ids,
+            });
+        }
+    }
+    (bindings, diagnostics)
+}
+
+/// One in-flight binding of [`bind_segments`]: a distinct candidate set
+/// first matched in the owning segment, accumulating mention regions until
+/// the segment's scan completes. `region_ids` holds raw accumulation;
+/// finalization sorts and dedupes.
+struct PendingBinding {
+    code: Id,
+    status: BindingStatus,
+    alternatives: Vec<Id>,
+    region_ids: Vec<Id>,
+    /// The first-matched surface, naming the mention in the ambiguity
+    /// record.
+    surface: String,
+}
+
+impl PendingBinding {
+    /// Fix code, status, and alternatives from the first match of a
+    /// candidate set (`key` ascending by id bytes).
+    fn open(key: &[Id], surface: &str, representative: &HashMap<&Id, &str>) -> PendingBinding {
+        let (code, status, alternatives) = match key {
+            [concept] => {
+                let status = if representative[concept] == surface {
+                    BindingStatus::Exact
+                } else {
+                    BindingStatus::Synonym
+                };
+                (concept.clone(), status, vec![])
+            }
+            _ => (key[0].clone(), BindingStatus::Ambiguous, key.to_vec()),
+        };
+        PendingBinding {
+            code,
+            status,
+            alternatives,
+            region_ids: vec![],
+            surface: surface.to_owned(),
+        }
+    }
+}
+
+/// One `terminology_ambiguous` Ambiguity record for an ambiguous binding
+/// (§5): the first-matched surface and the candidate set as the detail,
+/// grounded in the binding's regions.
+fn ambiguity(surface: &str, alternatives: &[Id], region_ids: &[Id]) -> DiagnosticRecord {
+    let candidates = alternatives
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let detail = StringPolicy::DiagnosticText
+        .normalize(&format!("ambiguous surface {surface}: {candidates}"))
+        .expect("diagnostic_text is infallible");
+    DiagnosticRecord {
+        code: DiagnosticCode::TerminologyAmbiguous,
+        outcome: Outcome::Ambiguity,
+        payload: vec![(static_id("detail"), detail)],
+        region_ids: region_ids.to_vec(),
+        artifact_hashes: vec![],
+    }
 }
 
 #[cfg(test)]
@@ -565,5 +780,311 @@ mod tests {
                 String::from_utf8_lossy(bytes)
             );
         }
+    }
+
+    // Surfaces folding empty under semantic_ja are rejected at load: a
+    // zero-length surface would zero-byte-loop the binding scan.
+    #[test]
+    fn empty_surface_rejected() {
+        let concept = concat!(
+            "system: ckc.lex\n",
+            "concepts:\n",
+            "  - id: x.a\n",
+            "    surface: [\" \"]\n",
+            "actions: []\n",
+            "modality: []\n",
+            "certainty: []\n",
+        );
+        assert_eq!(invalid(concept), "x.a: empty surface");
+        let modality = concat!(
+            "system: ckc.lex\n",
+            "concepts: []\n",
+            "actions: []\n",
+            "modality:\n",
+            "  - surface: \"\"\n",
+            "    direction: for\n",
+            "    strength: strong\n",
+            "certainty: []\n",
+        );
+        assert_eq!(invalid(modality), "empty modality surface");
+        let certainty = concat!(
+            "system: ckc.lex\n",
+            "concepts: []\n",
+            "actions: []\n",
+            "modality: []\n",
+            "certainty:\n",
+            "  - surface: \" \"\n",
+            "    value: high\n",
+        );
+        assert_eq!(invalid(certainty), "empty certainty surface");
+    }
+
+    // --- bind_segments ---
+
+    use crate::extract::{ExtractConfig, extract};
+    use crate::segment::segment;
+    use ckc_core::{ArtifactEnvelope, ClinicalSegment, DataClass, Producer, Provenance};
+
+    fn producer() -> Producer {
+        Producer {
+            candidate_id: id("cand.v1"),
+            component_id: id("stage.normalize"),
+            toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
+        }
+    }
+
+    fn extracted(html: &[u8]) -> ArtifactEnvelope<SourceGraph> {
+        let config = ExtractConfig {
+            document_id: id("doc.test"),
+            source_family: id("synthetic_fixture_html"),
+            provenance: Provenance::Synthetic,
+            data_class: DataClass::None,
+            producer: producer(),
+        };
+        extract(html, &config).unwrap()
+    }
+
+    fn fixture(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+        std::fs::read(format!("{dir}{name}")).unwrap()
+    }
+
+    /// Extract → segment → bind `html` under `lexicon`.
+    fn bound(html: &[u8], lexicon: &Lexicon) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) {
+        let source = extracted(html);
+        let segments = segment(&source, &producer()).unwrap();
+        bind_segments(&source.payload, &segments.payload, lexicon)
+    }
+
+    fn binding(
+        binding_id: &str,
+        code: &str,
+        status: BindingStatus,
+        alternatives: &[&str],
+        region_ids: &[&str],
+    ) -> TerminologyBinding {
+        TerminologyBinding {
+            binding_id: id(binding_id),
+            system: id("ckc.lex"),
+            code: id(code),
+            status,
+            alternatives: alternatives.iter().map(|s| id(s)).collect(),
+            region_ids: region_ids.iter().map(|s| id(s)).collect(),
+        }
+    }
+
+    // The committed fixtures bind their recommendation and exception
+    // mentions against the committed lexicon — all exact (every fixture
+    // mention is a representative surface), diagnostic-free, ids
+    // document-wide across segments. Unscanned kinds prove the segment
+    // filter: a's CQ heading and definition rows and every metadata
+    // heading mention concepts yet mint nothing.
+    #[test]
+    fn committed_fixtures_bind_exact() {
+        let lexicon = load_lexicon(&committed()).unwrap();
+        let cases: [(&str, Vec<TerminologyBinding>); 3] = [
+            (
+                "v1_guideline_a.html",
+                vec![
+                    binding("bind.0", "pop.adult", BindingStatus::Exact, &[], &["r.2"]),
+                    binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
+                    binding("bind.2", "drug.abx_a", BindingStatus::Exact, &[], &["r.2"]),
+                    binding(
+                        "bind.3",
+                        "cond.renal_severe",
+                        BindingStatus::Exact,
+                        &[],
+                        &["r.3"],
+                    ),
+                ],
+            ),
+            (
+                "v1_guideline_b.html",
+                vec![
+                    binding("bind.0", "pop.adult", BindingStatus::Exact, &[], &["r.2"]),
+                    binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
+                    binding(
+                        "bind.2",
+                        "cond.pregnancy",
+                        BindingStatus::Exact,
+                        &[],
+                        &["r.2"],
+                    ),
+                    binding("bind.3", "drug.abx_a", BindingStatus::Exact, &[], &["r.2"]),
+                ],
+            ),
+            (
+                "v1_control.html",
+                vec![
+                    binding("bind.0", "pop.child", BindingStatus::Exact, &[], &["r.2"]),
+                    binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
+                    binding("bind.2", "drug.abx_a", BindingStatus::Exact, &[], &["r.2"]),
+                ],
+            ),
+        ];
+        for (name, want) in cases {
+            let (bindings, diagnostics) = bound(&fixture(name), &lexicon);
+            assert!(
+                diagnostics.is_empty(),
+                "{name} binds diagnostic-free, got {diagnostics:?}"
+            );
+            assert_eq!(bindings, want, "{name}");
+        }
+    }
+
+    // A surface shared by two concepts binds ambiguous: code the
+    // byte-lowest candidate, all candidates as alternatives, one
+    // terminology_ambiguous Ambiguity record grounded in the binding's
+    // regions.
+    #[test]
+    fn shared_surface_binds_ambiguous() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: x.b\n",
+                "    surface: [甲]\n",
+                "  - id: x.a\n",
+                "    surface: [乙, 甲]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let (bindings, diagnostics) = bound(
+            "<!DOCTYPE html><html><body><p>甲を推奨する。</p></body></html>".as_bytes(),
+            &lexicon,
+        );
+        assert_eq!(
+            bindings,
+            vec![binding(
+                "bind.0",
+                "x.a",
+                BindingStatus::Ambiguous,
+                &["x.a", "x.b"],
+                &["r.0"],
+            )]
+        );
+        let [diag] = diagnostics.as_slice() else {
+            panic!("one ambiguity record, got {diagnostics:?}");
+        };
+        assert_eq!(diag.code, DiagnosticCode::TerminologyAmbiguous);
+        assert_eq!(diag.outcome, Outcome::Ambiguity);
+        assert_eq!(
+            diag.payload,
+            vec![(id("detail"), "ambiguous surface 甲: x.a x.b".to_owned())]
+        );
+        assert_eq!(diag.region_ids, vec![id("r.0")]);
+        assert!(diag.artifact_hashes.is_empty());
+    }
+
+    // Scan semantics on inline lexicons: a synonym first match fixes
+    // status synonym and a later representative match of the same
+    // candidate set only extends regions (one binding, no status change);
+    // the longest surface wins its position and consumes its bytes, the
+    // shorter surface binding only where it stands alone.
+    #[test]
+    fn scan_is_longest_match_with_first_match_status() {
+        let synonym_first = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: x.a\n",
+                "    surface: [甲, 乙]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let (bindings, diagnostics) = bound(
+            "<!DOCTYPE html><html><body><p>乙は甲を推奨する。</p></body></html>".as_bytes(),
+            &synonym_first,
+        );
+        assert!(diagnostics.is_empty());
+        assert_eq!(
+            bindings,
+            vec![binding(
+                "bind.0",
+                "x.a",
+                BindingStatus::Synonym,
+                &[],
+                &["r.0"],
+            )]
+        );
+
+        let nested = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: x.a\n",
+                "    surface: [甲]\n",
+                "  - id: x.ab\n",
+                "    surface: [甲乙]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let (bindings, diagnostics) = bound(
+            "<!DOCTYPE html><html><body><p>甲乙のあとに甲を推奨する。</p></body></html>".as_bytes(),
+            &nested,
+        );
+        assert!(diagnostics.is_empty());
+        assert_eq!(
+            bindings,
+            vec![
+                binding("bind.0", "x.ab", BindingStatus::Exact, &[], &["r.0"]),
+                binding("bind.1", "x.a", BindingStatus::Exact, &[], &["r.0"]),
+            ]
+        );
+    }
+
+    // A hand-built segment over two regions: the same concept mentioned
+    // in both spans yields one binding whose region_ids accumulate every
+    // mention's region in canonical set order.
+    #[test]
+    fn multi_region_segment_accumulates_regions() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: x.a\n",
+                "    surface: [甲]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let source = extracted(
+            "<!DOCTYPE html><html><body><p>甲を推奨する。</p><p>甲は対象である。</p></body></html>"
+                .as_bytes(),
+        );
+        let segments = SegmentIr {
+            segments: vec![ClinicalSegment {
+                segment_id: id("seg.0"),
+                kind: SegmentKind::Recommendation,
+                region_ids: vec![id("r.0"), id("r.1")],
+            }],
+        };
+        let (bindings, diagnostics) = bind_segments(&source.payload, &segments, &lexicon);
+        assert!(diagnostics.is_empty());
+        assert_eq!(
+            bindings,
+            vec![binding(
+                "bind.0",
+                "x.a",
+                BindingStatus::Exact,
+                &[],
+                &["r.0", "r.1"],
+            )]
+        );
     }
 }

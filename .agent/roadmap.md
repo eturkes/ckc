@@ -274,8 +274,8 @@ next plan session removes their checklists (git history retains them).
   one rejection per Invalid class. Reading: SPEC §5 lexicon paragraph, §4.4 hash_bytes;
   corpus/lexicon/ja_core.yaml shape comment; segment.rs error and test style. Consumes
   fixtures-v1 lexicon, core-ir.2 types. Gate: `cargo test -p ckc-cli normalize::`.
-  60% 119K/200K _
-- [ ] stage-normalize.1b: Mention binding in normalize.rs: pub bind_segments(graph:
+  60% 119K/200K 14bb86f
+- [x] stage-normalize.1b: Mention binding in normalize.rs: pub bind_segments(graph:
   &SourceGraph, segments: &SegmentIr, lexicon: &Lexicon) -> (Vec<TerminologyBinding>,
   Vec<DiagnosticRecord>) over recommendation and exception segments only, in document order:
   resolve each segment's region_ids to spans, sort by reading_order, dedupe repeated spans;
@@ -291,7 +291,7 @@ next plan session removes their checklists (git history retains them).
   shared-surface lexicon for the ambiguous path. Reading: SPEC §5 binding contract, §8.2
   sentences; ir.rs TerminologyBinding; segment.rs region resolution. Consumes
   stage-normalize.1a Lexicon, stage-segment SegmentIr. Gate: `cargo test -p ckc-cli
-  normalize::`.
+  normalize::`. 69% 138K/200K _
 - [ ] stage-normalize.1c: Clinical statements completing the stage first half: pub
   clinical_ir(graph, segments, lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) wrapping .1b
   bindings into ClinicalIr {bindings, statements}; per recommendation segment, slot readings =
