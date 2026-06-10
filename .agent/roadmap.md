@@ -291,32 +291,75 @@ next plan session removes their checklists (git history retains them).
   shared-surface lexicon for the ambiguous path. Reading: SPEC §5 binding contract, §8.2
   sentences; ir.rs TerminologyBinding; segment.rs region resolution. Consumes
   stage-normalize.1a Lexicon, stage-segment SegmentIr. Gate: `cargo test -p ckc-cli
-  normalize::`. 69% 138K/200K _
-- [ ] stage-normalize.1c: Clinical statements completing the stage first half: pub
-  clinical_ir(graph, segments, lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) wrapping .1b
-  bindings into ClinicalIr {bindings, statements}; per recommendation segment, slot readings =
-  that segment's exact/synonym bindings split by code namespace (pop.* population, drug.*
-  action target, else condition; ambiguous bindings contribute no readings) plus segment-text
-  scans (same longest-match) for action verbs, modality phrases, certainty phrases, each
-  value-deduped; mint stmt.<k> (counter over kept statements): population/condition as Concept
-  atoms in canonical set order (interval lowering stays .2), action = Action::new(kind,
-  target), modality and strength from the modality reading, certainty Option,
-  source_segment_ids = the segment. Withhold the statement (bindings and diagnostics still
-  emit) on: zero modality readings, or zero kind readings (no verb and the modality phrase
-  carries no implies_action) -> semantic_slot_missing Residual; zero target readings ->
-  terminology_unmapped Residual; >1 distinct readings for modality, kind, or target ->
-  terminology_ambiguous Ambiguity. >1 distinct certainty values -> terminology_ambiguous
-  diagnostic with certainty None, statement kept. Exception segments mint exc.<k>
-  ExceptionClause {atoms = all its exact/synonym concepts as Concept atoms, region_ids = the
-  segment's regions} onto the nearest preceding kept statement, extending that statement's
-  source_segment_ids (canonical set order); zero-concept exception -> terminology_unmapped
-  Residual with the clause dropped; no preceding kept statement -> semantic_slot_missing
-  Residual. Tests: fixture statement shapes pinned from observed output (a: one statement plus
-  its exception; b and control: contraindicate statements, control kind via implies_action);
-  inline withhold, certainty, and exception-miss cases; double derivation byte-identical plus
-  strict-read. Reading: SPEC §8.3 normalize row, §5, §8.6 source spans; ir.rs
-  ClinicalStatement/ExceptionClause. Consumes stage-normalize.1b. Gate: `cargo test -p ckc-cli
+  normalize::`. 69% 138K/200K 23a8ccf
+- [ ] stage-normalize.1c: Behavior-frozen refactor carving the per-segment binding core out of
+  bind_segments so .1d statement building can call it per segment; zero public-surface change,
+  zero test edits — the existing normalize:: tests are the behavior authority. Internals: struct
+  GraphIndex<'a> {spans, regions} indexing the graph once, with segment_spans(&self, segment:
+  &ClinicalSegment) -> Vec<(&SourceSpan, Vec<&Id>)> resolving region_ids to deduped spans sorted
+  by reading_order, each span paired with the region ids naming it; struct ConceptTable<'a>
+  built once from the lexicon (longest-first surface list, surface -> candidate concepts,
+  exact-vs-synonym representative lookup); free fns longest_first(surfaces) -> Vec<&str>
+  (byte-length desc, ties by bytes) and scan(text, surfaces) -> Vec<&str> (greedy left-to-right
+  longest-match, a match consumes its bytes) — .1d reuses both for verb/modality/certainty
+  tables; dedup_keep_first<T: PartialEq>(&mut Vec<T>); bind_segment(spans, table, system, next:
+  usize) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) holding the .1b per-segment
+  candidate-set logic with binding_id = bind.<next + local index>; bind_segments shrinks to the
+  rec/exc loop over these. Reading: normalize.rs in full (edit target). Consumes
+  stage-normalize.1b. Gate: `cargo test -p ckc-cli normalize::` with the test module untouched.
+- [ ] stage-normalize.1d: Recommendation statements: pub clinical_ir(graph: &SourceGraph,
+  segments: &SegmentIr, lexicon: &Lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) running the
+  .1c binding core per recommendation/exception segment in document order (bindings and binding
+  diagnostics byte-equal to bind_segments — assert equality in a test), then building at most
+  one statement per recommendation segment; exception segments bind only (clause attachment is
+  .1e) so every statement ships exceptions: []. Diagnostics accumulate in document order,
+  binding diagnostics before that segment's slot diagnostics. StatementTables built once: verb
+  surface -> Vec<action id> (one surface may serve several actions), modality surface ->
+  &LexiconModality, certainty surface -> Certainty, every surface list longest-first. Slot
+  readings per segment: from its exact/synonym bindings split by code namespace — pop.*
+  population, drug.* action target, else condition (ambiguous bindings contribute nothing); from
+  scan over its span texts — verbs, modality phrases, certainty phrases. A modality reading's
+  value is the (Direction, Strength) pair ONLY; implies_action ids collect separately as kind
+  fallback (kinds = verbs if any verb matched, else implied) — guideline_b's 投与しないこと(禁忌)
+  hits two phrases sharing (contraindicate, strong) that must dedupe to one reading.
+  dedup_keep_first every list. Slot rule (shared helper; payload [(detail, <text>), (segment,
+  <segment_id>)], region_ids = the segment's regions, artifact_hashes empty): zero modality
+  readings or zero kinds -> semantic_slot_missing Residual ("no modality phrase" / "no action
+  kind"); zero targets -> terminology_unmapped Residual ("no action target"); >1 distinct
+  readings for modality/kind/target -> terminology_ambiguous Ambiguity ("ambiguous <slot>:
+  <values sorted, comma-joined>", modality values rendered "<direction> <strength>"); each
+  withholds the statement while bindings and diagnostics still emit. Certainty: zero -> None;
+  one -> Some; >1 -> terminology_ambiguous ("ambiguous certainty: ...") with None and the
+  statement KEPT. Mint stmt.<k> counting kept statements: population/condition as
+  ContextAtom::Concept sorted+deduped (interval lowering stays .2), action =
+  Action::new(kinds[0], targets[0]), modality/strength from the single reading, certainty,
+  source_segment_ids = {segment}. Field shapes, saving the ir.rs read: ClinicalStatement
+  {statement_id, population (set), condition (set), action, modality, strength, certainty
+  (omitted when None), exceptions (array), source_segment_ids (set)}; ClinicalIr {bindings,
+  statements}; Action::new(kind, target) derives key kind:target. Module doc paragraph plus
+  lib.rs sentence. Tests: pin guideline_b (verb 投与 matches inside 投与しないこと) and control
+  (kind via 禁忌 implies_action) statements from observed output — guideline_a's pin waits for
+  .1e; inline lexicons drive one case per withhold class (marker 考慮してもよい classifies the
+  segment recommendation while an inline lexicon omits it from modality -> zero modality
+  readings) and both certainty paths. Reading: SPEC §8.3 normalize row, §5 statement contract;
+  normalize.rs (edit target). Consumes stage-normalize.1c core. Gate: `cargo test -p ckc-cli
   normalize::`.
+- [ ] stage-normalize.1e: Exception clauses completing clinical_ir: an exception segment's
+  exact/synonym binding codes become ContextAtom::Concept atoms sorted+deduped in
+  ExceptionClause {exception_id = exc.<k> counting attached clauses, atoms, region_ids = the
+  segment's regions} pushed onto the NEAREST PRECEDING kept statement, whose source_segment_ids
+  gains the exception segment id (re-sorted to canonical set order); zero concepts ->
+  terminology_unmapped Residual ("no exception concept") and the clause drops; no preceding kept
+  statement -> semantic_slot_missing Residual ("no preceding statement"); bindings emit in both
+  miss cases; diagnostic shape per .1d. Tests: pin guideline_a's full statement from observed
+  output (one exception clause naming cond.renal_severe, source_segment_ids spanning
+  recommendation and exception segments); inline miss cases (unknown-text exception after a kept
+  statement leaves it exception-free; lone exception with no statement); accumulation (one
+  recommendation then two exceptions -> exc.0 and exc.1 on one statement); double clinical_ir
+  derivation byte-identical via canonical_payload_bytes plus read_canonical::<ClinicalIr>
+  strict-read. lib.rs sentence. Reading: SPEC §8.3 normalize row, §5 exception contract; ir.rs
+  ExceptionClause; normalize.rs (edit target). Consumes stage-normalize.1d. Gate: `cargo test -p
+  ckc-cli normalize::`.
 - [ ] stage-normalize.2: Normalize stage second half: derive NormRules with guarded DNF contexts;
   exceptions compile to negated conjuncts whose regions join source_region_ids; lexicon interval
   semantics yield quantity-interval atoms (adult/child age bounds); canonical bytes reproduce §8.6
@@ -325,7 +368,7 @@ next plan session removes their checklists (git history retains them).
   rule_id/source_region_ids minting scheme before coding; envelope-wrapped normalization.json
   payload completing the stage contract. Reading:
   SPEC §8.3 normalize row, §5 NormRule/ContextExpr, §8.6 worked rule, §4.4. Consumes
-  stage-normalize.1a-.1c lexicon, bindings, statements. Gate: `cargo test -p ckc-cli`.
+  stage-normalize.1a-.1e lexicon, bindings, statements. Gate: `cargo test -p ckc-cli`.
 - [ ] smt-emit.1: ckc-smt crate foundation: workspace member depending on ckc-core; CompiledArtifact
   (target id, logic, query plan, query bodies, named-assertion records mapping assertion ids to IR
   rule ids and source region ids, target metadata, diagnostics) and VerifierResult (per-query §6

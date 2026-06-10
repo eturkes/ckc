@@ -51,6 +51,20 @@ technically derivable but easily forgotten under token pressure.
   (durable, cheap text; sessions then spend context on code and tests only); and land a
   compiling skeleton before authoring the full test battery. Sizing anchor: a lexicon-driven
   derivation stage half (loader + binding pass + statement builder) is three units.
+- [2026-06-11] stage-normalize.1c (statement builder; semantics already fully pre-resolved in
+  the roadmap line per the entry above) STILL overran 200K: compaction landed after the main
+  code but before tests or a first compile; work discarded, tree restored to 23a8ccf, unit
+  re-scoped to .1c/.1d/.1e. What ate the window: the feature first needed bind_segments
+  refactored into a per-segment core (an unplanned ~150-line splice, byte-verified, inside a
+  1.1K-line module), then a ~250-line derivation fn, then an 8-test battery — three
+  deliverables in one unit. Plan/re-scope rules this adds: a feature requiring a refactor of
+  existing code to share internals gets that refactor as its own behavior-frozen unit FIRST
+  (existing tests = the gate, zero test edits); a derivation fn with its fixture-pinned test
+  battery plus a second attachment sub-feature is two units. Sizing anchors: statement builder
+  over a prebuilt binding core = one unit; exception attachment + determinism tests = one unit.
+  The re-scoped lines carry this session's resolved design (modality reading = (Direction,
+  Strength) with implies_action a separate kind fallback; per-slot diagnostic details; counter
+  semantics; field shapes) — implement sessions re-derive nothing.
 - [2026-06-10] Search-channel status (all verified live this date). WebSearch 400s because the
   Fable/Mythos preview model line rejects forced tool_choice (types any/tool) at the API level —
   documented at platform.claude.com docs agents-and-tools/tool-use/define-tools — and Claude
