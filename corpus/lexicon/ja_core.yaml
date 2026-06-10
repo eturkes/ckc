@@ -1,0 +1,62 @@
+# SPEC §5 V1 terminology and modality authority (system ckc.lex), consumed by
+# the normalize stage and content-hash versioned into every run manifest.
+# Shape contract (typed loader lands with stage-normalize.1):
+#   concepts[]: id + surface forms; optional interval semantics over a
+#     quantity variable (成人 → age >= 18) with i64 bounds ge/gt/le/lt
+#     mirroring §5 QuantityInterval.
+#   actions[]: action-kind id + verb surface forms.
+#   modality[]: phrase → (direction, strength) per §5; implies_action names
+#     the action kind a drug-targeted rule takes when the sentence carries no
+#     action verb (§8.2 control: 抗菌薬Aは禁忌である → act.administer).
+#   certainty[]: phrase → §5 certainty level, feeding certainty when present.
+system: ckc.lex
+concepts:
+  - id: cond.sepsis
+    surface: [敗血症]
+  - id: cond.renal_severe
+    surface: [重度腎機能障害]
+  - id: cond.pregnancy
+    surface: [妊娠中]
+  - id: drug.abx_a
+    surface: [抗菌薬A]
+  - id: pop.adult
+    surface: [成人]
+    interval: { var: q.age_years, ge: 18 }
+  - id: pop.child
+    surface: [小児]
+    interval: { var: q.age_years, lt: 18 }
+actions:
+  - id: act.administer
+    surface: [投与する, 投与]
+modality:
+  - surface: 推奨する
+    direction: for
+    strength: strong
+  - surface: 提案する
+    direction: for
+    strength: weak
+  - surface: 考慮してもよい
+    direction: permit
+    strength: weak
+  - surface: 推奨しない
+    direction: against
+    strength: strong
+  - surface: 提案しない
+    direction: against
+    strength: weak
+  - surface: 投与しないこと
+    direction: contraindicate
+    strength: strong
+  - surface: 禁忌
+    direction: contraindicate
+    strength: strong
+    implies_action: act.administer
+certainty:
+  - surface: "エビデンスの確実性:高"
+    value: high
+  - surface: "エビデンスの確実性:中"
+    value: moderate
+  - surface: "エビデンスの確実性:低"
+    value: low
+  - surface: "エビデンスの確実性:非常に低"
+    value: very_low

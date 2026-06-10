@@ -183,8 +183,8 @@ next plan session removes their checklists (git history retains them).
   stage's declared input artifact kinds are produced by predecessors; typed validation errors;
   inline-fixture tests including chain violations and dangling refs. Reading: SPEC §8.4; §3
   registry-check invariant. Consumes core-registry.1 types. Gate: `cargo test -p ckc-core`.
-  48% 97K/200K _
-- [ ] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
+  48% 97K/200K 1225b1a
+- [x] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
   corpus/fixtures/ (guideline_a with CQ heading, recommendation and exception sentences, definitions
   table, evidence list; guideline_b contraindication; control with disjoint child age interval),
   corpus/lexicon/ja_core.yaml (concept entries with adult/child age-interval semantics, action
@@ -195,7 +195,7 @@ next plan session removes their checklists (git history retains them).
   the fixtures_v1 integration test loading every authored file through core-registry types and
   validation and resolving fixture and gold paths. Reading: SPEC §8.2, §5 lexicon paragraph, §8.6
   ids, §8.4. Consumes core-registry.1 types and core-registry.2 validation. Gate: `cargo test -p
-  ckc-core --test fixtures_v1`.
+  ckc-core --test fixtures_v1`. 65% 129K/200K _
 - [ ] cli-runner.1.1: ckc-cli crate foundation: workspace member building the ckc binary; dispatch
   for the §3 four-command surface (registry check; run --experiment --out; replay; trace --run
   --finding argument shapes; commands pending implementation return typed unsupported total

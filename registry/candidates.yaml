@@ -1,0 +1,60 @@
+# SPEC §8.4 candidate components: pipe.layered_ckcir_to_smt chains the eight
+# §8.3 stage components; input/output artifact kinds (§8.3 artifact names)
+# satisfy the chain rule checked by `ckc registry check`. Input lists declare
+# what each stage actually reads; extract is the chain head (corpus document
+# input, no artifact kinds). All V1 components are deterministic (§8.1
+# runtime_ai: false).
+pipelines:
+  - id: pipe.layered_ckcir_to_smt
+    stages:
+      - stage.v1.extract
+      - stage.v1.segment
+      - stage.v1.normalize
+      - stage.v1.assemble
+      - stage.v1.compile
+      - stage.v1.verify
+      - stage.v1.trace
+      - stage.v1.report
+stages:
+  - id: stage.v1.extract
+    kind: extract
+    determinism: deterministic
+    input_artifact_kinds: []
+    output_artifact_kinds: [source_graph]
+  - id: stage.v1.segment
+    kind: segment
+    determinism: deterministic
+    input_artifact_kinds: [source_graph]
+    output_artifact_kinds: [segments]
+  - id: stage.v1.normalize
+    kind: normalize
+    determinism: deterministic
+    input_artifact_kinds: [source_graph, segments]
+    output_artifact_kinds: [normalization]
+  - id: stage.v1.assemble
+    kind: assemble
+    determinism: deterministic
+    input_artifact_kinds: [source_graph, segments, normalization]
+    output_artifact_kinds: [ir_bundle]
+  - id: stage.v1.compile
+    kind: compile
+    determinism: deterministic
+    input_artifact_kinds: [ir_bundle]
+    output_artifact_kinds: [compiled, smt_query]
+  - id: stage.v1.verify
+    kind: verify
+    determinism: deterministic
+    input_artifact_kinds: [compiled, smt_query]
+    output_artifact_kinds: [verifier_results]
+  - id: stage.v1.trace
+    kind: trace
+    determinism: deterministic
+    input_artifact_kinds:
+      [source_graph, segments, normalization, ir_bundle, compiled, verifier_results]
+    output_artifact_kinds: [trace_bundle, lineage_index]
+  - id: stage.v1.report
+    kind: report
+    determinism: deterministic
+    input_artifact_kinds:
+      [source_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
+    output_artifact_kinds: [report, run_manifest, replay_manifest]
