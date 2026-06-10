@@ -41,6 +41,16 @@ technically derivable but easily forgotten under token pressure.
   fixture-integration; expected node/span shapes get pinned from observed output by the
   implementing session — hand-computed expectations written before code runs anchor wrong.
   Research tooling: see the search-channel status entry below.
+- [2026-06-10] stage-normalize.1 as one unit (lexicon loader + mention binding + statement
+  builder) overran 200K: compaction landed before the first compile; work discarded, tree
+  restored, unit re-scoped to .1a/.1b/.1c. The window went to resolving ~8 open semantic
+  decisions (miss taxonomy, slot-reading and dedupe rules, scan algorithm, id minting,
+  ambiguous-binding shape) plus a ~1K-line single-Write module. Plan/re-scope rule extending the
+  stage-extract entry: a unit line that leaves more than ~2 semantic contract decisions to the
+  implementing session is a planning bug — resolve semantics INTO the roadmap line at plan time
+  (durable, cheap text; sessions then spend context on code and tests only); and land a
+  compiling skeleton before authoring the full test battery. Sizing anchor: a lexicon-driven
+  derivation stage half (loader + binding pass + statement builder) is three units.
 - [2026-06-10] Search-channel status (all verified live this date). WebSearch 400s because the
   Fable/Mythos preview model line rejects forced tool_choice (types any/tool) at the API level —
   documented at platform.claude.com docs agents-and-tools/tool-use/define-tools — and Claude

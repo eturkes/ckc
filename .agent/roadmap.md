@@ -256,20 +256,75 @@ next plan session removes their checklists (git history retains them).
   evidence lists) producing ClinicalSegments with region refs; envelope-wrapped segments.json
   payload; segmentation_boundary_error diagnostics on misses. Reading: SPEC §8.3 segment row, §8.2
   markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract.2 SourceGraph, core-ir.1 types.
-  Gate: `cargo test -p ckc-cli segment::`. 69% 138K/200K _
-- [ ] stage-normalize.1: Normalize stage first half, in a normalize module: load
-  corpus/lexicon/ja_core.yaml content-hash versioned; bind mentions to TerminologyBindings with
-  BindingStatus mapping (ambiguous emits terminology_ambiguous ambiguity, unmapped emits
-  terminology_unmapped residual when one concept is required); normalize ClinicalStatements with
-  direction/strength from modality phrases and certainty phrases when present. Reading: SPEC §8.3
-  normalize row, §5 lexicon and binding contract, §8.2 mention text, §4.4. Consumes fixtures-v1
-  lexicon, stage-segment output, core-ir.2 types. Gate: `cargo test -p ckc-cli normalize::`.
+  Gate: `cargo test -p ckc-cli segment::`. 69% 138K/200K 89bdf26
+- [ ] stage-normalize.1a: Lexicon loader opening a normalize module in ckc-cli: add serde and
+  serde-saphyr workspace deps to the crate, wire `pub mod normalize` plus a lib.rs doc line;
+  pub load_lexicon(bytes: &[u8]) -> Result<Lexicon, LexiconError> deserializing private
+  deny_unknown_fields serde structs then validating into Lexicon {system: Id, content_hash:
+  Hash as hash_bytes over the raw file bytes (§4.4), concepts: Vec<LexiconConcept {concept_id,
+  surfaces, interval: Option<QuantityInterval>}>, actions: Vec<LexiconAction {action_id,
+  surfaces}>, modality: Vec<LexiconModality {surface, direction: Direction, strength: Strength,
+  implies_action: Option<Id>}>, certainty: Vec<LexiconCertainty {surface, value: Certainty}>};
+  every surface normalized StringPolicy::SemanticJa with surfaces[0] the representative;
+  LexiconError {Yaml(String), Invalid(String)} rejecting duplicate ids (one pool across
+  concepts and actions), empty or duplicate surface lists per entry, duplicate
+  modality/certainty surfaces, intervals violating the core-ir.5 rule (>=1 bound, <=1 per side,
+  nonempty range); one surface shared across concepts stays legal — it is the ambiguity source
+  .1b consumes. Tests: committed ja_core.yaml loads (pin ids/intervals from observed output),
+  one rejection per Invalid class. Reading: SPEC §5 lexicon paragraph, §4.4 hash_bytes;
+  corpus/lexicon/ja_core.yaml shape comment; segment.rs error and test style. Consumes
+  fixtures-v1 lexicon, core-ir.2 types. Gate: `cargo test -p ckc-cli normalize::`.
+- [ ] stage-normalize.1b: Mention binding in normalize.rs: pub bind_segments(graph:
+  &SourceGraph, segments: &SegmentIr, lexicon: &Lexicon) -> (Vec<TerminologyBinding>,
+  Vec<DiagnosticRecord>) over recommendation and exception segments only, in document order:
+  resolve each segment's region_ids to spans, sort by reading_order, dedupe repeated spans;
+  scan each span's text normalized SemanticJa greedy left-to-right longest-match against all
+  concept surfaces (a match consumes its bytes); candidate set = the concepts sharing the
+  matched surface; per segment mint one binding per distinct candidate set in first-match order
+  (a later match of the same set only extends region_ids); binding_id = document-wide counter
+  bind.<k>; singleton set: code = the concept, status exact when surfaces[0] matched else
+  synonym; multi set: status ambiguous, code = byte-lowest candidate, alternatives = all
+  candidates, plus one terminology_ambiguous Ambiguity diagnostic (§5); alternatives and
+  region_ids in canonical set order; unmapped text mints nothing — demand-side residuals are
+  .1c. Tests: committed-fixture binding shapes pinned from observed output; inline
+  shared-surface lexicon for the ambiguous path. Reading: SPEC §5 binding contract, §8.2
+  sentences; ir.rs TerminologyBinding; segment.rs region resolution. Consumes
+  stage-normalize.1a Lexicon, stage-segment SegmentIr. Gate: `cargo test -p ckc-cli
+  normalize::`.
+- [ ] stage-normalize.1c: Clinical statements completing the stage first half: pub
+  clinical_ir(graph, segments, lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) wrapping .1b
+  bindings into ClinicalIr {bindings, statements}; per recommendation segment, slot readings =
+  that segment's exact/synonym bindings split by code namespace (pop.* population, drug.*
+  action target, else condition; ambiguous bindings contribute no readings) plus segment-text
+  scans (same longest-match) for action verbs, modality phrases, certainty phrases, each
+  value-deduped; mint stmt.<k> (counter over kept statements): population/condition as Concept
+  atoms in canonical set order (interval lowering stays .2), action = Action::new(kind,
+  target), modality and strength from the modality reading, certainty Option,
+  source_segment_ids = the segment. Withhold the statement (bindings and diagnostics still
+  emit) on: zero modality readings, or zero kind readings (no verb and the modality phrase
+  carries no implies_action) -> semantic_slot_missing Residual; zero target readings ->
+  terminology_unmapped Residual; >1 distinct readings for modality, kind, or target ->
+  terminology_ambiguous Ambiguity. >1 distinct certainty values -> terminology_ambiguous
+  diagnostic with certainty None, statement kept. Exception segments mint exc.<k>
+  ExceptionClause {atoms = all its exact/synonym concepts as Concept atoms, region_ids = the
+  segment's regions} onto the nearest preceding kept statement, extending that statement's
+  source_segment_ids (canonical set order); zero-concept exception -> terminology_unmapped
+  Residual with the clause dropped; no preceding kept statement -> semantic_slot_missing
+  Residual. Tests: fixture statement shapes pinned from observed output (a: one statement plus
+  its exception; b and control: contraindicate statements, control kind via implies_action);
+  inline withhold, certainty, and exception-miss cases; double derivation byte-identical plus
+  strict-read. Reading: SPEC §8.3 normalize row, §5, §8.6 source spans; ir.rs
+  ClinicalStatement/ExceptionClause. Consumes stage-normalize.1b. Gate: `cargo test -p ckc-cli
+  normalize::`.
 - [ ] stage-normalize.2: Normalize stage second half: derive NormRules with guarded DNF contexts;
   exceptions compile to negated conjuncts whose regions join source_region_ids; lexicon interval
   semantics yield quantity-interval atoms (adult/child age bounds); canonical bytes reproduce §8.6
-  rule.a.cq1.r1; envelope-wrapped normalization.json payload completing the stage contract. Reading:
+  rule.a.cq1.r1 — resolve at session start, §1 amendment if needed: §8.6 pins semantic rule and
+  region ids (rule.a.cq1.r1, region.a.cq1.rec) while extract mints r.<k> counters, so decide the
+  rule_id/source_region_ids minting scheme before coding; envelope-wrapped normalization.json
+  payload completing the stage contract. Reading:
   SPEC §8.3 normalize row, §5 NormRule/ContextExpr, §8.6 worked rule, §4.4. Consumes
-  stage-normalize.1 bindings and statements. Gate: `cargo test -p ckc-cli`.
+  stage-normalize.1a-.1c lexicon, bindings, statements. Gate: `cargo test -p ckc-cli`.
 - [ ] smt-emit.1: ckc-smt crate foundation: workspace member depending on ckc-core; CompiledArtifact
   (target id, logic, query plan, query bodies, named-assertion records mapping assertion ids to IR
   rule ids and source region ids, target metadata, diagnostics) and VerifierResult (per-query §6
