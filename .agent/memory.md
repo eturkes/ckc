@@ -3,7 +3,7 @@
 Entries must add value beyond the spec, CLAUDE.md, codebase, git history, and runtime
 environment. Exception: high-value reminders that are derivable but easily forgotten under
 token pressure. Entries are consolidated aggressively; full pre-consolidation text lives in
-git history (46d95e2 and earlier).
+git history.
 
 ## Policy
 
@@ -11,7 +11,10 @@ git history (46d95e2 and earlier).
   46d95e2`): keep every session's context lean and phrased in project vocabulary (stages,
   units, gates, artifacts) — plain operational words over research jargon, in memory,
   roadmap, commits, and code alike. Consult `docs/` surveys through read-only subagents
-  so their vocabulary stays out of the main window. Checked roadmap
+  so their vocabulary stays out of the main window; a root `.ignore`
+  keeps ripgrep-backed sweeps (subagent Grep tool, `rtk proxy rg`) out of `docs/`, while
+  Bash `grep -r` still enters it — scope Bash greps by path; deliberate docs searches use
+  `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths. Checked roadmap
   items collapse to one-line stubs; full unit text lives in git history. Implement sessions
   match patterns from the latest unit-scoped commit (`git log --oneline`), not bare HEAD,
   when HEAD is hygiene/memory work. If degraded-model output is ever suspected: a session's
@@ -114,4 +117,3 @@ git history (46d95e2 and earlier).
   records in `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the
   fallback event is the switch marker. Full case detail (transcript ids, timestamps,
   trigger tokens): `git show 14e520b`.
-

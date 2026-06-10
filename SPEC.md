@@ -65,7 +65,7 @@ Intent: every session behaves the same way, learns from prior sessions, and leav
 in a state the next session can trust.
 
 Sources of truth, in order: user instructions > CLAUDE.md > this spec > `.agent/roadmap.md`
-(build plan) > `.agent/memory.md` (lessons). Sessions load §0–§2 plus the reading slice their
+(build plan) > `.agent/memory.md` (lessons). Sessions load §1–§2 plus the reading slice their
 roadmap unit names; wider loading is reserved for spec-maintenance sessions.
 
 Unit discipline:
@@ -78,11 +78,8 @@ Unit discipline:
   Record genuine future needs as roadmap candidates for the unit that will consume them.
 - Every Rust unit runs `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, and
   its gate before staging.
-- Monitor context with `.agent/compaction.sh`; from 80% usage, bring work to a committable state
-  before starting anything new. A projected unit overrun is a stop-and-report: recovery (restore
-  to the last commit, re-scope the roadmap) is always user-initiated.
-- Close each cohesive piece of work with one scoped commit (CLAUDE.md); write non-ASCII commit
-  messages to a file and commit with `git commit -F <path>`.
+- A projected unit overrun is a stop-and-report: recovery (restore to the last commit, re-scope
+  the roadmap) is always user-initiated.
 
 Working style (Fable 5):
 
@@ -90,13 +87,9 @@ Working style (Fable 5):
   actions, and genuine scope changes to the user, and proceed on everything else.
 - Audit every progress claim against a tool result from the current session; report failures with
   their output, and state verified results plainly.
-- Milestone-closing reviews audit the whole milestone single-context in a 1M window (every other
-  session runs 200K); plan sessions fan out to subagent workflows per the session command.
-  Subagents stay read-only; all mutations land in the main session.
-- Record transferable lessons in `.agent/memory.md` when they generalize beyond the current unit;
-  update or delete entries that have drifted.
-- Lead final reports with the outcome, in plain sentences a reader without your working context
-  can follow.
+
+Session shapes — context sizing, plan-session workflows, subagent policy — live in the session
+command; commit, compaction, and memory discipline live in CLAUDE.md and `.agent/memory.md`.
 
 Spec evolution: the spec grows in place. When a milestone closes (its closing review lands), the
 plan session that opens the next milestone is an elaboration session while that milestone's
@@ -135,8 +128,7 @@ ordered unit checklist whose completed items record context usage and commit has
 milestones persist as bare headers. The plan session that opens a milestone authors its whole
 checklist from the milestone's spec section; the milestone is complete when its acceptance item
 passes in a dedicated acceptance session and the closing review stamps the header. Lines marked
-`user-selected` get scope confirmation from the user before work begins. V1 carries a suggested
-seed decomposition in §8.7.
+`user-selected` get scope confirmation from the user before work begins.
 
 Conservation rule: deferred capabilities remain represented — each appears in a
 milestone contract (§9–§13), the registry backlog (§14), or a gate (§15). Elaboration sessions
@@ -710,41 +702,6 @@ classifies as `deontic_direction_conflict`, claim tier `s1_admitted`, wording `s
 measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closing as
 `documented_null_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to
 the core and back.
-
-### §8.7 Seed decomposition (sizing aid; the roadmap is authoritative)
-
-```text
-core-ids: ckc-core crate + workspace wiring + Id/Hash/Rational value types (§4.1).
-core-strings: the seven §4.2 string policies as deterministic normalizers.
-core-canon-writer: canonical JSON writer core (§4.3 object/optional/integer/rational rules).
-core-canon-collections: canonical arrays, sets, and maps over the writer core.
-core-canon-unions: tagged-union and fieldless-enum emission.
-core-canon-reader: strict canonical reader as the writer's inverse (full window; schedule solo).
-core-canon-hash: content_hash + canonicalization_policy_hash over canonical payload bytes.
-core-enums-envelope: §4.4 enums + envelope + total result types + §4.6/§7.4 event and
-diagnostic record types.
-core-grounding: §4.5 SourceGraph/Span/Anchor/Region types + invariants.
-core-ir.1: DocIR+SegmentIR layers + per-layer hash pattern.
-core-ir.2: ClinicalIR+NormIR (statements, bindings, Action, ContextExpr, NormRule).
-core-ir.3: FormalIR + IRBundle assembly + bundle validation.
-core-plans: RunPlan/RunManifest/replay-manifest types + canonicalization.
-core-registry: corpora/candidates/experiments entry types + validation.
-fixtures-v1: three fixture documents + lexicon ja_core.yaml + corpora entries + expected outcomes.
-stage-extract: HTML → SourceGraph (parser dep; tables/lists/sections).
-stage-segment: rule-based segmentation.
-stage-normalize.1: lexicon load + bindings + statements.
-stage-normalize.2: NormRule derivation (guards, exceptions, intervals).
-smt-emit.1: ckc-smt crate foundation + CompiledArtifact/VerifierResult types, round-trip tested.
-smt-emit.2: eligibility scan + contradiction-query planning over FormalIR.
-smt-emit.3: deterministic SMT emission + assertion map.
-smt-verify: Z3 invocation + verdict/core/model parsing into VerifierResult.
-cli-runner.1: ckc-cli crate foundation + CLI dispatch + registry check.
-cli-runner.2: run orchestration over stages + run layout + total-result aggregation + JSONL
-event/diagnostic emission + the strict-canonical-read run-directory test (§8.5 item 3).
-cli-runner.3: trace bundle + lineage index + ckc trace.
-cli-runner.4: report rendering + manifests + ckc replay.
-acceptance-v1 per §1 protocol; the closing review stamps the milestone header.
-```
 
 ## §9 V2 — Comparison and metrics (normative)
 

@@ -17,13 +17,13 @@ use crate::id::Hash;
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
 /// SPEC §4.3 `content_hash = sha256(canonical_payload_bytes(payload))`, wrapped as
-/// the [`Hash`] value type. The one authority for an artifact's content hash;
+/// the [`struct@Hash`] value type. The one authority for an artifact's content hash;
 /// fails only when `value` cannot be canonicalized.
 pub fn content_hash<T: Canonical>(value: &T) -> Result<Hash, CanonError> {
     Ok(hash_bytes(&canonical_payload_bytes(value)?))
 }
 
-/// sha256 of raw bytes as a [`Hash`] (`"sha256:"` + 64 lowercase hex digits). The
+/// sha256 of raw bytes as a [`struct@Hash`] (`"sha256:"` + 64 lowercase hex digits). The
 /// primitive behind [`content_hash`], and the entry point for §4.4 `_hash` fields
 /// that declare raw-byte hashing rather than canonical-payload hashing.
 pub fn hash_bytes(bytes: &[u8]) -> Hash {

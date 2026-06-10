@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 pub enum ValidationError {
     /// An [`Id`] violated `[a-z][a-z0-9_.:-]*`.
     Id(String),
-    /// A [`Hash`] was not `"sha256:"` + 64 lowercase hex digits.
+    /// A [`struct@Hash`] was not `"sha256:"` + 64 lowercase hex digits.
     Hash(String),
     /// A [`Rational`] had a non-integer part or a zero denominator.
     Rational(String),

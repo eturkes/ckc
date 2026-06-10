@@ -1,0 +1,4 @@
+# ripgrep sweep scope (memory Policy): docs/ surveys stay out of root-wide
+# rg/Grep-tool searches. Deliberate docs searches: `git grep <pat> -- docs/`,
+# `rg --no-ignore`, or explicit file paths. Read access is unaffected.
+docs/

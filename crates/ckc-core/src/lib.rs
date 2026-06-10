@@ -1,52 +1,43 @@
-//! ckc-core — durable typed core for the Clinical Knowledge Compiler (SPEC §3).
+//! ckc-core — durable typed core for the Clinical Knowledge Compiler
+//! (SPEC §3): stable IDs, value types, enums, schema structs, canonical JSON
+//! bytes, semantic hashes, and validation. Surface by module (unit lineage:
+//! roadmap stubs + `git log`):
 //!
-//! Rust owns durable semantics: stable IDs, value types, enums, schema structs,
-//! canonical JSON bytes, semantic hashes, and validation. The crate is built up
-//! unit by unit; `core-ids` seeds it with the SPEC §4.1 value types [`Id`],
-//! [`Hash`], and [`Rational`]; `core-strings` adds the SPEC §4.2
-//! [`StringPolicy`] normalizers; `core-canon-writer` opens the SPEC §4.3
-//! canonical JSON writer ([`Canonical`], [`canonical_payload_bytes`],
-//! [`ObjectEmitter`]), `core-canon-collections` adds the array/set/map
-//! rules ([`emit_array`], [`emit_set`], [`emit_map`], [`MapKey`]),
-//! `core-canon-unions` adds tagged-union emission ([`emit_union`]), and
-//! `core-canon-reader` adds the strict canonical reader ([`read_canonical`],
-//! [`CanonRead`], [`CanonReadError`]) that admits only the writer's bytes.
-//! `core-canon-hash` then seals a payload into its content hash and pins the
-//! policy version ([`content_hash`], [`hash_bytes`],
-//! [`canonicalization_policy_hash`]). `core-enums-envelope.1` adds the SPEC
-//! §4.4 fieldless enum family ([`Outcome`] severity-ordered) with the §7.4
-//! [`DiagnosticRecord`] and the §4.4 [`TotalOperationResult`];
-//! `core-enums-envelope.2` wraps payloads in the §4.4 [`ArtifactEnvelope`]
-//! and frames §4.6 [`EventRecord`]s and diagnostics as canonical JSONL
-//! ([`write_jsonl`], [`read_jsonl`]). `core-grounding` adds the SPEC §4.5
-//! source-grounding layer ([`SourceGraph`] with its document, nodes, spans,
-//! anchors, and regions, validated by [`SourceGraph::validate`]).
-//! `core-ir.1` opens the SPEC §5 IR layers ([`DocIr`], [`SegmentIr`] with
-//! [`ClinicalSegment`]) and the §4.3 rename-stable structural-hash pattern
-//! ([`Structural`], [`structural_hash`], [`RefLocalizer`]); `core-ir.2` adds
-//! ClinicalIR and NormIR ([`ClinicalIr`] with [`ClinicalStatement`] and
-//! [`TerminologyBinding`], [`NormIr`] with [`NormRule`] guarded by
-//! [`ContextExpr`] DNF over [`ContextAtom`]s on an [`Action`]); `core-ir.3`
-//! completes the layer stack with FormalIR ([`FormalIr`] deriving
-//! [`FormalConstraint`]s from rules, [`ContradictionQueryPair`] plan slots,
-//! [`directions_opposed`]); `core-ir.4` assembles the layers into the §5
-//! [`IrBundle`] ([`assemble`]) with the derived [`ComponentRecord`] index
-//! ([`derive_components`]), explicit [`Assumption`]s, [`LayerHashes`], and
-//! the rename-stable whole-bundle hash; `core-ir.5` seals the bundle with
-//! [`IrBundle::validate`] ([`BundleError`]), enforcing the §5 grounding,
-//! reference, coherence, and re-derivation invariants against the source
-//! graph. `core-plans` adds the §5 run records — [`RunPlan`] whose canonical
-//! bytes hash into [`RunManifest`] via [`RunPlan::plan_hash`] — and the §4.6
-//! [`ReplayManifest`] attestation with the shared [`SolverIdentity`].
-//! `core-registry.1` adds the §8.4 registry surface, strict-loaded from YAML
-//! ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
-//! [`parse_gold`]): [`CorpusEntry`], [`Candidates`] over [`PipelineEntry`]
-//! and [`StageEntry`], [`ExperimentEntry`] with [`FixtureGroup`]s, and the
-//! §8.2 [`GoldEntry`] expectations. `core-registry.2` validates the loaded
-//! set as one cross-referenced whole ([`validate_registries`] collecting
-//! [`RegistryFinding`]s): pool-level id uniqueness, nonempty requirements,
-//! experiment → pipeline → stage and fixture → corpus resolution, gold
-//! refs, and the §8.4 stage-chain rule.
+//! - `id` — §4.1 value types [`Id`], [`struct@Hash`], [`Rational`].
+//! - `strings` — the seven §4.2 [`StringPolicy`] normalizers.
+//! - `canon` — §4.3 canonical bytes: writer ([`Canonical`],
+//!   [`canonical_payload_bytes`], [`ObjectEmitter`], [`emit_array`],
+//!   [`emit_set`], [`emit_map`], [`emit_union`], [`MapKey`]) and the strict
+//!   reader admitting only the writer's bytes ([`read_canonical`],
+//!   [`CanonRead`], [`CanonReadError`]).
+//! - `hash` — content-hash seal + policy pin ([`content_hash`],
+//!   [`hash_bytes`], [`canonicalization_policy_hash`]).
+//! - `enums` — §4.4 fieldless enum family ([`Outcome`] severity-ordered),
+//!   §7.4 [`DiagnosticRecord`], §4.4 [`TotalOperationResult`].
+//! - `envelope` — §4.4 [`ArtifactEnvelope`]; §4.6 [`EventRecord`]; canonical
+//!   JSONL framing ([`write_jsonl`], [`read_jsonl`]).
+//! - `grounding` — §4.5 [`SourceGraph`] (document, nodes, spans, anchors,
+//!   regions; [`SourceGraph::validate`]).
+//! - `ir` — the §5 layers [`DocIr`]/[`SegmentIr`]/[`ClinicalIr`]/[`NormIr`]/
+//!   [`FormalIr`] over [`ClinicalSegment`], [`ClinicalStatement`],
+//!   [`TerminologyBinding`], [`NormRule`] guarded by [`ContextExpr`] DNF of
+//!   [`ContextAtom`]s on an [`Action`], [`FormalConstraint`],
+//!   [`ContradictionQueryPair`], [`directions_opposed`]; plus the §4.3
+//!   rename-stable structural-hash pattern ([`Structural`],
+//!   [`structural_hash`], [`RefLocalizer`]).
+//! - `bundle` — §5 [`IrBundle`] assembly and sealing: [`assemble`],
+//!   [`derive_components`] ([`ComponentRecord`]), [`Assumption`],
+//!   [`LayerHashes`], rename-stable whole-bundle hash, and
+//!   [`IrBundle::validate`] ([`BundleError`]) enforcing the §5 grounding,
+//!   reference, coherence, and re-derivation invariants.
+//! - `plans` — §5/§4.6 run records [`RunPlan`] ([`RunPlan::plan_hash`]),
+//!   [`RunManifest`], [`ReplayManifest`], [`SolverIdentity`].
+//! - `registry` — §8.4 registries + §8.2 gold, strict-loaded
+//!   ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
+//!   [`parse_gold`]; [`CorpusEntry`], [`Candidates`], [`PipelineEntry`],
+//!   [`StageEntry`], [`ExperimentEntry`], [`FixtureGroup`], [`GoldEntry`])
+//!   and cross-validated as one set ([`validate_registries`] collecting
+//!   [`RegistryFinding`]s: uniqueness, resolution, the stage-chain rule).
 #![forbid(unsafe_code)]
 
 mod bundle;

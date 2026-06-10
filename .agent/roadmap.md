@@ -1,13 +1,10 @@
 # CKC roadmap
 
-Build plan for /session-prompt (the full session protocol lives in that command; SPEC.md is
-the design authority, its §2 the milestone sequence). One milestone at a time: header
-`## <name> — plan <hash> — review <hash>` (the pair bounds the milestone's commits;
-acceptance adds the evidence run id per SPEC §1) over an ordered unit checklist. Unchecked
-lines carry the full unit spec. Checked items collapse to one-line stubs
-`- [x] <id>: <gist>. NN% NNNK/200K <hash>` (context usage — `>=90% compacted/200K` when the
-session hit compaction — then the completing commit; `_` = hash pending, at most one at a
-time, filled by the next roadmap session via commit scopes). Closed milestones persist as
+Build plan for /session-prompt — the session protocol, bookkeeping format, and stamp
+semantics live in that command; SPEC.md is the design authority, its §2 the milestone
+sequence. One milestone at a time: header `## <name> — plan <hash> — review <hash>` over an
+ordered unit checklist; unchecked lines carry the full unit spec; checked items collapse to
+one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
 ## V1 spine — plan e6523e9

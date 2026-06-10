@@ -638,7 +638,7 @@ fn ambiguity(surface: &str, alternatives: &[Id], region_ids: &[Id]) -> Diagnosti
 /// modality reading is the (direction, strength) pair only;
 /// `implies_action` ids collect separately as the kind fallback (kinds =
 /// verbs if any verb matched, else implied). Every list dedupes keeping
-/// first occurrences. The slot rule ([`slot_diag`] records, grounded in
+/// first occurrences. The slot rule (`slot_diag` records, grounded in
 /// the segment's regions): zero modality readings or zero kinds →
 /// `semantic_slot_missing`; zero targets → `terminology_unmapped`; more
 /// than one distinct modality/kind/target reading →
