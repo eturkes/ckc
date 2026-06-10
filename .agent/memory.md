@@ -41,10 +41,17 @@ technically derivable but easily forgotten under token pressure.
   fixture-integration; expected node/span shapes get pinned from observed output by the
   implementing session — hand-computed expectations written before code runs anchor wrong.
   Research tooling: see the search-channel status entry below.
-- [2026-06-10] Search-channel status (all verified live this date). The WebSearch tool 400s
-  ("tool_choice forces tool use is not compatible with this model"); the error arrives INLINE in
-  an ok-looking result (is_error unset), so read result bodies — re-test after model/CC updates
-  and drop this clause when healed. Working channels: general web search = WebFetch on
+- [2026-06-10] Search-channel status (all verified live this date). WebSearch 400s because the
+  Fable/Mythos preview model line rejects forced tool_choice (types any/tool) at the API level —
+  documented at platform.claude.com docs agents-and-tools/tool-use/define-tools — and Claude
+  Code's search sub-request forces it; sessions on pre-Fable models (through 2026-06-09) searched
+  fine. The error arrives INLINE in an ok-looking result (is_error unset), so read result bodies.
+  Heals only via a Claude Code update or a non-Mythos-lineage model — re-test on either change and
+  drop this clause when healed. The same 400 threatens ANY API-level tool forcing: Workflow
+  agent() `schema` is described as forcing a StructuredOutput call, and workflow subagents inherit
+  the fable model, so the next plan session runs a one-agent schema canary BEFORE its judge-panel
+  fan-out and, on a 400, falls back to prompt-requested JSON text parsed and validated in the main
+  session. Working channels: general web search = WebFetch on
   `https://lite.duckduckgo.com/lite/?q=<query>` (Anthropic egress passes DDG's bot wall; sandbox
   curl to DDG gets a block page); crates.io via curl with a `-A` user-agent header (403 without
   one) — detail https://crates.io/api/v1/crates/NAME, search .../crates?q=<terms>&sort=relevance;
