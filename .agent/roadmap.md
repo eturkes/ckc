@@ -234,8 +234,8 @@ next plan session removes their checklists (git history retains them).
   read_canonical strict-read, non-UTF8 input gives ExtractError::Utf8. Reading: SPEC §8.3 extract
   row, §4.5, §4.4, §7.4; grounding.rs, envelope.rs and enums.rs surfaces, shell.rs static_id.
   Consumes core-grounding, core-enums-envelope.2, cli-runner.1.1 crate. Gate: `cargo test -p
-  ckc-cli extract::`. 70% 140K/200K _
-- [ ] stage-extract.2: Table extraction completing the extract module: replace the table residual
+  ckc-cli extract::`. 70% 140K/200K 7be225a
+- [x] stage-extract.2: Table extraction completing the extract module: replace the table residual
   path with a real arm — scan direct children accepting caption, colgroup, col, thead, tbody,
   tfoot, tr (html5ever wraps bare tr in tbody), at most one caption minting a textual caption
   node; rows flatten in document order; each cell node parents DIRECTLY to the table node with
@@ -250,7 +250,7 @@ next plan session removes their checklists (git history retains them).
   DocIr::from_graph over it; all three committed fixtures extract residual-free; rejected-table
   inline cases withhold cells and DocIr drops the table. Reading: SPEC §8.3 extract row, §8.2;
   ir.rs DocIr::from_graph and TableCell; extract.rs (edit target). Consumes stage-extract.1
-  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`.
+  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`. 62% 124K/200K _
 - [ ] stage-segment: Segment stage in a segment module: rule-based segmentation keyed on fixture
   structure (CQ headings, recommendation and exception sentence markers, definition table rows,
   evidence lists) producing ClinicalSegments with region refs; envelope-wrapped segments.json

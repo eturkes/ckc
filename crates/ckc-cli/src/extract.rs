@@ -10,8 +10,21 @@
 //! plus one {node,span} region; whitespace-only units mint nothing;
 //! anchors stay empty (§4.5 subspan anchors belong to later stages).
 //! Parse errors and unknown flow content become `extraction_uncertain`
-//! residuals; tables ride that residual path until `stage-extract.2`
-//! lands the real arm.
+//! residuals.
+//!
+//! `stage-extract.2` lands the table arm. A table node's direct
+//! children scan as caption (at most one, minting a textual caption
+//! node), colgroup/col (ignored), and thead/tbody/tfoot/tr (html5ever
+//! wraps bare tr in tbody); rows flatten in document order. Each
+//! nonempty cell parents directly to the table node with attrs `row`
+//! and `col` as 0-based decimal strings plus `header` `"true"` on th,
+//! absent on td — exactly the `DocIr::from_graph` cell contract; an
+//! empty cell mints no node yet still occupies its column index. Any
+//! rowspan or colspan other than `"1"`, nested table, second caption,
+//! stray non-whitespace text, or unknown child element rejects the
+//! whole table: one `table_structure_uncertain` residual names the
+//! table node and every cell is withheld while the table node stays
+//! (DocIr then withholds the table from the view).
 
 use std::collections::HashMap;
 use std::fmt;
@@ -94,7 +107,11 @@ pub fn extract(
     let mut walker = Walker::default();
     let doc_node = walker.mint_node(NodeKind::Document, None);
     for error in &parsed.errors {
-        walker.residual(format!("parse error: {error}"), &doc_node);
+        walker.residual(
+            DiagnosticCode::ExtractionUncertain,
+            format!("parse error: {error}"),
+            &doc_node,
+        );
     }
     walker.walk_body(find_body(&parsed), &doc_node);
 
@@ -196,12 +213,21 @@ struct Walker {
 
 impl Walker {
     fn mint_node(&mut self, kind: NodeKind, parent: Option<&Id>) -> Id {
+        self.mint_node_attrs(kind, parent, vec![])
+    }
+
+    fn mint_node_attrs(
+        &mut self,
+        kind: NodeKind,
+        parent: Option<&Id>,
+        attrs: Vec<(Id, String)>,
+    ) -> Id {
         let node_id = counter_id("n", self.nodes.len());
         self.nodes.push(SourceNode {
             node_id: node_id.clone(),
             kind,
             parent_id: parent.cloned(),
-            attrs: vec![],
+            attrs,
         });
         node_id
     }
@@ -243,16 +269,16 @@ impl Walker {
         region_id
     }
 
-    /// One `extraction_uncertain` residual grounded in `node_id`'s
-    /// memoized region, licensing that node for §4.5 coverage.
-    fn residual(&mut self, detail: String, node_id: &Id) {
+    /// One residual under `code` grounded in `node_id`'s memoized
+    /// region, licensing that node for §4.5 coverage.
+    fn residual(&mut self, code: DiagnosticCode, detail: String, node_id: &Id) {
         let region_id = self.node_region(node_id);
         self.residual_nodes.push(node_id.clone());
         let detail = StringPolicy::DiagnosticText
             .normalize(&detail)
             .expect("diagnostic_text is infallible");
         self.diagnostics.push(DiagnosticRecord {
-            code: DiagnosticCode::ExtractionUncertain,
+            code,
             outcome: Outcome::Residual,
             payload: vec![(static_id("detail"), detail)],
             region_ids: vec![region_id],
@@ -291,14 +317,18 @@ impl Walker {
         }
     }
 
-    /// One non-heading flow element at structural level. Unknown names —
-    /// tables included until `stage-extract.2` — leave one residual and
-    /// skip the subtree.
+    /// One non-heading flow element at structural level. Unknown names
+    /// leave one residual and skip the subtree.
     fn flow_element(&mut self, node: NodeRef<'_, Node>, name: &str, parent: &Id) {
         match name {
             "p" => self.textual_node(node, NodeKind::Paragraph, parent),
             "ul" | "ol" => self.list(node, parent),
-            _ => self.residual(format!("unknown flow element: {name}"), parent),
+            "table" => self.table(node, parent),
+            _ => self.residual(
+                DiagnosticCode::ExtractionUncertain,
+                format!("unknown flow element: {name}"),
+                parent,
+            ),
         }
     }
 
@@ -336,6 +366,7 @@ impl Walker {
                 }
                 Node::Element(element) => {
                     self.residual(
+                        DiagnosticCode::ExtractionUncertain,
                         format!("unknown flow element: {}", element.name()),
                         &list_id,
                     );
@@ -346,12 +377,60 @@ impl Walker {
         }
     }
 
+    /// A table: the node mints unconditionally, then the subtree scan
+    /// decides between minting the validated plan and one
+    /// `table_structure_uncertain` residual naming the table node with
+    /// every cell withheld.
+    fn table(&mut self, node: NodeRef<'_, Node>, parent: &Id) {
+        let table_id = self.mint_node(NodeKind::Table, Some(parent));
+        match scan_table(node) {
+            Ok(items) => self.mint_table_items(&table_id, items),
+            Err(detail) => {
+                self.residual(DiagnosticCode::TableStructureUncertain, detail, &table_id);
+            }
+        }
+    }
+
+    /// Mint an accepted table plan in document order: captions as
+    /// textual caption nodes, cells parented directly to the table node
+    /// with the `DocIr::from_graph` attrs (`col`/`row` 0-based decimal,
+    /// `header` `"true"` on th only); an empty cell mints no node yet
+    /// still occupies its column index.
+    fn mint_table_items(&mut self, table_id: &Id, items: Vec<TableItem>) {
+        let mut row = 0usize;
+        for item in items {
+            match item {
+                TableItem::Caption(text) => {
+                    let caption_id = self.mint_node(NodeKind::Caption, Some(table_id));
+                    self.mint_span(&caption_id, text);
+                }
+                TableItem::Row(cells) => {
+                    for (col, cell) in cells.into_iter().enumerate() {
+                        let Some((header, text)) = cell else { continue };
+                        let mut attrs = vec![(static_id("col"), col.to_string())];
+                        if header {
+                            attrs.push((static_id("header"), "true".to_owned()));
+                        }
+                        attrs.push((static_id("row"), row.to_string()));
+                        let cell_id = self.mint_node_attrs(NodeKind::Cell, Some(table_id), attrs);
+                        self.mint_span(&cell_id, text);
+                    }
+                    row += 1;
+                }
+            }
+        }
+    }
+
     /// Non-whitespace text outside any textual unit: one residual
     /// grounded in the enclosing node; whitespace-only mints nothing.
     fn stray_text(&mut self, text: &str, parent: &Id) {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
-            self.residual(format!("stray text: {trimmed}"), parent);
+            self.residual(
+                DiagnosticCode::ExtractionUncertain,
+                format!("stray text: {trimmed}"),
+                parent,
+            );
         }
     }
 }
@@ -359,6 +438,117 @@ impl Walker {
 /// `<prefix>.<k>`: the walk-order counter ids of §8.3 extract.
 fn counter_id(prefix: &str, k: usize) -> Id {
     Id::new(format!("{prefix}.{k}")).expect("counter ids match the Id grammar")
+}
+
+/// One document-order unit of a validated table plan; minting happens
+/// only after the whole scan accepts, so a rejection withholds every
+/// cell without disturbing counter ids.
+enum TableItem {
+    /// Nonempty trimmed caption text.
+    Caption(String),
+    /// One row, indexed by column: `None` is an empty cell (occupies
+    /// the index, mints nothing), `Some((header, text))` a th/td cell.
+    Row(Vec<Option<(bool, String)>>),
+}
+
+/// Scan a table element's direct children into the validated plan;
+/// `Err` carries the `table_structure_uncertain` detail.
+fn scan_table(table: NodeRef<'_, Node>) -> Result<Vec<TableItem>, String> {
+    let mut items = Vec::new();
+    let mut caption_seen = false;
+    for child in table.children() {
+        match child.value() {
+            Node::Element(element) => match element.name() {
+                "caption" => {
+                    if caption_seen {
+                        return Err("second caption".to_owned());
+                    }
+                    caption_seen = true;
+                    reject_nested_table(child)?;
+                    let text = collect_text(child);
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        items.push(TableItem::Caption(trimmed.to_owned()));
+                    }
+                }
+                "colgroup" | "col" => {}
+                "thead" | "tbody" | "tfoot" => scan_row_section(child, &mut items)?,
+                "tr" => items.push(TableItem::Row(scan_row(child)?)),
+                name => return Err(format!("unknown table child: {name}")),
+            },
+            Node::Text(t) => reject_stray_text(&t.text)?,
+            _ => {}
+        }
+    }
+    Ok(items)
+}
+
+/// thead/tbody/tfoot: rows only, flattened into `items` in document
+/// order.
+fn scan_row_section(section: NodeRef<'_, Node>, items: &mut Vec<TableItem>) -> Result<(), String> {
+    for child in section.children() {
+        match child.value() {
+            Node::Element(element) => match element.name() {
+                "tr" => items.push(TableItem::Row(scan_row(child)?)),
+                name => return Err(format!("unknown table child: {name}")),
+            },
+            Node::Text(t) => reject_stray_text(&t.text)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// One tr: th/td children in column order. Any rowspan or colspan
+/// other than `"1"` rejects — the cell grid must stay literal for the
+/// `row`/`col` attrs to mean what `DocIr::from_graph` reads.
+fn scan_row(tr: NodeRef<'_, Node>) -> Result<Vec<Option<(bool, String)>>, String> {
+    let mut cells = Vec::new();
+    for child in tr.children() {
+        match child.value() {
+            Node::Element(element) => match element.name() {
+                name @ ("th" | "td") => {
+                    for key in ["rowspan", "colspan"] {
+                        if let Some(value) = element.attr(key)
+                            && value != "1"
+                        {
+                            return Err(format!("{key} {value} on {name}"));
+                        }
+                    }
+                    reject_nested_table(child)?;
+                    let text = collect_text(child);
+                    let trimmed = text.trim();
+                    cells.push((!trimmed.is_empty()).then(|| (name == "th", trimmed.to_owned())));
+                }
+                name => return Err(format!("unknown table child: {name}")),
+            },
+            Node::Text(t) => reject_stray_text(&t.text)?,
+            _ => {}
+        }
+    }
+    Ok(cells)
+}
+
+/// A table nested under a caption or cell defeats the literal grid.
+fn reject_nested_table(node: NodeRef<'_, Node>) -> Result<(), String> {
+    let nested = node
+        .descendants()
+        .any(|d| d.value().as_element().is_some_and(|e| e.name() == "table"));
+    if nested {
+        return Err("nested table".to_owned());
+    }
+    Ok(())
+}
+
+/// Non-whitespace text between table structure elements rejects;
+/// whitespace is layout.
+fn reject_stray_text(text: &str) -> Result<(), String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("stray text in table: {trimmed}"))
+    }
 }
 
 #[cfg(test)]
@@ -419,8 +609,8 @@ mod tests {
             .collect()
     }
 
-    fn detail(d: &DiagnosticRecord) -> &str {
-        assert_eq!(d.code, DiagnosticCode::ExtractionUncertain);
+    fn detail_of(d: &DiagnosticRecord, code: DiagnosticCode) -> &str {
+        assert_eq!(d.code, code);
         assert_eq!(d.outcome, Outcome::Residual);
         assert!(d.artifact_hashes.is_empty());
         let [(key, value)] = d.payload.as_slice() else {
@@ -428,6 +618,10 @@ mod tests {
         };
         assert_eq!(*key, id("detail"));
         value
+    }
+
+    fn detail(d: &DiagnosticRecord) -> &str {
+        detail_of(d, DiagnosticCode::ExtractionUncertain)
     }
 
     // Sections stack by heading level (h1 pops the h1+h2 pair), p and
@@ -553,16 +747,16 @@ mod tests {
         );
     }
 
-    // Unknown flow elements (tables until stage-extract.2) and stray
-    // text leave one residual each, grounded in the parent node's
-    // memoized region; their subtrees mint nothing.
+    // Unknown flow elements and stray text leave one residual each,
+    // grounded in the parent node's memoized region; their subtrees
+    // mint nothing.
     #[test]
     fn unknown_flow_and_stray_text_residuals() {
         let (g, diags) = graph(concat!(
             "<!DOCTYPE html><html><body>",
             "<h1>見出し</h1>",
             "はぐれた本文",
-            "<table><tr><td>表</td></tr></table>",
+            "<blockquote>引用</blockquote>",
             "<div><p>内部</p></div>",
             "</body></html>"
         ));
@@ -571,7 +765,7 @@ mod tests {
             details,
             vec![
                 "stray text: はぐれた本文",
-                "unknown flow element: table",
+                "unknown flow element: blockquote",
                 "unknown flow element: div",
             ]
         );
@@ -650,5 +844,269 @@ mod tests {
     fn non_utf8_input_is_utf8_error() {
         let err = extract(&[0xff, 0xfe, b'<', b'p', b'>'], &config()).unwrap_err();
         assert!(matches!(err, ExtractError::Utf8(_)), "got {err}");
+    }
+
+    fn fixture(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+        std::fs::read(format!("{dir}{name}")).unwrap()
+    }
+
+    /// The cell-attr vocabulary `DocIr::from_graph` reads: `col`/`row`
+    /// 0-based decimal, `header` `"true"` on th only, stored sorted.
+    fn cell_attrs(row: u64, col: u64, header: bool) -> Vec<(Id, String)> {
+        let mut attrs = vec![(id("col"), col.to_string())];
+        if header {
+            attrs.push((id("header"), "true".to_owned()));
+        }
+        attrs.push((id("row"), row.to_string()));
+        attrs
+    }
+
+    /// Every region is the {node,span} pair of the same-index span —
+    /// the walker's only region shape outside residual grounding.
+    fn assert_span_regions(g: &SourceGraph) {
+        assert_eq!(g.regions.len(), g.spans.len());
+        for (region, span) in g.regions.iter().zip(&g.spans) {
+            assert_eq!(region.node_ids, vec![span.node_id.clone()]);
+            assert_eq!(region.span_ids, vec![span.span_id.clone()]);
+            assert!(region.anchor_ids.is_empty());
+        }
+    }
+
+    // The committed v1_guideline_a fixture, full shape pinned from
+    // observed output: section tree, recommendation and exception
+    // paragraphs, the 4x2 definitions table with th header row, and
+    // the evidence list; DocIr::from_graph accepts the result.
+    #[test]
+    fn fixture_guideline_a_full_shape_and_doc_ir() {
+        let envelope = extract(&fixture("v1_guideline_a.html"), &config()).unwrap();
+        let (g, diags) = (envelope.payload, envelope.diagnostics);
+        assert!(diags.is_empty(), "fixture extracts residual-free");
+
+        let n = |k: usize| id(&format!("n.{k}"));
+        let mut want_nodes = vec![
+            (n(0), NodeKind::Document, None),
+            (n(1), NodeKind::Section, Some(n(0))),
+            (n(2), NodeKind::Section, Some(n(1))),
+            (n(3), NodeKind::Paragraph, Some(n(2))),
+            (n(4), NodeKind::Paragraph, Some(n(2))),
+            (n(5), NodeKind::Section, Some(n(2))),
+            (n(6), NodeKind::Table, Some(n(5))),
+        ];
+        want_nodes.extend((7..15).map(|k| (n(k), NodeKind::Cell, Some(n(6)))));
+        want_nodes.extend([
+            (n(15), NodeKind::Section, Some(n(2))),
+            (n(16), NodeKind::List, Some(n(15))),
+            (n(17), NodeKind::Paragraph, Some(n(16))),
+            (n(18), NodeKind::Paragraph, Some(n(16))),
+        ]);
+        assert_eq!(node_shape(&g), want_nodes);
+
+        let cells: Vec<(Id, Vec<(Id, String)>)> = g
+            .nodes
+            .iter()
+            .filter(|node| node.kind == NodeKind::Cell)
+            .map(|node| (node.node_id.clone(), node.attrs.clone()))
+            .collect();
+        let want_cells: Vec<(Id, Vec<(Id, String)>)> = [
+            (7, 0, 0, true),
+            (8, 0, 1, true),
+            (9, 1, 0, false),
+            (10, 1, 1, false),
+            (11, 2, 0, false),
+            (12, 2, 1, false),
+            (13, 3, 0, false),
+            (14, 3, 1, false),
+        ]
+        .map(|(k, row, col, header)| (n(k), cell_attrs(row, col, header)))
+        .into();
+        assert_eq!(cells, want_cells);
+        assert!(
+            g.nodes
+                .iter()
+                .filter(|node| node.kind != NodeKind::Cell)
+                .all(|node| node.attrs.is_empty())
+        );
+
+        let texts = [
+            (1, "敗血症診療ガイドライン(合成)"),
+            (2, "CQ1:成人の敗血症患者に対して抗菌薬Aを投与すべきか"),
+            (
+                3,
+                "成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)。",
+            ),
+            (4, "ただし、重度腎機能障害のある患者を除く。"),
+            (5, "用語の定義"),
+            (7, "用語"),
+            (8, "定義"),
+            (9, "成人"),
+            (10, "18歳以上の患者"),
+            (11, "小児"),
+            (12, "18歳未満の患者"),
+            (13, "重度腎機能障害"),
+            (14, "高度の腎機能低下を認める状態(合成定義)"),
+            (15, "エビデンス"),
+            (17, "ランダム化比較試験2件(エビデンスの確実性:中)"),
+            (18, "観察研究1件(エビデンスの確実性:低)"),
+        ];
+        let want_spans: Vec<(Id, Id, String, u64)> = texts
+            .iter()
+            .enumerate()
+            .map(|(k, (node, text))| {
+                (
+                    id(&format!("s.{k}")),
+                    n(*node),
+                    (*text).to_owned(),
+                    k as u64,
+                )
+            })
+            .collect();
+        assert_eq!(span_shape(&g), want_spans);
+        assert_span_regions(&g);
+
+        let doc = ckc_core::DocIr::from_graph(&g, diags).unwrap();
+        assert!(doc.diagnostics.is_empty());
+        assert_eq!(doc.blocks.len(), 16);
+        let [table] = doc.tables.as_slice() else {
+            panic!("one table view, got {:?}", doc.tables);
+        };
+        assert_eq!(table.table_node_id, n(6));
+        let want: Vec<ckc_core::TableCell> = [
+            (7, 0, 0, ckc_core::CellRole::Header),
+            (8, 0, 1, ckc_core::CellRole::Header),
+            (9, 1, 0, ckc_core::CellRole::Body),
+            (10, 1, 1, ckc_core::CellRole::Body),
+            (11, 2, 0, ckc_core::CellRole::Body),
+            (12, 2, 1, ckc_core::CellRole::Body),
+            (13, 3, 0, ckc_core::CellRole::Body),
+            (14, 3, 1, ckc_core::CellRole::Body),
+        ]
+        .map(|(k, row, col, role)| ckc_core::TableCell {
+            node_id: n(k),
+            row,
+            col,
+            role,
+        })
+        .into();
+        assert_eq!(table.cells, want);
+    }
+
+    #[test]
+    fn committed_fixtures_extract_residual_free() {
+        for name in [
+            "v1_guideline_a.html",
+            "v1_guideline_b.html",
+            "v1_control.html",
+        ] {
+            let envelope = extract(&fixture(name), &config()).unwrap();
+            assert!(
+                envelope.diagnostics.is_empty(),
+                "{name} extracts residual-free, got {:?}",
+                envelope.diagnostics
+            );
+        }
+    }
+
+    // Caption mints a textual caption node under the table, an empty
+    // cell occupies its column index minting nothing, and an explicit
+    // colspan="1" is accepted.
+    #[test]
+    fn table_caption_and_empty_cell() {
+        let (g, diags) = graph(concat!(
+            "<!DOCTYPE html><html><body>",
+            "<table><caption>表1:定義</caption>",
+            r#"<tr><th colspan="1">語</th><td></td><td>値</td></tr>"#,
+            "</table></body></html>"
+        ));
+        assert!(diags.is_empty());
+        assert_eq!(
+            node_shape(&g),
+            vec![
+                (id("n.0"), NodeKind::Document, None),
+                (id("n.1"), NodeKind::Table, Some(id("n.0"))),
+                (id("n.2"), NodeKind::Caption, Some(id("n.1"))),
+                (id("n.3"), NodeKind::Cell, Some(id("n.1"))),
+                (id("n.4"), NodeKind::Cell, Some(id("n.1"))),
+            ]
+        );
+        assert_eq!(g.nodes[3].attrs, cell_attrs(0, 0, true));
+        assert_eq!(
+            g.nodes[4].attrs,
+            cell_attrs(0, 2, false),
+            "empty td holds col 1"
+        );
+        assert_eq!(
+            span_shape(&g),
+            vec![
+                (id("s.0"), id("n.2"), "表1:定義".to_owned(), 0),
+                (id("s.1"), id("n.3"), "語".to_owned(), 1),
+                (id("s.2"), id("n.4"), "値".to_owned(), 2),
+            ]
+        );
+        assert_span_regions(&g);
+
+        let doc = ckc_core::DocIr::from_graph(&g, diags).unwrap();
+        let kinds: Vec<NodeKind> = doc.blocks.iter().map(|b| b.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![NodeKind::Caption, NodeKind::Cell, NodeKind::Cell]
+        );
+        let [table] = doc.tables.as_slice() else {
+            panic!("one table view, got {:?}", doc.tables);
+        };
+        let positions: Vec<(u64, u64)> = table.cells.iter().map(|c| (c.row, c.col)).collect();
+        assert_eq!(positions, vec![(0, 0), (0, 2)]);
+    }
+
+    // Each rejection arm: one table_structure_uncertain residual whose
+    // region names the table node, every cell withheld while the table
+    // node stays, and DocIr::from_graph drops the table from the view.
+    #[test]
+    fn rejected_tables_withhold_cells_and_doc_ir_drops_the_table() {
+        let cases = [
+            (
+                r#"<table><tr><td rowspan="2">甲</td></tr></table>"#,
+                "rowspan 2 on td",
+            ),
+            (
+                "<table><tr><td><table><tr><td>乙</td></tr></table></td></tr></table>",
+                "nested table",
+            ),
+            (
+                "<table><caption>一</caption><caption>二</caption><tr><td>丙</td></tr></table>",
+                "second caption",
+            ),
+            (
+                "<table><style>x</style><tr><td>丁</td></tr></table>",
+                "unknown table child: style",
+            ),
+        ];
+        for (html, want_detail) in cases {
+            let (g, diags) = graph(&format!("<!DOCTYPE html><html><body>{html}</body></html>"));
+            let [diag] = diags.as_slice() else {
+                panic!("one residual for {want_detail}, got {diags:?}");
+            };
+            assert_eq!(
+                detail_of(diag, DiagnosticCode::TableStructureUncertain),
+                want_detail
+            );
+            assert_eq!(diag.region_ids, vec![id("r.0")]);
+            assert_eq!(
+                node_shape(&g),
+                vec![
+                    (id("n.0"), NodeKind::Document, None),
+                    (id("n.1"), NodeKind::Table, Some(id("n.0"))),
+                ],
+                "table node stays, every cell withheld: {want_detail}"
+            );
+            assert!(g.spans.is_empty());
+            assert_eq!(region_shape(&g), vec![(id("r.0"), vec![id("n.1")], vec![])]);
+            let doc = ckc_core::DocIr::from_graph(&g, diags).unwrap();
+            assert!(
+                doc.tables.is_empty(),
+                "DocIr drops the table: {want_detail}"
+            );
+            assert!(doc.blocks.is_empty());
+        }
     }
 }
