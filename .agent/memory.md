@@ -159,4 +159,21 @@ technically derivable but easily forgotten under token pressure.
   backslash, e.g. `&[b'"', 0x5c, b'u', b'0', b'0', b'4', b'1', b'"']` — and read
   the region back after writing. Recurs in any unit whose tests assert on escape
   syntax (the canonical string reader/writer, later wire parsers).
+- [2026-06-11] Fable 5 refusal fallback silently switches a session to Opus mid-flight: a
+  `type=system subtype=model_refusal_fallback` transcript event ("safety measures flagged this
+  message for cybersecurity or biology topics ... Switched to Opus 4.") moved three consecutive
+  stage-normalize.1d attempts (2026-06-10 17:57/19:25/19:28Z; transcripts c9c22e06, 2b59af9b,
+  e7e152ad) from claude-fable-5 to claude-opus-4-8. The switch is one-way and in-context
+  invisible — the post-switch assistant continues the unit unaware. Trigger correlates with raw
+  Japanese clinical fixture text (抗菌薬/敗血症/妊娠中) entering context via whole-fixture
+  reads, the flag firing ~25-35s later; it is probabilistic, not deterministic — the fourth
+  attempt (73db12b5) carried the same vocabulary, stayed on fable, and landed 28898bd. Handling
+  precedent: Opus-mode output is discarded — two sessions were killed under a minute after the
+  switch, and c9c22e06's two pre-death normalize.rs edits are verified absent from the landed
+  bytes (its main insert never ran; it died on the h2 GOAWAY documented above). Expect
+  recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-v1); the
+  user monitors for the switch, so on any suspicion of degraded-model output, stop and report.
+  Forensics: per-record models via `jq '.message.model'` over assistant records in
+  `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback event
+  is the switch marker.
 
