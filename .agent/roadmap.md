@@ -176,13 +176,14 @@ next plan session removes their checklists (git history retains them).
   (group_id, expected_outcome, optional expected_conflict_kind, expected_core compared as a set,
   expected_null_result); inline-YAML loading and round-trip tests. Reading: SPEC §8.4, §8.2 corpora
   fields and gold shape. Consumes core-enums-envelope.1 enums, canon stack. Gate: `cargo test -p
-  ckc-core registry::`. 56% 113K/200K _
-- [ ] core-registry.2: Registry validation in the registry module: per-entry required fields, Id
+  ckc-core registry::`. 56% 113K/200K 907e20b
+- [x] core-registry.2: Registry validation in the registry module: per-entry required fields, Id
   grammar, cross-file resolution (experiment to pipeline, corpora, and gold expected-outcome ref;
   every referenced entry resolves and is well-formed), and the §8.4 stage-chain rule that every
   stage's declared input artifact kinds are produced by predecessors; typed validation errors;
   inline-fixture tests including chain violations and dangling refs. Reading: SPEC §8.4; §3
   registry-check invariant. Consumes core-registry.1 types. Gate: `cargo test -p ckc-core`.
+  48% 97K/200K _
 - [ ] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
   corpus/fixtures/ (guideline_a with CQ heading, recommendation and exception sentences, definitions
   table, evidence list; guideline_b contraindication; control with disjoint child age interval),

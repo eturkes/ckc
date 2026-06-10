@@ -42,7 +42,11 @@
 //! ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
 //! [`parse_gold`]): [`CorpusEntry`], [`Candidates`] over [`PipelineEntry`]
 //! and [`StageEntry`], [`ExperimentEntry`] with [`FixtureGroup`]s, and the
-//! §8.2 [`GoldEntry`] expectations.
+//! §8.2 [`GoldEntry`] expectations. `core-registry.2` validates the loaded
+//! set as one cross-referenced whole ([`validate_registries`] collecting
+//! [`RegistryFinding`]s): pool-level id uniqueness, nonempty requirements,
+//! experiment → pipeline → stage and fixture → corpus resolution, gold
+//! refs, and the §8.4 stage-chain rule.
 #![forbid(unsafe_code)]
 
 mod bundle;
@@ -92,7 +96,7 @@ pub use ir::{
 pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use registry::{
     Candidates, CorpusEntry, Determinism, ExperimentEntry, FixtureGroup, GoldEntry, PipelineEntry,
-    RegistryError, StageEntry, parse_candidates, parse_corpora, parse_experiments, parse_gold,
-    to_yaml,
+    RegistryError, RegistryFinding, StageEntry, parse_candidates, parse_corpora, parse_experiments,
+    parse_gold, to_yaml, validate_registries,
 };
 pub use strings::StringPolicy;
