@@ -269,6 +269,13 @@ pub(crate) fn emit_payload(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Resul
     emit_map(out, entries.iter().map(|(k, _)| k).zip(&texts))
 }
 
+/// Read a §7.4 structured payload, the inverse of [`emit_payload`].
+/// Crate-visible so sibling payload carriers (bundle assumptions) reuse it.
+pub(crate) fn read_payload(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, CanonReadError> {
+    let entries = read_map::<Id, DiagText>(r)?;
+    Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
+}
+
 /// SPEC §7.4 diagnostic: a stable code from the V1–V2 set, a structured
 /// payload, region/artifact refs, and exactly one [`Outcome`]. The ref lists
 /// are sets in canonical form (sorted, duplicate-free); the producing stage
@@ -305,13 +312,7 @@ impl CanonRead for DiagnosticRecord {
         let artifact_hashes = obj.member("artifact_hashes", read_set::<Hash>)?;
         let code = obj.member("code", DiagnosticCode::read)?;
         let outcome = obj.member("outcome", Outcome::read)?;
-        let payload = obj.member("payload", |r| {
-            let entries = read_map::<Id, DiagText>(r)?;
-            Ok(entries
-                .into_iter()
-                .map(|(k, v)| (k, v.0))
-                .collect::<Vec<_>>())
-        })?;
+        let payload = obj.member("payload", read_payload)?;
         let region_ids = obj.member("region_ids", read_set::<Id>)?;
         obj.close()?;
         Ok(DiagnosticRecord {

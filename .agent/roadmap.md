@@ -113,8 +113,8 @@ next plan session removes their checklists (git history retains them).
   re-exports. Tests: derive + round-trips, computed canonical and structural byte pins,
   directions_opposed truth table. Reading: SPEC §5, §6 two-query plan shape, §8.6 query ids; ir.rs
   in full (edit target; reuse core-ir.2 patterns and fixtures). Consumes core-ir.2
-  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`. 61% 122K/200K _
-- [ ] core-ir.4: IRBundle assembly in a new bundle module (bundle.rs): expose the ir.rs structural
+  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`. 61% 122K/200K 2bd8aad
+- [x] core-ir.4: IRBundle assembly in a new bundle module (bundle.rs): expose the ir.rs structural
   plumbing (Structural, RefLocalizer, structural_hash, emit_structural_components,
   emit_structural_record_set, emit_structural_array) and its test fixtures pub(crate); add enums.rs
   pub(crate) read_payload as emit_payload's inverse. ComponentKind fieldless enum
@@ -139,7 +139,7 @@ next plan session removes their checklists (git history retains them).
   swap moves bundle_hash); bundle round-trip and canonical shape. Reading: SPEC §5
   IRBundle/component/assumption rows, §4.3 sets, §7.4 payload; ir.rs fixtures and core-ir.3
   surfaces. Consumes core-ir.1/.2/.3 layers, core-grounding regions, core-enums-envelope.1
-  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`.
+  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`. 85% 170K/200K _
 - [ ] core-ir.5: IRBundle validation in bundle.rs: validate(&self, graph: &SourceGraph) ->
   Result<(), BundleError> enforcing the §5 IR invariants in this pinned order — (1) DocIr layer
   re-derives equal: DocIr::from_graph(graph, self.doc.diagnostics) == self.doc; (2) grounding:

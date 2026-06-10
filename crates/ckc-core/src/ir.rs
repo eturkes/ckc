@@ -116,7 +116,7 @@ fn emit_structural_ref_array(
 
 /// Emit an ordered run of structural values inside the enclosing scope
 /// (arrays whose order is semantic share their component's scope).
-fn emit_structural_array<T: Structural>(
+pub(crate) fn emit_structural_array<T: Structural>(
     out: &mut Vec<u8>,
     ids: &mut RefLocalizer,
     items: &[T],
@@ -134,7 +134,7 @@ fn emit_structural_array<T: Structural>(
 
 /// Emit components as an ordered array, each under a fresh scope (the
 /// component boundary).
-fn emit_structural_components<T: Structural>(
+pub(crate) fn emit_structural_components<T: Structural>(
     out: &mut Vec<u8>,
     items: &[T],
 ) -> Result<(), CanonError> {
@@ -153,7 +153,7 @@ fn emit_structural_components<T: Structural>(
 /// bytes under a fresh scope, sorted byte-lexicographically, byte-identical
 /// duplicates collapsed — so set order is decided by structural content,
 /// never by semantic names.
-fn emit_structural_record_set<T: Structural>(
+pub(crate) fn emit_structural_record_set<T: Structural>(
     out: &mut Vec<u8>,
     items: &[T],
 ) -> Result<(), CanonError> {
@@ -1501,19 +1501,21 @@ impl fmt::Display for IrError {
 
 impl std::error::Error for IrError {}
 
+/// Test fixtures shared with sibling modules (bundle): the §8.6 worked-rule
+/// family under a rename prefix, atom/DNF builders, and byte-pin helpers.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::canon::{canonical_payload_bytes, read_canonical};
     use crate::enums::Outcome;
     use crate::grounding::{DataClass, Provenance, SourceDocument, SourceRegion, SourceSpan};
     use crate::hash::content_hash;
 
-    fn canon<T: Canonical>(value: &T) -> String {
+    pub(crate) fn canon<T: Canonical>(value: &T) -> String {
         String::from_utf8(canonical_payload_bytes(value).unwrap()).unwrap()
     }
 
-    fn structural<T: Structural>(value: &T) -> String {
+    pub(crate) fn structural<T: Structural>(value: &T) -> String {
         let mut out = Vec::new();
         value
             .emit_structural(&mut out, &mut RefLocalizer::new())
@@ -1521,13 +1523,13 @@ mod tests {
         String::from_utf8(out).unwrap()
     }
 
-    fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
+    pub(crate) fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
         let got: T = read_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
-    fn id(s: &str) -> Id {
+    pub(crate) fn id(s: &str) -> Id {
         Id::new(s).unwrap()
     }
 
@@ -1613,7 +1615,7 @@ mod tests {
         }
     }
 
-    fn diag(code: DiagnosticCode, region: &str) -> DiagnosticRecord {
+    pub(crate) fn diag(code: DiagnosticCode, region: &str) -> DiagnosticRecord {
         DiagnosticRecord {
             code,
             outcome: Outcome::Residual,
@@ -1964,15 +1966,15 @@ mod tests {
 
     // ---- core-ir.2: ClinicalIR + NormIR ------------------------------------
 
-    fn atom_c(c: &str) -> ContextAtom {
+    pub(crate) fn atom_c(c: &str) -> ContextAtom {
         ContextAtom::Concept(id(c))
     }
 
-    fn atom_nc(c: &str) -> ContextAtom {
+    pub(crate) fn atom_nc(c: &str) -> ContextAtom {
         ContextAtom::ConceptNegated(id(c))
     }
 
-    fn atom_ge(var: &str, n: i64) -> ContextAtom {
+    pub(crate) fn atom_ge(var: &str, n: i64) -> ContextAtom {
         ContextAtom::Interval(QuantityInterval {
             var: id(var),
             ge: Some(n),
@@ -1982,14 +1984,14 @@ mod tests {
         })
     }
 
-    fn dnf1(all: Vec<ContextAtom>) -> ContextExpr {
+    pub(crate) fn dnf1(all: Vec<ContextAtom>) -> ContextExpr {
         ContextExpr {
             any: vec![ContextConjunct { all }],
         }
     }
 
     /// The §8.6 worked rule `rule.a.cq1.r1`, local ids under prefix `p`.
-    fn rule_p(p: &str) -> NormRule {
+    pub(crate) fn rule_p(p: &str) -> NormRule {
         NormRule {
             rule_id: id(&format!("{p}rule.a.cq1.r1")),
             context: dnf1(vec![
@@ -2010,7 +2012,7 @@ mod tests {
     }
 
     /// The statement the §8.6 rule normalizes from, local ids under `p`.
-    fn statement_p(p: &str) -> ClinicalStatement {
+    pub(crate) fn statement_p(p: &str) -> ClinicalStatement {
         ClinicalStatement {
             statement_id: id(&format!("{p}st.a.cq1.s1")),
             population: vec![atom_ge("q.age_years", 18)],
@@ -2028,7 +2030,7 @@ mod tests {
         }
     }
 
-    fn binding_p(p: &str) -> TerminologyBinding {
+    pub(crate) fn binding_p(p: &str) -> TerminologyBinding {
         TerminologyBinding {
             binding_id: id(&format!("{p}bind.a.m1")),
             system: id("ckc.lex"),
@@ -2363,7 +2365,7 @@ mod tests {
 
     /// A §8.6-style plan slot for the worked pair, local ids under prefix
     /// `p` (constraint refs follow the `fc.<rule_id>` derivation).
-    fn pair_p(p: &str) -> ContradictionQueryPair {
+    pub(crate) fn pair_p(p: &str) -> ContradictionQueryPair {
         ContradictionQueryPair {
             pair_id: id(&format!("{p}q.v1_conflict.pair1")),
             action_key: id("act.administer:drug.abx_a"),

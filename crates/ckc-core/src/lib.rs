@@ -29,9 +29,13 @@
 //! [`ContextExpr`] DNF over [`ContextAtom`]s on an [`Action`]); `core-ir.3`
 //! completes the layer stack with FormalIR ([`FormalIr`] deriving
 //! [`FormalConstraint`]s from rules, [`ContradictionQueryPair`] plan slots,
-//! [`directions_opposed`]).
+//! [`directions_opposed`]); `core-ir.4` assembles the layers into the §5
+//! [`IrBundle`] ([`assemble`]) with the derived [`ComponentRecord`] index
+//! ([`derive_components`]), explicit [`Assumption`]s, [`LayerHashes`], and
+//! the rename-stable whole-bundle hash.
 #![forbid(unsafe_code)]
 
+mod bundle;
 mod canon;
 mod enums;
 mod envelope;
@@ -41,6 +45,9 @@ mod id;
 mod ir;
 mod strings;
 
+pub use bundle::{
+    Assumption, ComponentKind, ComponentRecord, IrBundle, LayerHashes, assemble, derive_components,
+};
 pub use canon::{
     CanonError, CanonRead, CanonReadError, Canonical, MapKey, ObjectEmitter, ObjectReader, Reader,
     canonical_payload_bytes, canonical_sort_key, emit_array, emit_int, emit_map, emit_set,
