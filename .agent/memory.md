@@ -16,10 +16,15 @@ technically derivable but easily forgotten under token pressure.
   crate-foundation units run hot (~81%) — pair them only with a small type
   surface; a unit that implements a nontrivial algorithm AND authors a second
   artifact splits in two; registry entry types alone fit one unit (~69%);
-  five-layer/recursive type families (IR) split into ~three units. Pre-split
-  such stacks BEFORE scheduling; reserve JIT-splitting for hot-but-fitting
-  single-deliverable units (~70-85%). Calibrate finer from neighbouring units'
-  actual `NN%` once they exist. Archive roadmaps mix measured lines (checked,
+  five-layer/recursive type families (IR) split into ~three units; a type
+  family PLUS its assembly PLUS its validation is three units, not one — old
+  core-ir.3 (FormalIR layer + IrBundle assembly + §5 validation) blew the
+  window on reading+design alone, before any code landed; units extending a
+  ~2K-line module pay a full-file read up front, so house new type families in
+  a fresh module. Pre-split such stacks BEFORE scheduling — mid-session overrun
+  recovery is user-initiated: stop implementing, bring the tree clean, report;
+  the user restores to the last commit and directs the re-scope. Calibrate
+  finer from neighbouring units' actual `NN%` once they exist. Archive roadmaps mix measured lines (checked,
   `NN%` annotated) with planned-only lines (unchecked, no `NN%`); cite only
   checked lines as measured anchors — planned scopes are projections.
 - [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose

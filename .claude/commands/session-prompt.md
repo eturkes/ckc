@@ -110,19 +110,10 @@ One closing commit covers work + roadmap — fill any pending `_`, mark the item
 `[x]` with its usage annotation and a fresh `_` hash slot — with the unit id
 as the scope (e.g. `<unit-id>: …`). End the session.
 
-### Splitting (when a unit overruns)
-
 A unit must be finishable AND committable within one context window with
-margin to spare; if mid-work you project otherwise, stop implementing and
-author the split in-session — splitting is a normal single-context task.
-Decompose at the cleanest boundary (specification-section family, artifact
-layer, deliverable type). Each sub-line is one conceptual deliverable with
-explicit file paths, real identifiers from the existing codebase, and exactly
-one gate command (the unit's full gate lands on the final sub-line; give
-earlier sub-lines narrower test commands); calibrate granularity from
-neighbouring items' usage annotations. Replace the unit's line with the
-`<unit-id>.1`, `<unit-id>.2`, … sub-lines, commit the split plan in one commit
-(fill any pending `_`; the split creates none), and end the session.
+margin to spare; if mid-work you project otherwise, stop implementing, bring
+the tree to a clean state, and report the overrun — recovery (restoring to
+the last commit, re-scoping the roadmap) is always user-initiated.
 
 ## Review session
 

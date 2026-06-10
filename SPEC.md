@@ -79,7 +79,8 @@ Unit discipline:
 - Every Rust unit runs `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, and
   its gate before staging.
 - Monitor context with `.agent/compaction.sh`; from 80% usage, bring work to a committable state
-  before starting anything new.
+  before starting anything new. A projected unit overrun is a stop-and-report: recovery (restore
+  to the last commit, re-scope the roadmap) is always user-initiated.
 - Close each cohesive piece of work with one scoped commit (CLAUDE.md); write non-ASCII commit
   messages to a file and commit with `git commit -F <path>`.
 
