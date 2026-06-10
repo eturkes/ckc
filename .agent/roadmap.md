@@ -1,350 +1,50 @@
 # CKC roadmap
 
-Build plan consumed by the /session-prompt command; SPEC.md is the design
-authority, its §2 the milestone sequence. One milestone at a time: a header
-`## <milestone> — plan <hash> — review <hash>` (plan opens, review closes, the
-pair bounds the milestone's commits; acceptance adds the evidence run id per
-SPEC §1) over an ordered unit checklist. Completed items gain `[x]` plus
-trailing `NN% NNNK/200K <hash>` (context usage — `>=90% compacted/200K` when
-the session hit compaction — then the completing commit); plan/review stamps carry no
-usage. A commit cannot contain its own hash, so a
-session writes `_` in its own hash slot and the next unit of roadmap work
-fills it (at most one `_` pending; resolve via commit scopes `<unit-id>:`,
-`plan-v<n>:`, `review-v<n>:`). Closed milestones persist as bare headers; the
-next plan session removes their checklists (git history retains them).
+Build plan for /session-prompt (the full session protocol lives in that command; SPEC.md is
+the design authority, its §2 the milestone sequence). One milestone at a time: header
+`## <name> — plan <hash> — review <hash>` (the pair bounds the milestone's commits;
+acceptance adds the evidence run id per SPEC §1) over an ordered unit checklist. Unchecked
+lines carry the full unit spec. Checked items collapse to one-line stubs
+`- [x] <id>: <gist>. NN% NNNK/200K <hash>` (context usage — `>=90% compacted/200K` when the
+session hit compaction — then the completing commit; `_` = hash pending, at most one at a
+time, filled by the next roadmap session via commit scopes). Closed milestones persist as
+bare headers; git history retains all removed text.
 
 ## V1 spine — plan e6523e9
 
-- [x] core-ids: Fill the existing ckc-core stub crate: workspace dependency pins (serde, num-bigint,
-  num-rational), lib.rs wiring with unsafe forbidden, and value types Id (`[a-z][a-z0-9_.:-]*`), Hash
-  (sha256: plus 64 lowercase hex), exact-reduced Rational (positive denominator, decimal-string
-  num/den repr) with ValidationError, serde via try_from/into String, Display/FromStr;
-  acceptance/rejection tables and serde round-trip tests. Reading: SPEC §4.1, §3 crate table. Gate:
-  `cargo test -p ckc-core`. 34% 67K/200K 10bf054
-- [x] core-strings: StringPolicy enum (Copy, snake_case serde) with the seven policies raw_source,
-  source_nfkc, semantic_ja, semantic_en, identifier_ascii, diagnostic_text, view_text as
-  deterministic normalizers: pipeline NFKC, whitespace fold to single U+0020 trimmed, CJK
-  punctuation fold (U+3001 to comma, U+3002 to period), ASCII lowercase for semantic_en; only
-  identifier_ascii ([a-z0-9_:./-]+) fallible; per-policy exact-output and idempotence tests. Reading: SPEC §4.2. Consumes core-ids ValidationError and crate skeleton. Gate: `cargo
-  test -p ckc-core`. 30% 60K/200K 3813a4d
-- [x] core-canon-writer: Canonical JSON writer core in a canon module: Canonical trait and
-  canonical_payload_bytes as the single byte authority; emit_string with the fixed minimal escape
-  set, emit_int as quoted decimal (never bare number tokens), emit_string_policy; ObjectEmitter
-  sorting members by UTF-8 name bytes, omitting absent optionals, rejecting duplicates; Rational as
-  reduced {den,num} object; CanonError; exact-byte assertion tests. Reading: SPEC §4.3.
-  Consumes core-ids value types, core-strings policies. Gate: `cargo test -p ckc-core canon::`.
-  43% 86K/200K 1adc76b
-- [x] core-canon-collections: Canonical collections over the writer core: emit_array in semantic
-  order; canonical_sort_key from element canonical bytes; emit_set sorted byte-lexicographically
-  with byte-identical duplicates collapsed; MapKey trait whose const IDENTIFIER_ASCII picks the map
-  form for the whole map; emit_map as sorted object for identifier_ascii keys and as key/value pair
-  array sorted by key bytes otherwise, duplicates rejected in both forms. Reading: SPEC §4.3. Consumes core-canon-writer core. Gate: `cargo test -p ckc-core canon::`.
-  41% 82K/200K 0e13c14
-- [x] core-canon-unions: Tagged-union and fieldless-enum emission: emit_union producing exactly
-  {tag,value} with identifier_ascii tags via ObjectEmitter, tag byte-sorted before value; fieldless
-  enums emitted as identifier_ascii strings. Reading:
-  SPEC §4.3. Consumes
-  core-canon-writer core. Gate: `cargo test -p ckc-core canon::`. 30% 61K/200K 97a3a46
-- [x] core-canon-reader: Strict canonical reader as the writer's inverse, scheduled solo: CanonRead
-  trait, Reader cursor, read_canonical requiring full consumption;
-  read_string/read_int/read_string_policy admitting only writer output (minimal escapes, canonical
-  decimals, already-normalized policy strings); ObjectReader demanding fields in ascending byte
-  order; read_array/read_set/read_map/read_union enforcing strictly ascending sort keys and exact
-  {tag,value} shape; CanonReadError taxonomy rejecting unknown/duplicate/misordered fields, null,
-  bare numerics, non-reduced rationals; write-read round-trip tests. Reading: SPEC §4.3. Consumes core-canon-writer, core-canon-collections, core-canon-unions. Gate: `cargo test -p
-  ckc-core canon::`. 28% 55K/200K 0353438
-- [x] core-canon-hash: Hashing in a hash module: sha2 dep; content_hash as sha256 over
-  canonical_payload_bytes wrapped as Hash; hash_bytes raw-byte primitive for _hash fields declared
-  over raw bytes; CanonicalizationPolicy descriptor type with pinned canonical bytes and
-  canonicalization_policy_hash derived through content_hash; NIST vector, determinism,
-  value-sensitivity, and pinned-descriptor tests.
-  Reading: SPEC §4.3, §4.4 canonicalization_policy_hash row. Consumes core-ids Hash and the canon stack. Gate: `cargo test -p
-  ckc-core`. 36% 72K/200K c568017
-- [x] core-enums-envelope.1: V1 enums plus result and diagnostic records in an enums module: all ten
-  §4.4 enums — Outcome with the §4.4 severity order, Origin, Authority, BindingStatus, Direction,
-  ClaimTier, ReviewClassification, AttemptClassification, PromotionDecision, PromotionScope — as
-  fieldless identifier_ascii canonical strings; DiagnosticRecord per §7.4 (stable code from the
-  V1-V2 set, structured payload, region/artifact refs, exactly one Outcome); TotalOperationResult
-  with operation_id, outcome, and the five hash-list buckets; canonical round-trips and
-  severity-ordering tests. Reading: SPEC §4.4 enum and outcome tables, §7.4. Consumes the canon
-  stack and core-canon-hash. Gate: `cargo test -p ckc-core enums::`. 59% 118K/200K a27a723
-- [x] core-enums-envelope.2: Artifact envelope and event records in an envelope module:
-  ArtifactEnvelope with the §4.4 field table (schema_version ckc.1, schema_id, artifact_id/kind,
-  producer triple, input_hashes, content_hash, canonicalization_policy_hash, origin, authority,
-  accepted_effects, trace_refs, diagnostics, runtime_metadata excluded from content hash, payload)
-  with authority and accepted_effects invariants; EventRecord with the §4.6 events.jsonl fields;
-  JSONL serialization for both streams; envelope-invariant and round-trip tests. Reading: SPEC §4.4
-  envelope table, §4.6. Consumes core-enums-envelope.1 enums and DiagnosticRecord, canon stack,
-  core-canon-hash. Gate: `cargo test -p ckc-core`. 64% 128K/200K 0876269
-- [x] core-grounding: Source grounding types in a grounding module: SourceDocument (source family,
-  provenance synthetic/public, raw/content hashes, data_class default none), SourceGraph with the
-  §4.5 node kinds (document through CQ and recommendation), SourceSpan (node, offsets,
-  raw/nfkc/search text, reading order, text hash), SourceAnchor, SourceRegion as closed support set;
-  validate grounding invariants (every textual unit spanned or typed residual, region refs resolve,
-  identical bytes plus config give identical graph bytes); canonical round-trips. Reading: SPEC
-  §4.5. Consumes core-strings policies, canon stack, core-canon-hash. Gate: `cargo test -p ckc-core
-  grounding::`. 68% 135K/200K 0c416ee
-- [x] core-ir.1: DocIR and SegmentIR layers in an ir module: layout-preserving text/table view over
-  SourceGraph refs with extraction diagnostics; ClinicalSegment with the seven §5 kinds (CQ,
-  recommendation, evidence, exception, definition, table-row, metadata) and region refs; canonical
-  impls plus the per-layer structural hash over locally indexed references (rename-stable),
-  establishing the pattern core-ir.2/.3 reuse. Reading: SPEC §5 layer table and ClinicalSegment row,
-  §4.3 structural-hash tail. Consumes core-grounding refs, core-canon-hash. Gate: `cargo test -p
-  ckc-core ir::`. 72% 144K/200K 81a541b
-- [x] core-ir.2: ClinicalIR and NormIR layers: TerminologyBinding (system ckc.lex, code,
-  BindingStatus, alternatives, region refs), ClinicalStatement (population, condition, action,
-  modality, strength strong/weak, certainty, exceptions, source refs), Action with normalized target
-  key, ContextExpr as finite DNF over concept, negated-concept, and quantity-interval atoms,
-  NormRule (rule_id, context, direction, action, strength, source_region_ids, optional certainty and
-  exception_refs); per-layer hashes; canonical bytes pinned against the §8.6 NormRule JSON. Reading:
-  SPEC §5, §8.6 NormRule example. Consumes core-ir.1 layer/hash pattern. Gate: `cargo test -p
-  ckc-core ir::`. 72% 145K/200K cb7df1e
-- [x] core-ir.3: FormalIR layer in ir.rs: pub fn directions_opposed over the §6 groups — positive
-  for/require/permit vs the against/avoid and contraindicate/avoid groups; FormalConstraint {action
-  (full self-contained Action), certainty (Option, omitted when absent), constraint_id, context
-  (ContextExpr), direction, rule_id, strength} with from_rule(&NormRule): constraint_id =
-  `fc.<rule_id>`, otherwise a straight projection since NormRule.context already folds exceptions;
-  ContradictionQueryPair plan slot {action_key, constraint_a_id, constraint_b_id (ascending by id
-  bytes), context_overlap_query_id, deontic_consistency_query_id, pair_id} holding §8.6-style
-  planner-minted query ids (planning itself lands in smt-emit.2); FormalIr {constraints (rule
-  order), plan (ordered array)} with derive(&NormIr) mapping rules and leaving plan empty.
-  Structural hashing: constraints via emit_structural_components (fresh scope each — constraint_id
-  i0, rule_id i1, action/context/enums verbatim); plan via emit_structural_array in the enclosing
-  FormalIr scope (a/b/overlap/deontic/pair ids localize to i0..i4, action_key verbatim). lib.rs
-  re-exports. Tests: derive + round-trips, computed canonical and structural byte pins,
-  directions_opposed truth table. Reading: SPEC §5, §6 two-query plan shape, §8.6 query ids; ir.rs
-  in full (edit target; reuse core-ir.2 patterns and fixtures). Consumes core-ir.2
-  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`. 61% 122K/200K 2bd8aad
-- [x] core-ir.4: IRBundle assembly in a new bundle module (bundle.rs): expose the ir.rs structural
-  plumbing (Structural, RefLocalizer, structural_hash, emit_structural_components,
-  emit_structural_record_set, emit_structural_array) and its test fixtures pub(crate); add enums.rs
-  pub(crate) read_payload as emit_payload's inverse. ComponentKind fieldless enum
-  concept/action/segment/binding/statement/rule/constraint (population and condition reduce to
-  concept atoms in V1); ComponentRecord {component_id, kind, structural_hash, use_sites (set)} —
-  Canonical+CanonRead only, a derived index carrying no Structural impl; Assumption {assumption_id,
-  payload (§7.4 pairs via emit/read_payload), region_ids (set)} localizing ids with payload
-  verbatim; LayerHashes {clinical, doc, formal, norm, segment}; IrBundle {assumptions (set),
-  bundle_hash, clinical, components (set), diagnostics (set, bundle-level — extraction diags stay
-  in DocIr), doc, formal, layer_hashes, norm, segment}. assemble(doc, segment, clinical, norm,
-  assumptions, diagnostics) derives formal via FormalIr::derive, components, layer_hashes
-  (structural_hash per layer), and bundle_hash as one structural emission of layers + assumptions +
-  diagnostics (derived fields excluded — rename-stable). derive_components: structural-hash records
-  for segments (use_sites = statements via source_segment_ids), bindings and statements (empty),
-  rules (constraints via rule_id), constraints (plan pairs); content_hash vocabulary records —
-  actions keyed by Action.key (component_id = key) and concepts (component_id = concept id) drawn
-  from binding code+alternatives, statement population/condition/exception atoms, and
-  rule/constraint context atoms; use_sites sorted+deduped owner ids; records sorted by
-  canonical_sort_key so stored order equals canonical set order. lib.rs wires the module and
-  re-exports. Tests: assemble over a prefix-parameterized graph fixture pinning expected use_sites;
-  rename-stability (prefixed ids keep layer/bundle hashes while content_hash moves; a vocabulary
-  swap moves bundle_hash); bundle round-trip and canonical shape. Reading: SPEC §5
-  IRBundle/component/assumption rows, §4.3 sets, §7.4 payload; ir.rs fixtures and core-ir.3
-  surfaces. Consumes core-ir.1/.2/.3 layers, core-grounding regions, core-enums-envelope.1
-  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`. 85% 170K/200K 1fa9d17
-- [x] core-ir.5: IRBundle validation in bundle.rs: validate(&self, graph: &SourceGraph) ->
-  Result<(), BundleError> enforcing the §5 IR invariants in this pinned order — (1) DocIr layer
-  re-derives equal: DocIr::from_graph(graph, self.doc.diagnostics) == self.doc; (2) grounding:
-  graph.validate with residual node ids licensed by extraction_uncertain doc diagnostics (their
-  regions' nodes); (3) id uniqueness per pool: segment, binding, statement, exception, rule,
-  constraint, plan (pair_id plus both query ids), assumption; (4) segment support nonempty, then
-  every region ref resolves (segments, bindings, statement exceptions, rules, assumptions, bundle
-  diagnostics); (5) statements: Action::new key re-derivation, atom checks with QuantityInterval
-  coherence (at least one bound, at most one per side, nonempty: strict lo<hi else lo<=hi),
-  source_segment_ids resolve; (6) rules: key, context atoms, exception_refs resolve against
-  statement exceptions; (7) constraints: rule_id resolves and FormalConstraint::from_rule(rule)
-  equals the stored constraint (covers id derivation and the whole projection); (8) plan pairs:
-  constraint refs resolve, a < b by id bytes, action_key equals both constraints' keys,
-  directions_opposed holds; (9) components re-derive equal; (10) layer_hashes then bundle_hash
-  re-derive equal. BundleError with Display/Error/From<CanonError>: Doc(IrError), DocLayerMismatch,
-  Grounding(GroundingError), Duplicate{pool,id}, Dangling{pool,id}, EmptySupport, KeyMismatch,
-  ConstraintMismatch, Interval{var,rule}, PairInvalid{pair_id,rule}, ComponentsMismatch,
-  HashMismatch, Canon. Tests: a restamp helper re-deriving components/hashes after tampering;
-  rejection coverage per variant — reference breaks, key/projection tampers, an interval table,
-  plan breaks on a two-rule for/against fixture, stale derived fields — plus a residual-licensed
-  grounding pass. Reading: SPEC §5 IR-invariant paragraph, §6 direction groups; bundle.rs and the
-  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`. >=90% compacted/200K f39e2f6
-- [x] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
-  budget) with canonical bytes and plan hash; RunManifest (plan hash, git commit,
-  toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);
-  ReplayManifest with the §4.6 field list; canonical round-trips. Reading: SPEC §5 RunPlan and
-  RunManifest rows, §4.6 replay manifest fields. Consumes canon stack, core-canon-hash. Gate: `cargo
-  test -p ckc-core`. 53% 106K/200K 90a1654
-- [x] core-registry.1: Registry entry types in a registry module with a pinned serde-compatible YAML
-  dependency: corpora entries (origin, authority, provenance per §8.2), candidates entries (pipeline
-  and stage components: ids, kinds, determinism, input/output artifact kinds), experiments entries
-  (fixture groups, pipeline, seed, budget, expected-outcome ref), and gold expected-outcome entries
-  (group_id, expected_outcome, optional expected_conflict_kind, expected_core compared as a set,
-  expected_null_result); inline-YAML loading and round-trip tests. Reading: SPEC §8.4, §8.2 corpora
-  fields and gold shape. Consumes core-enums-envelope.1 enums, canon stack. Gate: `cargo test -p
-  ckc-core registry::`. 56% 113K/200K 907e20b
-- [x] core-registry.2: Registry validation in the registry module: per-entry required fields, Id
-  grammar, cross-file resolution (experiment to pipeline, corpora, and gold expected-outcome ref;
-  every referenced entry resolves and is well-formed), and the §8.4 stage-chain rule that every
-  stage's declared input artifact kinds are produced by predecessors; typed validation errors;
-  inline-fixture tests including chain violations and dangling refs. Reading: SPEC §8.4; §3
-  registry-check invariant. Consumes core-registry.1 types. Gate: `cargo test -p ckc-core`.
-  48% 97K/200K 1225b1a
-- [x] fixtures-v1: Author the V1 data layer: three §8.2 fixture HTML documents under
-  corpus/fixtures/ (guideline_a with CQ heading, recommendation and exception sentences, definitions
-  table, evidence list; guideline_b contraindication; control with disjoint child age interval),
-  corpus/lexicon/ja_core.yaml (concept entries with adult/child age-interval semantics, action
-  verbs, modality phrases to direction/strength, certainty phrases, yielding the §8.6 concept and
-  rule ids), corpus/gold/v1_expected.yaml in the typed gold shape, and
-  registry/{corpora,candidates,experiments}.yaml seeds (pipe.layered_ckcir_to_smt stage chain;
-  exp.v1_spine with group.v1_conflict and group.v1_null, seed, budget, expected-outcome ref); add
-  the fixtures_v1 integration test loading every authored file through core-registry types and
-  validation and resolving fixture and gold paths. Reading: SPEC §8.2, §5 lexicon paragraph, §8.6
-  ids, §8.4. Consumes core-registry.1 types and core-registry.2 validation. Gate: `cargo test -p
-  ckc-core --test fixtures_v1`. 65% 129K/200K f85c716
-- [x] cli-runner.1.1: ckc-cli crate foundation: workspace member building the ckc binary; dispatch
-  for the §3 four-command surface (registry check; run --experiment --out; replay; trace --run
-  --finding argument shapes; commands pending implementation return typed unsupported total
-  results); CLI invariants wired once: validate inputs, emit §4.6 JSONL events, write only under the
-  output directory, end with exactly one §4.4 total operation result; dispatch and shell tests.
-  Reading: SPEC §3 crate table, CLI surface and invariants, §4.4 total result, §4.6 events. Consumes
-  core-enums-envelope.1 TotalOperationResult and core-enums-envelope.2 EventRecord. Gate: `cargo
-  test -p ckc-cli`. 68% 137K/200K adc4b18
-- [x] cli-runner.1.2: Implement ckc registry check end-to-end: load the three seeded registry files
-  through core-registry.1, run core-registry.2 validation including experiment resolution and the
-  stage chain, map findings to the severity-aggregated §4.4 outcome inside the cli-runner.1.1 shell.
-  Closes §8.5 item 2. Reading: SPEC §3 CLI surface, §8.4, §4.4 outcome severity. Consumes
-  cli-runner.1.1 dispatch, core-registry.2, fixtures-v1 registry files. Gate: `cargo run -p ckc-cli
-  -- registry check`. 60% 121K/200K 9efecc2
-- [x] stage-extract.1: Extract stage core in a new extract module of ckc-cli; tables defer to
-  stage-extract.2 (table elements ride the unknown-flow residual path until then). Dependencies
-  are decided — skip re-research: workspace scraper 0.27 with default-features = false, features
-  `["errors", "deterministic"]` (html5ever DOM; Html::errors is gated behind errors), plus direct
-  ego-tree 0.11 (scraper's arena, unexported by scraper, names NodeRef). Surface: ExtractConfig
-  {document_id, source_family, provenance, data_class, producer}, ExtractError {Utf8, Grounding,
-  Canon}, extract(html: &[u8], &ExtractConfig) -> Result<ArtifactEnvelope<SourceGraph>,
-  ExtractError>. Walk body (html5ever guarantees html/head/body): counter ids `n.<k>`/`s.<k>`/
-  `r.<k>` minted in walk order under the document root; h1-h6 drive a section stack (pop depths
-  >= level; heading text spans the section node itself — grounding.rs sanctions structural-node
-  spans); p maps to paragraph; ul/ol map to list with li children as paragraphs; every nonempty
-  trimmed textual unit gets one SourceSpan::derive span at offset 0 with strictly increasing
-  reading_order plus one {node,span} region; whitespace-only units mint nothing; anchors stay an
-  empty set (§4.5 subspan anchors belong to later stages). extraction_uncertain residuals: one
-  per Html::errors parse error (payload key detail, grounded in one memoized whole-document
-  region) and one per unknown flow element or stray text (grounded in the parent node's region).
-  graph.validate licensed by residual region node ids, then the §4.4 envelope:
-  schema.source_graph, `<document_id>.source_graph`, kind source_graph, config.producer,
-  deterministic_compiler, mechanical_authority, empty input_hashes/accepted_effects/trace_refs/
-  runtime_metadata, content_hash(&graph), canonicalization_policy_hash(). Tests on inline HTML
-  literals only: walk shape, both residual classes, byte-identical double extract plus
-  read_canonical strict-read, non-UTF8 input gives ExtractError::Utf8. Reading: SPEC §8.3 extract
-  row, §4.5, §4.4, §7.4; grounding.rs, envelope.rs and enums.rs surfaces, shell.rs static_id.
-  Consumes core-grounding, core-enums-envelope.2, cli-runner.1.1 crate. Gate: `cargo test -p
-  ckc-cli extract::`. 70% 140K/200K 7be225a
-- [x] stage-extract.2: Table extraction completing the extract module: replace the table residual
-  path with a real arm — scan direct children accepting caption, colgroup, col, thead, tbody,
-  tfoot, tr (html5ever wraps bare tr in tbody), at most one caption minting a textual caption
-  node; rows flatten in document order; each cell node parents DIRECTLY to the table node with
-  attrs row and col as 0-based decimal strings plus header "true" on th, absent on td — exactly
-  the DocIr::from_graph cell contract (ir.rs TableCell/CellRole); an empty cell mints no node yet
-  still occupies its column index. Rejection — any rowspan or colspan other than "1", nested
-  table, second caption, stray non-whitespace text, unknown child element — emits one
-  table_structure_uncertain residual whose region names the table node and withholds every cell
-  while the table node stays (DocIr then withholds the table from the view). Tests: pin
-  v1_guideline_a's full node/span shape from observed output (sections, recommendation and
-  exception paragraphs, 4x2 definitions table with th header row, evidence list) and run
-  DocIr::from_graph over it; all three committed fixtures extract residual-free; rejected-table
-  inline cases withhold cells and DocIr drops the table. Reading: SPEC §8.3 extract row, §8.2;
-  ir.rs DocIr::from_graph and TableCell; extract.rs (edit target). Consumes stage-extract.1
-  module, fixtures-v1 HTML. Gate: `cargo test -p ckc-cli extract::`. 62% 124K/200K b5a9054
-- [x] stage-segment: Segment stage in a segment module: rule-based segmentation keyed on fixture
-  structure (CQ headings, recommendation and exception sentence markers, definition table rows,
-  evidence lists) producing ClinicalSegments with region refs; envelope-wrapped segments.json
-  payload; segmentation_boundary_error diagnostics on misses. Reading: SPEC §8.3 segment row, §8.2
-  markers, §5 ClinicalSegment row, §4.4. Consumes stage-extract.2 SourceGraph, core-ir.1 types.
-  Gate: `cargo test -p ckc-cli segment::`. 69% 138K/200K 89bdf26
-- [x] stage-normalize.1a: Lexicon loader opening a normalize module in ckc-cli: add serde and
-  serde-saphyr workspace deps to the crate, wire `pub mod normalize` plus a lib.rs doc line;
-  pub load_lexicon(bytes: &[u8]) -> Result<Lexicon, LexiconError> deserializing private
-  deny_unknown_fields serde structs then validating into Lexicon {system: Id, content_hash:
-  Hash as hash_bytes over the raw file bytes (§4.4), concepts: Vec<LexiconConcept {concept_id,
-  surfaces, interval: Option<QuantityInterval>}>, actions: Vec<LexiconAction {action_id,
-  surfaces}>, modality: Vec<LexiconModality {surface, direction: Direction, strength: Strength,
-  implies_action: Option<Id>}>, certainty: Vec<LexiconCertainty {surface, value: Certainty}>};
-  every surface normalized StringPolicy::SemanticJa with surfaces[0] the representative;
-  LexiconError {Yaml(String), Invalid(String)} rejecting duplicate ids (one pool across
-  concepts and actions), empty or duplicate surface lists per entry, duplicate
-  modality/certainty surfaces, intervals violating the core-ir.5 rule (>=1 bound, <=1 per side,
-  nonempty range); one surface shared across concepts stays legal — it is the ambiguity source
-  .1b consumes. Tests: committed ja_core.yaml loads (pin ids/intervals from observed output),
-  one rejection per Invalid class. Reading: SPEC §5 lexicon paragraph, §4.4 hash_bytes;
-  corpus/lexicon/ja_core.yaml shape comment; segment.rs error and test style. Consumes
-  fixtures-v1 lexicon, core-ir.2 types. Gate: `cargo test -p ckc-cli normalize::`.
-  60% 119K/200K 14bb86f
-- [x] stage-normalize.1b: Mention binding in normalize.rs: pub bind_segments(graph:
-  &SourceGraph, segments: &SegmentIr, lexicon: &Lexicon) -> (Vec<TerminologyBinding>,
-  Vec<DiagnosticRecord>) over recommendation and exception segments only, in document order:
-  resolve each segment's region_ids to spans, sort by reading_order, dedupe repeated spans;
-  scan each span's text normalized SemanticJa greedy left-to-right longest-match against all
-  concept surfaces (a match consumes its bytes); candidate set = the concepts sharing the
-  matched surface; per segment mint one binding per distinct candidate set in first-match order
-  (a later match of the same set only extends region_ids); binding_id = document-wide counter
-  bind.<k>; singleton set: code = the concept, status exact when surfaces[0] matched else
-  synonym; multi set: status ambiguous, code = byte-lowest candidate, alternatives = all
-  candidates, plus one terminology_ambiguous Ambiguity diagnostic (§5); alternatives and
-  region_ids in canonical set order; unmapped text mints nothing — demand-side residuals are
-  .1c. Tests: committed-fixture binding shapes pinned from observed output; inline
-  shared-surface lexicon for the ambiguous path. Reading: SPEC §5 binding contract, §8.2
-  sentences; ir.rs TerminologyBinding; segment.rs region resolution. Consumes
-  stage-normalize.1a Lexicon, stage-segment SegmentIr. Gate: `cargo test -p ckc-cli
-  normalize::`. 69% 138K/200K 23a8ccf
-- [x] stage-normalize.1c: Behavior-frozen refactor carving the per-segment binding core out of
-  bind_segments so .1d statement building can call it per segment; zero public-surface change,
-  zero test edits — the existing normalize:: tests are the behavior authority. Internals: struct
-  GraphIndex<'a> {spans, regions} indexing the graph once, with segment_spans(&self, segment:
-  &ClinicalSegment) -> Vec<(&SourceSpan, Vec<&Id>)> resolving region_ids to deduped spans sorted
-  by reading_order, each span paired with the region ids naming it; struct ConceptTable<'a>
-  built once from the lexicon (longest-first surface list, surface -> candidate concepts,
-  exact-vs-synonym representative lookup); free fns longest_first(surfaces) -> Vec<&str>
-  (byte-length desc, ties by bytes) and scan(text, surfaces) -> Vec<&str> (greedy left-to-right
-  longest-match, a match consumes its bytes) — .1d reuses both for verb/modality/certainty
-  tables; dedup_keep_first<T: PartialEq>(&mut Vec<T>); bind_segment(spans, table, system, next:
-  usize) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) holding the .1b per-segment
-  candidate-set logic with binding_id = bind.<next + local index>; bind_segments shrinks to the
-  rec/exc loop over these. Reading: normalize.rs in full (edit target). Consumes
-  stage-normalize.1b. Gate: `cargo test -p ckc-cli normalize::` with the test module untouched.
-  53% 105K/200K e3c4d7f
-- [x] stage-normalize.1d: Recommendation statements: pub clinical_ir(graph: &SourceGraph,
-  segments: &SegmentIr, lexicon: &Lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>) running the
-  .1c binding core per recommendation/exception segment in document order (bindings and binding
-  diagnostics byte-equal to bind_segments — assert equality in a test), then building at most
-  one statement per recommendation segment; exception segments bind only (clause attachment is
-  .1e) so every statement ships exceptions: []. Diagnostics accumulate in document order,
-  binding diagnostics before that segment's slot diagnostics. StatementTables built once: verb
-  surface -> Vec<action id> (one surface may serve several actions), modality surface ->
-  &LexiconModality, certainty surface -> Certainty, every surface list longest-first. Slot
-  readings per segment: from its exact/synonym bindings split by code namespace — pop.*
-  population, drug.* action target, else condition (ambiguous bindings contribute nothing); from
-  scan over its span texts — verbs, modality phrases, certainty phrases. A modality reading's
-  value is the (Direction, Strength) pair ONLY; implies_action ids collect separately as kind
-  fallback (kinds = verbs if any verb matched, else implied) — guideline_b's 投与しないこと(禁忌)
-  hits two phrases sharing (contraindicate, strong) that must dedupe to one reading.
-  dedup_keep_first every list. Slot rule (shared helper; payload [(detail, <text>), (segment,
-  <segment_id>)], region_ids = the segment's regions, artifact_hashes empty): zero modality
-  readings or zero kinds -> semantic_slot_missing Residual ("no modality phrase" / "no action
-  kind"); zero targets -> terminology_unmapped Residual ("no action target"); >1 distinct
-  readings for modality/kind/target -> terminology_ambiguous Ambiguity ("ambiguous <slot>:
-  <values sorted, comma-joined>", modality values rendered "<direction> <strength>"); each
-  withholds the statement while bindings and diagnostics still emit. Certainty: zero -> None;
-  one -> Some; >1 -> terminology_ambiguous ("ambiguous certainty: ...") with None and the
-  statement KEPT. Mint stmt.<k> counting kept statements: population/condition as
-  ContextAtom::Concept sorted+deduped (interval lowering stays .2), action =
-  Action::new(kinds[0], targets[0]), modality/strength from the single reading, certainty,
-  source_segment_ids = {segment}. Field shapes, saving the ir.rs read: ClinicalStatement
-  {statement_id, population (set), condition (set), action, modality, strength, certainty
-  (omitted when None), exceptions (array), source_segment_ids (set)}; ClinicalIr {bindings,
-  statements}; Action::new(kind, target) derives key kind:target. Module doc paragraph plus
-  lib.rs sentence. Tests: pin guideline_b (verb 投与 matches inside 投与しないこと) and control
-  (kind via 禁忌 implies_action) statements from observed output — guideline_a's pin waits for
-  .1e; inline lexicons drive one case per withhold class (marker 考慮してもよい classifies the
-  segment recommendation while an inline lexicon omits it from modality -> zero modality
-  readings) and both certainty paths. Reading: SPEC §8.3 normalize row, §5 statement contract;
-  normalize.rs (edit target). Consumes stage-normalize.1c core. Gate: `cargo test -p ckc-cli
-  normalize::`. 68% 136K/200K _
+- [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 10bf054
+- [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 3813a4d
+- [x] core-canon-writer: canonical JSON writer core + ObjectEmitter. 43% 86K/200K 1adc76b
+- [x] core-canon-collections: arrays/sets/maps over the writer core. 41% 82K/200K 0e13c14
+- [x] core-canon-unions: tagged-union + fieldless-enum emission. 30% 61K/200K 97a3a46
+- [x] core-canon-reader: strict reader, the writer's inverse (solo). 28% 55K/200K 0353438
+- [x] core-canon-hash: content_hash/hash_bytes + policy descriptor. 36% 72K/200K c568017
+- [x] core-enums-envelope.1: ten §4.4 enums + DiagnosticRecord + TotalOperationResult.
+  59% 118K/200K a27a723
+- [x] core-enums-envelope.2: ArtifactEnvelope + EventRecord + JSONL. 64% 128K/200K 0876269
+- [x] core-grounding: SourceDocument/Graph/Span/Anchor/Region + invariants.
+  68% 135K/200K 0c416ee
+- [x] core-ir.1: DocIR + SegmentIR layers, structural-hash pattern. 72% 144K/200K 81a541b
+- [x] core-ir.2: ClinicalIR + NormIR layers, §8.6 byte pin. 72% 145K/200K cb7df1e
+- [x] core-ir.3: FormalIR layer + directions_opposed + pair slots. 61% 122K/200K 2bd8aad
+- [x] core-ir.4: IrBundle assembly + components + hashes (bundle.rs). 85% 170K/200K 1fa9d17
+- [x] core-ir.5: ten-invariant bundle validation + rejection suite.
+  >=90% compacted/200K f39e2f6
+- [x] core-plans: RunPlan/RunManifest/ReplayManifest. 53% 106K/200K 90a1654
+- [x] core-registry.1: registry entry types + YAML loading. 56% 113K/200K 907e20b
+- [x] core-registry.2: registry validation + stage-chain rule. 48% 97K/200K 1225b1a
+- [x] fixtures-v1: three fixture HTMLs, ja_core lexicon, gold, registry seeds.
+  65% 129K/200K f85c716
+- [x] cli-runner.1.1: ckc-cli crate, four-command dispatch + CLI invariants.
+  68% 137K/200K adc4b18
+- [x] cli-runner.1.2: ckc registry check end-to-end. 60% 121K/200K 9efecc2
+- [x] stage-extract.1: extract stage core, DOM walk + residuals. 70% 140K/200K 7be225a
+- [x] stage-extract.2: table extraction + fixture pins. 62% 124K/200K b5a9054
+- [x] stage-segment: rule-based segmentation stage. 69% 138K/200K 89bdf26
+- [x] stage-normalize.1a: lexicon loader. 60% 119K/200K 14bb86f
+- [x] stage-normalize.1b: mention binding. 69% 138K/200K 23a8ccf
+- [x] stage-normalize.1c: behavior-frozen binding-core refactor. 53% 105K/200K e3c4d7f
+- [x] stage-normalize.1d: recommendation statement builder. 68% 136K/200K _
 - [ ] stage-normalize.1e: Exception clauses completing clinical_ir: an exception segment's
   exact/synonym binding codes become ContextAtom::Concept atoms sorted+deduped in
   ExceptionClause {exception_id = exc.<k> counting attached clauses, atoms, region_ids = the

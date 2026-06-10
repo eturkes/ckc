@@ -2,7 +2,15 @@
   "permissions": {
     "deny": [
       "Read(./.git/**)",
-      "Read(./LICENSE)"
+      "Read(./LICENSE)",
+      "Read(./Cargo.lock)",
+      "Read(./target/**)",
+      "Read(./runs/**)",
+      "Read(./corpus/raw/**)",
+      "Read(./.serena/cache/**)",
+      "Read(./.serena/memories/**)",
+      "Read(./.serena/project.local.yml)",
+      "Read(./.claude/marketplace/**)"
     ]
   },
   "enabledPlugins": {
