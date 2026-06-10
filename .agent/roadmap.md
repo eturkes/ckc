@@ -43,15 +43,15 @@ next plan session removes their checklists (git history retains them).
   {tag,value} with identifier_ascii tags via ObjectEmitter, tag byte-sorted before value; fieldless
   enums emitted as identifier_ascii strings. Reading:
   SPEC §4.3. Consumes
-  core-canon-writer core. Gate: `cargo test -p ckc-core canon::`. 30% 61K/200K _
-- [ ] core-canon-reader: Strict canonical reader as the writer's inverse, scheduled solo: CanonRead
+  core-canon-writer core. Gate: `cargo test -p ckc-core canon::`. 30% 61K/200K 97a3a46
+- [x] core-canon-reader: Strict canonical reader as the writer's inverse, scheduled solo: CanonRead
   trait, Reader cursor, read_canonical requiring full consumption;
   read_string/read_int/read_string_policy admitting only writer output (minimal escapes, canonical
   decimals, already-normalized policy strings); ObjectReader demanding fields in ascending byte
   order; read_array/read_set/read_map/read_union enforcing strictly ascending sort keys and exact
   {tag,value} shape; CanonReadError taxonomy rejecting unknown/duplicate/misordered fields, null,
   bare numerics, non-reduced rationals; write-read round-trip tests. Reading: SPEC §4.3. Consumes core-canon-writer, core-canon-collections, core-canon-unions. Gate: `cargo test -p
-  ckc-core canon::`.
+  ckc-core canon::`. 28% 55K/200K _
 - [ ] core-canon-hash: Hashing in a hash module: sha2 dep; content_hash as sha256 over
   canonical_payload_bytes wrapped as Hash; hash_bytes raw-byte primitive for _hash fields declared
   over raw bytes; CanonicalizationPolicy descriptor type with pinned canonical bytes and
