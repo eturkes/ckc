@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.git/**)",
+      "Read(./LICENSE)"
+    ]
+  },
+  "enabledPlugins": {
+    "json-lsp@ckc-lsps": true,
+    "yaml-lsp@ckc-lsps": true,
+    "markdown-lsp@ckc-lsps": true,
+    "toml-lsp@ckc-lsps": true,
+    "xml-lsp@ckc-lsps": true,
+    "turtle-lsp@ckc-lsps": true,
+    "lean4-lsp@ckc-lsps": true,
+    "alloy-lsp@ckc-lsps": true,
+    "prolog-lsp@ckc-lsps": true,
+    "dolmen-lsp@ckc-lsps": true,
+    "souffle-lsp@ckc-lsps": true,
+    "egglog-lsp@ckc-lsps": true
+  },
+  "extraKnownMarketplaces": {
+    "ckc-lsps": {
+      "source": {
+        "source": "directory",
+        "path": ".claude/marketplace"
+      }
+    }
+  }
+}

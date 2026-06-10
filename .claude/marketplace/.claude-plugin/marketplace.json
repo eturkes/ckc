@@ -1,0 +1,277 @@
+{
+  "name": "ckc-lsps",
+  "owner": {
+    "name": "ckc agents",
+    "email": "agents@ckc.local"
+  },
+  "metadata": {
+    "description": "Project-local LSP plugins for the CKC workspace, covering the formal-methods, data, and markup formats used across the project. Server binaries must be present on PATH; see plugin READMEs for install commands."
+  },
+  "plugins": [
+    {
+      "name": "json-lsp",
+      "description": "JSON LSP via vscode-json-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/json-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-json": {
+          "command": "vscode-json-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".json": "json",
+            ".jsonc": "jsonc"
+          }
+        }
+      }
+    },
+    {
+      "name": "yaml-lsp",
+      "description": "YAML LSP via yaml-language-server (Red Hat)",
+      "version": "1.0.0",
+      "source": "./plugins/yaml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "yaml": {
+          "command": "yaml-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".yaml": "yaml",
+            ".yml": "yaml"
+          }
+        }
+      }
+    },
+    {
+      "name": "markdown-lsp",
+      "description": "Markdown LSP via marksman",
+      "version": "1.0.0",
+      "source": "./plugins/markdown-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "marksman": {
+          "command": "marksman",
+          "args": ["server"],
+          "extensionToLanguage": {
+            ".md": "markdown",
+            ".markdown": "markdown"
+          }
+        }
+      }
+    },
+    {
+      "name": "toml-lsp",
+      "description": "TOML LSP via taplo",
+      "version": "1.0.0",
+      "source": "./plugins/toml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "taplo": {
+          "command": "taplo",
+          "args": ["lsp", "stdio"],
+          "extensionToLanguage": {
+            ".toml": "toml"
+          }
+        }
+      }
+    },
+    {
+      "name": "html-lsp",
+      "description": "HTML LSP via vscode-html-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/html-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-html": {
+          "command": "vscode-html-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".html": "html",
+            ".htm": "html"
+          }
+        }
+      }
+    },
+    {
+      "name": "css-lsp",
+      "description": "CSS LSP via vscode-css-language-server (from vscode-langservers-extracted)",
+      "version": "1.0.0",
+      "source": "./plugins/css-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "vscode-css": {
+          "command": "vscode-css-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".css": "css",
+            ".scss": "scss",
+            ".less": "less"
+          }
+        }
+      }
+    },
+    {
+      "name": "svelte-lsp",
+      "description": "Svelte LSP via svelteserver",
+      "version": "1.0.0",
+      "source": "./plugins/svelte-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "svelte": {
+          "command": "svelteserver",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".svelte": "svelte"
+          }
+        }
+      }
+    },
+    {
+      "name": "lean4-lsp",
+      "description": "Lean 4 LSP via lake serve",
+      "version": "1.0.0",
+      "source": "./plugins/lean4-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "lean4": {
+          "command": "lake",
+          "args": ["serve"],
+          "extensionToLanguage": {
+            ".lean": "lean4"
+          }
+        }
+      }
+    },
+    {
+      "name": "turtle-lsp",
+      "description": "Turtle/RDF LSP via Stardog turtle-language-server",
+      "version": "1.0.0",
+      "source": "./plugins/turtle-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "turtle": {
+          "command": "turtle-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": {
+            ".ttl": "turtle",
+            ".nt": "turtle"
+          }
+        }
+      }
+    },
+    {
+      "name": "xml-lsp",
+      "description": "XML LSP via Eclipse LemMinX; covers DMN, BPMN, SHACL-XML and generic XML/XSD",
+      "version": "1.0.0",
+      "source": "./plugins/xml-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "lemminx": {
+          "command": "lemminx",
+          "extensionToLanguage": {
+            ".xml": "xml",
+            ".xsd": "xml",
+            ".dmn": "xml",
+            ".bpmn": "xml"
+          }
+        }
+      }
+    },
+    {
+      "name": "alloy-lsp",
+      "description": "Alloy 6 LSP via the `lsp` subcommand of org.alloytools.alloy.dist.jar",
+      "version": "1.0.0",
+      "source": "./plugins/alloy-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "alloy": {
+          "command": "alloy-lsp",
+          "extensionToLanguage": {
+            ".als": "alloy"
+          }
+        }
+      }
+    },
+    {
+      "name": "prolog-lsp",
+      "description": "SWI-Prolog LSP via jamesnvc/lsp_server pack",
+      "version": "1.0.0",
+      "source": "./plugins/prolog-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "prolog": {
+          "command": "prolog-lsp",
+          "extensionToLanguage": {
+            ".pl": "prolog",
+            ".pro": "prolog"
+          }
+        }
+      }
+    },
+    {
+      "name": "dolmen-lsp",
+      "description": "Dolmen LSP for SMT-LIB, TPTP, DIMACS, Zipperposition",
+      "version": "1.0.0",
+      "source": "./plugins/dolmen-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "dolmenls": {
+          "command": "dolmen-lsp",
+          "extensionToLanguage": {
+            ".smt2": "smtlib",
+            ".cnf": "dimacs",
+            ".icnf": "dimacs",
+            ".p": "tptp",
+            ".tptp": "tptp",
+            ".zf": "zf"
+          }
+        }
+      }
+    },
+    {
+      "name": "souffle-lsp",
+      "description": "Soufflé Datalog LSP via jdaridis/souffle-lsp-plugin",
+      "version": "1.0.0",
+      "source": "./plugins/souffle-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "souffle": {
+          "command": "souffle-lsp",
+          "extensionToLanguage": {
+            ".dl": "souffle"
+          }
+        }
+      }
+    },
+    {
+      "name": "egglog-lsp",
+      "description": "egglog LSP via hatoo/egglog-language-server",
+      "version": "1.0.0",
+      "source": "./plugins/egglog-lsp",
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "egglog": {
+          "command": "egglog-lsp",
+          "extensionToLanguage": {
+            ".egg": "egglog"
+          }
+        }
+      }
+    }
+  ]
+}
