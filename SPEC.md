@@ -97,7 +97,7 @@ Working style (Fable 5):
 - Lead final reports with the outcome, in plain sentences a reader without your working context
   can follow.
 
-Spec evolution: the spec grows in place. When a milestone closes (its review stamp lands), the
+Spec evolution: the spec grows in place. When a milestone closes (its closing review lands), the
 plan session that opens the next milestone is an elaboration session while that milestone's
 contract section is still compact: expand it into full normative text (workflow-driven; mine
 `docs/` through subagents), present the diff to the user for review, then seed

@@ -2,13 +2,15 @@
 
 Build plan consumed by the /session-prompt command; SPEC.md is the design
 authority, its §2 the milestone sequence. One milestone at a time: a header
-`## <milestone> — plan <hash>`, stamped `— review <hash>` by its closing
-review (the pair bounds the milestone's commits; acceptance adds the evidence
-run id per SPEC §1), over an ordered unit checklist. Completed items gain `[x]`
-plus trailing `NN% NNNK/200K <hash>` (context usage from
-`.agent/compaction.sh`, then the completing commit). Plan/review stamps carry
-no usage. Closed milestones persist as bare headers; the next plan session
-removes their checklists (git history retains them).
+`## <milestone> — plan <hash> — review <hash>` (plan opens, review closes, the
+pair bounds the milestone's commits; acceptance adds the evidence run id per
+SPEC §1) over an ordered unit checklist. Completed items gain `[x]` plus
+trailing `NN% NNNK/200K <hash>` (context usage, then the completing commit);
+plan/review stamps carry no usage. A commit cannot contain its own hash, so a
+session writes `_` in its own hash slot and the next unit of roadmap work
+fills it (at most one `_` pending; resolve via commit scopes `<unit-id>:`,
+`plan-v<n>:`, `review-v<n>:`). Closed milestones persist as bare headers; the
+next plan session removes their checklists (git history retains them).
 
 ## V1 spine — plan e6523e9
 

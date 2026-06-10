@@ -17,10 +17,13 @@ hash of the session that completed them (`NN% NNNK/200K <hash>`); milestone
 headers record the commit that opened the milestone (`plan <hash>`) and the
 commit that closed it (`review <hash>`), so the pair bounds the milestone's
 commit range. Plan and review stamps carry hashes only, never usage. A commit
-cannot contain its own hash, so a roadmap-mode session closes with two
-commits: its substantive commit, then a `roadmap:`-scoped stamp commit that
-writes the substantive commit's short hash into the item line or header.
-Usage comes from `.agent/compaction.sh`, run right before staging.
+cannot contain its own hash, so hashes land lazily: a session writes `_` in
+its own hash slot, and the next unit of roadmap work fills the latest `_`
+within its single closing commit, resolving it from commit scopes (`git log
+--oneline`; item commits are scoped `<unit-id>:`, plan commits `plan-v<n>:`,
+review commits `review-v<n>:`). At most one `_` is pending at a time;
+execute-task sessions neither fill nor create one. Usage comes from
+`.agent/compaction.sh`, run right before staging.
 
 ## Step 1: Load context
 
@@ -38,20 +41,22 @@ this command.
   matching session.
 - **Non-blank** ⇒ *execute-task mode*: the argument is this session's sole task
   and overrides the roadmap. Skip "Select session type"; carry the task out,
-  then commit per CLAUDE.md (one commit covering the work, no stamp). Leave the
-  roadmap untouched unless the task itself directs an edit.
+  then commit per CLAUDE.md (one commit covering the work; leave any pending
+  `_` alone). Leave the roadmap untouched unless the task itself directs an
+  edit.
 
 ### Select session type (roadmap mode)
 
 The current milestone is the last header in the roadmap:
 
-- Its header lacks a `review` stamp and an unchecked item exists →
+- Its header lacks a `review` marker and an unchecked item exists →
   **Implement** the first unchecked item (a line marked `user-selected` → stop
   and confirm scope with the user first).
-- Its header lacks a `review` stamp and every item is checked → **Review**.
-- Its header carries a `review` stamp → the milestone is closed → **Plan** the
-  next SPEC §2 milestone. No milestone left → the spec is fully implemented;
-  report and stop.
+- Its header lacks a `review` marker and every item is checked → **Review**.
+- Its header carries a `review` marker (hash or pending `_`) → the milestone
+  is closed → **Plan** the next SPEC §2 milestone. No milestone left → fill a
+  pending `_` if one exists (one small commit), report the spec fully
+  implemented, and stop.
 
 ## Plan session
 
@@ -83,10 +88,11 @@ what fits a window — plus the memory.md sizing anchors. Each unit line is one
 conceptual deliverable with explicit file paths, real identifiers, its reading
 slice, and exactly one gate command.
 
-Closing: the substantive commit appends the new milestone header + checklist
-and deletes the previous milestone's items, keeping its bare header — a closed
-milestone collapses to that one line (git history retains the rest). Stamp
-`plan <hash>` on the new header and end the session.
+Closing: one commit, scoped `plan-v<n>:` — fill the previous milestone's
+pending `review _`, delete its items keeping the bare header (a closed
+milestone collapses to that one line; git history retains the rest), and
+append the new milestone header `## <milestone> — plan _` + checklist. End the
+session.
 
 Every other session type stays single-context: ad-hoc read-only subagent
 lookups (`docs/`) remain available everywhere, and the `Workflow`
@@ -100,9 +106,9 @@ Read `git show HEAD` to match the previous unit's patterns. Implement the
 unit's deliverable; run its acceptance gate until green; run the full test
 suite.
 
-The substantive commit covers work + roadmap (item marked `[x]` with its usage
-annotation), with the unit id as the scope (e.g. `<unit-id>: …`). Stamp the
-item's hash and end.
+One closing commit covers work + roadmap — fill any pending `_`, mark the item
+`[x]` with its usage annotation and a fresh `_` hash slot — with the unit id
+as the scope (e.g. `<unit-id>: …`). End the session.
 
 ### Splitting (when a unit overruns)
 
@@ -115,8 +121,8 @@ explicit file paths, real identifiers from the existing codebase, and exactly
 one gate command (the unit's full gate lands on the final sub-line; give
 earlier sub-lines narrower test commands); calibrate granularity from
 neighbouring items' usage annotations. Replace the unit's line with the
-`<unit-id>.1`, `<unit-id>.2`, … sub-lines, commit the split plan (no stamp),
-and end the session.
+`<unit-id>.1`, `<unit-id>.2`, … sub-lines, commit the split plan in one commit
+(fill any pending `_`; the split creates none), and end the session.
 
 ## Review session
 
@@ -138,10 +144,10 @@ are in scope: when the analysis exposes a better contract or design, edit
 SPEC.md in the same session (contract-affecting amendments reach the user
 first, per SPEC §1).
 
-Close the milestone: the substantive commit carries the corrections (or, for a
-clean review, states that with `--allow-empty`); stamp `review <hash>` on the
-milestone header — reviews record no usage. The next roadmap-mode session
-plans the next milestone.
+Close the milestone in one commit, scoped `review-v<n>:` — fill the last
+item's pending `_`, carry the corrections (or state the review was clean), and
+mark the header `— review _`; reviews record no usage. The next roadmap-mode
+session — the plan session for the next milestone — fills the review hash.
 
 ## Task argument
 
