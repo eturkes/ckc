@@ -40,9 +40,18 @@ technically derivable but easily forgotten under token pressure.
   committed fixtures splits into walker-core (inline-literal tests) and format-completion +
   fixture-integration; expected node/span shapes get pinned from observed output by the
   implementing session — hand-computed expectations written before code runs anchor wrong.
-  Research tooling: the WebSearch tool currently 400s ("tool_choice forces tool use is not
-  compatible with this model"); research deps via curl against the crates.io API
-  (https://crates.io/api/v1/crates/NAME) with a `-A` user-agent header (403 without one).
+  Research tooling: see the search-channel status entry below.
+- [2026-06-10] Search-channel status (all verified live this date). The WebSearch tool 400s
+  ("tool_choice forces tool use is not compatible with this model"); the error arrives INLINE in
+  an ok-looking result (is_error unset), so read result bodies — re-test after model/CC updates
+  and drop this clause when healed. Working channels: general web search = WebFetch on
+  `https://lite.duckduckgo.com/lite/?q=<query>` (Anthropic egress passes DDG's bot wall; sandbox
+  curl to DDG gets a block page); crates.io via curl with a `-A` user-agent header (403 without
+  one) — detail https://crates.io/api/v1/crates/NAME, search .../crates?q=<terms>&sort=relevance;
+  GitHub https://api.github.com/search/repositories?q= and Wikipedia opensearch work
+  unauthenticated. Meta-rule this entry reinforces: the session that FIRST hits an
+  environment/tool failure records it to memory in that same session — the registry.1 session hit
+  this 400 hours before stage-extract re-discovered it, and the gap cost two more dead calls.
 - [2026-06-09] RTK proxy mangles `git commit` with multiple `-m` flags whose
   values carry non-ASCII (`§`, em-dash `—`): args get dropped/split, leaving a
   bare space git reads as a pathspec ("pathspec ' ' did not match any file(s)"),
