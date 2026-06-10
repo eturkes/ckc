@@ -18,12 +18,15 @@
 //! [`DiagnosticRecord`] and the §4.4 [`TotalOperationResult`];
 //! `core-enums-envelope.2` wraps payloads in the §4.4 [`ArtifactEnvelope`]
 //! and frames §4.6 [`EventRecord`]s and diagnostics as canonical JSONL
-//! ([`write_jsonl`], [`read_jsonl`]).
+//! ([`write_jsonl`], [`read_jsonl`]). `core-grounding` adds the SPEC §4.5
+//! source-grounding layer ([`SourceGraph`] with its document, nodes, spans,
+//! anchors, and regions, validated by [`SourceGraph::validate`]).
 #![forbid(unsafe_code)]
 
 mod canon;
 mod enums;
 mod envelope;
+mod grounding;
 mod hash;
 mod id;
 mod strings;
@@ -42,6 +45,10 @@ pub use enums::{
 pub use envelope::{
     ArtifactEnvelope, Effect, EnvelopeError, EventRecord, Producer, SCHEMA_VERSION, jsonl_line,
     read_jsonl, write_jsonl,
+};
+pub use grounding::{
+    AnchorKind, DataClass, GroundingError, NodeKind, Provenance, RefKind, SourceAnchor,
+    SourceDocument, SourceGraph, SourceNode, SourceRegion, SourceSpan,
 };
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};

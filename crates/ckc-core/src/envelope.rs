@@ -10,12 +10,10 @@
 
 use std::fmt;
 
-use num_bigint::BigInt;
-
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    canonical_payload_bytes, emit_int, emit_map, emit_set, emit_string, read_canonical, read_int,
-    read_map, read_set, read_string,
+    canonical_payload_bytes, emit_map, emit_raw_map, emit_set, emit_string, emit_u64,
+    read_canonical, read_map, read_raw_map, read_set, read_string, read_u64,
 };
 use crate::enums::{Authority, DiagnosticRecord, Origin, Outcome, fieldless_enum};
 use crate::hash::{canonicalization_policy_hash, content_hash};
@@ -369,23 +367,6 @@ impl CanonRead for EventRecord {
     }
 }
 
-/// A runtime-evidence string (timestamps, host facts): raw bytes, no §4.2
-/// policy normalization.
-struct RawText(String);
-
-impl Canonical for RawText {
-    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
-        emit_string(out, &self.0);
-        Ok(())
-    }
-}
-
-impl CanonRead for RawText {
-    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
-        Ok(RawText(read_string(r)?))
-    }
-}
-
 /// A canonical unsigned counter: the §4.3 decimal-string integer constrained
 /// to `u64`.
 struct Count(u64);
@@ -401,30 +382,6 @@ impl CanonRead for Count {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         Ok(Count(read_u64(r)?))
     }
-}
-
-fn emit_u64(out: &mut Vec<u8>, value: u64) {
-    emit_int(out, &BigInt::from(value));
-}
-
-/// Read a canonical integer and bound it to `u64`; negative or oversized
-/// values surface as [`CanonReadError::Integer`].
-fn read_u64(r: &mut Reader<'_>) -> Result<u64, CanonReadError> {
-    let n = read_int(r)?;
-    u64::try_from(&n).map_err(|_| CanonReadError::Integer(n.to_string()))
-}
-
-/// Emit `entries` as a §4.3 map of identifier keys to raw-text values
-/// (`runtime_metadata`).
-fn emit_raw_map(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Result<(), CanonError> {
-    let texts: Vec<RawText> = entries.iter().map(|(_, v)| RawText(v.clone())).collect();
-    emit_map(out, entries.iter().map(|(k, _)| k).zip(&texts))
-}
-
-/// Inverse of [`emit_raw_map`].
-fn read_raw_map(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, CanonReadError> {
-    let entries = read_map::<Id, RawText>(r)?;
-    Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
 }
 
 /// Emit `entries` as a §4.3 map of identifier keys to counter values

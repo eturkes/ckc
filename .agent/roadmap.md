@@ -74,15 +74,15 @@ next plan session removes their checklists (git history retains them).
   with authority and accepted_effects invariants; EventRecord with the §4.6 events.jsonl fields;
   JSONL serialization for both streams; envelope-invariant and round-trip tests. Reading: SPEC §4.4
   envelope table, §4.6. Consumes core-enums-envelope.1 enums and DiagnosticRecord, canon stack,
-  core-canon-hash. Gate: `cargo test -p ckc-core`. 64% 128K/200K _
-- [ ] core-grounding: Source grounding types in a grounding module: SourceDocument (source family,
+  core-canon-hash. Gate: `cargo test -p ckc-core`. 64% 128K/200K 0876269
+- [x] core-grounding: Source grounding types in a grounding module: SourceDocument (source family,
   provenance synthetic/public, raw/content hashes, data_class default none), SourceGraph with the
   §4.5 node kinds (document through CQ and recommendation), SourceSpan (node, offsets,
   raw/nfkc/search text, reading order, text hash), SourceAnchor, SourceRegion as closed support set;
   validate grounding invariants (every textual unit spanned or typed residual, region refs resolve,
   identical bytes plus config give identical graph bytes); canonical round-trips. Reading: SPEC
   §4.5. Consumes core-strings policies, canon stack, core-canon-hash. Gate: `cargo test -p ckc-core
-  grounding::`.
+  grounding::`. 68% 135K/200K _
 - [ ] core-ir.1: DocIR and SegmentIR layers in an ir module: layout-preserving text/table view over
   SourceGraph refs with extraction diagnostics; ClinicalSegment with the seven §5 kinds (CQ,
   recommendation, evidence, exception, definition, table-row, metadata) and region refs; canonical

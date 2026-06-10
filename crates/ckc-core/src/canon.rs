@@ -854,6 +854,49 @@ pub fn read_union<V>(
     Ok((tag, value))
 }
 
+/// A runtime-evidence or extractor-emitted string carried as raw bytes — no
+/// §4.2 policy normalization on write, none enforced on read. Crate-internal
+/// wrapper so raw strings can ride the [`Canonical`]/[`CanonRead`] generics
+/// (map values, set elements).
+pub(crate) struct RawText(pub(crate) String);
+
+impl Canonical for RawText {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        emit_string(out, &self.0);
+        Ok(())
+    }
+}
+
+impl CanonRead for RawText {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        Ok(RawText(read_string(r)?))
+    }
+}
+
+/// Emit a `u64` as the §4.3 decimal-string integer.
+pub(crate) fn emit_u64(out: &mut Vec<u8>, value: u64) {
+    emit_int(out, &BigInt::from(value));
+}
+
+/// Read a canonical integer and bound it to `u64`; negative or oversized
+/// values surface as [`CanonReadError::Integer`].
+pub(crate) fn read_u64(r: &mut Reader<'_>) -> Result<u64, CanonReadError> {
+    let n = read_int(r)?;
+    u64::try_from(&n).map_err(|_| CanonReadError::Integer(n.to_string()))
+}
+
+/// Emit `entries` as a §4.3 map of identifier keys to raw-text values.
+pub(crate) fn emit_raw_map(out: &mut Vec<u8>, entries: &[(Id, String)]) -> Result<(), CanonError> {
+    let texts: Vec<RawText> = entries.iter().map(|(_, v)| RawText(v.clone())).collect();
+    emit_map(out, entries.iter().map(|(k, _)| k).zip(&texts))
+}
+
+/// Inverse of [`emit_raw_map`].
+pub(crate) fn read_raw_map(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, CanonReadError> {
+    let entries = read_map::<Id, RawText>(r)?;
+    Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
