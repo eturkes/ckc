@@ -97,13 +97,71 @@ next plan session removes their checklists (git history retains them).
   NormRule (rule_id, context, direction, action, strength, source_region_ids, optional certainty and
   exception_refs); per-layer hashes; canonical bytes pinned against the §8.6 NormRule JSON. Reading:
   SPEC §5, §8.6 NormRule example. Consumes core-ir.1 layer/hash pattern. Gate: `cargo test -p
-  ckc-core ir::`. 72% 145K/200K _
-- [ ] core-ir.3: FormalIR layer and IRBundle: target-independent constraints, normalized
-  actions/contexts, contradiction-query plan slots shaped per §6; IRBundle assembling the five
-  layers with reusable component records (use sites), assumptions, diagnostics, per-layer plus
-  whole-bundle structural hashes; §5 IR-invariant validation (grounding refs, references, policy
-  completeness) before compilation. Reading: SPEC §5, §6 two-query plan shape. Consumes core-ir.1/.2
-  layers, core-grounding. Gate: `cargo test -p ckc-core`.
+  ckc-core ir::`. 72% 145K/200K cb7df1e
+- [ ] core-ir.3: FormalIR layer in ir.rs: pub fn directions_opposed over the §6 groups — positive
+  for/require/permit vs the against/avoid and contraindicate/avoid groups; FormalConstraint {action
+  (full self-contained Action), certainty (Option, omitted when absent), constraint_id, context
+  (ContextExpr), direction, rule_id, strength} with from_rule(&NormRule): constraint_id =
+  `fc.<rule_id>`, otherwise a straight projection since NormRule.context already folds exceptions;
+  ContradictionQueryPair plan slot {action_key, constraint_a_id, constraint_b_id (ascending by id
+  bytes), context_overlap_query_id, deontic_consistency_query_id, pair_id} holding §8.6-style
+  planner-minted query ids (planning itself lands in smt-emit.2); FormalIr {constraints (rule
+  order), plan (ordered array)} with derive(&NormIr) mapping rules and leaving plan empty.
+  Structural hashing: constraints via emit_structural_components (fresh scope each — constraint_id
+  i0, rule_id i1, action/context/enums verbatim); plan via emit_structural_array in the enclosing
+  FormalIr scope (a/b/overlap/deontic/pair ids localize to i0..i4, action_key verbatim). lib.rs
+  re-exports. Tests: derive + round-trips, computed canonical and structural byte pins,
+  directions_opposed truth table. Reading: SPEC §5, §6 two-query plan shape, §8.6 query ids; ir.rs
+  in full (edit target; reuse core-ir.2 patterns and fixtures). Consumes core-ir.2
+  NormIr/NormRule/Action/ContextExpr. Gate: `cargo test -p ckc-core ir::`.
+- [ ] core-ir.4: IRBundle assembly in a new bundle module (bundle.rs): expose the ir.rs structural
+  plumbing (Structural, RefLocalizer, structural_hash, emit_structural_components,
+  emit_structural_record_set, emit_structural_array) and its test fixtures pub(crate); add enums.rs
+  pub(crate) read_payload as emit_payload's inverse. ComponentKind fieldless enum
+  concept/action/segment/binding/statement/rule/constraint (population and condition reduce to
+  concept atoms in V1); ComponentRecord {component_id, kind, structural_hash, use_sites (set)} —
+  Canonical+CanonRead only, a derived index carrying no Structural impl; Assumption {assumption_id,
+  payload (§7.4 pairs via emit/read_payload), region_ids (set)} localizing ids with payload
+  verbatim; LayerHashes {clinical, doc, formal, norm, segment}; IrBundle {assumptions (set),
+  bundle_hash, clinical, components (set), diagnostics (set, bundle-level — extraction diags stay
+  in DocIr), doc, formal, layer_hashes, norm, segment}. assemble(doc, segment, clinical, norm,
+  assumptions, diagnostics) derives formal via FormalIr::derive, components, layer_hashes
+  (structural_hash per layer), and bundle_hash as one structural emission of layers + assumptions +
+  diagnostics (derived fields excluded — rename-stable). derive_components: structural-hash records
+  for segments (use_sites = statements via source_segment_ids), bindings and statements (empty),
+  rules (constraints via rule_id), constraints (plan pairs); content_hash vocabulary records —
+  actions keyed by Action.key (component_id = key) and concepts (component_id = concept id) drawn
+  from binding code+alternatives, statement population/condition/exception atoms, and
+  rule/constraint context atoms; use_sites sorted+deduped owner ids; records sorted by
+  canonical_sort_key so stored order equals canonical set order. lib.rs wires the module and
+  re-exports. Tests: assemble over a prefix-parameterized graph fixture pinning expected use_sites;
+  rename-stability (prefixed ids keep layer/bundle hashes while content_hash moves; a vocabulary
+  swap moves bundle_hash); bundle round-trip and canonical shape. Reading: SPEC §5
+  IRBundle/component/assumption rows, §4.3 sets, §7.4 payload; ir.rs fixtures and core-ir.3
+  surfaces. Consumes core-ir.1/.2/.3 layers, core-grounding regions, core-enums-envelope.1
+  DiagnosticRecord. Gate: `cargo test -p ckc-core bundle::`.
+- [ ] core-ir.5: IRBundle validation in bundle.rs: validate(&self, graph: &SourceGraph) ->
+  Result<(), BundleError> enforcing the §5 IR invariants in this pinned order — (1) DocIr layer
+  re-derives equal: DocIr::from_graph(graph, self.doc.diagnostics) == self.doc; (2) grounding:
+  graph.validate with residual node ids licensed by extraction_uncertain doc diagnostics (their
+  regions' nodes); (3) id uniqueness per pool: segment, binding, statement, exception, rule,
+  constraint, plan (pair_id plus both query ids), assumption; (4) segment support nonempty, then
+  every region ref resolves (segments, bindings, statement exceptions, rules, assumptions, bundle
+  diagnostics); (5) statements: Action::new key re-derivation, atom checks with QuantityInterval
+  coherence (at least one bound, at most one per side, nonempty: strict lo<hi else lo<=hi),
+  source_segment_ids resolve; (6) rules: key, context atoms, exception_refs resolve against
+  statement exceptions; (7) constraints: rule_id resolves and FormalConstraint::from_rule(rule)
+  equals the stored constraint (covers id derivation and the whole projection); (8) plan pairs:
+  constraint refs resolve, a < b by id bytes, action_key equals both constraints' keys,
+  directions_opposed holds; (9) components re-derive equal; (10) layer_hashes then bundle_hash
+  re-derive equal. BundleError with Display/Error/From<CanonError>: Doc(IrError), DocLayerMismatch,
+  Grounding(GroundingError), Duplicate{pool,id}, Dangling{pool,id}, EmptySupport, KeyMismatch,
+  ConstraintMismatch, Interval{var,rule}, PairInvalid{pair_id,rule}, ComponentsMismatch,
+  HashMismatch, Canon. Tests: a restamp helper re-deriving components/hashes after tampering;
+  rejection coverage per variant — reference breaks, key/projection tampers, an interval table,
+  plan breaks on a two-rule for/against fixture, stale derived fields — plus a residual-licensed
+  grounding pass. Reading: SPEC §5 IR-invariant paragraph, §6 direction groups; bundle.rs and the
+  ir.rs fixtures. Consumes core-ir.4. Gate: `cargo test -p ckc-core`.
 - [ ] core-plans: Plan and manifest types: RunPlan (experiment id, fixture groups, pipeline, seed,
   budget) with canonical bytes and plan hash; RunManifest (plan hash, git commit,
   toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes);
@@ -210,17 +268,17 @@ next plan session removes their checklists (git history retains them).
   files, smt-emit.1 VerifierResult. Gate: `cargo test -p ckc-smt`.
 - [ ] cli-runner.2: ckc run orchestration: resolve exp.v1_spine through the registries; execute
   extract, segment, normalize, assemble (thin wrapper emitting envelope-wrapped ir_bundle.json via
-  core-ir.3 assembly and validation), compile, verify per document and group; write the §8.3 run
+  core-ir.4 assembly and core-ir.5 validation), compile, verify per document and group; write the §8.3 run
   layout; strict-canonical-read every consumed artifact at each boundary; aggregate stage outcomes
   by severity into exactly one total operation result; stream events.jsonl and diagnostics.jsonl;
   add the workspace test that runs the experiment into a temp dir, strict-reads every accepted
   artifact by walking the run directory (later-stage artifacts join the sweep as they wire in), and
   asserts the corpus/gold/v1_expected.yaml expected outcomes for both fixture groups through the
-  typed gold entries. Closes §8.5 item 3 and stands as the code oracle behind items 5 and 6. JIT
-  seam if hot: document phase (extract..assemble) before group phase (compile/verify, aggregation,
-  workspace test). Reading: SPEC §8.1, §8.3 stage contracts and run layout, §8.4, §8.2 gold shape,
-  §4.4, §4.6, §8.5 item 3. Consumes stage-extract/segment/normalize.1-.2, core-ir.3, smt-emit.2/.3,
-  smt-verify, core-registry.1 gold entries, cli-runner.1.1 shell. Gate: `cargo test --workspace`.
+  typed gold entries. Closes §8.5 item 3 and stands as the code oracle behind items 5 and 6.
+  Reading: SPEC §8.1, §8.3 stage contracts and run layout, §8.4, §8.2 gold shape,
+  §4.4, §4.6, §8.5 item 3. Consumes stage-extract/segment/normalize.1-.2, core-ir.4/.5,
+  smt-emit.2/.3, smt-verify, core-registry.1 gold entries, cli-runner.1.1 shell. Gate: `cargo test
+  --workspace`.
 - [ ] cli-runner.3: Trace stage and command in a trace module: derive finding ids
   finding.<group_id>.<ordinal> with ordinals in source-then-hash order (§7.2) as claim-evidence rows
   are born; assemble TraceBundle (derivation DAG with operation-labeled edges from source through
