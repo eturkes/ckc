@@ -68,30 +68,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K 49b0930
 - [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K 3ef32e0
 - [x] cli-runner.4.1a.1: report module types — Report/finding shapes + validation.
-  68% 136K/200K _
-- [ ] cli-runner.4.1a.2: assemble_report completing the report payload — no run.rs contact
-  (report.json landing = 4.1b.1). Transcribe the assembly half + full test battery of
-  .agent/wip-4.1a.patch (UNCOMPILED — verify while transcribing; delete the patch in this
-  unit's closing commit): assemble_report(&TraceBundle, &LineageIndex, &[&SourceGraph],
-  &[&VerifierResults], lexicon_hash, &SolverIdentity, &[DiagnosticRecord]) -> Result<Report,
-  ReportError>. Graphs index by document id, results by query id (duplicates error);
-  corpus_hashes from the bundle's Source nodes; diagnostics_summary = code-keyed counts.
-  Partition each semantic claim on (category, role, verdict), role = query-id suffix
-  .overlap/.deontic (§8.6 ids, minted by smt plan.rs; other suffixes error):
-  no_conflict+overlap+sat skips (Q1 precondition witness, not a report row);
-  contradiction+deontic lands a finding; no_conflict+overlap+unsat and no_conflict+deontic+sat
-  land null results; remaining combos error. Claim category+verdict must equal the indexed
-  result's; core = that result's unsat_core (None on Q1-unsat nulls — Q1 runs produce-models,
-  no core). Quoted spans resolve per document through the claim's LineageRows (document-local
-  region ids collide across documents; the claim-level region set is the ambiguous union), text
-  = span raw_text; missing graph/region/span/result/lineage error; pair-agreement: claim
-  id-sets equal the lineage-row unions. Row constants: claim_tier s1_admitted, finding wording
-  the synthetic-fixture §0 label, null wording the documented-null §0 label, Report.wording =
-  set of row wordings, replay_status not_replayed. The patch battery stays synthetic
-  (§8.6-shaped two-document world, colliding document-local r.0 regions, conflict + null
-  groups, per-error rejections); live pins land in 4.1b.1. Reading: SPEC §8.6, §6 + ckc-smt
-  verdict.rs category_verdict_rule. Consumes cli-runner.4.1a.1, .2b/.3a.3 artifacts. Gate:
-  `cargo test -p ckc-cli report::`.
+  68% 136K/200K 8b65437
+- [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K _
 - [ ] cli-runner.4.1b.1: report stage wired into ckc run landing report.json in the §8.3 run
   layout: assemble_report over the live run state (trace-stage bundle + lineage, per-doc source
   graphs, per-group verifier results, the run's collected diagnostics, lexicon hash + solver

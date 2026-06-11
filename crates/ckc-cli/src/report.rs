@@ -4,10 +4,10 @@
 //! claim-evidence rows, quoted Japanese source spans resolved per member
 //! document, a code-keyed §7.4 diagnostics rollup, corpus and lexicon
 //! hashes, solver identity, the replay-status slot, and §0-vocabulary
-//! wording. This module owns the types, their canonical bytes, and
-//! structural validation; assembly over the run's validated artifacts
-//! lands with cli-runner.4.1a.2, the markdown rendering, the run/replay
-//! manifests, and the `ckc run` report-stage wiring with cli-runner.4.1b.
+//! wording. This module owns the types, their canonical bytes, structural
+//! validation, and assembly ([`assemble_report`]) over the run's validated
+//! artifacts; the markdown rendering, the run/replay manifests, and the
+//! `ckc run` report-stage wiring land with cli-runner.4.1b.
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):
@@ -24,15 +24,19 @@
 //!   records rolled up in `diagnostics_summary`.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use ckc_core::{
-    CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, Hash, Id, ObjectEmitter,
-    ObjectReader, Reader, SolverIdentity, canonical_sort_key, emit_map, emit_set, emit_string,
-    emit_u64_map, fieldless_enum, read_map, read_set, read_string, read_u64_map,
+    CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, DiagnosticRecord, Hash, Id,
+    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceGraph, canonical_sort_key, emit_map,
+    emit_set, emit_string, emit_u64_map, fieldless_enum, read_map, read_set, read_string,
+    read_u64_map,
 };
-use ckc_smt::SolverVerdict;
+use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult, VerifierResults};
 
-use crate::trace::ConflictKind;
+use crate::trace::{
+    ConflictKind, LineageIndex, LineageRow, TraceBundle, TraceNodeKind, canonical_id_set,
+};
 
 fieldless_enum! {
     /// SPEC §7.2 replay-status slot. Assembly always writes
@@ -352,6 +356,240 @@ impl CanonRead for Report {
     }
 }
 
+/// §6 query role inside its contradiction pair, recovered from the §8.6
+/// query-id suffix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    Overlap,
+    Deontic,
+}
+
+/// Assemble the run's [`Report`] over the validated run artifact set:
+/// the strict-read §7.1 pair (claims and source nodes from `bundle`,
+/// per-document reference rows from `lineage`), each member document's
+/// SourceGraph, each group's VerifierResults, the run's lexicon hash and
+/// solver identity, and every §7.4 record the run emitted.
+///
+/// Inputs must already satisfy their own validation (the §8.5 item 3 bar);
+/// breaks of those per-artifact guarantees panic as caller bugs. Errors
+/// are cross-artifact gaps: a claim with no lineage rows, verifier result,
+/// or resolvable span chain; a pair disagreement between claim and lineage
+/// evidence; duplicate or missing per-document/per-query inputs.
+///
+/// Rows: claims partition per the module rules; every row resolves its
+/// quoted spans per member document through the lineage rows (region and
+/// span ids are document-local), takes `core` from its verifier result's
+/// recorded unsat core, and carries the M1 constants (`s1_admitted`, the
+/// partition's §0 label). `corpus_hashes` come from the bundle's source
+/// nodes; `diagnostics_summary` counts `diagnostics` by §7.4 code;
+/// `replay_status` starts [`NotReplayed`](ReplayStatus::NotReplayed). The
+/// caller runs [`Report::validate`] on the value (the boundary discipline
+/// stays with the landing).
+pub fn assemble_report(
+    bundle: &TraceBundle,
+    lineage: &LineageIndex,
+    graphs: &[&SourceGraph],
+    results: &[&VerifierResults],
+    lexicon_hash: &Hash,
+    solver_identity: &SolverIdentity,
+    diagnostics: &[DiagnosticRecord],
+) -> Result<Report, ReportError> {
+    let mut graph_index: BTreeMap<&str, &SourceGraph> = BTreeMap::new();
+    for &graph in graphs {
+        let document_id = &graph.document.document_id;
+        if graph_index.insert(document_id.as_str(), graph).is_some() {
+            return Err(ReportError::DuplicateGraph(document_id.clone()));
+        }
+    }
+    let mut result_index: BTreeMap<&str, &VerifierResult> = BTreeMap::new();
+    for result in results.iter().flat_map(|r| &r.results) {
+        if result_index
+            .insert(result.query_id.as_str(), result)
+            .is_some()
+        {
+            return Err(ReportError::DuplicateResult(result.query_id.clone()));
+        }
+    }
+
+    let mut corpus_hashes: Vec<(Id, Hash)> = bundle
+        .nodes
+        .iter()
+        .filter(|n| n.kind == TraceNodeKind::Source)
+        .map(|n| {
+            let hash = n
+                .content_hash
+                .clone()
+                .expect("validated bundles: source nodes carry hashes");
+            (n.node_id.clone(), hash)
+        })
+        .collect();
+    corpus_hashes.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+
+    let mut counts: BTreeMap<&'static str, u64> = BTreeMap::new();
+    for record in diagnostics {
+        *counts.entry(record.code.as_str()).or_insert(0) += 1;
+    }
+    let diagnostics_summary: Vec<(Id, u64)> = counts
+        .into_iter()
+        .map(|(code, n)| {
+            let code = Id::new(code.to_owned()).expect("§7.4 code tokens are valid ids");
+            (code, n)
+        })
+        .collect();
+
+    let mut findings = Vec::new();
+    let mut null_results = Vec::new();
+    for claim in &bundle.claims {
+        if !matches!(
+            claim.category,
+            VerifierCategory::SemanticContradiction | VerifierCategory::SemanticNoConflict
+        ) {
+            continue;
+        }
+        let suffix = claim
+            .query_id
+            .as_str()
+            .strip_prefix(claim.pair_id.as_str())
+            .expect("validated claims: query_id extends pair_id");
+        let role = match suffix {
+            ".overlap" => Role::Overlap,
+            ".deontic" => Role::Deontic,
+            _ => return Err(ReportError::UnknownQueryRole(claim.query_id.clone())),
+        };
+        let verdict = claim
+            .verdict
+            .expect("validated claims: semantic rows carry verdicts");
+        let is_finding = match (claim.category, role, verdict) {
+            (VerifierCategory::SemanticContradiction, Role::Deontic, _) => true,
+            (VerifierCategory::SemanticContradiction, Role::Overlap, _)
+            | (VerifierCategory::SemanticNoConflict, Role::Deontic, SolverVerdict::Unsat) => {
+                return Err(ReportError::RoleVerdict(claim.query_id.clone()));
+            }
+            (VerifierCategory::SemanticNoConflict, Role::Overlap, SolverVerdict::Sat) => continue,
+            (VerifierCategory::SemanticNoConflict, Role::Overlap, SolverVerdict::Unsat)
+            | (VerifierCategory::SemanticNoConflict, Role::Deontic, SolverVerdict::Sat) => false,
+            _ => unreachable!("validated claims: §6 category-verdict coherence"),
+        };
+        let result = result_index
+            .get(claim.query_id.as_str())
+            .copied()
+            .ok_or_else(|| ReportError::MissingResult(claim.query_id.clone()))?;
+        if result.category != claim.category || result.verdict != claim.verdict {
+            return Err(ReportError::ResultMismatch(claim.query_id.clone()));
+        }
+        let rows: Vec<&LineageRow> = lineage
+            .rows
+            .iter()
+            .filter(|r| r.finding_id == claim.finding_id)
+            .collect();
+        if rows.is_empty() {
+            return Err(ReportError::MissingLineage(claim.finding_id.clone()));
+        }
+        let region_union =
+            canonical_id_set(rows.iter().flat_map(|r| &r.region_ids).cloned().collect());
+        let rule_union = canonical_id_set(rows.iter().flat_map(|r| &r.rule_ids).cloned().collect());
+        for (pool, claim_set, union) in [
+            ("region_ids", &claim.region_ids, region_union),
+            ("rule_ids", &claim.rule_ids, rule_union),
+        ] {
+            if *claim_set != union {
+                return Err(ReportError::PairDisagreement {
+                    finding_id: claim.finding_id.clone(),
+                    pool,
+                });
+            }
+        }
+        let mut quoted = Vec::new();
+        for row in &rows {
+            let graph = graph_index
+                .get(row.document_id.as_str())
+                .copied()
+                .ok_or_else(|| ReportError::MissingGraph(row.document_id.clone()))?;
+            for region_id in &row.region_ids {
+                let region = graph
+                    .regions
+                    .iter()
+                    .find(|r| r.region_id == *region_id)
+                    .ok_or_else(|| ReportError::MissingRegion {
+                        document_id: row.document_id.clone(),
+                        region_id: region_id.clone(),
+                    })?;
+                for span_id in &region.span_ids {
+                    let span = graph
+                        .spans
+                        .iter()
+                        .find(|s| s.span_id == *span_id)
+                        .ok_or_else(|| ReportError::MissingSpan {
+                            document_id: row.document_id.clone(),
+                            span_id: span_id.clone(),
+                        })?;
+                    quoted.push(QuotedSpan {
+                        document_id: row.document_id.clone(),
+                        region_id: region_id.clone(),
+                        span_id: span_id.clone(),
+                        text: span.raw_text.clone(),
+                    });
+                }
+            }
+        }
+        let row = ReportFinding {
+            assertion_ids: claim.assertion_ids.clone(),
+            claim_tier: ClaimTier::S1Admitted,
+            conflict_kind: claim.conflict_kind,
+            core: result.unsat_core.clone(),
+            finding_id: claim.finding_id.clone(),
+            query_id: claim.query_id.clone(),
+            quoted_spans: canonical_set(quoted)?,
+            region_ids: claim.region_ids.clone(),
+            rule_ids: claim.rule_ids.clone(),
+            verdict,
+            wording: if is_finding {
+                Wording::SyntheticFixtureMeasurement
+            } else {
+                Wording::DocumentedNullResult
+            },
+        };
+        if is_finding {
+            findings.push(row);
+        } else {
+            null_results.push(row);
+        }
+    }
+    let findings = canonical_set(findings)?;
+    let null_results = canonical_set(null_results)?;
+    // §0-label bytes order the pair: "documented null result" sorts before
+    // "synthetic fixture measurement".
+    let mut wording = Vec::new();
+    if !null_results.is_empty() {
+        wording.push(Wording::DocumentedNullResult);
+    }
+    if !findings.is_empty() {
+        wording.push(Wording::SyntheticFixtureMeasurement);
+    }
+    Ok(Report {
+        corpus_hashes,
+        diagnostics_summary,
+        findings,
+        lexicon_hash: lexicon_hash.clone(),
+        null_results,
+        replay_status: ReplayStatus::NotReplayed,
+        solver_identity: solver_identity.clone(),
+        wording,
+    })
+}
+
+/// Sort `items` into canonical-set storage order by [`canonical_sort_key`]
+/// (assembly produces no byte-identical duplicates: quoted-span rows are
+/// keyed by per-document lineage triples, partition rows by finding id).
+fn canonical_set<T: Canonical>(items: Vec<T>) -> Result<Vec<T>, ReportError> {
+    let mut keyed: Vec<(Vec<u8>, T)> = items
+        .into_iter()
+        .map(|item| Ok((canonical_sort_key(&item)?, item)))
+        .collect::<Result<_, CanonError>>()?;
+    keyed.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(keyed.into_iter().map(|(_, item)| item).collect())
+}
+
 /// Enforce canonical-set storage — strictly ascending by
 /// [`canonical_sort_key`], duplicate-free (`pool` names the set in
 /// errors).
@@ -392,9 +630,8 @@ fn check_map_order<'a>(
     Ok(())
 }
 
-/// Structural failure taxonomy for [`Report`] validation; every variant
-/// names its offending id or pool (assembly variants join with
-/// cli-runner.4.1a.2).
+/// Structural/assembly failure taxonomy for [`Report`]; every variant
+/// names its offending id or pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReportError {
     /// A set field is out of canonical order.
@@ -417,6 +654,28 @@ pub enum ReportError {
     EmptyEvidence { finding_id: Id, pool: &'static str },
     /// A quoted span carries no text.
     EmptyQuotedText { finding_id: Id, span_id: Id },
+    /// Two input graphs claim one document.
+    DuplicateGraph(Id),
+    /// Two input results claim one query.
+    DuplicateResult(Id),
+    /// A lineage row's document has no input SourceGraph.
+    MissingGraph(Id),
+    /// A lineage region is absent from its document's graph.
+    MissingRegion { document_id: Id, region_id: Id },
+    /// A region's span is absent from its document's graph.
+    MissingSpan { document_id: Id, span_id: Id },
+    /// A partitioned claim's query has no verifier result.
+    MissingResult(Id),
+    /// A partitioned claim has no lineage rows.
+    MissingLineage(Id),
+    /// The claim's evidence set disagrees with its lineage-row union.
+    PairDisagreement { finding_id: Id, pool: &'static str },
+    /// A semantic claim's query-id suffix names no §8.6 role.
+    UnknownQueryRole(Id),
+    /// A semantic claim's category contradicts its query role and verdict.
+    RoleVerdict(Id),
+    /// The verifier result disagrees with its claim row.
+    ResultMismatch(Id),
     /// Canonical emission failed while sorting or checking.
     Canon(CanonError),
 }
@@ -469,6 +728,51 @@ impl std::fmt::Display for ReportError {
             } => {
                 write!(f, "row {finding_id} quotes span {span_id} with no text")
             }
+            ReportError::DuplicateGraph(id) => {
+                write!(f, "two source graphs claim document {id}")
+            }
+            ReportError::DuplicateResult(id) => {
+                write!(f, "two verifier results claim query {id}")
+            }
+            ReportError::MissingGraph(id) => {
+                write!(f, "document {id} has no input source graph")
+            }
+            ReportError::MissingRegion {
+                document_id,
+                region_id,
+            } => {
+                write!(
+                    f,
+                    "region {region_id} is absent from document {document_id}"
+                )
+            }
+            ReportError::MissingSpan {
+                document_id,
+                span_id,
+            } => {
+                write!(f, "span {span_id} is absent from document {document_id}")
+            }
+            ReportError::MissingResult(id) => {
+                write!(f, "query {id} has no verifier result")
+            }
+            ReportError::MissingLineage(id) => {
+                write!(f, "finding {id} has no lineage rows")
+            }
+            ReportError::PairDisagreement { finding_id, pool } => {
+                write!(f, "finding {finding_id}: the pair disagrees on {pool}")
+            }
+            ReportError::UnknownQueryRole(id) => {
+                write!(f, "query {id} names no §8.6 role suffix")
+            }
+            ReportError::RoleVerdict(id) => {
+                write!(f, "query {id}: category contradicts its role and verdict")
+            }
+            ReportError::ResultMismatch(id) => {
+                write!(
+                    f,
+                    "query {id}: verifier result disagrees with its claim row"
+                )
+            }
             ReportError::Canon(e) => write!(f, "canonical emission failed: {e:?}"),
         }
     }
@@ -478,9 +782,13 @@ impl std::error::Error for ReportError {}
 
 #[cfg(test)]
 mod tests {
-    use ckc_core::{canonical_payload_bytes, read_canonical};
+    use ckc_core::{
+        DataClass, DiagnosticCode, Outcome, Provenance, SourceDocument, SourceRegion, SourceSpan,
+        canonical_payload_bytes, read_canonical,
+    };
 
     use super::*;
+    use crate::trace::{ClaimEvidenceRow, TraceNode};
 
     fn id(text: &str) -> Id {
         Id::new(text.to_owned()).unwrap()
@@ -843,6 +1151,603 @@ mod tests {
                 finding_id: id("finding.group.g2.0"),
                 span_id: id("s.1"),
             })
+        );
+    }
+
+    fn identity() -> SolverIdentity {
+        SolverIdentity {
+            solver_id: id("z3"),
+            version: "4.13.0".to_owned(),
+        }
+    }
+
+    /// A lookup-minimal SourceGraph: the spans and regions assembly
+    /// resolves, document identity for the index key, empty node/anchor
+    /// pools.
+    fn graph(doc: &str, spans: &[(&str, &str)], regions: &[(&str, &[&str])]) -> SourceGraph {
+        SourceGraph {
+            document: SourceDocument {
+                document_id: id(doc),
+                source_family: id("family.fixture_html"),
+                provenance: Provenance::Synthetic,
+                raw_hash: hash('a'),
+                content_hash: hash('b'),
+                data_class: DataClass::None,
+            },
+            nodes: vec![],
+            spans: spans
+                .iter()
+                .enumerate()
+                .map(|(k, (span_id, text))| {
+                    SourceSpan::derive(id(span_id), id("n.0"), 0, (*text).to_owned(), k as u64)
+                })
+                .collect(),
+            anchors: vec![],
+            regions: regions
+                .iter()
+                .map(|(region_id, span_ids)| SourceRegion {
+                    region_id: id(region_id),
+                    node_ids: vec![],
+                    span_ids: span_ids.iter().map(|s| id(s)).collect(),
+                    anchor_ids: vec![],
+                })
+                .collect(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn claim(
+        finding: &str,
+        group: &str,
+        pair: &str,
+        query: &str,
+        category: VerifierCategory,
+        verdict: Option<SolverVerdict>,
+        conflict_kind: Option<ConflictKind>,
+        assertions: &[&str],
+        rules: &[&str],
+        regions: &[&str],
+    ) -> ClaimEvidenceRow {
+        ClaimEvidenceRow {
+            finding_id: id(finding),
+            group_id: id(group),
+            pair_id: id(pair),
+            query_id: id(query),
+            category,
+            verdict,
+            conflict_kind,
+            assertion_ids: assertions.iter().map(|a| id(a)).collect(),
+            rule_ids: rules.iter().map(|r| id(r)).collect(),
+            region_ids: regions.iter().map(|r| id(r)).collect(),
+            report_ref: id("report"),
+        }
+    }
+
+    fn result(
+        query: &str,
+        category: VerifierCategory,
+        verdict: Option<SolverVerdict>,
+        core: Option<&[&str]>,
+    ) -> VerifierResult {
+        VerifierResult {
+            query_id: id(query),
+            category,
+            verdict,
+            model: None,
+            unsat_core: core.map(|ids| ids.iter().map(|c| id(c)).collect()),
+            solver_identity: identity(),
+            diagnostics: vec![],
+        }
+    }
+
+    fn lineage_row(finding: &str, doc: &str, regions: &[&str], rules: &[&str]) -> LineageRow {
+        LineageRow {
+            finding_id: id(finding),
+            document_id: id(doc),
+            region_ids: regions.iter().map(|r| id(r)).collect(),
+            rule_ids: rules.iter().map(|r| id(r)).collect(),
+            segment_ids: vec![id("seg.0")],
+            statement_ids: vec![id("st.0")],
+        }
+    }
+
+    fn sorted<T: Canonical>(items: Vec<T>) -> Vec<T> {
+        canonical_set(items).unwrap()
+    }
+
+    /// The §8.6-shaped synthetic run: two documents whose region ids
+    /// collide (document-local counters), a conflict group whose overlap
+    /// probe answered sat (ordinal 0, no report row) and whose deontic
+    /// query cored (ordinal 1, the finding), and a null group closed by an
+    /// unsat overlap probe (ordinal 0, the documented null result).
+    struct World {
+        bundle: TraceBundle,
+        lineage: LineageIndex,
+        graphs: Vec<SourceGraph>,
+        results: Vec<VerifierResults>,
+        diagnostics: Vec<DiagnosticRecord>,
+    }
+
+    fn world() -> World {
+        let nodes = sorted(vec![
+            TraceNode {
+                node_id: id("report"),
+                kind: TraceNodeKind::Report,
+                path: "report.json".to_owned(),
+                content_hash: None,
+            },
+            TraceNode {
+                node_id: id("fixture.a"),
+                kind: TraceNodeKind::Source,
+                path: "corpus/fixtures/a.html".to_owned(),
+                content_hash: Some(hash('1')),
+            },
+            TraceNode {
+                node_id: id("fixture.b"),
+                kind: TraceNodeKind::Source,
+                path: "corpus/fixtures/b.html".to_owned(),
+                content_hash: Some(hash('2')),
+            },
+        ]);
+        let claims = sorted(vec![
+            claim(
+                "finding.group.g1.0",
+                "group.g1",
+                "q.g1.pair1",
+                "q.g1.pair1.overlap",
+                VerifierCategory::SemanticNoConflict,
+                Some(SolverVerdict::Sat),
+                None,
+                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
+                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["r.0"],
+            ),
+            claim(
+                "finding.group.g1.1",
+                "group.g1",
+                "q.g1.pair1",
+                "q.g1.pair1.deontic",
+                VerifierCategory::SemanticContradiction,
+                Some(SolverVerdict::Unsat),
+                Some(ConflictKind::DeonticDirectionConflict),
+                &["a.fixture.a.rule.0", "a.fixture.b.rule.0"],
+                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["r.0"],
+            ),
+            claim(
+                "finding.group.g2.0",
+                "group.g2",
+                "q.g2.pair1",
+                "q.g2.pair1.overlap",
+                VerifierCategory::SemanticNoConflict,
+                Some(SolverVerdict::Unsat),
+                None,
+                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
+                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["r.0"],
+            ),
+        ]);
+        let bundle = TraceBundle {
+            nodes,
+            edges: vec![],
+            claims,
+        };
+        let lineage = LineageIndex {
+            rows: sorted(vec![
+                lineage_row(
+                    "finding.group.g1.0",
+                    "fixture.a",
+                    &["r.0"],
+                    &["fixture.a.rule.0"],
+                ),
+                lineage_row(
+                    "finding.group.g1.0",
+                    "fixture.b",
+                    &["r.0"],
+                    &["fixture.b.rule.0"],
+                ),
+                lineage_row(
+                    "finding.group.g1.1",
+                    "fixture.a",
+                    &["r.0"],
+                    &["fixture.a.rule.0"],
+                ),
+                lineage_row(
+                    "finding.group.g1.1",
+                    "fixture.b",
+                    &["r.0"],
+                    &["fixture.b.rule.0"],
+                ),
+                lineage_row(
+                    "finding.group.g2.0",
+                    "fixture.a",
+                    &["r.0"],
+                    &["fixture.a.rule.0"],
+                ),
+                lineage_row(
+                    "finding.group.g2.0",
+                    "fixture.b",
+                    &["r.0"],
+                    &["fixture.b.rule.0"],
+                ),
+            ]),
+        };
+        let graphs = vec![
+            graph(
+                "fixture.a",
+                &[("s.0", "投与を推奨する")],
+                &[("r.0", &["s.0"])],
+            ),
+            graph(
+                "fixture.b",
+                &[("s.0", "投与しないこと")],
+                &[("r.0", &["s.0"])],
+            ),
+        ];
+        let results = vec![
+            VerifierResults {
+                results: vec![
+                    result(
+                        "q.g1.pair1.overlap",
+                        VerifierCategory::SemanticNoConflict,
+                        Some(SolverVerdict::Sat),
+                        None,
+                    ),
+                    result(
+                        "q.g1.pair1.deontic",
+                        VerifierCategory::SemanticContradiction,
+                        Some(SolverVerdict::Unsat),
+                        Some(&["a.fixture.a.rule.0", "a.fixture.b.rule.0"]),
+                    ),
+                ],
+            },
+            VerifierResults {
+                results: vec![result(
+                    "q.g2.pair1.overlap",
+                    VerifierCategory::SemanticNoConflict,
+                    Some(SolverVerdict::Unsat),
+                    None,
+                )],
+            },
+        ];
+        let diagnostic = |code: DiagnosticCode, outcome: Outcome| DiagnosticRecord {
+            code,
+            outcome,
+            payload: vec![],
+            region_ids: vec![],
+            artifact_hashes: vec![],
+        };
+        let diagnostics = vec![
+            diagnostic(DiagnosticCode::SolverTimeout, Outcome::Residual),
+            diagnostic(DiagnosticCode::SchemaInvalid, Outcome::Invalid),
+            diagnostic(DiagnosticCode::SolverTimeout, Outcome::Residual),
+        ];
+        World {
+            bundle,
+            lineage,
+            graphs,
+            results,
+            diagnostics,
+        }
+    }
+
+    fn assemble(world: &World) -> Result<Report, ReportError> {
+        assemble_report(
+            &world.bundle,
+            &world.lineage,
+            &world.graphs.iter().collect::<Vec<_>>(),
+            &world.results.iter().collect::<Vec<_>>(),
+            &hash('f'),
+            &identity(),
+            &world.diagnostics,
+        )
+    }
+
+    #[test]
+    fn assembles_the_m1_shaped_report() {
+        let report = assemble(&world()).unwrap();
+        report.validate().unwrap();
+
+        assert_eq!(
+            report.corpus_hashes,
+            vec![(id("fixture.a"), hash('1')), (id("fixture.b"), hash('2'))]
+        );
+        assert_eq!(report.lexicon_hash, hash('f'));
+        assert_eq!(
+            report.diagnostics_summary,
+            vec![(id("schema_invalid"), 1), (id("solver_timeout"), 2)]
+        );
+        assert_eq!(report.replay_status, ReplayStatus::NotReplayed);
+        assert_eq!(report.solver_identity, identity());
+        assert_eq!(
+            report.wording,
+            vec![
+                Wording::DocumentedNullResult,
+                Wording::SyntheticFixtureMeasurement
+            ]
+        );
+
+        // The overlap-sat precondition row reaches neither partition.
+        assert_eq!(report.findings.len(), 1);
+        assert_eq!(report.null_results.len(), 1);
+
+        let finding = &report.findings[0];
+        assert_eq!(finding.finding_id, id("finding.group.g1.1"));
+        assert_eq!(finding.query_id, id("q.g1.pair1.deontic"));
+        assert_eq!(
+            finding.conflict_kind,
+            Some(ConflictKind::DeonticDirectionConflict)
+        );
+        assert_eq!(finding.verdict, SolverVerdict::Unsat);
+        assert_eq!(finding.claim_tier, ClaimTier::S1Admitted);
+        assert_eq!(finding.wording, Wording::SyntheticFixtureMeasurement);
+        assert_eq!(
+            finding.assertion_ids,
+            vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")]
+        );
+        assert_eq!(
+            finding.core,
+            Some(vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")])
+        );
+        assert_eq!(
+            finding.rule_ids,
+            vec![id("fixture.a.rule.0"), id("fixture.b.rule.0")]
+        );
+        assert_eq!(finding.region_ids, vec![id("r.0")]);
+        // The colliding document-local region id resolves per document.
+        assert_eq!(
+            finding.quoted_spans,
+            vec![
+                QuotedSpan {
+                    document_id: id("fixture.a"),
+                    region_id: id("r.0"),
+                    span_id: id("s.0"),
+                    text: "投与を推奨する".to_owned(),
+                },
+                QuotedSpan {
+                    document_id: id("fixture.b"),
+                    region_id: id("r.0"),
+                    span_id: id("s.0"),
+                    text: "投与しないこと".to_owned(),
+                },
+            ]
+        );
+
+        let null = &report.null_results[0];
+        assert_eq!(null.finding_id, id("finding.group.g2.0"));
+        assert_eq!(null.query_id, id("q.g2.pair1.overlap"));
+        assert_eq!(null.conflict_kind, None);
+        assert_eq!(null.core, None);
+        assert_eq!(null.verdict, SolverVerdict::Unsat);
+        assert_eq!(null.wording, Wording::DocumentedNullResult);
+        assert_eq!(
+            null.assertion_ids,
+            vec![id("ctx.fixture.a.rule.0"), id("ctx.fixture.b.rule.0")]
+        );
+        assert_eq!(null.quoted_spans.len(), 2);
+    }
+
+    #[test]
+    fn assembled_report_round_trips_canonically() {
+        let report = assemble(&world()).unwrap();
+        let bytes = canonical_payload_bytes(&report).unwrap();
+        let read: Report = read_canonical(&bytes).unwrap();
+        assert_eq!(read, report);
+        read.validate().unwrap();
+        // Pin the §0 spellings and the code-keyed summary form.
+        let text = String::from_utf8(bytes).unwrap();
+        assert!(
+            text.contains(
+                r#""wording":["documented null result","synthetic fixture measurement"]"#
+            )
+        );
+        assert!(
+            text.contains(r#""diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"}"#)
+        );
+        assert!(text.contains(r#""replay_status":"not_replayed""#));
+    }
+
+    #[test]
+    fn deontic_sat_closes_as_a_null_result() {
+        let mut world = world();
+        // Rebuild g1: overlap sat, then a consistent (sat) deontic query.
+        world.bundle.claims = sorted(vec![
+            claim(
+                "finding.group.g1.0",
+                "group.g1",
+                "q.g1.pair1",
+                "q.g1.pair1.overlap",
+                VerifierCategory::SemanticNoConflict,
+                Some(SolverVerdict::Sat),
+                None,
+                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
+                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["r.0"],
+            ),
+            claim(
+                "finding.group.g1.1",
+                "group.g1",
+                "q.g1.pair1",
+                "q.g1.pair1.deontic",
+                VerifierCategory::SemanticNoConflict,
+                Some(SolverVerdict::Sat),
+                None,
+                &["a.fixture.a.rule.0", "a.fixture.b.rule.0"],
+                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["r.0"],
+            ),
+        ]);
+        world
+            .lineage
+            .rows
+            .retain(|r| !r.finding_id.as_str().starts_with("finding.group.g2."));
+        world.results = vec![VerifierResults {
+            results: vec![
+                result(
+                    "q.g1.pair1.overlap",
+                    VerifierCategory::SemanticNoConflict,
+                    Some(SolverVerdict::Sat),
+                    None,
+                ),
+                result(
+                    "q.g1.pair1.deontic",
+                    VerifierCategory::SemanticNoConflict,
+                    Some(SolverVerdict::Sat),
+                    None,
+                ),
+            ],
+        }];
+        let report = assemble(&world).unwrap();
+        report.validate().unwrap();
+        assert!(report.findings.is_empty());
+        assert_eq!(report.null_results.len(), 1);
+        let null = &report.null_results[0];
+        assert_eq!(null.finding_id, id("finding.group.g1.1"));
+        assert_eq!(null.verdict, SolverVerdict::Sat);
+        assert_eq!(null.wording, Wording::DocumentedNullResult);
+        assert_eq!(report.wording, vec![Wording::DocumentedNullResult]);
+    }
+
+    #[test]
+    fn missing_graph_is_an_assembly_error() {
+        let mut world = world();
+        world
+            .graphs
+            .retain(|g| g.document.document_id.as_str() != "fixture.b");
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::MissingGraph(id("fixture.b")))
+        );
+    }
+
+    #[test]
+    fn missing_region_is_an_assembly_error() {
+        let mut world = world();
+        world.graphs[0].regions.clear();
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::MissingRegion {
+                document_id: id("fixture.a"),
+                region_id: id("r.0"),
+            })
+        );
+    }
+
+    #[test]
+    fn missing_span_is_an_assembly_error() {
+        let mut world = world();
+        world.graphs[0].spans.clear();
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::MissingSpan {
+                document_id: id("fixture.a"),
+                span_id: id("s.0"),
+            })
+        );
+    }
+
+    #[test]
+    fn missing_result_is_an_assembly_error() {
+        let mut world = world();
+        world.results[0]
+            .results
+            .retain(|r| r.query_id.as_str() != "q.g1.pair1.deontic");
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::MissingResult(id("q.g1.pair1.deontic")))
+        );
+    }
+
+    #[test]
+    fn missing_lineage_is_an_assembly_error() {
+        let mut world = world();
+        world
+            .lineage
+            .rows
+            .retain(|r| r.finding_id.as_str() != "finding.group.g1.1");
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::MissingLineage(id("finding.group.g1.1")))
+        );
+    }
+
+    #[test]
+    fn duplicate_graph_is_an_assembly_error() {
+        let mut world = world();
+        let copy = world.graphs[0].clone();
+        world.graphs.push(copy);
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::DuplicateGraph(id("fixture.a")))
+        );
+    }
+
+    #[test]
+    fn duplicate_result_is_an_assembly_error() {
+        let mut world = world();
+        let copy = world.results[1].results[0].clone();
+        world.results[1].results.push(copy);
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::DuplicateResult(id("q.g2.pair1.overlap")))
+        );
+    }
+
+    #[test]
+    fn unknown_query_suffix_is_an_assembly_error() {
+        let mut world = world();
+        for claim in &mut world.bundle.claims {
+            if claim.finding_id.as_str() == "finding.group.g2.0" {
+                claim.query_id = id("q.g2.pair1.probe");
+            }
+        }
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::UnknownQueryRole(id("q.g2.pair1.probe")))
+        );
+    }
+
+    #[test]
+    fn deontic_unsat_no_conflict_is_a_role_error() {
+        let mut world = world();
+        for claim in &mut world.bundle.claims {
+            if claim.finding_id.as_str() == "finding.group.g1.1" {
+                claim.category = VerifierCategory::SemanticNoConflict;
+                claim.conflict_kind = None;
+            }
+        }
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::RoleVerdict(id("q.g1.pair1.deontic")))
+        );
+    }
+
+    #[test]
+    fn pair_disagreement_is_an_assembly_error() {
+        let mut world = world();
+        for row in &mut world.lineage.rows {
+            if row.finding_id.as_str() == "finding.group.g1.1"
+                && row.document_id.as_str() == "fixture.a"
+            {
+                row.region_ids = vec![id("r.0"), id("r.9")];
+            }
+        }
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::PairDisagreement {
+                finding_id: id("finding.group.g1.1"),
+                pool: "region_ids",
+            })
+        );
+    }
+
+    #[test]
+    fn result_mismatch_is_an_assembly_error() {
+        let mut world = world();
+        world.results[1].results[0].verdict = Some(SolverVerdict::Sat);
+        assert_eq!(
+            assemble(&world),
+            Err(ReportError::ResultMismatch(id("q.g2.pair1.overlap")))
         );
     }
 }
