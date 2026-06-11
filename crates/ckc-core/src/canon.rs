@@ -927,14 +927,14 @@ impl CanonRead for Count {
 }
 
 /// Emit `entries` as a §4.3 map of identifier keys to `u64` counter values
-/// (event `budget_counters`, plan `budget`).
-pub(crate) fn emit_u64_map(out: &mut Vec<u8>, entries: &[(Id, u64)]) -> Result<(), CanonError> {
+/// (event `budget_counters`, plan `budget`, report `diagnostics_summary`).
+pub fn emit_u64_map(out: &mut Vec<u8>, entries: &[(Id, u64)]) -> Result<(), CanonError> {
     let counts: Vec<Count> = entries.iter().map(|&(_, v)| Count(v)).collect();
     emit_map(out, entries.iter().map(|(k, _)| k).zip(&counts))
 }
 
 /// Inverse of [`emit_u64_map`].
-pub(crate) fn read_u64_map(r: &mut Reader<'_>) -> Result<Vec<(Id, u64)>, CanonReadError> {
+pub fn read_u64_map(r: &mut Reader<'_>) -> Result<Vec<(Id, u64)>, CanonReadError> {
     let entries = read_map::<Id, Count>(r)?;
     Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
 }

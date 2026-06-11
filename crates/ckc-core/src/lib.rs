@@ -60,8 +60,8 @@ pub use bundle::{
 pub use canon::{
     CanonError, CanonRead, CanonReadError, Canonical, MapKey, ObjectEmitter, ObjectReader, Reader,
     canonical_payload_bytes, canonical_sort_key, emit_array, emit_int, emit_map, emit_set,
-    emit_string, emit_string_policy, emit_union, read_array, read_canonical, read_int, read_map,
-    read_set, read_string, read_string_policy, read_union,
+    emit_string, emit_string_policy, emit_u64_map, emit_union, read_array, read_canonical,
+    read_int, read_map, read_set, read_string, read_string_policy, read_u64_map, read_union,
 };
 pub use enums::{
     AttemptClassification, Authority, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord,

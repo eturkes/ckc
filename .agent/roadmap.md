@@ -66,28 +66,9 @@ bare headers; git history retains all removed text.
   76% 153K/200K d6fd71b
 - [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K f93bfe6
 - [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K 49b0930
-- [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K _
-- [ ] cli-runner.4.1a.1: Report types in a report module — canonical shapes + validation, no
-  assembly. Reference: .agent/wip-4.1a.patch from the reverted single-unit 4.1a attempt,
-  UNCOMPILED (written, never built) — transcribe its types half verifying every line against
-  this line + HEAD APIs; keep the patch for 4.1a.2. Apply its canon.rs/lib.rs/trace.rs hunks
-  verbatim (emit_u64_map/read_u64_map promoted pub, lib.rs re-exports, trace canonical_id_set
-  pub(crate)). Types: fieldless enums ReplayStatus {not_replayed, replay_match, replay_mismatch,
-  replay_identity_unsupported} + Wording (all 14 §0 labels, exact spellings); QuotedSpan
-  {document_id, region_id, span_id, text}; ReportFinding {assertion_ids, claim_tier,
-  conflict_kind: Option, core: Option, finding_id, query_id, quoted_spans, region_ids, rule_ids,
-  verdict: SolverVerdict, wording}; Report {corpus_hashes id-to-hash map, diagnostics_summary
-  code-to-count u64 map (the promoted emitters), findings, lexicon_hash, null_results,
-  replay_status, solver_identity, wording set}; Canonical + CanonRead (alphabetical members,
-  optionals via obj.optional) + validate(): map orders, zero counts rejected, every set
-  canonical, finding-id uniqueness across both partitions, conflict_kind and core present iff
-  finding (core non-empty — tightens the patch, which leaves core presence unchecked), findings
-  verdict unsat, nulls sat or unsat, assertion/region/rule/quoted_spans sets non-empty, span
-  texts non-empty; ReportError validation variants + Display (assembly variants + assemble_report
-  stay in 4.1a.2). Tests are NEW, not in the patch (its battery is assembly-bound): hand-built
-  Report fixture, canonical round-trip byte pins, a rejection per validate rule. Reading: SPEC
-  §7.2, §0 vocabulary, §5 Report row, §8.6 finding example. Consumes cli-runner.3a.1 +
-  smt-emit.1 type surfaces. Gate: `cargo test -p ckc-cli report::`.
+- [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K 3ef32e0
+- [x] cli-runner.4.1a.1: report module types — Report/finding shapes + validation.
+  68% 136K/200K _
 - [ ] cli-runner.4.1a.2: assemble_report completing the report payload — no run.rs contact
   (report.json landing = 4.1b.1). Transcribe the assembly half + full test battery of
   .agent/wip-4.1a.patch (UNCOMPILED — verify while transcribing; delete the patch in this

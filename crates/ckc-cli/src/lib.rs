@@ -52,7 +52,7 @@
 //!   outcome the severity fold over the whole run; after the group loop
 //!   the run-scoped trace stage assembles and lands the §7.1 pair at the
 //!   run root (`cli-runner.3a.3`); the report stage joins with
-//!   cli-runner.4.1a.
+//!   cli-runner.4.1b.
 //! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`–`.3a.3`):
 //!   [`trace::TraceBundle`], the derivation DAG (eight ranked
 //!   [`trace::TraceNodeKind`]s, operation-labeled strictly rank-upward
@@ -65,10 +65,19 @@
 //!   root, one finding resolved through claim row + lineage rows + source
 //!   nodes under a pair-agreement check, the chain rendered in both
 //!   directions as the command's stdout body.
+//! - [`report`] — §7.2 report payload types (`cli-runner.4.1a.1`):
+//!   [`report::Report`], the canonical `report.json` shape (corpus/lexicon
+//!   hashes, finding and documented-null partitions as
+//!   [`report::ReportFinding`] rows with quoted spans, code-keyed
+//!   diagnostics rollup, solver identity, replay status, §0 wording) with
+//!   structural validation via [`report::ReportError`]; assembly joins
+//!   with cli-runner.4.1a.2, the run wiring and renderings with
+//!   cli-runner.4.1b.
 #![forbid(unsafe_code)]
 
 pub mod extract;
 pub mod normalize;
+pub mod report;
 pub mod rules;
 pub mod segment;
 pub mod trace;

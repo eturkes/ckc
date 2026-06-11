@@ -836,7 +836,7 @@ fn sort_canonical<T: Canonical>(items: &mut [T]) {
 /// Canonical Id set from an unordered pool: byte-sorted, duplicate-free
 /// (Id-byte order equals [`canonical_sort_key`] order for identifier
 /// strings).
-fn canonical_id_set(mut ids: Vec<Id>) -> Vec<Id> {
+pub(crate) fn canonical_id_set(mut ids: Vec<Id>) -> Vec<Id> {
     ids.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
     ids.dedup();
     ids
