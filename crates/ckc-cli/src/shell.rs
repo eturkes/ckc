@@ -18,7 +18,7 @@ use ckc_core::{
 };
 
 /// Parse a compile-time-constant token as an [`Id`]; all call sites pass
-/// literals from the V1 command surface, covered by tests.
+/// literals from the M1 command surface, covered by tests.
 pub(crate) fn static_id(token: &str) -> Id {
     token
         .parse()
@@ -292,7 +292,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let shell = Shell::open(
             static_id("run"),
-            static_id("v1"),
+            static_id("m1"),
             Some(root.path().to_path_buf()),
         );
         for escape in ["../sibling", "/etc/passwd", "logs/../../x", ""] {
@@ -312,7 +312,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let mut shell = Shell::open(
             static_id("run"),
-            static_id("v1"),
+            static_id("m1"),
             Some(root.path().to_path_buf()),
         );
         let d = diag(DiagnosticCode::SchemaInvalid, Outcome::Invalid, "bad");
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         let event = &events[0];
         assert_eq!(event.event_id, static_id("event.0"));
-        assert_eq!(event.run_id, static_id("v1"));
+        assert_eq!(event.run_id, static_id("m1"));
         assert_eq!(event.candidate_id, static_id("cli"));
         assert_eq!(event.component_id, static_id("cli.run"));
         assert_eq!(event.stage, static_id("run"));

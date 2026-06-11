@@ -7,7 +7,7 @@ ordered unit checklist; unchecked lines carry the full unit spec; checked items 
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
-## V1 spine — plan e6523e9
+## M1 spine — plan e6523e9
 
 - [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 10bf054
 - [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 3813a4d
@@ -30,7 +30,7 @@ bare headers; git history retains all removed text.
 - [x] core-plans: RunPlan/RunManifest/ReplayManifest. 53% 106K/200K 90a1654
 - [x] core-registry.1: registry entry types + YAML loading. 56% 113K/200K 907e20b
 - [x] core-registry.2: registry validation + stage-chain rule. 48% 97K/200K 1225b1a
-- [x] fixtures-v1: three fixture HTMLs, ja_core lexicon, gold, registry seeds.
+- [x] fixtures-m1: three fixture HTMLs, ja_core lexicon, gold, registry seeds.
   65% 129K/200K f85c716
 - [x] cli-runner.1.1: ckc-cli crate, four-command dispatch + CLI invariants.
   68% 137K/200K adc4b18
@@ -99,14 +99,14 @@ bare headers; git history retains all removed text.
   emitted §8.6 queries (Q1 sat with model, Q2 unsat with the expected core). Reading: SPEC §6
   solvers and verdict parsing, §8.3 verify row, §4.4 verifier_authority. Consumes smt-emit.3 smt2
   files, smt-emit.1 VerifierResult. Gate: `cargo test -p ckc-smt`.
-- [ ] cli-runner.2: ckc run orchestration: resolve exp.v1_spine through the registries; execute
+- [ ] cli-runner.2: ckc run orchestration: resolve exp.m1_spine through the registries; execute
   extract, segment, normalize, assemble (thin wrapper emitting envelope-wrapped ir_bundle.json via
   core-ir.4 assembly and core-ir.5 validation), compile, verify per document and group; write the §8.3 run
   layout; strict-canonical-read every consumed artifact at each boundary; aggregate stage outcomes
   by severity into exactly one total operation result; stream events.jsonl and diagnostics.jsonl;
   add the workspace test that runs the experiment into a temp dir, strict-reads every accepted
   artifact by walking the run directory (later-stage artifacts join the sweep as they wire in), and
-  asserts the corpus/gold/v1_expected.yaml expected outcomes for both fixture groups through the
+  asserts the corpus/gold/m1_expected.yaml expected outcomes for both fixture groups through the
   typed gold entries. Closes §8.5 item 3 and stands as the code oracle behind items 5 and 6.
   Reading: SPEC §8.1, §8.3 stage contracts and run layout, §8.4, §8.2 gold shape,
   §4.4, §4.6, §8.5 item 3. Consumes stage-extract/segment/normalize.1-.2, core-ir.4/.5,
@@ -134,13 +134,13 @@ bare headers; git history retains all removed text.
   matching hashes yield ok; re-run-equals-prior idempotency test over a fixture run. Closes §8.5
   item 8. Reading: SPEC §4.6 replay semantics, §8.3 layout, §7.4 replay codes. Consumes
   cli-runner.4.1 manifests and the complete run pipeline. Gate: `cargo test --workspace`.
-- [ ] acceptance-v1: Dedicated acceptance session for the V1 milestone: execute §8.5 items 1-9 in
-  order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.v1_spine --out
-  runs/v1 with outcome ok and strict-read artifact set; assertion-map audit; group.v1_conflict
-  semantic_contradiction with cross-document unsat core matching corpus/gold/v1_expected.yaml;
-  group.v1_null semantic_no_conflict with documented_null_result from the disjoint-interval Q1
+- [ ] acceptance-m1: Dedicated acceptance session for the M1 milestone: execute §8.5 items 1-9 in
+  order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.m1_spine --out
+  runs/m1 with outcome ok and strict-read artifact set; assertion-map audit; group.m1_conflict
+  semantic_contradiction with cross-document unsat core matching corpus/gold/m1_expected.yaml;
+  group.m1_null semantic_no_conflict with documented_null_result from the disjoint-interval Q1
   unsat; ckc trace full chain; ckc replay hash match; report content with quoted spans resolving to
   fixture bytes); mark the milestone header with the evidence run id and create the local tag
-  accept/v1. Reading: SPEC §8.5, §8.1-§8.4, §8.6; §1 acceptance and tagging protocol. Consumes the
+  accept/m1. Reading: SPEC §8.5, §8.1-§8.4, §8.6; §1 acceptance and tagging protocol. Consumes the
   complete built pipeline. Gate: All nine §8.5 items pass against one recorded run; roadmap
-  milestone header carries the evidence run id; local tag accept/v1 exists.
+  milestone header carries the evidence run id; local tag accept/m1 exists.

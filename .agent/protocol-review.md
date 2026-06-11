@@ -18,7 +18,7 @@ are in scope: when the analysis exposes a better contract or design, edit
 SPEC.md in the same session (contract-affecting amendments reach the user
 first, per SPEC §1).
 
-Close the milestone in one commit, scoped `review-v<n>:` — fill the last
+Close the milestone in one commit, scoped `review-m<n>:` — fill the last
 item's pending `_`, carry the corrections (or state the review was clean), and
 mark the header `— review _`; reviews record no usage. The next roadmap-mode
 session — the plan session for the next milestone — fills the review hash.

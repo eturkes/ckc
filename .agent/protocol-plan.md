@@ -28,7 +28,7 @@ what fits a window — plus the memory.md sizing anchors. Each unit line is one
 conceptual deliverable with explicit file paths, real identifiers, its reading
 slice, and exactly one gate command.
 
-Closing: one commit, scoped `plan-v<n>:` — fill the previous milestone's
+Closing: one commit, scoped `plan-m<n>:` — fill the previous milestone's
 pending `review _`, delete its items keeping the bare header (a closed
 milestone collapses to that one line; git history retains the rest), and
 append the new milestone header `## <milestone> — plan _` + checklist. End the

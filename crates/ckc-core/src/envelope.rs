@@ -140,7 +140,7 @@ pub struct ArtifactEnvelope<P> {
     pub origin: Origin,
     /// `compiler_authority` is reserved for compiled artifacts and
     /// `verifier_authority` for verifier results; those schemas bind the
-    /// reservation where they land (V1 compile/verify stages).
+    /// reservation where they land (M1 compile/verify stages).
     pub authority: Authority,
     /// `[]` for accepted semantic artifacts; evidence-discovery artifacts may
     /// record the channels they used. Set semantics.
@@ -269,7 +269,7 @@ pub struct EventRecord {
     pub component_id: Id,
     /// Pipeline stage the event belongs to (e.g. `extract`).
     pub stage: Id,
-    /// Log-level token (e.g. `info`); §4.6 leaves the value set open at V1.
+    /// Log-level token (e.g. `info`); §4.6 leaves the value set open at M1.
     pub level: Id,
     /// Deterministic event ordering within a run.
     pub logical_time: u64,

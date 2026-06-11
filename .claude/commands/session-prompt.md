@@ -22,8 +22,8 @@ commit range. Plan and review stamps carry hashes only, never usage. A commit
 cannot contain its own hash, so hashes land lazily: a session writes `_` in
 its own hash slot, and the next unit of roadmap work fills the latest `_`
 within its single closing commit, resolving it from commit scopes (`git log
---oneline`; item commits are scoped `<unit-id>:`, plan commits `plan-v<n>:`,
-review commits `review-v<n>:`). At most one `_` is pending at a time;
+--oneline`; item commits are scoped `<unit-id>:`, plan commits `plan-m<n>:`,
+review commits `review-m<n>:`). At most one `_` is pending at a time;
 execute-task sessions neither fill nor create one. Usage comes from
 `.agent/compaction.sh`, run right before staging. A session that hit
 compaction records `>=90% compacted/200K` in place of usage; whether compacted work

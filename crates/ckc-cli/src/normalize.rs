@@ -2,7 +2,7 @@
 //! (SPEC §8.3 normalize row).
 //!
 //! [`load_lexicon`] strict-deserializes `corpus/lexicon/ja_core.yaml` — the
-//! §5 V1 terminology and modality authority (system `ckc.lex`) — and
+//! §5 M1 terminology and modality authority (system `ckc.lex`) — and
 //! validates it into the typed [`Lexicon`], content-hash versioned over its
 //! raw file bytes (§4.4 raw-byte hashing) for every run manifest. Every
 //! surface form is stored normalized under [`StringPolicy::SemanticJa`]
@@ -47,11 +47,11 @@ use ckc_core::{
 
 use crate::shell::static_id;
 
-/// SPEC §5 V1 lexicon: the typed, validated view of
+/// SPEC §5 M1 lexicon: the typed, validated view of
 /// `corpus/lexicon/ja_core.yaml`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lexicon {
-    /// Terminology system the entries bind under (V1: `ckc.lex`).
+    /// Terminology system the entries bind under (M1: `ckc.lex`).
     pub system: Id,
     /// [`hash_bytes`] over the raw file bytes (§4.4 raw-byte hashing),
     /// versioning the lexicon in every run manifest.
@@ -1251,7 +1251,7 @@ mod tests {
 
     fn producer() -> Producer {
         Producer {
-            candidate_id: id("cand.v1"),
+            candidate_id: id("cand.m1"),
             component_id: id("stage.normalize"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
@@ -1308,7 +1308,7 @@ mod tests {
         let lexicon = load_lexicon(&committed()).unwrap();
         let cases: [(&str, Vec<TerminologyBinding>); 3] = [
             (
-                "v1_guideline_a.html",
+                "m1_guideline_a.html",
                 vec![
                     binding("bind.0", "pop.adult", BindingStatus::Exact, &[], &["r.2"]),
                     binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
@@ -1323,7 +1323,7 @@ mod tests {
                 ],
             ),
             (
-                "v1_guideline_b.html",
+                "m1_guideline_b.html",
                 vec![
                     binding("bind.0", "pop.adult", BindingStatus::Exact, &[], &["r.2"]),
                     binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
@@ -1338,7 +1338,7 @@ mod tests {
                 ],
             ),
             (
-                "v1_control.html",
+                "m1_control.html",
                 vec![
                     binding("bind.0", "pop.child", BindingStatus::Exact, &[], &["r.2"]),
                     binding("bind.1", "cond.sepsis", BindingStatus::Exact, &[], &["r.2"]),
@@ -1528,9 +1528,9 @@ mod tests {
     fn clinical_ir_bindings_equal_bind_segments() {
         let lexicon = load_lexicon(&committed()).unwrap();
         for name in [
-            "v1_guideline_a.html",
-            "v1_guideline_b.html",
-            "v1_control.html",
+            "m1_guideline_a.html",
+            "m1_guideline_b.html",
+            "m1_control.html",
         ] {
             let source = extracted(&fixture(name));
             let segments = segment(&source, &producer()).unwrap();
@@ -1566,10 +1566,10 @@ mod tests {
         };
         let cases = [
             (
-                "v1_guideline_b.html",
+                "m1_guideline_b.html",
                 statement("pop.adult", &["cond.pregnancy", "cond.sepsis"]),
             ),
-            ("v1_control.html", statement("pop.child", &["cond.sepsis"])),
+            ("m1_control.html", statement("pop.child", &["cond.sepsis"])),
         ];
         for (name, want) in cases {
             let (ir, diagnostics) = derived(&fixture(name), &lexicon);

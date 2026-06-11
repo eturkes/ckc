@@ -6,7 +6,7 @@
 //!
 //! - section heading spans: `CQ<digit>` prefix → `cq`, anything else →
 //!   `metadata`; caption spans → `metadata`;
-//! - paragraph spans: list-parented → `evidence` (V1 lists are evidence
+//! - paragraph spans: list-parented → `evidence` (M1 lists are evidence
 //!   lists); exception sentence markers (ただし, を除く) → `exception`,
 //!   checked before the recommendation markers (the §5 modality
 //!   phrases) → `recommendation`;
@@ -361,7 +361,7 @@ mod tests {
 
     fn producer() -> Producer {
         Producer {
-            candidate_id: id("cand.v1"),
+            candidate_id: id("cand.m1"),
             component_id: id("stage.segment"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
@@ -403,14 +403,14 @@ mod tests {
         value
     }
 
-    // The committed v1_guideline_a fixture, every span placed and no
+    // The committed m1_guideline_a fixture, every span placed and no
     // misses: title/heading metadata, the CQ heading, recommendation and
     // exception paragraphs, the th header row as table_row over the
     // definition body rows (region pairs in canonical set order — note
     // r.10 < r.9 by bytes), and the evidence list items.
     #[test]
     fn fixture_guideline_a_segments() {
-        let source = extracted(&fixture("v1_guideline_a.html"));
+        let source = extracted(&fixture("m1_guideline_a.html"));
         let envelope = segment(&source, &producer()).unwrap();
         assert!(
             envelope.diagnostics.is_empty(),
@@ -442,7 +442,7 @@ mod tests {
     // headings.
     #[test]
     fn fixtures_b_and_control_segment_residual_free() {
-        for name in ["v1_guideline_b.html", "v1_control.html"] {
+        for name in ["m1_guideline_b.html", "m1_control.html"] {
             let envelope = segment(&extracted(&fixture(name)), &producer()).unwrap();
             assert!(
                 envelope.diagnostics.is_empty(),
@@ -490,7 +490,7 @@ mod tests {
     // the bytes survive a strict read → re-emit cycle.
     #[test]
     fn double_segment_byte_identical_and_strict_reads() {
-        let source = extracted(&fixture("v1_guideline_a.html"));
+        let source = extracted(&fixture("m1_guideline_a.html"));
         let first = canonical_payload_bytes(&segment(&source, &producer()).unwrap()).unwrap();
         let second = canonical_payload_bytes(&segment(&source, &producer()).unwrap()).unwrap();
         assert_eq!(first, second, "double segment is byte-identical");

@@ -1,4 +1,4 @@
-# CKC workspace (SPEC §3). Remaining crate lands with its V1 unit:
+# CKC workspace (SPEC §3). Remaining crate lands with its M1 unit:
 # crates/ckc-smt.
 [workspace]
 resolver = "3"

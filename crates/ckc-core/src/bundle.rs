@@ -47,7 +47,7 @@ use crate::ir::{
 
 fieldless_enum! {
     /// SPEC §5 reusable-component kind. Population and condition reduce to
-    /// concept atoms in V1, so `concept` covers them.
+    /// concept atoms in M1, so `concept` covers them.
     ComponentKind {
         Concept => "concept",
         Action => "action",
@@ -1185,11 +1185,11 @@ mod tests {
         // both constraints cite the worked pair
         assert_eq!(
             by_id("fc.rule.a.cq1.r1").use_sites,
-            [id("q.v1_conflict.pair1")]
+            [id("q.m1_conflict.pair1")]
         );
         assert_eq!(
             by_id("fc.rule.b.contra1").use_sites,
-            [id("q.v1_conflict.pair1")]
+            [id("q.m1_conflict.pair1")]
         );
         // cond.sepsis occurs twice inside rule.b's context and once in its
         // constraint: owners dedup to one entry each
@@ -1447,7 +1447,7 @@ mod tests {
         restamp(&mut b);
         assert_eq!(
             b.validate(&graph_p("")).unwrap_err(),
-            dup("plan", "q.v1_conflict.pair1")
+            dup("plan", "q.m1_conflict.pair1")
         );
         let mut b = two_rule_bundle();
         b.formal.plan[0].deontic_consistency_query_id =
@@ -1455,7 +1455,7 @@ mod tests {
         restamp(&mut b);
         assert_eq!(
             b.validate(&graph_p("")).unwrap_err(),
-            dup("plan", "q.v1_conflict.pair1.overlap")
+            dup("plan", "q.m1_conflict.pair1.overlap")
         );
     }
 
@@ -1610,7 +1610,7 @@ mod tests {
             assert_eq!(
                 b.validate(&graph_p("")).unwrap_err(),
                 BundleError::PairInvalid {
-                    pair_id: id("q.v1_conflict.pair1"),
+                    pair_id: id("q.m1_conflict.pair1"),
                     rule
                 }
             );
@@ -1638,7 +1638,7 @@ mod tests {
         assert_eq!(
             b.validate(&graph_p("")).unwrap_err(),
             BundleError::PairInvalid {
-                pair_id: id("q.v1_conflict.pair1"),
+                pair_id: id("q.m1_conflict.pair1"),
                 rule: "directions not opposed"
             }
         );

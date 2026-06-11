@@ -1,4 +1,4 @@
-//! fixtures-v1 gate: the committed V1 data layer — corpus fixtures, lexicon,
+//! fixtures-m1 gate: the committed M1 data layer — corpus fixtures, lexicon,
 //! gold, registry seeds — loads through the SPEC §8.4 registry types,
 //! validates as one set with zero findings, fixture and gold paths resolve
 //! from the repository root, and fixture bytes carry the normative §8.2
@@ -62,7 +62,7 @@ fn load_set() -> (
     (corpora, candidates, experiments, gold)
 }
 
-// The committed set cross-resolves with zero findings, and exp.v1_spine
+// The committed set cross-resolves with zero findings, and exp.m1_spine
 // carries the §8.2 groups over the §8.3 stage chain.
 #[test]
 fn registry_set_loads_and_validates() {
@@ -76,26 +76,26 @@ fn registry_set_loads_and_validates() {
     assert_eq!(
         corpus_ids,
         vec![
-            &id("fixture.v1_guideline_a"),
-            &id("fixture.v1_guideline_b"),
-            &id("fixture.v1_control"),
+            &id("fixture.m1_guideline_a"),
+            &id("fixture.m1_guideline_b"),
+            &id("fixture.m1_control"),
         ]
     );
 
     assert_eq!(experiments.len(), 1);
     let exp = &experiments[0];
-    assert_eq!(exp.id, id("exp.v1_spine"));
+    assert_eq!(exp.id, id("exp.m1_spine"));
     assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
     assert_eq!(exp.fixture_groups.len(), 2);
-    assert_eq!(exp.fixture_groups[0].group_id, id("group.v1_conflict"));
+    assert_eq!(exp.fixture_groups[0].group_id, id("group.m1_conflict"));
     assert_eq!(
         exp.fixture_groups[0].fixtures,
-        vec![id("fixture.v1_guideline_a"), id("fixture.v1_guideline_b")]
+        vec![id("fixture.m1_guideline_a"), id("fixture.m1_guideline_b")]
     );
-    assert_eq!(exp.fixture_groups[1].group_id, id("group.v1_null"));
+    assert_eq!(exp.fixture_groups[1].group_id, id("group.m1_null"));
     assert_eq!(
         exp.fixture_groups[1].fixtures,
-        vec![id("fixture.v1_guideline_a"), id("fixture.v1_control")]
+        vec![id("fixture.m1_guideline_a"), id("fixture.m1_control")]
     );
     assert!(exp.budget.contains_key(&id("solver_ms_per_query")));
 
@@ -130,11 +130,11 @@ fn fixture_paths_resolve_and_carry_spec_sentences() {
     let (corpora, ..) = load_set();
     let required: BTreeMap<&str, Vec<&str>> = BTreeMap::from([
         (
-            "fixture.v1_guideline_a",
+            "fixture.m1_guideline_a",
             vec![A_RECOMMENDATION, A_EXCEPTION, "CQ1", "<table>", "<ul>"],
         ),
-        ("fixture.v1_guideline_b", vec![B_CONTRAINDICATION]),
-        ("fixture.v1_control", vec![CONTROL_SENTENCE]),
+        ("fixture.m1_guideline_b", vec![B_CONTRAINDICATION]),
+        ("fixture.m1_control", vec![CONTROL_SENTENCE]),
     ]);
     assert_eq!(corpora.len(), required.len());
     for entry in &corpora {
@@ -160,7 +160,7 @@ fn gold_matches_spec_expectations() {
     assert_eq!(entries.len(), 2);
 
     let conflict = &entries[0];
-    assert_eq!(conflict.group_id, id("group.v1_conflict"));
+    assert_eq!(conflict.group_id, id("group.m1_conflict"));
     assert_eq!(conflict.expected_outcome, id("semantic_contradiction"));
     assert_eq!(
         conflict.expected_conflict_kind,
@@ -173,7 +173,7 @@ fn gold_matches_spec_expectations() {
     assert!(!conflict.expected_null_result);
 
     let null = &entries[1];
-    assert_eq!(null.group_id, id("group.v1_null"));
+    assert_eq!(null.group_id, id("group.m1_null"));
     assert_eq!(null.expected_outcome, id("semantic_no_conflict"));
     assert_eq!(null.expected_conflict_kind, None);
     assert!(null.expected_core.is_empty());
@@ -290,7 +290,7 @@ fn lexicon_parses_and_yields_spec_ids() {
             .iter()
             .filter(|c| !c.id.as_str().starts_with("pop."))
             .all(|c| c.interval.is_none()),
-        "only the population concepts carry interval semantics at V1"
+        "only the population concepts carry interval semantics at M1"
     );
 
     assert_eq!(lexicon.actions.len(), 1);

@@ -75,7 +75,7 @@ fieldless_enum! {
 }
 
 fieldless_enum! {
-    /// SPEC §4.5 `data_class`: `none` is the default and the only V1 value;
+    /// SPEC §4.5 `data_class`: `none` is the default and the only M1 value;
     /// §15 source-permission gates add variants as real corpora land.
     DataClass {
         None => "none",
@@ -98,7 +98,7 @@ fieldless_enum! {
 /// over raw bytes (a source document is an external file, not an accepted
 /// artifact): `raw_hash` covers the bytes as acquired, `content_hash` the
 /// decoded content extract consumed — equal when no transport or charset
-/// decoding applies, as with the V1 fixtures. Distinct from the envelope's
+/// decoding applies, as with the M1 fixtures. Distinct from the envelope's
 /// canonical-payload `content_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceDocument {
@@ -208,7 +208,7 @@ pub struct SourceSpan {
     pub raw_text: String,
     /// `raw_text` under §4.2 `source_nfkc`.
     pub nfkc_text: String,
-    /// `raw_text` under §4.2 `semantic_ja`, the V1 search normal form.
+    /// `raw_text` under §4.2 `semantic_ja`, the M1 search normal form.
     pub search_text: String,
     /// Position in the document's total reading order; strictly increasing
     /// along [`SourceGraph::spans`].

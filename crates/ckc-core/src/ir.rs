@@ -88,7 +88,7 @@ pub fn structural_hash<T: Structural>(value: &T) -> Result<Hash, CanonError> {
 /// bytes are the canonical order — the grammar admits no escapes), and the
 /// localized set sorts by localized bytes. Fresh contiguous indices keep the
 /// result rename-stable while the set is its scope's only use of its id pool,
-/// which V1 component shapes satisfy.
+/// which M1 component shapes satisfy.
 pub fn emit_structural_ref_set(
     out: &mut Vec<u8>,
     ids: &mut RefLocalizer,
@@ -191,7 +191,7 @@ impl Structural for DiagnosticRecord {
 }
 
 fieldless_enum! {
-    /// SPEC §5 clinical segment kind — the seven V1 kinds (spec prose
+    /// SPEC §5 clinical segment kind — the seven M1 kinds (spec prose
     /// "table-row" spells `table_row` in the snake_case token family).
     SegmentKind {
         /// Clinical question.
@@ -668,7 +668,7 @@ fieldless_enum! {
 pub struct Action {
     pub kind: Id,
     pub target: Id,
-    /// Normalized target key `kind:target` (V1; V2 joins discriminating
+    /// Normalized target key `kind:target` (M1; M2 joins discriminating
     /// slots). [`new`](Self::new) derives it; bundle validation
     /// (`IrBundle::validate`) re-checks a stored key against its derivation,
     /// the [`SourceSpan`](crate::grounding::SourceSpan) precedent for
@@ -756,7 +756,7 @@ impl CanonRead for QuantityInterval {
 }
 
 /// SPEC §5 context atom, a §4.3 tagged union: concept predicate, negated
-/// concept predicate, or quantity interval (V2 adds slot equality and
+/// concept predicate, or quantity interval (M2 adds slot equality and
 /// temporal atoms). Concept ids and interval variables are lexicon
 /// vocabulary, so atoms have no [`Structural`] impl — enclosing components
 /// embed their canonical bytes.
@@ -839,7 +839,7 @@ impl CanonRead for ContextExpr {
 }
 
 /// SPEC §5 terminology binding: one mention bound to a concept of `system`
-/// (V1: `ckc.lex`). `alternatives` carries the competing codes of an
+/// (M1: `ckc.lex`). `alternatives` carries the competing codes of an
 /// `ambiguous` binding (§4.3 set); `region_ids` ground the mention (§4.3
 /// set). System, code, and alternatives are terminology vocabulary — verbatim
 /// in structural bytes.
@@ -961,7 +961,7 @@ impl Structural for ExceptionClause {
 /// population and condition as atom sets, the action, deontic modality
 /// ([`Direction`]), strength, optional certainty, exception clauses in
 /// document order, and the source segments it normalizes (§4.3 set).
-/// Comparator/outcome/temporal slots stay V2. An independently hashable
+/// Comparator/outcome/temporal slots stay M2. An independently hashable
 /// component.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClinicalStatement {
@@ -974,7 +974,7 @@ pub struct ClinicalStatement {
     /// Normalized deontic modality (lexicon modality phrase → direction).
     pub modality: Direction,
     pub strength: Strength,
-    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    /// Omitted from canonical bytes when `None` (§5: optional at M1).
     pub certainty: Option<Certainty>,
     /// Exception clauses in document order.
     pub exceptions: Vec<ExceptionClause>,
@@ -1052,7 +1052,7 @@ impl Structural for ClinicalStatement {
 /// SPEC §5 ClinicalIR: the document's [`ClinicalStatement`]s and
 /// [`TerminologyBinding`]s, each list in reading/derivation order, each
 /// element an independently hashable component. CQ/PICO/EtD slots stay
-/// optional-V1, unscheduled.
+/// optional-M1, unscheduled.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClinicalIr {
     pub bindings: Vec<TerminologyBinding>,
@@ -1111,11 +1111,11 @@ pub struct NormRule {
     /// regions in source order, exception regions joining as their clauses
     /// compile in (§5).
     pub source_region_ids: Vec<Id>,
-    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    /// Omitted from canonical bytes when `None` (§5: optional at M1).
     pub certainty: Option<Certainty>,
     /// §4.3 set of [`ExceptionClause`] ids, for trace. Empty means absent:
     /// the writer omits an empty set and the reader rejects a present-but-
-    /// empty one, keeping one canonical encoding (§5: optional at V1).
+    /// empty one, keeping one canonical encoding (§5: optional at M1).
     pub exception_refs: Vec<Id>,
 }
 
@@ -1260,7 +1260,7 @@ pub struct FormalConstraint {
     pub context: ContextExpr,
     pub direction: Direction,
     pub strength: Strength,
-    /// Omitted from canonical bytes when `None` (§5: optional at V1).
+    /// Omitted from canonical bytes when `None` (§5: optional at M1).
     pub certainty: Option<Certainty>,
 }
 
@@ -2157,7 +2157,7 @@ pub(crate) mod tests {
     }
 
     // certainty and exception_refs emit when present, vanish when absent
-    // (§5: optional at V1); a present-but-empty exception_refs is not writer
+    // (§5: optional at M1); a present-but-empty exception_refs is not writer
     // output and is rejected.
     #[test]
     fn norm_rule_optionals() {
@@ -2367,12 +2367,12 @@ pub(crate) mod tests {
     /// `p` (constraint refs follow the `fc.<rule_id>` derivation).
     pub(crate) fn pair_p(p: &str) -> ContradictionQueryPair {
         ContradictionQueryPair {
-            pair_id: id(&format!("{p}q.v1_conflict.pair1")),
+            pair_id: id(&format!("{p}q.m1_conflict.pair1")),
             action_key: id("act.administer:drug.abx_a"),
             constraint_a_id: id(&format!("fc.{p}rule.a.cq1.r1")),
             constraint_b_id: id(&format!("fc.{p}rule.b.contra1")),
-            context_overlap_query_id: id(&format!("{p}q.v1_conflict.pair1.overlap")),
-            deontic_consistency_query_id: id(&format!("{p}q.v1_conflict.pair1.deontic")),
+            context_overlap_query_id: id(&format!("{p}q.m1_conflict.pair1.overlap")),
+            deontic_consistency_query_id: id(&format!("{p}q.m1_conflict.pair1.deontic")),
         }
     }
 
@@ -2444,9 +2444,9 @@ pub(crate) mod tests {
                 r#"{"action_key":"act.administer:drug.abx_a","#,
                 r#""constraint_a_id":"fc.rule.a.cq1.r1","#,
                 r#""constraint_b_id":"fc.rule.b.contra1","#,
-                r#""context_overlap_query_id":"q.v1_conflict.pair1.overlap","#,
-                r#""deontic_consistency_query_id":"q.v1_conflict.pair1.deontic","#,
-                r#""pair_id":"q.v1_conflict.pair1"}"#
+                r#""context_overlap_query_id":"q.m1_conflict.pair1.overlap","#,
+                r#""deontic_consistency_query_id":"q.m1_conflict.pair1.deontic","#,
+                r#""pair_id":"q.m1_conflict.pair1"}"#
             )
         );
         round_trip(pair);

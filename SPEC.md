@@ -31,7 +31,7 @@ Thesis under test, as four falsifiable claims:
 
 Documented null results are first-class outcomes for all four claims.
 
-North-star demonstration (V6 era): cross-source conflict surfacing over real public corpora —
+North-star demonstration (M6 era): cross-source conflict surfacing over real public corpora —
 e.g. a guideline recommendation versus a PMDA package-insert contraindication — traced from
 Japanese source spans through IR and named SMT assertions to solver cores, replayable from
 content hashes alone. Behind it sits an asymptotic ideal: ever more minimal admitted mapping and
@@ -99,7 +99,7 @@ contract section is still compact: expand it into full normative text (workflow-
 `.agent/roadmap.md` with the milestone's header and units. Elaboration sessions may also amend
 earlier sections when implementation evidence justifies it; contract-affecting amendments reach
 the user before any unit consumes them. Acceptance sessions mark the milestone header in the
-roadmap with the evidence run id and add the local tag `accept/v<n>`.
+roadmap with the evidence run id and add the local tag `accept/m<n>`.
 
 Normative language: declarative present tense states binding contract. SHOULD marks a strong
 default whose alternative is recorded in a registry, manifest, or gate evidence. MAY marks
@@ -113,14 +113,14 @@ assembling the full harness before the first end-to-end result.
 
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
-| V1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.v1_spine` + §8 checklist |
-| V2 comparison | Direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report. First thesis measurement (claim 1; claim 3's optimization objective via the compactness front). | `ckc run --experiment exp.v2_compare` + §9 acceptance |
-| V3 weak-model PoC | Translation-route comparison under a weak local model (laptop CPU, grammar-constrained, recorded I/O): six routes (§10 table) scored on the V2 evaluator (claim 2); plus the build-once amortization experiment (claim 3). | `ckc run --experiment exp.v3_routes` / `exp.v3_amortize` + §10 |
-| V4 autoresearch PoC | Bounded autoresearch loop (§11) over declared surfaces against a locked evaluator, optimizing lift, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.v4_loop` + §11 |
-| V5 sources | Public corpus ingestion: fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks. | §12 contract, elaborated at V4 acceptance |
-| V6 expansion | Registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, candidate DSLs beyond the PoC. | §13 principles, elaborated per candidate |
+| M1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_spine` + §8 checklist |
+| M2 comparison | Direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report. First thesis measurement (claim 1; claim 3's optimization objective via the compactness front). | `ckc run --experiment exp.m2_compare` + §9 acceptance |
+| M3 weak-model PoC | Translation-route comparison under a weak local model (laptop CPU, grammar-constrained, recorded I/O): six routes (§10 table) scored on the M2 evaluator (claim 2); plus the build-once amortization experiment (claim 3). | `ckc run --experiment exp.m3_routes` / `exp.m3_amortize` + §10 |
+| M4 autoresearch PoC | Bounded autoresearch loop (§11) over declared surfaces against a locked evaluator, optimizing lift, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.m4_loop` + §11 |
+| M5 sources | Public corpus ingestion: fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks. | §12 contract, elaborated at M4 acceptance |
+| M6 expansion | Registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, candidate DSLs beyond the PoC. | §13 principles, elaborated per candidate |
 
-Scope note: V1–V4 are the current PoC horizon; V5–V6 stay in this file as compact forward
+Scope note: M1–M4 are the current PoC horizon; M5–M6 stay in this file as compact forward
 contracts so PoC decisions remain production-compatible.
 
 Roadmap protocol: `.agent/roadmap.md`, consumed by the session command, carries one milestone at
@@ -140,9 +140,9 @@ check deferred items against this rule as the sole scope source.
 Intent: one toolchain until evidence demands a second; durable semantics in typed Rust; every
 stage boundary a validated, content-addressed artifact.
 
-Stack: a Rust workspace (edition 2024) implements everything through V4; external engines (Z3,
-the V3 local-model runtime) join as recorded subprocess adapters rather than language bindings.
-V5's elaboration decides per extraction/NLP adapter whether to stay Rust or admit a `uv`-managed
+Stack: a Rust workspace (edition 2024) implements everything through M4; external engines (Z3,
+the M3 local-model runtime) join as recorded subprocess adapters rather than language bindings.
+M5's elaboration decides per extraction/NLP adapter whether to stay Rust or admit a `uv`-managed
 Python adapter layer joined only through canonical artifacts and exported JSON Schema; the
 decision criteria are determinism, lockability, fixture-tested quality, and maintenance cost,
 recorded in the registry. Every milestone runs on a single CPU laptop: small quantized local
@@ -157,7 +157,7 @@ Crates:
 | `ckc-smt` | FormalIR → SMT-LIB emission, query planning, assertion maps, solver invocation, verdict parsing. |
 | `ckc-cli` | `ckc` binary: pipeline stages, runner, trace/report/replay, registry check. |
 
-Pipeline shape (V1–V2; later stages splice in without reshaping):
+Pipeline shape (M1–M2; later stages splice in without reshaping):
 
 ```text
 corpus fixture -> extract -> segment -> normalize -> assemble(IR) -> compile(SMT) -> verify -> trace -> report
@@ -174,7 +174,7 @@ Runtime metadata stays outside content hashes.
 Accepted artifacts carry envelopes (§4.4); streams (events, diagnostics) are runtime evidence.
 ```
 
-Repository layout (target state; built up by the V1 units):
+Repository layout (target state; built up by the M1 units):
 
 ```text
 .
@@ -182,7 +182,7 @@ Repository layout (target state; built up by the V1 units):
 ├── Cargo.toml  Cargo.lock
 ├── crates/{ckc-core,ckc-smt,ckc-cli}/
 ├── corpus/{fixtures,lexicon,gold}/        # committed, license-clean
-├── registry/                              # corpora.yaml candidates.yaml experiments.yaml at V1;
+├── registry/                              # corpora.yaml candidates.yaml experiments.yaml at M1;
 │                                          # grows per milestone (§14)
 ├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
@@ -190,7 +190,7 @@ Repository layout (target state; built up by the V1 units):
 └── .claude/
 ```
 
-CLI (V1 surface; later milestones extend):
+CLI (M1 surface; later milestones extend):
 
 ```text
 ckc registry check
@@ -281,16 +281,16 @@ Enums (stage column = first milestone that uses the value set):
 
 | Enum | Values | Stage |
 | --- | --- | --- |
-| `Outcome` | `ok residual ambiguity incoherence unsupported invalid`; severity order `invalid > incoherence > unsupported > ambiguity > residual > ok` | V1 |
-| `Origin` | `human_authored ai_assisted ai_generated adapter_generated deterministic_compiler` | V1 |
-| `Authority` | `source_authority mechanical_authority evidence_discovery_only admitted_authority compiler_authority verifier_authority view_only` | V1 |
-| `BindingStatus` | `exact synonym ambiguous unmapped` | V1 |
-| `Direction` | `for against contraindicate require permit avoid` | V1 |
-| `ClaimTier` | `s0_replayable s1_admitted s2_research_evidence s3_clinical_regulatory` | V1 |
-| `ReviewClassification` | `candidate residual ambiguity incoherence replay_failure documented_null_result` | V1 |
-| `AttemptClassification` | `improved equivalent dominated regression invalid unsupported timeout crash null_result near_miss unreproducible unauthorized gate_required` | V4 |
-| `PromotionDecision` | `promote reject quarantine defer_gate request_replay` | V4 |
-| `PromotionScope` | `run_local registry_status` | V4 |
+| `Outcome` | `ok residual ambiguity incoherence unsupported invalid`; severity order `invalid > incoherence > unsupported > ambiguity > residual > ok` | M1 |
+| `Origin` | `human_authored ai_assisted ai_generated adapter_generated deterministic_compiler` | M1 |
+| `Authority` | `source_authority mechanical_authority evidence_discovery_only admitted_authority compiler_authority verifier_authority view_only` | M1 |
+| `BindingStatus` | `exact synonym ambiguous unmapped` | M1 |
+| `Direction` | `for against contraindicate require permit avoid` | M1 |
+| `ClaimTier` | `s0_replayable s1_admitted s2_research_evidence s3_clinical_regulatory` | M1 |
+| `ReviewClassification` | `candidate residual ambiguity incoherence replay_failure documented_null_result` | M1 |
+| `AttemptClassification` | `improved equivalent dominated regression invalid unsupported timeout crash null_result near_miss unreproducible unauthorized gate_required` | M4 |
+| `PromotionDecision` | `promote reject quarantine defer_gate request_replay` | M4 |
+| `PromotionScope` | `run_local registry_status` | M4 |
 
 Outcome meanings:
 
@@ -360,24 +360,24 @@ the standing idempotency property check.
 Intent: a typed bridge from Japanese prose to formal constraints, with reusable components as the
 unit of the thesis.
 
-| Object | Contract (V1 unless tagged) |
+| Object | Contract (M1 unless tagged) |
 | --- | --- |
 | `ClinicalSegment` | CQ, recommendation, evidence, exception, definition, table-row, or metadata segment with region refs. |
-| `TerminologyBinding` | Mention → concept binding: `system` (V1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs. |
-| `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at V1. |
-| `Action` | Action kind + target concept + discriminating slots (V2) + normalized target key. |
-| `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; V2 adds slot equality and temporal interval (difference-logic) atoms. |
-| `NormRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at V1 `certainty, exception_refs`; exceptions compile to negated context conjuncts, their regions joining `source_region_ids`. |
-| `FactualRule` (V2) | Context → factual consequent, strictness. |
-| `DecisionTable` (V5) | Input variables, units, rows, guards, outputs, source rows; DMN-style overlap semantics. |
+| `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs. |
+| `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at M1. |
+| `Action` | Action kind + target concept + discriminating slots (M2) + normalized target key. |
+| `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M2 adds slot equality and temporal interval (difference-logic) atoms. |
+| `NormRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile to negated context conjuncts, their regions joining `source_region_ids`. |
+| `FactualRule` (M2) | Context → factual consequent, strictness. |
+| `DecisionTable` (M5) | Input variables, units, rows, guards, outputs, source rows; DMN-style overlap semantics. |
 | `IRBundle` | The five layers below + reusable component records + assumptions + diagnostics + per-layer and whole-bundle structural hashes. |
 | `CompiledArtifact` | Target id, logic, query plan, query bodies, named-assertion records (assertion id → rule ids → region ids), diagnostics. |
 | `VerifierResult` | Per-query status (§6 categories), model or unsat core, solver identity, diagnostics. |
-| `TraceBundle` | Derivation DAG + claim-evidence rows; V2 adds reuse/compactness graphs. |
+| `TraceBundle` | Derivation DAG + claim-evidence rows; M2 adds reuse/compactness graphs. |
 | `LineageIndex` | Query index: artifact/finding ↔ source spans ↔ rules ↔ assertions ↔ verdicts ↔ report. |
 | `RunPlan` | Experiment id, fixture groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
-| `Report` | report.json (canonical) + report.md (derived view): findings, null results, diagnostics, metrics (V2+), wording per §0. |
+| `Report` | report.json (canonical) + report.md (derived view): findings, null results, diagnostics, metrics (M2+), wording per §0. |
 
 IR layers in one `IRBundle` per document:
 
@@ -385,8 +385,8 @@ IR layers in one `IRBundle` per document:
 | --- | --- |
 | `DocIR` | Layout-preserving text/table view over SourceGraph refs with extraction diagnostics. |
 | `SegmentIR` | ClinicalSegments. |
-| `ClinicalIR` | ClinicalStatements + TerminologyBindings (+ CQ/PICO/EtD slots, optional V1). |
-| `NormIR` | NormRules (+ FactualRules V2, DecisionTables V5). |
+| `ClinicalIR` | ClinicalStatements + TerminologyBindings (+ CQ/PICO/EtD slots, optional M1). |
+| `NormIR` | NormRules (+ FactualRules M2, DecisionTables M5). |
 | `FormalIR` | Target-independent constraints, normalized actions/contexts, contradiction-query plan. |
 
 IR invariants:
@@ -396,10 +396,10 @@ Every reusable action, condition, population, concept, rule, and constraint has 
 normalized structural hash; component records list use sites.
 IRBundle validates (grounding, references, policy completeness) before compilation.
 Assumptions and uncertainty are explicit payload fields.
-Layered pipelines expose component reuse metadata; V2 metrics consume it.
+Layered pipelines expose component reuse metadata; M2 metrics consume it.
 ```
 
-Lexicon: `corpus/lexicon/ja_core.yaml` is the V1 terminology and modality authority
+Lexicon: `corpus/lexicon/ja_core.yaml` is the M1 terminology and modality authority
 (system `ckc.lex`): concept entries (id, surface forms, optional interval semantics such as
 成人 → `age >= 18`), action verbs, modality phrases mapped to (direction, strength) — e.g.
 推奨する → (`for`, strong); 提案する/考慮してもよい → (`for`/`permit`, weak); 禁忌/投与しないこと →
@@ -409,12 +409,12 @@ Versioned by content hash in every manifest. Binding statuses: `exact`/`synonym`
 demands (after representative normalization); `ambiguous` emits
 `Ambiguity(terminology_ambiguous)` and `unmapped` emits `Residual(terminology_unmapped)` when one
 concept is required. External terminologies (MEDIS masters first: license-clean, MHLW-designated)
-join at V5 as additional systems behind the same TerminologyBinding contract.
+join at M5 as additional systems behind the same TerminologyBinding contract.
 
 Semantic policy invariants:
 
 ```text
-Action sameness = same action kind + terminology-representative target + (V2) discriminating
+Action sameness = same action kind + terminology-representative target + (M2) discriminating
 slots, via normalized target keys.
 Strength and certainty are proof-visible annotations; conflict logic consumes direction and
 normalized action/context.
@@ -446,7 +446,7 @@ Q1 context_overlap: assert both rules' guarded contexts (exceptions as negated c
   (no shared context).
 Q2 deontic_consistency: for pairs with a sat Q1, assert each rule's direction as a polarity
   literal on the shared action, each as a :named assertion; unsat -> semantic_contradiction with
-  unsat core naming the contributing assertions; sat -> documented null result. V2 conflict
+  unsat core naming the contributing assertions; sat -> documented null result. M2 conflict
   kinds extend Q2 with threshold, slot, and factual constraints.
 ```
 
@@ -454,25 +454,25 @@ Conflict kinds (stage = first milestone that detects them):
 
 | Kind | Stage | Idea |
 | --- | --- | --- |
-| `context_compatibility` | V1 | Finite context overlap over concept and interval atoms. |
-| `normalized_action_sameness` | V1 | Eligibility via normalized action keys. |
-| `deontic_direction_conflict` | V1 | Opposed direction groups under satisfiable shared context. |
-| `numeric_threshold_empty_intersection` | V2 | Same action+direction, disjoint quantity/temporal intervals. |
-| `strict_factual_contradiction` | V2 | Strict factual consequents jointly inconsistent. |
-| `terminology_incoherence` | V2 | Functional key collision or mutually exclusive mapping. |
-| `table_value_disagreement` | V5 | Overlapping table guards, incompatible outputs. |
-| `source_metadata_disagreement` | V5 | Singleton metadata values disagree after normalization. |
-| `gloss_drift` | V5 | Rendered view diverges from semantic payload. |
-| `replay_or_certificate_failure` | V1 | Replay mismatch or certificate check failure. |
-| `package_insert_vs_guideline_conflict` | V6 | Cross-source flagship (e-PI fixtures registered). |
+| `context_compatibility` | M1 | Finite context overlap over concept and interval atoms. |
+| `normalized_action_sameness` | M1 | Eligibility via normalized action keys. |
+| `deontic_direction_conflict` | M1 | Opposed direction groups under satisfiable shared context. |
+| `numeric_threshold_empty_intersection` | M2 | Same action+direction, disjoint quantity/temporal intervals. |
+| `strict_factual_contradiction` | M2 | Strict factual consequents jointly inconsistent. |
+| `terminology_incoherence` | M2 | Functional key collision or mutually exclusive mapping. |
+| `table_value_disagreement` | M5 | Overlapping table guards, incompatible outputs. |
+| `source_metadata_disagreement` | M5 | Singleton metadata values disagree after normalization. |
+| `gloss_drift` | M5 | Rendered view diverges from semantic payload. |
+| `replay_or_certificate_failure` | M1 | Replay mismatch or certificate check failure. |
+| `package_insert_vs_guideline_conflict` | M6 | Cross-source flagship (e-PI fixtures registered). |
 
 SMT profile:
 
 ```text
 Target: SMT-LIB 2 text artifacts, embedded in CompiledArtifact payloads and materialized
 byte-identically under groups/<gid>/smt/ for solver consumption.
-Logic: narrowest sufficient logic, recorded per query; V1 default QF_LRA (Bool constants +
-linear-real interval atoms). V2 adds difference-logic temporal atoms; declared target profiles
+Logic: narrowest sufficient logic, recorded per query; M1 default QF_LRA (Bool constants +
+linear-real interval atoms). M2 adds difference-logic temporal atoms; declared target profiles
 gate anything richer, which otherwise returns unsupported_fragment.
 Symbols: SMT symbols are |-quoted canonical Ids, so assertions remain self-identifying.
 Every assertion that can influence a query is :named and mapped in the assertion map to IR rule
@@ -502,26 +502,26 @@ Intent: every claim is a path through artifacts; every miss is a typed datum.
 `trace_bundle.json` holds the derivation DAG (source → extraction → segment → normalization → IR
 → compile → verify → report nodes with operation-labeled edges) and claim-evidence rows (finding
 → region ids → rule ids → assertion ids → verdict → report ref). `lineage_index.json` is its
-query index; `ckc trace` resolves a finding to the full chain in both directions. V2 adds
+query index; `ckc trace` resolves a finding to the full chain in both directions. M2 adds
 component-reuse and compactness exports plus deterministic path visualizations: `trace_graph.dot`
 (sorted nodes/edges) and per-finding Mermaid blocks in `report.md`, rendering the chain from
 Japanese source span to solver verdict and the convergence of documents onto shared mapping
-components; rendering to images is a view concern with renderer identity recorded. V4 adds
+components; rendering to images is a view concern with renderer identity recorded. M4 adds
 attempt-ledger rows to the trace exports (§11). The lineage index and derivation DAG subsume
 dedicated mapping-hypergraph and axiom-dependency exports at fixture scale; those exports
-re-stage with V6 corpus scale if measurement demands them.
+re-stage with M6 corpus scale if measurement demands them.
 
 ### §7.2 Reports
 
 `report.json` is canonical; `report.md` is a deterministic rendering. Contents: corpus and
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented null results, a diagnostics summary (code-keyed
-failure-taxonomy rollup), solver identity, replay status; from V2, raw metric rows before any
-weighted ranking plus ablations; from V4, attempt-ledger summaries; from V6, matrix coverage.
+failure-taxonomy rollup), solver identity, replay status; from M2, raw metric rows before any
+weighted ranking plus ablations; from M4, attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<ordinal>` with ordinals in source-then-hash order (§4.1).
 Report wording stays within the §0 vocabulary.
 
-### §7.3 Metrics (V2 onward)
+### §7.3 Metrics (M2 onward)
 
 Metric values are exact rationals; unavailable values are omitted with a diagnostic; zero
 denominators emit `not_applicable` per metric schema. Raw rows always accompany rankings. Core
@@ -530,15 +530,15 @@ mapping-set size versus coverage, fan-in/out, MDL proxies), convergence (normali
 agreement across variants), compilation (schema/compile/parse/solver pass rates), conflict
 quality (precision/recall and conflict-task accuracy over fixture expectations), trace
 completeness, determinism (hash stability), lift (per-metric route-versus-baseline deltas over
-identical fixtures: layered-minus-direct from V2, model routes from V3), route quality
+identical fixtures: layered-minus-direct from M2, model routes from M3), route quality
 (schema-valid rate, admission rate, repair count, recorded-call counts, k-sample convergence;
-from V3), amortized coverage (share of fresh-document semantics produced deterministically from
-admitted mappings, with zero apply-phase model calls; from V3), and loop outcomes (from V4).
+from M3), amortized coverage (share of fresh-document semantics produced deterministically from
+admitted mappings, with zero apply-phase model calls; from M3), and loop outcomes (from M4).
 
 ### §7.4 Diagnostics
 
 Every diagnostic carries a stable code, a structured payload, region/artifact refs, and maps to
-exactly one Outcome. V1–V2 code set:
+exactly one Outcome. M1–M2 code set:
 
 ```text
 extraction_uncertain table_structure_uncertain span_grounding_missing segmentation_boundary_error
@@ -549,12 +549,12 @@ trace_incomplete replay_mismatch replay_identity_unsupported deferred_gate_requi
 false_positive_conflict false_negative_conflict metamorphic_instability
 ```
 
-V3 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
-`repair_limit_exceeded`); V4 adds loop/budget/surface codes (`unauthorized_surface_edit`,
-`budget_exhausted`); V5 adds source/permission/drift codes; each is defined in its milestone
+M3 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
+`repair_limit_exceeded`); M4 adds loop/budget/surface codes (`unauthorized_surface_edit`,
+`budget_exhausted`); M5 adds source/permission/drift codes; each is defined in its milestone
 section at elaboration time.
 
-## §8 V1 — Spine (normative)
+## §8 M1 — Spine (normative)
 
 Intent: the smallest complete instance of the thesis machinery — one layered pipeline, real
 Japanese text shapes, a real solver, full trace, deterministic replay. Everything later is
@@ -563,8 +563,8 @@ measured against this spine, so its contracts are exact.
 ### §8.1 Scope
 
 Pipeline `pipe.layered_ckcir_to_smt` over synthetic fixtures; deterministic throughout
-(`runtime_ai: false` is the standing V1–V2 condition; model artifacts first appear under §10
-contracts at V3). Experiment `exp.v1_spine`.
+(`runtime_ai: false` is the standing M1–M2 condition; model artifacts first appear under §10
+contracts at M3). Experiment `exp.m1_spine`.
 
 ### §8.2 Fixtures
 
@@ -575,21 +575,21 @@ admission-over-proposer authority.
 
 | Fixture | Content | Role |
 | --- | --- | --- |
-| `fixture.v1_guideline_a` | Minds-style synthetic guideline: CQ + recommendation 「成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)」 with exception 「ただし、重度腎機能障害のある患者を除く」, plus one definitions table and an evidence list for layout coverage. | Recommendation source. |
-| `fixture.v1_guideline_b` | Synthetic companion document: 「成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)」. | Overlap + contraindication → expected contradiction with A. |
-| `fixture.v1_control` | Synthetic document: 「小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である」. | Age intervals disjoint with A → expected null result. |
+| `fixture.m1_guideline_a` | Minds-style synthetic guideline: CQ + recommendation 「成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)」 with exception 「ただし、重度腎機能障害のある患者を除く」, plus one definitions table and an evidence list for layout coverage. | Recommendation source. |
+| `fixture.m1_guideline_b` | Synthetic companion document: 「成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)」. | Overlap + contraindication → expected contradiction with A. |
+| `fixture.m1_control` | Synthetic document: 「小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である」. | Age intervals disjoint with A → expected null result. |
 
-Fixture groups in `exp.v1_spine`: `group.v1_conflict = [a, b]` expecting one
-`deontic_direction_conflict` finding; `group.v1_null = [a, control]` expecting
+Fixture groups in `exp.m1_spine`: `group.m1_conflict = [a, b]` expecting one
+`deontic_direction_conflict` finding; `group.m1_null = [a, control]` expecting
 `semantic_no_conflict` + `documented_null_result`. Expected outcomes live in
-`corpus/gold/v1_expected.yaml`, asserted by the acceptance tests, one entry per fixture group:
+`corpus/gold/m1_expected.yaml`, asserted by the acceptance tests, one entry per fixture group:
 
 ```yaml
-- group_id: group.v1_conflict
+- group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict
   expected_core: [a.rule.a.cq1.r1, a.rule.b.contra1]   # compared as a set
-- group_id: group.v1_null
+- group_id: group.m1_null
   expected_outcome: semantic_no_conflict
   expected_null_result: true
 ```
@@ -618,11 +618,11 @@ runs/<run-id>/
 └── logs/{events.jsonl,diagnostics.jsonl}
 ```
 
-### §8.4 Registries at V1
+### §8.4 Registries at M1
 
 `registry/corpora.yaml` (fixtures above), `registry/candidates.yaml` (the pipeline and its stage
 components with ids, kinds, determinism, input/output artifact kinds), `registry/experiments.yaml`
-(`exp.v1_spine`: fixture groups, pipeline, seed, budget, expected-outcome ref). `ckc registry
+(`exp.m1_spine`: fixture groups, pipeline, seed, budget, expected-outcome ref). `ckc registry
 check` validates all three and verifies each pipeline's stage components chain: every stage's
 declared input artifact kinds are produced by its predecessors.
 
@@ -631,17 +631,17 @@ declared input artifact kinds are produced by its predecessors.
 1. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and
    `cargo test --workspace` pass.
 2. `ckc registry check` passes.
-3. `ckc run --experiment exp.v1_spine --out runs/v1` completes with outcome `ok`, emitting the
+3. `ckc run --experiment exp.m1_spine --out runs/m1` completes with outcome `ok`, emitting the
    §8.3 artifact set with every accepted artifact passing strict canonical read (enforced by a
    workspace test over the run directory).
 4. Every named assertion in each `compiled.json` maps to IR rule ids and source region ids.
-5. `group.v1_conflict` yields `semantic_contradiction` with an unsat core naming assertions
+5. `group.m1_conflict` yields `semantic_contradiction` with an unsat core naming assertions
    derived from both documents.
-6. `group.v1_null` yields `semantic_no_conflict` and a `documented_null_result` entry in the
+6. `group.m1_null` yields `semantic_no_conflict` and a `documented_null_result` entry in the
    report, evidenced by the Q1 unsat (disjoint age intervals).
-7. `ckc trace --run runs/v1 --finding <finding-id>` prints the complete chain: source spans →
+7. `ckc trace --run runs/m1 --finding <finding-id>` prints the complete chain: source spans →
    segments → statements → rules → named assertions → solver verdict → report finding.
-8. `ckc replay runs/v1` reports matching canonical content hashes for all accepted artifacts.
+8. `ckc replay runs/m1` reports matching canonical content hashes for all accepted artifacts.
 9. `report.md`/`report.json` carry findings, the null result, diagnostics, solver identity, and
    §0-vocabulary wording, with quoted Japanese spans resolving to fixture bytes.
 
@@ -667,7 +667,7 @@ sorted by canonical_sort_key; sibling ids disambiguate per §4.1):
 docB yields `rule.b.contra1`: context `cond.sepsis ∧ age ≥ 18 ∧ cond.pregnancy`, direction
 `contraindicate`, same action key → pair eligible.
 
-Q1 `q.v1_conflict.pair1.overlap` (QF_LRA):
+Q1 `q.m1_conflict.pair1.overlap` (QF_LRA):
 
 ```smt2
 (set-logic QF_LRA)
@@ -684,7 +684,7 @@ Q1 `q.v1_conflict.pair1.overlap` (QF_LRA):
 (get-model)            ; witness model recorded
 ```
 
-Q2 `q.v1_conflict.pair1.deontic`: polarity literals on the shared action (overlap witnessed by Q1):
+Q2 `q.m1_conflict.pair1.deontic`: polarity literals on the shared action (overlap witnessed by Q1):
 
 ```smt2
 (set-logic QF_UF)
@@ -698,13 +698,13 @@ Q2 `q.v1_conflict.pair1.deontic`: polarity literals on the shared action (overla
 ```
 
 VerifierResult: `semantic_contradiction`, core `[a.rule.a.cq1.r1, a.rule.b.contra1]`. Report
-finding `finding.group.v1_conflict.1` cites both rules, their regions, the quoted spans, the core, and
+finding `finding.group.m1_conflict.1` cites both rules, their regions, the quoted spans, the core, and
 classifies as `deontic_direction_conflict`, claim tier `s1_admitted`, wording `synthetic fixture
 measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closing as
 `documented_null_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to
 the core and back.
 
-## §9 V2 — Comparison and metrics (normative)
+## §9 M2 — Comparison and metrics (normative)
 
 Intent: the first thesis measurement — layered versus direct, with reuse and convergence
 quantified on a corpus designed to exercise them.
@@ -715,9 +715,9 @@ Scope:
   bypassing shared ClinicalIR/NormIR component reuse; unused stages emit pass-through artifacts
   (outcome `ok`, payload marker `not_applicable`) under the same envelope rules.
 - Fixture growth: 4–6 additional synthetic documents sharing populations/actions/conditions
-  across documents (reuse pressure), plus deterministic metamorphic variants of V1 documents
+  across documents (reuse pressure), plus deterministic metamorphic variants of M1 documents
   (punctuation, kana/kanji, section order) committed as mutation fixtures with declared
-  provenance, plus threshold-conflict and factual-conflict cases for the V2 conflict kinds.
+  provenance, plus threshold-conflict and factual-conflict cases for the M2 conflict kinds.
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
   `compactness_front.json` join the trace exports — the front doubles as the
@@ -726,27 +726,27 @@ Scope:
 - Metrics per §7.3 over both pipelines; the per-metric layered-minus-direct deltas are the
   staged-pipeline lift measurement; `candidate_diff.json` compares segment, binding, rule,
   assertion, verdict, and metric levels; `ranking.csv` + `score_breakdown.json` with raw rows.
-- Frozen-measurement record: the run manifest freezes the V2 evaluator identity — fixture,
+- Frozen-measurement record: the run manifest freezes the M2 evaluator identity — fixture,
   gold, lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
-  semantics in V4).
-- V2 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
+  semantics in M4).
+- M2 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
   `strict_factual_contradiction`, `terminology_incoherence`; ambiguous/unmapped binding paths
   exercised by fixtures.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_grounding_off`.
 - `registry/methods.yaml` seeded from the `docs/` compendium (§14).
 
-Acceptance sketch (finalized when V2's roadmap units are authored): both pipelines run
-`exp.v2_compare` over all fixture groups; metrics emit exact-rational raw rows; hash-convergence
+Acceptance sketch (finalized when M2's roadmap units are authored): both pipelines run
+`exp.m2_compare` over all fixture groups; metrics emit exact-rational raw rows; hash-convergence
 asserts identical component hashes across metamorphic variants for the layered pipeline; the
 comparison report ranks pipelines with raw rows visible; path and reuse visualizations emit with
 deterministic bytes; expected conflict/null outcomes hold per gold; replay holds for both
 pipelines; `candidate_diff.json` is complete.
 
-## §10 V3 — Weak-model translation PoC (contract; elaborate at V2 acceptance)
+## §10 M3 — Weak-model translation PoC (contract; elaborate at M2 acceptance)
 
 Intent: measure claims 2–3 on this laptop — IR configuration as the variable, a weak local model
-as the constant, the V1–V2 evaluator as the instrument. The model stays in the loop for every
+as the constant, the M1–M2 evaluator as the instrument. The model stays in the loop for every
 route; the route axis decides how much it is trusted with, and the evaluator turns "more reliable
 translation" into locked raw rows instead of anecdote.
 
@@ -775,11 +775,11 @@ Committed direction:
 | `route.ckc_dsl` | Model emits a compact project-born DSL under a grammar mask; deterministic parse → IR → compile. |
 
 - Every route registers its schemas/grammars and a deterministic bridge into the §6 profile,
-  keeping conflict-task scoring identical across routes; V3 diagnostic codes land per §7.4.
-- Scoring: every route runs `exp.v3_routes` under one frozen-measurement identity (per §9);
+  keeping conflict-task scoring identical across routes; M3 diagnostic codes land per §7.4.
+- Scoring: every route runs `exp.m3_routes` under one frozen-measurement identity (per §9);
   model output passes the same §4 admission checks as any artifact; §7.3 route-quality, lift,
   conflict-task accuracy, and k-sample convergence metrics emit as raw rows before ranking.
-- Amortization experiment (`exp.v3_amortize`, claim 3): fixture set A builds mappings and
+- Amortization experiment (`exp.m3_amortize`, claim 3): fixture set A builds mappings and
   admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: deterministic coverage of B,
   accuracy versus gold, mapping-set size versus coverage on the compactness front, and
@@ -792,16 +792,16 @@ Acceptance themes (finalized at elaboration): all registered routes execute over
 locked inputs; recorded model I/O replays byte-stably; the lift table and amortization report
 emit with raw rows first; expected conflict/null outcomes hold per gold; §0 vocabulary holds.
 
-## §11 V4 — Autoresearch PoC (contract; elaborate at V3 acceptance)
+## §11 M4 — Autoresearch PoC (contract; elaborate at M3 acceptance)
 
-Intent: claim 4 — `ckc research loop --experiment exp.v4_loop` runs a bounded
+Intent: claim 4 — `ckc research loop --experiment exp.m4_loop` runs a bounded
 propose → patch → run → score → classify → promote/reject → replay → ledger cycle that improves
 claims 1–3's objectives under an immutable evaluator. The PoC runs on laptop budgets; the loop
 contract is built to outgrow them.
 
 Committed direction:
 
-- `EvaluatorLock` (`evaluator_lock.json`, extending the §9 V2 identity) materialized before
+- `EvaluatorLock` (`evaluator_lock.json`, extending the §9 M2 identity) materialized before
   attempts: fixture/gold/schema/metric/evaluator-code/toolchain/seed/budget hashes, immutable
   per experiment; per-attempt `attempt_run_lock` records evaluator-lock, candidate-graph (the
   resolved §8.4 pipeline+config identity hash), and patch/workspace hashes.
@@ -841,14 +841,14 @@ Committed direction:
 - Scale-out — `ExperimentPlan` matrices with compatibility filters, pairwise/fractional designs,
   Pareto/beam narrowing, and coverage classification (untested, skipped-incompatible,
   unsupported, failed, dominated, equivalent, Pareto-front, promising) — extends this contract
-  when candidate spaces outgrow the PoC (V6).
+  when candidate spaces outgrow the PoC (M6).
 
 Acceptance themes: the loop executes on `driver.local` within budgets over at least two
 surfaces, with the driver named in the manifest; the ledger holds at least one valid scored
 attempt and one rejected or dominated attempt; an unauthorized-surface patch is classified and
 stays unscored; at least one locally promoted attempt replays; ledger summaries emit as CSV/MD.
 
-## §12 V5 — Public sources (contract; elaborate at V4 acceptance)
+## §12 M5 — Public sources (contract; elaborate at M4 acceptance)
 
 Intent: the spine, comparison, and admitted translation routes run end-to-end on real public
 Japanese guideline material with permission-aware caching and richer extraction.
@@ -873,10 +873,10 @@ Committed direction:
   TerminologyBinding contract; version-pinned snapshots; license-encumbered vocabularies
   (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until licensing evidence exists.
 - Drift: source hash changes emit `source_drift.json` and mark dependent scores stale.
-- Boundary: the committed schemas exported since V3 govern any cross-language boundary; the
+- Boundary: the committed schemas exported since M3 govern any cross-language boundary; the
   Rust-vs-Python adapter decision per §3 is made and recorded here.
 
-## §13 V6 — Expansion (principles; elaborate per candidate)
+## §13 M6 — Expansion (principles; elaborate per candidate)
 
 Intent: registry-driven growth; every candidate enters behind benchmark evidence and applicable
 gates.
@@ -887,19 +887,19 @@ gates.
 | Richer rule semantics: defeasible priorities/superiority, ASP/Clingo, argumentation | Exception-as-context-conjunct measurably under-fits real guidelines. |
 | Additional targets: cvc5 certificates → Lean/Isabelle replay; DMN table semantics; Alloy/TLA+ pipeline properties; e-graph canonicalization | Verifier-portfolio, table-semantics, or convergence evidence demands them. |
 | Corpus-scale sweeps; matrix scale-out, long-horizon agent-driver loops, IR-combination search (§11) | Candidate spaces outgrow the PoC. |
-| `package_insert_vs_guideline_conflict` flagship | V5 e-PI fixtures registered. |
-| DSL/CKC-GEN beyond the V3 PoC DSL: typed-hole authoring, proof export, full kernel | V3/V4 evidence favors invented IRs. |
+| `package_insert_vs_guideline_conflict` flagship | M5 e-PI fixtures registered. |
+| DSL/CKC-GEN beyond the M3 PoC DSL: typed-hole authoring, proof export, full kernel | M3/M4 evidence favors invented IRs. |
 
 The §2 conservation rule keeps this table in sync with `registry/methods.yaml`.
 
 ## §14 Registries and research compendium
 
-Registry files are data, validated by `ckc registry check`, growing per milestone: V1
-`corpora|candidates|experiments`; V2 adds `methods`, the method-universe catalogue seeded from
+Registry files are data, validated by `ckc registry check`, growing per milestone: M1
+`corpora|candidates|experiments`; M2 adds `methods`, the method-universe catalogue seeded from
 the compendium (families, aliases, candidate roles, adapter status
 `v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata);
-V3 adds `prompts|schemas` (the schema export feeds V3's grammar constraints); V4 adds
-`evaluators|gates` (gate evidence objects); V5 adds `source_processors|policies`; V6 adds
+M3 adds `prompts|schemas` (the schema export feeds M3's grammar constraints); M4 adds
+`evaluators|gates` (gate evidence objects); M5 adds `source_processors|policies`; M6 adds
 `indexes` with retrieval.
 
 `docs/` is the committed research compendium — method-category deep-research

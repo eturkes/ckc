@@ -1,15 +1,15 @@
-# SPEC §8.4 experiments: exp.v1_spine resolves pipe.layered_ckcir_to_smt over
+# SPEC §8.4 experiments: exp.m1_spine resolves pipe.layered_ckcir_to_smt over
 # the §8.2 fixture groups; expected_outcomes references the typed gold file
 # asserted by acceptance tests. Budget counters are §4.6 budget_counters
 # vocabulary (per-query solver cap, milliseconds).
-- id: exp.v1_spine
+- id: exp.m1_spine
   pipeline: pipe.layered_ckcir_to_smt
   fixture_groups:
-    - group_id: group.v1_conflict
-      fixtures: [fixture.v1_guideline_a, fixture.v1_guideline_b]
-    - group_id: group.v1_null
-      fixtures: [fixture.v1_guideline_a, fixture.v1_control]
+    - group_id: group.m1_conflict
+      fixtures: [fixture.m1_guideline_a, fixture.m1_guideline_b]
+    - group_id: group.m1_null
+      fixtures: [fixture.m1_guideline_a, fixture.m1_control]
   seed: 42
   budget:
     solver_ms_per_query: 10000
-  expected_outcomes: corpus/gold/v1_expected.yaml
+  expected_outcomes: corpus/gold/m1_expected.yaml

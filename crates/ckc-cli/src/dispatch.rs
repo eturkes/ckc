@@ -413,11 +413,11 @@ mod tests {
     #[test]
     fn run_creates_out_dir_and_lands_logs() {
         let tmp = tempfile::tempdir().unwrap();
-        let out = tmp.path().join("v1");
+        let out = tmp.path().join("m1");
         let exit = run_cli(&args(&[
             "run",
             "--experiment",
-            "exp.v1_spine",
+            "exp.m1_spine",
             "--out",
             out.to_str().unwrap(),
         ]));
@@ -428,7 +428,7 @@ mod tests {
         let events: Vec<EventRecord> =
             read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].run_id, static_id("v1"));
+        assert_eq!(events[0].run_id, static_id("m1"));
         assert_eq!(events[0].stage, static_id(OP_RUN));
         let diagnostics: Vec<DiagnosticRecord> =
             read_jsonl(&std::fs::read(out.join("logs/diagnostics.jsonl")).unwrap()).unwrap();
@@ -439,12 +439,12 @@ mod tests {
     #[test]
     fn run_rejects_existing_out_dir() {
         let tmp = tempfile::tempdir().unwrap();
-        let out = tmp.path().join("v1");
+        let out = tmp.path().join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let exit = run_cli(&args(&[
             "run",
             "--experiment",
-            "exp.v1_spine",
+            "exp.m1_spine",
             "--out",
             out.to_str().unwrap(),
         ]));
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn run_argument_shape_failures() {
         let tmp = tempfile::tempdir().unwrap();
-        let fresh = tmp.path().join("v2");
+        let fresh = tmp.path().join("m2");
         let fresh_str = fresh.to_str().unwrap();
         let cases: Vec<(Vec<String>, &str)> = vec![
             (
@@ -542,7 +542,7 @@ mod tests {
             "--run",
             run_dir_str,
             "--finding",
-            "finding.group.v1_conflict.1",
+            "finding.group.m1_conflict.1",
         ]));
         assert_eq!(exit.result.operation_id, static_id(OP_TRACE));
         assert_eq!(exit.result.outcome, Outcome::Unsupported);

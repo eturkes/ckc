@@ -76,11 +76,11 @@ fn registry_check_fails_invalid_off_root() {
 #[test]
 fn run_writes_only_under_its_out_dir() {
     let tmp = tempfile::tempdir().unwrap();
-    let out_dir = tmp.path().join("v1");
+    let out_dir = tmp.path().join("m1");
     let out = ckc(&[
         "run",
         "--experiment",
-        "exp.v1_spine",
+        "exp.m1_spine",
         "--out",
         out_dir.to_str().unwrap(),
     ]);
@@ -88,7 +88,7 @@ fn run_writes_only_under_its_out_dir() {
     assert!(out.stderr.is_empty(), "events landed in logs/, not stderr");
     assert_eq!(single_result(&out.stdout).outcome, Outcome::Unsupported);
 
-    assert_eq!(sorted_entries(tmp.path()), ["v1"]);
+    assert_eq!(sorted_entries(tmp.path()), ["m1"]);
     assert_eq!(sorted_entries(&out_dir), ["logs"]);
     assert_eq!(
         sorted_entries(&out_dir.join("logs")),
@@ -97,7 +97,7 @@ fn run_writes_only_under_its_out_dir() {
     let events: Vec<EventRecord> =
         read_jsonl(&std::fs::read(out_dir.join("logs/events.jsonl")).unwrap()).unwrap();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].run_id, "v1".parse().unwrap());
+    assert_eq!(events[0].run_id, "m1".parse().unwrap());
 }
 
 #[test]

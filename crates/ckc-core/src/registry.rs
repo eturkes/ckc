@@ -28,9 +28,9 @@ use crate::grounding::Provenance;
 use crate::id::{Id, ValidationError};
 
 fieldless_enum! {
-    /// SPEC §8.4 stage-component determinism class. Every V1 component is
+    /// SPEC §8.4 stage-component determinism class. Every M1 component is
     /// `deterministic`; `nondeterministic` marks components whose reruns may
-    /// diverge (V3's recorded weak-model routes), which replay handles
+    /// diverge (M3's recorded weak-model routes), which replay handles
     /// through recorded I/O rather than re-execution.
     Determinism {
         Deterministic => "deterministic",
@@ -45,7 +45,7 @@ fieldless_enum! {
 #[serde(deny_unknown_fields)]
 pub struct CorpusEntry {
     /// Document id experiments and groups reference (e.g.
-    /// `fixture.v1_guideline_a`).
+    /// `fixture.m1_guideline_a`).
     pub id: Id,
     /// Document path relative to the repository root.
     pub path: String,
@@ -99,7 +99,7 @@ pub struct StageEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentEntry {
-    /// Experiment id (e.g. `exp.v1_spine`).
+    /// Experiment id (e.g. `exp.m1_spine`).
     pub id: Id,
     /// Pipeline candidate this experiment executes.
     pub pipeline: Id,
@@ -120,7 +120,7 @@ pub struct ExperimentEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FixtureGroup {
-    /// Group id (e.g. `group.v1_conflict`).
+    /// Group id (e.g. `group.m1_conflict`).
     pub group_id: Id,
     /// Member [`CorpusEntry`] ids, in semantic order.
     pub fixtures: Vec<Id>,
@@ -468,18 +468,18 @@ mod tests {
     }
 
     const CORPORA: &str = "\
-- id: fixture.v1_guideline_a
-  path: corpus/fixtures/v1_guideline_a.html
+- id: fixture.m1_guideline_a
+  path: corpus/fixtures/m1_guideline_a.html
   origin: ai_generated
   authority: source_authority
   provenance: synthetic
-- id: fixture.v1_guideline_b
-  path: corpus/fixtures/v1_guideline_b.html
+- id: fixture.m1_guideline_b
+  path: corpus/fixtures/m1_guideline_b.html
   origin: ai_generated
   authority: source_authority
   provenance: synthetic
-- id: fixture.v1_control
-  path: corpus/fixtures/v1_control.html
+- id: fixture.m1_control
+  path: corpus/fixtures/m1_control.html
   origin: ai_generated
   authority: source_authority
   provenance: synthetic
@@ -488,14 +488,14 @@ mod tests {
     const CANDIDATES: &str = "\
 pipelines:
   - id: pipe.layered_ckcir_to_smt
-    stages: [stage.v1.extract, stage.v1.segment]
+    stages: [stage.m1.extract, stage.m1.segment]
 stages:
-  - id: stage.v1.extract
+  - id: stage.m1.extract
     kind: extract
     determinism: deterministic
     input_artifact_kinds: []
     output_artifact_kinds: [source_graph]
-  - id: stage.v1.segment
+  - id: stage.m1.segment
     kind: segment
     determinism: deterministic
     input_artifact_kinds: [source_graph]
@@ -503,26 +503,26 @@ stages:
 ";
 
     const EXPERIMENTS: &str = "\
-- id: exp.v1_spine
+- id: exp.m1_spine
   pipeline: pipe.layered_ckcir_to_smt
   fixture_groups:
-    - group_id: group.v1_conflict
-      fixtures: [fixture.v1_guideline_a, fixture.v1_guideline_b]
-    - group_id: group.v1_null
-      fixtures: [fixture.v1_guideline_a, fixture.v1_control]
+    - group_id: group.m1_conflict
+      fixtures: [fixture.m1_guideline_a, fixture.m1_guideline_b]
+    - group_id: group.m1_null
+      fixtures: [fixture.m1_guideline_a, fixture.m1_control]
   seed: 42
   budget:
     solver_ms_per_query: 10000
-  expected_outcomes: corpus/gold/v1_expected.yaml
+  expected_outcomes: corpus/gold/m1_expected.yaml
 ";
 
     // Verbatim §8.2 gold block, comment included.
     const GOLD: &str = "\
-- group_id: group.v1_conflict
+- group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict
   expected_core: [a.rule.a.cq1.r1, a.rule.b.contra1]   # compared as a set
-- group_id: group.v1_null
+- group_id: group.m1_null
   expected_outcome: semantic_no_conflict
   expected_null_result: true
 ";
@@ -533,8 +533,8 @@ stages:
     fn corpora_load_typed() {
         let corpora = parse_corpora(CORPORA).unwrap();
         assert_eq!(corpora.len(), 3);
-        assert_eq!(corpora[0].id, id("fixture.v1_guideline_a"));
-        assert_eq!(corpora[0].path, "corpus/fixtures/v1_guideline_a.html");
+        assert_eq!(corpora[0].id, id("fixture.m1_guideline_a"));
+        assert_eq!(corpora[0].path, "corpus/fixtures/m1_guideline_a.html");
         for entry in &corpora {
             assert_eq!(entry.origin, Origin::AiGenerated);
             assert_eq!(entry.authority, Authority::SourceAuthority);
@@ -552,7 +552,7 @@ stages:
         assert_eq!(pipe.id, id("pipe.layered_ckcir_to_smt"));
         assert_eq!(
             pipe.stages,
-            vec![id("stage.v1.extract"), id("stage.v1.segment")]
+            vec![id("stage.m1.extract"), id("stage.m1.segment")]
         );
         let extract = &candidates.stages[0];
         assert_eq!(extract.kind, id("extract"));
@@ -572,17 +572,17 @@ stages:
         let experiments = parse_experiments(EXPERIMENTS).unwrap();
         assert_eq!(experiments.len(), 1);
         let exp = &experiments[0];
-        assert_eq!(exp.id, id("exp.v1_spine"));
+        assert_eq!(exp.id, id("exp.m1_spine"));
         assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
         assert_eq!(exp.fixture_groups.len(), 2);
-        assert_eq!(exp.fixture_groups[0].group_id, id("group.v1_conflict"));
+        assert_eq!(exp.fixture_groups[0].group_id, id("group.m1_conflict"));
         assert_eq!(
             exp.fixture_groups[1].fixtures,
-            vec![id("fixture.v1_guideline_a"), id("fixture.v1_control")]
+            vec![id("fixture.m1_guideline_a"), id("fixture.m1_control")]
         );
         assert_eq!(exp.seed, 42);
         assert_eq!(exp.budget[&id("solver_ms_per_query")], 10_000);
-        assert_eq!(exp.expected_outcomes, "corpus/gold/v1_expected.yaml");
+        assert_eq!(exp.expected_outcomes, "corpus/gold/m1_expected.yaml");
     }
 
     // The verbatim §8.2 gold block loads typed; absent optionals take their
@@ -592,7 +592,7 @@ stages:
         let gold = parse_gold(GOLD).unwrap();
         assert_eq!(gold.len(), 2);
         let conflict = &gold[0];
-        assert_eq!(conflict.group_id, id("group.v1_conflict"));
+        assert_eq!(conflict.group_id, id("group.m1_conflict"));
         assert_eq!(conflict.expected_outcome, id("semantic_contradiction"));
         assert_eq!(
             conflict.expected_conflict_kind,
@@ -630,7 +630,7 @@ stages:
     fn strict_loading_rejects_bad_documents() {
         let unknown_field = CORPORA.replace("  path:", "  surprise: 1\n  path:");
         assert!(parse_corpora(&unknown_field).is_err());
-        let bad_id = GOLD.replace("group.v1_conflict", "Group.V1_Conflict");
+        let bad_id = GOLD.replace("group.m1_conflict", "Group.M1_Conflict");
         assert!(parse_gold(&bad_id).is_err());
         let bad_enum = CORPORA.replace("origin: ai_generated", "origin: vibes");
         assert!(parse_corpora(&bad_enum).is_err());
@@ -638,7 +638,7 @@ stages:
         assert!(parse_experiments(&missing_field).is_err());
     }
 
-    const GOLD_PATH: &str = "corpus/gold/v1_expected.yaml";
+    const GOLD_PATH: &str = "corpus/gold/m1_expected.yaml";
 
     /// The inline §8.2/§8.4 documents loaded as one registry set, with the
     /// gold document supplied under the path EXPERIMENTS references.
@@ -656,9 +656,9 @@ stages:
         )
     }
 
-    // The V1 set cross-resolves cleanly: zero findings.
+    // The M1 set cross-resolves cleanly: zero findings.
     #[test]
-    fn validate_accepts_the_v1_set() {
+    fn validate_accepts_the_m1_set() {
         let (corpora, candidates, experiments, gold) = valid_set();
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
@@ -676,25 +676,25 @@ stages:
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::ChainBreak {
                 pipeline: id("pipe.layered_ckcir_to_smt"),
-                stage: id("stage.v1.segment"),
+                stage: id("stage.m1.segment"),
                 kind: id("source_graph"),
             }]
         );
 
         let (corpora, mut candidates, experiments, gold) = valid_set();
         candidates.stages.push(StageEntry {
-            id: id("stage.v1.compile"),
+            id: id("stage.m1.compile"),
             kind: id("compile"),
             determinism: Determinism::Deterministic,
             input_artifact_kinds: vec![id("ir_bundle")],
             output_artifact_kinds: vec![id("compiled")],
         });
-        candidates.pipelines[0].stages.push(id("stage.v1.compile"));
+        candidates.pipelines[0].stages.push(id("stage.m1.compile"));
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::ChainBreak {
                 pipeline: id("pipe.layered_ckcir_to_smt"),
-                stage: id("stage.v1.compile"),
+                stage: id("stage.m1.compile"),
                 kind: id("ir_bundle"),
             }]
         );
@@ -709,31 +709,31 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Dangling {
-                from: id("exp.v1_spine"),
+                from: id("exp.m1_spine"),
                 pool: "pipelines",
                 id: id("pipe.missing"),
             }]
         );
 
         let (corpora, mut candidates, experiments, gold) = valid_set();
-        candidates.pipelines[0].stages[1] = id("stage.v1.missing");
+        candidates.pipelines[0].stages[1] = id("stage.m1.missing");
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Dangling {
                 from: id("pipe.layered_ckcir_to_smt"),
                 pool: "stages",
-                id: id("stage.v1.missing"),
+                id: id("stage.m1.missing"),
             }]
         );
 
         let (corpora, candidates, mut experiments, gold) = valid_set();
-        experiments[0].fixture_groups[1].fixtures[1] = id("fixture.v1_missing");
+        experiments[0].fixture_groups[1].fixtures[1] = id("fixture.m1_missing");
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Dangling {
-                from: id("group.v1_null"),
+                from: id("group.m1_null"),
                 pool: "corpora",
-                id: id("fixture.v1_missing"),
+                id: id("fixture.m1_missing"),
             }]
         );
     }
@@ -748,7 +748,7 @@ stages:
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Duplicate {
                 pool: "corpora",
-                id: id("fixture.v1_guideline_a"),
+                id: id("fixture.m1_guideline_a"),
             }]
         );
 
@@ -762,7 +762,7 @@ stages:
             vec![
                 RegistryFinding::Duplicate {
                     pool: "stages",
-                    id: id("stage.v1.extract"),
+                    id: id("stage.m1.extract"),
                 },
                 RegistryFinding::Duplicate {
                     pool: "pipelines",
@@ -778,7 +778,7 @@ stages:
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Duplicate {
                 pool: "experiments",
-                id: id("exp.v1_spine"),
+                id: id("exp.m1_spine"),
             }]
         );
 
@@ -788,8 +788,8 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::DuplicateGroup {
-                experiment: id("exp.v1_spine"),
-                group_id: id("group.v1_conflict"),
+                experiment: id("exp.m1_spine"),
+                group_id: id("group.m1_conflict"),
             }]
         );
 
@@ -801,7 +801,7 @@ stages:
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::DuplicateGoldGroup {
                 path: GOLD_PATH.to_string(),
-                group_id: id("group.v1_conflict"),
+                group_id: id("group.m1_conflict"),
             }]
         );
     }
@@ -815,7 +815,7 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Empty {
-                entry: id("fixture.v1_control"),
+                entry: id("fixture.m1_control"),
                 field: "path",
             }]
         );
@@ -836,16 +836,16 @@ stages:
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![
                 RegistryFinding::Empty {
-                    entry: id("exp.v1_spine"),
+                    entry: id("exp.m1_spine"),
                     field: "fixture_groups",
                 },
                 RegistryFinding::GoldGroupUnknown {
-                    experiment: id("exp.v1_spine"),
-                    group_id: id("group.v1_conflict"),
+                    experiment: id("exp.m1_spine"),
+                    group_id: id("group.m1_conflict"),
                 },
                 RegistryFinding::GoldGroupUnknown {
-                    experiment: id("exp.v1_spine"),
-                    group_id: id("group.v1_null"),
+                    experiment: id("exp.m1_spine"),
+                    group_id: id("group.m1_null"),
                 },
             ]
         );
@@ -855,7 +855,7 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Empty {
-                entry: id("group.v1_conflict"),
+                entry: id("group.m1_conflict"),
                 field: "fixtures",
             }]
         );
@@ -865,7 +865,7 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::Empty {
-                entry: id("exp.v1_spine"),
+                entry: id("exp.m1_spine"),
                 field: "expected_outcomes",
             }]
         );
@@ -879,18 +879,18 @@ stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &BTreeMap::new()),
             vec![RegistryFinding::GoldUnresolved {
-                experiment: id("exp.v1_spine"),
+                experiment: id("exp.m1_spine"),
                 path: GOLD_PATH.to_string(),
             }]
         );
 
         let (corpora, candidates, experiments, mut gold) = valid_set();
-        gold.get_mut(GOLD_PATH).unwrap()[1].group_id = id("group.v1_extra");
+        gold.get_mut(GOLD_PATH).unwrap()[1].group_id = id("group.m1_extra");
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &gold),
             vec![RegistryFinding::GoldGroupUnknown {
-                experiment: id("exp.v1_spine"),
-                group_id: id("group.v1_extra"),
+                experiment: id("exp.m1_spine"),
+                group_id: id("group.m1_extra"),
             }]
         );
     }

@@ -186,7 +186,7 @@ fieldless_enum! {
 }
 
 fieldless_enum! {
-    /// SPEC §4.4 attempt classification (first used by the V4 loop).
+    /// SPEC §4.4 attempt classification (first used by the M4 loop).
     AttemptClassification {
         Improved => "improved",
         Equivalent => "equivalent",
@@ -205,7 +205,7 @@ fieldless_enum! {
 }
 
 fieldless_enum! {
-    /// SPEC §4.4 promotion decision (first used by the V4 loop).
+    /// SPEC §4.4 promotion decision (first used by the M4 loop).
     PromotionDecision {
         Promote => "promote",
         Reject => "reject",
@@ -216,7 +216,7 @@ fieldless_enum! {
 }
 
 fieldless_enum! {
-    /// SPEC §4.4 promotion scope (first used by the V4 loop).
+    /// SPEC §4.4 promotion scope (first used by the M4 loop).
     PromotionScope {
         RunLocal => "run_local",
         RegistryStatus => "registry_status",
@@ -224,9 +224,9 @@ fieldless_enum! {
 }
 
 fieldless_enum! {
-    /// SPEC §7.4 stable diagnostic codes, V1–V2 set. Later milestones extend
-    /// this set at elaboration time (V3 model-route, V4 loop/budget/surface,
-    /// V5 source/permission/drift codes).
+    /// SPEC §7.4 stable diagnostic codes, M1–M2 set. Later milestones extend
+    /// this set at elaboration time (M3 model-route, M4 loop/budget/surface,
+    /// M5 source/permission/drift codes).
     DiagnosticCode {
         ExtractionUncertain => "extraction_uncertain",
         TableStructureUncertain => "table_structure_uncertain",
@@ -291,7 +291,7 @@ pub(crate) fn read_payload(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, Cano
     Ok(entries.into_iter().map(|(k, v)| (k, v.0)).collect())
 }
 
-/// SPEC §7.4 diagnostic: a stable code from the V1–V2 set, a structured
+/// SPEC §7.4 diagnostic: a stable code from the M1–M2 set, a structured
 /// payload, region/artifact refs, and exactly one [`Outcome`]. The ref lists
 /// are sets in canonical form (sorted, duplicate-free); the producing stage
 /// chooses the outcome its code maps to (e.g. `terminology_ambiguous` ⇒

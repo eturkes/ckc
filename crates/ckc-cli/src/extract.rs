@@ -60,7 +60,7 @@ pub struct ExtractConfig {
 /// mechanical invariants plus input decoding.
 #[derive(Debug)]
 pub enum ExtractError {
-    /// Input bytes are not UTF-8 (V1 fixtures carry no charset layer).
+    /// Input bytes are not UTF-8 (M1 fixtures carry no charset layer).
     Utf8(std::str::Utf8Error),
     /// The built graph violates a §4.5 invariant (extractor bug).
     Grounding(GroundingError),
@@ -567,7 +567,7 @@ mod tests {
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: Producer {
-                candidate_id: id("cand.v1"),
+                candidate_id: id("cand.m1"),
                 component_id: id("stage.extract"),
                 toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
             },
@@ -873,13 +873,13 @@ mod tests {
         }
     }
 
-    // The committed v1_guideline_a fixture, full shape pinned from
+    // The committed m1_guideline_a fixture, full shape pinned from
     // observed output: section tree, recommendation and exception
     // paragraphs, the 4x2 definitions table with th header row, and
     // the evidence list; DocIr::from_graph accepts the result.
     #[test]
     fn fixture_guideline_a_full_shape_and_doc_ir() {
-        let envelope = extract(&fixture("v1_guideline_a.html"), &config()).unwrap();
+        let envelope = extract(&fixture("m1_guideline_a.html"), &config()).unwrap();
         let (g, diags) = (envelope.payload, envelope.diagnostics);
         assert!(diags.is_empty(), "fixture extracts residual-free");
 
@@ -994,9 +994,9 @@ mod tests {
     #[test]
     fn committed_fixtures_extract_residual_free() {
         for name in [
-            "v1_guideline_a.html",
-            "v1_guideline_b.html",
-            "v1_control.html",
+            "m1_guideline_a.html",
+            "m1_guideline_b.html",
+            "m1_control.html",
         ] {
             let envelope = extract(&fixture(name), &config()).unwrap();
             assert!(

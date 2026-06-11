@@ -135,5 +135,5 @@ git history.
   `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback
   event is the switch marker), and paired A/B task batteries scored by objective gates;
   CKC's deterministic gates and replay manifests are the standing mitigation. Expect
-  recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-v1).
+  recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-m1).
   Full case detail (transcript ids, timestamps, trigger tokens): `git show 14e520b`.

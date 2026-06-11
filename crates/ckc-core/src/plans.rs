@@ -54,11 +54,11 @@ impl CanonRead for SolverIdentity {
 /// budget — everything that fixes what a run executes, before it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunPlan {
-    /// Experiment registry entry this run executes (e.g. `exp.v1_spine`).
+    /// Experiment registry entry this run executes (e.g. `exp.m1_spine`).
     pub experiment_id: Id,
     /// Fixture groups in scope (§8.2 `group.*`). Set semantics.
     pub fixture_groups: Vec<Id>,
-    /// Pipeline candidates the run executes — a singleton at V1; the V2
+    /// Pipeline candidates the run executes — a singleton at M1; the M2
     /// comparison runs several over the same fixtures. Set semantics.
     pub pipelines: Vec<Id>,
     /// Deterministic seed for any seeded component.
@@ -314,8 +314,8 @@ mod tests {
 
     fn sample_plan() -> RunPlan {
         RunPlan {
-            experiment_id: id("exp.v1_spine"),
-            fixture_groups: vec![id("group.v1_conflict"), id("group.v1_null")],
+            experiment_id: id("exp.m1_spine"),
+            fixture_groups: vec![id("group.m1_conflict"), id("group.m1_null")],
             pipelines: vec![id("pipe.layered_ckcir_to_smt")],
             seed: 42,
             budget: vec![(id("solver_ms_per_query"), 10_000)],
@@ -345,9 +345,9 @@ mod tests {
                 "ckc",
                 "run",
                 "--experiment",
-                "exp.v1_spine",
+                "exp.m1_spine",
                 "--out",
-                "runs/v1",
+                "runs/m1",
             ]
             .map(str::to_owned)
             .to_vec(),
@@ -370,14 +370,14 @@ mod tests {
             canon(&sample_plan()),
             concat!(
                 r#"{"budget":{"solver_ms_per_query":"10000"},"#,
-                r#""experiment_id":"exp.v1_spine","#,
-                r#""fixture_groups":["group.v1_conflict","group.v1_null"],"#,
+                r#""experiment_id":"exp.m1_spine","#,
+                r#""fixture_groups":["group.m1_conflict","group.m1_null"],"#,
                 r#""pipelines":["pipe.layered_ckcir_to_smt"],"seed":"42"}"#
             )
         );
         // Empty collections keep their type-guided forms ({} map, [] sets).
         let empty = RunPlan {
-            experiment_id: id("exp.v1_spine"),
+            experiment_id: id("exp.m1_spine"),
             fixture_groups: vec![],
             pipelines: vec![],
             seed: 0,
@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(
             canon(&empty),
             concat!(
-                r#"{"budget":{},"experiment_id":"exp.v1_spine","#,
+                r#"{"budget":{},"experiment_id":"exp.m1_spine","#,
                 r#""fixture_groups":[],"pipelines":[],"seed":"0"}"#
             )
         );
@@ -439,7 +439,7 @@ mod tests {
     fn replay_manifest_canonical_bytes() {
         let want = format!(
             concat!(
-                r#"{{"command":["ckc","run","--experiment","exp.v1_spine","--out","runs/v1"],"#,
+                r#"{{"command":["ckc","run","--experiment","exp.m1_spine","--out","runs/m1"],"#,
                 r#""corpus_hash":"{c}","environment_profile":{{"os":"linux"}},"#,
                 r#""expected_output_hashes":["{e}"],"input_hashes":["{f}"],"#,
                 r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,
