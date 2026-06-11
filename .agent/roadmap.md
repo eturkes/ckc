@@ -72,27 +72,9 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K 8d2461b
 - [x] cli-runner.4.1b.1: report stage wired into ckc run landing report.json.
   >=90% compacted/200K bb9c524
-- [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K _
-- [ ] cli-runner.4.1b.2b.1: ckc run landing report.md + manifest.json + replay_manifest.json
-  beside report.json — apply committed .agent/wip-cli-runner.4.1b.2b.patch (whole-package
-  compile + lib `run::` 6/6 green at capture; integration-test edits compiled, unrun), verify
-  against this line, delete it in the closing commit. Pinned decisions: toolchain manifest =
-  new repo-root rust-toolchain.toml (channel "1.96.0", the installed version), read once at
-  resolve() tail (after every registry check so resolution-failure tests short-circuit first)
-  into Resolved.toolchain_manifest_hash shared by producer() (zero placeholder resolved) and
-  the manifests; git commit baked by new ckc-cli build.rs (`git rev-parse HEAD` ->
-  CKC_GIT_COMMIT env, rerun-if-changed .git/HEAD + resolved ref + packed-refs — runtime
-  probing breaks tempdir-cwd tests); Resolved.plan = RunPlan off the experiment entry; run.rs
-  manifest_inputs() gathers ManifestInputs: replay argv ["ckc","run","--experiment",<id>,
-  "--out",<dir>] via new shell out_dir(), lockfile_hashes [("cargo.lock", raw Cargo.lock)],
-  corpus_hash raw registry/corpora.yaml, environment_profile [(arch),(os)] consts,
-  input_hashes doc source hashes, output_hashes all 19 accepted envelope content hashes;
-  land_record() bare-record write boundary (canonical bytes -> write -> read_canonical ->
-  equality); report.md rendered from the read-back report payload, byte read-back checked;
-  write_tiny_root stages toolchain + lockfile; cli_shell entries + run_oracle expected_files
-  gain the three names; events stay 19. Reading: SPEC §8.3 layout, §4.4 producer note, §4.6
-  manifest fields; manifests.rs ManifestInputs contract. Consumes cli-runner.4.1b.2a. Gate:
-  `cargo test -p ckc-cli`.
+- [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K f020d2c
+- [x] cli-runner.4.1b.2b.1: ckc run lands report.md + run/replay manifests.
+  33% 65K/200K _
 - [ ] cli-runner.4.1b.2b.2: live pins for the landed trio — one new test in run_oracle.rs mod
   report over its own recorded run: report.md bytes == render_markdown(strict-read report.json
   payload) plus grounding substrings; manifest.json + replay_manifest.json via read_canonical

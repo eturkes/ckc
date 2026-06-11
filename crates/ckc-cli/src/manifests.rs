@@ -2,7 +2,7 @@
 //! `manifest.json` ([`ckc_core::RunManifest`]) and `replay_manifest.json`
 //! ([`ckc_core::ReplayManifest`]) of the §8.3 layout. [`assemble_manifests`]
 //! builds both records over caller-supplied hash/identity values: no I/O,
-//! no clock, no environment probing — the run landing (cli-runner.4.1b.2b)
+//! no clock, no environment probing — the run landing (`run::manifest_inputs`)
 //! gathers the values; this module owns the §5 plan-hash linkage, canonical
 //! storage order for every set and map field, and the shared-provenance
 //! guarantee: the two records agree on every fact they both attest, and the
@@ -15,8 +15,7 @@ use ckc_core::{CanonError, Hash, Id, ReplayManifest, RunManifest, RunPlan, Solve
 /// attest. Collection fields arrive in any order; assembly sorts them into
 /// canonical storage (§4.3 set/map semantics). `command` is the §4.6 argv
 /// `ckc replay` re-executes; `toolchain_manifest_hash` is the §4.4
-/// producer value once the run landing resolves it from its zero
-/// placeholder (run.rs note).
+/// producer value (the toolchain manifest file's raw-byte hash).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManifestInputs {
     /// The executed §5 plan; its canonical bytes hash into

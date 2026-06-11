@@ -107,7 +107,10 @@ fn run_writes_only_under_its_out_dir() {
             "groups",
             "lineage_index.json",
             "logs",
+            "manifest.json",
+            "replay_manifest.json",
             "report.json",
+            "report.md",
             "trace_bundle.json"
         ]
     );

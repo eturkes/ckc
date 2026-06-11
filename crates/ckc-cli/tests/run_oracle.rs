@@ -194,7 +194,10 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         "lineage_index.json".into(),
         "logs/diagnostics.jsonl".into(),
         "logs/events.jsonl".into(),
+        "manifest.json".into(),
+        "replay_manifest.json".into(),
         "report.json".into(),
+        "report.md".into(),
         "trace_bundle.json".into(),
     ];
 

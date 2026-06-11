@@ -173,6 +173,12 @@ impl Shell {
         &self.run_id
     }
 
+    /// The output directory as the dispatcher received it — the report
+    /// stage's `--out` token when reconstructing the §4.6 replay command.
+    pub(crate) fn out_dir(&self) -> Option<&Path> {
+        self.out_dir.as_deref()
+    }
+
     /// Every §7.4 record raised so far, append-ordered — the report
     /// stage's diagnostics-summary source.
     pub(crate) fn ledger(&self) -> &[DiagnosticRecord] {
