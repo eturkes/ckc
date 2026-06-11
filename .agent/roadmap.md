@@ -71,14 +71,8 @@ bare headers; git history retains all removed text.
   68% 136K/200K 8b65437
 - [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K 8d2461b
 - [x] cli-runner.4.1b.1: report stage wired into ckc run landing report.json.
-  >=90% compacted/200K _
-- [ ] cli-runner.4.1b.2a: rendering + manifest cores, run.rs untouched: byte-deterministic
-  markdown rendering of a validated Report in report.rs (the report.md body); a fresh
-  manifests module assembling RunManifest + ReplayManifest over caller-supplied hash/identity
-  values (core-plans types, no I/O — the assemble_report seam); synthetic-input tests for
-  both. Reading: SPEC §7.2, §4.6 replay manifest fields, §5 RunManifest row; report.rs Report
-  shape + assemble_report as the pattern. Consumes cli-runner.4.1b.1, core-plans types. Gate:
-  `cargo test -p ckc-cli`.
+  >=90% compacted/200K bb9c524
+- [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K _
 - [ ] cli-runner.4.1b.2b: ckc run landing report.md + manifest.json + replay_manifest.json
   beside report.json with real run-state values, the producer toolchain-manifest-hash zero
   placeholder resolved per §4.4 (run.rs note); live pins extending the cli-runner.2c oracle

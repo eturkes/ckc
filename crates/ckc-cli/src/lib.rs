@@ -75,11 +75,19 @@
 //!   [`report::ReportFinding`] rows with quoted spans, code-keyed
 //!   diagnostics rollup, solver identity, replay status, §0 wording) with
 //!   structural validation via [`report::ReportError`] and assembly via
-//!   [`report::assemble_report`] over the run's validated artifacts; the
-//!   markdown rendering and the manifests join with cli-runner.4.1b.2a/.2b.
+//!   [`report::assemble_report`] over the run's validated artifacts, plus
+//!   [`report::render_markdown`], the deterministic §7.2 derived view
+//!   (`report.md` body, cli-runner.4.1b.2a).
+//! - [`manifests`] — §5/§4.6 manifest assembly (cli-runner.4.1b.2a):
+//!   [`manifests::assemble_manifests`] building RunManifest +
+//!   ReplayManifest over the caller-supplied [`manifests::ManifestInputs`]
+//!   run state (no I/O): §5 plan-hash linkage, canonical set/map storage,
+//!   shared fields and expected-vs-output hashes mirrored between the two
+//!   records; the run landing writes both with cli-runner.4.1b.2b.
 #![forbid(unsafe_code)]
 
 pub mod extract;
+pub mod manifests;
 pub mod normalize;
 pub mod report;
 pub mod rules;

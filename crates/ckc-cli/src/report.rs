@@ -7,8 +7,9 @@
 //! wording. This module owns the types, their canonical bytes, structural
 //! validation, and assembly ([`assemble_report`]) over the run's validated
 //! artifacts; `ckc run` drives it from the report stage (cli-runner.4.1b.1);
-//! the markdown rendering arrives with cli-runner.4.1b.2a, the run/replay
-//! manifest landings with .4.1b.2b.
+//! [`render_markdown`] is the deterministic §7.2 derived view, the
+//! `report.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
+//! arrive with .4.1b.2b (manifest assembly lives in `crate::manifests`).
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):
@@ -579,6 +580,120 @@ pub fn assemble_report(
         solver_identity: solver_identity.clone(),
         wording,
     })
+}
+
+/// SPEC §7.2 `report.md` body: the deterministic markdown rendering of a
+/// validated [`Report`] — a pure function of the canonical value, §7.2
+/// contents in §7.2 prose order (corpus and lexicon hashes, findings,
+/// documented null results, diagnostics summary, solver identity, replay
+/// status), headings and labels drawn from §7.2/§0 vocabulary, ids and
+/// hashes verbatim in code spans, quoted-span texts verbatim as plain
+/// text (§8.5 item 9 resolves them to fixture bytes). Empty content slots
+/// render as `none.` so every §7.2 slot stays visible. The caller
+/// validates first (the [`assemble_report`] boundary discipline) and
+/// writes the returned body as `report.md` (cli-runner.4.1b.2b).
+pub fn render_markdown(report: &Report) -> String {
+    let mut md = String::new();
+    md.push_str("# CKC report\n\n");
+    md.push_str(&format!("wording: {}\n", join_labels(&report.wording)));
+
+    md.push_str("\n## Corpus\n\n");
+    if report.corpus_hashes.is_empty() {
+        md.push_str("none.\n");
+    } else {
+        md.push_str("| document | source hash |\n| --- | --- |\n");
+        for (document_id, hash) in &report.corpus_hashes {
+            md.push_str(&format!("| `{document_id}` | `{hash}` |\n"));
+        }
+    }
+    md.push_str(&format!("\nlexicon hash: `{}`\n", report.lexicon_hash));
+
+    md.push_str("\n## Findings\n");
+    render_rows(&mut md, &report.findings);
+
+    md.push_str("\n## Documented null results\n");
+    render_rows(&mut md, &report.null_results);
+
+    md.push_str("\n## Diagnostics summary\n\n");
+    if report.diagnostics_summary.is_empty() {
+        md.push_str("none.\n");
+    } else {
+        md.push_str("| code | count |\n| --- | --- |\n");
+        for (code, count) in &report.diagnostics_summary {
+            md.push_str(&format!("| `{code}` | {count} |\n"));
+        }
+    }
+
+    md.push_str("\n## Solver identity\n\n");
+    md.push_str(&format!(
+        "`{}` version `{}`\n",
+        report.solver_identity.solver_id, report.solver_identity.version
+    ));
+
+    md.push_str("\n## Replay status\n\n");
+    md.push_str(&format!("`{}`\n", report.replay_status.as_str()));
+    md
+}
+
+/// One partition's rows under its §7.2 heading: each row a `###` section
+/// headed by its finding id, its §0 label and claim tier as the lead
+/// sentence, evidence pools as backticked id lists, optionals
+/// (`conflict_kind`, `core`) rendered exactly when present — the
+/// partition rules make that findings-only.
+fn render_rows(md: &mut String, rows: &[ReportFinding]) {
+    if rows.is_empty() {
+        md.push_str("\nnone.\n");
+        return;
+    }
+    for row in rows {
+        md.push_str(&format!("\n### `{}`\n\n", row.finding_id));
+        md.push_str(&format!(
+            "{}; claim tier `{}`.\n\n",
+            row.wording.as_str(),
+            row.claim_tier.as_str()
+        ));
+        if let Some(kind) = row.conflict_kind {
+            md.push_str(&format!("- conflict kind: `{}`\n", kind.as_str()));
+        }
+        md.push_str(&format!(
+            "- query: `{}`, verdict `{}`\n",
+            row.query_id,
+            row.verdict.as_str()
+        ));
+        md.push_str(&format!("- rules: {}\n", join_ids(&row.rule_ids)));
+        md.push_str(&format!("- regions: {}\n", join_ids(&row.region_ids)));
+        md.push_str(&format!("- assertions: {}\n", join_ids(&row.assertion_ids)));
+        if let Some(core) = &row.core {
+            md.push_str(&format!("- core: {}\n", join_ids(core)));
+        }
+        md.push_str("- quoted spans:\n");
+        for span in &row.quoted_spans {
+            md.push_str(&format!(
+                "  - `{}` `{}` `{}`: {}\n",
+                span.document_id, span.region_id, span.span_id, span.text
+            ));
+        }
+    }
+}
+
+/// Backticked, comma-joined id list (sets render in storage order).
+fn join_ids(ids: &[Id]) -> String {
+    ids.iter()
+        .map(|id| format!("`{id}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Comma-joined §0 labels as plain prose; the empty set renders `none.`.
+fn join_labels(labels: &[Wording]) -> String {
+    if labels.is_empty() {
+        return "none.".to_owned();
+    }
+    labels
+        .iter()
+        .map(|w| w.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Sort `items` into canonical-set storage order by [`canonical_sort_key`]
@@ -1751,6 +1866,131 @@ mod tests {
         assert_eq!(
             assemble(&world),
             Err(ReportError::ResultMismatch(id("q.g2.pair1.overlap")))
+        );
+    }
+
+    /// The full `report.md` body of [`valid_report`], pinned from
+    /// observed output: §7.2 prose order, code-spanned ids and hashes,
+    /// the finding-only optionals (conflict kind, core) absent on the
+    /// null row, span texts plain and verbatim.
+    const PINNED_MARKDOWN: &str = r#"# CKC report
+
+wording: documented null result, synthetic fixture measurement
+
+## Corpus
+
+| document | source hash |
+| --- | --- |
+| `fixture.a` | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
+| `fixture.b` | `sha256:2222222222222222222222222222222222222222222222222222222222222222` |
+
+lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## Findings
+
+### `finding.group.g1.1`
+
+synthetic fixture measurement; claim tier `s1_admitted`.
+
+- conflict kind: `deontic_direction_conflict`
+- query: `q.g1.pair1.deontic`, verdict `unsat`
+- rules: `fixture.a.rule.0`, `fixture.b.rule.0`
+- regions: `r.0`
+- assertions: `a.fixture.a.rule.0`, `a.fixture.b.rule.0`
+- core: `a.fixture.a.rule.0`, `a.fixture.b.rule.0`
+- quoted spans:
+  - `fixture.a` `r.0` `s.0`: administer drug A
+  - `fixture.b` `r.0` `s.0`: withhold drug A
+
+## Documented null results
+
+### `finding.group.g2.0`
+
+documented null result; claim tier `s1_admitted`.
+
+- query: `q.g2.pair1.overlap`, verdict `unsat`
+- rules: `fixture.a.rule.1`, `fixture.b.rule.1`
+- regions: `r.1`
+- assertions: `ctx.fixture.a.rule.1`, `ctx.fixture.b.rule.1`
+- quoted spans:
+  - `fixture.a` `r.1` `s.1`: adults eighteen and over
+  - `fixture.b` `r.1` `s.1`: children under eighteen
+
+## Diagnostics summary
+
+| code | count |
+| --- | --- |
+| `schema_invalid` | 1 |
+| `solver_timeout` | 2 |
+
+## Solver identity
+
+`z3` version `4.13.0`
+
+## Replay status
+
+`not_replayed`
+"#;
+
+    #[test]
+    fn render_markdown_pins_the_derived_view() {
+        let report = valid_report();
+        report.validate().unwrap();
+        let md = render_markdown(&report);
+        assert_eq!(md, render_markdown(&report));
+        assert_eq!(md, PINNED_MARKDOWN);
+    }
+
+    /// Every §7.2 content slot stays visible when empty — pinned from
+    /// observed output over the all-empty report.
+    #[test]
+    fn render_markdown_marks_empty_slots() {
+        let report = Report {
+            corpus_hashes: vec![],
+            diagnostics_summary: vec![],
+            findings: vec![],
+            lexicon_hash: hash('f'),
+            null_results: vec![],
+            replay_status: ReplayStatus::NotReplayed,
+            solver_identity: SolverIdentity {
+                solver_id: id("z3"),
+                version: "4.13.0".to_owned(),
+            },
+            wording: vec![],
+        };
+        report.validate().unwrap();
+        assert_eq!(
+            render_markdown(&report),
+            r#"# CKC report
+
+wording: none.
+
+## Corpus
+
+none.
+
+lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## Findings
+
+none.
+
+## Documented null results
+
+none.
+
+## Diagnostics summary
+
+none.
+
+## Solver identity
+
+`z3` version `4.13.0`
+
+## Replay status
+
+`not_replayed`
+"#
         );
     }
 }
