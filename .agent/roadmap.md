@@ -67,25 +67,74 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K f93bfe6
 - [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K 49b0930
 - [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K _
-- [ ] cli-runner.4.1a: Report payload in a report module: canonical Report type + assembly from
-  the run artifact set — findings keyed by trace finding ids carrying conflict kind, rule ids,
-  region ids, quoted Japanese spans resolved from source graphs by region id, assertion names,
-  core; documented null results; code-keyed diagnostics summary; corpus/lexicon hashes; solver
-  identity; replay status slot; §0 vocabulary wording — written as report.json in the run layout.
-  Reading: SPEC §7.2, §5 Report row, §8.6 finding example, §0 vocabulary. Consumes
-  cli-runner.2b/.3a.3 artifacts. Gate: `cargo test -p ckc-cli report::`.
-- [ ] cli-runner.4.1b: report.md + manifests completing the §8.3 artifact set: deterministic
-  markdown rendering of report.json; manifest.json (RunManifest) + replay_manifest.json
-  (ReplayManifest) from core-plans with real hash/identity values; report stage wired into ckc
-  run. Closes §8.5 item 9 surface. Reading: SPEC §7.2, §4.6 replay manifest fields, §8.3 layout,
-  §5 RunManifest row. Consumes cli-runner.4.1a, core-plans types. Gate:
+- [ ] cli-runner.4.1a.1: Report types in a report module — canonical shapes + validation, no
+  assembly. Reference: .agent/wip-4.1a.patch from the reverted single-unit 4.1a attempt,
+  UNCOMPILED (written, never built) — transcribe its types half verifying every line against
+  this line + HEAD APIs; keep the patch for 4.1a.2. Apply its canon.rs/lib.rs/trace.rs hunks
+  verbatim (emit_u64_map/read_u64_map promoted pub, lib.rs re-exports, trace canonical_id_set
+  pub(crate)). Types: fieldless enums ReplayStatus {not_replayed, replay_match, replay_mismatch,
+  replay_identity_unsupported} + Wording (all 14 §0 labels, exact spellings); QuotedSpan
+  {document_id, region_id, span_id, text}; ReportFinding {assertion_ids, claim_tier,
+  conflict_kind: Option, core: Option, finding_id, query_id, quoted_spans, region_ids, rule_ids,
+  verdict: SolverVerdict, wording}; Report {corpus_hashes id-to-hash map, diagnostics_summary
+  code-to-count u64 map (the promoted emitters), findings, lexicon_hash, null_results,
+  replay_status, solver_identity, wording set}; Canonical + CanonRead (alphabetical members,
+  optionals via obj.optional) + validate(): map orders, zero counts rejected, every set
+  canonical, finding-id uniqueness across both partitions, conflict_kind and core present iff
+  finding (core non-empty — tightens the patch, which leaves core presence unchecked), findings
+  verdict unsat, nulls sat or unsat, assertion/region/rule/quoted_spans sets non-empty, span
+  texts non-empty; ReportError validation variants + Display (assembly variants + assemble_report
+  stay in 4.1a.2). Tests are NEW, not in the patch (its battery is assembly-bound): hand-built
+  Report fixture, canonical round-trip byte pins, a rejection per validate rule. Reading: SPEC
+  §7.2, §0 vocabulary, §5 Report row, §8.6 finding example. Consumes cli-runner.3a.1 +
+  smt-emit.1 type surfaces. Gate: `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.1a.2: assemble_report completing the report payload — no run.rs contact
+  (report.json landing = 4.1b.1). Transcribe the assembly half + full test battery of
+  .agent/wip-4.1a.patch (UNCOMPILED — verify while transcribing; delete the patch in this
+  unit's closing commit): assemble_report(&TraceBundle, &LineageIndex, &[&SourceGraph],
+  &[&VerifierResults], lexicon_hash, &SolverIdentity, &[DiagnosticRecord]) -> Result<Report,
+  ReportError>. Graphs index by document id, results by query id (duplicates error);
+  corpus_hashes from the bundle's Source nodes; diagnostics_summary = code-keyed counts.
+  Partition each semantic claim on (category, role, verdict), role = query-id suffix
+  .overlap/.deontic (§8.6 ids, minted by smt plan.rs; other suffixes error):
+  no_conflict+overlap+sat skips (Q1 precondition witness, not a report row);
+  contradiction+deontic lands a finding; no_conflict+overlap+unsat and no_conflict+deontic+sat
+  land null results; remaining combos error. Claim category+verdict must equal the indexed
+  result's; core = that result's unsat_core (None on Q1-unsat nulls — Q1 runs produce-models,
+  no core). Quoted spans resolve per document through the claim's LineageRows (document-local
+  region ids collide across documents; the claim-level region set is the ambiguous union), text
+  = span raw_text; missing graph/region/span/result/lineage error; pair-agreement: claim
+  id-sets equal the lineage-row unions. Row constants: claim_tier s1_admitted, finding wording
+  the synthetic-fixture §0 label, null wording the documented-null §0 label, Report.wording =
+  set of row wordings, replay_status not_replayed. The patch battery stays synthetic
+  (§8.6-shaped two-document world, colliding document-local r.0 regions, conflict + null
+  groups, per-error rejections); live pins land in 4.1b.1. Reading: SPEC §8.6, §6 + ckc-smt
+  verdict.rs category_verdict_rule. Consumes cli-runner.4.1a.1, .2b/.3a.3 artifacts. Gate:
   `cargo test -p ckc-cli report::`.
-- [ ] cli-runner.4.2: ckc replay command: re-execute from replay_manifest.json over the same inputs
-  and compare canonical content hashes for all accepted artifacts, runtime metadata excluded; emit
-  symmetric-difference diagnostics on mismatch and replay_identity_unsupported for missing tools;
-  matching hashes yield ok; re-run-equals-prior idempotency test over a fixture run. Closes §8.5
-  item 8. Reading: SPEC §4.6 replay semantics, §8.3 layout, §7.4 replay codes. Consumes
-  cli-runner.4.1b manifests and the complete run pipeline. Gate: `cargo test --workspace`.
+- [ ] cli-runner.4.1b.1: report stage wired into ckc run landing report.json in the §8.3 run
+  layout: assemble_report over the live run state (trace-stage bundle + lineage, per-doc source
+  graphs, per-group verifier results, the run's collected diagnostics, lexicon hash + solver
+  identity from where the run already holds them), land() write boundary + stage event,
+  total-outcome fold unchanged; live pins over exp.m1_spine extending the cli-runner.2c oracle
+  harness (finding/null partition, §8.6 finding id + core, quoted fixture bytes). Reading: SPEC
+  §7.2, §8.3 layout; run.rs trace_stage as the pattern. Consumes cli-runner.4.1a.2. Gate:
+  `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.1b.2: report.md + manifests completing the §8.3 artifact set: deterministic
+  markdown rendering of report.json; manifest.json (RunManifest) + replay_manifest.json
+  (ReplayManifest) from core-plans with real hash/identity values; all three landed by ckc run
+  beside report.json. Closes §8.5 item 9 surface. Reading: SPEC §7.2, §4.6 replay manifest
+  fields, §8.3 layout, §5 RunManifest row. Consumes cli-runner.4.1b.1, core-plans types. Gate:
+  `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.2a: replay core in a replay module, no shell contact: re-execute from
+  replay_manifest.json over the same inputs into a scratch directory and compare canonical
+  content hashes for all accepted artifacts, runtime metadata excluded; symmetric-difference
+  diagnostics on mismatch and replay_identity_unsupported for missing tools; matching hashes
+  yield ok; re-run-equals-prior idempotency test over a fixture run. Reading: SPEC §4.6 replay
+  semantics, §8.3 layout, §7.4 replay codes. Consumes cli-runner.4.1b.2 manifests and the
+  complete run pipeline. Gate: `cargo test -p ckc-cli replay::`.
+- [ ] cli-runner.4.2b: ckc replay command over the replay core — CLI surface, run-layout
+  resolution, diagnostics rendering. Closes §8.5 item 8. Reading: shell.rs dispatch, the trace
+  command as the pattern. Consumes cli-runner.4.2a. Gate: `cargo test --workspace`.
 - [ ] acceptance-m1: Dedicated acceptance session for the M1 milestone: execute §8.5 items 1-9 in
   order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.m1_spine --out
   runs/m1 with outcome ok and strict-read artifact set; assertion-map audit; group.m1_conflict

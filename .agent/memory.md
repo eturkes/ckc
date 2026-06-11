@@ -61,7 +61,12 @@ git history.
   battery = two units (7th overrun, cli-runner.3a.2 2026-06-11: assemble_trace + hand-off
   structs compiled clean, but the live battery — reading slice alone spanning run.rs, the
   verify-stage tests, the normalize.rs helpers — was unwritten at compaction; reverted,
-  split .3a.2a synthetic-tests / .3a.2b live-pins); a spec-byte
+  split .3a.2a synthetic-tests / .3a.2b live-pins); minting a split rule re-audits every
+  remaining unchecked line against it in the same recovery commit (8th overrun,
+  cli-runner.4.1a 2026-06-11: types + validation + assembly + synthetic battery as one unit —
+  the exact shape the 6th-overrun rule bans, left unaudited by both later recovery sessions;
+  the full report.rs draft was written but never built at compaction; reverted, split
+  .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors
@@ -78,7 +83,9 @@ git history.
   new type families in fresh modules (extending a ~2K-line module costs a full-file read);
   land a compiling skeleton before the full test battery; salvage a reverted session's
   compiling half as a committed `.agent/wip-<unit>.patch` the redo line points at (apply,
-  verify against the line, delete in the closing commit); pin expected shapes from observed
+  verify against the line, delete in the closing commit) — an uncompiled draft salvages the
+  same way flagged UNCOMPILED, transcription-with-verification still beating re-derivation
+  (8th overrun); pin expected shapes from observed
   output, never hand-computed; cite only checked roadmap lines as measured anchors.
   At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
   for readability (alignment padding, inline result comments, illustrative declaration or
