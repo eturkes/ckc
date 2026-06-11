@@ -7,7 +7,7 @@ ordered unit checklist; unchecked lines carry the full unit spec; checked items 
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
-## M1 spine — plan 40de97c
+## M1 spine — plan 40de97c — accept m1
 
 - [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 62ee8d3
 - [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 1110fc9
@@ -77,14 +77,5 @@ bare headers; git history retains all removed text.
   33% 65K/200K 72baf4b
 - [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K 05566a8
 - [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K f9b794a
-- [x] cli-runner.4.2b: ckc replay command, match report stdout body. 65% 129K/200K _
-- [ ] acceptance-m1: Dedicated acceptance session for the M1 milestone: execute §8.5 items 1-9 in
-  order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.m1_spine --out
-  runs/m1 with outcome ok and strict-read artifact set; assertion-map audit; group.m1_conflict
-  semantic_contradiction with cross-document unsat core matching corpus/gold/m1_expected.yaml;
-  group.m1_null semantic_no_conflict with documented_null_result from the disjoint-interval Q1
-  unsat; ckc trace full chain; ckc replay hash match; report content with quoted spans resolving to
-  fixture bytes); mark the milestone header with the evidence run id and create the local tag
-  accept/m1. Reading: SPEC §8.5, §8.1-§8.4, §8.6; §1 acceptance and tagging protocol. Consumes the
-  complete built pipeline. Gate: All nine §8.5 items pass against one recorded run; roadmap
-  milestone header carries the evidence run id; local tag accept/m1 exists.
+- [x] cli-runner.4.2b: ckc replay command, match report stdout body. 65% 129K/200K 3a5cac6
+- [x] acceptance-m1: §8.5 items 1-9 pass against recorded run m1; tag accept/m1. 38% 76K/200K _

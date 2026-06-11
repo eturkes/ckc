@@ -190,5 +190,7 @@ git history.
   `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback
   event is the switch marker), and paired A/B task batteries scored by objective gates;
   CKC's deterministic gates and replay manifests are the standing mitigation. Expect
-  recurrence in fixture-reading units (stage-normalize.2b, cli-runner.2, acceptance-m1).
+  recurrence in fixture-reading units (acceptance-m1 ran clean under redacted printing:
+  audit scripts compare bytes in code and print Japanese-bearing JSON/markdown only
+  through a redactor mapping such runs to `<ja Nch hash>` — reuse for M2 model-I/O work).
   Full case detail (transcript ids, timestamps, trigger tokens): `git show 4e9af1e`.
