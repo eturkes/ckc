@@ -73,10 +73,9 @@ fn registry_check_fails_invalid_off_root() {
     assert_eq!(events[0].diagnostics.len(), 3);
 }
 
-// `ckc run` from the repository root: the document stages execute (twelve
-// stage events, artifacts/ populated per fixture), the group half stays
-// pending (cli-runner.2b) as the unsupported outcome, and every write is
-// confined to the output directory.
+// `ckc run` from the repository root completes the §8.3 chain through
+// verify: document and group artifacts land under the §8.3 layout, the run
+// exits ok, and every write is confined to the output directory.
 #[test]
 fn run_writes_only_under_its_out_dir() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -96,12 +95,12 @@ fn run_writes_only_under_its_out_dir() {
         .current_dir(repo_root)
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(out.status.code(), Some(0));
     assert!(out.stderr.is_empty(), "events landed in logs/, not stderr");
-    assert_eq!(single_result(&out.stdout).outcome, Outcome::Unsupported);
+    assert_eq!(single_result(&out.stdout).outcome, Outcome::Ok);
 
     assert_eq!(sorted_entries(tmp.path()), ["m1"]);
-    assert_eq!(sorted_entries(&out_dir), ["artifacts", "logs"]);
+    assert_eq!(sorted_entries(&out_dir), ["artifacts", "groups", "logs"]);
     assert_eq!(
         sorted_entries(&out_dir.join("logs")),
         ["diagnostics.jsonl", "events.jsonl"]
@@ -115,9 +114,24 @@ fn run_writes_only_under_its_out_dir() {
             "source_graph.json"
         ]
     );
+    assert_eq!(
+        sorted_entries(&out_dir.join("groups")),
+        ["group.m1_conflict", "group.m1_null"]
+    );
+    assert_eq!(
+        sorted_entries(&out_dir.join("groups/group.m1_conflict")),
+        ["compiled.json", "smt", "verifier_results.json"]
+    );
+    assert_eq!(
+        sorted_entries(&out_dir.join("groups/group.m1_conflict/smt")),
+        [
+            "q.m1_conflict.pair1.deontic.smt2",
+            "q.m1_conflict.pair1.overlap.smt2"
+        ]
+    );
     let events: Vec<EventRecord> =
         read_jsonl(&std::fs::read(out_dir.join("logs/events.jsonl")).unwrap()).unwrap();
-    assert_eq!(events.len(), 13);
+    assert_eq!(events.len(), 17);
     assert_eq!(events[0].run_id, "m1".parse().unwrap());
 }
 

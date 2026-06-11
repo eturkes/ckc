@@ -1,32 +1,42 @@
-//! SPEC §3 `ckc run`, document half (cli-runner.2a): resolve the experiment
-//! through the §8.4 registries, then drive each corpus document through
-//! extract → segment → normalize → assemble into the §8.3 run layout —
-//! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`
-//! — every artifact written as §4.3 canonical envelope bytes and strict-read
-//! back at the write boundary ([`land`]). Each attempted stage records
-//! exactly one §4.6 stage event carrying the artifact's envelope
-//! diagnostics (or the failure diagnostic); group stages (compile/verify)
-//! and the total-outcome assembly land with cli-runner.2b, marked by the
-//! pending `unsupported` merge at their slot.
+//! SPEC §3 `ckc run` (cli-runner.2a + .2b): resolve the experiment through
+//! the §8.4 registries, drive each corpus document through extract →
+//! segment → normalize → assemble into
+//! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`,
+//! then drive each fixture group through compile → verify into
+//! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`
+//! — every envelope written as §4.3 canonical bytes and strict-read back at
+//! the write boundary ([`land`]), every smt file byte-identical to its
+//! [`ckc_smt::QueryBody`] body. Each attempted stage records exactly one
+//! §4.6 stage event carrying the artifact's envelope diagnostics (or the
+//! failure diagnostic); the §4.4 total outcome is the severity fold over
+//! every event and command-scope diagnostic; trace/report stages join in
+//! their units (cli-runner.3a/.4.1a).
 //!
-//! Failure scoping: registry resolution, lexicon loading, and corpus-file
-//! reads are command-scope ([`Shell::diagnostic`]); a stage failure rides
-//! its stage event and skips the document's remaining stages, leaving other
-//! documents to proceed (§4.4 valid-remainder rule). Producer values are
-//! runner-owned: candidate = the experiment's pipeline, component = the
-//! registry stage component, toolchain manifest hash = the zero placeholder
-//! until cli-runner.4.1b mints run manifests (envelope metadata outside
-//! content hashes, so replay identity is unaffected by the swap).
+//! Failure scoping: registry resolution, lexicon loading, solver-adapter
+//! construction, and corpus-file reads are command-scope
+//! ([`Shell::diagnostic`]); a stage failure rides its stage event and skips
+//! the document's (or group's) remaining stages, leaving other documents
+//! and groups to proceed (§4.4 valid-remainder rule). A group whose member
+//! bundle is missing fails its compile stage rather than compiling a
+//! partial group: a cross-document verdict over fewer documents than the
+//! group declares would document a null result the fixtures never earned.
+//! Producer values are runner-owned: candidate = the experiment's pipeline,
+//! component = the registry stage component, toolchain manifest hash = the
+//! zero placeholder until cli-runner.4.1b mints run manifests (envelope
+//! metadata outside content hashes, so replay identity is unaffected by the
+//! swap).
 
 use std::path::Path;
+use std::time::Duration;
 
 use ckc_core::{
     ArtifactEnvelope, Authority, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
-    DiagnosticRecord, Hash, Id, IrBundle, Normalization, Origin, Outcome, Producer, SegmentIr,
-    SourceGraph, assemble, canonical_payload_bytes, canonical_sort_key,
-    canonicalization_policy_hash, content_hash, parse_candidates, parse_corpora, parse_experiments,
-    read_canonical,
+    DiagnosticCode, DiagnosticRecord, FixtureGroup, Hash, Id, IrBundle, Normalization, Origin,
+    Outcome, Producer, SegmentIr, SourceGraph, assemble, canonical_payload_bytes,
+    canonical_sort_key, canonicalization_policy_hash, content_hash, parse_candidates,
+    parse_corpora, parse_experiments, read_canonical,
 };
+use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
 
 use crate::extract::{ExtractConfig, extract};
 use crate::normalize::{Lexicon, load_lexicon, normalize};
@@ -38,9 +48,25 @@ use crate::shell::{Shell, StageClock, StageEvent, stage_clock, static_id};
 /// [`crate::normalize`]), read from the invocation root like the registries.
 const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
 
-/// The four §8.3 document stages this unit drives, in chain order, spelled
-/// as the registry `kind` tokens the pipeline's stage components declare.
-const DOCUMENT_STAGE_KINDS: [&str; 4] = ["extract", "segment", "normalize", "assemble"];
+/// The six §8.3 stages this module drives, in chain order, spelled as the
+/// registry `kind` tokens the pipeline's stage components declare: four
+/// per-document stages, then the two per-group stages.
+const STAGE_KINDS: [&str; 6] = [
+    "extract",
+    "segment",
+    "normalize",
+    "assemble",
+    "compile",
+    "verify",
+];
+
+/// [`STAGE_KINDS`] indices of the group stages.
+const COMPILE: usize = 4;
+const VERIFY: usize = 5;
+
+/// §8.4 budget counter naming the per-query solver wall-clock cap in
+/// milliseconds — the one budget key the M1 vocabulary defines.
+const SOLVER_BUDGET_KEY: &str = "solver_ms_per_query";
 
 /// Run `ckc run` rooted at `root` (the invocation working directory: §3
 /// anchors `registry/` and corpus paths at the repository root). Evidence,
@@ -68,22 +94,45 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
             return;
         }
     };
+    let mut bundles: Vec<(Id, ArtifactEnvelope<IrBundle>)> = Vec::new();
     for entry in &resolved.documents {
-        document_pipeline(root, entry, &resolved, &lexicon, shell);
+        if let Some(bundle) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
+            bundles.push((entry.id.clone(), bundle));
+        }
     }
-    // Group stages (compile/verify) and the total-outcome assembly are
-    // cli-runner.2b's deliverable, replacing this pending marker in place.
-    shell.merge(Outcome::Unsupported);
+    // The solver adapter is load-bearing for every group verdict — the
+    // run's deliverable — so construction failure is command-scope, after
+    // the document artifacts have already landed (§4.4 valid remainder).
+    let adapter = match Z3Adapter::new() {
+        Ok(adapter) => adapter,
+        Err(e) => {
+            shell.diagnostic(DiagnosticRecord {
+                code: DiagnosticCode::SolverExecutionFailure,
+                outcome: Outcome::Invalid,
+                payload: vec![(static_id("reason"), format!("solver adapter: {e}"))],
+                region_ids: vec![],
+                artifact_hashes: vec![],
+            });
+            return;
+        }
+    };
+    for group in &resolved.groups {
+        group_pipeline(group, &bundles, &resolved, &adapter, shell);
+    }
 }
 
 /// The runner's resolved view of one experiment: the pipeline candidate,
-/// its document-stage component ids, and the unique corpus documents across
-/// the fixture groups in first-appearance order.
+/// its stage component ids, the unique corpus documents across the fixture
+/// groups in first-appearance order, the groups themselves in evaluation
+/// order, and the per-query solver budget.
 struct Resolved {
     pipeline_id: Id,
-    /// Stage component ids parallel to [`DOCUMENT_STAGE_KINDS`].
-    components: [Id; 4],
+    /// Stage component ids parallel to [`STAGE_KINDS`].
+    components: [Id; 6],
     documents: Vec<CorpusEntry>,
+    groups: Vec<FixtureGroup>,
+    /// §8.4 `solver_ms_per_query` budget value.
+    budget_ms: u64,
 }
 
 /// Resolve `experiment_id` against the §8.4 registry surface. Whole-set
@@ -121,8 +170,8 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         return None;
     };
 
-    let mut components: Vec<Id> = Vec::with_capacity(DOCUMENT_STAGE_KINDS.len());
-    for kind in DOCUMENT_STAGE_KINDS {
+    let mut components: Vec<Id> = Vec::with_capacity(STAGE_KINDS.len());
+    for kind in STAGE_KINDS {
         let found = pipeline.stages.iter().find_map(|stage_id| {
             candidates
                 .stages
@@ -143,9 +192,17 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
             }
         }
     }
-    let components: [Id; 4] = components
+    let components: [Id; 6] = components
         .try_into()
-        .expect("the loop pushes one component per document stage kind");
+        .expect("the loop pushes one component per stage kind");
+
+    let Some(&budget_ms) = experiment.budget.get(&static_id(SOLVER_BUDGET_KEY)) else {
+        shell.diagnostic(invalid_diagnostic(vec![(
+            static_id("reason"),
+            format!("experiment {experiment_id} declares no {SOLVER_BUDGET_KEY} budget"),
+        )]));
+        return None;
+    };
 
     let mut documents: Vec<CorpusEntry> = Vec::new();
     let mut unresolved = false;
@@ -176,19 +233,22 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         pipeline_id: pipeline.id.clone(),
         components,
         documents,
+        groups: experiment.fixture_groups.clone(),
+        budget_ms,
     })
 }
 
 /// Drive one corpus document through the four document stages. Every
 /// attempted stage lands exactly one stage event; the first failure stops
-/// this document and leaves the rest of the run to proceed.
+/// this document and leaves the rest of the run to proceed. Returns the
+/// landed (read-back) bundle envelope — the group stages' input.
 fn document_pipeline(
     root: &Path,
     entry: &CorpusEntry,
     resolved: &Resolved,
     lexicon: &Lexicon,
     shell: &mut Shell,
-) {
+) -> Option<ArtifactEnvelope<IrBundle>> {
     let html = match std::fs::read(root.join(&entry.path)) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -196,7 +256,7 @@ fn document_pipeline(
                 (static_id("file"), entry.path.clone()),
                 (static_id("reason"), format!("read {}: {e}", entry.path)),
             ]));
-            return;
+            return None;
         }
     };
     let dir = format!("artifacts/{}", entry.id);
@@ -209,29 +269,24 @@ fn document_pipeline(
         data_class: DataClass::None,
         producer: producer(resolved, 0),
     };
-    let built = extract(&html, &config).map_err(|e| stage_diagnostic(0, &entry.id, e.to_string()));
+    let built = extract(&html, &config)
+        .map_err(|e| stage_diagnostic(0, "document", &entry.id, e.to_string()));
     let rel = format!("{dir}/source_graph.json");
-    let Some(source) = close_stage(shell, resolved, 0, clock, Vec::new(), &rel, built) else {
-        return;
-    };
+    let source = close_stage(shell, resolved, 0, clock, Vec::new(), &rel, built)?;
 
     let clock = stage_clock();
     let built = segment(&source, &producer(resolved, 1))
-        .map_err(|e| stage_diagnostic(1, &entry.id, e.to_string()));
+        .map_err(|e| stage_diagnostic(1, "document", &entry.id, e.to_string()));
     let rel = format!("{dir}/segments.json");
     let inputs = vec![source.content_hash.clone()];
-    let Some(segments) = close_stage(shell, resolved, 1, clock, inputs, &rel, built) else {
-        return;
-    };
+    let segments = close_stage(shell, resolved, 1, clock, inputs, &rel, built)?;
 
     let clock = stage_clock();
     let built = normalize(&source, &segments, lexicon, &producer(resolved, 2))
-        .map_err(|e| stage_diagnostic(2, &entry.id, e.to_string()));
+        .map_err(|e| stage_diagnostic(2, "document", &entry.id, e.to_string()));
     let rel = format!("{dir}/normalization.json");
     let inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
-    let Some(normalization) = close_stage(shell, resolved, 2, clock, inputs, &rel, built) else {
-        return;
-    };
+    let normalization = close_stage(shell, resolved, 2, clock, inputs, &rel, built)?;
 
     let clock = stage_clock();
     let built = assemble_bundle(entry, resolved, &source, &segments, &normalization);
@@ -241,7 +296,142 @@ fn document_pipeline(
         segments.content_hash.clone(),
         normalization.content_hash.clone(),
     ];
-    close_stage(shell, resolved, 3, clock, inputs, &rel, built);
+    close_stage(shell, resolved, 3, clock, inputs, &rel, built)
+}
+
+/// Drive one fixture group through compile → verify. Compile loads the
+/// members' landed bundles (all must be present — see the module doc's
+/// partial-group rule), compiles their (FormalIR, NormIR) pairs into the
+/// enveloped [`ckc_smt::CompiledArtifact`] at `groups/<gid>/compiled.json`,
+/// and materializes every planned query body byte-identical at
+/// `groups/<gid>/smt/<query-id>.smt2`; verify drives the compiled plan
+/// through the solver adapter under the experiment's per-query budget into
+/// `groups/<gid>/verifier_results.json`. One stage event each; a compile
+/// failure skips the group's verify and leaves other groups to proceed.
+fn group_pipeline(
+    group: &FixtureGroup,
+    bundles: &[(Id, ArtifactEnvelope<IrBundle>)],
+    resolved: &Resolved,
+    adapter: &Z3Adapter,
+    shell: &mut Shell,
+) {
+    let gid = &group.group_id;
+    let dir = format!("groups/{gid}");
+
+    let clock = stage_clock();
+    let mut members: Vec<&ArtifactEnvelope<IrBundle>> = Vec::with_capacity(group.fixtures.len());
+    for fixture in &group.fixtures {
+        match bundles.iter().find(|(id, _)| id == fixture) {
+            Some((_, bundle)) => members.push(bundle),
+            None => {
+                let built = Err(stage_diagnostic(
+                    COMPILE,
+                    "group",
+                    gid,
+                    format!("member {fixture} landed no ir_bundle artifact"),
+                ));
+                finish_stage::<IrBundle>(shell, resolved, COMPILE, clock, Vec::new(), built);
+                return;
+            }
+        }
+    }
+    let inputs: Vec<Hash> = members.iter().map(|m| m.content_hash.clone()).collect();
+
+    let artifact = compile(
+        gid,
+        members.iter().map(|m| (&m.payload.formal, &m.payload.norm)),
+    );
+    let built = artifact
+        .validate()
+        .map_err(|e| stage_diagnostic(COMPILE, "group", gid, format!("compiled artifact: {e}")))
+        .and_then(|()| {
+            let diagnostics = canonical_diagnostic_set(&artifact.diagnostics)
+                .map_err(|e| stage_diagnostic(COMPILE, "group", gid, e.to_string()))?;
+            envelope(
+                format!("{gid}.compiled"),
+                "compiled",
+                producer(resolved, COMPILE),
+                inputs.clone(),
+                Origin::DeterministicCompiler,
+                Authority::CompilerAuthority,
+                diagnostics,
+                artifact,
+            )
+            .map_err(|e| stage_diagnostic(COMPILE, "group", gid, e.to_string()))
+        });
+    let landed = built
+        .and_then(|env| land(shell, &format!("{dir}/compiled.json"), env))
+        .and_then(|env| {
+            materialize_queries(shell, &dir, &env)?;
+            Ok(env)
+        });
+    let Some(compiled) = finish_stage(shell, resolved, COMPILE, clock, inputs, landed) else {
+        return;
+    };
+
+    let clock = stage_clock();
+    let results = verify(
+        adapter,
+        &compiled.payload,
+        Duration::from_millis(resolved.budget_ms),
+    );
+    let wrapped = VerifierResults { results };
+    let built = wrapped
+        .validate()
+        .map_err(|e| stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}")))
+        .and_then(|()| {
+            let diagnostics =
+                canonical_diagnostic_set(wrapped.results.iter().flat_map(|r| &r.diagnostics))
+                    .map_err(|e| stage_diagnostic(VERIFY, "group", gid, e.to_string()))?;
+            envelope(
+                format!("{gid}.verifier_results"),
+                "verifier_results",
+                producer(resolved, VERIFY),
+                vec![compiled.content_hash.clone()],
+                Origin::AdapterGenerated,
+                Authority::VerifierAuthority,
+                diagnostics,
+                wrapped,
+            )
+            .map_err(|e| stage_diagnostic(VERIFY, "group", gid, e.to_string()))
+        });
+    let landed = built.and_then(|env| land(shell, &format!("{dir}/verifier_results.json"), env));
+    finish_stage(
+        shell,
+        resolved,
+        VERIFY,
+        clock,
+        vec![compiled.content_hash.clone()],
+        landed,
+    );
+}
+
+/// Materialize the landed compiled artifact's query bodies as the §8.3
+/// `groups/<gid>/smt/<query-id>.smt2` files, each read back and checked
+/// byte-identical to its [`ckc_smt::QueryBody`] body — solver-bound text
+/// pinned at the same boundary discipline as the envelopes.
+fn materialize_queries(
+    shell: &Shell,
+    dir: &str,
+    compiled: &ArtifactEnvelope<ckc_smt::CompiledArtifact>,
+) -> Result<(), DiagnosticRecord> {
+    for body in &compiled.payload.query_bodies {
+        let rel = format!("{dir}/smt/{}.smt2", body.query_id);
+        let fail = |reason: String| {
+            invalid_diagnostic(vec![
+                (static_id("artifact"), rel.clone()),
+                (static_id("reason"), reason),
+            ])
+        };
+        let path = shell
+            .write_under(&rel, body.body.as_bytes())
+            .map_err(|e| fail(e.to_string()))?;
+        let read_back = std::fs::read(&path).map_err(|e| fail(format!("read back: {e}")))?;
+        if read_back != body.body.as_bytes() {
+            return Err(fail("read-back bytes differ from the query body".into()));
+        }
+    }
+    Ok(())
 }
 
 /// The §8.3 assemble stage, the thin core-ir.4/.5 wrapper: derive the DocIR
@@ -257,21 +447,18 @@ fn assemble_bundle(
     segments: &ArtifactEnvelope<SegmentIr>,
     normalization: &ArtifactEnvelope<Normalization>,
 ) -> Result<ArtifactEnvelope<IrBundle>, DiagnosticRecord> {
-    let fail = |reason: String| stage_diagnostic(3, &entry.id, reason);
+    let fail = |reason: String| stage_diagnostic(3, "document", &entry.id, reason);
 
     let doc = ckc_core::DocIr::from_graph(&source.payload, source.diagnostics.clone())
         .map_err(|e| fail(format!("doc layer: {e}")))?;
 
-    let mut keyed: Vec<(Vec<u8>, DiagnosticRecord)> = segments
-        .diagnostics
-        .iter()
-        .chain(&normalization.diagnostics)
-        .map(|d| Ok((canonical_sort_key(d)?, d.clone())))
-        .collect::<Result<_, CanonError>>()
-        .map_err(|e| fail(format!("diagnostic sort key: {e}")))?;
-    keyed.sort_by(|a, b| a.0.cmp(&b.0));
-    keyed.dedup_by(|a, b| a.0 == b.0);
-    let diagnostics = keyed.into_iter().map(|(_, d)| d).collect();
+    let diagnostics = canonical_diagnostic_set(
+        segments
+            .diagnostics
+            .iter()
+            .chain(&normalization.diagnostics),
+    )
+    .map_err(|e| fail(format!("diagnostic sort key: {e}")))?;
 
     let bundle = assemble(
         doc,
@@ -312,9 +499,7 @@ fn assemble_bundle(
 }
 
 /// Close one attempted stage: land the built envelope at `rel` on success,
-/// then record the stage event (envelope diagnostics and content hash on
-/// success, the failure diagnostic alone otherwise). Returns the read-back
-/// envelope for the next stage; `None` means the event recorded a failure.
+/// then record the stage event ([`finish_stage`]).
 fn close_stage<P: Canonical + CanonRead>(
     shell: &mut Shell,
     resolved: &Resolved,
@@ -325,6 +510,22 @@ fn close_stage<P: Canonical + CanonRead>(
     built: Result<ArtifactEnvelope<P>, DiagnosticRecord>,
 ) -> Option<ArtifactEnvelope<P>> {
     let landed = built.and_then(|envelope| land(shell, rel, envelope));
+    finish_stage(shell, resolved, stage_index, clock, input_hashes, landed)
+}
+
+/// Record one attempted stage's §4.6 event: envelope diagnostics and
+/// content hash on success, the failure diagnostic alone otherwise; the
+/// verify stage carries its §8.4 budget counter. Returns the landed
+/// envelope for the next consumer; `None` means the event recorded a
+/// failure.
+fn finish_stage<P: Canonical + CanonRead>(
+    shell: &mut Shell,
+    resolved: &Resolved,
+    stage_index: usize,
+    clock: StageClock,
+    input_hashes: Vec<Hash>,
+    landed: Result<ArtifactEnvelope<P>, DiagnosticRecord>,
+) -> Option<ArtifactEnvelope<P>> {
     let (started_at, ended_at, duration_ms) = clock.stop();
     let (outcome, diagnostics, output_hashes, envelope) = match landed {
         Ok(envelope) => (
@@ -335,10 +536,15 @@ fn close_stage<P: Canonical + CanonRead>(
         ),
         Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
     };
+    let budget_counters = if stage_index == VERIFY {
+        vec![(static_id(SOLVER_BUDGET_KEY), resolved.budget_ms)]
+    } else {
+        Vec::new()
+    };
     shell.stage_event(StageEvent {
         candidate_id: resolved.pipeline_id.clone(),
         component_id: resolved.components[stage_index].clone(),
-        stage: static_id(DOCUMENT_STAGE_KINDS[stage_index]),
+        stage: static_id(STAGE_KINDS[stage_index]),
         started_at,
         ended_at,
         duration_ms,
@@ -346,9 +552,57 @@ fn close_stage<P: Canonical + CanonRead>(
         output_hashes,
         outcome,
         diagnostics,
-        budget_counters: Vec::new(),
+        budget_counters,
     });
     envelope
+}
+
+/// Envelope one group-stage payload under the runner's fixed §4.4 fields:
+/// `schema.<kind>` schema id, `<artifact-id>` minted by the caller, content
+/// and policy hashes computed here.
+#[allow(clippy::too_many_arguments)]
+fn envelope<P: Canonical>(
+    artifact_id: String,
+    kind: &str,
+    producer: Producer,
+    input_hashes: Vec<Hash>,
+    origin: Origin,
+    authority: Authority,
+    diagnostics: Vec<DiagnosticRecord>,
+    payload: P,
+) -> Result<ArtifactEnvelope<P>, CanonError> {
+    Ok(ArtifactEnvelope {
+        schema_id: Id::new(format!("schema.{kind}")).expect("schema.<kind> stays in the grammar"),
+        artifact_id: Id::new(artifact_id)
+            .expect("a valid group id keeps the Id grammar under a suffix"),
+        artifact_kind: static_id(kind),
+        producer,
+        input_hashes,
+        content_hash: content_hash(&payload)?,
+        canonicalization_policy_hash: canonicalization_policy_hash(),
+        origin,
+        authority,
+        accepted_effects: vec![],
+        trace_refs: vec![],
+        diagnostics,
+        runtime_metadata: vec![],
+        payload,
+    })
+}
+
+/// §4.3 canonical-set view of stage diagnostics: sorted by canonical bytes,
+/// byte-identical duplicates collapsed — the envelope `diagnostics` field's
+/// storage order.
+fn canonical_diagnostic_set<'a>(
+    diagnostics: impl IntoIterator<Item = &'a DiagnosticRecord>,
+) -> Result<Vec<DiagnosticRecord>, CanonError> {
+    let mut keyed: Vec<(Vec<u8>, DiagnosticRecord)> = diagnostics
+        .into_iter()
+        .map(|d| Ok((canonical_sort_key(d)?, d.clone())))
+        .collect::<Result<_, CanonError>>()?;
+    keyed.sort_by(|a, b| a.0.cmp(&b.0));
+    keyed.dedup_by(|a, b| a.0 == b.0);
+    Ok(keyed.into_iter().map(|(_, d)| d).collect())
 }
 
 /// The write boundary: validate the produced envelope, write its canonical
@@ -397,15 +651,18 @@ fn severity(diagnostics: &[DiagnosticRecord]) -> Outcome {
 }
 
 /// Stage-failure diagnostic: `schema_invalid`/`invalid` naming the §8.3
-/// stage and the document (§4.4 "schema, hash, canonicalization … fails").
-fn stage_diagnostic(stage_index: usize, document_id: &Id, reason: String) -> DiagnosticRecord {
+/// stage and its subject — `document` for the per-document stages, `group`
+/// for the group stages (§4.4 "schema, hash, canonicalization … fails").
+fn stage_diagnostic(
+    stage_index: usize,
+    subject_key: &str,
+    subject: &Id,
+    reason: String,
+) -> DiagnosticRecord {
     invalid_diagnostic(vec![
-        (static_id("document"), document_id.to_string()),
+        (static_id(subject_key), subject.to_string()),
         (static_id("reason"), reason),
-        (
-            static_id("stage"),
-            DOCUMENT_STAGE_KINDS[stage_index].to_owned(),
-        ),
+        (static_id("stage"), STAGE_KINDS[stage_index].to_owned()),
     ])
 }
 
@@ -478,15 +735,20 @@ mod tests {
         hashes
     }
 
-    /// Strict-read one landed artifact envelope and re-check its mechanical
-    /// invariants; the §8.5 item 3 per-artifact property, asserted from the
-    /// consumer side.
-    fn strict<P: Canonical + CanonRead>(out: &Path, doc: &str, name: &str) -> ArtifactEnvelope<P> {
-        let path = out.join(format!("artifacts/{doc}/{name}.json"));
+    /// Strict-read one landed artifact envelope at `rel` under the run
+    /// directory and re-check its mechanical invariants; the §8.5 item 3
+    /// per-artifact property, asserted from the consumer side.
+    fn strict_at<P: Canonical + CanonRead>(out: &Path, rel: &str) -> ArtifactEnvelope<P> {
+        let path = out.join(rel);
         let envelope: ArtifactEnvelope<P> = read_canonical(&std::fs::read(&path).unwrap())
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         envelope.validate().unwrap();
         envelope
+    }
+
+    /// [`strict_at`] over the document-artifact layout slot.
+    fn strict<P: Canonical + CanonRead>(out: &Path, doc: &str, name: &str) -> ArtifactEnvelope<P> {
+        strict_at(out, &format!("artifacts/{doc}/{name}.json"))
     }
 
     // The unit gate: the document stages over the three fixtures land the
@@ -497,8 +759,8 @@ mod tests {
     fn document_stages_land_strict_artifacts_over_the_fixtures() {
         let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
 
-        // Group stages are pending (cli-runner.2b): unsupported, clean.
-        assert_eq!(result.outcome, Outcome::Unsupported);
+        // The full §8.3 chain through verify completes clean.
+        assert_eq!(result.outcome, Outcome::Ok);
         assert!(result.diagnostic_hashes.is_empty());
         assert!(diagnostics.is_empty());
 
@@ -542,15 +804,16 @@ mod tests {
             );
         }
 
-        // 4 stage events per document, then the closing command event.
-        assert_eq!(events.len(), 13);
+        // 4 stage events per document, compile+verify per group, then the
+        // closing command event.
+        assert_eq!(events.len(), 17);
         for (n, event) in events.iter().enumerate() {
             assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
             assert_eq!(event.logical_time, n as u64);
             assert_eq!(event.run_id, static_id("m1"));
         }
         for (d, doc) in DOC_IDS.iter().enumerate() {
-            for (s, kind) in DOCUMENT_STAGE_KINDS.iter().enumerate() {
+            for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
                 let event = &events[d * 4 + s];
                 assert_eq!(event.stage, static_id(kind), "{doc}");
                 assert_eq!(event.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
@@ -564,9 +827,187 @@ mod tests {
                 assert!(event.diagnostics.is_empty());
             }
         }
-        let command = &events[12];
+        // Group events in evaluation order: conflict then null, compile
+        // then verify; only verify carries the §8.4 budget counter.
+        for (g, base) in [12, 14].iter().enumerate() {
+            let compile = &events[*base];
+            assert_eq!(compile.stage, static_id("compile"), "group {g}");
+            assert_eq!(compile.component_id, static_id("stage.m1.compile"));
+            assert_eq!(compile.outcome, Outcome::Ok);
+            assert_eq!(compile.input_hashes.len(), 2);
+            assert_eq!(compile.output_hashes.len(), 1);
+            assert!(compile.diagnostics.is_empty());
+            assert!(compile.budget_counters.is_empty());
+            let verify = &events[*base + 1];
+            assert_eq!(verify.stage, static_id("verify"), "group {g}");
+            assert_eq!(verify.component_id, static_id("stage.m1.verify"));
+            assert_eq!(verify.outcome, Outcome::Ok);
+            assert_eq!(verify.input_hashes, compile.output_hashes);
+            assert_eq!(verify.output_hashes.len(), 1);
+            assert!(verify.diagnostics.is_empty());
+            assert_eq!(
+                verify.budget_counters,
+                vec![(static_id("solver_ms_per_query"), 10_000)]
+            );
+        }
+        let command = &events[16];
         assert_eq!(command.stage, static_id("run"));
-        assert_eq!(command.outcome, Outcome::Unsupported);
+        assert_eq!(command.outcome, Outcome::Ok);
+    }
+
+    // The group stages over exp.m1_spine: compiled artifacts and verifier
+    // results land strict-read clean with hashes chaining bundles →
+    // compiled → results and every query body materialized byte-identical
+    // under smt/; the §8.6 thread yields the cross-document contradiction
+    // in the conflict group and the disjoint-interval documented null in
+    // the null group.
+    #[test]
+    fn group_stages_compile_and_verify_the_fixture_groups() {
+        use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory};
+
+        let (_result, _events, _diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
+        let a: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_guideline_a", "ir_bundle");
+        let b: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_guideline_b", "ir_bundle");
+        let control: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_control", "ir_bundle");
+
+        // Per group: envelope identity/chaining pins, plan and assertion
+        // map shape, and byte-identical smt materialization.
+        for (gid, members, rules) in [
+            (
+                "group.m1_conflict",
+                [&a, &b],
+                ["a", "b"].map(|d| format!("fixture.m1_guideline_{d}.rule.0")),
+            ),
+            (
+                "group.m1_null",
+                [&a, &control],
+                [
+                    "fixture.m1_control.rule.0".to_owned(),
+                    "fixture.m1_guideline_a.rule.0".to_owned(),
+                ],
+            ),
+        ] {
+            let compiled: ArtifactEnvelope<CompiledArtifact> =
+                strict_at(&out, &format!("groups/{gid}/compiled.json"));
+            assert_eq!(compiled.schema_id, static_id("schema.compiled"), "{gid}");
+            assert_eq!(
+                compiled.artifact_id,
+                format!("{gid}.compiled").parse().unwrap()
+            );
+            assert_eq!(compiled.artifact_kind, static_id("compiled"));
+            assert_eq!(
+                compiled.producer.component_id,
+                static_id("stage.m1.compile")
+            );
+            assert_eq!(compiled.origin, Origin::DeterministicCompiler);
+            assert_eq!(compiled.authority, Authority::CompilerAuthority);
+            assert_eq!(
+                compiled.input_hashes,
+                sorted(&members.map(|m| m.content_hash.clone()))
+            );
+            assert!(compiled.diagnostics.is_empty());
+            assert!(compiled.payload.diagnostics.is_empty());
+
+            let gsuf = gid.strip_prefix("group.").unwrap();
+            assert_eq!(compiled.payload.query_plan.len(), 1);
+            assert_eq!(
+                compiled.payload.query_plan[0].pair_id,
+                format!("q.{gsuf}.pair1").parse().unwrap()
+            );
+            assert_eq!(compiled.payload.query_bodies.len(), 2);
+            let mut expected_names: Vec<Id> = Vec::new();
+            for prefix in ["a", "ctx"] {
+                for rule in &rules {
+                    expected_names.push(format!("{prefix}.{rule}").parse().unwrap());
+                }
+            }
+            expected_names.sort();
+            let names: Vec<Id> = compiled
+                .payload
+                .assertion_map
+                .iter()
+                .map(|(name, _)| name.clone())
+                .collect();
+            assert_eq!(names, expected_names, "{gid}");
+
+            let smt_dir = out.join(format!("groups/{gid}/smt"));
+            let mut files: Vec<String> = std::fs::read_dir(&smt_dir)
+                .unwrap()
+                .map(|e| e.unwrap().file_name().into_string().unwrap())
+                .collect();
+            files.sort();
+            assert_eq!(
+                files,
+                [
+                    format!("q.{gsuf}.pair1.deontic.smt2"),
+                    format!("q.{gsuf}.pair1.overlap.smt2")
+                ]
+            );
+            for body in &compiled.payload.query_bodies {
+                let bytes = std::fs::read(smt_dir.join(format!("{}.smt2", body.query_id))).unwrap();
+                assert_eq!(bytes, body.body.as_bytes(), "{}", body.query_id);
+            }
+
+            let results: ArtifactEnvelope<ckc_smt::VerifierResults> =
+                strict_at(&out, &format!("groups/{gid}/verifier_results.json"));
+            assert_eq!(results.schema_id, static_id("schema.verifier_results"));
+            assert_eq!(
+                results.artifact_id,
+                format!("{gid}.verifier_results").parse().unwrap()
+            );
+            assert_eq!(results.artifact_kind, static_id("verifier_results"));
+            assert_eq!(results.producer.component_id, static_id("stage.m1.verify"));
+            assert_eq!(results.origin, Origin::AdapterGenerated);
+            assert_eq!(results.authority, Authority::VerifierAuthority);
+            assert_eq!(results.input_hashes, vec![compiled.content_hash.clone()]);
+            assert!(results.diagnostics.is_empty());
+            results.payload.validate().unwrap();
+            for r in &results.payload.results {
+                assert!(r.diagnostics.is_empty(), "{gid} {}", r.query_id);
+                assert_eq!(r.solver_identity.solver_id, static_id("z3"));
+            }
+        }
+
+        // Conflict group: Q1 sat with the overlap witness, Q2 unsat with
+        // the cross-document core — the §8.6 finding.
+        let conflict: ArtifactEnvelope<ckc_smt::VerifierResults> =
+            strict_at(&out, "groups/group.m1_conflict/verifier_results.json");
+        let rs = &conflict.payload.results;
+        assert_eq!(rs.len(), 2);
+        assert_eq!(
+            rs[0].query_id,
+            "q.m1_conflict.pair1.overlap".parse().unwrap()
+        );
+        assert_eq!(rs[0].category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(rs[0].verdict, Some(SolverVerdict::Sat));
+        assert!(rs[0].model.is_some());
+        assert_eq!(rs[0].unsat_core, None);
+        assert_eq!(
+            rs[1].query_id,
+            "q.m1_conflict.pair1.deontic".parse().unwrap()
+        );
+        assert_eq!(rs[1].category, VerifierCategory::SemanticContradiction);
+        assert_eq!(rs[1].verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(rs[1].model, None);
+        assert_eq!(
+            rs[1].unsat_core,
+            Some(vec![
+                "a.fixture.m1_guideline_a.rule.0".parse().unwrap(),
+                "a.fixture.m1_guideline_b.rule.0".parse().unwrap(),
+            ])
+        );
+
+        // Null group: the disjoint-interval Q1 answers unsat, closing the
+        // pair as the documented null result — no Q2 run, no witness.
+        let null: ArtifactEnvelope<ckc_smt::VerifierResults> =
+            strict_at(&out, "groups/group.m1_null/verifier_results.json");
+        let rs = &null.payload.results;
+        assert_eq!(rs.len(), 1);
+        assert_eq!(rs[0].query_id, "q.m1_null.pair1.overlap".parse().unwrap());
+        assert_eq!(rs[0].category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(rs[0].verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(rs[0].model, None);
+        assert_eq!(rs[0].unsat_core, None);
     }
 
     // Resolution failures are command-scope diagnostics: a root without
@@ -624,7 +1065,9 @@ mod tests {
             "\
 pipelines:
   - id: pipe.tiny
-    stages: [stage.t.extract, stage.t.segment, stage.t.normalize, stage.t.assemble]
+    stages:
+      [stage.t.extract, stage.t.segment, stage.t.normalize, stage.t.assemble,
+       stage.t.compile, stage.t.verify]
 stages:
   - id: stage.t.extract
     kind: extract
@@ -646,6 +1089,16 @@ stages:
     determinism: deterministic
     input_artifact_kinds: [source_graph, segments, normalization]
     output_artifact_kinds: [ir_bundle]
+  - id: stage.t.compile
+    kind: compile
+    determinism: deterministic
+    input_artifact_kinds: [ir_bundle]
+    output_artifact_kinds: [compiled, smt_query]
+  - id: stage.t.verify
+    kind: verify
+    determinism: deterministic
+    input_artifact_kinds: [compiled, smt_query]
+    output_artifact_kinds: [verifier_results]
 ",
         );
         write(
@@ -670,7 +1123,9 @@ stages:
 
     // §4.4 valid remainder: a document whose corpus file is missing takes a
     // command-scope diagnostic while the other document still runs all four
-    // stages and lands its artifacts.
+    // stages and lands its artifacts; the group misses a member bundle, so
+    // its compile stage fails rather than compiling a partial group, and
+    // verify never runs.
     #[test]
     fn missing_corpus_file_keeps_other_documents() {
         let root = tempfile::tempdir().unwrap();
@@ -683,8 +1138,9 @@ stages:
         assert_eq!(result.outcome, Outcome::Invalid);
         // Ledger: the command-scope read failure first, then the tiny
         // document's stage residuals (extract parse error, unclassified
-        // paragraph) riding their stage events.
-        assert_eq!(diagnostics.len(), 3);
+        // paragraph) riding their stage events, then the group's compile
+        // failure naming the bundle-less member.
+        assert_eq!(diagnostics.len(), 4);
         assert!(
             diagnostics[0]
                 .payload
@@ -692,9 +1148,16 @@ stages:
                 .any(|(_, v)| v.contains("gone.html")),
             "{diagnostics:?}"
         );
+        assert!(
+            diagnostics[3]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("fixture.gone")),
+            "{diagnostics:?}"
+        );
 
-        assert_eq!(events.len(), 5);
-        for (s, kind) in DOCUMENT_STAGE_KINDS.iter().enumerate() {
+        assert_eq!(events.len(), 6);
+        for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
             assert_eq!(events[s].stage, static_id(kind));
             assert_eq!(
                 events[s].component_id,
@@ -706,10 +1169,52 @@ stages:
                 "{kind} landed its artifact"
             );
         }
+        let compile_event = &events[4];
+        assert_eq!(compile_event.stage, static_id("compile"));
+        assert_eq!(compile_event.component_id, static_id("stage.t.compile"));
+        assert_eq!(compile_event.outcome, Outcome::Invalid);
+        assert_eq!(compile_event.diagnostics.len(), 1);
+        assert!(compile_event.output_hashes.is_empty());
         assert!(!out.join("artifacts/fixture.gone").exists());
+        assert!(!out.join("groups").exists());
         let bundle: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.tiny", "ir_bundle");
         let source: ArtifactEnvelope<SourceGraph> = strict(&out, "fixture.tiny", "source_graph");
         bundle.payload.validate(&source.payload).unwrap();
+    }
+
+    // Budget resolution: an experiment without the §8.4 per-query solver
+    // budget key is one command-scope diagnostic and no stage runs.
+    #[test]
+    fn missing_solver_budget_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        std::fs::write(
+            root.path().join("registry/experiments.yaml"),
+            "\
+- id: exp.tiny
+  pipeline: pipe.tiny
+  fixture_groups:
+    - group_id: group.t
+      fixtures: [fixture.tiny]
+  seed: 1
+  budget: {}
+  expected_outcomes: corpus/gold/t.yaml
+",
+        )
+        .unwrap();
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("solver_ms_per_query")),
+            "{diagnostics:?}"
+        );
+        assert!(!out.join("artifacts").exists());
     }
 
     // The lexicon is load-bearing for the whole run: an unreadable file is

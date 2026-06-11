@@ -202,6 +202,42 @@ impl CanonRead for VerifierResult {
     }
 }
 
+/// SPEC §8.3 verify-stage durable artifact: one fixture group's results in
+/// plan order — pair k's `context_overlap`, then its `deontic_consistency`
+/// when Q1 answered sat — the payload of the run layout's
+/// `groups/<gid>/verifier_results.json`. Order is producer-owned:
+/// [`verify`](crate::verify) yields it by construction, and the compiled
+/// artifact's plan stays the order authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifierResults {
+    pub results: Vec<VerifierResult>,
+}
+
+impl VerifierResults {
+    /// Every member satisfies [`VerifierResult::validate`]; first break
+    /// wins.
+    pub fn validate(&self) -> Result<(), VerifierError> {
+        self.results.iter().try_for_each(VerifierResult::validate)
+    }
+}
+
+impl Canonical for VerifierResults {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("results", |b| emit_array(b, &self.results))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for VerifierResults {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let results = obj.member("results", read_array::<VerifierResult>)?;
+        obj.close()?;
+        Ok(VerifierResults { results })
+    }
+}
+
 /// A [`VerifierResult`] broke a coherence invariant
 /// ([`VerifierResult::validate`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -466,5 +502,22 @@ mod tests {
                 rule: "failure categories carry no verdict",
             })
         );
+    }
+
+    // The group-level wrapper: one member array, round-tripping, member
+    // validation delegated (first break wins).
+    #[test]
+    fn verifier_results_wrap_and_validate_members() {
+        let results = VerifierResults {
+            results: vec![q1_sat(), q2_unsat()],
+        };
+        results.validate().unwrap();
+        assert!(canon(&results).starts_with("{\"results\":[{\"category\":"));
+        round_trip(results.clone());
+        round_trip(VerifierResults { results: vec![] });
+
+        let mut broken = results;
+        broken.results[1].model = Some("(model)".to_owned());
+        assert_eq!(broken.validate(), Err(VerifierError::ModelWithoutSat));
     }
 }

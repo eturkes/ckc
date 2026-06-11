@@ -40,13 +40,17 @@
 //!   concepts interval-lowered through the lexicon, exception clauses
 //!   joined as negated concept atoms, clause regions and ids landing in
 //!   `source_region_ids`/`exception_refs`.
-//! - `run` — `ckc run`'s document half (`cli-runner.2a`): the experiment
+//! - `run` — `ckc run` (`cli-runner.2a`/`.2b`): the experiment
 //!   resolved through the §8.4 registries, each corpus document driven
 //!   extract → segment → normalize → assemble (the core-ir.4/.5 wrapper)
-//!   into `artifacts/<doc-id>/` of the §8.3 layout, every artifact written
-//!   canonical and strict-read back at the boundary, one §4.6 stage event
-//!   per attempted stage; group stages and the total outcome land with
-//!   cli-runner.2b.
+//!   into `artifacts/<doc-id>/` of the §8.3 layout, then each fixture
+//!   group driven compile → verify (the ckc-smt stage cores under the live
+//!   Z3 adapter and the experiment's per-query budget) into
+//!   `groups/<gid>/` with every query body byte-identical under `smt/`;
+//!   every artifact written canonical and strict-read back at the
+//!   boundary, one §4.6 stage event per attempted stage, the §4.4 total
+//!   outcome the severity fold over the whole run; trace/report stages
+//!   join in their units (cli-runner.3a/.4.1a).
 #![forbid(unsafe_code)]
 
 pub mod extract;

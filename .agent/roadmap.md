@@ -56,15 +56,9 @@ bare headers; git history retains all removed text.
 - [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K 92e9c4b
 - [x] smt-verify.b: verdict parsing + §6 categories completing verify. 74% 147K/200K 4487787
 - [x] cli-runner.2a: run module document half: resolution + per-doc stage chain, strict
-  read-back landings + stage events. >=90% compacted/200K _
-- [ ] cli-runner.2b: Group stages + total outcome completing ckc run: per fixture group load the
-  member ir_bundles, compile (plan + emit + assertion map → groups/<gid>/compiled.json with each
-  QueryBody body materialized byte-identical at groups/<gid>/smt/<query_id>.smt2) and verify
-  (adapter per query under budget → groups/<gid>/verifier_results.json); aggregate every stage
-  outcome by severity into exactly one TotalOperationResult; `ckc run --experiment exp.m1_spine
-  --out <dir>` completes ok (trace/report artifacts join in their units). Reading: SPEC §8.3
-  compile/verify rows + layout, §4.4 outcome aggregation. Consumes cli-runner.2a,
-  smt-emit.2/.3a/.3b, smt-verify.a/.b. Gate: `cargo test -p ckc-cli run::`.
+  read-back landings + stage events. >=90% compacted/200K c28dab5
+- [x] cli-runner.2b: group stages + total outcome completing ckc run: per-group compile/verify
+  landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K _
 - [ ] cli-runner.2c: Workspace run oracle: workspace test executing exp.m1_spine into a temp dir,
   walking the run directory, strict-reading every accepted artifact (later-stage artifacts join
   the sweep as they wire in), asserting corpus/gold/m1_expected.yaml through typed GoldEntry rows

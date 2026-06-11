@@ -82,6 +82,7 @@ name = "ckc-cli"
 version = "0.1.0"
 dependencies = [
  "ckc-core",
+ "ckc-smt",
  "ego-tree",
  "scraper",
  "serde",

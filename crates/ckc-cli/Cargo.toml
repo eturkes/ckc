@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 ckc-core = { path = "../ckc-core" }
+ckc-smt = { path = "../ckc-smt" }
 scraper.workspace = true
 ego-tree.workspace = true
 serde.workspace = true

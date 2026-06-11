@@ -19,10 +19,12 @@
 //! - `plan` — compile-stage planning: [`plan_queries`], the §6 eligibility
 //!   scan over a fixture group's per-document FormalIRs, minting the §8.6
 //!   pair/query ids into §5 ContradictionQueryPair slots.
-//! - `result` — verify-stage payload: [`VerifierResult`] (per-query §6
+//! - `result` — verify-stage payloads: [`VerifierResult`] (per-query §6
 //!   [`VerifierCategory`], raw [`SolverVerdict`] token kept distinct,
 //!   witness model or canonical unsat core, §5 solver identity, diagnostics)
-//!   with coherence validation ([`VerifierError`]).
+//!   with coherence validation ([`VerifierError`]), and [`VerifierResults`],
+//!   one group's plan-ordered results — the §8.3
+//!   `groups/<gid>/verifier_results.json` payload.
 //! - `verify` — verify-stage adapter: [`Z3Adapter`] (§5 SolverIdentity
 //!   live-parsed from `--version` at construction; per-query subprocess
 //!   invocation under a wall-clock budget with kill-on-expiry), every
@@ -47,7 +49,7 @@ mod verify;
 pub use artifact::{ArtifactError, AssertionRecord, CompiledArtifact, QueryBody, SmtLogic};
 pub use emit::{compile, emit_deontic_query, emit_overlap_query};
 pub use plan::plan_queries;
-pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult};
+pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult, VerifierResults};
 pub use verdict::{QueryRole, assemble_result, verify};
 pub use verify::{AdapterError, RunOutcome, SolverRun, Z3Adapter};
 
