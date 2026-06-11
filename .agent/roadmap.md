@@ -58,15 +58,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.2a: run module document half: resolution + per-doc stage chain, strict
   read-back landings + stage events. >=90% compacted/200K c28dab5
 - [x] cli-runner.2b: group stages + total outcome completing ckc run: per-group compile/verify
-  landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K _
-- [ ] cli-runner.2c: Workspace run oracle: workspace test executing exp.m1_spine into a temp dir,
-  walking the run directory, strict-reading every accepted artifact (later-stage artifacts join
-  the sweep as they wire in), asserting corpus/gold/m1_expected.yaml through typed GoldEntry rows
-  for both groups — conflict group semantic_contradiction + deontic_direction_conflict + expected
-  core compared as a set; null group semantic_no_conflict + null result. Closes §8.5 item 3 and
-  stands as the code oracle behind items 5 and 6. First whole-pipeline execution — reserve the
-  window's margin for cross-stage debugging. Reading: SPEC §8.5 item 3, §8.2 gold shape, §8.3
-  layout. Consumes cli-runner.2a/.2b, core-registry.1 GoldEntry. Gate: `cargo test --workspace`.
+  landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K 9fe4145
+- [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + gold assert. 47% 93K/200K _
 - [ ] cli-runner.3a: Trace types + assembly in a trace module: finding ids
   finding.<group_id>.<ordinal> with ordinals in source-then-hash order (§7.2) as claim-evidence
   rows are born from verifier results; TraceBundle (derivation DAG source → extraction → segment →
