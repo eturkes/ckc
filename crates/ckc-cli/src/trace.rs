@@ -2002,4 +2002,396 @@ mod tests {
             Err(TraceError::FindingOrdinals(id("group.g1")))
         );
     }
+
+    // --- live fixture pins (cli-runner.3a.2b) ---
+
+    use std::time::Duration;
+
+    use crate::extract::{ExtractConfig, extract};
+    use crate::normalize::{Lexicon, load_lexicon, normalize};
+    use crate::segment::segment;
+    use ckc_core::{
+        DataClass, DiagnosticRecord, DocIr, Provenance, assemble, canonicalization_policy_hash,
+        content_hash, hash_bytes,
+    };
+    use ckc_smt::{Z3Adapter, compile, verify};
+
+    /// §8.2 committed fixture bytes, repository-rooted.
+    fn fixture(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+        std::fs::read(format!("{dir}{name}")).unwrap()
+    }
+
+    /// The committed §5 lexicon authority, loaded.
+    fn committed_lexicon() -> Lexicon {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../corpus/lexicon/ja_core.yaml"
+        );
+        load_lexicon(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    /// Inert stage producer (real producer values are run.rs's concern).
+    fn live_producer() -> Producer {
+        Producer {
+            candidate_id: id("cand.m1"),
+            component_id: id("stage.trace"),
+            toolchain_manifest_hash: hash('f'),
+        }
+    }
+
+    /// The generic live wrap: real content/policy hashes over the payload,
+    /// every effect/trace/diagnostic/metadata slot empty — assembly reads
+    /// `artifact_id`, `content_hash`, and `payload` only.
+    fn live_envelope<P: Canonical>(
+        artifact_id: &str,
+        kind: &str,
+        payload: P,
+    ) -> ArtifactEnvelope<P> {
+        ArtifactEnvelope {
+            schema_id: id(&format!("schema.{kind}")),
+            artifact_id: id(artifact_id),
+            artifact_kind: id(kind),
+            producer: live_producer(),
+            input_hashes: vec![],
+            content_hash: content_hash(&payload).unwrap(),
+            canonicalization_policy_hash: canonicalization_policy_hash(),
+            origin: Origin::DeterministicCompiler,
+            authority: Authority::CompilerAuthority,
+            accepted_effects: vec![],
+            trace_refs: vec![],
+            diagnostics: vec![],
+            runtime_metadata: vec![],
+            payload,
+        }
+    }
+
+    /// run.rs's document pipeline mirrored through the pub stage surface:
+    /// extract → segment → normalize → DocIr + canonical diagnostic union
+    /// → [`ckc_core::assemble`] → graph validation, every landing Some.
+    fn live_doc(stem: &str, lexicon: &Lexicon) -> DocTrace {
+        let document_id = id(&format!("fixture.{stem}"));
+        let raw = fixture(&format!("{stem}.html"));
+        let config = ExtractConfig {
+            document_id: document_id.clone(),
+            source_family: id("synthetic_fixture_html"),
+            provenance: Provenance::Synthetic,
+            data_class: DataClass::None,
+            producer: live_producer(),
+        };
+        let source = extract(&raw, &config).unwrap();
+        let segments = segment(&source, &live_producer()).unwrap();
+        let normalization = normalize(&source, &segments, lexicon, &live_producer()).unwrap();
+
+        let doc = DocIr::from_graph(&source.payload, source.diagnostics.clone()).unwrap();
+        let mut diagnostics: Vec<DiagnosticRecord> = segments
+            .diagnostics
+            .iter()
+            .chain(&normalization.diagnostics)
+            .cloned()
+            .collect();
+        sort_canonical(&mut diagnostics);
+        diagnostics
+            .dedup_by(|a, b| canonical_sort_key(a).unwrap() == canonical_sort_key(b).unwrap());
+        let bundle = assemble(
+            doc,
+            segments.payload.clone(),
+            normalization.payload.clinical.clone(),
+            normalization.payload.norm.clone(),
+            Vec::new(),
+            diagnostics,
+        )
+        .unwrap();
+        bundle.validate(&source.payload).unwrap();
+
+        DocTrace {
+            fixture_path: format!("corpus/fixtures/{stem}.html"),
+            source_hash: hash_bytes(&raw),
+            source_graph: Some((source.artifact_id.clone(), source.content_hash.clone())),
+            segments: Some((segments.artifact_id.clone(), segments.content_hash.clone())),
+            normalization: Some((
+                normalization.artifact_id.clone(),
+                normalization.content_hash.clone(),
+            )),
+            bundle: Some(live_envelope(
+                &format!("{document_id}.ir_bundle"),
+                "ir_bundle",
+                bundle,
+            )),
+            document_id,
+        }
+    }
+
+    /// run.rs's group pipeline mirrored: compile the members' (formal,
+    /// norm) pairs, verify on live z3 under a generous budget.
+    fn live_group(gid: &str, members: &[&DocTrace], adapter: &Z3Adapter) -> GroupTrace {
+        let artifact = compile(
+            &id(gid),
+            members.iter().map(|d| {
+                let bundle = &d.bundle.as_ref().unwrap().payload;
+                (&bundle.formal, &bundle.norm)
+            }),
+        );
+        let results = verify(adapter, &artifact, Duration::from_secs(30));
+        GroupTrace {
+            group_id: id(gid),
+            fixtures: members.iter().map(|d| d.document_id.clone()).collect(),
+            compiled: Some(live_envelope(
+                &format!("{gid}.compiled"),
+                "compiled",
+                artifact,
+            )),
+            verifier_results: Some(live_envelope(
+                &format!("{gid}.verifier_results"),
+                "verifier_results",
+                VerifierResults { results },
+            )),
+        }
+    }
+
+    fn row(
+        finding: &str,
+        document: &str,
+        regions: &[&str],
+        rules: &[&str],
+        segments: &[&str],
+        statements: &[&str],
+    ) -> LineageRow {
+        let ids = |ss: &[&str]| ss.iter().map(|s| id(s)).collect();
+        LineageRow {
+            finding_id: id(finding),
+            document_id: id(document),
+            region_ids: ids(regions),
+            rule_ids: ids(rules),
+            segment_ids: ids(segments),
+            statement_ids: ids(statements),
+        }
+    }
+
+    // The §8.6 thread live: the three committed fixtures through the
+    // mirrored document pipeline, both §8.4 groups through compile +
+    // live-z3 verify, assembled into the validating trace pair — census,
+    // §8.3 paths, chain/compile/verify/report edges, the three §8.6 claim
+    // rows, and the full lineage index pinned.
+    #[test]
+    fn live_fixture_groups_assemble_full_trace() {
+        let lexicon = committed_lexicon();
+        let a = live_doc("m1_guideline_a", &lexicon);
+        let b = live_doc("m1_guideline_b", &lexicon);
+        let control = live_doc("m1_control", &lexicon);
+        let adapter = Z3Adapter::new().unwrap();
+        let conflict = live_group("group.m1_conflict", &[&a, &b], &adapter);
+        let null = live_group("group.m1_null", &[&a, &control], &adapter);
+
+        let (bundle, index) = assemble_trace(&[a, b, control], &[conflict, null]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(index.validate(), Ok(()));
+
+        // Node census by kind (1 report + 3 sources + 3×4 document
+        // artifacts + 2×2 group artifacts) and the 12 + 4 + 2 + 2 edges.
+        for (kind, count) in [
+            (TraceNodeKind::Source, 3),
+            (TraceNodeKind::SourceGraph, 3),
+            (TraceNodeKind::Segments, 3),
+            (TraceNodeKind::Normalization, 3),
+            (TraceNodeKind::IrBundle, 3),
+            (TraceNodeKind::Compiled, 2),
+            (TraceNodeKind::VerifierResults, 2),
+            (TraceNodeKind::Report, 1),
+        ] {
+            let got = bundle.nodes.iter().filter(|n| n.kind == kind).count();
+            assert_eq!(got, count, "{}", kind.as_str());
+        }
+        assert_eq!(bundle.nodes.len(), 20);
+        assert_eq!(bundle.edges.len(), 20);
+
+        // §8.3 paths: corpus-relative source (hash = the raw fixture
+        // bytes), run-relative artifacts, the static report sink.
+        let source = node(&bundle, "fixture.m1_guideline_a");
+        assert_eq!(source.kind, TraceNodeKind::Source);
+        assert_eq!(source.path, "corpus/fixtures/m1_guideline_a.html");
+        assert_eq!(
+            source.content_hash,
+            Some(hash_bytes(&fixture("m1_guideline_a.html")))
+        );
+        assert_eq!(
+            node(&bundle, "fixture.m1_guideline_a.ir_bundle").path,
+            "artifacts/fixture.m1_guideline_a/ir_bundle.json"
+        );
+        assert_eq!(
+            node(&bundle, "group.m1_conflict.compiled").path,
+            "groups/group.m1_conflict/compiled.json"
+        );
+        assert_eq!(
+            node(&bundle, "group.m1_null.verifier_results").path,
+            "groups/group.m1_null/verifier_results.json"
+        );
+        assert_eq!(node(&bundle, "report"), &report_node());
+
+        // Edge spot checks: docA's full chain, both conflict compile
+        // fan-ins, the null group's control fan-in, verify, report.
+        for (from, operation, to) in [
+            (
+                "fixture.m1_guideline_a",
+                TraceOperation::Extract,
+                "fixture.m1_guideline_a.source_graph",
+            ),
+            (
+                "fixture.m1_guideline_a.source_graph",
+                TraceOperation::Segment,
+                "fixture.m1_guideline_a.segments",
+            ),
+            (
+                "fixture.m1_guideline_a.segments",
+                TraceOperation::Normalize,
+                "fixture.m1_guideline_a.normalization",
+            ),
+            (
+                "fixture.m1_guideline_a.normalization",
+                TraceOperation::Assemble,
+                "fixture.m1_guideline_a.ir_bundle",
+            ),
+            (
+                "fixture.m1_guideline_a.ir_bundle",
+                TraceOperation::Compile,
+                "group.m1_conflict.compiled",
+            ),
+            (
+                "fixture.m1_guideline_b.ir_bundle",
+                TraceOperation::Compile,
+                "group.m1_conflict.compiled",
+            ),
+            (
+                "fixture.m1_control.ir_bundle",
+                TraceOperation::Compile,
+                "group.m1_null.compiled",
+            ),
+            (
+                "group.m1_conflict.compiled",
+                TraceOperation::Verify,
+                "group.m1_conflict.verifier_results",
+            ),
+            (
+                "group.m1_conflict.verifier_results",
+                TraceOperation::Report,
+                "report",
+            ),
+        ] {
+            assert!(has_edge(&bundle, from, operation, to), "{from} -> {to}");
+        }
+
+        // The three §8.6 claim rows.
+        assert_eq!(bundle.claims.len(), 3);
+        let overlap = claim(&bundle, "finding.group.m1_conflict.0");
+        assert_eq!(overlap.pair_id, id("q.m1_conflict.pair1"));
+        assert_eq!(overlap.query_id, id("q.m1_conflict.pair1.overlap"));
+        assert_eq!(overlap.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(overlap.verdict, Some(SolverVerdict::Sat));
+        assert_eq!(overlap.conflict_kind, None);
+        // Sat records no core: both ctx.* assertions stand as evidence.
+        assert_eq!(
+            overlap.assertion_ids,
+            vec![
+                id("ctx.fixture.m1_guideline_a.rule.0"),
+                id("ctx.fixture.m1_guideline_b.rule.0"),
+            ]
+        );
+        let deontic = claim(&bundle, "finding.group.m1_conflict.1");
+        assert_eq!(deontic.pair_id, id("q.m1_conflict.pair1"));
+        assert_eq!(deontic.query_id, id("q.m1_conflict.pair1.deontic"));
+        assert_eq!(deontic.category, VerifierCategory::SemanticContradiction);
+        assert_eq!(deontic.verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(
+            deontic.conflict_kind,
+            Some(ConflictKind::DeonticDirectionConflict)
+        );
+        // The recorded cross-document core, verbatim (§8.6).
+        assert_eq!(
+            deontic.assertion_ids,
+            vec![
+                id("a.fixture.m1_guideline_a.rule.0"),
+                id("a.fixture.m1_guideline_b.rule.0"),
+            ]
+        );
+        for row in [overlap, deontic] {
+            assert_eq!(row.group_id, id("group.m1_conflict"));
+            assert_eq!(
+                row.rule_ids,
+                vec![
+                    id("fixture.m1_guideline_a.rule.0"),
+                    id("fixture.m1_guideline_b.rule.0"),
+                ]
+            );
+            assert_eq!(row.region_ids, vec![id("r.2"), id("r.3")]);
+            assert_eq!(row.report_ref, id("report"));
+        }
+        // The documented-null overlap row: disjoint intervals answer
+        // unsat, no core recorded, ctx fallback over the pair.
+        let null_row = claim(&bundle, "finding.group.m1_null.0");
+        assert_eq!(null_row.group_id, id("group.m1_null"));
+        assert_eq!(null_row.pair_id, id("q.m1_null.pair1"));
+        assert_eq!(null_row.query_id, id("q.m1_null.pair1.overlap"));
+        assert_eq!(null_row.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(null_row.verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(null_row.conflict_kind, None);
+        assert_eq!(
+            null_row.assertion_ids,
+            vec![
+                id("ctx.fixture.m1_control.rule.0"),
+                id("ctx.fixture.m1_guideline_a.rule.0"),
+            ]
+        );
+        assert_eq!(
+            null_row.rule_ids,
+            vec![
+                id("fixture.m1_control.rule.0"),
+                id("fixture.m1_guideline_a.rule.0"),
+            ]
+        );
+        assert_eq!(null_row.region_ids, vec![id("r.2"), id("r.3")]);
+        assert_eq!(null_row.report_ref, id("report"));
+
+        // The full lineage index, pinned from observed output: docA rows
+        // carry the §8.6 regions and the normalize.rs-pinned statement +
+        // segments across all three findings; rows in canonical-set order
+        // (document_id first).
+        let doc_a = |finding: &str| {
+            row(
+                finding,
+                "fixture.m1_guideline_a",
+                &["r.2", "r.3"],
+                &["fixture.m1_guideline_a.rule.0"],
+                &["seg.2", "seg.3"],
+                &["stmt.0"],
+            )
+        };
+        let doc_b = |finding: &str| {
+            row(
+                finding,
+                "fixture.m1_guideline_b",
+                &["r.2"],
+                &["fixture.m1_guideline_b.rule.0"],
+                &["seg.2"],
+                &["stmt.0"],
+            )
+        };
+        assert_eq!(
+            index.rows,
+            vec![
+                row(
+                    "finding.group.m1_null.0",
+                    "fixture.m1_control",
+                    &["r.2"],
+                    &["fixture.m1_control.rule.0"],
+                    &["seg.2"],
+                    &["stmt.0"],
+                ),
+                doc_a("finding.group.m1_conflict.0"),
+                doc_a("finding.group.m1_conflict.1"),
+                doc_a("finding.group.m1_null.0"),
+                doc_b("finding.group.m1_conflict.0"),
+                doc_b("finding.group.m1_conflict.1"),
+            ]
+        );
+    }
 }

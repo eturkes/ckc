@@ -63,30 +63,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
   71% 142K/200K 01317b9
 - [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.
-  76% 153K/200K _
-- [ ] cli-runner.3a.2b: Live fixture pins for assemble_trace (tests only; production trace.rs
-  and run.rs untouched): trace.rs test helpers mirroring run.rs's two pipelines through the pub
-  stage surface — fixture/lexicon/producer helpers per the normalize.rs test pattern, a generic
-  envelope wrap (schema id schema.<kind>, content_hash(payload), canonicalization_policy_hash(),
-  empty effects/trace_refs/diagnostics/runtime_metadata); live_doc = extract
-  (synthetic_fixture_html family, Provenance::Synthetic, DataClass::None) → segment → normalize
-  → DocIr::from_graph + canonical union of the segment/normalization envelope diagnostics →
-  ckc_core::assemble → bundle.validate against the source graph → DocTrace with every landing
-  Some, fixture_path corpus/fixtures/<file>, source_hash = hash_bytes(raw); live_group = compile
-  over member (formal, norm) pairs → verify under a live Z3Adapter with a generous budget →
-  GroupTrace. One test: docs m1_guideline_a/b + m1_control, group.m1_conflict = [a, b],
-  group.m1_null = [a, control] → assemble_trace, both validate Ok; assert the node/edge census
-  with §8.3 paths and chain/compile/verify/report edge spot checks; claims:
-  finding.group.m1_conflict.0 = the overlap row (sat, no conflict_kind, evidence = both ctx.*
-  assertions), finding.group.m1_conflict.1 = the deontic row (semantic_contradiction, unsat,
-  deontic_direction_conflict, core verbatim `[a.fixture.m1_guideline_a.rule.0,
-  a.fixture.m1_guideline_b.rule.0]`), finding.group.m1_null.0 = the documented-null overlap row
-  (unsat, evidence [ctx.fixture.m1_control.rule.0, ctx.fixture.m1_guideline_a.rule.0]); lineage:
-  docA rows carry the §8.6 regions [r.2, r.3] and the normalize.rs-pinned statement + segments
-  [seg.2, seg.3]; docB/control row values pinned from observed gate output, never hand-computed.
-  Pattern: the verdict.rs live tests. Reading: trace.rs, run.rs (mirror only), ckc-smt
-  verdict.rs live tests, normalize.rs test helpers, SPEC §8.6. Consumes cli-runner.3a.2a. Gate:
-  `cargo test -p ckc-cli trace::`.
+  76% 153K/200K d6fd71b
+- [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K _
 - [ ] cli-runner.3a.3: Trace stage wired into ckc run: STAGE_KINDS gains trace as the seventh
   resolved component (stage.m1.trace in registry/candidates.yaml); document_pipeline returns its
   DocTrace (corpus path, hash_bytes source hash, landed ids+hashes, bundle envelope),
