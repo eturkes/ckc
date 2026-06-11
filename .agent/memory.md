@@ -39,7 +39,7 @@ git history.
 
 ## Lessons
 
-- Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus three
+- Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus four
   observed 200K overruns; case studies in git history). Target: one conceptual deliverable
   plus one gate, finishable AND committable in one window with margin; prefer more, smaller
   units. Plan-time obligations (a violation is a planning bug): resolve semantic contract
@@ -53,7 +53,12 @@ git history.
   format-completion + fixture-integration; a nontrivial algorithm plus a second authored
   artifact = two units; a multi-invariant validator plus full rejection coverage = two
   units; a derivation fn with its fixture-pinned battery plus an attachment sub-feature =
-  two units; a type family plus assembly plus validation = three units. Measured anchors:
+  two units; a type family plus assembly plus validation = three units; a spec-byte
+  amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
+  an open decision whose resolution amends pinned bytes is a deliverable, not a session
+  preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors
+  consumed ~half the window before the derivation module; compacted at the test gate,
+  reverted, split into .2a/.2b with the decisions written into the roadmap lines). Measured anchors:
   canonical JSON = five units (~62-69% each); a strict reader (writer-inverse) fills a
   window solo; crate foundations ~81% (pair only with a small type surface); registry entry
   types ~69%; a five-layer recursive type family ~3 units; a lexicon-driven derivation half
@@ -146,5 +151,5 @@ git history.
   `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback
   event is the switch marker), and paired A/B task batteries scored by objective gates;
   CKC's deterministic gates and replay manifests are the standing mitigation. Expect
-  recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-m1).
+  recurrence in fixture-reading units (stage-normalize.2b, cli-runner.2, acceptance-m1).
   Full case detail (transcript ids, timestamps, trigger tokens): `git show 4e9af1e`.
