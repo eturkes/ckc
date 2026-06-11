@@ -74,20 +74,8 @@ bare headers; git history retains all removed text.
   >=90% compacted/200K bb9c524
 - [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K f020d2c
 - [x] cli-runner.4.1b.2b.1: ckc run lands report.md + run/replay manifests.
-  33% 65K/200K _
-- [ ] cli-runner.4.1b.2b.2: live pins for the landed trio — one new test in run_oracle.rs mod
-  report over its own recorded run: report.md bytes == render_markdown(strict-read report.json
-  payload) plus grounding substrings; manifest.json + replay_manifest.json via read_canonical
-  (bare records, not strict_read): run_plan_hash == registry-rebuilt RunPlan .plan_hash(),
-  git_commit == env!("CKC_GIT_COMMIT") (build.rs covers test targets) + 40-hex shape,
-  toolchain/lockfile/corpus/lexicon hashes == hash_bytes of the repo files,
-  environment_profile [(arch),(os)], solver_identity == the report payload's, output_hashes ==
-  the 19 strict-read envelope hashes per the assemble_manifests ordering contract, replay
-  command == ["ckc","run","--experiment","exp.m1_spine","--out",<run dir>], input_hashes ==
-  the 3 fixture raw-byte hashes per the same contract, mirror fields + expected_output_hashes
-  == the manifest's. Closes §8.5 item 9 surface. Reading: SPEC §8.3, §4.6; run_oracle.rs mod
-  report as the pattern; manifests.rs ordering contracts. Consumes cli-runner.4.1b.2b.1. Gate:
-  `cargo test -p ckc-cli report::`.
+  33% 65K/200K 72baf4b
+- [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K _
 - [ ] cli-runner.4.2a: replay core in a replay module, no shell contact: re-execute from
   replay_manifest.json over the same inputs into a scratch directory and compare canonical
   content hashes for all accepted artifacts, runtime metadata excluded; symmetric-difference

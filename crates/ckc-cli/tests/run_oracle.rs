@@ -3,9 +3,11 @@
 //! artifact entering the layout must join the sweep), strict-read every
 //! accepted artifact with §4.4 re-validation, and assert the experiment's
 //! gold entries over the verifier results — the code oracle behind §8.5
-//! items 5 and 6. The [`report`] module pins the landed `report.json`
-//! over its own recorded run: the finding/null partition and the quoted
-//! spans resolving to fixture bytes (§8.5 item 9's code oracle).
+//! items 5 and 6. The [`report`] module pins the landed report surface
+//! — `report.json`, its `report.md` rendering, and the §5/§4.6 manifest
+//! pair — over its own recorded runs: the finding/null partition, the
+//! quoted spans resolving to fixture bytes (§8.5 item 9's code oracle),
+//! and the run's provenance facts.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -445,12 +447,14 @@ document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
 /// documented null — with every quoted span resolving through its landed
 /// source graph to the raw fixture bytes (§8.5 item 9), the corpus and
 /// lexicon rows recomputed from the files in force, and the solver
-/// identity matching the recorded verifier results.
+/// identity matching the recorded verifier results. The trio pin extends
+/// the surface: `report.md` as the landed payload's exact rendering and
+/// the §5/§4.6 manifest pair attesting the run's provenance.
 mod report {
     use super::*;
 
-    use ckc_cli::report::{QuotedSpan, ReplayStatus, Report, Wording};
-    use ckc_core::{ClaimTier, parse_corpora};
+    use ckc_cli::report::{QuotedSpan, ReplayStatus, Report, Wording, render_markdown};
+    use ckc_core::{ClaimTier, ReplayManifest, RunManifest, RunPlan, parse_corpora};
 
     /// Pin one row's evidence: the quoted spans carry exactly the
     /// `(document, region, span)` triples, each text equal to its span's
@@ -677,5 +681,199 @@ mod report {
             &graphs,
             &fixtures,
         );
+    }
+
+    /// The landed trio's live pins over its own recorded run: `report.md`
+    /// is byte-for-byte the rendering of the strict-read `report.json`
+    /// payload with every quoted span's grounded text present — closing
+    /// the §8.5 item 9 surface on the derived view — and the §5/§4.6
+    /// manifest pair attests the run's provenance: the registry-rebuilt
+    /// plan hash, the build-baked commit, raw-byte hashes of the repo
+    /// files in force, the `arch`/`os` profile, the recorded solver
+    /// identity, the three fixture input hashes, and the nineteen
+    /// accepted envelopes' output-hash set mirrored verbatim into the
+    /// replay expectation.
+    #[test]
+    fn report_md_and_manifests_pin_run_provenance() {
+        let root = repo_root();
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path().join("m1");
+        let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+            .args([
+                "run",
+                "--experiment",
+                "exp.m1_spine",
+                "--out",
+                run_dir.to_str().unwrap(),
+            ])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        // §7.2 derived view: report.md carries exactly the landed
+        // payload's rendering, quoted Japanese spans included.
+        let report: ArtifactEnvelope<Report> = strict_read(&run_dir.join("report.json"));
+        let md = std::fs::read(run_dir.join("report.md")).unwrap();
+        assert_eq!(md, render_markdown(&report.payload).into_bytes());
+        let md = String::from_utf8(md).unwrap();
+        for span in report
+            .payload
+            .findings
+            .iter()
+            .chain(&report.payload.null_results)
+            .flat_map(|row| &row.quoted_spans)
+        {
+            assert!(
+                md.contains(&span.text),
+                "{}/{}: quoted text missing from report.md",
+                span.document_id,
+                span.span_id
+            );
+        }
+
+        // The nineteen accepted envelopes — four layers per document, the
+        // compile/verify pair per group, the trace pair, the report —
+        // strict-read into the manifests' §4.3 output-hash set.
+        let docs = [
+            "fixture.m1_control",
+            "fixture.m1_guideline_a",
+            "fixture.m1_guideline_b",
+        ];
+        let mut output_hashes: Vec<Hash> = vec![report.content_hash.clone()];
+        for doc in docs {
+            let dir = run_dir.join("artifacts").join(doc);
+            output_hashes.extend([
+                strict_read::<SourceGraph>(&dir.join("source_graph.json")).content_hash,
+                strict_read::<SegmentIr>(&dir.join("segments.json")).content_hash,
+                strict_read::<Normalization>(&dir.join("normalization.json")).content_hash,
+                strict_read::<IrBundle>(&dir.join("ir_bundle.json")).content_hash,
+            ]);
+        }
+        for gid in ["group.m1_conflict", "group.m1_null"] {
+            let dir = run_dir.join("groups").join(gid);
+            output_hashes.extend([
+                strict_read::<CompiledArtifact>(&dir.join("compiled.json")).content_hash,
+                strict_read::<VerifierResults>(&dir.join("verifier_results.json")).content_hash,
+            ]);
+        }
+        output_hashes.extend([
+            strict_read::<TraceBundle>(&run_dir.join("trace_bundle.json")).content_hash,
+            strict_read::<LineageIndex>(&run_dir.join("lineage_index.json")).content_hash,
+        ]);
+        assert_eq!(output_hashes.len(), 19, "nineteen accepted envelopes");
+        output_hashes.sort();
+        output_hashes.dedup();
+        // Content addresses, not files: the control and guideline_b
+        // segment payloads are byte-equal (structure-only layer, both
+        // documents segment identically), so the §4.3 set collapses the
+        // pair into eighteen addresses.
+        assert_eq!(output_hashes.len(), 18, "one content-equal pair");
+
+        // The §5/§4.6 records land bare — the manifests attest envelopes;
+        // nothing envelopes them — so the bar is the canonical read.
+        let manifest: RunManifest =
+            read_canonical(&std::fs::read(run_dir.join("manifest.json")).unwrap()).unwrap();
+        let replay: ReplayManifest =
+            read_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap();
+
+        // §5 plan linkage: the plan rebuilt from the experiment registry
+        // hashes to the recorded value.
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == id("exp.m1_spine"))
+            .unwrap();
+        let plan = RunPlan {
+            experiment_id: exp.id.clone(),
+            fixture_groups: exp
+                .fixture_groups
+                .iter()
+                .map(|g| g.group_id.clone())
+                .collect(),
+            pipelines: vec![exp.pipeline.clone()],
+            seed: exp.seed,
+            budget: exp.budget.iter().map(|(k, v)| (k.clone(), *v)).collect(),
+        };
+        assert_eq!(manifest.run_plan_hash, plan.plan_hash().unwrap());
+
+        // Build-baked provenance: the commit this test and the binary
+        // were built at (one build script serves both targets), 40 hex.
+        assert_eq!(manifest.git_commit, env!("CKC_GIT_COMMIT"));
+        assert_eq!(manifest.git_commit.len(), 40);
+        assert!(manifest.git_commit.bytes().all(|b| b.is_ascii_hexdigit()));
+
+        // Raw-byte hashes of the repo files in force (§4.4 `_hash` rule),
+        // the environment profile, and the verify stage's live identity.
+        let file_hash = |rel: &str| ckc_core::hash_bytes(&std::fs::read(root.join(rel)).unwrap());
+        assert_eq!(
+            manifest.toolchain_manifest_hash,
+            file_hash("rust-toolchain.toml")
+        );
+        assert_eq!(
+            manifest.lockfile_hashes,
+            vec![(id("cargo.lock"), file_hash("Cargo.lock"))]
+        );
+        assert_eq!(manifest.corpus_hash, file_hash("registry/corpora.yaml"));
+        assert_eq!(
+            manifest.lexicon_hash,
+            file_hash("corpus/lexicon/ja_core.yaml")
+        );
+        assert_eq!(
+            manifest.environment_profile,
+            vec![
+                (id("arch"), std::env::consts::ARCH.to_owned()),
+                (id("os"), std::env::consts::OS.to_owned()),
+            ]
+        );
+        assert_eq!(manifest.solver_identity, report.payload.solver_identity);
+        assert_eq!(manifest.output_hashes, output_hashes);
+
+        // §4.6 replay record: the re-execution argv, the three fixture
+        // raw-byte input hashes, every shared fact mirrored from the §5
+        // record, and the output expectation verbatim.
+        assert_eq!(
+            replay.command,
+            [
+                "ckc",
+                "run",
+                "--experiment",
+                "exp.m1_spine",
+                "--out",
+                run_dir.to_str().unwrap(),
+            ]
+            .map(str::to_owned)
+            .to_vec()
+        );
+        let corpora =
+            parse_corpora(&std::fs::read_to_string(root.join("registry/corpora.yaml")).unwrap())
+                .unwrap();
+        let mut input_hashes = docs
+            .map(|doc| {
+                let entry = corpora.iter().find(|c| c.id == id(doc)).unwrap();
+                file_hash(&entry.path)
+            })
+            .to_vec();
+        input_hashes.sort();
+        input_hashes.dedup();
+        assert_eq!(replay.input_hashes, input_hashes);
+        assert_eq!(replay.corpus_hash, manifest.corpus_hash);
+        assert_eq!(replay.lexicon_hash, manifest.lexicon_hash);
+        assert_eq!(
+            replay.toolchain_manifest_hash,
+            manifest.toolchain_manifest_hash
+        );
+        assert_eq!(replay.environment_profile, manifest.environment_profile);
+        assert_eq!(replay.lockfile_hashes, manifest.lockfile_hashes);
+        assert_eq!(replay.solver_identity, manifest.solver_identity);
+        assert_eq!(replay.expected_output_hashes, manifest.output_hashes);
     }
 }
