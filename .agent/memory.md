@@ -70,6 +70,10 @@ git history.
   new type families in fresh modules (extending a ~2K-line module costs a full-file read);
   land a compiling skeleton before the full test battery; pin expected shapes from observed
   output, never hand-computed; cite only checked roadmap lines as measured anchors.
+  At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
+  for readability (alignment padding, inline result comments, illustrative declaration or
+  conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
+  deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
 - [2026-06-10] WebSearch 400s on this model line (the API rejects the forced tool_choice
   the search sub-request uses; the error arrives INLINE in an ok-looking result — read
   result bodies). Still broken 2026-06-11; re-test after a Claude Code update or model-line

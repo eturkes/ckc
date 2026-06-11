@@ -50,66 +50,123 @@ bare headers; git history retains all removed text.
   74% 149K/200K dcfe7e4
 - [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
   >=90% compacted/200K _
-- [ ] smt-emit.2: Eligibility scan and contradiction-query planning over FormalIR per fixture group,
-  in a plan module: normalized-action sameness keys, §6 direction-group opposition (positive vs
-  against or contraindicating), two-query plan per eligible pair (Q1 context_overlap asserting both
-  guarded contexts with exceptions as negated conjuncts, Q2 deontic_consistency on polarity literals
-  over the shared action) with stable deterministic query ids; tested on the §8.6 pair and the
-  disjoint-interval control pair. Reading: SPEC §6 direction groups, eligibility, two-query plan, §5
-  action-sameness invariants, §8.6, §8.3 compile row. Consumes core-ir.3 FormalIR, smt-emit.1 types.
-  Gate: `cargo test -p ckc-smt plan::`.
-- [ ] smt-emit.3: Deterministic SMT-LIB emission in an emit module: per-query files with narrowest
-  sufficient logic (QF_LRA contexts, QF_UF deontic), required set-option lines, pipe-quoted
-  canonical Id symbols, sorted declarations, named assertions in the forms ctx.<rule_id> and
-  a.<rule_id>; assertion map binding every named assertion to IR rule ids and source region ids
-  (§8.5 item 4); unsupported_fragment path for out-of-profile constructs; emitted bytes reproduce
-  the §8.6 Q1/Q2 files. Reading: SPEC §6 SMT profile, §8.6 smt2 listings, §8.3 compile row, §4.4
-  envelope. Consumes smt-emit.2 query plans. Gate: `cargo test -p ckc-smt emit::`.
-- [ ] smt-verify: Z3 verifier adapter in a verify module: install and pin the z3 binary, record
-  solver identity and version for manifests and results; invoke per query file under per-query
-  budget; parse the verdict token and result s-expressions from get-model and get-unsat-core; strip
-  pipe quotes and normalize cores to canonical Id sets sorted by canonical_sort_key; map outcomes to
-  the §6 categories semantic_no_conflict, semantic_contradiction, unknown, unsupported_fragment,
-  target_syntax_failure, solver_execution_failure, keeping raw sat/unsat/unknown/timeout tokens and
-  the §7.4 solver_timeout and solver_unknown diagnostics distinct; produce VerifierResults over the
-  emitted §8.6 queries (Q1 sat with model, Q2 unsat with the expected core). Reading: SPEC §6
-  solvers and verdict parsing, §8.3 verify row, §4.4 verifier_authority. Consumes smt-emit.3 smt2
-  files, smt-emit.1 VerifierResult. Gate: `cargo test -p ckc-smt`.
-- [ ] cli-runner.2: ckc run orchestration: resolve exp.m1_spine through the registries; execute
-  extract, segment, normalize, assemble (thin wrapper emitting envelope-wrapped ir_bundle.json via
-  core-ir.4 assembly and core-ir.5 validation), compile, verify per document and group; write the §8.3 run
-  layout; strict-canonical-read every consumed artifact at each boundary; aggregate stage outcomes
-  by severity into exactly one total operation result; stream events.jsonl and diagnostics.jsonl;
-  add the workspace test that runs the experiment into a temp dir, strict-reads every accepted
-  artifact by walking the run directory (later-stage artifacts join the sweep as they wire in), and
-  asserts the corpus/gold/m1_expected.yaml expected outcomes for both fixture groups through the
-  typed gold entries. Closes §8.5 item 3 and stands as the code oracle behind items 5 and 6.
-  Reading: SPEC §8.1, §8.3 stage contracts and run layout, §8.4, §8.2 gold shape,
-  §4.4, §4.6, §8.5 item 3. Consumes stage-extract/segment/normalize.1-.2, core-ir.4/.5,
-  smt-emit.2/.3, smt-verify, core-registry.1 gold entries, cli-runner.1.1 shell. Gate: `cargo test
-  --workspace`.
-- [ ] cli-runner.3: Trace stage and command in a trace module: derive finding ids
-  finding.<group_id>.<ordinal> with ordinals in source-then-hash order (§7.2) as claim-evidence rows
-  are born; assemble TraceBundle (derivation DAG with operation-labeled edges from source through
-  report, claim-evidence rows) and LineageIndex into trace_bundle.json and lineage_index.json in the
-  run layout; ckc trace --run --finding resolves a finding to the full chain source spans, segments,
-  statements, rules, named assertions, verdict, finding, in both directions. Closes §8.5 item 7.
-  Reading: SPEC §7.1, §7.2 finding-id rule, §5 TraceBundle/LineageIndex rows, §8.3 layout, §4.4.
-  Consumes the cli-runner.2 run artifact set. Gate: `cargo test -p ckc-cli trace::`.
-- [ ] cli-runner.4.1: Report stage and manifests in a report module: render canonical report.json
-  and derived report.md (findings keyed by the trace-derived finding ids with conflict kind, rules,
-  regions, quoted Japanese spans, assertion names, core; documented null results; code-keyed
-  diagnostics summary; corpus/lexicon hashes; solver identity; replay status; §0 vocabulary
-  wording); write manifest.json and replay_manifest.json from core-plans types; wire report into ckc
-  run, completing the §8.3 artifact set. Closes §8.5 item 9. Reading: SPEC §7.2, §5 Report and
-  RunManifest rows, §4.6 replay manifest fields, §8.3 layout, §4.4; §0 vocabulary. Consumes
-  core-plans types, cli-runner.2/.3 outputs. Gate: `cargo test -p ckc-cli report::`.
+- [ ] smt-emit.2: Eligibility scan and contradiction-query planning in a plan module: over the
+  per-document FormalIRs of a fixture group, collect all unordered constraint pairs (same- and
+  cross-document) whose Action normalized keys are equal and whose directions satisfy
+  directions_opposed (§6: one positive, the other against or contraindicating), each pair
+  normalized to constraint_a_id < constraint_b_id by id bytes; pair_id `q.<gsuf>.pair<n>` where
+  gsuf is the group id minus its `group.` prefix and n counts from 1 in (a,b) id-byte order;
+  query ids `<pair_id>.overlap` and `<pair_id>.deontic` (§8.6 forms). The planner returns
+  ContradictionQueryPairs only — query text derives in emit from the paired constraints, and
+  per-document FormalIr.plan stays empty (core-ir.3 comment). Tests: §8.6 pair eligible with
+  pinned pair/query ids; disjoint-interval control pair equally eligible (Q1 later decides the
+  null); same-direction and different-action pairs excluded. Reading: SPEC §6 direction groups +
+  two-query plan, §8.6 id forms, §8.3 compile row, §5 action sameness. Consumes core-ir.3
+  FormalIr/ContradictionQueryPair/directions_opposed, smt-emit.1 set helpers. Gate:
+  `cargo test -p ckc-smt plan::`.
+- [ ] smt-emit.3a: §8.6 smt2 re-pin + query-text emission in an emit module. First resolve the
+  emitter's byte rules into the spec and re-pin both §8.6 smt2 listings to exact emitter output —
+  the current listings carry presentation layout that the §6 determinism rules contradict
+  (q.age_years declared before the sorted Bool symbols, two declares sharing a line, trailing `;`
+  result notes, assert wrapping/alignment padding, and-conjunct order differing from the stored
+  canonical ContextExpr order). Pinned rules: one s-expression command per line, no comments,
+  declarations sorted by symbol bytes one per line, conjuncts in stored ContextExpr order,
+  single-disjunct `any` collapsing to a bare `and`, Rational numerals rendered as plain integer
+  when the denominator is 1 else `(/ n d)`, file ends with a newline. Then emit Q1 (QF_LRA;
+  :print-success false + :produce-models; both guarded contexts as ctx.<rule_id> named assertions;
+  check-sat, get-model) and Q2 (QF_UF; :print-success false + :produce-unsat-cores;
+  `pos:<action key>` Bool literal asserted bare for the positive direction and negated for
+  against/contraindicating, a.<rule_id> names; check-sat, get-unsat-core) from a constraint pair.
+  Gate pins emitted bytes to the re-pinned listings. Reading: SPEC §6 SMT profile, §8.6, §8.3
+  compile row. Consumes smt-emit.2 pairs, core-ir.3 FormalConstraint/ContextExpr. Gate:
+  `cargo test -p ckc-smt emit::`.
+- [ ] smt-emit.3b: CompiledArtifact assembly completing compile: assertion map binding every
+  ctx.<rule_id> and a.<rule_id> name to its rule id and source region ids (looked up from NormIR
+  rules by rule_id — FormalConstraint carries no regions), target metadata; out-of-profile
+  constructs (anything beyond §6 M1 concept/concept_negated/interval atoms expressible in QF_LRA)
+  drop their pair from the plan with an unsupported_fragment diagnostic while the artifact still
+  validates; assemble + validate CompiledArtifacts for the §8.6 pair and the control pair.
+  Reading: SPEC §6 profile + assertion map, §8.5 item 4, §7.4, §5 CompiledArtifact row. Consumes
+  smt-emit.3a, smt-emit.1 validation, core-ir.2 NormRule. Gate: `cargo test -p ckc-smt emit::`.
+- [ ] smt-verify.a: Z3 adapter foundation in a verify module: install z3 via apt; SolverIdentity
+  parsed live from `z3 --version` at adapter construction — code carries no version literal,
+  manifests and results carry the truth; per-query subprocess invocation under a per-query
+  wall-clock budget with kill-on-expiry; capture raw stdout/stderr and the leading verdict token;
+  timeout maps to solver_timeout and spawn failure/nonzero exit to solver_execution_failure (§7.4
+  codes, kept distinct from §6 categories). Tests: live z3 on tiny inline smt2 for sat and unsat;
+  verdict-token parse incl. unknown on canned text; budget kill via a stub sleeper executable.
+  Reading: SPEC §6 solvers, §7.4 solver codes, §8.3 verify row, §5 RunManifest row
+  (solver identity). Consumes core-plans SolverIdentity. Gate: `cargo test -p ckc-smt verify::`.
+- [ ] smt-verify.b: Verdict parsing and §6 categories completing verify: s-expression reader over
+  get-model and get-unsat-core output; pipe-quote stripping; cores normalized to canonical Id sets
+  sorted by canonical_sort_key and compared set-based; witness model recorded on sat; category
+  mapping — Q2 unsat semantic_contradiction, Q2 sat semantic_no_conflict, Q1 unsat closes the pair
+  as the documented-null path of semantic_no_conflict, unknown stays unknown — with raw
+  sat/unsat/unknown/timeout tokens preserved distinctly; VerifierResult assembly + validate.
+  Integration runs plan + emit + live z3 over the §8.6 pair and control pair: Q1 sat with model,
+  Q2 unsat with the expected core, control Q1 unsat. Reading: SPEC §6 verdict parsing +
+  categories, §8.6 expectations, §4.4 verifier_authority, §8.3 verify row. Consumes smt-verify.a,
+  smt-emit.2/.3a/.3b. Gate: `cargo test -p ckc-smt`.
+- [ ] cli-runner.2a: Run scaffolding + document pipeline in a run module: resolve exp.m1_spine
+  through the registries (cli-runner.1.2 loaders); create the §8.3 run layout under --out; per
+  document run extract → segment → normalize → assemble (thin wrapper: core-ir.4 assemble +
+  core-ir.5 validate) emitting envelope-wrapped
+  artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json, each written canonical
+  and strict-read back at the boundary; stream events.jsonl + diagnostics.jsonl
+  (core-enums-envelope.2 records). Gate test runs the document stages over the three fixtures into
+  a temp dir with every artifact strict-read clean. Reading: SPEC §8.1, §8.3 stage rows + layout,
+  §4.4, §4.6. Consumes stage fns, core-ir.4/.5, cli-runner.1.1 shell. Gate:
+  `cargo test -p ckc-cli run::`.
+- [ ] cli-runner.2b: Group stages + total outcome completing ckc run: per fixture group load the
+  member ir_bundles, compile (plan + emit + assertion map → groups/<gid>/compiled.json with each
+  QueryBody body materialized byte-identical at groups/<gid>/smt/<query_id>.smt2) and verify
+  (adapter per query under budget → groups/<gid>/verifier_results.json); aggregate every stage
+  outcome by severity into exactly one TotalOperationResult; `ckc run --experiment exp.m1_spine
+  --out <dir>` completes ok (trace/report artifacts join in their units). Reading: SPEC §8.3
+  compile/verify rows + layout, §4.4 outcome aggregation. Consumes cli-runner.2a,
+  smt-emit.2/.3a/.3b, smt-verify.a/.b. Gate: `cargo test -p ckc-cli run::`.
+- [ ] cli-runner.2c: Workspace run oracle: workspace test executing exp.m1_spine into a temp dir,
+  walking the run directory, strict-reading every accepted artifact (later-stage artifacts join
+  the sweep as they wire in), asserting corpus/gold/m1_expected.yaml through typed GoldEntry rows
+  for both groups — conflict group semantic_contradiction + deontic_direction_conflict + expected
+  core compared as a set; null group semantic_no_conflict + null result. Closes §8.5 item 3 and
+  stands as the code oracle behind items 5 and 6. First whole-pipeline execution — reserve the
+  window's margin for cross-stage debugging. Reading: SPEC §8.5 item 3, §8.2 gold shape, §8.3
+  layout. Consumes cli-runner.2a/.2b, core-registry.1 GoldEntry. Gate: `cargo test --workspace`.
+- [ ] cli-runner.3a: Trace types + assembly in a trace module: finding ids
+  finding.<group_id>.<ordinal> with ordinals in source-then-hash order (§7.2) as claim-evidence
+  rows are born from verifier results; TraceBundle (derivation DAG source → extraction → segment →
+  normalization → IR → compile → verify → report with operation-labeled edges; claim-evidence rows
+  finding → region ids → rule ids → assertion ids → verdict → report ref) and LineageIndex types
+  with canonical bytes — the report node and report refs are static id/path references, keeping
+  trace before report in stage order; assemble both from the run artifact set, wire into ckc run,
+  write trace_bundle.json + lineage_index.json. Reading: SPEC §7.1, §7.2 finding-id rule, §5
+  TraceBundle/LineageIndex rows, §8.3 layout. Consumes cli-runner.2b run artifacts. Gate:
+  `cargo test -p ckc-cli trace::`.
+- [ ] cli-runner.3b: ckc trace command: --run + --finding resolve through LineageIndex to the full
+  chain source spans → segments → statements → rules → named assertions → solver verdict →
+  finding, printed in both directions (§8.5 item 7 shape). Closes §8.5 item 7. Reading: SPEC §7.1,
+  §8.5 item 7. Consumes cli-runner.3a artifacts, cli-runner.1.1 dispatch. Gate:
+  `cargo test -p ckc-cli trace::`.
+- [ ] cli-runner.4.1a: Report payload in a report module: canonical Report type + assembly from
+  the run artifact set — findings keyed by trace finding ids carrying conflict kind, rule ids,
+  region ids, quoted Japanese spans resolved from source graphs by region id, assertion names,
+  core; documented null results; code-keyed diagnostics summary; corpus/lexicon hashes; solver
+  identity; replay status slot; §0 vocabulary wording — written as report.json in the run layout.
+  Reading: SPEC §7.2, §5 Report row, §8.6 finding example, §0 vocabulary. Consumes
+  cli-runner.2b/.3a artifacts. Gate: `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.1b: report.md + manifests completing the §8.3 artifact set: deterministic
+  markdown rendering of report.json; manifest.json (RunManifest) + replay_manifest.json
+  (ReplayManifest) from core-plans with real hash/identity values; report stage wired into ckc
+  run. Closes §8.5 item 9 surface. Reading: SPEC §7.2, §4.6 replay manifest fields, §8.3 layout,
+  §5 RunManifest row. Consumes cli-runner.4.1a, core-plans types. Gate:
+  `cargo test -p ckc-cli report::`.
 - [ ] cli-runner.4.2: ckc replay command: re-execute from replay_manifest.json over the same inputs
   and compare canonical content hashes for all accepted artifacts, runtime metadata excluded; emit
   symmetric-difference diagnostics on mismatch and replay_identity_unsupported for missing tools;
   matching hashes yield ok; re-run-equals-prior idempotency test over a fixture run. Closes §8.5
   item 8. Reading: SPEC §4.6 replay semantics, §8.3 layout, §7.4 replay codes. Consumes
-  cli-runner.4.1 manifests and the complete run pipeline. Gate: `cargo test --workspace`.
+  cli-runner.4.1b manifests and the complete run pipeline. Gate: `cargo test --workspace`.
 - [ ] acceptance-m1: Dedicated acceptance session for the M1 milestone: execute §8.5 items 1-9 in
   order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.m1_spine --out
   runs/m1 with outcome ok and strict-read artifact set; assertion-map audit; group.m1_conflict
