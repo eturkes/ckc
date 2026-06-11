@@ -33,7 +33,7 @@ git history.
   lean4, alloy, egglog) — compendium-catalogued families whose registry presence is YAML
   data carry no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server
   (2026-05 audit); Isabelle's LSP and any Python LSP land
-  only with their adoption decisions (§13 additional-targets row; §12 adapter boundary).
+  only with their adoption decisions (§13 additional-targets row; §13.1 adapter boundary).
   dolmen-lsp deploys as a standalone copied binary with the opam tree removed — rebuild
   recipe in its plugin README.
 

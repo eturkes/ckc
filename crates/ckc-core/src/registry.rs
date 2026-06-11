@@ -30,7 +30,7 @@ use crate::id::{Id, ValidationError};
 fieldless_enum! {
     /// SPEC §8.4 stage-component determinism class. Every M1 component is
     /// `deterministic`; `nondeterministic` marks components whose reruns may
-    /// diverge (M3's recorded weak-model routes), which replay handles
+    /// diverge (M2's recorded weak-model routes), which replay handles
     /// through recorded I/O rather than re-execution.
     Determinism {
         Deterministic => "deterministic",

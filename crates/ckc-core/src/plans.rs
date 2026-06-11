@@ -58,8 +58,8 @@ pub struct RunPlan {
     pub experiment_id: Id,
     /// Fixture groups in scope (§8.2 `group.*`). Set semantics.
     pub fixture_groups: Vec<Id>,
-    /// Pipeline candidates the run executes — a singleton at M1; the M2
-    /// comparison runs several over the same fixtures. Set semantics.
+    /// Pipeline candidates the run executes — a singleton at M1; M2 onward
+    /// runs several over the same fixtures. Set semantics.
     pub pipelines: Vec<Id>,
     /// Deterministic seed for any seeded component.
     pub seed: u64,

@@ -668,7 +668,7 @@ fieldless_enum! {
 pub struct Action {
     pub kind: Id,
     pub target: Id,
-    /// Normalized target key `kind:target` (M1; M2 joins discriminating
+    /// Normalized target key `kind:target` (M1; M3 joins discriminating
     /// slots). [`new`](Self::new) derives it; bundle validation
     /// (`IrBundle::validate`) re-checks a stored key against its derivation,
     /// the [`SourceSpan`](crate::grounding::SourceSpan) precedent for
@@ -756,7 +756,7 @@ impl CanonRead for QuantityInterval {
 }
 
 /// SPEC §5 context atom, a §4.3 tagged union: concept predicate, negated
-/// concept predicate, or quantity interval (M2 adds slot equality and
+/// concept predicate, or quantity interval (M3 adds slot equality and
 /// temporal atoms). Concept ids and interval variables are lexicon
 /// vocabulary, so atoms have no [`Structural`] impl — enclosing components
 /// embed their canonical bytes.
@@ -961,7 +961,7 @@ impl Structural for ExceptionClause {
 /// population and condition as atom sets, the action, deontic modality
 /// ([`Direction`]), strength, optional certainty, exception clauses in
 /// document order, and the source segments it normalizes (§4.3 set).
-/// Comparator/outcome/temporal slots stay M2. An independently hashable
+/// Comparator/outcome/temporal slots stay M3. An independently hashable
 /// component.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClinicalStatement {
