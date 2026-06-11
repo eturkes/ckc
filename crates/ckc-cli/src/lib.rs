@@ -51,12 +51,20 @@
 //!   boundary, one §4.6 stage event per attempted stage, the §4.4 total
 //!   outcome the severity fold over the whole run; trace/report stages
 //!   join in their units (cli-runner.3a/.4.1a).
+//! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`):
+//!   [`trace::TraceBundle`], the derivation DAG (eight ranked
+//!   [`trace::TraceNodeKind`]s, operation-labeled strictly rank-upward
+//!   edges) plus §7.2 claim-evidence rows, and [`trace::LineageIndex`],
+//!   its per-(finding, document) query index — every collection a
+//!   canonical set, structural validation via [`trace::TraceError`];
+//!   assembly and run wiring land with cli-runner.3a.2/.3a.3.
 #![forbid(unsafe_code)]
 
 pub mod extract;
 pub mod normalize;
 pub mod rules;
 pub mod segment;
+pub mod trace;
 
 mod dispatch;
 mod registry_check;

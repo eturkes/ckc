@@ -59,26 +59,9 @@ bare headers; git history retains all removed text.
   read-back landings + stage events. >=90% compacted/200K c28dab5
 - [x] cli-runner.2b: group stages + total outcome completing ckc run: per-group compile/verify
   landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K 9fe4145
-- [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + gold assert. 47% 93K/200K _
-- [ ] cli-runner.3a.1: Trace types in a fresh trace module (pub mod trace in lib.rs, pub items so
-  clippy stays green pre-wiring; no run.rs contact): TraceNodeKind fieldless enum source |
-  source_graph | segments | normalization | ir_bundle | compiled | verifier_results | report with
-  rank() 0..=7 and operation() = the producing stage kind (none for source); TraceNode { node_id,
-  kind, path, content_hash: Option<Hash> }, hash absent exactly on the report node; TraceEdge
-  { from, operation, to }; ClaimEvidenceRow { finding_id, group_id, pair_id, query_id, category,
-  verdict?, conflict_kind?, assertion_ids, rule_ids, region_ids, report_ref }, optionals
-  canonically omitted, conflict_kind present exactly on semantic_contradiction rows (M1 kind
-  deontic_direction_conflict); TraceBundle { nodes, edges, claims }; LineageRow { finding_id,
-  document_id, region_ids, rule_ids, segment_ids, statement_ids }; LineageIndex { rows }.
-  Canonical + CanonRead per type, sets via canonical_sort_key + a check_canonical_set helper,
-  TraceError with Display/From<CanonError>. validate(): unique node ids, non-empty paths,
-  hash-presence rule, edges resolve + strictly rank-upward + operation matches target kind + no
-  duplicates, finding ids finding.<group_id>.<ordinal> canonical decimal dense from 0 per group
-  (§7.2), query under its pair, category-verdict + conflict-kind coherence, non-empty evidence
-  sets, report_ref = the report node, lineage rows unique per (finding, document). Tests:
-  emit-read-reemit round-trips + one rejection per clause. Pattern: ckc-smt artifact.rs/result.rs.
-  Reading: SPEC §7.1, §7.2 finding-id rule, §5 TraceBundle/LineageIndex rows, §8.3 layout. Gate:
-  `cargo test -p ckc-cli trace::`.
+- [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + gold assert. 47% 93K/200K 7cae297
+- [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
+  71% 142K/200K _
 - [ ] cli-runner.3a.2: Trace assembly in the trace module (still no run.rs contact): pub hand-off
   structs DocTrace (document_id, corpus-relative fixture path, raw-byte source hash, landed
   (Id, Hash) per stage, bundle envelope — landings as Options) and GroupTrace (group_id, fixtures,
