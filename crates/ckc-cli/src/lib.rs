@@ -51,8 +51,12 @@
 //!   boundary, one §4.6 stage event per attempted stage, the §4.4 total
 //!   outcome the severity fold over the whole run; after the group loop
 //!   the run-scoped trace stage assembles and lands the §7.1 pair at the
-//!   run root (`cli-runner.3a.3`); the report stage joins with
-//!   cli-runner.4.1b.
+//!   run root (`cli-runner.3a.3`), then the report stage assembles the
+//!   §7.2 report over the landed pair, the source-graph envelopes, the
+//!   verifier results, the raw lexicon-byte hash, the live solver
+//!   identity, and the diagnostic ledger, landing `report.json` beside it
+//!   (`cli-runner.4.1b.1`); `report.md` and the manifests join with
+//!   cli-runner.4.1b.2.
 //! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`–`.3a.3`):
 //!   [`trace::TraceBundle`], the derivation DAG (eight ranked
 //!   [`trace::TraceNodeKind`]s, operation-labeled strictly rank-upward
@@ -65,14 +69,14 @@
 //!   root, one finding resolved through claim row + lineage rows + source
 //!   nodes under a pair-agreement check, the chain rendered in both
 //!   directions as the command's stdout body.
-//! - [`report`] — §7.2 report payload types (`cli-runner.4.1a.1`):
+//! - [`report`] — §7.2 report payload (`cli-runner.4.1a.1`–`.4.1b.1`):
 //!   [`report::Report`], the canonical `report.json` shape (corpus/lexicon
 //!   hashes, finding and documented-null partitions as
 //!   [`report::ReportFinding`] rows with quoted spans, code-keyed
 //!   diagnostics rollup, solver identity, replay status, §0 wording) with
-//!   structural validation via [`report::ReportError`]; assembly joins
-//!   with cli-runner.4.1a.2, the run wiring and renderings with
-//!   cli-runner.4.1b.
+//!   structural validation via [`report::ReportError`] and assembly via
+//!   [`report::assemble_report`] over the run's validated artifacts; the
+//!   markdown rendering and the manifests join with cli-runner.4.1b.2.
 #![forbid(unsafe_code)]
 
 pub mod extract;

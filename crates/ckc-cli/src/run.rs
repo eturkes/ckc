@@ -1,18 +1,19 @@
-//! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3): resolve the experiment
-//! through the §8.4 registries, drive each corpus document through extract →
-//! segment → normalize → assemble into
+//! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3 + .4.1b.1): resolve the
+//! experiment through the §8.4 registries, drive each corpus document through
+//! extract → segment → normalize → assemble into
 //! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`,
 //! drive each fixture group through compile → verify into
 //! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`,
-//! then assemble the run-scoped §7.1 trace pair over every landed artifact
-//! into `trace_bundle.json` + `lineage_index.json` at the run root
+//! assemble the run-scoped §7.1 trace pair over every landed artifact
+//! into `trace_bundle.json` + `lineage_index.json` at the run root, then
+//! assemble the §7.2 report over the landed pair into `report.json`
 //! — every envelope written as §4.3 canonical bytes and strict-read back at
 //! the write boundary ([`land`]), every smt file byte-identical to its
 //! [`ckc_smt::QueryBody`] body. Each attempted stage records exactly one
 //! §4.6 stage event carrying the artifact's envelope diagnostics (or the
 //! failure diagnostic); the §4.4 total outcome is the severity fold over
-//! every event and command-scope diagnostic; the report stage joins with
-//! cli-runner.4.1a.
+//! every event and command-scope diagnostic; `report.md` and the run/replay
+//! manifests join with cli-runner.4.1b.2.
 //!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
@@ -34,7 +35,7 @@ use std::time::Duration;
 use ckc_core::{
     ArtifactEnvelope, Authority, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
     DiagnosticCode, DiagnosticRecord, FixtureGroup, Hash, Id, IrBundle, Normalization, Origin,
-    Outcome, Producer, SegmentIr, SourceGraph, assemble, canonical_payload_bytes,
+    Outcome, Producer, SegmentIr, SolverIdentity, SourceGraph, assemble, canonical_payload_bytes,
     canonical_sort_key, canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates,
     parse_corpora, parse_experiments, read_canonical,
 };
@@ -43,19 +44,20 @@ use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
 use crate::extract::{ExtractConfig, extract};
 use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
+use crate::report::assemble_report;
 use crate::segment::segment;
 use crate::shell::{Shell, StageClock, StageEvent, stage_clock, static_id};
-use crate::trace::{DocTrace, GroupTrace, assemble_trace};
+use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_trace};
 
 /// §5 lexicon authority the normalize stage consumes (module doc in
 /// [`crate::normalize`]), read from the invocation root like the registries.
 const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
 
-/// The seven §8.3 stages this module drives, in chain order, spelled as the
+/// The eight §8.3 stages this module drives, in chain order, spelled as the
 /// registry `kind` tokens the pipeline's stage components declare: four
 /// per-document stages, the two per-group stages, then the run-scoped
-/// trace stage.
-const STAGE_KINDS: [&str; 7] = [
+/// trace and report stages.
+const STAGE_KINDS: [&str; 8] = [
     "extract",
     "segment",
     "normalize",
@@ -63,12 +65,14 @@ const STAGE_KINDS: [&str; 7] = [
     "compile",
     "verify",
     "trace",
+    "report",
 ];
 
-/// [`STAGE_KINDS`] indices of the group stages and the run-scoped trace.
+/// [`STAGE_KINDS`] indices of the group stages and the run-scoped pair.
 const COMPILE: usize = 4;
 const VERIFY: usize = 5;
 const TRACE: usize = 6;
+const REPORT: usize = 7;
 
 /// §8.4 budget counter naming the per-query solver wall-clock cap in
 /// milliseconds — the one budget key the M1 vocabulary defines.
@@ -81,9 +85,12 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     let Some(resolved) = resolve(root, experiment_id, shell) else {
         return;
     };
-    let lexicon = match std::fs::read(root.join(LEXICON_FILE)) {
+    // §7.2's lexicon hash rides the raw authority-file bytes (§4.4: the
+    // lexicon is a file, not an accepted artifact), taken here where the
+    // run already holds them.
+    let (lexicon, lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
         Ok(bytes) => match load_lexicon(&bytes) {
-            Ok(lexicon) => lexicon,
+            Ok(lexicon) => (lexicon, hash_bytes(&bytes)),
             Err(e) => {
                 shell.diagnostic(invalid_diagnostic(vec![
                     (static_id("file"), LEXICON_FILE.to_owned()),
@@ -101,9 +108,11 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         }
     };
     let mut docs: Vec<DocTrace> = Vec::new();
+    let mut graphs: Vec<ArtifactEnvelope<SourceGraph>> = Vec::new();
     for entry in &resolved.documents {
-        if let Some(doc) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
+        if let Some((doc, graph)) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
             docs.push(doc);
+            graphs.extend(graph);
         }
     }
     // The solver adapter is load-bearing for every group verdict — the
@@ -126,7 +135,21 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     for group in &resolved.groups {
         groups.push(group_pipeline(group, &docs, &resolved, &adapter, shell));
     }
-    trace_stage(&docs, &groups, &resolved, shell);
+    // Run-scoped chain: a trace-stage failure stops it before the report,
+    // the same first-failure rule the document chain runs under.
+    let Some((bundle, lineage)) = trace_stage(&docs, &groups, &resolved, shell) else {
+        return;
+    };
+    report_stage(
+        &graphs,
+        &groups,
+        &bundle,
+        &lineage,
+        &lexicon_hash,
+        adapter.identity(),
+        &resolved,
+        shell,
+    );
 }
 
 /// The runner's resolved view of one experiment: the pipeline candidate,
@@ -136,7 +159,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
 struct Resolved {
     pipeline_id: Id,
     /// Stage component ids parallel to [`STAGE_KINDS`].
-    components: [Id; 7],
+    components: [Id; 8],
     documents: Vec<CorpusEntry>,
     groups: Vec<FixtureGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
@@ -200,7 +223,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
             }
         }
     }
-    let components: [Id; 7] = components
+    let components: [Id; 8] = components
         .try_into()
         .expect("the loop pushes one component per stage kind");
 
@@ -250,16 +273,18 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
 /// attempted stage lands exactly one stage event; the first failure stops
 /// this document and leaves the rest of the run to proceed. Returns the
 /// document's [`DocTrace`] — every landing recorded as it happens, the
-/// bundle envelope riding whole as the group stages' input — or `None`
-/// when the corpus file itself was unreadable (command-scope diagnostic:
-/// without source bytes there is no hash to ground a trace node).
+/// bundle envelope riding whole as the group stages' input — beside its
+/// landed source-graph envelope when extract succeeded (the report stage's
+/// quoted-span authority), or `None` when the corpus file itself was
+/// unreadable (command-scope diagnostic: without source bytes there is no
+/// hash to ground a trace node).
 fn document_pipeline(
     root: &Path,
     entry: &CorpusEntry,
     resolved: &Resolved,
     lexicon: &Lexicon,
     shell: &mut Shell,
-) -> Option<DocTrace> {
+) -> Option<(DocTrace, Option<ArtifactEnvelope<SourceGraph>>)> {
     let html = match std::fs::read(root.join(&entry.path)) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -280,6 +305,7 @@ fn document_pipeline(
         bundle: None,
     };
     let dir = format!("artifacts/{}", entry.id);
+    let mut graph: Option<ArtifactEnvelope<SourceGraph>> = None;
 
     'chain: {
         let clock = stage_clock();
@@ -297,6 +323,7 @@ fn document_pipeline(
             break 'chain;
         };
         trace.source_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
+        graph = Some(source.clone());
 
         let clock = stage_clock();
         let built = segment(&source, &producer(resolved, 1))
@@ -332,7 +359,7 @@ fn document_pipeline(
         ];
         trace.bundle = close_stage(shell, resolved, 3, clock, inputs, &rel, built);
     }
-    Some(trace)
+    Some((trace, graph))
 }
 
 /// Drive one fixture group through compile → verify. Compile loads the
@@ -463,8 +490,17 @@ fn group_pipeline(
 /// DAG's node content-hash set as input hashes (each source's raw-byte
 /// hash beside every landed envelope hash; the hashless report node
 /// contributes nothing). One stage event covers the pair: both content
-/// hashes as outputs, or the first failure diagnostic.
-fn trace_stage(docs: &[DocTrace], groups: &[GroupTrace], resolved: &Resolved, shell: &mut Shell) {
+/// hashes as outputs, or the first failure diagnostic. Returns the landed
+/// pair — the report stage's input — or `None` on the recorded failure.
+fn trace_stage(
+    docs: &[DocTrace],
+    groups: &[GroupTrace],
+    resolved: &Resolved,
+    shell: &mut Shell,
+) -> Option<(
+    ArtifactEnvelope<TraceBundle>,
+    ArtifactEnvelope<LineageIndex>,
+)> {
     let clock = stage_clock();
     let (bundle, lineage) = assemble_trace(docs, groups);
     // §4.3 set semantics up front so the in-memory hashes equal every
@@ -521,20 +557,108 @@ fn trace_stage(docs: &[DocTrace], groups: &[GroupTrace], resolved: &Resolved, sh
         });
 
     let (started_at, ended_at, duration_ms) = clock.stop();
-    let (outcome, diagnostics, output_hashes) = match landed {
+    let (outcome, diagnostics, output_hashes, pair) = match landed {
         // Both envelopes are built with empty diagnostics (assembly raises
         // nothing of its own), so a landed pair is a clean stage.
         Ok((bundle, lineage)) => (
             Outcome::Ok,
             Vec::new(),
-            vec![bundle.content_hash, lineage.content_hash],
+            vec![bundle.content_hash.clone(), lineage.content_hash.clone()],
+            Some((bundle, lineage)),
         ),
-        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new()),
+        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
     };
     shell.stage_event(StageEvent {
         candidate_id: resolved.pipeline_id.clone(),
         component_id: resolved.components[TRACE].clone(),
         stage: static_id(STAGE_KINDS[TRACE]),
+        started_at,
+        ended_at,
+        duration_ms,
+        input_hashes,
+        output_hashes,
+        outcome,
+        diagnostics,
+        budget_counters: Vec::new(),
+    });
+    pair
+}
+
+/// The §8.3 report stage, the run-scoped chain's tail: snapshot the
+/// shell's diagnostic ledger (every §7.4 record the run raised before this
+/// stage; the report cannot count records that do not yet exist), assemble
+/// the §7.2 [`crate::report::Report`] over the landed trace pair, the
+/// landed source-graph envelopes, the landed verifier results, the raw
+/// lexicon-byte hash, and the adapter's live solver identity, validate it,
+/// and land it at the run root as `report.json` — the path the DAG's
+/// hashless sink node already names. Input hashes are the §4.3 set of
+/// every consumed envelope's content hash; one stage event closes the
+/// stage with the report's content hash or the first failure diagnostic.
+#[allow(clippy::too_many_arguments)]
+fn report_stage(
+    graphs: &[ArtifactEnvelope<SourceGraph>],
+    groups: &[GroupTrace],
+    bundle: &ArtifactEnvelope<TraceBundle>,
+    lineage: &ArtifactEnvelope<LineageIndex>,
+    lexicon_hash: &Hash,
+    solver_identity: &SolverIdentity,
+    resolved: &Resolved,
+    shell: &mut Shell,
+) {
+    let clock = stage_clock();
+    let ledger = shell.ledger().to_vec();
+    let run_id = shell.run_id().clone();
+    let fail = |reason: String| stage_diagnostic(REPORT, "run", &run_id, reason);
+
+    let results: Vec<&ArtifactEnvelope<VerifierResults>> = groups
+        .iter()
+        .filter_map(|g| g.verifier_results.as_ref())
+        .collect();
+    let mut input_hashes = vec![bundle.content_hash.clone(), lineage.content_hash.clone()];
+    input_hashes.extend(graphs.iter().map(|g| g.content_hash.clone()));
+    input_hashes.extend(results.iter().map(|r| r.content_hash.clone()));
+    input_hashes.sort();
+    input_hashes.dedup();
+
+    let landed = assemble_report(
+        &bundle.payload,
+        &lineage.payload,
+        &graphs.iter().map(|g| &g.payload).collect::<Vec<_>>(),
+        &results.iter().map(|r| &r.payload).collect::<Vec<_>>(),
+        lexicon_hash,
+        solver_identity,
+        &ledger,
+    )
+    .map_err(|e| fail(format!("report assembly: {e}")))
+    .and_then(|report| {
+        report
+            .validate()
+            .map_err(|e| fail(format!("report invariant: {e}")))?;
+        envelope(
+            "report".to_owned(),
+            "report",
+            producer(resolved, REPORT),
+            input_hashes.clone(),
+            Origin::DeterministicCompiler,
+            Authority::MechanicalAuthority,
+            vec![],
+            report,
+        )
+        .map_err(|e| fail(e.to_string()))
+    })
+    .and_then(|report| land(shell, "report.json", report));
+
+    let (started_at, ended_at, duration_ms) = clock.stop();
+    let (outcome, diagnostics, output_hashes) = match landed {
+        // The envelope is built with empty diagnostics (assembly raises
+        // nothing of its own), so a landed report is a clean stage.
+        Ok(report) => (Outcome::Ok, Vec::new(), vec![report.content_hash]),
+        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new()),
+    };
+    shell.stage_event(StageEvent {
+        candidate_id: resolved.pipeline_id.clone(),
+        component_id: resolved.components[REPORT].clone(),
+        stage: static_id(STAGE_KINDS[REPORT]),
         started_at,
         ended_at,
         duration_ms,
@@ -807,7 +931,7 @@ fn stage_diagnostic(
 }
 
 /// §4.4 producer for one stage execution. The toolchain manifest hash is
-/// the zero placeholder until cli-runner.4.1b mints run manifests.
+/// the zero placeholder until cli-runner.4.1b.2 mints run manifests.
 fn producer(resolved: &Resolved, stage_index: usize) -> Producer {
     Producer {
         candidate_id: resolved.pipeline_id.clone(),
@@ -945,8 +1069,9 @@ mod tests {
         }
 
         // 4 stage events per document, compile+verify per group, the
-        // run-scoped trace stage, then the closing command event.
-        assert_eq!(events.len(), 18);
+        // run-scoped trace and report stages, then the closing command
+        // event.
+        assert_eq!(events.len(), 19);
         for (n, event) in events.iter().enumerate() {
             assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
             assert_eq!(event.logical_time, n as u64);
@@ -1004,7 +1129,22 @@ mod tests {
         assert_eq!(trace.output_hashes.len(), 2);
         assert!(trace.diagnostics.is_empty());
         assert!(trace.budget_counters.is_empty());
-        let command = &events[17];
+        // The report stage: every consumed envelope's content hash as
+        // input — the trace pair, three source graphs, two verifier
+        // results — and the landed report as output.
+        let report = &events[17];
+        assert_eq!(report.stage, static_id("report"));
+        assert_eq!(report.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(report.component_id, static_id("stage.m1.report"));
+        assert_eq!(report.outcome, Outcome::Ok);
+        assert_eq!(report.input_hashes.len(), 7);
+        assert!(report.input_hashes.contains(&trace.output_hashes[0]));
+        assert!(report.input_hashes.contains(&trace.output_hashes[1]));
+        assert_eq!(report.output_hashes.len(), 1);
+        assert!(report.diagnostics.is_empty());
+        assert!(report.budget_counters.is_empty());
+        assert!(out.join("report.json").exists());
+        let command = &events[18];
         assert_eq!(command.stage, static_id("run"));
         assert_eq!(command.outcome, Outcome::Ok);
     }
@@ -1192,7 +1332,7 @@ mod tests {
 
     /// Write a minimal two-fixture registry trio under `root`: `fixture.gone`
     /// points at a missing file, `fixture.tiny` at a minimal HTML document;
-    /// the pipeline declares exactly the four document stages.
+    /// the pipeline declares one component per [`STAGE_KINDS`] entry.
     fn write_tiny_root(root: &Path) {
         let write = |rel: &str, text: &str| {
             let path = root.join(rel);
@@ -1221,7 +1361,7 @@ pipelines:
   - id: pipe.tiny
     stages:
       [stage.t.extract, stage.t.segment, stage.t.normalize, stage.t.assemble,
-       stage.t.compile, stage.t.verify, stage.t.trace]
+       stage.t.compile, stage.t.verify, stage.t.trace, stage.t.report]
 stages:
   - id: stage.t.extract
     kind: extract
@@ -1259,6 +1399,12 @@ stages:
     input_artifact_kinds:
       [source_graph, segments, normalization, ir_bundle, compiled, verifier_results]
     output_artifact_kinds: [trace_bundle, lineage_index]
+  - id: stage.t.report
+    kind: report
+    determinism: deterministic
+    input_artifact_kinds:
+      [source_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
+    output_artifact_kinds: [report, run_manifest, replay_manifest]
 ",
         );
         write(
@@ -1286,7 +1432,10 @@ stages:
     // stages and lands its artifacts; the group misses a member bundle, so
     // its compile stage fails rather than compiling a partial group, and
     // verify never runs. The trace stage still assembles and lands the pair
-    // over what landed: the surviving document's chain, no group artifacts.
+    // over what landed — the surviving document's chain, no group artifacts
+    // — and the report stage closes the chain over it: no claims, so both
+    // partitions are empty, while the corpus row and the ledger rollup
+    // still document the degraded run.
     #[test]
     fn missing_corpus_file_keeps_other_documents() {
         let root = tempfile::tempdir().unwrap();
@@ -1317,7 +1466,7 @@ stages:
             "{diagnostics:?}"
         );
 
-        assert_eq!(events.len(), 7);
+        assert_eq!(events.len(), 8);
         for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
             assert_eq!(events[s].stage, static_id(kind));
             assert_eq!(
@@ -1344,6 +1493,15 @@ stages:
         // bundle-less group contributes no nodes.
         assert_eq!(trace_event.input_hashes.len(), 5);
         assert_eq!(trace_event.output_hashes.len(), 2);
+        // The report stage consumes the trace pair and the surviving
+        // document's graph (the verdict-less group contributes nothing);
+        // its rollup counts the whole four-record ledger.
+        let report_event = &events[6];
+        assert_eq!(report_event.stage, static_id("report"));
+        assert_eq!(report_event.component_id, static_id("stage.t.report"));
+        assert_eq!(report_event.outcome, Outcome::Ok);
+        assert_eq!(report_event.input_hashes.len(), 3);
+        assert_eq!(report_event.output_hashes.len(), 1);
         assert!(out.join("trace_bundle.json").exists());
         assert!(out.join("lineage_index.json").exists());
         assert!(!out.join("artifacts/fixture.gone").exists());
@@ -1351,6 +1509,21 @@ stages:
         let bundle: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.tiny", "ir_bundle");
         let source: ArtifactEnvelope<SourceGraph> = strict(&out, "fixture.tiny", "source_graph");
         bundle.payload.validate(&source.payload).unwrap();
+        let report: ArtifactEnvelope<crate::report::Report> = strict_at(&out, "report.json");
+        assert!(report.payload.findings.is_empty());
+        assert!(report.payload.null_results.is_empty());
+        assert!(report.payload.wording.is_empty());
+        assert_eq!(report.payload.corpus_hashes.len(), 1);
+        assert_eq!(report.payload.corpus_hashes[0].0, static_id("fixture.tiny"));
+        assert_eq!(
+            report
+                .payload
+                .diagnostics_summary
+                .iter()
+                .map(|(_, n)| n)
+                .sum::<u64>(),
+            4
+        );
     }
 
     // Budget resolution: an experiment without the §8.4 per-query solver

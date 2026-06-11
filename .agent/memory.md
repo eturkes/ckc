@@ -66,7 +66,12 @@ git history.
   cli-runner.4.1a 2026-06-11: types + validation + assembly + synthetic battery as one unit —
   the exact shape the 6th-overrun rule bans, left unaudited by both later recovery sessions;
   the full report.rs draft was written but never built at compaction; reverted, split
-  .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a spec-byte
+  .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a live-pin
+  battery over the run binary is a unit on its own — pairing it with assembly (7th overrun)
+  or with stage wiring overruns (9th overrun, cli-runner.4.1b.1 2026-06-11: the 8th-overrun
+  core/wiring pre-split still left run.rs threading + the exp.m1_spine report pins on one
+  line; compacted at the workspace-suite rerun with work otherwise done, landed
+  user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors

@@ -3,7 +3,9 @@
 //! artifact entering the layout must join the sweep), strict-read every
 //! accepted artifact with §4.4 re-validation, and assert the experiment's
 //! gold entries over the verifier results — the code oracle behind §8.5
-//! items 5 and 6.
+//! items 5 and 6. The [`report`] module pins the landed `report.json`
+//! over its own recorded run: the finding/null partition and the quoted
+//! spans resolving to fixture bytes (§8.5 item 9's code oracle).
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -192,6 +194,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         "lineage_index.json".into(),
         "logs/diagnostics.jsonl".into(),
         "logs/events.jsonl".into(),
+        "report.json".into(),
         "trace_bundle.json".into(),
     ];
 
@@ -246,6 +249,10 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
             .unwrap_or_else(|| panic!("{}: no gold entry", group.group_id));
         assert_group_matches_gold(entry, &compiled.payload, &verifier.payload);
     }
+
+    // The report joins the §8.5 item 3 bar; its content pins live in the
+    // `report` module over its own recorded run.
+    let _: ArtifactEnvelope<ckc_cli::report::Report> = strict_read(&run_dir.join("report.json"));
 
     // Trace artifacts: the §7.1 pair strict-read from the run root, both
     // enveloped by the trace component over the DAG's node content-hash
@@ -428,4 +435,244 @@ document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
     // accounted for above.
     expected_files.sort();
     assert_eq!(files_under(&run_dir), expected_files);
+}
+
+/// The report stage's live pins (`cargo test -p ckc-cli report::`): the
+/// §7.2 partition over the recorded §8.6 world — one finding, one
+/// documented null — with every quoted span resolving through its landed
+/// source graph to the raw fixture bytes (§8.5 item 9), the corpus and
+/// lexicon rows recomputed from the files in force, and the solver
+/// identity matching the recorded verifier results.
+mod report {
+    use super::*;
+
+    use ckc_cli::report::{QuotedSpan, ReplayStatus, Report, Wording};
+    use ckc_core::{ClaimTier, parse_corpora};
+
+    /// Pin one row's evidence: the quoted spans carry exactly the
+    /// `(document, region, span)` triples, each text equal to its span's
+    /// `raw_text` in the document's landed source graph and present in
+    /// the raw fixture file — quoted Japanese spans resolving to fixture
+    /// bytes.
+    fn assert_spans_ground(
+        spans: &[QuotedSpan],
+        triples: &[(&str, &str, &str)],
+        graphs: &std::collections::BTreeMap<Id, ArtifactEnvelope<SourceGraph>>,
+        fixtures: &std::collections::BTreeMap<Id, String>,
+    ) {
+        let got: Vec<(Id, Id, Id)> = spans
+            .iter()
+            .map(|s| {
+                (
+                    s.document_id.clone(),
+                    s.region_id.clone(),
+                    s.span_id.clone(),
+                )
+            })
+            .collect();
+        let expected: Vec<(Id, Id, Id)> = triples
+            .iter()
+            .map(|(d, r, s)| (id(d), id(r), id(s)))
+            .collect();
+        assert_eq!(got, expected);
+        for span in spans {
+            let graph = &graphs[&span.document_id].payload;
+            let raw = &graph
+                .spans
+                .iter()
+                .find(|s| s.span_id == span.span_id)
+                .expect("quoted span exists in its landed source graph")
+                .raw_text;
+            assert_eq!(&span.text, raw, "{}/{}", span.document_id, span.span_id);
+            assert!(!span.text.is_empty());
+            assert!(
+                fixtures[&span.document_id].contains(&span.text),
+                "{}/{}: quoted text missing from the raw fixture bytes",
+                span.document_id,
+                span.span_id
+            );
+        }
+    }
+
+    #[test]
+    fn report_pins_the_partition_and_quoted_fixture_bytes() {
+        let root = repo_root();
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path().join("m1");
+        let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+            .args([
+                "run",
+                "--experiment",
+                "exp.m1_spine",
+                "--out",
+                run_dir.to_str().unwrap(),
+            ])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        // The fixture documents and their raw bytes, resolved through the
+        // corpus registry like the run itself resolves them.
+        let corpora =
+            parse_corpora(&std::fs::read_to_string(root.join("registry/corpora.yaml")).unwrap())
+                .unwrap();
+        let docs = [
+            "fixture.m1_control",
+            "fixture.m1_guideline_a",
+            "fixture.m1_guideline_b",
+        ];
+        let mut fixtures = std::collections::BTreeMap::new();
+        let mut graphs = std::collections::BTreeMap::new();
+        for doc in docs {
+            let entry = corpora.iter().find(|c| c.id == id(doc)).unwrap();
+            fixtures.insert(
+                id(doc),
+                std::fs::read_to_string(root.join(&entry.path)).unwrap(),
+            );
+            let graph: ArtifactEnvelope<SourceGraph> =
+                strict_read(&run_dir.join(format!("artifacts/{doc}/source_graph.json")));
+            graphs.insert(id(doc), graph);
+        }
+
+        let report: ArtifactEnvelope<Report> = strict_read(&run_dir.join("report.json"));
+        report.payload.validate().unwrap();
+        assert_eq!(report.schema_id, id("schema.report"));
+        assert_eq!(report.artifact_id, id("report"));
+        assert_eq!(report.artifact_kind, id("report"));
+        assert_eq!(report.producer.component_id, id("stage.m1.report"));
+        assert!(report.diagnostics.is_empty());
+
+        // Input set: the trace pair, the three source graphs, the two
+        // verifier results — every envelope the assembly consumed.
+        let trace: ArtifactEnvelope<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
+        let lineage: ArtifactEnvelope<LineageIndex> =
+            strict_read(&run_dir.join("lineage_index.json"));
+        let mut inputs = vec![trace.content_hash.clone(), lineage.content_hash.clone()];
+        inputs.extend(graphs.values().map(|g| g.content_hash.clone()));
+        let mut identities = Vec::new();
+        for gid in ["group.m1_conflict", "group.m1_null"] {
+            let verifier: ArtifactEnvelope<VerifierResults> =
+                strict_read(&run_dir.join(format!("groups/{gid}/verifier_results.json")));
+            inputs.push(verifier.content_hash.clone());
+            identities.extend(
+                verifier
+                    .payload
+                    .results
+                    .iter()
+                    .map(|r| r.solver_identity.clone()),
+            );
+        }
+        inputs.sort();
+        inputs.dedup();
+        assert_eq!(report.input_hashes, inputs);
+
+        // Corpus and lexicon rows recomputed from the files in force:
+        // raw-byte hashes (§4.4 — files, not accepted artifacts), keys in
+        // id order.
+        let payload = &report.payload;
+        let expected_corpus: Vec<(Id, Hash)> = docs
+            .iter()
+            .map(|doc| (id(doc), ckc_core::hash_bytes(fixtures[&id(doc)].as_bytes())))
+            .collect();
+        assert_eq!(payload.corpus_hashes, expected_corpus);
+        assert_eq!(
+            payload.lexicon_hash,
+            ckc_core::hash_bytes(&std::fs::read(root.join("corpus/lexicon/ja_core.yaml")).unwrap())
+        );
+
+        // A clean run rolls up no diagnostics; the replay slot opens
+        // unreplayed; the identity is the live z3 the verify stage used.
+        assert_eq!(payload.diagnostics_summary, Vec::new());
+        assert_eq!(payload.replay_status, ReplayStatus::NotReplayed);
+        assert_eq!(payload.solver_identity.solver_id, id("z3"));
+        assert!(identities.iter().all(|i| *i == payload.solver_identity));
+        assert_eq!(
+            payload.wording,
+            vec![
+                Wording::DocumentedNullResult,
+                Wording::SyntheticFixtureMeasurement
+            ]
+        );
+
+        // §8.5 item 5's report surface: the §8.6 finding with the
+        // cross-document core.
+        assert_eq!(payload.findings.len(), 1);
+        let finding = &payload.findings[0];
+        assert_eq!(finding.finding_id, id("finding.group.m1_conflict.1"));
+        assert_eq!(finding.query_id, id("q.m1_conflict.pair1.deontic"));
+        assert_eq!(finding.verdict, SolverVerdict::Unsat);
+        assert_eq!(
+            finding.conflict_kind,
+            Some(ConflictKind::DeonticDirectionConflict)
+        );
+        assert_eq!(finding.claim_tier, ClaimTier::S1Admitted);
+        assert_eq!(finding.wording, Wording::SyntheticFixtureMeasurement);
+        let cross_core = vec![
+            id("a.fixture.m1_guideline_a.rule.0"),
+            id("a.fixture.m1_guideline_b.rule.0"),
+        ];
+        assert_eq!(finding.core, Some(cross_core.clone()));
+        assert_eq!(finding.assertion_ids, cross_core);
+        assert_eq!(
+            finding.rule_ids,
+            vec![
+                id("fixture.m1_guideline_a.rule.0"),
+                id("fixture.m1_guideline_b.rule.0")
+            ]
+        );
+        assert_eq!(finding.region_ids, vec![id("r.2"), id("r.3")]);
+        assert_spans_ground(
+            &finding.quoted_spans,
+            &[
+                ("fixture.m1_guideline_a", "r.2", "s.2"),
+                ("fixture.m1_guideline_a", "r.3", "s.3"),
+                ("fixture.m1_guideline_b", "r.2", "s.2"),
+            ],
+            &graphs,
+            &fixtures,
+        );
+
+        // §8.5 item 6's report surface: the disjoint-interval Q1 unsat as
+        // the documented null — context assertions, no kind, no core.
+        assert_eq!(payload.null_results.len(), 1);
+        let null = &payload.null_results[0];
+        assert_eq!(null.finding_id, id("finding.group.m1_null.0"));
+        assert_eq!(null.query_id, id("q.m1_null.pair1.overlap"));
+        assert_eq!(null.verdict, SolverVerdict::Unsat);
+        assert_eq!(null.conflict_kind, None);
+        assert_eq!(null.core, None);
+        assert_eq!(null.claim_tier, ClaimTier::S1Admitted);
+        assert_eq!(null.wording, Wording::DocumentedNullResult);
+        assert_eq!(
+            null.assertion_ids,
+            vec![
+                id("ctx.fixture.m1_control.rule.0"),
+                id("ctx.fixture.m1_guideline_a.rule.0")
+            ]
+        );
+        assert_eq!(
+            null.rule_ids,
+            vec![
+                id("fixture.m1_control.rule.0"),
+                id("fixture.m1_guideline_a.rule.0")
+            ]
+        );
+        assert_eq!(null.region_ids, vec![id("r.2"), id("r.3")]);
+        assert_spans_ground(
+            &null.quoted_spans,
+            &[
+                ("fixture.m1_control", "r.2", "s.2"),
+                ("fixture.m1_guideline_a", "r.2", "s.2"),
+                ("fixture.m1_guideline_a", "r.3", "s.3"),
+            ],
+            &graphs,
+            &fixtures,
+        );
+    }
 }

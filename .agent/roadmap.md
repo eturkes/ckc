@@ -69,15 +69,9 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K 3ef32e0
 - [x] cli-runner.4.1a.1: report module types — Report/finding shapes + validation.
   68% 136K/200K 8b65437
-- [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K _
-- [ ] cli-runner.4.1b.1: report stage wired into ckc run landing report.json in the §8.3 run
-  layout: assemble_report over the live run state (trace-stage bundle + lineage, per-doc source
-  graphs, per-group verifier results, the run's collected diagnostics, lexicon hash + solver
-  identity from where the run already holds them), land() write boundary + stage event,
-  total-outcome fold unchanged; live pins over exp.m1_spine extending the cli-runner.2c oracle
-  harness (finding/null partition, §8.6 finding id + core, quoted fixture bytes). Reading: SPEC
-  §7.2, §8.3 layout; run.rs trace_stage as the pattern. Consumes cli-runner.4.1a.2. Gate:
-  `cargo test -p ckc-cli report::`.
+- [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K 8d2461b
+- [x] cli-runner.4.1b.1: report stage wired into ckc run landing report.json.
+  >=90% compacted/200K _
 - [ ] cli-runner.4.1b.2: report.md + manifests completing the §8.3 artifact set: deterministic
   markdown rendering of report.json; manifest.json (RunManifest) + replay_manifest.json
   (ReplayManifest) from core-plans with real hash/identity values; all three landed by ckc run

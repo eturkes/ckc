@@ -107,6 +107,7 @@ fn run_writes_only_under_its_out_dir() {
             "groups",
             "lineage_index.json",
             "logs",
+            "report.json",
             "trace_bundle.json"
         ]
     );
@@ -140,7 +141,7 @@ fn run_writes_only_under_its_out_dir() {
     );
     let events: Vec<EventRecord> =
         read_jsonl(&std::fs::read(out_dir.join("logs/events.jsonl")).unwrap()).unwrap();
-    assert_eq!(events.len(), 18);
+    assert_eq!(events.len(), 19);
     assert_eq!(events[0].run_id, "m1".parse().unwrap());
 }
 

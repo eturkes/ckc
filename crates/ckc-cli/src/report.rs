@@ -6,8 +6,9 @@
 //! hashes, solver identity, the replay-status slot, and §0-vocabulary
 //! wording. This module owns the types, their canonical bytes, structural
 //! validation, and assembly ([`assemble_report`]) over the run's validated
-//! artifacts; the markdown rendering, the run/replay manifests, and the
-//! `ckc run` report-stage wiring land with cli-runner.4.1b.
+//! artifacts; `ckc run` drives it from the report stage (cli-runner.4.1b.1);
+//! the markdown rendering and the run/replay manifests land with
+//! cli-runner.4.1b.2.
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):
@@ -208,6 +209,8 @@ pub struct Report {
     pub corpus_hashes: Vec<(Id, Hash)>,
     pub diagnostics_summary: Vec<(Id, u64)>,
     pub findings: Vec<ReportFinding>,
+    /// Raw-byte hash of the §5 lexicon authority file (§4.4: the lexicon
+    /// is a file, not an accepted artifact).
     pub lexicon_hash: Hash,
     pub null_results: Vec<ReportFinding>,
     pub replay_status: ReplayStatus,

@@ -173,6 +173,12 @@ impl Shell {
         &self.run_id
     }
 
+    /// Every §7.4 record raised so far, append-ordered — the report
+    /// stage's diagnostics-summary source.
+    pub(crate) fn ledger(&self) -> &[DiagnosticRecord] {
+        &self.ledger
+    }
+
     /// Record a command-scope §7.4 diagnostic: its outcome folds into the
     /// total and the record rides the command event,
     /// `logs/diagnostics.jsonl`, and `diagnostic_hashes`.
