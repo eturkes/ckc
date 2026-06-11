@@ -110,17 +110,24 @@ git history.
   silently corrupted and often still compiles. Express such bytes without that substring
   (byte-array literal with `0x5c` for the backslash) and read the region back after
   writing. Recurs in escape-syntax tests (wire parsers).
-- [2026-06-11] Agent-tool subagents run at the stock 200K context window even when the main
-  session runs at 1M — the 1M window does not propagate. The overflow surfaces as an INLINE
-  `Prompt is too long` string in the Agent result (tool_uses > 0, subagent_tokens 0), with
-  no exception raised. Evidence: two whole-file rewrite agents died after last successful
-  calls at 176K/145K input tokens (next request projected past 200K) while the same
-  session's main loop ran at 485K; no subagent call ever exceeded 200K. Per-agent
-  transcripts: `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl`
-  (assistant `.message.usage` records; rejected requests log no usage). Sizing rule: budget
-  every subagent at 200K — a read+rewrite agent handles ~40KB of text comfortably (~100K
+- [2026-06-11] Subagent window = session window; the launch flag decides both. The user
+  toggles 200K/1M solely by prefixing `claude` with `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
+  (terminal-only; settings carry only model slugs); the flag gates the 1M beta header
+  process-wide (v2.1.170 short-circuits both 1M paths: `[1m]` suffix parse and the
+  always-1M fable/opus allowlist). Flag on — every non-review session — leaves the global
+  `CLAUDE_CODE_SUBAGENT_MODEL=claude-fable-5[1m]` slug silently inert: every subagent caps
+  at 200K. Flag off (review sessions): subagents get 1M via both paths. The slug keeps
+  `[1m]` by user choice; a subagent env block echoing it verifies model selection only,
+  never the effective window. Overflow = hard mid-task death (subagents never compact):
+  the API rejects the next request, the Agent result carries an INLINE `Prompt is too
+  long` (tool_uses > 0, subagent_tokens 0, no exception, no result); pinned by a probe of
+  ~19K-token reads dying at read 10, the 200K boundary. Sizing: in 200K sessions budget
+  every subagent at 200K with margin — a read+rewrite agent handles ~40KB text (~100K
   peak); chunk larger rewrites at section boundaries and stage outputs for main-session
-  assembly. compaction.sh gauges the main loop only.
+  assembly. Per-agent transcripts:
+  `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
+  `.message.usage`; rejected requests log no usage). compaction.sh reads the same flag and
+  gauges the main loop only.
 - [2026-06-11] Fable 5 refusal fallback silently switches a session to Opus mid-flight
   (`type=system subtype=model_refusal_fallback` transcript event, flagged "cybersecurity or
   biology topics"). One-way and in-context invisible — the post-switch assistant continues

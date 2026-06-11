@@ -12,7 +12,9 @@ session command routing here is your standing opt-in to multi-agent
 orchestration — call `Workflow` directly, no confirmation needed. There are no
 saved workflows; every script is written fresh for the task at hand. Subagent
 model and effort (fable/max) come from the user's global Claude settings, so
-omit per-call `model`. A judge-panel shape fits: fan out agents that each
+omit per-call `model`; every workflow agent shares the session's 200K cap (the
+slug's `[1m]` lifts nothing) and dies mid-task with no result past it — size
+each agent's reading slice with margin. A judge-panel shape fits: fan out agents that each
 propose a full decomposition from a different boundary (specification-section
 family, artifact layer, deliverable type), score the candidates with parallel
 judges, and return the winner as structured unit specs (use the `schema`

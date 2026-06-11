@@ -12,7 +12,9 @@ type names below.
 
 Context sizing: every session runs in a 200K context window, except Review
 sessions, which run at 1M — a review's value comes from holding as much of the
-codebase as possible coherently in one context.
+codebase as possible coherently in one context. The cap is launch-set and
+process-wide: every subagent runs under its session's window — the `[1m]`
+model slug lifts nothing (sizing and failure mode: memory.md Lessons).
 
 Bookkeeping: completed checklist items record the context usage and commit
 hash of the session that completed them (`NN% NNNK/200K <hash>`); milestone
