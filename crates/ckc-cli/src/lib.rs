@@ -6,7 +6,7 @@
 //!   surface with validated argument shapes and the once-wired CLI
 //!   invariants: containment-guarded writes, §4.6 JSONL event/diagnostic
 //!   streams, exactly one §4.4 total operation result, outcome-mapped exit
-//!   codes; pending command bodies return typed `unsupported` results.
+//!   codes; the pending replay body returns a typed `unsupported` result.
 //! - `registry_check` — `ckc registry check` (§8.5 item 2): the §8.4
 //!   registry surface plus experiment-referenced gold strict-loaded from the
 //!   invocation root and validated as one cross-referenced set, every load
@@ -60,7 +60,11 @@
 //!   its per-(finding, document) query index — every collection a
 //!   canonical set, structural validation via [`trace::TraceError`],
 //!   assembly via [`trace::assemble_trace`] over the run's [`trace::DocTrace`]
-//!   / [`trace::GroupTrace`] hand-offs.
+//!   / [`trace::GroupTrace`] hand-offs; `trace::command` is `ckc trace`
+//!   (`cli-runner.3b`, §8.5 item 7): the pair strict-read from the run
+//!   root, one finding resolved through claim row + lineage rows + source
+//!   nodes under a pair-agreement check, the chain rendered in both
+//!   directions as the command's stdout body.
 #![forbid(unsafe_code)]
 
 pub mod extract;

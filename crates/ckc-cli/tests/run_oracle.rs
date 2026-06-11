@@ -336,6 +336,85 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         2
     );
 
+    // §8.5 item 7 binary-level: `ckc trace` resolves the §8.6 finding to
+    // the full chain in both directions, byte-pinned from the recorded
+    // run; the result line follows the chain on stdout.
+    let trace_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args([
+            "trace",
+            "--run",
+            run_dir.to_str().unwrap(),
+            "--finding",
+            "finding.group.m1_conflict.1",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert_eq!(trace_out.status.code(), Some(0));
+    let chain = "\
+trace finding.group.m1_conflict.1 run m1
+forward source spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
+document fixture.m1_guideline_a path corpus/fixtures/m1_guideline_a.html
+  source spans: r.2 r.3
+  segments: seg.2 seg.3
+  statements: stmt.0
+  rules: fixture.m1_guideline_a.rule.0
+document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
+  source spans: r.2
+  segments: seg.2
+  statements: stmt.0
+  rules: fixture.m1_guideline_b.rule.0
+named assertions: a.fixture.m1_guideline_a.rule.0 a.fixture.m1_guideline_b.rule.0
+solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
+finding: finding.group.m1_conflict.1 report report
+reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source spans
+finding: finding.group.m1_conflict.1 report report
+solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
+named assertions: a.fixture.m1_guideline_a.rule.0 a.fixture.m1_guideline_b.rule.0
+document fixture.m1_guideline_a path corpus/fixtures/m1_guideline_a.html
+  rules: fixture.m1_guideline_a.rule.0
+  statements: stmt.0
+  segments: seg.2 seg.3
+  source spans: r.2 r.3
+document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
+  rules: fixture.m1_guideline_b.rule.0
+  statements: stmt.0
+  segments: seg.2
+  source spans: r.2
+";
+    let stdout = String::from_utf8(trace_out.stdout).unwrap();
+    let tail = stdout
+        .strip_prefix(chain)
+        .expect("stdout opens with the chain");
+    let trace_results: Vec<TotalOperationResult> = read_jsonl(tail.as_bytes()).unwrap();
+    assert_eq!(trace_results.len(), 1);
+    assert_eq!(trace_results[0].outcome, Outcome::Ok);
+    assert_eq!(trace_results[0].operation_id, id("trace"));
+
+    // The null finding resolves through the same chain: the §8.5 item 6
+    // Q1 unsat renders as a no-conflict verdict over context assertions.
+    let null_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args([
+            "trace",
+            "--run",
+            run_dir.to_str().unwrap(),
+            "--finding",
+            "finding.group.m1_null.0",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert_eq!(null_out.status.code(), Some(0));
+    let null_stdout = String::from_utf8(null_out.stdout).unwrap();
+    assert!(null_stdout.starts_with("trace finding.group.m1_null.0 run m1\n"));
+    assert!(null_stdout.contains(
+        "solver verdict: unsat category semantic_no_conflict \
+         group group.m1_null pair q.m1_null.pair1 query q.m1_null.pair1.overlap\n"
+    ));
+    assert!(
+        null_stdout.contains("document fixture.m1_control path corpus/fixtures/m1_control.html\n")
+    );
+
     // Logs parse as their §4.6 record types; an ok total is a pure severity
     // fold, so nothing in the streams sits above ok.
     let events: Vec<EventRecord> =

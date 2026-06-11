@@ -10,10 +10,12 @@
 //! Every invocation — including unparseable input — ends in exactly one §4.4
 //! total operation result on stdout. Argument and validation failures report
 //! a `schema_invalid` diagnostic under outcome `invalid` (§4.4 "command
-//! validation fails"); well-formed commands whose body is pending return a
-//! bare typed `unsupported` result. Exit code maps from the outcome: `ok` 0,
-//! `invalid` 2, every other outcome 1. There is no human usage text: the
-//! result line and event stream are the interface.
+//! validation fails"); the pending replay body returns a bare typed
+//! `unsupported` result. `ckc trace` precedes the result line with its
+//! chain text (§8.5 item 7), the one stdout body. Exit code maps from the
+//! outcome: `ok` 0, `invalid` 2, every other outcome 1. There is no human
+//! usage text: the result line, command body, and event stream are the
+//! interface.
 
 use std::path::{Path, PathBuf};
 
@@ -30,11 +32,14 @@ const OP_TRACE: &str = "trace";
 /// One completed invocation: what `main` emits plus the process exit code.
 /// `result_line` is the §4.4 result as one canonical JSONL line for stdout;
 /// `streamed_events` is the §4.6 events stream for stderr whenever no output
-/// directory took it as `logs/events.jsonl`.
+/// directory took it as `logs/events.jsonl`; `command_output` is the
+/// command body's stdout text ahead of the result line (today: the
+/// `ckc trace` chain), present only beside an ok result.
 pub struct CliExit {
     pub result: TotalOperationResult,
     pub result_line: Vec<u8>,
     pub streamed_events: Option<Vec<u8>>,
+    pub command_output: Option<Vec<u8>>,
     pub exit_code: i32,
 }
 
@@ -46,8 +51,8 @@ pub fn run_cli(args: &[String]) -> CliExit {
         Err(fail) => return invalid_exit(fail),
     };
     let mut shell = shell_for(&command);
-    execute(&command, &mut shell);
-    finish_exit(command_op(&command), shell)
+    let command_output = execute(&command, &mut shell);
+    finish_exit(command_op(&command), shell, command_output)
 }
 
 /// Argument-shape failure or input-validation failure: `op` is the §4.4
@@ -72,10 +77,10 @@ enum RawCommand {
     Trace { run_dir: String, finding: String },
 }
 
-/// Validated command. Pending bodies read only what the shell needs; the
-/// implementing units (cli-runner.1.2/.2/.3/.4.2) consume the rest in place.
+/// Validated command. The pending replay body reads only what the shell
+/// needs; cli-runner.4.2 consumes its run directory in place.
 #[derive(Debug)]
-#[expect(dead_code, reason = "argument payloads await their implementing units")]
+#[expect(dead_code, reason = "replay's argument payload awaits cli-runner.4.2")]
 enum Command {
     RegistryCheck,
     Run {
@@ -292,14 +297,27 @@ fn shell_for(command: &Command) -> Shell {
 
 /// Command bodies. `registry check` and `run` work against the working
 /// directory (§3 anchors `registry/` and corpus paths at the repository
-/// root); the remaining bodies are pending and return typed `unsupported`
-/// results after input validation, replaced in place by their units
-/// (trace → cli-runner.3, replay → cli-runner.4.2).
-fn execute(command: &Command, shell: &mut Shell) {
+/// root); `trace` resolves against its validated run directory and is the
+/// one body returning stdout text (the §8.5 item 7 chain); `replay` is
+/// pending and returns a typed `unsupported` result after input
+/// validation, replaced in place by cli-runner.4.2.
+fn execute(command: &Command, shell: &mut Shell) -> Option<Vec<u8>> {
     match command {
-        Command::RegistryCheck => crate::registry_check::check(Path::new("."), shell),
-        Command::Run { experiment, .. } => crate::run::execute(Path::new("."), experiment, shell),
-        Command::Replay { .. } | Command::Trace { .. } => shell.merge(Outcome::Unsupported),
+        Command::RegistryCheck => {
+            crate::registry_check::check(Path::new("."), shell);
+            None
+        }
+        Command::Run { experiment, .. } => {
+            crate::run::execute(Path::new("."), experiment, shell);
+            None
+        }
+        Command::Trace {
+            run_dir, finding, ..
+        } => crate::trace::command::execute(run_dir, finding, shell),
+        Command::Replay { .. } => {
+            shell.merge(Outcome::Unsupported);
+            None
+        }
     }
 }
 
@@ -322,15 +340,16 @@ fn invalid_exit(fail: Fail) -> CliExit {
         region_ids: Vec::new(),
         artifact_hashes: Vec::new(),
     });
-    finish_exit(fail.op, shell)
+    finish_exit(fail.op, shell, None)
 }
 
-fn finish_exit(op: Id, shell: Shell) -> CliExit {
+fn finish_exit(op: Id, shell: Shell, command_output: Option<Vec<u8>>) -> CliExit {
     match shell.finish() {
         Ok(finished) => CliExit {
             exit_code: exit_code(finished.result.outcome),
             result_line: finished.result_line,
             streamed_events: finished.streamed_events,
+            command_output,
             result: finished.result,
         },
         Err(err) => {
@@ -354,6 +373,7 @@ fn finish_exit(op: Id, shell: Shell) -> CliExit {
                 exit_code: exit_code(Outcome::Invalid),
                 result_line,
                 streamed_events: None,
+                command_output: None,
                 result,
             }
         }
@@ -542,6 +562,9 @@ mod tests {
         std::fs::create_dir_all(&run_dir).unwrap();
         let run_dir_str = run_dir.to_str().unwrap();
 
+        // The body runs against the validated directory: an empty run dir
+        // fails the trace_bundle.json strict read (the command's own tests
+        // cover resolution; the ok path runs in the binary-level test).
         let exit = run_cli(&args(&[
             "trace",
             "--run",
@@ -550,8 +573,14 @@ mod tests {
             "finding.group.m1_conflict.1",
         ]));
         assert_eq!(exit.result.operation_id, static_id(OP_TRACE));
-        assert_eq!(exit.result.outcome, Outcome::Unsupported);
-        assert_eq!(exit.exit_code, 1);
+        assert_eq!(exit.result.outcome, Outcome::Invalid);
+        assert_eq!(exit.exit_code, 2);
+        assert!(exit.command_output.is_none());
+        let events = streamed(&exit);
+        assert_eq!(events[0].run_id, static_id("r1"));
+        let diagnostic = &events[0].diagnostics[0];
+        assert_eq!(diagnostic.code, DiagnosticCode::SchemaInvalid);
+        assert_eq!(diagnostic.payload[0].1, "trace_bundle.json");
 
         let exit = run_cli(&args(&["trace", "--run", run_dir_str, "--finding", "Bad!"]));
         assert!(invalid_reason(&exit).contains("--finding"));

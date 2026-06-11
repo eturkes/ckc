@@ -8,7 +8,10 @@
 //! and assembly: [`assemble_trace`] builds both payloads over the run's
 //! landed stage artifacts, handed off per document as [`DocTrace`] and per
 //! fixture group as [`GroupTrace`] by the §8.3 trace stage in
-//! [`crate::run`].
+//! [`crate::run`]. The [`command`] submodule is the pair's consumer:
+//! `ckc trace` (§8.5 item 7).
+
+pub(crate) mod command;
 
 use std::collections::BTreeMap;
 

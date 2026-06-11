@@ -65,12 +65,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.
   76% 153K/200K d6fd71b
 - [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K f93bfe6
-- [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K _
-- [ ] cli-runner.3b: ckc trace command: --run + --finding resolve through LineageIndex to the full
-  chain source spans → segments → statements → rules → named assertions → solver verdict →
-  finding, printed in both directions (§8.5 item 7 shape). Closes §8.5 item 7. Reading: SPEC §7.1,
-  §8.5 item 7. Consumes cli-runner.3a.3 artifacts, cli-runner.1.1 dispatch. Gate:
-  `cargo test -p ckc-cli trace::`.
+- [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K 49b0930
+- [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K _
 - [ ] cli-runner.4.1a: Report payload in a report module: canonical Report type + assembly from
   the run artifact set — findings keyed by trace finding ids carrying conflict kind, rule ids,
   region ids, quoted Japanese spans resolved from source graphs by region id, assertion names,
