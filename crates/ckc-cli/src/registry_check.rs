@@ -63,8 +63,9 @@ pub(crate) fn check(root: &Path, shell: &mut Shell) {
 }
 
 /// Read and strictly parse one registry document; a failure lands as one
-/// `schema_invalid` diagnostic naming the file and returns `None`.
-fn load<T>(
+/// `schema_invalid` diagnostic naming the file and returns `None`. Shared
+/// with the run command's resolution step (`crate::run`).
+pub(crate) fn load<T>(
     root: &Path,
     rel: &str,
     parse: fn(&str) -> Result<T, RegistryError>,
@@ -87,7 +88,9 @@ fn load<T>(
     }
 }
 
-fn invalid_diagnostic(payload: Vec<(Id, String)>) -> DiagnosticRecord {
+/// `schema_invalid`/`invalid` diagnostic from sorted-key payload rows; the
+/// shared §4.4 "validation fails" shape (also `crate::run` resolution).
+pub(crate) fn invalid_diagnostic(payload: Vec<(Id, String)>) -> DiagnosticRecord {
     DiagnosticRecord {
         code: DiagnosticCode::SchemaInvalid,
         outcome: Outcome::Invalid,

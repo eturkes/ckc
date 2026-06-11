@@ -73,30 +73,51 @@ fn registry_check_fails_invalid_off_root() {
     assert_eq!(events[0].diagnostics.len(), 3);
 }
 
+// `ckc run` from the repository root: the document stages execute (twelve
+// stage events, artifacts/ populated per fixture), the group half stays
+// pending (cli-runner.2b) as the unsupported outcome, and every write is
+// confined to the output directory.
 #[test]
 fn run_writes_only_under_its_out_dir() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let out_dir = tmp.path().join("m1");
-    let out = ckc(&[
-        "run",
-        "--experiment",
-        "exp.m1_spine",
-        "--out",
-        out_dir.to_str().unwrap(),
-    ]);
+    let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args([
+            "run",
+            "--experiment",
+            "exp.m1_spine",
+            "--out",
+            out_dir.to_str().unwrap(),
+        ])
+        .current_dir(repo_root)
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(1));
     assert!(out.stderr.is_empty(), "events landed in logs/, not stderr");
     assert_eq!(single_result(&out.stdout).outcome, Outcome::Unsupported);
 
     assert_eq!(sorted_entries(tmp.path()), ["m1"]);
-    assert_eq!(sorted_entries(&out_dir), ["logs"]);
+    assert_eq!(sorted_entries(&out_dir), ["artifacts", "logs"]);
     assert_eq!(
         sorted_entries(&out_dir.join("logs")),
         ["diagnostics.jsonl", "events.jsonl"]
     );
+    assert_eq!(
+        sorted_entries(&out_dir.join("artifacts/fixture.m1_guideline_a")),
+        [
+            "ir_bundle.json",
+            "normalization.json",
+            "segments.json",
+            "source_graph.json"
+        ]
+    );
     let events: Vec<EventRecord> =
         read_jsonl(&std::fs::read(out_dir.join("logs/events.jsonl")).unwrap()).unwrap();
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.len(), 13);
     assert_eq!(events[0].run_id, "m1".parse().unwrap());
 }
 

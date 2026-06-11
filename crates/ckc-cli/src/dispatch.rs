@@ -290,17 +290,16 @@ fn shell_for(command: &Command) -> Shell {
     }
 }
 
-/// Command bodies. `registry check` runs against the working directory
-/// (§3 anchors `registry/` at the repository root); the remaining bodies
-/// are pending and return typed `unsupported` results after input
-/// validation, replaced in place by their units (run → cli-runner.2,
-/// trace → cli-runner.3, replay → cli-runner.4.2).
+/// Command bodies. `registry check` and `run` work against the working
+/// directory (§3 anchors `registry/` and corpus paths at the repository
+/// root); the remaining bodies are pending and return typed `unsupported`
+/// results after input validation, replaced in place by their units
+/// (trace → cli-runner.3, replay → cli-runner.4.2).
 fn execute(command: &Command, shell: &mut Shell) {
     match command {
         Command::RegistryCheck => crate::registry_check::check(Path::new("."), shell),
-        Command::Run { .. } | Command::Replay { .. } | Command::Trace { .. } => {
-            shell.merge(Outcome::Unsupported)
-        }
+        Command::Run { experiment, .. } => crate::run::execute(Path::new("."), experiment, shell),
+        Command::Replay { .. } | Command::Trace { .. } => shell.merge(Outcome::Unsupported),
     }
 }
 
@@ -410,6 +409,11 @@ mod tests {
         assert_one_result_line(&exit);
     }
 
+    // Dispatch wires the run body: from this test's working directory (the
+    // crate dir, no registry/ tree) resolution reports the three unreadable
+    // registry files; the out dir was created and took the streams. The ok
+    // path runs in run::tests and the binary-level test, rooted at the
+    // repository.
     #[test]
     fn run_creates_out_dir_and_lands_logs() {
         let tmp = tempfile::tempdir().unwrap();
@@ -422,8 +426,8 @@ mod tests {
             out.to_str().unwrap(),
         ]));
         assert_eq!(exit.result.operation_id, static_id(OP_RUN));
-        assert_eq!(exit.result.outcome, Outcome::Unsupported);
-        assert_eq!(exit.exit_code, 1);
+        assert_eq!(exit.result.outcome, Outcome::Invalid);
+        assert_eq!(exit.exit_code, 2);
         assert!(exit.streamed_events.is_none());
         let events: Vec<EventRecord> =
             read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
@@ -432,7 +436,8 @@ mod tests {
         assert_eq!(events[0].stage, static_id(OP_RUN));
         let diagnostics: Vec<DiagnosticRecord> =
             read_jsonl(&std::fs::read(out.join("logs/diagnostics.jsonl")).unwrap()).unwrap();
-        assert!(diagnostics.is_empty());
+        assert_eq!(diagnostics.len(), 3);
+        assert_eq!(exit.result.diagnostic_hashes.len(), 3);
         assert_one_result_line(&exit);
     }
 

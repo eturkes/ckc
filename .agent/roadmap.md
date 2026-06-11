@@ -54,17 +54,9 @@ bare headers; git history retains all removed text.
 - [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K 2d190a6
 - [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K b662324
 - [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K 92e9c4b
-- [x] smt-verify.b: verdict parsing + §6 categories completing verify. 74% 147K/200K _
-- [ ] cli-runner.2a: Run scaffolding + document pipeline in a run module: resolve exp.m1_spine
-  through the registries (cli-runner.1.2 loaders); create the §8.3 run layout under --out; per
-  document run extract → segment → normalize → assemble (thin wrapper: core-ir.4 assemble +
-  core-ir.5 validate) emitting envelope-wrapped
-  artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json, each written canonical
-  and strict-read back at the boundary; stream events.jsonl + diagnostics.jsonl
-  (core-enums-envelope.2 records). Gate test runs the document stages over the three fixtures into
-  a temp dir with every artifact strict-read clean. Reading: SPEC §8.1, §8.3 stage rows + layout,
-  §4.4, §4.6. Consumes stage fns, core-ir.4/.5, cli-runner.1.1 shell. Gate:
-  `cargo test -p ckc-cli run::`.
+- [x] smt-verify.b: verdict parsing + §6 categories completing verify. 74% 147K/200K 4487787
+- [x] cli-runner.2a: run module document half: resolution + per-doc stage chain, strict
+  read-back landings + stage events. >=90% compacted/200K _
 - [ ] cli-runner.2b: Group stages + total outcome completing ckc run: per fixture group load the
   member ir_bundles, compile (plan + emit + assertion map → groups/<gid>/compiled.json with each
   QueryBody body materialized byte-identical at groups/<gid>/smt/<query_id>.smt2) and verify

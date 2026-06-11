@@ -77,7 +77,8 @@ pub(crate) struct FinishedCommand {
 }
 
 /// One command's invariant context. Open it after validation, record
-/// outcomes and diagnostics while the command body runs, then [`finish`].
+/// outcomes, diagnostics, and stage events while the command body runs,
+/// then [`finish`].
 ///
 /// [`finish`]: Shell::finish
 pub(crate) struct Shell {
@@ -87,7 +88,59 @@ pub(crate) struct Shell {
     started_at: String,
     started: Instant,
     outcome: Outcome,
+    /// Command-scope diagnostics ([`Shell::diagnostic`]): they ride the
+    /// closing command event. Stage-scope diagnostics ride their stage
+    /// event instead.
     diagnostics: Vec<DiagnosticRecord>,
+    /// Every diagnostic raised during the command, append-ordered: the
+    /// `logs/diagnostics.jsonl` stream and the result's
+    /// `diagnostic_hashes` draw from here.
+    ledger: Vec<DiagnosticRecord>,
+    /// §4.6 stage events in execution order ([`Shell::stage_event`]);
+    /// [`Shell::finish`] appends the command event after them.
+    events: Vec<EventRecord>,
+}
+
+/// One §4.6 stage execution, ready for the shell to number: the shell
+/// assigns `event_id`/`logical_time` (execution order), `run_id`, and
+/// `level`; everything else is the stage's to report.
+pub(crate) struct StageEvent {
+    pub candidate_id: Id,
+    pub component_id: Id,
+    pub stage: Id,
+    pub started_at: String,
+    pub ended_at: String,
+    pub duration_ms: u64,
+    pub input_hashes: Vec<Hash>,
+    pub output_hashes: Vec<Hash>,
+    pub outcome: Outcome,
+    /// Diagnostics the stage raised (§4.3 set: pass canonical order —
+    /// envelope fields already hold it). They extend the ledger here.
+    pub diagnostics: Vec<DiagnosticRecord>,
+    pub budget_counters: Vec<(Id, u64)>,
+}
+
+/// Wall-clock + monotonic capture opened at a stage's start, closed into
+/// the §4.6 event bounds.
+pub(crate) struct StageClock {
+    started_at: String,
+    started: Instant,
+}
+
+pub(crate) fn stage_clock() -> StageClock {
+    StageClock {
+        started_at: rfc3339_utc(SystemTime::now()),
+        started: Instant::now(),
+    }
+}
+
+impl StageClock {
+    /// `(started_at, ended_at, duration_ms)` at stage end.
+    pub(crate) fn stop(self) -> (String, String, u64) {
+        let ended_at = rfc3339_utc(SystemTime::now());
+        let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        (self.started_at, ended_at, duration_ms)
+    }
 }
 
 impl Shell {
@@ -103,6 +156,8 @@ impl Shell {
             started: Instant::now(),
             outcome: Outcome::Ok,
             diagnostics: Vec::new(),
+            ledger: Vec::new(),
+            events: Vec::new(),
         }
     }
 
@@ -112,12 +167,39 @@ impl Shell {
         self.outcome = self.outcome.max(outcome);
     }
 
-    /// Record a §7.4 diagnostic: its outcome folds into the total and the
-    /// record rides the event, `logs/diagnostics.jsonl`, and
-    /// `diagnostic_hashes`.
+    /// Record a command-scope §7.4 diagnostic: its outcome folds into the
+    /// total and the record rides the command event,
+    /// `logs/diagnostics.jsonl`, and `diagnostic_hashes`.
     pub(crate) fn diagnostic(&mut self, diagnostic: DiagnosticRecord) {
         self.merge(diagnostic.outcome);
+        self.ledger.push(diagnostic.clone());
         self.diagnostics.push(diagnostic);
+    }
+
+    /// Record one §4.6 stage event: the outcome folds into the total, the
+    /// stage's diagnostics extend the ledger, and the event takes the next
+    /// `event_id`/`logical_time` slot ahead of the closing command event.
+    pub(crate) fn stage_event(&mut self, stage: StageEvent) {
+        self.merge(stage.outcome);
+        self.ledger.extend(stage.diagnostics.iter().cloned());
+        let slot = self.events.len();
+        self.events.push(EventRecord {
+            event_id: event_id(slot),
+            run_id: self.run_id.clone(),
+            candidate_id: stage.candidate_id,
+            component_id: stage.component_id,
+            stage: stage.stage,
+            level: level_for(stage.outcome),
+            logical_time: slot as u64,
+            started_at: stage.started_at,
+            ended_at: stage.ended_at,
+            duration_ms: stage.duration_ms,
+            input_hashes: stage.input_hashes,
+            output_hashes: stage.output_hashes,
+            outcome: stage.outcome,
+            diagnostics: stage.diagnostics,
+            budget_counters: stage.budget_counters,
+        });
     }
 
     /// The single write primitive: every byte a command persists goes
@@ -148,32 +230,37 @@ impl Shell {
         Ok(path)
     }
 
-    /// Close the command: build the §4.6 command event (`logical_time` 0;
-    /// later units prepend stage events), land both JSONL streams, and
-    /// return exactly one §4.4 total operation result.
+    /// Close the command: build the §4.6 command event (the last event,
+    /// numbered after the stage events; command-scope diagnostics ride it),
+    /// land both JSONL streams, and return exactly one §4.4 total operation
+    /// result.
     pub(crate) fn finish(self) -> Result<FinishedCommand, ShellError> {
         let ended_at = rfc3339_utc(SystemTime::now());
         let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
 
-        // diagnostic_hashes and the event's diagnostics are §4.3 sets: store
-        // them in canonical sort order with byte-identical duplicates
-        // collapsed, so the structs round-trip equal through strict reads.
+        // diagnostic_hashes (over the whole ledger) and the command event's
+        // diagnostics (command scope) are §4.3 sets: store them in canonical
+        // sort order with byte-identical duplicates collapsed, so the
+        // structs round-trip equal through strict reads.
         // logs/diagnostics.jsonl keeps append order (streams are evidence).
-        let mut keyed_hashes: Vec<(Vec<u8>, Hash)> = Vec::with_capacity(self.diagnostics.len());
-        let mut keyed_diags: Vec<(Vec<u8>, DiagnosticRecord)> =
-            Vec::with_capacity(self.diagnostics.len());
-        for diagnostic in &self.diagnostics {
+        let mut keyed_hashes: Vec<(Vec<u8>, Hash)> = Vec::with_capacity(self.ledger.len());
+        for diagnostic in &self.ledger {
             let hash = content_hash(diagnostic)?;
             keyed_hashes.push((canonical_sort_key(&hash)?, hash));
-            keyed_diags.push((canonical_sort_key(diagnostic)?, diagnostic.clone()));
         }
         keyed_hashes.sort_by(|a, b| a.0.cmp(&b.0));
         keyed_hashes.dedup_by(|a, b| a.0 == b.0);
+        let mut keyed_diags: Vec<(Vec<u8>, DiagnosticRecord)> =
+            Vec::with_capacity(self.diagnostics.len());
+        for diagnostic in &self.diagnostics {
+            keyed_diags.push((canonical_sort_key(diagnostic)?, diagnostic.clone()));
+        }
         keyed_diags.sort_by(|a, b| a.0.cmp(&b.0));
         keyed_diags.dedup_by(|a, b| a.0 == b.0);
 
+        let slot = self.events.len();
         let event = EventRecord {
-            event_id: static_id("event.0"),
+            event_id: event_id(slot),
             run_id: self.run_id.clone(),
             candidate_id: static_id("cli"),
             component_id: format!("cli.{}", self.operation_id)
@@ -181,7 +268,7 @@ impl Shell {
                 .expect("cli.<operation-id> matches the Id grammar"),
             stage: self.operation_id.clone(),
             level: level_for(self.outcome),
-            logical_time: 0,
+            logical_time: slot as u64,
             started_at: self.started_at.clone(),
             ended_at,
             duration_ms,
@@ -191,10 +278,10 @@ impl Shell {
             diagnostics: keyed_diags.into_iter().map(|(_, d)| d).collect(),
             budget_counters: Vec::new(),
         };
-        let events_bytes = write_jsonl([&event])?;
+        let events_bytes = write_jsonl(self.events.iter().chain([&event]))?;
 
         let streamed_events = if self.out_dir.is_some() {
-            let diagnostics_bytes = write_jsonl(self.diagnostics.iter())?;
+            let diagnostics_bytes = write_jsonl(self.ledger.iter())?;
             self.write_under("logs/events.jsonl", &events_bytes)?;
             self.write_under("logs/diagnostics.jsonl", &diagnostics_bytes)?;
             None
@@ -218,6 +305,14 @@ impl Shell {
             streamed_events,
         })
     }
+}
+
+/// §4.6 event id for execution slot `n`: `event.<n>`, matching
+/// `logical_time` so id order is event order.
+fn event_id(slot: usize) -> Id {
+    format!("event.{slot}")
+        .parse()
+        .expect("event.<decimal> matches the Id grammar")
 }
 
 /// §4.6 `level` token from the total outcome's severity band.
@@ -363,6 +458,68 @@ mod tests {
         assert_eq!(events[0].outcome, Outcome::Ok);
         assert_eq!(finished.result.outcome, Outcome::Ok);
         assert!(finished.result.diagnostic_hashes.is_empty());
+    }
+
+    // Stage events take slots 0..n in execution order; the command event
+    // closes the file at slot n carrying only command-scope diagnostics,
+    // while the result's hashes and the diagnostics stream cover the whole
+    // ledger (stage diagnostics included).
+    #[test]
+    fn stage_events_precede_the_command_event() {
+        let root = tempfile::tempdir().unwrap();
+        let mut shell = Shell::open(
+            static_id("run"),
+            static_id("m1"),
+            Some(root.path().to_path_buf()),
+        );
+        let stage_diag = diag(DiagnosticCode::SolverTimeout, Outcome::Residual, "slow");
+        let command_diag = diag(DiagnosticCode::SchemaInvalid, Outcome::Invalid, "late");
+        let (started_at, ended_at, duration_ms) = stage_clock().stop();
+        shell.stage_event(StageEvent {
+            candidate_id: static_id("pipe.p"),
+            component_id: static_id("stage.s"),
+            stage: static_id("extract"),
+            started_at,
+            ended_at,
+            duration_ms,
+            input_hashes: Vec::new(),
+            output_hashes: Vec::new(),
+            outcome: Outcome::Residual,
+            diagnostics: vec![stage_diag.clone()],
+            budget_counters: Vec::new(),
+        });
+        shell.diagnostic(command_diag.clone());
+        let finished = shell.finish().unwrap();
+
+        let events: Vec<EventRecord> =
+            read_jsonl(&std::fs::read(root.path().join("logs/events.jsonl")).unwrap()).unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event_id, static_id("event.0"));
+        assert_eq!(events[0].logical_time, 0);
+        assert_eq!(events[0].candidate_id, static_id("pipe.p"));
+        assert_eq!(events[0].component_id, static_id("stage.s"));
+        assert_eq!(events[0].stage, static_id("extract"));
+        assert_eq!(events[0].level, static_id("warn"));
+        assert_eq!(events[0].outcome, Outcome::Residual);
+        assert_eq!(events[0].diagnostics, vec![stage_diag.clone()]);
+        assert_eq!(events[1].event_id, static_id("event.1"));
+        assert_eq!(events[1].logical_time, 1);
+        assert_eq!(events[1].stage, static_id("run"));
+        assert_eq!(events[1].outcome, Outcome::Invalid);
+        assert_eq!(events[1].diagnostics, vec![command_diag.clone()]);
+
+        let stream: Vec<DiagnosticRecord> =
+            read_jsonl(&std::fs::read(root.path().join("logs/diagnostics.jsonl")).unwrap())
+                .unwrap();
+        assert_eq!(stream, vec![stage_diag.clone(), command_diag.clone()]);
+
+        assert_eq!(finished.result.outcome, Outcome::Invalid);
+        let mut expected = vec![
+            content_hash(&stage_diag).unwrap(),
+            content_hash(&command_diag).unwrap(),
+        ];
+        expected.sort_by_key(|h| canonical_sort_key(h).unwrap());
+        assert_eq!(finished.result.diagnostic_hashes, expected);
     }
 
     #[test]
