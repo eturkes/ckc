@@ -7,7 +7,7 @@ git history.
 
 ## Policy
 
-- [2026-06-11] Context hygiene (user directive; background: `git show 46d95e2`): keep every
+- [2026-06-11] Context hygiene (user directive; background: `git show a4a4f0e`): keep every
   session lean and phrased in project vocabulary (stages, units, gates, artifacts) — plain
   operational words over research jargon in memory, roadmap, commits, and code alike.
   Consult `docs/` through read-only subagents so its vocabulary stays out of
@@ -136,4 +136,4 @@ git history.
   event is the switch marker), and paired A/B task batteries scored by objective gates;
   CKC's deterministic gates and replay manifests are the standing mitigation. Expect
   recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-m1).
-  Full case detail (transcript ids, timestamps, trigger tokens): `git show 14e520b`.
+  Full case detail (transcript ids, timestamps, trigger tokens): `git show 4e9af1e`.
