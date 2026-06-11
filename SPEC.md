@@ -9,6 +9,15 @@ Revision r2 (2026-06-11): build plan resequenced — the weak-model lift PoC is 
 comparison), invented IR/DSLs gained standalone milestone M4, autoresearch moved to M5, sources
 merged into M6 expansion; §9–§13 rewritten to match.
 
+Revision r3 (2026-06-12): stage arc named in §0 (research instrument → guideline auditor →
+CDS backend); M7 auditor-product contract (§13.3) and Stage III CDS-backend contract (§13.4)
+added; §6 gains `condition_unsatisfiable` and `exception_resolved_conflict` (M3) plus
+`priority_ambiguity` and `source_support_mismatch` (M7); §7.2 gains finding severity,
+review-question fields, and the manuscript bundle; §13.1 gains the OCR lane, textbook family,
+JLAC codes, unit normalization, and M6 acceptance themes; gate `G-EXEC-EVAL`. Inputs: container probes (clingo raw-vs-
+resolved, Z3 assert-soft correction sets, Lean per-instance reflection, cvc5 replay of the
+recorded m1 run) — see the commit introducing this revision.
+
 ## §0 Mission, thesis, posture
 
 CKC is a headless research harness that maps public Japanese clinical-guideline knowledge into
@@ -34,6 +43,17 @@ Thesis under test, as four falsifiable claims:
    search over the IR-combination space — while every attempt stays ledgered and replayable.
 
 Documented null results are first-class outcomes for all four claims.
+
+Stage arc: the plan realizes CKC in three stages, each gated by its predecessor. Stage I —
+research instrument (M1–M5): prove claims 1–4 on synthetic corpora; "executable" means compiled
+to solver-checked formal targets; locked Stage I measurements anchor a methods manuscript.
+Stage II — guideline auditor (M6–M7): the compiler's first application — static analysis of
+real public corpora surfacing source-grounded revision candidates for guideline authors,
+adjudicated and rendered bilingual; Stage I is the auditor's validity argument (measured
+translation reliability, deterministic coverage with zero runtime model calls), and the
+auditor's adjudicated findings anchor a second manuscript. Stage III — CDS backend (§13.4,
+contract-only): the compiler's runtime target — admitted knowledge evaluated over patient
+contexts; "executable" extends to runtime evaluation; every capability sits behind §15 gates.
 
 North-star demonstration (M6 era): cross-source conflict surfacing over real public corpora —
 e.g. a guideline recommendation versus a PMDA package-insert contraindication — traced from
@@ -122,10 +142,12 @@ assembling the full harness before the first end-to-end result.
 | M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; build-once amortization experiment (claims 1–2; claim 3 via the compactness front and amortization). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_amortize` + §10 |
 | M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (claim 2, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
 | M5 autoresearch PoC | Bounded autoresearch loop (§12) over declared surfaces against a locked evaluator, optimizing lift, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.m5_loop` + §12 |
-| M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, deeper DSL capabilities. | §13 contracts, elaborated at M5 acceptance and per candidate |
+| M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 contract elaborated at M5 acceptance; §13.2 per candidate |
+| M7 auditor product | Reviewer-facing audit over M6 corpora: finding triage (severity, bilingual review questions), weighted minimal-correction-set revision localization, cvc5 cross-check on blocking/major findings, Lean per-instance reflection anchor, adjudication records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
 
-Scope note: M1–M5 are the current PoC horizon; M6 stays in this file as a compact forward
-contract so PoC decisions remain production-compatible.
+Scope note: M1–M5 are the current PoC horizon (Stage I); M6–M7 stay in this file as compact
+forward contracts (Stage II) so PoC decisions remain production-compatible; Stage III is
+contract-only (§13.4).
 
 Roadmap protocol: `.agent/roadmap.md`, consumed by the session command, carries one milestone at
 a time: a header stamped with the commits that open (`plan`) and close (`review`) it, over an
@@ -295,6 +317,7 @@ Enums (stage column = first milestone that uses the value set):
 | `AttemptClassification` | `improved equivalent dominated regression invalid unsupported timeout crash null_result near_miss unreproducible unauthorized gate_required` | M5 |
 | `PromotionDecision` | `promote reject quarantine defer_gate request_replay` | M5 |
 | `PromotionScope` | `run_local registry_status` | M5 |
+| `Severity` | `blocking major moderate minor info` — finding triage labels | M7 |
 
 Outcome meanings:
 
@@ -452,6 +475,10 @@ Q2 deontic_consistency: for pairs with a sat Q1, assert each rule's direction as
   literal on the shared action, each as a :named assertion; unsat -> semantic_contradiction with
   unsat core naming the contributing assertions; sat -> documented null result. M3 conflict
   kinds extend Q2 with threshold, slot, and factual constraints.
+M3 adds a per-rule Q0 self-check (own guarded context satisfiability; unsat ->
+  condition_unsatisfiable) and a raw Q1 view with exception conjuncts stripped: raw sat with
+  the guarded view unsat closes the pair as documented null result carrying an
+  exception_resolved_conflict finding.
 ```
 
 Conflict kinds (stage = first milestone that detects them):
@@ -464,11 +491,15 @@ Conflict kinds (stage = first milestone that detects them):
 | `numeric_threshold_empty_intersection` | M3 | Same action+direction, disjoint quantity/temporal intervals. |
 | `strict_factual_contradiction` | M3 | Strict factual consequents jointly inconsistent. |
 | `terminology_incoherence` | M3 | Functional key collision or mutually exclusive mapping. |
+| `condition_unsatisfiable` | M3 | A rule's own context unsatisfiable (Q0): extraction or normalization defect, or genuine source defect. |
+| `exception_resolved_conflict` | M3 | Raw overlap sat, guarded overlap unsat: the exception averts a live conflict; informational finding on the closed pair. |
 | `table_value_disagreement` | M6 | Overlapping table guards, incompatible outputs. |
 | `source_metadata_disagreement` | M6 | Singleton metadata values disagree after normalization. |
 | `gloss_drift` | M6 | Rendered view diverges from semantic payload. |
 | `replay_or_certificate_failure` | M1 | Replay mismatch or certificate check failure. |
 | `package_insert_vs_guideline_conflict` | M6 | Cross-source flagship (e-PI fixtures registered). |
+| `priority_ambiguity` | M7 | Conflicting defeasible rules with insufficient superiority metadata (ASP lane, behind the §13.2 richer-rule-semantics trigger). |
+| `source_support_mismatch` | M7 | Accepted IR whose cited spans fail adjudicated support review — admission audit over model-assisted authoring. |
 
 SMT profile:
 
@@ -529,6 +560,11 @@ failure-taxonomy rollup), solver identity, replay status; from M2, raw metric ro
 weighted ranking; from M3, ablations; from M5, attempt-ledger summaries; from M6, matrix
 coverage.
 Finding ids form `finding.<group_id>.<ordinal>` with ordinals in source-then-hash order (§4.1).
+From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
+publication-designated runs export a manuscript bundle — figure-ready CSV/JSON metric tables,
+corpus/permission summaries, replay instructions, limitations derived from typed
+residual/ambiguity statistics — extended at M7 with finding and adjudication tables (§0 stage
+arc: Stage I methods paper, Stage II auditor paper).
 Report wording stays within the §0 vocabulary.
 
 ### §7.3 Metrics (M2 onward)
@@ -812,8 +848,8 @@ Committed direction:
   gold, lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
   semantics in M5).
 - M3 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
-  `strict_factual_contradiction`, `terminology_incoherence`; ambiguous/unmapped binding paths
-  exercised by fixtures.
+  `strict_factual_contradiction`, `terminology_incoherence`, `condition_unsatisfiable`,
+  `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by fixtures.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_grounding_off`.
 - Amortization experiment (`exp.m3_amortize`, claim 3): fixture set A builds mappings and
@@ -858,6 +894,9 @@ Committed direction:
   best §10 route; §7.4 M4 invented-DSL route codes land at elaboration.
 - Deeper DSL capabilities (typed-hole authoring, proof export, full kernel — the CKC-GEN
   direction) stay §13 candidates behind evidence from this milestone.
+- Elaboration MAY add an informalization round-trip metamorphic — accepted IR rendered to a
+  deterministic informal summary, re-formalized through a route, compared by normalized hash —
+  as a route-stability check.
 
 Acceptance themes (finalized at elaboration): at least two invented candidates execute singular
 and layered over identical locked inputs; ranked against the §10 field with raw rows first;
@@ -919,12 +958,13 @@ surfaces, with the driver named in the manifest; the ledger holds at least one v
 attempt and one rejected or dominated attempt; an unauthorized-surface patch is classified and
 stays unscored; at least one locally promoted attempt replays; ledger summaries emit as CSV/MD.
 
-## §13 M6 — Sources and expansion
+## §13 Stage II and beyond — sources (M6), auditor product (M7), CDS-backend contract
 
 Intent: the spine, comparison, and admitted translation routes run end-to-end on real public
 Japanese guideline material with permission-aware caching and richer extraction, followed by
 registry-driven growth where every candidate enters behind benchmark evidence and applicable
-gates.
+gates. M7 turns the audited corpus into the reviewer-facing auditor product; §13.4 keeps the
+Stage III CDS-backend target visible behind gates.
 
 ### §13.1 Public sources (contract; elaborate at M5 acceptance)
 
@@ -937,17 +977,30 @@ gates.
 - Source families: Minds-style guideline HTML/PDF (full text treated internal-only with
   offsets/hashes/derived labels exportable; spans quoted in reports only where permitted),
   J-STAGE/JATS XML, and PMDA e-PI XML (license-clean structured sections — 禁忌/効能/用法 — and
-  the future cross-source counterpart). `registry/source_processors.yaml` declares per-family
-  adapters, stages, permission behavior, drift policy, diagnostics.
+  the future cross-source counterpart). Licensed textbook EPUB/PDF joins as a
+  `restricted_internal_only` family when rights evidence exists — corpus expansion, not M6
+  acceptance; textbooks need the permission machinery, not new schema.
+  `registry/source_processors.yaml` declares per-family adapters, stages, permission behavior,
+  drift policy, diagnostics.
 - Extraction: real HTML/XML parsing extended to PDF text/layout and table structure with
-  uncertainty diagnostics; DecisionTable IR + `table_value_disagreement`; gold segment/statement
-  labels for at least one real fixture; extractor promotion claims trigger `G-EXTRACTOR-ADAPTER`.
+  uncertainty diagnostics; DecisionTable IR + `table_value_disagreement`; scanned-page OCR as a
+  separate low-trust lane (engine identity and confidence recorded; OCR text feeds review
+  surfaces and mapping authoring, with accepted formalization requiring validated spans);
+  quantity/unit normalization (exact rationals plus canonical unit codes with committed
+  UCUM-compatible conversion tables; raw Japanese unit strings preserved; threshold conflicts
+  compare unit-normalized values only); gold segment/statement labels for at least one real
+  fixture; extractor promotion claims trigger `G-EXTRACTOR-ADAPTER`.
 - Terminology: MEDIS standard masters (病名/HOT) as the first external systems behind the
-  TerminologyBinding contract; version-pinned snapshots; license-encumbered vocabularies
-  (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until licensing evidence exists.
+  TerminologyBinding contract; version-pinned snapshots; JLAC10/11 laboratory codes registered
+  next; license-encumbered vocabularies (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until
+  licensing evidence exists.
 - Drift: source hash changes emit `source_drift.json` and mark dependent scores stale.
 - Boundary: the committed schemas exported since M2 govern any cross-language boundary; the
   Rust-vs-Python adapter decision per §3 is made and recorded here.
+
+M6 acceptance themes (finalized at elaboration): the M1–M5 experiment set re-runs end-to-end
+over at least one real Minds-family corpus slice plus its e-PI counterpart with live permission
+records, redaction, and drift checks; the cross-source flagship experiment registers.
 
 ### §13.2 Expansion principles (elaborate per candidate)
 
@@ -962,6 +1015,61 @@ gates.
 
 The §2 conservation rule keeps this table in sync with `registry/methods.yaml`.
 
+### §13.3 M7 — Auditor product (contract; elaborate at M6 acceptance)
+
+Intent: Stage II's reviewer-facing deliverable — the compiler as guideline auditor. Real-corpus
+findings become adjudicable revision candidates with formal evidence, rendered bilingual and
+exported as a manuscript bundle; a documented absence of defects in an audited corpus is itself
+a publishable null result. Container probes for every committed backend ran 2026-06-12 (r3
+revision commit).
+
+Committed direction:
+
+- Revision localization: per finding cluster, weighted minimal correction sets via solver
+  soft-assertions (Z3 `assert-soft`; weights from strength, certainty, and source authority
+  class, declared in the experiment registry); MARCO-style MUS/MCS enumeration in the Rust
+  adapter when clusters outgrow single calls. Findings render "these k passages jointly imply
+  an impossibility" with member spans.
+- Verifier cross-check: cvc5 replays every blocking/major finding's queries; agreement,
+  divergence, or unknown recorded per query; divergence emits a review item; evidence feeds
+  `G-PORTFOLIO`. The cvc5 adapter parses verdict tokens and tolerates result-command errors
+  after non-matching verdicts (the Z3-adapter pattern); §6 emission stays byte-pinned.
+- Mechanized anchor: a Lean 4 package defines the NormIR/FormalIR fragment, the §6 conflict
+  predicates, and normalizer properties; per-run generated data files; per-instance checks by
+  `decide`/`native_decide` recorded in the trace with replay commands (kernel reduction stalls
+  on String-order-heavy computation — `native_decide` or Nat-keyed encodings); generic
+  theorems land as explicit proof-debt records, never silent assumptions.
+- Finding triage: severity (§4.4) plus bilingual suggested review questions; wording stays
+  §0-calibrated — `warrants review` by default, contradiction vocabulary only for proven
+  inconsistency within supported semantics.
+- `AdjudicationRecord`: append-only reviewer-role-typed records (clinician, formalist,
+  terminology, adjudicator) attached to findings by hash, never mutating them; agreement
+  statistics in reports; adjudicated-corpus claims trigger `G-GOLD-CORPUS`.
+- `report.html`: one self-contained deterministic bilingual review artifact per run — embedded
+  canonical report/trace data plus committed content-hashed viewer assets; Japanese spans
+  primary, English glosses linked per span; corpus overview, rule browser, finding list with
+  filters, finding detail with formal evidence and revision candidates, metrics; renderer
+  identity recorded; zero servers, zero network, zero external toolchain in the build path.
+- Auditor manuscript bundle: extends the §7.2 bundle with finding/adjudication tables and
+  per-kind defect statistics for the Stage II paper.
+
+Acceptance themes (finalized at elaboration): an auditor run over the M6 corpus emits triaged,
+localized, cross-checked, anchor-checked findings; a reviewer walks source span → rule →
+assertion → verdict → review question entirely offline in `report.html`; adjudication records
+round-trip without mutating findings; the bundle exports; replay holds.
+
+### §13.4 Stage III — CDS-backend contract (gated; no build commitment)
+
+The compiler's runtime target, kept visible so Stage I/II decisions stay compatible.
+Capabilities enter only behind their gates, each as a registered candidate citing its
+compendium row: a three-valued rule evaluator over typed patient contexts (`applicable |
+not_applicable | unknown` plus conflict statuses; open-world missing-data semantics;
+`G-EXEC-EVAL` adoption defines the semantics before any build), FHIR-family interop exports
+(JP Core patient substrate, Clinical Reasoning packaging, CQL/ELM where expressible, lossiness
+recorded per export), EHR ingestion (SS-MIX2, CDS Hooks/SMART), live-patient data
+(`G-LIVE-PATIENT`), probabilistic and world-model semantics (`G-PROB`, `G-WORLD-MODEL`),
+clinical deployment authority (`G-S3`).
+
 ## §14 Registries and research compendium
 
 Registry files are data, validated by `ckc registry check`, growing per milestone: M1
@@ -970,7 +1078,8 @@ grammar constraints); M3 adds `methods`, the method-universe catalogue seeded fr
 compendium (families, aliases, candidate roles, adapter status
 `v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata);
 M4 extends `schemas|prompts` with invented-DSL entries; M5 adds `evaluators|gates` (gate
-evidence objects); M6 adds `source_processors|policies` and `indexes` with retrieval.
+evidence objects); M6 adds `source_processors|policies` and `indexes` with retrieval; M7 adds
+`adjudication` and `views` (content-hashed `report.html` viewer assets).
 
 `docs/` is the committed research compendium — method-category deep-research
 reports plus the agent-language catalogue, scope-pruned to the build plan (pruned surveys live
@@ -1001,6 +1110,7 @@ stand on their own.
 | `G-AUTO-PROMOTE` | Automated registry/status promotion of accepted generators, prompts, policies, compilers, verifier adapters, metric/report code. | `AutoPromotionEvidence` |
 | `G-PROB` | Probabilistic semantics affecting accepted outputs. | `ProbabilisticProfileRecord` |
 | `G-WORLD-MODEL` | Latent-state/multimodal observations affecting outputs. | `WorldModelProfileRecord` |
+| `G-EXEC-EVAL` | Patient-context rule-evaluation semantics in any shipped output. | `ExecEvalProfileRecord` |
 | `G-LIVE-PATIENT` | Any patient-derived data entering CKC. | `GovernedPatientDataProfile` |
 | `G-S3` | Clinical/regulatory/deployment authority claims. | `S3AssuranceEvidence` |
 
