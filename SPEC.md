@@ -12,22 +12,27 @@ compact, reusable, source-grounded IR components; compiles them deterministicall
 targets (SMT-LIB first); and surfaces contradictions and documented null results with end-to-end
 machine-checkable evidence.
 
-Thesis under test, as four falsifiable claims:
+Thesis under test, as four falsifiable claims. Order is dependency, not test order — each claim
+builds on its predecessors' machinery; §2 schedules the experiments, §7.3 defines the metrics:
 
 1. Reuse: a layered IR of reusable components — verified once, reused by normalized hash,
-   compiled deterministically — outperforms direct per-document formalization on reuse,
-   compactness, hash convergence, compilability, conflict precision/recall, and trace quality.
-2. Lift (models in the loop, role minimized): IR configuration changes how reliably a weak
-   local model translates clinical Japanese into symbolic executable form; staged,
-   grammar-constrained, short-hop routes tame model non-determinism, lifting schema validity,
-   admission rate, and conflict-task accuracy over direct emission.
-3. Amortization (models out of the runtime): a compact admitted mapping layer — authored and
-   maintained by AI agents at development time, where hand-encoding once made expert systems
+   compiled deterministically — outperforms direct per-document formalization on the §7.3 reuse,
+   compactness, convergence, compilation, conflict-quality, and trace-completeness families.
+   Tested at M3.
+2. Short-hop translation (models in the loop): how reliably a weak local model translates
+   clinical Japanese into an executable formal target depends on the IR configuration the route
+   targets; staged, grammar-constrained, short-hop routes tame model non-determinism and beat
+   direct one-leap emission on the §7.3 route-quality and conflict-quality families. Tested at
+   M2; widened at M3–M4.
+3. Model-free runtime (models at development time only): a compact admitted mapping layer —
+   authored and maintained by AI agents, where hand-encoding once made expert systems
    prohibitive — covers fresh documents deterministically with zero runtime model calls; its
    quality is an optimization problem: maximize coverage and reuse, minimize mapping-set size.
+   Tested at M3.
 4. Autoresearch: a bounded autonomous loop over declared surfaces, scored by an immutable
    evaluator, measurably improves the objectives of claims 1–3 — from lexicon repair up to
    search over the IR-combination space — while every attempt stays ledgered and replayable.
+   Tested at M5.
 
 Documented null results are first-class outcomes for all four claims.
 
@@ -125,10 +130,10 @@ assembling the full harness before the first end-to-end result.
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
 | M1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_spine` + §8 checklist |
-| M2 lift PoC | First experiment, claim 2's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_lift` + §9 |
-| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; build-once amortization experiment (claims 1–2; claim 3 via the compactness front and amortization). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_amortize` + §10 |
+| M2 short-hop PoC | First experiment, claim 2's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_shorthop` + §9 |
+| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; model-free coverage experiment (claims 1–2; claim 3 via the compactness front and the coverage experiment). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
 | M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (claim 2, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
-| M5 autoresearch PoC | Bounded autoresearch loop (§12) over declared surfaces against a locked evaluator, optimizing lift, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.m5_loop` + §12 |
+| M5 autoresearch PoC | Bounded autoresearch loop (§12) over declared surfaces against a locked evaluator, optimizing translation reliability, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 contract elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora: finding triage (severity, bilingual review questions), weighted minimal-correction-set revision localization, cvc5 cross-check on blocking/major findings, Lean per-instance reflection anchor, adjudication records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
 
@@ -562,10 +567,10 @@ metric families: reuse (component reuse rate, duplicate rate), compactness (comp
 mapping-set size versus coverage, fan-in/out, MDL proxies), convergence (normalized hash
 agreement across variants), compilation (schema/compile/parse/solver pass rates), conflict
 quality (precision/recall and conflict-task accuracy over fixture expectations), trace
-completeness, determinism (hash stability), lift (per-metric route-versus-baseline deltas over
+completeness, determinism (hash stability), baseline delta (per-metric route-versus-baseline deltas over
 identical fixtures: model routes from M2, layered-minus-direct from M3), route quality
 (schema-valid rate, admission rate, repair count, recorded-call counts, k-sample convergence;
-from M2), amortized coverage (share of fresh-document semantics produced deterministically from
+from M2), model-free coverage (share of fresh-document semantics produced deterministically from
 admitted mappings, with zero apply-phase model calls; from M3), and loop outcomes (from M5).
 
 ### §7.4 Diagnostics
@@ -744,11 +749,11 @@ measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closi
 `documented_null_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to
 the core and back.
 
-## §9 M2 — Weak-model lift PoC (contract; elaborate at M1 acceptance)
+## §9 M2 — Short-hop translation PoC (contract; elaborate at M1 acceptance)
 
 Intent: the first experiment — claim 2's minimal pair on this laptop. Establish as a locked
 measurement that a weak local model translating clinical Japanese directly into an executable
-formal target is unreliable, and that one IR-mediated route measurably lifts reliability on the
+formal target is unreliable, and that one IR-mediated route measurably improves reliability on the
 same inputs; publish the result as a bilingual research report. The M1 spine is the instrument:
 its deterministic pipeline supplies the gold verdicts and the calibrated compile → verify back
 end that scores both routes, so route failures attribute to translation, not to the instrument.
@@ -765,7 +770,7 @@ Committed direction:
   experiment. Model I/O records as fixture artifacts (origin `ai_generated`, authority
   `evidence_discovery_only`, prompt-template hashes in manifests); recorded bytes replay
   deterministically; live calls run only under an explicit experiment flag with full recording.
-- Exactly two routes — the lift pair (further routes are §10 scope):
+- Exactly two routes — the minimal pair (further routes are §10 scope):
 
 | Route | Shape |
 | --- | --- |
@@ -775,23 +780,23 @@ Committed direction:
 - Inputs: the M1 fixtures, lexicon, and gold, frozen under a minimal measurement record —
   fixture/gold/schema/prompt/model/runtime hashes in the run manifest (the evaluator identity
   that §10 formalizes and §12 locks).
-- Scoring (§7.3 route-quality and lift metrics, raw rows before any ranking): target syntactic
+- Scoring (§7.3 route-quality and baseline-delta metrics, raw rows before any ranking): target syntactic
   validity (solver parse), admission rate — model output passes the same §4 admission checks as
   any artifact — conflict-verdict accuracy against gold over the §8 conflict and null groups,
   and k-sample verdict stability; §6 categories and the §7.4 M2 model-route codes carry the
   failure taxonomy; documented null results are first-class.
 - Report: `report.md` (English) and `report.ja.md` (Japanese) render deterministically from one
-  canonical `report.json` (§7.2): per-route raw rows, the lift table, findings with quoted
+  canonical `report.json` (§7.2): per-route raw rows, the baseline-delta table, findings with quoted
   Japanese spans and named assertions, failure-taxonomy summary, model and solver identities,
   replay status; wording per §0 (locked measurement, synthetic fixture measurement; no clinical
   claims).
 - Deliberately out of scope, landing in §10: additional routes, metamorphic fixtures, the
-  component store, the deterministic direct pipeline, amortization, ablations.
+  component store, the deterministic direct pipeline, model-free coverage, ablations.
 
 Acceptance themes (finalized at elaboration): both routes execute over identical locked inputs
-(`exp.m2_lift`); recorded model I/O replays byte-stably; raw rows emit before the lift table;
-expected conflict/null outcomes hold per gold for admitted translations; the bilingual report
-renders deterministically from `report.json`; §0 vocabulary holds.
+(`exp.m2_shorthop`); recorded model I/O replays byte-stably; raw rows emit before the
+baseline-delta table; expected conflict/null outcomes hold per gold for admitted translations;
+the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
 ## §10 M3 — IR variation and comparison (contract; elaborate at M2 acceptance)
 
@@ -812,7 +817,7 @@ Committed direction:
 
 - Every route registers its schemas/grammars and a deterministic bridge into the §6 profile,
   keeping conflict-task scoring identical across routes; all §9 and §10 routes run
-  `exp.m3_routes` under one frozen-measurement identity, and §7.3 route-quality, lift,
+  `exp.m3_routes` under one frozen-measurement identity, and §7.3 route-quality, baseline-delta,
   conflict-task accuracy, and k-sample convergence metrics emit as raw rows before ranking.
 - `pipe.direct_rule_to_smt` (`exp.m3_compare`, the claim-1 deterministic baseline): extract →
   segment → direct phrase-normalization → FormalIR → SMT, bypassing shared ClinicalIR/NormIR
@@ -828,7 +833,7 @@ Committed direction:
   mapping-minimization view (claim 3's optimization objective, measured deterministically here).
 - Path visualizations per §7.1 (per-finding chain; cross-document component convergence).
 - Metrics per §7.3 over both pipelines and every route; the per-metric layered-minus-direct
-  deltas are the staged-pipeline lift measurement; `candidate_diff.json` compares segment,
+  deltas are the staged pipeline's §7.3 baseline-delta measurement; `candidate_diff.json` compares segment,
   binding, rule, assertion, verdict, and metric levels; `ranking.csv` + `score_breakdown.json`
   with raw rows.
 - Frozen-measurement record: the run manifest freezes the M3 evaluator identity — fixture,
@@ -839,9 +844,9 @@ Committed direction:
   `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by fixtures.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_grounding_off`.
-- Amortization experiment (`exp.m3_amortize`, claim 3): fixture set A builds mappings and
+- Model-free coverage experiment (`exp.m3_coverage`, claim 3): fixture set A builds mappings and
   admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
-  components) then runs `runtime_ai: false` (§8.1). Metrics: deterministic coverage of B,
+  components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus gold, mapping-set size versus coverage on the compactness front, and
   apply-phase model-call count (zero) against a model-per-document baseline. Apply-phase path
   graphs (§7.1) contain zero model nodes — the runtime removal made visible.
@@ -855,7 +860,7 @@ hash-convergence asserts identical component hashes across metamorphic variants 
 pipeline; the comparison report ranks pipelines and routes with raw rows visible; recorded model
 I/O replays byte-stably; path and reuse visualizations emit with deterministic bytes; expected
 conflict/null outcomes hold per gold; replay holds for both pipelines; `candidate_diff.json` is
-complete; the amortization report emits with raw rows first.
+complete; the coverage report emits with raw rows first.
 
 ## §11 M4 — Invented IR/DSLs (contract; elaborate at M3 acceptance)
 
@@ -877,7 +882,7 @@ Committed direction:
 - Design dimensions recorded per candidate: token compactness, grammar constraint strength,
   semantic distance per hop, layer composability — the seed coordinates of the §12 search
   space.
-- Scoring and reporting identical to §10; lift measured against both `route.direct_smt` and the
+- Scoring and reporting identical to §10; baseline deltas measured against both `route.direct_smt` and the
   best §10 route; §7.4 M4 invented-DSL route codes land at elaboration.
 - Deeper DSL capabilities (typed-hole authoring, proof export, full kernel — the CKC-GEN
   direction) stay §13 candidates behind evidence from this milestone.
@@ -906,7 +911,7 @@ Committed direction:
   configuration (grammar included). The evaluator stays outside every candidate's editable
   surfaces; an attempt editing locked surfaces classifies as `unauthorized` (diagnostic
   `unauthorized_surface_edit`) and stays unscored.
-- Objectives: §7.3 lift, route quality, amortized coverage, and reuse — promotion requires
+- Objectives: §7.3 baseline delta, route quality, model-free coverage, and reuse — promotion requires
   (improvement on at least one objective, or front membership), every objective within
   regression thresholds, schema validity, trace completeness, and replay success.
 - Ledger: every attempt, whatever its AttemptClassification (§4.4), lands in append-only
