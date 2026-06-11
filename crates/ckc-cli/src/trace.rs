@@ -4,18 +4,22 @@
 //! per-(finding, document) query index.
 //!
 //! This module owns the types, their canonical bytes (every collection a
-//! canonical set sorted by [`canonical_sort_key`]), and structural
-//! validation; assembly over landed stage artifacts arrives with
-//! cli-runner.3a.2 and the run wiring with cli-runner.3a.3 (§8.3 trace
-//! stage row).
+//! canonical set sorted by [`canonical_sort_key`]), structural validation,
+//! and assembly: [`assemble_trace`] builds both payloads over the run's
+//! landed stage artifacts, handed off per document as [`DocTrace`] and per
+//! fixture group as [`GroupTrace`]; the run wiring arrives with
+//! cli-runner.3a.3 (§8.3 trace stage row).
 
 use std::collections::BTreeMap;
 
 use ckc_core::{
-    CanonError, CanonRead, CanonReadError, Canonical, Hash, Id, ObjectEmitter, ObjectReader,
-    Reader, canonical_sort_key, emit_set, emit_string, fieldless_enum, read_set, read_string,
+    ArtifactEnvelope, CanonError, CanonRead, CanonReadError, Canonical, Hash, Id, IrBundle,
+    ObjectEmitter, ObjectReader, Reader, canonical_sort_key, emit_set, emit_string, fieldless_enum,
+    read_set, read_string,
 };
-use ckc_smt::{SolverVerdict, VerifierCategory};
+use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory, VerifierResults};
+
+use crate::shell::static_id;
 
 fieldless_enum! {
     /// SPEC §7.1 derivation-DAG node kind, one per §8.3 durable artifact
@@ -521,6 +525,320 @@ impl CanonRead for LineageIndex {
     }
 }
 
+/// One document's per-stage landings for [`assemble_trace`] — the run
+/// hand-off (cli-runner.3a.3 fills it from the document pipeline): identity
+/// and corpus grounding, then each §8.3 landing as an Option in chain
+/// order, present exactly when its stage landed the artifact.
+#[derive(Debug, Clone)]
+pub struct DocTrace {
+    pub document_id: Id,
+    /// Corpus-relative fixture path (§8.2), the source node's `path`.
+    pub fixture_path: String,
+    /// Raw source-byte hash, the source node's content hash.
+    pub source_hash: Hash,
+    /// Landed (artifact id, envelope content hash) per document stage.
+    pub source_graph: Option<(Id, Hash)>,
+    pub segments: Option<(Id, Hash)>,
+    pub normalization: Option<(Id, Hash)>,
+    /// The assemble landing rides whole: lineage reads its rule, statement,
+    /// and segment layers.
+    pub bundle: Option<ArtifactEnvelope<IrBundle>>,
+}
+
+/// One fixture group's landings for [`assemble_trace`] — the run hand-off
+/// (cli-runner.3a.3 fills it from the group pipeline): the §8.4 member set,
+/// then the two group landings riding whole — claims read the compiled
+/// plan and assertion map beside the verifier results.
+#[derive(Debug, Clone)]
+pub struct GroupTrace {
+    pub group_id: Id,
+    /// Member document ids in §8.4 registry order.
+    pub fixtures: Vec<Id>,
+    pub compiled: Option<ArtifactEnvelope<CompiledArtifact>>,
+    pub verifier_results: Option<ArtifactEnvelope<VerifierResults>>,
+}
+
+/// Assemble the run's [`TraceBundle`] and [`LineageIndex`] over the landed
+/// stage artifacts (§7.1), skipping absent pieces.
+///
+/// DAG: one static report node (id `report`, path `report.json`, hashless)
+/// as the sink; per document the §8.3 chain source →extract→ source_graph
+/// →segment→ segments →normalize→ normalization →assemble→ ir_bundle —
+/// node ids the artifact ids, paths the §8.3 run-relative layout, hashes
+/// the envelope content hashes, each present landing edged from its
+/// nearest present predecessor; per group every member ir_bundle →compile→
+/// compiled →verify→ verifier_results →report→ the report node.
+///
+/// Claims: one row per verifier result, ordinal = its index in the group's
+/// plan-ordered results vector (§7.2 finding ids; a result resolving to no
+/// plan pair contributes nothing, surfacing downstream as an ordinal gap).
+/// Evidence is the recorded unsat core, else the row's query `:named`
+/// assertions — `ctx.<rule_id>`/`a.<rule_id>` from the pair's
+/// `fc.<rule_id>` constraints; rule and region ids union the
+/// assertion-map records bound to the pair's two constraint rules,
+/// independent of the evidence set; `conflict_kind` rides on
+/// `semantic_contradiction` rows as M1's single kind.
+///
+/// Lineage: one row per finding × contributing member document — the
+/// claim's rules narrowed by the `<document_id>.rule.` prefix, statements
+/// via the §5 `rules[k] ← statements[k]` index invariant on the member
+/// bundle, segments from those statements, regions from the rule.
+///
+/// Every collection lands sorted by [`canonical_sort_key`]; the caller
+/// runs [`TraceBundle::validate`] / [`LineageIndex::validate`] on the
+/// pair.
+pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle, LineageIndex) {
+    let report = static_id("report");
+    let mut nodes = vec![TraceNode {
+        node_id: report.clone(),
+        kind: TraceNodeKind::Report,
+        path: "report.json".to_owned(),
+        content_hash: None,
+    }];
+    let mut edges = Vec::new();
+
+    let mut bundle_nodes: BTreeMap<&str, &Id> = BTreeMap::new();
+    for doc in docs {
+        nodes.push(TraceNode {
+            node_id: doc.document_id.clone(),
+            kind: TraceNodeKind::Source,
+            path: doc.fixture_path.clone(),
+            content_hash: Some(doc.source_hash.clone()),
+        });
+        let dir = format!("artifacts/{}", doc.document_id);
+        let mut prev = &doc.document_id;
+        for (landing, kind, file) in [
+            (
+                &doc.source_graph,
+                TraceNodeKind::SourceGraph,
+                "source_graph",
+            ),
+            (&doc.segments, TraceNodeKind::Segments, "segments"),
+            (
+                &doc.normalization,
+                TraceNodeKind::Normalization,
+                "normalization",
+            ),
+        ] {
+            let Some((artifact_id, hash)) = landing else {
+                continue;
+            };
+            nodes.push(TraceNode {
+                node_id: artifact_id.clone(),
+                kind,
+                path: format!("{dir}/{file}.json"),
+                content_hash: Some(hash.clone()),
+            });
+            edges.push(TraceEdge {
+                from: prev.clone(),
+                operation: kind.operation().expect("landing kinds carry producers"),
+                to: artifact_id.clone(),
+            });
+            prev = artifact_id;
+        }
+        if let Some(bundle) = &doc.bundle {
+            nodes.push(TraceNode {
+                node_id: bundle.artifact_id.clone(),
+                kind: TraceNodeKind::IrBundle,
+                path: format!("{dir}/ir_bundle.json"),
+                content_hash: Some(bundle.content_hash.clone()),
+            });
+            edges.push(TraceEdge {
+                from: prev.clone(),
+                operation: TraceOperation::Assemble,
+                to: bundle.artifact_id.clone(),
+            });
+            bundle_nodes.insert(doc.document_id.as_str(), &bundle.artifact_id);
+        }
+    }
+
+    let mut claims = Vec::new();
+    let mut rows = Vec::new();
+    for group in groups {
+        let dir = format!("groups/{}", group.group_id);
+        if let Some(compiled) = &group.compiled {
+            nodes.push(TraceNode {
+                node_id: compiled.artifact_id.clone(),
+                kind: TraceNodeKind::Compiled,
+                path: format!("{dir}/compiled.json"),
+                content_hash: Some(compiled.content_hash.clone()),
+            });
+            for fixture in &group.fixtures {
+                if let Some(bundle_id) = bundle_nodes.get(fixture.as_str()) {
+                    edges.push(TraceEdge {
+                        from: (*bundle_id).clone(),
+                        operation: TraceOperation::Compile,
+                        to: compiled.artifact_id.clone(),
+                    });
+                }
+            }
+        }
+        if let Some(results) = &group.verifier_results {
+            nodes.push(TraceNode {
+                node_id: results.artifact_id.clone(),
+                kind: TraceNodeKind::VerifierResults,
+                path: format!("{dir}/verifier_results.json"),
+                content_hash: Some(results.content_hash.clone()),
+            });
+            if let Some(compiled) = &group.compiled {
+                edges.push(TraceEdge {
+                    from: compiled.artifact_id.clone(),
+                    operation: TraceOperation::Verify,
+                    to: results.artifact_id.clone(),
+                });
+            }
+            edges.push(TraceEdge {
+                from: results.artifact_id.clone(),
+                operation: TraceOperation::Report,
+                to: report.clone(),
+            });
+        }
+
+        let (Some(compiled), Some(results)) = (&group.compiled, &group.verifier_results) else {
+            continue;
+        };
+        for (ordinal, result) in results.payload.results.iter().enumerate() {
+            let Some(pair) = compiled.payload.query_plan.iter().find(|p| {
+                p.context_overlap_query_id == result.query_id
+                    || p.deontic_consistency_query_id == result.query_id
+            }) else {
+                continue;
+            };
+            let pair_rules: Vec<&str> = [&pair.constraint_a_id, &pair.constraint_b_id]
+                .into_iter()
+                .filter_map(|c| c.as_str().strip_prefix("fc."))
+                .collect();
+            let assertion_ids = match &result.unsat_core {
+                Some(core) => core.clone(),
+                None => {
+                    let prefix = if pair.context_overlap_query_id == result.query_id {
+                        "ctx."
+                    } else {
+                        "a."
+                    };
+                    canonical_id_set(
+                        pair_rules
+                            .iter()
+                            .map(|rule| {
+                                Id::new(format!("{prefix}{rule}")).expect(
+                                    "a valid constraint id keeps the Id grammar re-prefixed",
+                                )
+                            })
+                            .collect(),
+                    )
+                }
+            };
+            let mut rule_ids = Vec::new();
+            let mut region_ids = Vec::new();
+            for (assertion_id, record) in &compiled.payload.assertion_map {
+                let bound = assertion_id
+                    .as_str()
+                    .strip_prefix("ctx.")
+                    .or_else(|| assertion_id.as_str().strip_prefix("a."))
+                    .is_some_and(|rule| pair_rules.contains(&rule));
+                if bound {
+                    rule_ids.extend(record.rule_ids.iter().cloned());
+                    region_ids.extend(record.region_ids.iter().cloned());
+                }
+            }
+            let rule_ids = canonical_id_set(rule_ids);
+            let finding_id = Id::new(format!("finding.{}.{ordinal}", group.group_id))
+                .expect("a valid group id keeps the Id grammar under the finding prefix");
+
+            for fixture in &group.fixtures {
+                let Some(bundle) = docs
+                    .iter()
+                    .find(|d| d.document_id == *fixture)
+                    .and_then(|d| d.bundle.as_ref())
+                else {
+                    continue;
+                };
+                let rule_prefix = format!("{fixture}.rule.");
+                let doc_rules: Vec<Id> = rule_ids
+                    .iter()
+                    .filter(|r| r.as_str().starts_with(&rule_prefix))
+                    .cloned()
+                    .collect();
+                if doc_rules.is_empty() {
+                    continue;
+                }
+                let mut doc_regions = Vec::new();
+                let mut statement_ids = Vec::new();
+                let mut segment_ids = Vec::new();
+                for rule_id in &doc_rules {
+                    let Some(index) = bundle
+                        .payload
+                        .norm
+                        .rules
+                        .iter()
+                        .position(|rule| rule.rule_id == *rule_id)
+                    else {
+                        continue;
+                    };
+                    doc_regions.extend(bundle.payload.norm.rules[index].source_region_ids.clone());
+                    if let Some(statement) = bundle.payload.clinical.statements.get(index) {
+                        statement_ids.push(statement.statement_id.clone());
+                        segment_ids.extend(statement.source_segment_ids.iter().cloned());
+                    }
+                }
+                rows.push(LineageRow {
+                    finding_id: finding_id.clone(),
+                    document_id: fixture.clone(),
+                    region_ids: canonical_id_set(doc_regions),
+                    rule_ids: doc_rules,
+                    segment_ids: canonical_id_set(segment_ids),
+                    statement_ids: canonical_id_set(statement_ids),
+                });
+            }
+
+            claims.push(ClaimEvidenceRow {
+                finding_id,
+                group_id: group.group_id.clone(),
+                pair_id: pair.pair_id.clone(),
+                query_id: result.query_id.clone(),
+                category: result.category,
+                verdict: result.verdict,
+                conflict_kind: (result.category == VerifierCategory::SemanticContradiction)
+                    .then_some(ConflictKind::DeonticDirectionConflict),
+                assertion_ids,
+                rule_ids,
+                region_ids: canonical_id_set(region_ids),
+                report_ref: report.clone(),
+            });
+        }
+    }
+
+    sort_canonical(&mut nodes);
+    sort_canonical(&mut edges);
+    sort_canonical(&mut claims);
+    sort_canonical(&mut rows);
+    (
+        TraceBundle {
+            nodes,
+            edges,
+            claims,
+        },
+        LineageIndex { rows },
+    )
+}
+
+/// Sort a collection into canonical-set storage order
+/// ([`canonical_sort_key`]); trace shapes emit infallibly.
+fn sort_canonical<T: Canonical>(items: &mut [T]) {
+    items.sort_by_cached_key(|item| {
+        canonical_sort_key(item).expect("trace shapes emit canonically")
+    });
+}
+
+/// Canonical Id set from an unordered pool: byte-sorted, duplicate-free
+/// (Id-byte order equals [`canonical_sort_key`] order for identifier
+/// strings).
+fn canonical_id_set(mut ids: Vec<Id>) -> Vec<Id> {
+    ids.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
+    ids.dedup();
+    ids
+}
+
 /// Enforce canonical-set storage — strictly ascending by
 /// [`canonical_sort_key`], duplicate-free — so stored values equal their
 /// strict-read round trip (`pool` names the set in errors, `index` the
@@ -723,7 +1041,11 @@ impl std::error::Error for TraceError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::{canonical_payload_bytes, read_canonical};
+    use ckc_core::{
+        Authority, ContradictionQueryPair, Origin, Producer, SolverIdentity,
+        canonical_payload_bytes, read_canonical,
+    };
+    use ckc_smt::{AssertionRecord, VerifierResult};
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
     fn canon<T: Canonical>(value: &T) -> String {
@@ -1292,6 +1614,392 @@ mod tests {
                 pool: "region_ids",
                 index: 1,
             })
+        );
+    }
+
+    /// Envelope wrap for hand-built group payloads: assembly reads
+    /// `artifact_id`, `content_hash`, and `payload` only, so the metadata
+    /// fields carry inert synthetic values and `fill` pins the hash the
+    /// node must copy.
+    fn envelope<P>(artifact_id: &str, kind: &str, fill: char, payload: P) -> ArtifactEnvelope<P> {
+        ArtifactEnvelope {
+            schema_id: id(&format!("schema.{kind}")),
+            artifact_id: id(artifact_id),
+            artifact_kind: id(kind),
+            producer: Producer {
+                candidate_id: id("cand.test"),
+                component_id: id("comp.test"),
+                toolchain_manifest_hash: hash('f'),
+            },
+            input_hashes: vec![],
+            content_hash: hash(fill),
+            canonicalization_policy_hash: hash('f'),
+            origin: Origin::DeterministicCompiler,
+            authority: Authority::CompilerAuthority,
+            accepted_effects: vec![],
+            trace_refs: vec![],
+            diagnostics: vec![],
+            runtime_metadata: vec![],
+            payload,
+        }
+    }
+
+    /// DocTrace with every landing absent — contributes a bare source node.
+    fn bare_doc(doc: &str) -> DocTrace {
+        DocTrace {
+            document_id: id(doc),
+            fixture_path: format!("corpus/fixtures/{doc}.html"),
+            source_hash: hash('a'),
+            source_graph: None,
+            segments: None,
+            normalization: None,
+            bundle: None,
+        }
+    }
+
+    /// doc.full with the three pre-bundle landings present.
+    fn chain_doc() -> DocTrace {
+        DocTrace {
+            source_graph: Some((id("doc.full.source_graph"), hash('b'))),
+            segments: Some((id("doc.full.segments"), hash('c'))),
+            normalization: Some((id("doc.full.normalization"), hash('d'))),
+            ..bare_doc("doc.full")
+        }
+    }
+
+    fn record(rule: &str, regions: &[&str]) -> AssertionRecord {
+        AssertionRecord {
+            rule_ids: vec![id(rule)],
+            region_ids: regions.iter().map(|r| id(r)).collect(),
+        }
+    }
+
+    /// The synthetic plan: pair doc.a.rule.0 × doc.b.rule.0 with all four
+    /// named-assertion records — ctx.doc.a carries an extra region (r.2)
+    /// so claim unions distinguish "the pair's records" from "the
+    /// evidence's records". Bodies stay empty: assembly reads the plan and
+    /// assertion map only.
+    fn compiled_payload() -> CompiledArtifact {
+        CompiledArtifact {
+            target_id: id("target.smtlib2"),
+            query_plan: vec![ContradictionQueryPair {
+                pair_id: id("q.g1.pair1"),
+                action_key: id("act.administer:drug.x"),
+                constraint_a_id: id("fc.doc.a.rule.0"),
+                constraint_b_id: id("fc.doc.b.rule.0"),
+                context_overlap_query_id: id("q.g1.pair1.overlap"),
+                deontic_consistency_query_id: id("q.g1.pair1.deontic"),
+            }],
+            query_bodies: vec![],
+            assertion_map: vec![
+                (id("a.doc.a.rule.0"), record("doc.a.rule.0", &["r.1"])),
+                (id("a.doc.b.rule.0"), record("doc.b.rule.0", &["r.9"])),
+                (
+                    id("ctx.doc.a.rule.0"),
+                    record("doc.a.rule.0", &["r.1", "r.2"]),
+                ),
+                (id("ctx.doc.b.rule.0"), record("doc.b.rule.0", &["r.9"])),
+            ],
+            target_metadata: vec![],
+            diagnostics: vec![],
+        }
+    }
+
+    fn verifier_result(
+        query: &str,
+        category: VerifierCategory,
+        verdict: SolverVerdict,
+        core: Option<&[&str]>,
+    ) -> VerifierResult {
+        VerifierResult {
+            query_id: id(query),
+            category,
+            verdict: Some(verdict),
+            model: None,
+            unsat_core: core.map(|ids| ids.iter().map(|i| id(i)).collect()),
+            solver_identity: SolverIdentity {
+                solver_id: id("z3"),
+                version: "4.13.4".to_owned(),
+            },
+            diagnostics: vec![],
+        }
+    }
+
+    /// group.g1 with both landings present over the synthetic plan.
+    fn claims_group(results: Vec<VerifierResult>) -> GroupTrace {
+        GroupTrace {
+            group_id: id("group.g1"),
+            fixtures: vec![id("doc.a"), id("doc.b")],
+            compiled: Some(envelope(
+                "group.g1.compiled",
+                "compiled",
+                'b',
+                compiled_payload(),
+            )),
+            verifier_results: Some(envelope(
+                "group.g1.verifier_results",
+                "verifier_results",
+                'e',
+                VerifierResults { results },
+            )),
+        }
+    }
+
+    fn node<'a>(bundle: &'a TraceBundle, node_id: &str) -> &'a TraceNode {
+        bundle
+            .nodes
+            .iter()
+            .find(|n| n.node_id.as_str() == node_id)
+            .expect("node present")
+    }
+
+    fn claim<'a>(bundle: &'a TraceBundle, finding_id: &str) -> &'a ClaimEvidenceRow {
+        bundle
+            .claims
+            .iter()
+            .find(|c| c.finding_id.as_str() == finding_id)
+            .expect("claim present")
+    }
+
+    fn has_edge(bundle: &TraceBundle, from: &str, operation: TraceOperation, to: &str) -> bool {
+        bundle
+            .edges
+            .iter()
+            .any(|e| e.from.as_str() == from && e.operation == operation && e.to.as_str() == to)
+    }
+
+    // Empty inputs assemble to the lone report node.
+    #[test]
+    fn assemble_empty_inputs() {
+        let (bundle, index) = assemble_trace(&[], &[]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(index.validate(), Ok(()));
+        assert_eq!(bundle.nodes, vec![report_node()]);
+        assert!(bundle.edges.is_empty());
+        assert!(bundle.claims.is_empty());
+        assert!(index.rows.is_empty());
+    }
+
+    // A bundle-less full chain: source + three landings at §8.3 paths with
+    // the landing hashes, chain edges in stage order.
+    #[test]
+    fn assemble_full_chain_doc() {
+        let (bundle, index) = assemble_trace(&[chain_doc()], &[]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(index.validate(), Ok(()));
+        assert_eq!(bundle.nodes.len(), 5);
+        let source = node(&bundle, "doc.full");
+        assert_eq!(source.kind, TraceNodeKind::Source);
+        assert_eq!(source.path, "corpus/fixtures/doc.full.html");
+        assert_eq!(source.content_hash, Some(hash('a')));
+        let segments = node(&bundle, "doc.full.segments");
+        assert_eq!(segments.kind, TraceNodeKind::Segments);
+        assert_eq!(segments.path, "artifacts/doc.full/segments.json");
+        assert_eq!(segments.content_hash, Some(hash('c')));
+        assert_eq!(bundle.edges.len(), 3);
+        assert!(has_edge(
+            &bundle,
+            "doc.full",
+            TraceOperation::Extract,
+            "doc.full.source_graph"
+        ));
+        assert!(has_edge(
+            &bundle,
+            "doc.full.source_graph",
+            TraceOperation::Segment,
+            "doc.full.segments"
+        ));
+        assert!(has_edge(
+            &bundle,
+            "doc.full.segments",
+            TraceOperation::Normalize,
+            "doc.full.normalization"
+        ));
+        assert!(bundle.claims.is_empty());
+    }
+
+    // Segments absent: one normalize edge bridges source_graph →
+    // normalization (nearest present predecessor).
+    #[test]
+    fn assemble_gapped_doc() {
+        let mut doc = chain_doc();
+        doc.segments = None;
+        let (bundle, _) = assemble_trace(&[doc], &[]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(bundle.nodes.len(), 4);
+        assert_eq!(bundle.edges.len(), 2);
+        assert!(has_edge(
+            &bundle,
+            "doc.full.source_graph",
+            TraceOperation::Normalize,
+            "doc.full.normalization"
+        ));
+    }
+
+    // A group with neither landing contributes nothing.
+    #[test]
+    fn assemble_bare_group() {
+        let group = GroupTrace {
+            group_id: id("group.g1"),
+            fixtures: vec![id("doc.a")],
+            compiled: None,
+            verifier_results: None,
+        };
+        let (bundle, index) = assemble_trace(&[], &[group]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(bundle.nodes, vec![report_node()]);
+        assert!(bundle.edges.is_empty());
+        assert!(bundle.claims.is_empty());
+        assert!(index.rows.is_empty());
+    }
+
+    // Verifier results without the compiled half: the node and its report
+    // edge land, no verify edge, no claims.
+    #[test]
+    fn assemble_results_only_group() {
+        let group = GroupTrace {
+            group_id: id("group.g1"),
+            fixtures: vec![],
+            compiled: None,
+            verifier_results: Some(envelope(
+                "group.g1.verifier_results",
+                "verifier_results",
+                'e',
+                VerifierResults { results: vec![] },
+            )),
+        };
+        let (bundle, index) = assemble_trace(&[], &[group]);
+        assert_eq!(bundle.validate(), Ok(()));
+        let results = node(&bundle, "group.g1.verifier_results");
+        assert_eq!(results.kind, TraceNodeKind::VerifierResults);
+        assert_eq!(results.path, "groups/group.g1/verifier_results.json");
+        assert_eq!(results.content_hash, Some(hash('e')));
+        assert_eq!(bundle.edges.len(), 1);
+        assert!(has_edge(
+            &bundle,
+            "group.g1.verifier_results",
+            TraceOperation::Report,
+            "report"
+        ));
+        assert!(bundle.claims.is_empty());
+        assert!(index.rows.is_empty());
+    }
+
+    // The hand-built claims battery: ordinals from the results vector,
+    // core-verbatim vs ctx.-fallback evidence, assertion-map unions over
+    // the pair's two constraints on both rows, conflict_kind exactly on
+    // semantic_contradiction — and both lineage skip paths (doc.a rides
+    // bundle-less, doc.b has no DocTrace at all → zero rows).
+    #[test]
+    fn assemble_claims_and_lineage_skips() {
+        let results = vec![
+            verifier_result(
+                "q.g1.pair1.overlap",
+                VerifierCategory::SemanticNoConflict,
+                SolverVerdict::Sat,
+                None,
+            ),
+            verifier_result(
+                "q.g1.pair1.deontic",
+                VerifierCategory::SemanticContradiction,
+                SolverVerdict::Unsat,
+                Some(&["a.doc.a.rule.0", "a.doc.b.rule.0"]),
+            ),
+            // Resolving to no plan pair: contributes nothing.
+            verifier_result(
+                "q.g1.unplanned",
+                VerifierCategory::SemanticNoConflict,
+                SolverVerdict::Sat,
+                None,
+            ),
+        ];
+        let (bundle, index) = assemble_trace(&[bare_doc("doc.a")], &[claims_group(results)]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(index.validate(), Ok(()));
+        assert!(index.rows.is_empty());
+        assert_eq!(bundle.nodes.len(), 4);
+        assert_eq!(
+            node(&bundle, "group.g1.compiled").path,
+            "groups/group.g1/compiled.json"
+        );
+        // No compile edges without member ir_bundle nodes.
+        assert_eq!(bundle.edges.len(), 2);
+        assert!(has_edge(
+            &bundle,
+            "group.g1.compiled",
+            TraceOperation::Verify,
+            "group.g1.verifier_results"
+        ));
+        assert!(has_edge(
+            &bundle,
+            "group.g1.verifier_results",
+            TraceOperation::Report,
+            "report"
+        ));
+        assert_eq!(bundle.claims.len(), 2);
+        let overlap = claim(&bundle, "finding.group.g1.0");
+        assert_eq!(overlap.group_id, id("group.g1"));
+        assert_eq!(overlap.pair_id, id("q.g1.pair1"));
+        assert_eq!(overlap.query_id, id("q.g1.pair1.overlap"));
+        assert_eq!(overlap.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(overlap.verdict, Some(SolverVerdict::Sat));
+        assert_eq!(overlap.conflict_kind, None);
+        // Coreless overlap evidence: both constraints fc.-stripped and
+        // ctx.-prefixed.
+        assert_eq!(
+            overlap.assertion_ids,
+            vec![id("ctx.doc.a.rule.0"), id("ctx.doc.b.rule.0")]
+        );
+        let deontic = claim(&bundle, "finding.group.g1.1");
+        assert_eq!(deontic.query_id, id("q.g1.pair1.deontic"));
+        assert_eq!(
+            deontic.conflict_kind,
+            Some(ConflictKind::DeonticDirectionConflict)
+        );
+        // Recorded core rides verbatim.
+        assert_eq!(
+            deontic.assertion_ids,
+            vec![id("a.doc.a.rule.0"), id("a.doc.b.rule.0")]
+        );
+        // Rule/region unions are evidence-independent: ctx.doc.a's extra
+        // r.2 reaches the deontic row too.
+        for row in [overlap, deontic] {
+            assert_eq!(row.rule_ids, vec![id("doc.a.rule.0"), id("doc.b.rule.0")]);
+            assert_eq!(row.region_ids, vec![id("r.1"), id("r.2"), id("r.9")]);
+            assert_eq!(row.report_ref, id("report"));
+        }
+    }
+
+    // A skipped result keeps its index: the lone claim lands at ordinal 1
+    // with the deontic a.-fallback evidence, and the gap surfaces
+    // downstream as non-dense ordinals.
+    #[test]
+    fn assemble_claim_ordinal_gap_and_deontic_fallback() {
+        let results = vec![
+            verifier_result(
+                "q.g1.unplanned",
+                VerifierCategory::SemanticNoConflict,
+                SolverVerdict::Sat,
+                None,
+            ),
+            verifier_result(
+                "q.g1.pair1.deontic",
+                VerifierCategory::SemanticNoConflict,
+                SolverVerdict::Sat,
+                None,
+            ),
+        ];
+        let (bundle, _) = assemble_trace(&[], &[claims_group(results)]);
+        assert_eq!(bundle.claims.len(), 1);
+        let row = &bundle.claims[0];
+        assert_eq!(row.finding_id, id("finding.group.g1.1"));
+        assert_eq!(
+            row.assertion_ids,
+            vec![id("a.doc.a.rule.0"), id("a.doc.b.rule.0")]
+        );
+        assert_eq!(
+            bundle.validate(),
+            Err(TraceError::FindingOrdinals(id("group.g1")))
         );
     }
 }

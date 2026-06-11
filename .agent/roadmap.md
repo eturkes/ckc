@@ -61,41 +61,9 @@ bare headers; git history retains all removed text.
   landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K 9fe4145
 - [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + gold assert. 47% 93K/200K 7cae297
 - [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
-  71% 142K/200K _
-- [ ] cli-runner.3a.2a: Trace assembly in the trace module (still no run.rs contact). Reference
-  implementation from the reverted first attempt: .agent/wip-3a.2a.patch — apply or transcribe,
-  verify against this line, trim its test imports to the synthetic surface, delete it in the
-  closing commit. Pub hand-off structs DocTrace (document_id, fixture_path: corpus-relative
-  String, source_hash: raw-byte Hash, source_graph/segments/normalization: Option<(Id, Hash)>,
-  bundle: Option<ArtifactEnvelope<IrBundle>> — the whole envelope; claims/lineage read payload
-  layers) and GroupTrace (group_id, fixtures, compiled + verifier_results envelope Options);
-  infallible assemble_trace(&[DocTrace], &[GroupTrace]) -> (TraceBundle, LineageIndex) — trace
-  shapes emit canonically by construction, expect() inside. DAG: the one static report node
-  always present (static id, path report.json, hash None); per doc a source node (id =
-  document_id, path = fixture_path, hash = source_hash) then present landings in stage order as
-  nodes (id/hash from the landing, path = artifacts/<doc-id>/<kind>.json, ir_bundle node from
-  the envelope's artifact_id/content_hash), each edged from the nearest present predecessor
-  with the target kind's operation(); per group compiled + verifier_results nodes (paths
-  groups/<gid>/{compiled,verifier_results}.json), compile edges from each member's present
-  ir_bundle node (lookup keyed by document_id), compiled →verify→ verifier_results →report→
-  report. Claims iff compiled AND results present, one row per result: ordinal = index in the
-  results vector; pair = the query_plan entry whose overlap or deontic slot equals the row's
-  query_id (no match → skip); finding_id = finding.<group_id>.<ordinal>; evidence = recorded
-  unsat core verbatim, else both pair constraint ids fc.-stripped and prefixed ctx. (overlap
-  slot matched) / a. (deontic); rule/region ids = assertion_map union over the pair's two
-  constraints; conflict_kind = deontic_direction_conflict iff category semantic_contradiction;
-  report_ref = the report node. Lineage per claim x member fixture: member bundle required,
-  doc_rules = the claim's rules prefixed <fixture>.rule. (empty → skip row); each rule's
-  position k in norm.rules gives its source_region_ids and clinical.statements[k] →
-  statement_id + source_segment_ids. Sort every emitted set by canonical_sort_key, then
-  validate() both. Tests stay synthetic — no fixtures, no Z3, no IrBundle values: empty inputs
-  (lone report node); a bundle-less full chain; a gapped doc (segments absent → one
-  normalize-operation edge bridging source_graph → normalization); a bare group (no nodes); a
-  results-only group (node + report edge, no verify edge, no claims); hand-built
-  CompiledArtifact + VerifierResults pinning ordinals, evidence fallback naming, assertion_map
-  unions, conflict_kind, and the lineage skip paths — live fixture values land in
-  cli-runner.3a.2b. Reading: trace.rs, ckc-smt artifact.rs + result.rs, SPEC §7.1, §8.3.
-  Consumes cli-runner.3a.1. Gate: `cargo test -p ckc-cli trace::`.
+  71% 142K/200K 01317b9
+- [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.
+  76% 153K/200K _
 - [ ] cli-runner.3a.2b: Live fixture pins for assemble_trace (tests only; production trace.rs
   and run.rs untouched): trace.rs test helpers mirroring run.rs's two pipelines through the pub
   stage surface — fixture/lexicon/producer helpers per the normalize.rs test pattern, a generic
