@@ -53,7 +53,11 @@ git history.
   format-completion + fixture-integration; a nontrivial algorithm plus a second authored
   artifact = two units; a multi-invariant validator plus full rejection coverage = two
   units; a derivation fn with its fixture-pinned battery plus an attachment sub-feature =
-  two units; a type family plus assembly plus validation = three units; a spec-byte
+  two units; a type family plus assembly plus validation = three units (6th overrun,
+  cli-runner.3a 2026-06-11: trace types + assembly + ckc-run wiring scheduled as one unit
+  against this anchor — 975 uncompiled lines plus full run.rs/shell.rs reads by compaction;
+  reverted, split .3a.1/.2/.3 with the decisions pinned in the lines and each Reading slice
+  excluding files its half leaves untouched); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors
