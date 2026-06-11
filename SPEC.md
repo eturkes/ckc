@@ -12,32 +12,31 @@ compact, reusable, source-grounded IR components; compiles them deterministicall
 targets (SMT-LIB first); and surfaces contradictions and documented null results with end-to-end
 machine-checkable evidence.
 
-Thesis under test, as four falsifiable claims. Order is dependency, not test order — each claim
-builds on its predecessors' machinery; §2 schedules the experiments, §7.3 defines the metrics:
+Thesis under test, as three falsifiable claims, ordered by dependency — each claim builds on
+its predecessors' machinery, and test order matches (M2, M3, M5). §2 schedules the experiments,
+§7.3 defines the metrics. The layered component IR is the instrument, not a claim: layering is
+a route variable inside claim 1, reuse generalization is what claim 2's coverage measures, and
+the layered-versus-direct payoff lands as M3's architecture ablation (§10):
 
-1. Reuse: a layered IR of reusable components — verified once, reused by normalized hash,
-   compiled deterministically — outperforms direct per-document formalization on the §7.3 reuse,
-   compactness, convergence, compilation, conflict-quality, and trace-completeness families.
-   Tested at M3.
-2. Short-hop translation (models in the loop): how reliably a weak local model translates
+1. Short-hop translation (models in the loop): how reliably a weak local model translates
    clinical Japanese into an executable formal target depends on the IR configuration the route
-   targets; staged, grammar-constrained, short-hop routes tame model non-determinism and beat
-   direct one-leap emission on the §7.3 route-quality and conflict-quality families. Tested at
-   M2; widened at M3–M4.
-3. Model-free runtime (models at development time only): a compact admitted mapping layer —
+   targets; staged, grammar-constrained, short-hop routes — layered and hop-chain forms
+   included — tame model non-determinism and beat direct one-leap emission on the §7.3
+   route-quality and conflict-quality families. Tested at M2; widened at M3–M4.
+2. Model-free runtime (models at development time only): a compact admitted mapping layer —
    authored and maintained by AI agents, where hand-encoding once made expert systems
    prohibitive — covers fresh documents deterministically with zero runtime model calls; its
    quality is an optimization problem: maximize coverage and reuse, minimize mapping-set size.
    Tested at M3.
-4. Autoresearch: a bounded autonomous loop over declared surfaces, scored by an immutable
-   evaluator, measurably improves the objectives of claims 1–3 — from lexicon repair up to
-   search over the IR-combination space — while every attempt stays ledgered and replayable.
-   Tested at M5.
+3. Autonomous optimization: a bounded autonomous loop over declared surfaces, scored by an
+   immutable evaluator, measurably improves the objectives of claims 1–2 — from lexicon repair
+   up to search over the IR-combination space — while every attempt stays ledgered and
+   replayable. Tested at M5.
 
-Documented null results are first-class outcomes for all four claims.
+Documented null results are first-class outcomes for all three claims.
 
 Stage arc: the plan realizes CKC in three stages, each gated by its predecessor. Stage I —
-research instrument (M1–M5): prove claims 1–4 on synthetic corpora; "executable" means compiled
+research instrument (M1–M5): prove claims 1–3 on synthetic corpora; "executable" means compiled
 to solver-checked formal targets; locked Stage I measurements anchor a methods manuscript.
 Stage II — guideline auditor (M6–M7): the compiler's first application — static analysis of
 real public corpora surfacing source-grounded revision candidates for guideline authors,
@@ -52,7 +51,7 @@ e.g. a guideline recommendation versus a PMDA package-insert contraindication �
 Japanese source spans through IR and named SMT assertions to solver cores, replayable from
 content hashes alone. Behind it sits an asymptotic ideal: ever more minimal admitted mapping and
 axiom sets representing ever more clinical knowledge — a single global axiom in the unreachable
-limit — which orients compactness and autoresearch optimization (`G-MDL`) while staying outside
+limit — which orients compactness and autonomous optimization (`G-MDL`) while staying outside
 every report's claims.
 
 Research posture: every output is research evidence. Accepted
@@ -130,10 +129,10 @@ assembling the full harness before the first end-to-end result.
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
 | M1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_spine` + §8 checklist |
-| M2 short-hop PoC | First experiment, claim 2's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_shorthop` + §9 |
-| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization baseline pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; model-free coverage experiment (claims 1–2; claim 3 via the compactness front and the coverage experiment). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
-| M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (claim 2, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
-| M5 autoresearch PoC | Bounded autoresearch loop (§12) over declared surfaces against a locked evaluator, optimizing translation reliability, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 4). | `ckc research loop --experiment exp.m5_loop` + §12 |
+| M2 short-hop PoC | First experiment, claim 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_shorthop` + §9 |
+| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; model-free coverage experiment (claim 1 across the route axis; claim 2 via the coverage experiment and compactness front; layered-versus-direct as architecture ablation). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
+| M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (claim 1, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
+| M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a locked evaluator, optimizing translation reliability, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 3). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 contract elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora: finding triage (severity, bilingual review questions), weighted minimal-correction-set revision localization, cvc5 cross-check on blocking/major findings, Lean per-instance reflection anchor, adjudication records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
 
@@ -751,7 +750,7 @@ the core and back.
 
 ## §9 M2 — Short-hop translation PoC (contract; elaborate at M1 acceptance)
 
-Intent: the first experiment — claim 2's minimal pair on this laptop. Establish as a locked
+Intent: the first experiment — claim 1's minimal pair on this laptop. Establish as a locked
 measurement that a weak local model translating clinical Japanese directly into an executable
 formal target is unreliable, and that one IR-mediated route measurably improves reliability on the
 same inputs; publish the result as a bilingual research report. The M1 spine is the instrument:
@@ -800,9 +799,9 @@ the bilingual report renders deterministically from `report.json`; §0 vocabular
 
 ## §10 M3 — IR variation and comparison (contract; elaborate at M2 acceptance)
 
-Intent: widen claim 2 across the route axis — vary and layer existing IR forms — and take the
-claim-1 and claim-3 measurements with the full evaluator: layered versus direct, reuse and
-convergence quantified on a corpus designed to exercise them.
+Intent: widen claim 1 across the route axis — vary and layer existing IR forms — and take the
+claim-2 measurements with the full evaluator; the layered-versus-direct architecture ablation
+quantifies reuse and convergence on a corpus designed to exercise them.
 
 Committed direction:
 
@@ -819,10 +818,10 @@ Committed direction:
   keeping conflict-task scoring identical across routes; all §9 and §10 routes run
   `exp.m3_routes` under one frozen-measurement identity, and §7.3 route-quality, baseline-delta,
   conflict-task accuracy, and k-sample convergence metrics emit as raw rows before ranking.
-- `pipe.direct_rule_to_smt` (`exp.m3_compare`, the claim-1 deterministic baseline): extract →
-  segment → direct phrase-normalization → FormalIR → SMT, bypassing shared ClinicalIR/NormIR
-  component reuse; unused stages emit pass-through artifacts (outcome `ok`, payload marker
-  `not_applicable`) under the same envelope rules.
+- `pipe.direct_rule_to_smt` (`exp.m3_compare`, the deterministic architecture-ablation
+  baseline): extract → segment → direct phrase-normalization → FormalIR → SMT, bypassing shared
+  ClinicalIR/NormIR component reuse; unused stages emit pass-through artifacts (outcome `ok`,
+  payload marker `not_applicable`) under the same envelope rules.
 - Fixture growth: 4–6 additional synthetic documents sharing populations/actions/conditions
   across documents (reuse pressure), plus deterministic metamorphic variants of M1 documents
   (punctuation, kana/kanji, section order) committed as mutation fixtures with declared
@@ -830,7 +829,7 @@ Committed direction:
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
   `compactness_front.json` join the trace exports — the front doubles as the
-  mapping-minimization view (claim 3's optimization objective, measured deterministically here).
+  mapping-minimization view (claim 2's optimization objective, measured deterministically here).
 - Path visualizations per §7.1 (per-finding chain; cross-document component convergence).
 - Metrics per §7.3 over both pipelines and every route; the per-metric layered-minus-direct
   deltas are the staged pipeline's §7.3 baseline-delta measurement; `candidate_diff.json` compares segment,
@@ -844,7 +843,7 @@ Committed direction:
   `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by fixtures.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_grounding_off`.
-- Model-free coverage experiment (`exp.m3_coverage`, claim 3): fixture set A builds mappings and
+- Model-free coverage experiment (`exp.m3_coverage`, claim 2): fixture set A builds mappings and
   admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus gold, mapping-set size versus coverage on the compactness front, and
@@ -864,7 +863,7 @@ complete; the coverage report emits with raw rows first.
 
 ## §11 M4 — Invented IR/DSLs (contract; elaborate at M3 acceptance)
 
-Intent: claim 2 extended to invented forms — project-born IR/DSLs designed for weak-model translation
+Intent: claim 1 extended to invented forms — project-born IR/DSLs designed for weak-model translation
 reliability and deterministic compilation, evaluated with the same instrument as every existing
 IR form, in singular and layered configurations. A documented null result — no invented form
 beats the §10 field — is a first-class outcome.
@@ -894,11 +893,11 @@ Acceptance themes (finalized at elaboration): at least two invented candidates e
 and layered over identical locked inputs; ranked against the §10 field with raw rows first;
 recorded model I/O replays byte-stably; §0 vocabulary holds.
 
-## §12 M5 — Autoresearch PoC (contract; elaborate at M4 acceptance)
+## §12 M5 — Autonomous optimization PoC (contract; elaborate at M4 acceptance)
 
-Intent: claim 4 — `ckc research loop --experiment exp.m5_loop` runs a bounded
+Intent: claim 3 — `ckc research loop --experiment exp.m5_loop` runs a bounded
 propose → patch → run → score → classify → promote/reject → replay → ledger cycle that improves
-claims 1–3's objectives under an immutable evaluator. The PoC runs on laptop budgets; the loop
+claims 1–2's objectives under an immutable evaluator. The PoC runs on laptop budgets; the loop
 contract is built to outgrow them.
 
 Committed direction:
@@ -937,7 +936,7 @@ Committed direction:
   registered, exercised on user request. Long-horizon loops run on the agent driver when scale
   demands; evaluator locks, admission, and ledgers stay identical across drivers.
 - Standing long-run objectives: route/IR-combination search over the `registry/methods.yaml`
-  universe (§14) — existing formalisms and the §11 invented-DSL program; the claim-2
+  universe (§14) — existing formalisms and the §11 invented-DSL program; the claim-1
   configuration space is combinatorial — and mapping-set minimization toward the §0 asymptotic
   ideal, under `G-MDL` for any calibrated minimality claim.
 - Scale-out — `ExperimentPlan` matrices with compatibility filters, pairwise/fractional designs,
