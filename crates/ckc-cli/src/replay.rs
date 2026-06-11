@@ -4,8 +4,8 @@
 //! timestamps, the JSONL logs — never enters the comparison: content
 //! hashes cover canonical payload bytes only, so the exclusion holds by
 //! construction. No shell contact: [`execute`] takes paths and returns
-//! values; the `ckc replay` command (cli-runner.4.2b) owns the CLI
-//! surface. The re-execution itself drives the full §8.3 pipeline through
+//! values; [`command`] owns the `ckc replay` CLI surface. The
+//! re-execution itself drives the full §8.3 pipeline through
 //! [`crate::run::execute`] under a replay-owned internal shell, so the
 //! scratch directory ends up a complete run layout, inspectable after any
 //! verdict.
@@ -19,6 +19,8 @@
 //! §4.6 expectation, is `replay_mismatch` — the record carries the
 //! symmetric difference, every diverging hash an artifact ref. Matching
 //! hashes are the §4.6 standing idempotency property: re-run equals prior.
+
+pub(crate) mod command;
 
 use std::path::Path;
 
@@ -271,7 +273,7 @@ mod tests {
 
     /// Repository root: two levels above the ckc-cli manifest, where the
     /// §3 `registry/` and `corpus/` trees live.
-    fn repo_root() -> PathBuf {
+    pub(crate) fn repo_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .ancestors()
             .nth(2)
@@ -281,7 +283,7 @@ mod tests {
 
     /// Execute `exp.m1_spine` into `<tmp>/m1` — the prior run every live
     /// replay test re-executes — and require it clean.
-    fn fixture_run(root: &Path, tmp: &Path) -> PathBuf {
+    pub(crate) fn fixture_run(root: &Path, tmp: &Path) -> PathBuf {
         let out = tmp.join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m1"), Some(out.clone()));

@@ -76,10 +76,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1b.2b.1: ckc run lands report.md + run/replay manifests.
   33% 65K/200K 72baf4b
 - [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K 05566a8
-- [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K _
-- [ ] cli-runner.4.2b: ckc replay command over the replay core — CLI surface, run-layout
-  resolution, diagnostics rendering. Closes §8.5 item 8. Reading: shell.rs dispatch, the trace
-  command as the pattern. Consumes cli-runner.4.2a. Gate: `cargo test --workspace`.
+- [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K f9b794a
+- [x] cli-runner.4.2b: ckc replay command, match report stdout body. 65% 129K/200K _
 - [ ] acceptance-m1: Dedicated acceptance session for the M1 milestone: execute §8.5 items 1-9 in
   order (fmt/clippy/workspace tests; ckc registry check; ckc run --experiment exp.m1_spine --out
   runs/m1 with outcome ok and strict-read artifact set; assertion-map audit; group.m1_conflict

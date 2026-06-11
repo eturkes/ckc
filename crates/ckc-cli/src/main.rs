@@ -1,7 +1,7 @@
 //! `ckc` binary entry: thin I/O wrapper over [`ckc_cli::run_cli`] — events
 //! to stderr when no output directory took them, the command's stdout body
-//! (the `ckc trace` chain) and then the single §4.4 result line to stdout,
-//! exit code from the outcome.
+//! (the `ckc trace` chain, the `ckc replay` match report) and then the
+//! single §4.4 result line to stdout, exit code from the outcome.
 
 use std::io::Write;
 

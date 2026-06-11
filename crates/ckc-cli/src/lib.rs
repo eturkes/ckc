@@ -6,7 +6,7 @@
 //!   surface with validated argument shapes and the once-wired CLI
 //!   invariants: containment-guarded writes, §4.6 JSONL event/diagnostic
 //!   streams, exactly one §4.4 total operation result, outcome-mapped exit
-//!   codes; the pending replay body returns a typed `unsupported` result.
+//!   codes.
 //! - `registry_check` — `ckc registry check` (§8.5 item 2): the §8.4
 //!   registry surface plus experiment-referenced gold strict-loaded from the
 //!   invocation root and validated as one cross-referenced set, every load
@@ -92,8 +92,11 @@
 //!   hashes, runtime metadata excluded by construction — a match is the
 //!   §4.6 re-run-equals-prior property, divergence a `replay_mismatch`
 //!   carrying the symmetric difference, a missing solver
-//!   `replay_identity_unsupported`; the `ckc replay` command joins with
-//!   cli-runner.4.2b.
+//!   `replay_identity_unsupported`; `replay::command` is `ckc replay`
+//!   (cli-runner.4.2b, §8.5 item 8): the prior run re-executed into the
+//!   sibling `<run-dir>.replay` scratch layout, a match rendered as the
+//!   command's stdout body (rerun outcome and layout, every accepted
+//!   artifact hash), every failure one command-scope §7.4 diagnostic.
 #![forbid(unsafe_code)]
 
 pub mod extract;

@@ -10,9 +10,9 @@
 //! Every invocation — including unparseable input — ends in exactly one §4.4
 //! total operation result on stdout. Argument and validation failures report
 //! a `schema_invalid` diagnostic under outcome `invalid` (§4.4 "command
-//! validation fails"); the pending replay body returns a bare typed
-//! `unsupported` result. `ckc trace` precedes the result line with its
-//! chain text (§8.5 item 7), the one stdout body. Exit code maps from the
+//! validation fails"). `ckc trace` precedes the result line with its
+//! chain text (§8.5 item 7) and `ckc replay` with its match report (§8.5
+//! item 8), the two stdout bodies. Exit code maps from the
 //! outcome: `ok` 0, `invalid` 2, every other outcome 1. There is no human
 //! usage text: the result line, command body, and event stream are the
 //! interface.
@@ -33,8 +33,9 @@ const OP_TRACE: &str = "trace";
 /// `result_line` is the §4.4 result as one canonical JSONL line for stdout;
 /// `streamed_events` is the §4.6 events stream for stderr whenever no output
 /// directory took it as `logs/events.jsonl`; `command_output` is the
-/// command body's stdout text ahead of the result line (today: the
-/// `ckc trace` chain), present only beside an ok result.
+/// command body's stdout text ahead of the result line (the `ckc trace`
+/// chain, the `ckc replay` match report), present only beside an ok
+/// result.
 pub struct CliExit {
     pub result: TotalOperationResult,
     pub result_line: Vec<u8>,
@@ -77,10 +78,8 @@ enum RawCommand {
     Trace { run_dir: String, finding: String },
 }
 
-/// Validated command. The pending replay body reads only what the shell
-/// needs; cli-runner.4.2 consumes its run directory in place.
+/// Validated command.
 #[derive(Debug)]
-#[expect(dead_code, reason = "replay's argument payload awaits cli-runner.4.2")]
 enum Command {
     RegistryCheck,
     Run {
@@ -287,20 +286,20 @@ fn shell_for(command: &Command) -> Shell {
         Command::Run { out, run_id, .. } => {
             Shell::open(command_op(command), run_id.clone(), Some(out.clone()))
         }
-        // replay/trace consume an existing run directory but write nothing
-        // at this unit; their implementing units pick the write root.
+        // replay/trace consume an existing run directory and stream their
+        // events: trace writes nothing, and replay's re-execution writes
+        // only through the core's internal shell into the scratch layout.
         Command::Replay { run_id, .. } | Command::Trace { run_id, .. } => {
             Shell::open(command_op(command), run_id.clone(), None)
         }
     }
 }
 
-/// Command bodies. `registry check` and `run` work against the working
-/// directory (§3 anchors `registry/` and corpus paths at the repository
-/// root); `trace` resolves against its validated run directory and is the
-/// one body returning stdout text (the §8.5 item 7 chain); `replay` is
-/// pending and returns a typed `unsupported` result after input
-/// validation, replaced in place by cli-runner.4.2.
+/// Command bodies. `registry check`, `run`, and `replay`'s re-execution
+/// work against the working directory (§3 anchors `registry/` and corpus
+/// paths at the repository root); `trace` and `replay` resolve their
+/// validated run directories in place and are the bodies returning stdout
+/// text (the §8.5 item 7 chain, the §8.5 item 8 match report).
 fn execute(command: &Command, shell: &mut Shell) -> Option<Vec<u8>> {
     match command {
         Command::RegistryCheck => {
@@ -314,9 +313,8 @@ fn execute(command: &Command, shell: &mut Shell) -> Option<Vec<u8>> {
         Command::Trace {
             run_dir, finding, ..
         } => crate::trace::command::execute(run_dir, finding, shell),
-        Command::Replay { .. } => {
-            shell.merge(Outcome::Unsupported);
-            None
+        Command::Replay { run_dir, .. } => {
+            crate::replay::command::execute(Path::new("."), run_dir, shell)
         }
     }
 }
@@ -540,12 +538,21 @@ mod tests {
         let exit = run_cli(&args(&["replay", missing.to_str().unwrap()]));
         assert!(invalid_reason(&exit).contains("run directory not found"));
 
+        // The body runs against the validated directory: an empty run dir
+        // fails the replay_manifest.json strict read (the command's own
+        // tests cover the live paths, rooted at the repository).
         let run_dir = tmp.path().join("r1");
         std::fs::create_dir_all(&run_dir).unwrap();
         let exit = run_cli(&args(&["replay", run_dir.to_str().unwrap()]));
         assert_eq!(exit.result.operation_id, static_id(OP_REPLAY));
-        assert_eq!(exit.result.outcome, Outcome::Unsupported);
-        assert_eq!(streamed(&exit)[0].run_id, static_id("r1"));
+        assert_eq!(exit.result.outcome, Outcome::Invalid);
+        assert_eq!(exit.exit_code, 2);
+        assert!(exit.command_output.is_none());
+        let events = streamed(&exit);
+        assert_eq!(events[0].run_id, static_id("r1"));
+        let diagnostic = &events[0].diagnostics[0];
+        assert_eq!(diagnostic.code, DiagnosticCode::SchemaInvalid);
+        assert_eq!(diagnostic.payload[0].1, "replay_manifest.json");
 
         let exit = run_cli(&args(&["replay"]));
         assert!(invalid_reason(&exit).contains("missing run directory"));
