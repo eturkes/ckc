@@ -45,27 +45,9 @@ bare headers; git history retains all removed text.
 - [x] stage-normalize.1e: exception clause attachment completing clinical_ir.
   51% 102K/200K 68b71e2
 - [x] stage-normalize.2a: rule-id scheme + §8.6/§8.2 re-pin + Normalization payload.
-  63% 127K/200K _
-- [ ] stage-normalize.2b: NormRule derivation + stage envelope (cli half; consumes
-  stage-normalize.2a). New ckc-cli module rules.rs: derive_norm_ir(document_id, &ClinicalIr,
-  &SegmentIr, &Lexicon) -> NormIr — per statement one DNF conjunct: population+condition atoms
-  interval-lowered (a positive Concept whose lexicon entry carries an interval becomes that
-  Interval atom — adult ge "18" / child lt "18" on q.age_years; exception negation never
-  lowers), plus one ConceptNegated per exception-clause Concept atom (non-Concept clause atoms
-  contribute nothing, unreachable at M1); source_region_ids = regions of recommendation-kind
-  source segments in reading order, then clause regions in clause order; exception_refs = clause
-  ids; direction/strength/certainty/action flow from the statement; rule_id
-  <document_id>.rule.<k>. normalize.rs gains the stage entry normalize(source, segments,
-  lexicon, producer) -> ArtifactEnvelope<Normalization> mirroring segment(): schema.normalization,
-  artifact id <document_id>.normalization, input_hashes [source, segments], NormalizeError::Canon
-  shaped like SegmentError; lib.rs: pub mod rules + doc bullet. Tests in rules.rs: pipeline byte
-  pin for guideline_a equal to the amended §8.6 listing + strict-read round trip (THE oracle);
-  full value pins for guideline_b + control (predicted: source_region_ids [r.2] both, b conjunct
-  {age ge "18", cond.pregnancy, cond.sepsis} contraindicate/strong, control {age lt "18",
-  cond.sepsis}; pin from observed output if off); hand-built derivation-semantics case (clause
-  refs, region order, certainty flow, Interval clause atom skipped); envelope contract +
-  double-run determinism. Reading: SPEC §8.6 (amended), §5 NormRule/ContextExpr, §8.3 normalize
-  row, §4.4; patterns: clinical_ir, segment(). Gate: `cargo test -p ckc-cli`.
+  63% 127K/200K 86414f1
+- [x] stage-normalize.2b: NormRule derivation + normalize() stage envelope.
+  74% 149K/200K _
 - [ ] smt-emit.1: ckc-smt crate foundation: workspace member depending on ckc-core; CompiledArtifact
   (target id, logic, query plan, query bodies, named-assertion records mapping assertion ids to IR
   rule ids and source region ids, target metadata, diagnostics) and VerifierResult (per-query §6

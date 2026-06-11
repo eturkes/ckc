@@ -31,11 +31,20 @@
 //!   ambiguities withholding it as §7.4 records; exception segments
 //!   attaching their concepts as ExceptionClauses to the nearest preceding
 //!   kept statement, concept-free or statement-less exceptions dropping the
-//!   clause as a Residual).
+//!   clause as a Residual); the stage entry ([`normalize::normalize`]:
+//!   statement and rule layers as one enveloped `schema.normalization`
+//!   artifact, input hashes `[source, segments]`).
+//! - [`rules`] — NormRule derivation (`stage-normalize.2b`):
+//!   [`rules::derive_norm_ir`] lowering `statements[k]` to `rules[k]` under
+//!   the §8.6 id scheme: one DNF conjunct per rule, population/condition
+//!   concepts interval-lowered through the lexicon, exception clauses
+//!   joined as negated concept atoms, clause regions and ids landing in
+//!   `source_region_ids`/`exception_refs`.
 #![forbid(unsafe_code)]
 
 pub mod extract;
 pub mod normalize;
+pub mod rules;
 pub mod segment;
 
 mod dispatch;

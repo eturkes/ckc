@@ -1,5 +1,6 @@
-//! Normalize stage, first half: lexicon loading and mention binding
-//! (SPEC §8.3 normalize row).
+//! Normalize stage (SPEC §8.3 normalize row): lexicon loading, mention
+//! binding, statement building, and the enveloped stage entry;
+//! [`NormRule`](ckc_core::NormRule) derivation lives in [`crate::rules`].
 //!
 //! [`load_lexicon`] strict-deserializes `corpus/lexicon/ja_core.yaml` — the
 //! §5 M1 terminology and modality authority (system `ckc.lex`) — and
@@ -36,6 +37,14 @@
 //! nearest preceding kept statement, whose `source_segment_ids` gains the
 //! segment; a concept-free exception or one with no preceding statement
 //! records a Residual and drops the clause, bindings emitting either way.
+//!
+//! [`normalize`] (`stage-normalize.2b`) is the stage entry: [`clinical_ir`]
+//! plus [`crate::rules::derive_norm_ir`] under one §4.4 envelope —
+//! `schema.normalization`, artifact id `<document_id>.normalization`,
+//! `deterministic_compiler` origin under `mechanical_authority`, the
+//! consumed source-graph and segments envelopes' content hashes as the
+//! input hashes in that order, the statement pass's diagnostics in the
+//! envelope, payload hashes computed here.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -43,10 +52,11 @@ use std::fmt;
 use serde::Deserialize;
 
 use ckc_core::{
-    Action, BindingStatus, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
-    DiagnosticCode, DiagnosticRecord, Direction, ExceptionClause, Hash, Id, Outcome,
-    QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength,
-    StringPolicy, TerminologyBinding, hash_bytes,
+    Action, ArtifactEnvelope, Authority, BindingStatus, CanonError, Certainty, ClinicalIr,
+    ClinicalSegment, ClinicalStatement, ContextAtom, DiagnosticCode, DiagnosticRecord, Direction,
+    ExceptionClause, Hash, Id, Normalization, Origin, Outcome, Producer, QuantityInterval,
+    SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength, StringPolicy,
+    TerminologyBinding, canonicalization_policy_hash, content_hash, hash_bytes,
 };
 
 use crate::shell::static_id;
@@ -1000,6 +1010,64 @@ fn slot_diag(
         region_ids,
         artifact_hashes: vec![],
     }
+}
+
+/// Normalization failed mechanically. Binding gaps, slot misses, and
+/// dropped clauses are diagnostics, never errors, so canonical emission
+/// while hashing the payload is the sole variant.
+#[derive(Debug)]
+pub enum NormalizeError {
+    Canon(CanonError),
+}
+
+impl fmt::Display for NormalizeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NormalizeError::Canon(e) => write!(f, "canonical emission: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for NormalizeError {}
+
+impl From<CanonError> for NormalizeError {
+    fn from(e: CanonError) -> Self {
+        NormalizeError::Canon(e)
+    }
+}
+
+/// Normalize `source` under `segments` and wrap the result per §4.4
+/// (module doc): the §5 statement layer beside the rule layer derived
+/// from it, `schema.normalization`.
+pub fn normalize(
+    source: &ArtifactEnvelope<SourceGraph>,
+    segments: &ArtifactEnvelope<SegmentIr>,
+    lexicon: &Lexicon,
+    producer: &Producer,
+) -> Result<ArtifactEnvelope<Normalization>, NormalizeError> {
+    let (clinical, diagnostics) = clinical_ir(&source.payload, &segments.payload, lexicon);
+    let document_id = &source.payload.document.document_id;
+    let norm = crate::rules::derive_norm_ir(document_id, &clinical, &segments.payload, lexicon);
+    let payload = Normalization { clinical, norm };
+
+    let artifact_id = Id::new(format!("{document_id}.normalization"))
+        .expect("a valid document id keeps the Id grammar under a suffix");
+    Ok(ArtifactEnvelope {
+        schema_id: static_id("schema.normalization"),
+        artifact_id,
+        artifact_kind: static_id("normalization"),
+        producer: producer.clone(),
+        input_hashes: vec![source.content_hash.clone(), segments.content_hash.clone()],
+        content_hash: content_hash(&payload)?,
+        canonicalization_policy_hash: canonicalization_policy_hash(),
+        origin: Origin::DeterministicCompiler,
+        authority: Authority::MechanicalAuthority,
+        accepted_effects: vec![],
+        trace_refs: vec![],
+        diagnostics,
+        runtime_metadata: vec![],
+        payload,
+    })
 }
 
 #[cfg(test)]
