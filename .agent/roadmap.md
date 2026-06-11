@@ -44,26 +44,8 @@ bare headers; git history retains all removed text.
 - [x] stage-normalize.1d: recommendation statement builder. 68% 136K/200K eca4462
 - [x] stage-normalize.1e: exception clause attachment completing clinical_ir.
   51% 102K/200K 68b71e2
-- [ ] stage-normalize.2a: Rule-id amendment + Normalization payload (core half of the split
-  stage-normalize.2; first attempt 2026-06-11 hit compaction and was reverted — decisions below
-  are user-approved, execute them, reconfirm only if blocked). Scheme: rule_id =
-  <document_id>.rule.<k> in derivation order (rules[k] <-> statements[k]; doc id = corpora
-  fixture id, so fixture.m1_guideline_a.rule.0); every other id stays a doc-local counter.
-  Rationale: SPEC §8.6's semantic ids are unmintable (extract is structure-driven; alias regions
-  would break §4.5 validation) and smt-emit.3's pinned ctx.<rule_id>/a.<rule_id> assertion forms
-  need cross-document uniqueness in one SMT file (§8.5 item 5 cores both documents). Amend SPEC
-  §8.6 under §1: preamble states the scheme; NormRule listing re-pinned with rule_id
-  fixture.m1_guideline_a.rule.0, source_region_ids ["r.2","r.3"], exception_refs ["exc.0"]
-  (populate, user-approved), context conjunct {concept cond.sepsis, concept_negated
-  cond.renal_severe, interval q.age_years ge "18"}; the SMT ctx./a. names follow the new ids.
-  Amend §8.2 gold core -> [a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0],
-  compared as a set. Mirrors: corpus/gold/m1_expected.yaml; registry.rs GOLD const +
-  reorder-test replace strings + core-set assert; fixtures_m1.rs core-set assert. ir.rs:
-  retarget norm_rule_spec86_bytes to the amended listing bytes; add payload struct
-  Normalization{clinical: ClinicalIr, norm: NormIr} (Canonical members "clinical"/"norm", strict
-  CanonRead, empty-payload byte-pin test); re-export from lib.rs. The _p helpers and bundle.rs
-  ids are local test vocabulary claiming no spec bytes — leave every occurrence untouched.
-  Reading: SPEC §8.6, §8.2, §4.3. Gate: `cargo test -p ckc-core`.
+- [x] stage-normalize.2a: rule-id scheme + §8.6/§8.2 re-pin + Normalization payload.
+  63% 127K/200K _
 - [ ] stage-normalize.2b: NormRule derivation + stage envelope (cli half; consumes
   stage-normalize.2a). New ckc-cli module rules.rs: derive_norm_ir(document_id, &ClinicalIr,
   &SegmentIr, &Lexicon) -> NormIr — per statement one DNF conjunct: population+condition atoms

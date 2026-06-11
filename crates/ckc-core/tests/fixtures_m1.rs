@@ -168,7 +168,10 @@ fn gold_matches_spec_expectations() {
     );
     assert_eq!(
         conflict.expected_core,
-        BTreeSet::from([id("a.rule.a.cq1.r1"), id("a.rule.b.contra1")])
+        BTreeSet::from([
+            id("a.fixture.m1_guideline_a.rule.0"),
+            id("a.fixture.m1_guideline_b.rule.0"),
+        ])
     );
     assert!(!conflict.expected_null_result);
 

@@ -6,6 +6,8 @@
 //! FormalIR ([`FormalIr`]) — target-independent [`FormalConstraint`]s plus
 //! the [`ContradictionQueryPair`] contradiction-query plan.
 //! Layers hold references into the graph; the graph stays the byte authority.
+//! [`Normalization`] pairs the ClinicalIR and NormIR layers as the §8.3
+//! normalize-stage envelope payload (`normalization.json`).
 //!
 //! The module also defines the §4.3 structural-hash machinery the later
 //! layers (core-ir.2/.3) reuse: a component's *structural bytes* are its
@@ -1226,6 +1228,34 @@ impl Structural for NormIr {
     }
 }
 
+/// SPEC §8.3 normalize-stage payload (`normalization.json`): the document's
+/// [`ClinicalIr`] and [`NormIr`] under one envelope, the statement layer
+/// beside the rule layer derived from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Normalization {
+    pub clinical: ClinicalIr,
+    pub norm: NormIr,
+}
+
+impl Canonical for Normalization {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("clinical", |b| self.clinical.emit_canonical(b))?;
+        obj.member("norm", |b| self.norm.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for Normalization {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let clinical = obj.member("clinical", ClinicalIr::read)?;
+        let norm = obj.member("norm", NormIr::read)?;
+        obj.close()?;
+        Ok(Normalization { clinical, norm })
+    }
+}
+
 /// SPEC §6 direction-group opposition, the direction half of conflict
 /// eligibility (the other half is action sameness via normalized keys, §5):
 /// true when one direction is in the positive group (`for`/`require`/
@@ -2136,10 +2166,25 @@ pub(crate) mod tests {
         assert!(bytes.find("cond.a").unwrap() < bytes.find("cond.b").unwrap());
     }
 
-    // THE unit pin: the §8.6 NormRule canonical payload, byte for byte.
+    // THE unit pin: the §8.6 NormRule canonical payload, byte for byte —
+    // spec-scheme ids (rule_id = <document_id>.rule.<k>; every other id a
+    // document-local counter), exception_refs populated.
     #[test]
     fn norm_rule_spec86_bytes() {
-        let rule = rule_p("");
+        let rule = NormRule {
+            rule_id: id("fixture.m1_guideline_a.rule.0"),
+            context: dnf1(vec![
+                atom_c("cond.sepsis"),
+                atom_nc("cond.renal_severe"),
+                atom_ge("q.age_years", 18),
+            ]),
+            direction: Direction::For,
+            action: Action::new(id("act.administer"), id("drug.abx_a")),
+            strength: Strength::Strong,
+            source_region_ids: vec![id("r.2"), id("r.3")],
+            certainty: None,
+            exception_refs: vec![id("exc.0")],
+        };
         assert_eq!(
             canon(&rule),
             concat!(
@@ -2148,8 +2193,9 @@ pub(crate) mod tests {
                 r#"{"tag":"concept","value":"cond.sepsis"},"#,
                 r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
                 r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
-                r#""direction":"for","rule_id":"rule.a.cq1.r1","#,
-                r#""source_region_ids":["region.a.cq1.rec","region.a.cq1.exc"],"#,
+                r#""direction":"for","exception_refs":["exc.0"],"#,
+                r#""rule_id":"fixture.m1_guideline_a.rule.0","#,
+                r#""source_region_ids":["r.2","r.3"],"#,
                 r#""strength":"strong"}"#
             )
         );
@@ -2235,6 +2281,33 @@ pub(crate) mod tests {
         };
         assert!(canon(&norm).starts_with(r#"{"rules":[{"action""#));
         round_trip(norm);
+    }
+
+    // The §8.3 normalize-stage payload pairs the two layers under sorted
+    // members; the empty payload pins the bytes.
+    #[test]
+    fn normalization_empty_bytes() {
+        let empty = Normalization {
+            clinical: ClinicalIr {
+                bindings: vec![],
+                statements: vec![],
+            },
+            norm: NormIr { rules: vec![] },
+        };
+        assert_eq!(
+            canon(&empty),
+            r#"{"clinical":{"bindings":[],"statements":[]},"norm":{"rules":[]}}"#
+        );
+        round_trip(empty);
+        round_trip(Normalization {
+            clinical: ClinicalIr {
+                bindings: vec![binding_p("")],
+                statements: vec![statement_p("")],
+            },
+            norm: NormIr {
+                rules: vec![rule_p("")],
+            },
+        });
     }
 
     // Structural bytes: local ids localize in canonical field order,

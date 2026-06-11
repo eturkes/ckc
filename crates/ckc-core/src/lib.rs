@@ -22,7 +22,8 @@
 //!   [`FormalIr`] over [`ClinicalSegment`], [`ClinicalStatement`],
 //!   [`TerminologyBinding`], [`NormRule`] guarded by [`ContextExpr`] DNF of
 //!   [`ContextAtom`]s on an [`Action`], [`FormalConstraint`],
-//!   [`ContradictionQueryPair`], [`directions_opposed`]; plus the §4.3
+//!   [`ContradictionQueryPair`], [`directions_opposed`], the §8.3
+//!   normalize-stage payload [`Normalization`]; plus the §4.3
 //!   rename-stable structural-hash pattern ([`Structural`],
 //!   [`structural_hash`], [`RefLocalizer`]).
 //! - `bundle` — §5 [`IrBundle`] assembly and sealing: [`assemble`],
@@ -80,9 +81,9 @@ pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use ir::{
     Action, CellRole, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
     ContextConjunct, ContextExpr, ContradictionQueryPair, DocIr, ExceptionClause, FormalConstraint,
-    FormalIr, IrError, NormIr, NormRule, QuantityInterval, RefLocalizer, SegmentIr, SegmentKind,
-    Strength, Structural, TableCell, TableView, TerminologyBinding, TextBlock, directions_opposed,
-    emit_structural_ref_set, structural_hash,
+    FormalIr, IrError, NormIr, NormRule, Normalization, QuantityInterval, RefLocalizer, SegmentIr,
+    SegmentKind, Strength, Structural, TableCell, TableView, TerminologyBinding, TextBlock,
+    directions_opposed, emit_structural_ref_set, structural_hash,
 };
 pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use registry::{

@@ -594,7 +594,7 @@ Fixture groups in `exp.m1_spine`: `group.m1_conflict = [a, b]` expecting one
 - group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict
-  expected_core: [a.rule.a.cq1.r1, a.rule.b.contra1]   # compared as a set
+  expected_core: [a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]   # compared as a set
 - group_id: group.m1_null
   expected_outcome: semantic_no_conflict
   expected_null_result: true
@@ -656,8 +656,13 @@ declared input artifact kinds are produced by its predecessors.
 Source span (docA): 「成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する」 + exception
 span 「ただし、重度腎機能障害のある患者を除く」.
 
+Ids: `rule_id = <document_id>.rule.<k>` in derivation order (`rules[k]` derives from
+`statements[k]`; document ids are the corpora fixture ids), so rule ids — and the assertion
+names built from them — stay unique when one SMT file cores several documents; every other id
+is a document-local counter (regions `r.<k>`, exception clauses `exc.<k>`).
+
 NormRule (canonical payload: fields byte-sorted, atoms as §4.3 tagged unions, conjunct sets
-sorted by canonical_sort_key; sibling ids disambiguate per §4.1):
+sorted by canonical_sort_key):
 
 ```json
 {"action":{"key":"act.administer:drug.abx_a","kind":"act.administer","target":"drug.abx_a"},
@@ -665,13 +670,14 @@ sorted by canonical_sort_key; sibling ids disambiguate per §4.1):
    {"tag":"concept","value":"cond.sepsis"},
    {"tag":"concept_negated","value":"cond.renal_severe"},
    {"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},
- "direction":"for","rule_id":"rule.a.cq1.r1",
- "source_region_ids":["region.a.cq1.rec","region.a.cq1.exc"],
+ "direction":"for","exception_refs":["exc.0"],
+ "rule_id":"fixture.m1_guideline_a.rule.0",
+ "source_region_ids":["r.2","r.3"],
  "strength":"strong"}
 ```
 
-docB yields `rule.b.contra1`: context `cond.sepsis ∧ age ≥ 18 ∧ cond.pregnancy`, direction
-`contraindicate`, same action key → pair eligible.
+docB yields `fixture.m1_guideline_b.rule.0`: context `cond.sepsis ∧ age ≥ 18 ∧ cond.pregnancy`,
+direction `contraindicate`, same action key → pair eligible.
 
 Q1 `q.m1_conflict.pair1.overlap` (QF_LRA):
 
@@ -683,9 +689,9 @@ Q1 `q.m1_conflict.pair1.overlap` (QF_LRA):
 (declare-const |cond.sepsis| Bool) (declare-const |cond.renal_severe| Bool)
 (declare-const |cond.pregnancy| Bool)
 (assert (! (and |cond.sepsis| (>= |q.age_years| 18) (not |cond.renal_severe|))
-           :named |ctx.rule.a.cq1.r1|))
+           :named |ctx.fixture.m1_guideline_a.rule.0|))
 (assert (! (and |cond.sepsis| (>= |q.age_years| 18) |cond.pregnancy|)
-           :named |ctx.rule.b.contra1|))
+           :named |ctx.fixture.m1_guideline_b.rule.0|))
 (check-sat)            ; sat
 (get-model)            ; witness model recorded
 ```
@@ -697,14 +703,16 @@ Q2 `q.m1_conflict.pair1.deontic`: polarity literals on the shared action (overla
 (set-option :print-success false)
 (set-option :produce-unsat-cores true)
 (declare-const |pos:act.administer:drug.abx_a| Bool)
-(assert (! |pos:act.administer:drug.abx_a|        :named |a.rule.a.cq1.r1|))
-(assert (! (not |pos:act.administer:drug.abx_a|)  :named |a.rule.b.contra1|))
+(assert (! |pos:act.administer:drug.abx_a|        :named |a.fixture.m1_guideline_a.rule.0|))
+(assert (! (not |pos:act.administer:drug.abx_a|)  :named |a.fixture.m1_guideline_b.rule.0|))
 (check-sat)            ; unsat
-(get-unsat-core)       ; recorded as the canonical set {a.rule.a.cq1.r1, a.rule.b.contra1}
+(get-unsat-core)       ; recorded as the canonical set
+                       ; {a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0}
 ```
 
-VerifierResult: `semantic_contradiction`, core `[a.rule.a.cq1.r1, a.rule.b.contra1]`. Report
-finding `finding.group.m1_conflict.1` cites both rules, their regions, the quoted spans, the core, and
+VerifierResult: `semantic_contradiction`, core
+`[a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]`. Report finding
+`finding.group.m1_conflict.1` cites both rules, their regions, the quoted spans, the core, and
 classifies as `deontic_direction_conflict`, claim tier `s1_admitted`, wording `synthetic fixture
 measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closing as
 `documented_null_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to

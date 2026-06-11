@@ -521,7 +521,7 @@ stages:
 - group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict
-  expected_core: [a.rule.a.cq1.r1, a.rule.b.contra1]   # compared as a set
+  expected_core: [a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]   # compared as a set
 - group_id: group.m1_null
   expected_outcome: semantic_no_conflict
   expected_null_result: true
@@ -606,13 +606,16 @@ stages:
         assert!(null.expected_core.is_empty());
 
         let reordered = GOLD.replace(
-            "[a.rule.a.cq1.r1, a.rule.b.contra1]",
-            "[a.rule.b.contra1, a.rule.a.cq1.r1]",
+            "[a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]",
+            "[a.fixture.m1_guideline_b.rule.0, a.fixture.m1_guideline_a.rule.0]",
         );
         assert_eq!(parse_gold(&reordered).unwrap()[0], *conflict);
         assert_eq!(
             conflict.expected_core,
-            BTreeSet::from([id("a.rule.a.cq1.r1"), id("a.rule.b.contra1")])
+            BTreeSet::from([
+                id("a.fixture.m1_guideline_a.rule.0"),
+                id("a.fixture.m1_guideline_b.rule.0"),
+            ])
         );
     }
 
