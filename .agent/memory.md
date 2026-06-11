@@ -11,7 +11,7 @@ git history.
   session lean and phrased in project vocabulary (stages, units, gates, artifacts) — plain
   operational words over research jargon in memory, roadmap, commits, and code alike.
   Consult `docs/` through read-only subagents so its vocabulary stays out of
-  the main window. Root `.ignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
+  the main window. Root `.rgignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
   rg`) out of `docs/`; Bash `grep -r` still enters it — scope Bash greps by path; deliberate
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Checked roadmap items collapse to one-line stubs (full unit text in git history).
@@ -95,7 +95,11 @@ git history.
   parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
   code spans). Serena get_diagnostics_for_file routes non-code files to the fallback LS and
   is useless there; Marksman diagnostics reach the session only via the harness
-  new-diagnostics channel.
+  new-diagnostics channel. Marksman's index honors `.ignore`/`.gitignore`/`.hgignore`
+  (Folder.fs ignoreFiles); an ignored markdown target turns valid links into "non-existent
+  document" warnings — hence docs/ sweep-exclusion lives in `.rgignore` (rg-only,
+  Marksman-invisible) and link diagnostics are trustworthy. Ignore files are read at folder
+  scan, not watched: such fixes clear at the next LSP start.
 - [2026-06-10] Serena replace_symbol_body spans the preceding doc comment AND outer
   `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
   way). Include the leading `///` lines and every attribute, or edit inner regions with
