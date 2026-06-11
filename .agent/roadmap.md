@@ -7,7 +7,7 @@ ordered unit checklist; unchecked lines carry the full unit spec; checked items 
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
-## M1 spine — plan 89c4cba — accept m1
+## M1 spine — plan 89c4cba — accept m1 — review _
 
 - [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 4b46cac
 - [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 0d823e0
@@ -78,4 +78,4 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K 7ecc19e
 - [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K 68eabd3
 - [x] cli-runner.4.2b: ckc replay command, match report stdout body. 65% 129K/200K 37d61a5
-- [x] acceptance-m1: §8.5 items 1-9 pass against recorded run m1; tag accept/m1. 38% 76K/200K _
+- [x] acceptance-m1: §8.5 items 1-9 pass against recorded run m1; tag accept/m1. 38% 76K/200K b8dae7e

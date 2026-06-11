@@ -203,7 +203,7 @@ Repository layout (target state; built up by the M1 units):
 │                                          # grows per milestone (§14)
 ├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
-├── .agent/{memory.md,roadmap.md,compaction.sh}
+├── .agent/{memory.md,roadmap.md,compaction.sh,lexgate.sh,protocol-plan.md,protocol-review.md}
 └── .claude/
 ```
 
