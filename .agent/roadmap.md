@@ -51,15 +51,8 @@ bare headers; git history retains all removed text.
 - [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
   >=90% compacted/200K 511b002
 - [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K 22787f9
-- [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K _
-- [ ] smt-emit.3b: CompiledArtifact assembly completing compile: assertion map binding every
-  ctx.<rule_id> and a.<rule_id> name to its rule id and source region ids (looked up from NormIR
-  rules by rule_id — FormalConstraint carries no regions), target metadata; out-of-profile
-  constructs (anything beyond §6 M1 concept/concept_negated/interval atoms expressible in QF_LRA)
-  drop their pair from the plan with an unsupported_fragment diagnostic while the artifact still
-  validates; assemble + validate CompiledArtifacts for the §8.6 pair and the control pair.
-  Reading: SPEC §6 profile + assertion map, §8.5 item 4, §7.4, §5 CompiledArtifact row. Consumes
-  smt-emit.3a, smt-emit.1 validation, core-ir.2 NormRule. Gate: `cargo test -p ckc-smt emit::`.
+- [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K 2d190a6
+- [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K _
 - [ ] smt-verify.a: Z3 adapter foundation in a verify module: install z3 via apt; SolverIdentity
   parsed live from `z3 --version` at adapter construction — code carries no version literal,
   manifests and results carry the truth; per-query subprocess invocation under a per-query

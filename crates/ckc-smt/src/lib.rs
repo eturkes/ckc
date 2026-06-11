@@ -9,9 +9,13 @@
 //!   query-plan slots, §6 query bodies under [`SmtLogic`], the
 //!   named-assertion map of [`AssertionRecord`]s, target metadata,
 //!   diagnostics) with structural validation ([`ArtifactError`]).
-//! - `emit` — compile-stage emission: [`emit_overlap_query`] /
+//! - `emit` — compile-stage emission and assembly: [`emit_overlap_query`] /
 //!   [`emit_deontic_query`], the §6 byte-pinned (§8.6) query texts of one
-//!   planned pair as [`QueryBody`]s.
+//!   planned pair as [`QueryBody`]s; [`compile`], one fixture group's
+//!   [`CompiledArtifact`] — planned pairs gated by the §6 M1 atom profile
+//!   (an out-of-profile pair drops with `unsupported_ir_fragment`), bodies
+//!   in plan order, the §8.5-item-4 assertion map bound through NormIR
+//!   rules, target metadata.
 //! - `plan` — compile-stage planning: [`plan_queries`], the §6 eligibility
 //!   scan over a fixture group's per-document FormalIRs, minting the §8.6
 //!   pair/query ids into §5 ContradictionQueryPair slots.
@@ -27,7 +31,7 @@ mod plan;
 mod result;
 
 pub use artifact::{ArtifactError, AssertionRecord, CompiledArtifact, QueryBody, SmtLogic};
-pub use emit::{emit_deontic_query, emit_overlap_query};
+pub use emit::{compile, emit_deontic_query, emit_overlap_query};
 pub use plan::plan_queries;
 pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult};
 

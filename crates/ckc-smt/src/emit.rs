@@ -1,8 +1,11 @@
-//! SPEC §6/§8.6 deterministic SMT-LIB emission — query text for the two §6
-//! contradiction queries of one planned pair
-//! ([`plan_queries`](crate::plan_queries) mints the pair and its query ids;
-//! smt-emit.3b assembles [`CompiledArtifact`](crate::CompiledArtifact)s
-//! from these bodies).
+//! SPEC §6/§8.6 deterministic SMT-LIB emission and §8.3 compile-stage
+//! assembly — [`emit_overlap_query`] / [`emit_deontic_query`] render the two
+//! §6 contradiction queries of one planned pair
+//! ([`plan_queries`](crate::plan_queries) mints the pair and its query ids),
+//! and [`compile`] assembles one fixture group's
+//! [`CompiledArtifact`](crate::CompiledArtifact) from them: planned pairs
+//! gated by the §6 M1 atom profile, bodies in plan order, the §8.5-item-4
+//! assertion map bound through NormIR rules, target metadata.
 //!
 //! Byte rules (§6 SMT profile, pinned by the §8.6 listings): one
 //! s-expression command per line, no comments, the file ending in a
@@ -16,13 +19,15 @@
 //! renders `true`, an interval atom contributes one comparison per present
 //! bound (ge gt le lt order), and a negative bound renders `(- n)`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use ckc_core::{
-    ContextAtom, ContextConjunct, ContextExpr, ContradictionQueryPair, Direction, FormalConstraint,
+    ContextAtom, ContextConjunct, ContextExpr, ContradictionQueryPair, DiagnosticCode,
+    DiagnosticRecord, Direction, FormalConstraint, FormalIr, Id, NormIr, NormRule, Outcome,
+    StringPolicy,
 };
 
-use crate::{QueryBody, SmtLogic};
+use crate::{AssertionRecord, CompiledArtifact, QueryBody, SmtLogic, plan_queries};
 
 /// SPEC §6 Q1 context_overlap (QF_LRA): both guarded contexts as
 /// `ctx.<rule_id>` named assertions; sat yields the recorded overlap
@@ -90,6 +95,161 @@ pub fn emit_deontic_query(
         logic: SmtLogic::QfUf,
         body,
     }
+}
+
+/// SPEC §8.3 compile-stage core — the [`CompiledArtifact`] of one fixture
+/// group. [`plan_queries`] plans over the documents' FormalIRs, each
+/// surviving pair emits its two §6 bodies in plan order, and the §6
+/// assertion map binds every `ctx.<rule_id>` and `a.<rule_id>` name to its
+/// rule id and the rule's source region ids as a canonical set — looked up
+/// from NormIR by `rule_id`, since FormalConstraint carries no regions
+/// (§8.5 item 4 audits exactly this binding).
+///
+/// An out-of-profile construct — any context atom beyond the §6 M1
+/// concept/concept_negated/interval set expressible in QF_LRA — drops its
+/// pair from the plan with an `unsupported_ir_fragment` diagnostic (no plan
+/// slot, bodies, or assertion entries; later pairs keep their minted
+/// ordinals) while the artifact still validates.
+///
+/// Documents arrive as the (FormalIR, NormIR) layer pairs of one IrBundle
+/// each, validated per §5 before compilation; a planned rule the layers
+/// cannot resolve is a caller bug, like emitter slot order. Target facts
+/// ride the pinned target row: `target.smtlib2` with metadata
+/// `profile m1`, `smtlib_version 2.6`.
+pub fn compile<'a>(
+    group_id: &Id,
+    docs: impl IntoIterator<Item = (&'a FormalIr, &'a NormIr)>,
+) -> CompiledArtifact {
+    compile_with(group_id, docs, in_m1_profile)
+}
+
+/// SPEC §6 M1 declared profile over context atoms: concept and negated-
+/// concept Bool constants plus QF_LRA quantity intervals — every atom kind
+/// the M1 type admits, exhaustively matched so an M3 variant (slot
+/// equality, temporal interval) forces a profile decision here.
+fn in_m1_profile(atom: &ContextAtom) -> bool {
+    match atom {
+        ContextAtom::Concept(_) | ContextAtom::ConceptNegated(_) | ContextAtom::Interval(_) => true,
+    }
+}
+
+/// [`compile`] over an explicit atom profile — the seam §6 names "declared
+/// target profiles gate anything richer", and the test path for the drop
+/// machinery (the M1 profile admits every constructible atom).
+fn compile_with<'a>(
+    group_id: &Id,
+    docs: impl IntoIterator<Item = (&'a FormalIr, &'a NormIr)>,
+    in_profile: impl Fn(&ContextAtom) -> bool,
+) -> CompiledArtifact {
+    let docs: Vec<(&FormalIr, &NormIr)> = docs.into_iter().collect();
+    let constraints: HashMap<&str, &FormalConstraint> = docs
+        .iter()
+        .flat_map(|&(formal, _)| &formal.constraints)
+        .map(|c| (c.constraint_id.as_str(), c))
+        .collect();
+    let rules: HashMap<&str, &NormRule> = docs
+        .iter()
+        .flat_map(|&(_, norm)| &norm.rules)
+        .map(|r| (r.rule_id.as_str(), r))
+        .collect();
+    let mut query_plan = Vec::new();
+    let mut query_bodies = Vec::new();
+    let mut assertion_map: BTreeMap<Id, AssertionRecord> = BTreeMap::new();
+    let mut diagnostics = Vec::new();
+    for pair in plan_queries(group_id, docs.iter().map(|&(formal, _)| formal)) {
+        let constraint = |id: &Id| {
+            *constraints
+                .get(id.as_str())
+                .expect("planner pairs derive from these constraints")
+        };
+        let (a, b) = (
+            constraint(&pair.constraint_a_id),
+            constraint(&pair.constraint_b_id),
+        );
+        if let Some(offender) = [a, b]
+            .into_iter()
+            .find(|c| atoms(&c.context).any(|atom| !in_profile(atom)))
+        {
+            diagnostics.push(dropped_pair(&pair, norm_rule(&rules, &offender.rule_id)));
+            continue;
+        }
+        query_bodies.push(emit_overlap_query(&pair, a, b));
+        query_bodies.push(emit_deontic_query(&pair, a, b));
+        for constraint in [a, b] {
+            let rule = norm_rule(&rules, &constraint.rule_id);
+            let record = AssertionRecord {
+                rule_ids: vec![rule.rule_id.clone()],
+                region_ids: region_set(&rule.source_region_ids),
+            };
+            for prefix in ["ctx.", "a."] {
+                let name = Id::new(format!("{prefix}{}", rule.rule_id))
+                    .expect("a §6 assertion prefix before a valid id forms a valid id");
+                assertion_map.insert(name, record.clone());
+            }
+        }
+        query_plan.push(pair);
+    }
+    CompiledArtifact {
+        target_id: static_id("target.smtlib2"),
+        query_plan,
+        query_bodies,
+        assertion_map: assertion_map.into_iter().collect(),
+        target_metadata: vec![
+            (static_id("profile"), "m1".to_owned()),
+            (static_id("smtlib_version"), "2.6".to_owned()),
+        ],
+        diagnostics,
+    }
+}
+
+/// Every atom of a stored guard, in stored order.
+fn atoms(context: &ContextExpr) -> impl Iterator<Item = &ContextAtom> {
+    context.any.iter().flat_map(|conjunct| &conjunct.all)
+}
+
+/// Resolve a planned constraint's rule through the group's NormIRs (§5:
+/// bundles validate layer coherence before compilation).
+fn norm_rule<'r>(rules: &HashMap<&str, &'r NormRule>, rule_id: &Id) -> &'r NormRule {
+    rules
+        .get(rule_id.as_str())
+        .unwrap_or_else(|| panic!("rule {rule_id} absent from NormIR"))
+}
+
+/// A rule's ordered source regions as the canonical set an
+/// [`AssertionRecord`] or diagnostic stores (sorted by Id bytes,
+/// duplicates collapsed).
+fn region_set(ordered: &[Id]) -> Vec<Id> {
+    let mut set = ordered.to_vec();
+    set.sort();
+    set.dedup();
+    set
+}
+
+/// The §7.4 record of one dropped pair: `unsupported_ir_fragment` under
+/// outcome `unsupported`, grounded in the offending rule's regions, naming
+/// the pair whose plan slot it cost.
+fn dropped_pair(pair: &ContradictionQueryPair, rule: &NormRule) -> DiagnosticRecord {
+    let detail = StringPolicy::DiagnosticText
+        .normalize(&format!(
+            "pair {} dropped: rule {} context atom outside the target profile",
+            pair.pair_id, rule.rule_id
+        ))
+        .expect("diagnostic_text is infallible");
+    DiagnosticRecord {
+        code: DiagnosticCode::UnsupportedIrFragment,
+        outcome: Outcome::Unsupported,
+        payload: vec![
+            (static_id("detail"), detail),
+            (static_id("pair"), pair.pair_id.to_string()),
+        ],
+        region_ids: region_set(&rule.source_region_ids),
+        artifact_hashes: vec![],
+    }
+}
+
+/// An [`Id`] from a static, known-valid identifier.
+fn static_id(s: &str) -> Id {
+    Id::new(s).expect("static ids are valid")
 }
 
 /// The slot contract both emitters lean on: `a`/`b` arrive in pair order
@@ -250,45 +410,100 @@ mod tests {
         plan.remove(0)
     }
 
-    /// docA rule.0 (§8.6): for administer abx_a under
-    /// sepsis ∧ ¬renal_severe ∧ age ≥ 18, atoms in canonical stored order.
-    fn doc_a() -> FormalConstraint {
-        fc(
+    /// A NormRule behind an [`fc`]-shaped constraint: the §5 fields the
+    /// projection copies plus regions and exception refs.
+    fn nr(
+        rule_id: &str,
+        direction: Direction,
+        target: &str,
+        context: ContextExpr,
+        regions: &[&str],
+        exceptions: &[&str],
+    ) -> NormRule {
+        NormRule {
+            rule_id: id(rule_id),
+            context,
+            direction,
+            action: Action::new(id("act.administer"), id(target)),
+            strength: Strength::Strong,
+            source_region_ids: regions.iter().map(|r| id(r)).collect(),
+            certainty: None,
+            exception_refs: exceptions.iter().map(|e| id(e)).collect(),
+        }
+    }
+
+    /// One document's layer pair for [`compile`]: NormIR from `rules`,
+    /// FormalIR derived per §5.
+    fn layers(rules: Vec<NormRule>) -> (FormalIr, NormIr) {
+        let norm = NormIr { rules };
+        (FormalIr::derive(&norm), norm)
+    }
+
+    /// docA rule.0 (§8.6 NormRule listing): for administer abx_a under
+    /// sepsis ∧ ¬renal_severe ∧ age ≥ 18 (atoms in canonical stored order),
+    /// grounded in r.2 + r.3 with exc.0 folded in.
+    fn rule_a() -> NormRule {
+        nr(
             "fixture.m1_guideline_a.rule.0",
             Direction::For,
+            "drug.abx_a",
             dnf1(vec![
                 concept("cond.sepsis"),
                 ContextAtom::ConceptNegated(id("cond.renal_severe")),
                 interval("q.age_years", Some(18), None, None, None),
             ]),
+            &["r.2", "r.3"],
+            &["exc.0"],
         )
     }
 
     /// docB rule.0 (§8.6): contraindicate the same action under
-    /// pregnancy ∧ sepsis ∧ age ≥ 18 (canonical stored order).
-    fn doc_b() -> FormalConstraint {
-        fc(
+    /// pregnancy ∧ sepsis ∧ age ≥ 18 (canonical stored order), grounded in
+    /// r.2.
+    fn rule_b() -> NormRule {
+        nr(
             "fixture.m1_guideline_b.rule.0",
             Direction::Contraindicate,
+            "drug.abx_a",
             dnf1(vec![
                 concept("cond.pregnancy"),
                 concept("cond.sepsis"),
                 interval("q.age_years", Some(18), None, None, None),
             ]),
+            &["r.2"],
+            &[],
         )
     }
 
     /// Control rule.0 (§8.2): contraindicate the same action under
-    /// sepsis ∧ age < 18 — interval disjoint with docA's.
-    fn control() -> FormalConstraint {
-        fc(
+    /// sepsis ∧ age < 18 — interval disjoint with docA's — grounded in r.2.
+    fn rule_control() -> NormRule {
+        nr(
             "fixture.m1_control.rule.0",
             Direction::Contraindicate,
+            "drug.abx_a",
             dnf1(vec![
                 concept("cond.sepsis"),
                 interval("q.age_years", None, None, None, Some(18)),
             ]),
+            &["r.2"],
+            &[],
         )
+    }
+
+    /// docA rule.0 as FormalIR projects it.
+    fn doc_a() -> FormalConstraint {
+        FormalConstraint::from_rule(&rule_a())
+    }
+
+    /// docB rule.0 as FormalIR projects it.
+    fn doc_b() -> FormalConstraint {
+        FormalConstraint::from_rule(&rule_b())
+    }
+
+    /// Control rule.0 as FormalIR projects it.
+    fn control() -> FormalConstraint {
+        FormalConstraint::from_rule(&rule_control())
     }
 
     /// §8.6 Q1 listing, byte-exact, under the pair's minted query id and
@@ -489,5 +704,307 @@ mod tests {
         let (a, b) = (doc_a(), doc_b());
         let pair = plan_pair("group.m1_conflict", &a, &b);
         emit_overlap_query(&pair, &b, &a);
+    }
+
+    /// compile assembles the §8.6 pair's artifact: pinned plan, both
+    /// emitter bodies in plan order, the §8.5-item-4 assertion map with
+    /// regions looked up from NormIR (docA r.2 + r.3, docB r.2), the
+    /// pinned target row, no diagnostics; the §5 payload validates.
+    #[test]
+    fn compile_assembles_worked_pair_artifact() {
+        let (fa, na) = layers(vec![rule_a()]);
+        let (fb, nb) = layers(vec![rule_b()]);
+        let artifact = compile(&id("group.m1_conflict"), [(&fa, &na), (&fb, &nb)]);
+        assert_eq!(artifact.validate(), Ok(()));
+        assert_eq!(artifact.target_id, id("target.smtlib2"));
+        assert_eq!(artifact.query_plan.len(), 1);
+        let pair = &artifact.query_plan[0];
+        assert_eq!(pair.pair_id, id("q.m1_conflict.pair1"));
+        let (a, b) = (doc_a(), doc_b());
+        assert_eq!(
+            artifact.query_bodies,
+            [
+                emit_overlap_query(pair, &a, &b),
+                emit_deontic_query(pair, &a, &b),
+            ]
+        );
+        let record_a = AssertionRecord {
+            rule_ids: vec![id("fixture.m1_guideline_a.rule.0")],
+            region_ids: vec![id("r.2"), id("r.3")],
+        };
+        let record_b = AssertionRecord {
+            rule_ids: vec![id("fixture.m1_guideline_b.rule.0")],
+            region_ids: vec![id("r.2")],
+        };
+        assert_eq!(
+            artifact.assertion_map,
+            [
+                (id("a.fixture.m1_guideline_a.rule.0"), record_a.clone()),
+                (id("a.fixture.m1_guideline_b.rule.0"), record_b.clone()),
+                (id("ctx.fixture.m1_guideline_a.rule.0"), record_a),
+                (id("ctx.fixture.m1_guideline_b.rule.0"), record_b),
+            ]
+        );
+        assert_eq!(
+            artifact.target_metadata,
+            [
+                (id("profile"), "m1".to_owned()),
+                (id("smtlib_version"), "2.6".to_owned()),
+            ]
+        );
+        assert_eq!(artifact.diagnostics, []);
+    }
+
+    /// The §8.2 control pair (group.m1_null) compiles the same way: the
+    /// disjoint age intervals stay in profile (Q1 decides the null at
+    /// verify), the control rule in slot a by id bytes.
+    #[test]
+    fn compile_assembles_control_pair_artifact() {
+        let (fa, na) = layers(vec![rule_a()]);
+        let (fc_, nc) = layers(vec![rule_control()]);
+        let artifact = compile(&id("group.m1_null"), [(&fa, &na), (&fc_, &nc)]);
+        assert_eq!(artifact.validate(), Ok(()));
+        assert_eq!(artifact.query_plan.len(), 1);
+        let pair = &artifact.query_plan[0];
+        assert_eq!(pair.pair_id, id("q.m1_null.pair1"));
+        assert_eq!(pair.constraint_a_id, id("fc.fixture.m1_control.rule.0"));
+        let (a, b) = (control(), doc_a());
+        assert_eq!(
+            artifact.query_bodies,
+            [
+                emit_overlap_query(pair, &a, &b),
+                emit_deontic_query(pair, &a, &b),
+            ]
+        );
+        let record_control = AssertionRecord {
+            rule_ids: vec![id("fixture.m1_control.rule.0")],
+            region_ids: vec![id("r.2")],
+        };
+        let record_a = AssertionRecord {
+            rule_ids: vec![id("fixture.m1_guideline_a.rule.0")],
+            region_ids: vec![id("r.2"), id("r.3")],
+        };
+        assert_eq!(
+            artifact.assertion_map,
+            [
+                (id("a.fixture.m1_control.rule.0"), record_control.clone()),
+                (id("a.fixture.m1_guideline_a.rule.0"), record_a.clone()),
+                (id("ctx.fixture.m1_control.rule.0"), record_control),
+                (id("ctx.fixture.m1_guideline_a.rule.0"), record_a),
+            ]
+        );
+        assert_eq!(artifact.diagnostics, []);
+    }
+
+    /// Multi-pair assembly: a rule shared by two pairs keeps one ctx./a.
+    /// entry pair (identical records re-inserted), bodies stack in plan
+    /// order, and ordered source regions store as canonical sets (r.9
+    /// before r.10 in source order, r.10 first by id bytes).
+    #[test]
+    fn shared_rule_assertions_merge_and_regions_sort() {
+        let (f, n) = layers(vec![
+            nr(
+                "t.rule.0",
+                Direction::For,
+                "drug.abx_a",
+                dnf1(vec![concept("cond.sepsis")]),
+                &["r.0"],
+                &[],
+            ),
+            nr(
+                "t.rule.1",
+                Direction::Permit,
+                "drug.abx_a",
+                dnf1(vec![concept("cond.pregnancy")]),
+                &["r.1"],
+                &[],
+            ),
+            nr(
+                "t.rule.2",
+                Direction::Against,
+                "drug.abx_a",
+                dnf1(vec![concept("cond.renal_severe")]),
+                &["r.9", "r.10"],
+                &[],
+            ),
+        ]);
+        let artifact = compile(&id("group.t"), [(&f, &n)]);
+        assert_eq!(artifact.validate(), Ok(()));
+        let pair_ids: Vec<&str> = artifact
+            .query_plan
+            .iter()
+            .map(|p| p.pair_id.as_str())
+            .collect();
+        assert_eq!(pair_ids, ["q.t.pair1", "q.t.pair2"]);
+        let body_ids: Vec<&str> = artifact
+            .query_bodies
+            .iter()
+            .map(|q| q.query_id.as_str())
+            .collect();
+        assert_eq!(
+            body_ids,
+            [
+                "q.t.pair1.overlap",
+                "q.t.pair1.deontic",
+                "q.t.pair2.overlap",
+                "q.t.pair2.deontic",
+            ]
+        );
+        let keys: Vec<&str> = artifact
+            .assertion_map
+            .iter()
+            .map(|(k, _)| k.as_str())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "a.t.rule.0",
+                "a.t.rule.1",
+                "a.t.rule.2",
+                "ctx.t.rule.0",
+                "ctx.t.rule.1",
+                "ctx.t.rule.2",
+            ]
+        );
+        assert_eq!(
+            artifact.assertion_map[2].1.region_ids,
+            [id("r.10"), id("r.9")]
+        );
+    }
+
+    /// The §6 profile gate through the compile_with seam (the M1 profile
+    /// admits every constructible atom): a target without interval support
+    /// drops the interval-bearing pair — no plan slot, bodies, or assertion
+    /// entries; the survivor keeps its minted ordinal — minting the §7.4
+    /// unsupported_ir_fragment record grounded in the offending rule's
+    /// regions, and the artifact still validates.
+    #[test]
+    fn out_of_profile_pair_drops_with_diagnostic() {
+        let (fx, nx) = layers(vec![
+            nr(
+                "t.x.rule.0",
+                Direction::For,
+                "drug.abx_a",
+                dnf1(vec![
+                    concept("cond.sepsis"),
+                    interval("q.age_years", Some(18), None, None, None),
+                ]),
+                &["r.0", "r.1"],
+                &[],
+            ),
+            nr(
+                "t.x.rule.1",
+                Direction::For,
+                "drug.abx_b",
+                dnf1(vec![concept("cond.pregnancy")]),
+                &["r.2"],
+                &[],
+            ),
+        ]);
+        let (fy, ny) = layers(vec![
+            nr(
+                "t.y.rule.0",
+                Direction::Contraindicate,
+                "drug.abx_a",
+                dnf1(vec![concept("cond.sepsis")]),
+                &["r.0"],
+                &[],
+            ),
+            nr(
+                "t.y.rule.1",
+                Direction::Against,
+                "drug.abx_b",
+                dnf1(vec![concept("cond.pregnancy")]),
+                &["r.1"],
+                &[],
+            ),
+        ]);
+        let docs = [(&fx, &nx), (&fy, &ny)];
+        let no_intervals = |atom: &ContextAtom| !matches!(atom, ContextAtom::Interval(_));
+        let artifact = compile_with(&id("group.t"), docs, no_intervals);
+        assert_eq!(artifact.validate(), Ok(()));
+        let pair_ids: Vec<&str> = artifact
+            .query_plan
+            .iter()
+            .map(|p| p.pair_id.as_str())
+            .collect();
+        assert_eq!(pair_ids, ["q.t.pair2"]);
+        assert_eq!(artifact.query_bodies.len(), 2);
+        let keys: Vec<&str> = artifact
+            .assertion_map
+            .iter()
+            .map(|(k, _)| k.as_str())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "a.t.x.rule.1",
+                "a.t.y.rule.1",
+                "ctx.t.x.rule.1",
+                "ctx.t.y.rule.1"
+            ]
+        );
+        assert_eq!(
+            artifact.diagnostics,
+            [DiagnosticRecord {
+                code: DiagnosticCode::UnsupportedIrFragment,
+                outcome: Outcome::Unsupported,
+                payload: vec![
+                    (
+                        id("detail"),
+                        "pair q.t.pair1 dropped: rule t.x.rule.0 context atom outside the \
+                         target profile"
+                            .to_owned(),
+                    ),
+                    (id("pair"), "q.t.pair1".to_owned()),
+                ],
+                region_ids: vec![id("r.0"), id("r.1")],
+                artifact_hashes: vec![],
+            }]
+        );
+        // The M1 profile keeps the same group whole.
+        let m1 = compile(&id("group.t"), docs);
+        assert_eq!(m1.query_plan.len(), 2);
+        assert_eq!(m1.diagnostics, []);
+    }
+
+    /// A group with no eligible pairs compiles to the empty artifact —
+    /// pinned target row and metadata, nothing else — and validates.
+    #[test]
+    fn pairless_group_compiles_empty() {
+        let (f, n) = layers(vec![nr(
+            "t.rule.0",
+            Direction::For,
+            "drug.abx_a",
+            dnf1(vec![concept("cond.sepsis")]),
+            &["r.0"],
+            &[],
+        )]);
+        let artifact = compile(&id("group.t"), [(&f, &n)]);
+        assert_eq!(artifact.validate(), Ok(()));
+        assert_eq!(artifact.target_id, id("target.smtlib2"));
+        assert_eq!(artifact.query_plan, []);
+        assert_eq!(artifact.query_bodies, []);
+        assert_eq!(artifact.assertion_map, []);
+        assert_eq!(
+            artifact.target_metadata,
+            [
+                (id("profile"), "m1".to_owned()),
+                (id("smtlib_version"), "2.6".to_owned()),
+            ]
+        );
+        assert_eq!(artifact.diagnostics, []);
+    }
+
+    /// Layer coherence is the caller's contract (§5: bundles validate
+    /// before compilation); a planned rule the NormIRs cannot resolve is a
+    /// bug, not data.
+    #[test]
+    #[should_panic(expected = "absent from NormIR")]
+    fn unresolvable_rule_panics() {
+        let (fa, _) = layers(vec![rule_a()]);
+        let (fb, nb) = layers(vec![rule_b()]);
+        let empty = NormIr { rules: vec![] };
+        compile(&id("group.m1_conflict"), [(&fa, &empty), (&fb, &nb)]);
     }
 }
