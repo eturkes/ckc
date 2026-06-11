@@ -5,9 +5,10 @@
 //! Query text is embedded here and materialized byte-identically under
 //! `groups/<gid>/smt/` for solver consumption (§6 SMT profile); §8.5 item 4
 //! audits the assertion map. Planning over FormalIR lives in
-//! [`plan_queries`](crate::plan_queries); §8.6-pinned emission lands with
-//! the emit module (smt-emit.3); this module owns the shapes, their
-//! canonical bytes, and structural validation.
+//! [`plan_queries`](crate::plan_queries), §8.6-pinned emission in
+//! [`emit_overlap_query`](crate::emit_overlap_query) /
+//! [`emit_deontic_query`](crate::emit_deontic_query); this module owns the
+//! shapes, their canonical bytes, and structural validation.
 
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, ContradictionQueryPair, DiagnosticRecord, Id,

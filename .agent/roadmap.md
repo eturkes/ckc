@@ -50,23 +50,8 @@ bare headers; git history retains all removed text.
   74% 149K/200K dcfe7e4
 - [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
   >=90% compacted/200K 511b002
-- [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K _
-- [ ] smt-emit.3a: §8.6 smt2 re-pin + query-text emission in an emit module. First resolve the
-  emitter's byte rules into the spec and re-pin both §8.6 smt2 listings to exact emitter output —
-  the current listings carry presentation layout that the §6 determinism rules contradict
-  (q.age_years declared before the sorted Bool symbols, two declares sharing a line, trailing `;`
-  result notes, assert wrapping/alignment padding, and-conjunct order differing from the stored
-  canonical ContextExpr order). Pinned rules: one s-expression command per line, no comments,
-  declarations sorted by symbol bytes one per line, conjuncts in stored ContextExpr order,
-  single-disjunct `any` collapsing to a bare `and`, Rational numerals rendered as plain integer
-  when the denominator is 1 else `(/ n d)`, file ends with a newline. Then emit Q1 (QF_LRA;
-  :print-success false + :produce-models; both guarded contexts as ctx.<rule_id> named assertions;
-  check-sat, get-model) and Q2 (QF_UF; :print-success false + :produce-unsat-cores;
-  `pos:<action key>` Bool literal asserted bare for the positive direction and negated for
-  against/contraindicating, a.<rule_id> names; check-sat, get-unsat-core) from a constraint pair.
-  Gate pins emitted bytes to the re-pinned listings. Reading: SPEC §6 SMT profile, §8.6, §8.3
-  compile row. Consumes smt-emit.2 pairs, core-ir.3 FormalConstraint/ContextExpr. Gate:
-  `cargo test -p ckc-smt emit::`.
+- [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K 22787f9
+- [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K _
 - [ ] smt-emit.3b: CompiledArtifact assembly completing compile: assertion map binding every
   ctx.<rule_id> and a.<rule_id> name to its rule id and source region ids (looked up from NormIR
   rules by rule_id — FormalConstraint carries no regions), target metadata; out-of-profile

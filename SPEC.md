@@ -482,9 +482,13 @@ Symbols: SMT symbols are |-quoted canonical Ids, so assertions remain self-ident
 Every assertion that can influence a query is :named and mapped in the assertion map to IR rule
 ids and source region ids; assertion ids form a.<rule_id> (polarity/factual) and ctx.<rule_id>
 (context).
-Emission is deterministic: sorted declarations, canonical symbol order, stable query ids. Each
-query file sets its logic and required options (:produce-unsat-cores / :produce-models where
-used; :print-success false).
+Emission is deterministic and byte-pinned (§8.6 listings are exact emitter output): one
+s-expression command per line, no comments, the file ending in a newline; command order
+set-logic, :print-success false, :produce-models / :produce-unsat-cores as used, declarations
+sorted by symbol bytes one per line, named assertions in pair order, check-sat, then the
+result command. Guard conjuncts render in stored ContextExpr order, a single-disjunct any
+collapses to a bare and, and Rational numerals render as a plain integer when the denominator
+is 1, else (/ n d).
 Solvers: Z3 required first (binary invocation; identity+version recorded in manifests and
 verifier results); cvc5 registered as the second solver (Alethe/LFSC certificate path, §13).
 (get-unsat-core) on unsat; witness model on sat where relevant. Verifier adapters parse the
@@ -679,35 +683,34 @@ sorted by canonical_sort_key):
 docB yields `fixture.m1_guideline_b.rule.0`: context `cond.sepsis ∧ age ≥ 18 ∧ cond.pregnancy`,
 direction `contraindicate`, same action key → pair eligible.
 
-Q1 `q.m1_conflict.pair1.overlap` (QF_LRA):
+Q1 `q.m1_conflict.pair1.overlap` (QF_LRA; expected sat, witness model recorded):
 
 ```smt2
 (set-logic QF_LRA)
 (set-option :print-success false)
 (set-option :produce-models true)
-(declare-const |q.age_years| Real)
-(declare-const |cond.sepsis| Bool) (declare-const |cond.renal_severe| Bool)
 (declare-const |cond.pregnancy| Bool)
-(assert (! (and |cond.sepsis| (>= |q.age_years| 18) (not |cond.renal_severe|))
-           :named |ctx.fixture.m1_guideline_a.rule.0|))
-(assert (! (and |cond.sepsis| (>= |q.age_years| 18) |cond.pregnancy|)
-           :named |ctx.fixture.m1_guideline_b.rule.0|))
-(check-sat)            ; sat
-(get-model)            ; witness model recorded
+(declare-const |cond.renal_severe| Bool)
+(declare-const |cond.sepsis| Bool)
+(declare-const |q.age_years| Real)
+(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.fixture.m1_guideline_a.rule.0|))
+(assert (! (and |cond.pregnancy| |cond.sepsis| (>= |q.age_years| 18)) :named |ctx.fixture.m1_guideline_b.rule.0|))
+(check-sat)
+(get-model)
 ```
 
-Q2 `q.m1_conflict.pair1.deontic`: polarity literals on the shared action (overlap witnessed by Q1):
+Q2 `q.m1_conflict.pair1.deontic` — polarity literals on the shared action (overlap witnessed
+by Q1); expected unsat, the core recorded as the canonical set:
 
 ```smt2
 (set-logic QF_UF)
 (set-option :print-success false)
 (set-option :produce-unsat-cores true)
 (declare-const |pos:act.administer:drug.abx_a| Bool)
-(assert (! |pos:act.administer:drug.abx_a|        :named |a.fixture.m1_guideline_a.rule.0|))
-(assert (! (not |pos:act.administer:drug.abx_a|)  :named |a.fixture.m1_guideline_b.rule.0|))
-(check-sat)            ; unsat
-(get-unsat-core)       ; recorded as the canonical set
-                       ; {a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0}
+(assert (! |pos:act.administer:drug.abx_a| :named |a.fixture.m1_guideline_a.rule.0|))
+(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.fixture.m1_guideline_b.rule.0|))
+(check-sat)
+(get-unsat-core)
 ```
 
 VerifierResult: `semantic_contradiction`, core

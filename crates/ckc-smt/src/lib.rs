@@ -1,14 +1,17 @@
 //! ckc-smt — FormalIR → SMT-LIB compilation and verification for the
 //! Clinical Knowledge Compiler (SPEC §3 crate table: emission, query
 //! planning, assertion maps, solver invocation, verdict parsing). This
-//! foundation owns the two §5 durable payloads; emission (emit module) and
-//! the Z3 adapter (verify module) land with their roadmap units. Surface by
+//! crate owns the two §5 durable payloads plus planning and emission; the
+//! Z3 adapter (verify module) lands with its roadmap unit. Surface by
 //! module:
 //!
 //! - `artifact` — compile-stage payload: [`CompiledArtifact`] (target id, §5
 //!   query-plan slots, §6 query bodies under [`SmtLogic`], the
 //!   named-assertion map of [`AssertionRecord`]s, target metadata,
 //!   diagnostics) with structural validation ([`ArtifactError`]).
+//! - `emit` — compile-stage emission: [`emit_overlap_query`] /
+//!   [`emit_deontic_query`], the §6 byte-pinned (§8.6) query texts of one
+//!   planned pair as [`QueryBody`]s.
 //! - `plan` — compile-stage planning: [`plan_queries`], the §6 eligibility
 //!   scan over a fixture group's per-document FormalIRs, minting the §8.6
 //!   pair/query ids into §5 ContradictionQueryPair slots.
@@ -19,10 +22,12 @@
 #![forbid(unsafe_code)]
 
 mod artifact;
+mod emit;
 mod plan;
 mod result;
 
 pub use artifact::{ArtifactError, AssertionRecord, CompiledArtifact, QueryBody, SmtLogic};
+pub use emit::{emit_deontic_query, emit_overlap_query};
 pub use plan::plan_queries;
 pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult};
 

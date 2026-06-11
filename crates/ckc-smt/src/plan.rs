@@ -2,8 +2,10 @@
 //! contradiction-query plan over a fixture group's per-document FormalIRs.
 //!
 //! [`plan_queries`] returns [`ContradictionQueryPair`]s only: query text
-//! derives in emit from the paired constraints (smt-emit.3a), the pairs
-//! ride [`CompiledArtifact::query_plan`](crate::CompiledArtifact), and each
+//! derives from the paired constraints in
+//! [`emit_overlap_query`](crate::emit_overlap_query) /
+//! [`emit_deontic_query`](crate::emit_deontic_query), the pairs ride
+//! [`CompiledArtifact::query_plan`](crate::CompiledArtifact), and each
 //! document's `FormalIr::plan` slot stays empty (pairs may cross documents,
 //! so `FormalIr::derive` leaves planning here).
 
