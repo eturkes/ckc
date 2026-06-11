@@ -1,16 +1,18 @@
-//! SPEC §3 `ckc run` (cli-runner.2a + .2b): resolve the experiment through
-//! the §8.4 registries, drive each corpus document through extract →
+//! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3): resolve the experiment
+//! through the §8.4 registries, drive each corpus document through extract →
 //! segment → normalize → assemble into
 //! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`,
-//! then drive each fixture group through compile → verify into
-//! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`
+//! drive each fixture group through compile → verify into
+//! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`,
+//! then assemble the run-scoped §7.1 trace pair over every landed artifact
+//! into `trace_bundle.json` + `lineage_index.json` at the run root
 //! — every envelope written as §4.3 canonical bytes and strict-read back at
 //! the write boundary ([`land`]), every smt file byte-identical to its
 //! [`ckc_smt::QueryBody`] body. Each attempted stage records exactly one
 //! §4.6 stage event carrying the artifact's envelope diagnostics (or the
 //! failure diagnostic); the §4.4 total outcome is the severity fold over
-//! every event and command-scope diagnostic; trace/report stages join in
-//! their units (cli-runner.3a/.4.1a).
+//! every event and command-scope diagnostic; the report stage joins with
+//! cli-runner.4.1a.
 //!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
@@ -33,7 +35,7 @@ use ckc_core::{
     ArtifactEnvelope, Authority, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
     DiagnosticCode, DiagnosticRecord, FixtureGroup, Hash, Id, IrBundle, Normalization, Origin,
     Outcome, Producer, SegmentIr, SourceGraph, assemble, canonical_payload_bytes,
-    canonical_sort_key, canonicalization_policy_hash, content_hash, parse_candidates,
+    canonical_sort_key, canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates,
     parse_corpora, parse_experiments, read_canonical,
 };
 use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
@@ -43,26 +45,30 @@ use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
 use crate::segment::segment;
 use crate::shell::{Shell, StageClock, StageEvent, stage_clock, static_id};
+use crate::trace::{DocTrace, GroupTrace, assemble_trace};
 
 /// §5 lexicon authority the normalize stage consumes (module doc in
 /// [`crate::normalize`]), read from the invocation root like the registries.
 const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
 
-/// The six §8.3 stages this module drives, in chain order, spelled as the
+/// The seven §8.3 stages this module drives, in chain order, spelled as the
 /// registry `kind` tokens the pipeline's stage components declare: four
-/// per-document stages, then the two per-group stages.
-const STAGE_KINDS: [&str; 6] = [
+/// per-document stages, the two per-group stages, then the run-scoped
+/// trace stage.
+const STAGE_KINDS: [&str; 7] = [
     "extract",
     "segment",
     "normalize",
     "assemble",
     "compile",
     "verify",
+    "trace",
 ];
 
-/// [`STAGE_KINDS`] indices of the group stages.
+/// [`STAGE_KINDS`] indices of the group stages and the run-scoped trace.
 const COMPILE: usize = 4;
 const VERIFY: usize = 5;
+const TRACE: usize = 6;
 
 /// §8.4 budget counter naming the per-query solver wall-clock cap in
 /// milliseconds — the one budget key the M1 vocabulary defines.
@@ -94,10 +100,10 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
             return;
         }
     };
-    let mut bundles: Vec<(Id, ArtifactEnvelope<IrBundle>)> = Vec::new();
+    let mut docs: Vec<DocTrace> = Vec::new();
     for entry in &resolved.documents {
-        if let Some(bundle) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
-            bundles.push((entry.id.clone(), bundle));
+        if let Some(doc) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
+            docs.push(doc);
         }
     }
     // The solver adapter is load-bearing for every group verdict — the
@@ -116,9 +122,11 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
             return;
         }
     };
+    let mut groups: Vec<GroupTrace> = Vec::with_capacity(resolved.groups.len());
     for group in &resolved.groups {
-        group_pipeline(group, &bundles, &resolved, &adapter, shell);
+        groups.push(group_pipeline(group, &docs, &resolved, &adapter, shell));
     }
+    trace_stage(&docs, &groups, &resolved, shell);
 }
 
 /// The runner's resolved view of one experiment: the pipeline candidate,
@@ -128,7 +136,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
 struct Resolved {
     pipeline_id: Id,
     /// Stage component ids parallel to [`STAGE_KINDS`].
-    components: [Id; 6],
+    components: [Id; 7],
     documents: Vec<CorpusEntry>,
     groups: Vec<FixtureGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
@@ -192,7 +200,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
             }
         }
     }
-    let components: [Id; 6] = components
+    let components: [Id; 7] = components
         .try_into()
         .expect("the loop pushes one component per stage kind");
 
@@ -241,14 +249,17 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
 /// Drive one corpus document through the four document stages. Every
 /// attempted stage lands exactly one stage event; the first failure stops
 /// this document and leaves the rest of the run to proceed. Returns the
-/// landed (read-back) bundle envelope — the group stages' input.
+/// document's [`DocTrace`] — every landing recorded as it happens, the
+/// bundle envelope riding whole as the group stages' input — or `None`
+/// when the corpus file itself was unreadable (command-scope diagnostic:
+/// without source bytes there is no hash to ground a trace node).
 fn document_pipeline(
     root: &Path,
     entry: &CorpusEntry,
     resolved: &Resolved,
     lexicon: &Lexicon,
     shell: &mut Shell,
-) -> Option<ArtifactEnvelope<IrBundle>> {
+) -> Option<DocTrace> {
     let html = match std::fs::read(root.join(&entry.path)) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -259,44 +270,69 @@ fn document_pipeline(
             return None;
         }
     };
+    let mut trace = DocTrace {
+        document_id: entry.id.clone(),
+        fixture_path: entry.path.clone(),
+        source_hash: hash_bytes(&html),
+        source_graph: None,
+        segments: None,
+        normalization: None,
+        bundle: None,
+    };
     let dir = format!("artifacts/{}", entry.id);
 
-    let clock = stage_clock();
-    let config = ExtractConfig {
-        document_id: entry.id.clone(),
-        source_family: static_id("synthetic_fixture_html"),
-        provenance: entry.provenance,
-        data_class: DataClass::None,
-        producer: producer(resolved, 0),
-    };
-    let built = extract(&html, &config)
-        .map_err(|e| stage_diagnostic(0, "document", &entry.id, e.to_string()));
-    let rel = format!("{dir}/source_graph.json");
-    let source = close_stage(shell, resolved, 0, clock, Vec::new(), &rel, built)?;
+    'chain: {
+        let clock = stage_clock();
+        let config = ExtractConfig {
+            document_id: entry.id.clone(),
+            source_family: static_id("synthetic_fixture_html"),
+            provenance: entry.provenance,
+            data_class: DataClass::None,
+            producer: producer(resolved, 0),
+        };
+        let built = extract(&html, &config)
+            .map_err(|e| stage_diagnostic(0, "document", &entry.id, e.to_string()));
+        let rel = format!("{dir}/source_graph.json");
+        let Some(source) = close_stage(shell, resolved, 0, clock, Vec::new(), &rel, built) else {
+            break 'chain;
+        };
+        trace.source_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
 
-    let clock = stage_clock();
-    let built = segment(&source, &producer(resolved, 1))
-        .map_err(|e| stage_diagnostic(1, "document", &entry.id, e.to_string()));
-    let rel = format!("{dir}/segments.json");
-    let inputs = vec![source.content_hash.clone()];
-    let segments = close_stage(shell, resolved, 1, clock, inputs, &rel, built)?;
+        let clock = stage_clock();
+        let built = segment(&source, &producer(resolved, 1))
+            .map_err(|e| stage_diagnostic(1, "document", &entry.id, e.to_string()));
+        let rel = format!("{dir}/segments.json");
+        let inputs = vec![source.content_hash.clone()];
+        let Some(segments) = close_stage(shell, resolved, 1, clock, inputs, &rel, built) else {
+            break 'chain;
+        };
+        trace.segments = Some((segments.artifact_id.clone(), segments.content_hash.clone()));
 
-    let clock = stage_clock();
-    let built = normalize(&source, &segments, lexicon, &producer(resolved, 2))
-        .map_err(|e| stage_diagnostic(2, "document", &entry.id, e.to_string()));
-    let rel = format!("{dir}/normalization.json");
-    let inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
-    let normalization = close_stage(shell, resolved, 2, clock, inputs, &rel, built)?;
+        let clock = stage_clock();
+        let built = normalize(&source, &segments, lexicon, &producer(resolved, 2))
+            .map_err(|e| stage_diagnostic(2, "document", &entry.id, e.to_string()));
+        let rel = format!("{dir}/normalization.json");
+        let inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
+        let Some(normalization) = close_stage(shell, resolved, 2, clock, inputs, &rel, built)
+        else {
+            break 'chain;
+        };
+        trace.normalization = Some((
+            normalization.artifact_id.clone(),
+            normalization.content_hash.clone(),
+        ));
 
-    let clock = stage_clock();
-    let built = assemble_bundle(entry, resolved, &source, &segments, &normalization);
-    let rel = format!("{dir}/ir_bundle.json");
-    let inputs = vec![
-        source.content_hash.clone(),
-        segments.content_hash.clone(),
-        normalization.content_hash.clone(),
-    ];
-    close_stage(shell, resolved, 3, clock, inputs, &rel, built)
+        let clock = stage_clock();
+        let built = assemble_bundle(entry, resolved, &source, &segments, &normalization);
+        let rel = format!("{dir}/ir_bundle.json");
+        let inputs = vec![
+            source.content_hash.clone(),
+            segments.content_hash.clone(),
+            normalization.content_hash.clone(),
+        ];
+        trace.bundle = close_stage(shell, resolved, 3, clock, inputs, &rel, built);
+    }
+    Some(trace)
 }
 
 /// Drive one fixture group through compile → verify. Compile loads the
@@ -308,21 +344,33 @@ fn document_pipeline(
 /// through the solver adapter under the experiment's per-query budget into
 /// `groups/<gid>/verifier_results.json`. One stage event each; a compile
 /// failure skips the group's verify and leaves other groups to proceed.
+/// Returns the group's [`GroupTrace`]: the §8.4 member set plus each group
+/// landing that happened, riding whole.
 fn group_pipeline(
     group: &FixtureGroup,
-    bundles: &[(Id, ArtifactEnvelope<IrBundle>)],
+    docs: &[DocTrace],
     resolved: &Resolved,
     adapter: &Z3Adapter,
     shell: &mut Shell,
-) {
+) -> GroupTrace {
     let gid = &group.group_id;
     let dir = format!("groups/{gid}");
+    let mut trace = GroupTrace {
+        group_id: gid.clone(),
+        fixtures: group.fixtures.clone(),
+        compiled: None,
+        verifier_results: None,
+    };
 
     let clock = stage_clock();
     let mut members: Vec<&ArtifactEnvelope<IrBundle>> = Vec::with_capacity(group.fixtures.len());
     for fixture in &group.fixtures {
-        match bundles.iter().find(|(id, _)| id == fixture) {
-            Some((_, bundle)) => members.push(bundle),
+        let bundle = docs
+            .iter()
+            .find(|d| d.document_id == *fixture)
+            .and_then(|d| d.bundle.as_ref());
+        match bundle {
+            Some(bundle) => members.push(bundle),
             None => {
                 let built = Err(stage_diagnostic(
                     COMPILE,
@@ -331,7 +379,7 @@ fn group_pipeline(
                     format!("member {fixture} landed no ir_bundle artifact"),
                 ));
                 finish_stage::<IrBundle>(shell, resolved, COMPILE, clock, Vec::new(), built);
-                return;
+                return trace;
             }
         }
     }
@@ -366,7 +414,7 @@ fn group_pipeline(
             Ok(env)
         });
     let Some(compiled) = finish_stage(shell, resolved, COMPILE, clock, inputs, landed) else {
-        return;
+        return trace;
     };
 
     let clock = stage_clock();
@@ -396,7 +444,7 @@ fn group_pipeline(
             .map_err(|e| stage_diagnostic(VERIFY, "group", gid, e.to_string()))
         });
     let landed = built.and_then(|env| land(shell, &format!("{dir}/verifier_results.json"), env));
-    finish_stage(
+    trace.verifier_results = finish_stage(
         shell,
         resolved,
         VERIFY,
@@ -404,6 +452,98 @@ fn group_pipeline(
         vec![compiled.content_hash.clone()],
         landed,
     );
+    trace.compiled = Some(compiled);
+    trace
+}
+
+/// The §8.3 trace stage, run once after the group loop: assemble the §7.1
+/// pair over every landed artifact ([`assemble_trace`] skips absent
+/// pieces), validate both payloads, and land them at the run root as
+/// `trace_bundle.json` + `lineage_index.json`. Both envelopes carry the
+/// DAG's node content-hash set as input hashes (each source's raw-byte
+/// hash beside every landed envelope hash; the hashless report node
+/// contributes nothing). One stage event covers the pair: both content
+/// hashes as outputs, or the first failure diagnostic.
+fn trace_stage(docs: &[DocTrace], groups: &[GroupTrace], resolved: &Resolved, shell: &mut Shell) {
+    let clock = stage_clock();
+    let (bundle, lineage) = assemble_trace(docs, groups);
+    // §4.3 set semantics up front so the in-memory hashes equal every
+    // durable view: distinct nodes can share bytes (two structurally
+    // identical segments artifacts hash alike), and set emission would
+    // collapse them at the boundary anyway.
+    let mut input_hashes: Vec<Hash> = bundle
+        .nodes
+        .iter()
+        .filter_map(|n| n.content_hash.clone())
+        .collect();
+    input_hashes.sort();
+    input_hashes.dedup();
+    let run_id = shell.run_id().clone();
+    let fail = |reason: String| stage_diagnostic(TRACE, "run", &run_id, reason);
+
+    let landed = bundle
+        .validate()
+        .map_err(|e| fail(format!("trace bundle: {e}")))
+        .and_then(|()| {
+            lineage
+                .validate()
+                .map_err(|e| fail(format!("lineage index: {e}")))
+        })
+        .and_then(|()| {
+            let bundle = envelope(
+                "trace_bundle".to_owned(),
+                "trace_bundle",
+                producer(resolved, TRACE),
+                input_hashes.clone(),
+                Origin::DeterministicCompiler,
+                Authority::MechanicalAuthority,
+                vec![],
+                bundle,
+            )
+            .map_err(|e| fail(e.to_string()))?;
+            let lineage = envelope(
+                "lineage_index".to_owned(),
+                "lineage_index",
+                producer(resolved, TRACE),
+                input_hashes.clone(),
+                Origin::DeterministicCompiler,
+                Authority::MechanicalAuthority,
+                vec![],
+                lineage,
+            )
+            .map_err(|e| fail(e.to_string()))?;
+            Ok((bundle, lineage))
+        })
+        .and_then(|(bundle, lineage)| {
+            let bundle = land(shell, "trace_bundle.json", bundle)?;
+            let lineage = land(shell, "lineage_index.json", lineage)?;
+            Ok((bundle, lineage))
+        });
+
+    let (started_at, ended_at, duration_ms) = clock.stop();
+    let (outcome, diagnostics, output_hashes) = match landed {
+        // Both envelopes are built with empty diagnostics (assembly raises
+        // nothing of its own), so a landed pair is a clean stage.
+        Ok((bundle, lineage)) => (
+            Outcome::Ok,
+            Vec::new(),
+            vec![bundle.content_hash, lineage.content_hash],
+        ),
+        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new()),
+    };
+    shell.stage_event(StageEvent {
+        candidate_id: resolved.pipeline_id.clone(),
+        component_id: resolved.components[TRACE].clone(),
+        stage: static_id(STAGE_KINDS[TRACE]),
+        started_at,
+        ended_at,
+        duration_ms,
+        input_hashes,
+        output_hashes,
+        outcome,
+        diagnostics,
+        budget_counters: Vec::new(),
+    });
 }
 
 /// Materialize the landed compiled artifact's query bodies as the §8.3
@@ -574,7 +714,7 @@ fn envelope<P: Canonical>(
     Ok(ArtifactEnvelope {
         schema_id: Id::new(format!("schema.{kind}")).expect("schema.<kind> stays in the grammar"),
         artifact_id: Id::new(artifact_id)
-            .expect("a valid group id keeps the Id grammar under a suffix"),
+            .expect("the runner mints artifact ids inside the Id grammar"),
         artifact_kind: static_id(kind),
         producer,
         input_hashes,
@@ -804,9 +944,9 @@ mod tests {
             );
         }
 
-        // 4 stage events per document, compile+verify per group, then the
-        // closing command event.
-        assert_eq!(events.len(), 17);
+        // 4 stage events per document, compile+verify per group, the
+        // run-scoped trace stage, then the closing command event.
+        assert_eq!(events.len(), 18);
         for (n, event) in events.iter().enumerate() {
             assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
             assert_eq!(event.logical_time, n as u64);
@@ -850,7 +990,21 @@ mod tests {
                 vec![(static_id("solver_ms_per_query"), 10_000)]
             );
         }
-        let command = &events[16];
+        // The trace stage: the DAG node content-hash set as input — 19
+        // hashed nodes (3 sources + 12 document artifacts + 4 group
+        // artifacts; the report node is hashless) collapsing to 18 because
+        // control's and guideline_b's segments artifacts are byte-identical
+        // — and the landed pair as outputs.
+        let trace = &events[16];
+        assert_eq!(trace.stage, static_id("trace"));
+        assert_eq!(trace.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(trace.component_id, static_id("stage.m1.trace"));
+        assert_eq!(trace.outcome, Outcome::Ok);
+        assert_eq!(trace.input_hashes.len(), 18);
+        assert_eq!(trace.output_hashes.len(), 2);
+        assert!(trace.diagnostics.is_empty());
+        assert!(trace.budget_counters.is_empty());
+        let command = &events[17];
         assert_eq!(command.stage, static_id("run"));
         assert_eq!(command.outcome, Outcome::Ok);
     }
@@ -1067,7 +1221,7 @@ pipelines:
   - id: pipe.tiny
     stages:
       [stage.t.extract, stage.t.segment, stage.t.normalize, stage.t.assemble,
-       stage.t.compile, stage.t.verify]
+       stage.t.compile, stage.t.verify, stage.t.trace]
 stages:
   - id: stage.t.extract
     kind: extract
@@ -1099,6 +1253,12 @@ stages:
     determinism: deterministic
     input_artifact_kinds: [compiled, smt_query]
     output_artifact_kinds: [verifier_results]
+  - id: stage.t.trace
+    kind: trace
+    determinism: deterministic
+    input_artifact_kinds:
+      [source_graph, segments, normalization, ir_bundle, compiled, verifier_results]
+    output_artifact_kinds: [trace_bundle, lineage_index]
 ",
         );
         write(
@@ -1125,7 +1285,8 @@ stages:
     // command-scope diagnostic while the other document still runs all four
     // stages and lands its artifacts; the group misses a member bundle, so
     // its compile stage fails rather than compiling a partial group, and
-    // verify never runs.
+    // verify never runs. The trace stage still assembles and lands the pair
+    // over what landed: the surviving document's chain, no group artifacts.
     #[test]
     fn missing_corpus_file_keeps_other_documents() {
         let root = tempfile::tempdir().unwrap();
@@ -1156,7 +1317,7 @@ stages:
             "{diagnostics:?}"
         );
 
-        assert_eq!(events.len(), 6);
+        assert_eq!(events.len(), 7);
         for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
             assert_eq!(events[s].stage, static_id(kind));
             assert_eq!(
@@ -1175,6 +1336,16 @@ stages:
         assert_eq!(compile_event.outcome, Outcome::Invalid);
         assert_eq!(compile_event.diagnostics.len(), 1);
         assert!(compile_event.output_hashes.is_empty());
+        let trace_event = &events[5];
+        assert_eq!(trace_event.stage, static_id("trace"));
+        assert_eq!(trace_event.component_id, static_id("stage.t.trace"));
+        assert_eq!(trace_event.outcome, Outcome::Ok);
+        // fixture.tiny's source + its four landed artifacts; the
+        // bundle-less group contributes no nodes.
+        assert_eq!(trace_event.input_hashes.len(), 5);
+        assert_eq!(trace_event.output_hashes.len(), 2);
+        assert!(out.join("trace_bundle.json").exists());
+        assert!(out.join("lineage_index.json").exists());
         assert!(!out.join("artifacts/fixture.gone").exists());
         assert!(!out.join("groups").exists());
         let bundle: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.tiny", "ir_bundle");

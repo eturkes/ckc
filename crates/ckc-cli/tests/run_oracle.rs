@@ -9,10 +9,11 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ckc_cli::trace::{ConflictKind, LineageIndex, TraceBundle, TraceNodeKind};
 use ckc_core::{
-    ArtifactEnvelope, CanonRead, Canonical, DiagnosticRecord, EventRecord, GoldEntry, Id, IrBundle,
-    Normalization, Outcome, SegmentIr, SourceGraph, TotalOperationResult, parse_experiments,
-    parse_gold, read_canonical, read_jsonl,
+    ArtifactEnvelope, CanonRead, Canonical, DiagnosticRecord, EventRecord, GoldEntry, Hash, Id,
+    IrBundle, Normalization, Outcome, SegmentIr, SourceGraph, TotalOperationResult,
+    parse_experiments, parse_gold, read_canonical, read_jsonl,
 };
 use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory, VerifierResults};
 
@@ -187,8 +188,12 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         "one gold entry per fixture group"
     );
 
-    let mut expected_files: Vec<PathBuf> =
-        vec!["logs/diagnostics.jsonl".into(), "logs/events.jsonl".into()];
+    let mut expected_files: Vec<PathBuf> = vec![
+        "lineage_index.json".into(),
+        "logs/diagnostics.jsonl".into(),
+        "logs/events.jsonl".into(),
+        "trace_bundle.json".into(),
+    ];
 
     // Document artifacts: the four §8.3 per-document layers strict-read.
     let documents: BTreeSet<&Id> = exp
@@ -241,6 +246,95 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
             .unwrap_or_else(|| panic!("{}: no gold entry", group.group_id));
         assert_group_matches_gold(entry, &compiled.payload, &verifier.payload);
     }
+
+    // Trace artifacts: the §7.1 pair strict-read from the run root, both
+    // enveloped by the trace component over the DAG's node content-hash
+    // set; the §8.6 finding row and the hashless report node pin the
+    // claim surface.
+    let trace: ArtifactEnvelope<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
+    let lineage: ArtifactEnvelope<LineageIndex> = strict_read(&run_dir.join("lineage_index.json"));
+    trace.payload.validate().unwrap();
+    lineage.payload.validate().unwrap();
+    let mut node_hashes: Vec<Hash> = trace
+        .payload
+        .nodes
+        .iter()
+        .filter_map(|n| n.content_hash.clone())
+        .collect();
+    node_hashes.sort();
+    node_hashes.dedup();
+    assert_eq!(trace.schema_id, id("schema.trace_bundle"));
+    assert_eq!(trace.artifact_id, id("trace_bundle"));
+    assert_eq!(trace.artifact_kind, id("trace_bundle"));
+    assert_eq!(trace.producer.component_id, id("stage.m1.trace"));
+    assert_eq!(trace.input_hashes, node_hashes);
+    assert_eq!(lineage.schema_id, id("schema.lineage_index"));
+    assert_eq!(lineage.artifact_id, id("lineage_index"));
+    assert_eq!(lineage.artifact_kind, id("lineage_index"));
+    assert_eq!(lineage.producer.component_id, id("stage.m1.trace"));
+    assert_eq!(lineage.input_hashes, node_hashes);
+
+    // The DAG sink: exactly one report node, the only hashless one.
+    let reports: Vec<_> = trace
+        .payload
+        .nodes
+        .iter()
+        .filter(|n| n.kind == TraceNodeKind::Report)
+        .collect();
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].node_id, id("report"));
+    assert_eq!(reports[0].path, "report.json");
+    assert_eq!(reports[0].content_hash, None);
+    assert!(
+        trace
+            .payload
+            .nodes
+            .iter()
+            .all(|n| n.content_hash.is_some() || n.kind == TraceNodeKind::Report)
+    );
+
+    // The §8.6 finding row: the conflict group's deontic claim cites the
+    // cross-document core, both rules, their regions, and the report.
+    let finding = trace
+        .payload
+        .claims
+        .iter()
+        .find(|c| c.finding_id == id("finding.group.m1_conflict.1"))
+        .expect("the §8.6 finding row");
+    assert_eq!(finding.group_id, id("group.m1_conflict"));
+    assert_eq!(finding.query_id, id("q.m1_conflict.pair1.deontic"));
+    assert_eq!(finding.category, VerifierCategory::SemanticContradiction);
+    assert_eq!(finding.verdict, Some(SolverVerdict::Unsat));
+    assert_eq!(
+        finding.conflict_kind,
+        Some(ConflictKind::DeonticDirectionConflict)
+    );
+    assert_eq!(
+        finding.assertion_ids,
+        vec![
+            id("a.fixture.m1_guideline_a.rule.0"),
+            id("a.fixture.m1_guideline_b.rule.0")
+        ]
+    );
+    assert_eq!(
+        finding.rule_ids,
+        vec![
+            id("fixture.m1_guideline_a.rule.0"),
+            id("fixture.m1_guideline_b.rule.0")
+        ]
+    );
+    assert_eq!(finding.region_ids, vec![id("r.2"), id("r.3")]);
+    assert_eq!(finding.report_ref, id("report"));
+    // Lineage covers the finding for both member documents.
+    assert_eq!(
+        lineage
+            .payload
+            .rows
+            .iter()
+            .filter(|r| r.finding_id == finding.finding_id)
+            .count(),
+        2
+    );
 
     // Logs parse as their §4.6 record types; an ok total is a pure severity
     // fold, so nothing in the streams sits above ok.

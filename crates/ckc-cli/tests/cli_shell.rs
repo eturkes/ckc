@@ -100,7 +100,16 @@ fn run_writes_only_under_its_out_dir() {
     assert_eq!(single_result(&out.stdout).outcome, Outcome::Ok);
 
     assert_eq!(sorted_entries(tmp.path()), ["m1"]);
-    assert_eq!(sorted_entries(&out_dir), ["artifacts", "groups", "logs"]);
+    assert_eq!(
+        sorted_entries(&out_dir),
+        [
+            "artifacts",
+            "groups",
+            "lineage_index.json",
+            "logs",
+            "trace_bundle.json"
+        ]
+    );
     assert_eq!(
         sorted_entries(&out_dir.join("logs")),
         ["diagnostics.jsonl", "events.jsonl"]
@@ -131,7 +140,7 @@ fn run_writes_only_under_its_out_dir() {
     );
     let events: Vec<EventRecord> =
         read_jsonl(&std::fs::read(out_dir.join("logs/events.jsonl")).unwrap()).unwrap();
-    assert_eq!(events.len(), 17);
+    assert_eq!(events.len(), 18);
     assert_eq!(events[0].run_id, "m1".parse().unwrap());
 }
 

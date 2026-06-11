@@ -64,17 +64,8 @@ bare headers; git history retains all removed text.
   71% 142K/200K 01317b9
 - [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.
   76% 153K/200K d6fd71b
-- [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K _
-- [ ] cli-runner.3a.3: Trace stage wired into ckc run: STAGE_KINDS gains trace as the seventh
-  resolved component (stage.m1.trace in registry/candidates.yaml); document_pipeline returns its
-  DocTrace (corpus path, hash_bytes source hash, landed ids+hashes, bundle envelope),
-  group_pipeline its GroupTrace; after the group loop assemble_trace → validate both → two
-  envelopes (kinds trace_bundle + lineage_index, producer = the trace component, input_hashes =
-  the node content-hash set) → land trace_bundle.json + lineage_index.json at the run root (§8.3)
-  → one trace stage event. Update run.rs document_stages test (18 events, command event last) and
-  the run_oracle.rs §8.3 sweep (+2 files, strict-read, assert the §8.6 finding row and the
-  hashless report node). Reading: run.rs, run_oracle.rs, SPEC §8.3 + §4.6 events. Consumes
-  cli-runner.3a.2b. Gate: `cargo test --workspace`.
+- [x] cli-runner.3a.2b: live fixture pins for assemble_trace. 71% 142K/200K f93bfe6
+- [x] cli-runner.3a.3: trace stage wired into ckc run. 75% 150K/200K _
 - [ ] cli-runner.3b: ckc trace command: --run + --finding resolve through LineageIndex to the full
   chain source spans → segments → statements → rules → named assertions → solver verdict →
   finding, printed in both directions (§8.5 item 7 shape). Closes §8.5 item 7. Reading: SPEC §7.1,

@@ -49,15 +49,18 @@
 //!   `groups/<gid>/` with every query body byte-identical under `smt/`;
 //!   every artifact written canonical and strict-read back at the
 //!   boundary, one §4.6 stage event per attempted stage, the §4.4 total
-//!   outcome the severity fold over the whole run; trace/report stages
-//!   join in their units (cli-runner.3a/.4.1a).
-//! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`):
+//!   outcome the severity fold over the whole run; after the group loop
+//!   the run-scoped trace stage assembles and lands the §7.1 pair at the
+//!   run root (`cli-runner.3a.3`); the report stage joins with
+//!   cli-runner.4.1a.
+//! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`–`.3a.3`):
 //!   [`trace::TraceBundle`], the derivation DAG (eight ranked
 //!   [`trace::TraceNodeKind`]s, operation-labeled strictly rank-upward
 //!   edges) plus §7.2 claim-evidence rows, and [`trace::LineageIndex`],
 //!   its per-(finding, document) query index — every collection a
-//!   canonical set, structural validation via [`trace::TraceError`];
-//!   assembly and run wiring land with cli-runner.3a.2/.3a.3.
+//!   canonical set, structural validation via [`trace::TraceError`],
+//!   assembly via [`trace::assemble_trace`] over the run's [`trace::DocTrace`]
+//!   / [`trace::GroupTrace`] hand-offs.
 #![forbid(unsafe_code)]
 
 pub mod extract;

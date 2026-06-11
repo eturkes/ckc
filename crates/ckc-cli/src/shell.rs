@@ -167,6 +167,12 @@ impl Shell {
         self.outcome = self.outcome.max(outcome);
     }
 
+    /// The run id this shell stamps on every event — run-scoped stage
+    /// diagnostics cite it as their subject.
+    pub(crate) fn run_id(&self) -> &Id {
+        &self.run_id
+    }
+
     /// Record a command-scope §7.4 diagnostic: its outcome folds into the
     /// total and the record rides the command event,
     /// `logs/diagnostics.jsonl`, and `diagnostic_hashes`.

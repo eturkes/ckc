@@ -7,8 +7,8 @@
 //! canonical set sorted by [`canonical_sort_key`]), structural validation,
 //! and assembly: [`assemble_trace`] builds both payloads over the run's
 //! landed stage artifacts, handed off per document as [`DocTrace`] and per
-//! fixture group as [`GroupTrace`]; the run wiring arrives with
-//! cli-runner.3a.3 (§8.3 trace stage row).
+//! fixture group as [`GroupTrace`] by the §8.3 trace stage in
+//! [`crate::run`].
 
 use std::collections::BTreeMap;
 
@@ -526,7 +526,7 @@ impl CanonRead for LineageIndex {
 }
 
 /// One document's per-stage landings for [`assemble_trace`] — the run
-/// hand-off (cli-runner.3a.3 fills it from the document pipeline): identity
+/// hand-off (the document pipeline fills it as stages land): identity
 /// and corpus grounding, then each §8.3 landing as an Option in chain
 /// order, present exactly when its stage landed the artifact.
 #[derive(Debug, Clone)]
@@ -546,7 +546,7 @@ pub struct DocTrace {
 }
 
 /// One fixture group's landings for [`assemble_trace`] — the run hand-off
-/// (cli-runner.3a.3 fills it from the group pipeline): the §8.4 member set,
+/// (the group pipeline fills it as stages land): the §8.4 member set,
 /// then the two group landings riding whole — claims read the compiled
 /// plan and assertion map beside the verifier results.
 #[derive(Debug, Clone)]
