@@ -56,7 +56,7 @@
 //!   verifier results, the raw lexicon-byte hash, the live solver
 //!   identity, and the diagnostic ledger, landing `report.json` beside it
 //!   (`cli-runner.4.1b.1`); `report.md` and the manifests join with
-//!   cli-runner.4.1b.2.
+//!   cli-runner.4.1b.2b.
 //! - [`trace`] — §7.1 trace-stage payloads (`cli-runner.3a.1`–`.3a.3`):
 //!   [`trace::TraceBundle`], the derivation DAG (eight ranked
 //!   [`trace::TraceNodeKind`]s, operation-labeled strictly rank-upward
@@ -76,7 +76,7 @@
 //!   diagnostics rollup, solver identity, replay status, §0 wording) with
 //!   structural validation via [`report::ReportError`] and assembly via
 //!   [`report::assemble_report`] over the run's validated artifacts; the
-//!   markdown rendering and the manifests join with cli-runner.4.1b.2.
+//!   markdown rendering and the manifests join with cli-runner.4.1b.2a/.2b.
 #![forbid(unsafe_code)]
 
 pub mod extract;

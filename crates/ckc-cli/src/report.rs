@@ -7,8 +7,8 @@
 //! wording. This module owns the types, their canonical bytes, structural
 //! validation, and assembly ([`assemble_report`]) over the run's validated
 //! artifacts; `ckc run` drives it from the report stage (cli-runner.4.1b.1);
-//! the markdown rendering and the run/replay manifests land with
-//! cli-runner.4.1b.2.
+//! the markdown rendering arrives with cli-runner.4.1b.2a, the run/replay
+//! manifest landings with .4.1b.2b.
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):

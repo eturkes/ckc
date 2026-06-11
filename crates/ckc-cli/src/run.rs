@@ -13,7 +13,7 @@
 //! §4.6 stage event carrying the artifact's envelope diagnostics (or the
 //! failure diagnostic); the §4.4 total outcome is the severity fold over
 //! every event and command-scope diagnostic; `report.md` and the run/replay
-//! manifests join with cli-runner.4.1b.2.
+//! manifests join with cli-runner.4.1b.2b.
 //!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
@@ -931,7 +931,7 @@ fn stage_diagnostic(
 }
 
 /// §4.4 producer for one stage execution. The toolchain manifest hash is
-/// the zero placeholder until cli-runner.4.1b.2 mints run manifests.
+/// the zero placeholder until cli-runner.4.1b.2b mints run manifests.
 fn producer(resolved: &Resolved, stage_index: usize) -> Producer {
     Producer {
         candidate_id: resolved.pipeline_id.clone(),

@@ -72,12 +72,19 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K 8d2461b
 - [x] cli-runner.4.1b.1: report stage wired into ckc run landing report.json.
   >=90% compacted/200K _
-- [ ] cli-runner.4.1b.2: report.md + manifests completing the §8.3 artifact set: deterministic
-  markdown rendering of report.json; manifest.json (RunManifest) + replay_manifest.json
-  (ReplayManifest) from core-plans with real hash/identity values; all three landed by ckc run
-  beside report.json. Closes §8.5 item 9 surface. Reading: SPEC §7.2, §4.6 replay manifest
-  fields, §8.3 layout, §5 RunManifest row. Consumes cli-runner.4.1b.1, core-plans types. Gate:
-  `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.1b.2a: rendering + manifest cores, run.rs untouched: byte-deterministic
+  markdown rendering of a validated Report in report.rs (the report.md body); a fresh
+  manifests module assembling RunManifest + ReplayManifest over caller-supplied hash/identity
+  values (core-plans types, no I/O — the assemble_report seam); synthetic-input tests for
+  both. Reading: SPEC §7.2, §4.6 replay manifest fields, §5 RunManifest row; report.rs Report
+  shape + assemble_report as the pattern. Consumes cli-runner.4.1b.1, core-plans types. Gate:
+  `cargo test -p ckc-cli`.
+- [ ] cli-runner.4.1b.2b: ckc run landing report.md + manifest.json + replay_manifest.json
+  beside report.json with real run-state values, the producer toolchain-manifest-hash zero
+  placeholder resolved per §4.4 (run.rs note); live pins extending the cli-runner.2c oracle
+  sweep and its report module. Closes §8.5 item 9 surface. Reading: SPEC §8.3 layout, §4.6
+  replay manifest fields; run.rs report_stage as the pattern. Consumes cli-runner.4.1b.2a.
+  Gate: `cargo test -p ckc-cli report::`.
 - [ ] cli-runner.4.2a: replay core in a replay module, no shell contact: re-execute from
   replay_manifest.json over the same inputs into a scratch directory and compare canonical
   content hashes for all accepted artifacts, runtime metadata excluded; symmetric-difference
