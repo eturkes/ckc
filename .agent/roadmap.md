@@ -49,21 +49,8 @@ bare headers; git history retains all removed text.
 - [x] stage-normalize.2b: NormRule derivation + normalize() stage envelope.
   74% 149K/200K dcfe7e4
 - [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
-  >=90% compacted/200K _
-- [ ] smt-emit.2: Eligibility scan and contradiction-query planning in a plan module: over the
-  per-document FormalIRs of a fixture group, collect all unordered constraint pairs (same- and
-  cross-document) whose Action normalized keys are equal and whose directions satisfy
-  directions_opposed (§6: one positive, the other against or contraindicating), each pair
-  normalized to constraint_a_id < constraint_b_id by id bytes; pair_id `q.<gsuf>.pair<n>` where
-  gsuf is the group id minus its `group.` prefix and n counts from 1 in (a,b) id-byte order;
-  query ids `<pair_id>.overlap` and `<pair_id>.deontic` (§8.6 forms). The planner returns
-  ContradictionQueryPairs only — query text derives in emit from the paired constraints, and
-  per-document FormalIr.plan stays empty (core-ir.3 comment). Tests: §8.6 pair eligible with
-  pinned pair/query ids; disjoint-interval control pair equally eligible (Q1 later decides the
-  null); same-direction and different-action pairs excluded. Reading: SPEC §6 direction groups +
-  two-query plan, §8.6 id forms, §8.3 compile row, §5 action sameness. Consumes core-ir.3
-  FormalIr/ContradictionQueryPair/directions_opposed, smt-emit.1 set helpers. Gate:
-  `cargo test -p ckc-smt plan::`.
+  >=90% compacted/200K 511b002
+- [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K _
 - [ ] smt-emit.3a: §8.6 smt2 re-pin + query-text emission in an emit module. First resolve the
   emitter's byte rules into the spec and re-pin both §8.6 smt2 listings to exact emitter output —
   the current listings carry presentation layout that the §6 determinism rules contradict

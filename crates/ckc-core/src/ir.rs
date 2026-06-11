@@ -1371,7 +1371,8 @@ impl Structural for FormalConstraint {
 /// `constraint_a_id < constraint_b_id` by id bytes (`IrBundle::validate`) —
 /// holding the planner-minted ids of its two §6 queries (Q1
 /// context_overlap, Q2 deontic_consistency; §8.6 spells them
-/// `q.<group>.<pair>.overlap`/`.deontic`). Planning lands in smt-emit.2.
+/// `q.<group>.<pair>.overlap`/`.deontic`). Planning lives in ckc-smt
+/// (`plan_queries`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContradictionQueryPair {
     pub pair_id: Id,
@@ -1449,7 +1450,8 @@ impl Structural for ContradictionQueryPair {
 
 /// SPEC §5 FormalIR: the document's [`FormalConstraint`]s in rule order plus
 /// the contradiction-query plan (ordered array; pairs may cross documents,
-/// so [`derive`](Self::derive) leaves it for the planner, smt-emit.2).
+/// so [`derive`](Self::derive) leaves it to the group-level planner,
+/// ckc-smt `plan_queries`).
 /// Constraints emit under per-component scopes; plan entries localize in the
 /// layer scope, so cross-pair co-reference stays in the structural bytes
 /// (module doc).
@@ -1461,7 +1463,8 @@ pub struct FormalIr {
 
 impl FormalIr {
     /// Derive the layer from NormIR: one constraint per rule, in rule order;
-    /// the plan stays empty until planning (smt-emit.2).
+    /// the plan slot stays empty (group-level pairs ride ckc-smt's
+    /// CompiledArtifact::query_plan, minted by `plan_queries`).
     pub fn derive(norm: &NormIr) -> FormalIr {
         FormalIr {
             constraints: norm.rules.iter().map(FormalConstraint::from_rule).collect(),
