@@ -1,9 +1,9 @@
 //! ckc-smt — FormalIR → SMT-LIB compilation and verification for the
 //! Clinical Knowledge Compiler (SPEC §3 crate table: emission, query
 //! planning, assertion maps, solver invocation, verdict parsing). This
-//! crate owns the two §5 durable payloads plus planning and emission; the
-//! Z3 adapter (verify module) lands with its roadmap unit. Surface by
-//! module:
+//! crate owns the two §5 durable payloads plus planning, emission, and the
+//! Z3 adapter; §6 verdict/core/model parsing into [`VerifierResult`]s lands
+//! with smt-verify.b. Surface by module:
 //!
 //! - `artifact` — compile-stage payload: [`CompiledArtifact`] (target id, §5
 //!   query-plan slots, §6 query bodies under [`SmtLogic`], the
@@ -23,17 +23,25 @@
 //!   [`VerifierCategory`], raw [`SolverVerdict`] token kept distinct,
 //!   witness model or canonical unsat core, §5 solver identity, diagnostics)
 //!   with coherence validation ([`VerifierError`]).
+//! - `verify` — verify-stage adapter: [`Z3Adapter`] (§5 SolverIdentity
+//!   live-parsed from `--version` at construction; per-query subprocess
+//!   invocation under a wall-clock budget with kill-on-expiry), every
+//!   process fate as [`SolverRun`]/[`RunOutcome`] data with raw streams and
+//!   the leading verdict token, §7.4 failure codes via
+//!   [`RunOutcome::failure_code`].
 #![forbid(unsafe_code)]
 
 mod artifact;
 mod emit;
 mod plan;
 mod result;
+mod verify;
 
 pub use artifact::{ArtifactError, AssertionRecord, CompiledArtifact, QueryBody, SmtLogic};
 pub use emit::{compile, emit_deontic_query, emit_overlap_query};
 pub use plan::plan_queries;
 pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult};
+pub use verify::{AdapterError, RunOutcome, SolverRun, Z3Adapter};
 
 use ckc_core::Id;
 

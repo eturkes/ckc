@@ -52,16 +52,8 @@ bare headers; git history retains all removed text.
   >=90% compacted/200K 511b002
 - [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K 22787f9
 - [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K 2d190a6
-- [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K _
-- [ ] smt-verify.a: Z3 adapter foundation in a verify module: install z3 via apt; SolverIdentity
-  parsed live from `z3 --version` at adapter construction — code carries no version literal,
-  manifests and results carry the truth; per-query subprocess invocation under a per-query
-  wall-clock budget with kill-on-expiry; capture raw stdout/stderr and the leading verdict token;
-  timeout maps to solver_timeout and spawn failure/nonzero exit to solver_execution_failure (§7.4
-  codes, kept distinct from §6 categories). Tests: live z3 on tiny inline smt2 for sat and unsat;
-  verdict-token parse incl. unknown on canned text; budget kill via a stub sleeper executable.
-  Reading: SPEC §6 solvers, §7.4 solver codes, §8.3 verify row, §5 RunManifest row
-  (solver identity). Consumes core-plans SolverIdentity. Gate: `cargo test -p ckc-smt verify::`.
+- [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K b662324
+- [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K _
 - [ ] smt-verify.b: Verdict parsing and §6 categories completing verify: s-expression reader over
   get-model and get-unsat-core output; pipe-quote stripping; cores normalized to canonical Id sets
   sorted by canonical_sort_key and compared set-based; witness model recorded on sat; category
