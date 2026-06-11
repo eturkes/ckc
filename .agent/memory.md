@@ -71,7 +71,14 @@ git history.
   or with stage wiring overruns (9th overrun, cli-runner.4.1b.1 2026-06-11: the 8th-overrun
   core/wiring pre-split still left run.rs threading + the exp.m1_spine report pins on one
   line; compacted at the workspace-suite rerun with work otherwise done, landed
-  user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a spec-byte
+  user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a recovery split
+  is itself plan work — audit its replacement lines against every standing rule and the
+  open-decision ceiling within the recovery commit (10th overrun, cli-runner.4.1b.2b
+  2026-06-11: the 9th-overrun recovery named that rule yet left wiring + live pins paired
+  and ~6 provenance decisions open on the .2b line — toolchain-manifest identity, git-commit
+  source, environment profile, replay argv, hash sources; the window went to decision
+  derivation + run.rs threading, compacted with the pin battery unwritten; reverted,
+  decisions + salvage patch pinned into .2b.1, pins split to .2b.2); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors

@@ -73,18 +73,45 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1b.1: report stage wired into ckc run landing report.json.
   >=90% compacted/200K bb9c524
 - [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K _
-- [ ] cli-runner.4.1b.2b: ckc run landing report.md + manifest.json + replay_manifest.json
-  beside report.json with real run-state values, the producer toolchain-manifest-hash zero
-  placeholder resolved per §4.4 (run.rs note); live pins extending the cli-runner.2c oracle
-  sweep and its report module. Closes §8.5 item 9 surface. Reading: SPEC §8.3 layout, §4.6
-  replay manifest fields; run.rs report_stage as the pattern. Consumes cli-runner.4.1b.2a.
-  Gate: `cargo test -p ckc-cli report::`.
+- [ ] cli-runner.4.1b.2b.1: ckc run landing report.md + manifest.json + replay_manifest.json
+  beside report.json — apply committed .agent/wip-cli-runner.4.1b.2b.patch (whole-package
+  compile + lib `run::` 6/6 green at capture; integration-test edits compiled, unrun), verify
+  against this line, delete it in the closing commit. Pinned decisions: toolchain manifest =
+  new repo-root rust-toolchain.toml (channel "1.96.0", the installed version), read once at
+  resolve() tail (after every registry check so resolution-failure tests short-circuit first)
+  into Resolved.toolchain_manifest_hash shared by producer() (zero placeholder resolved) and
+  the manifests; git commit baked by new ckc-cli build.rs (`git rev-parse HEAD` ->
+  CKC_GIT_COMMIT env, rerun-if-changed .git/HEAD + resolved ref + packed-refs — runtime
+  probing breaks tempdir-cwd tests); Resolved.plan = RunPlan off the experiment entry; run.rs
+  manifest_inputs() gathers ManifestInputs: replay argv ["ckc","run","--experiment",<id>,
+  "--out",<dir>] via new shell out_dir(), lockfile_hashes [("cargo.lock", raw Cargo.lock)],
+  corpus_hash raw registry/corpora.yaml, environment_profile [(arch),(os)] consts,
+  input_hashes doc source hashes, output_hashes all 19 accepted envelope content hashes;
+  land_record() bare-record write boundary (canonical bytes -> write -> read_canonical ->
+  equality); report.md rendered from the read-back report payload, byte read-back checked;
+  write_tiny_root stages toolchain + lockfile; cli_shell entries + run_oracle expected_files
+  gain the three names; events stay 19. Reading: SPEC §8.3 layout, §4.4 producer note, §4.6
+  manifest fields; manifests.rs ManifestInputs contract. Consumes cli-runner.4.1b.2a. Gate:
+  `cargo test -p ckc-cli`.
+- [ ] cli-runner.4.1b.2b.2: live pins for the landed trio — one new test in run_oracle.rs mod
+  report over its own recorded run: report.md bytes == render_markdown(strict-read report.json
+  payload) plus grounding substrings; manifest.json + replay_manifest.json via read_canonical
+  (bare records, not strict_read): run_plan_hash == registry-rebuilt RunPlan .plan_hash(),
+  git_commit == env!("CKC_GIT_COMMIT") (build.rs covers test targets) + 40-hex shape,
+  toolchain/lockfile/corpus/lexicon hashes == hash_bytes of the repo files,
+  environment_profile [(arch),(os)], solver_identity == the report payload's, output_hashes ==
+  the 19 strict-read envelope hashes per the assemble_manifests ordering contract, replay
+  command == ["ckc","run","--experiment","exp.m1_spine","--out",<run dir>], input_hashes ==
+  the 3 fixture raw-byte hashes per the same contract, mirror fields + expected_output_hashes
+  == the manifest's. Closes §8.5 item 9 surface. Reading: SPEC §8.3, §4.6; run_oracle.rs mod
+  report as the pattern; manifests.rs ordering contracts. Consumes cli-runner.4.1b.2b.1. Gate:
+  `cargo test -p ckc-cli report::`.
 - [ ] cli-runner.4.2a: replay core in a replay module, no shell contact: re-execute from
   replay_manifest.json over the same inputs into a scratch directory and compare canonical
   content hashes for all accepted artifacts, runtime metadata excluded; symmetric-difference
   diagnostics on mismatch and replay_identity_unsupported for missing tools; matching hashes
   yield ok; re-run-equals-prior idempotency test over a fixture run. Reading: SPEC §4.6 replay
-  semantics, §8.3 layout, §7.4 replay codes. Consumes cli-runner.4.1b.2 manifests and the
+  semantics, §8.3 layout, §7.4 replay codes. Consumes cli-runner.4.1b.2b.1 manifests and the
   complete run pipeline. Gate: `cargo test -p ckc-cli replay::`.
 - [ ] cli-runner.4.2b: ckc replay command over the replay core — CLI surface, run-layout
   resolution, diagnostics rendering. Closes §8.5 item 8. Reading: shell.rs dispatch, the trace

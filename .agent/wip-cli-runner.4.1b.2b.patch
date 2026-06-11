@@ -1,0 +1,516 @@
+diff --git a/crates/ckc-cli/build.rs b/crates/ckc-cli/build.rs
+new file mode 100644
+index 0000000..ffeced1
+--- /dev/null
++++ b/crates/ckc-cli/build.rs
+@@ -0,0 +1,52 @@
++//! Build-time provenance: bakes the repository commit into every ckc-cli
++//! target as `CKC_GIT_COMMIT` — the §5 `RunManifest::git_commit` value, the
++//! commit the run was *built* at (a fact of the binary, not of whatever
++//! directory a command later runs in). M1 builds happen only inside the
++//! development checkout, so an unreadable repository is a build error.
++
++use std::path::Path;
++use std::process::Command;
++
++fn main() {
++    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR");
++    let repo_root = Path::new(&manifest_dir)
++        .ancestors()
++        .nth(2)
++        .expect("crates/ckc-cli sits two levels under the repo root")
++        .to_path_buf();
++    let out = Command::new("git")
++        .args(["rev-parse", "HEAD"])
++        .current_dir(&repo_root)
++        .output()
++        .expect("git rev-parse HEAD: git must be invocable at build time");
++    assert!(
++        out.status.success(),
++        "git rev-parse HEAD failed: {}",
++        String::from_utf8_lossy(&out.stderr)
++    );
++    let commit = String::from_utf8(out.stdout)
++        .expect("a commit id is ASCII hex")
++        .trim()
++        .to_owned();
++    assert!(!commit.is_empty(), "git rev-parse HEAD returned nothing");
++    println!("cargo:rustc-env=CKC_GIT_COMMIT={commit}");
++
++    // Re-run exactly when HEAD moves: the HEAD file (branch switches,
++    // detached checkouts), the checked-out branch's ref file, and
++    // packed-refs (gc can move the tip there). Only existing paths are
++    // watched — naming a missing path would re-run every build.
++    let git_dir = repo_root.join(".git");
++    println!("cargo:rerun-if-changed={}", git_dir.join("HEAD").display());
++    if let Ok(head) = std::fs::read_to_string(git_dir.join("HEAD"))
++        && let Some(target) = head.trim().strip_prefix("ref: ")
++    {
++        let ref_file = git_dir.join(target);
++        if ref_file.exists() {
++            println!("cargo:rerun-if-changed={}", ref_file.display());
++        }
++    }
++    let packed = git_dir.join("packed-refs");
++    if packed.exists() {
++        println!("cargo:rerun-if-changed={}", packed.display());
++    }
++}
+diff --git a/crates/ckc-cli/src/manifests.rs b/crates/ckc-cli/src/manifests.rs
+index d3f1d20..fbfdd22 100644
+--- a/crates/ckc-cli/src/manifests.rs
++++ b/crates/ckc-cli/src/manifests.rs
+@@ -2,7 +2,7 @@
+ //! `manifest.json` ([`ckc_core::RunManifest`]) and `replay_manifest.json`
+ //! ([`ckc_core::ReplayManifest`]) of the §8.3 layout. [`assemble_manifests`]
+ //! builds both records over caller-supplied hash/identity values: no I/O,
+-//! no clock, no environment probing — the run landing (cli-runner.4.1b.2b)
++//! no clock, no environment probing — the run landing (`run::manifest_inputs`)
+ //! gathers the values; this module owns the §5 plan-hash linkage, canonical
+ //! storage order for every set and map field, and the shared-provenance
+ //! guarantee: the two records agree on every fact they both attest, and the
+@@ -15,8 +15,7 @@ use ckc_core::{CanonError, Hash, Id, ReplayManifest, RunManifest, RunPlan, Solve
+ /// attest. Collection fields arrive in any order; assembly sorts them into
+ /// canonical storage (§4.3 set/map semantics). `command` is the §4.6 argv
+ /// `ckc replay` re-executes; `toolchain_manifest_hash` is the §4.4
+-/// producer value once the run landing resolves it from its zero
+-/// placeholder (run.rs note).
++/// producer value (the toolchain manifest file's raw-byte hash).
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct ManifestInputs {
+     /// The executed §5 plan; its canonical bytes hash into
+diff --git a/crates/ckc-cli/src/run.rs b/crates/ckc-cli/src/run.rs
+index f18256e..30b39c6 100644
+--- a/crates/ckc-cli/src/run.rs
++++ b/crates/ckc-cli/src/run.rs
+@@ -1,4 +1,4 @@
+-//! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3 + .4.1b.1): resolve the
++//! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3 + .4.1b): resolve the
+ //! experiment through the §8.4 registries, drive each corpus document through
+ //! extract → segment → normalize → assemble into
+ //! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`,
+@@ -6,14 +6,16 @@
+ //! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`,
+ //! assemble the run-scoped §7.1 trace pair over every landed artifact
+ //! into `trace_bundle.json` + `lineage_index.json` at the run root, then
+-//! assemble the §7.2 report over the landed pair into `report.json`
++//! close with the §8.3 report stage: `report.json` (§7.2), its rendered
++//! `report.md` view, and the §5/§4.6 provenance pair `manifest.json` +
++//! `replay_manifest.json` over the run's recorded state
+ //! — every envelope written as §4.3 canonical bytes and strict-read back at
+ //! the write boundary ([`land`]), every smt file byte-identical to its
+-//! [`ckc_smt::QueryBody`] body. Each attempted stage records exactly one
++//! [`ckc_smt::QueryBody`] body, every bare record re-read equal
++//! ([`land_record`]). Each attempted stage records exactly one
+ //! §4.6 stage event carrying the artifact's envelope diagnostics (or the
+ //! failure diagnostic); the §4.4 total outcome is the severity fold over
+-//! every event and command-scope diagnostic; `report.md` and the run/replay
+-//! manifests join with cli-runner.4.1b.2b.
++//! every event and command-scope diagnostic.
+ //!
+ //! Failure scoping: registry resolution, lexicon loading, solver-adapter
+ //! construction, and corpus-file reads are command-scope
+@@ -25,9 +27,8 @@
+ //! group declares would document a null result the fixtures never earned.
+ //! Producer values are runner-owned: candidate = the experiment's pipeline,
+ //! component = the registry stage component, toolchain manifest hash = the
+-//! zero placeholder until cli-runner.4.1b mints run manifests (envelope
+-//! metadata outside content hashes, so replay identity is unaffected by the
+-//! swap).
++//! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
++//! shared verbatim with the §5/§4.6 manifests.
+ 
+ use std::path::Path;
+ use std::time::Duration;
+@@ -35,16 +36,17 @@ use std::time::Duration;
+ use ckc_core::{
+     ArtifactEnvelope, Authority, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
+     DiagnosticCode, DiagnosticRecord, FixtureGroup, Hash, Id, IrBundle, Normalization, Origin,
+-    Outcome, Producer, SegmentIr, SolverIdentity, SourceGraph, assemble, canonical_payload_bytes,
+-    canonical_sort_key, canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates,
+-    parse_corpora, parse_experiments, read_canonical,
++    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceGraph, assemble,
++    canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
++    hash_bytes, parse_candidates, parse_corpora, parse_experiments, read_canonical,
+ };
+ use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
+ 
+ use crate::extract::{ExtractConfig, extract};
++use crate::manifests::{ManifestInputs, assemble_manifests};
+ use crate::normalize::{Lexicon, load_lexicon, normalize};
+ use crate::registry_check::{invalid_diagnostic, load};
+-use crate::report::assemble_report;
++use crate::report::{Report, assemble_report, render_markdown};
+ use crate::segment::segment;
+ use crate::shell::{Shell, StageClock, StageEvent, stage_clock, static_id};
+ use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_trace};
+@@ -53,6 +55,23 @@ use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_tra
+ /// [`crate::normalize`]), read from the invocation root like the registries.
+ const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
+ 
++/// §4.4 toolchain manifest in force — the workspace's pinned-toolchain
++/// file, raw-byte hashed into every producer and both §5/§4.6 manifests.
++const TOOLCHAIN_FILE: &str = "rust-toolchain.toml";
++
++/// §8.4 corpus registry; its raw bytes hash into the manifests'
++/// `corpus_hash` (the §5 "content hash versioning the corpus in force").
++const CORPORA_FILE: &str = "registry/corpora.yaml";
++
++/// The workspace lockfile, raw-byte hashed under the manifests'
++/// `lockfile_hashes` key `cargo.lock`.
++const LOCKFILE: &str = "Cargo.lock";
++
++/// §5 `git_commit`: the repository commit this binary was built at, baked
++/// in by the ckc-cli build script (provenance of the build, not of the
++/// invocation directory).
++const GIT_COMMIT: &str = env!("CKC_GIT_COMMIT");
++
+ /// The eight §8.3 stages this module drives, in chain order, spelled as the
+ /// registry `kind` tokens the pipeline's stage components declare: four
+ /// per-document stages, the two per-group stages, then the run-scoped
+@@ -141,6 +160,8 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
+         return;
+     };
+     report_stage(
++        root,
++        &docs,
+         &graphs,
+         &groups,
+         &bundle,
+@@ -155,7 +176,8 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
+ /// The runner's resolved view of one experiment: the pipeline candidate,
+ /// its stage component ids, the unique corpus documents across the fixture
+ /// groups in first-appearance order, the groups themselves in evaluation
+-/// order, and the per-query solver budget.
++/// order, the per-query solver budget, the §5 plan the run executes, and
++/// the toolchain manifest hash every producer carries.
+ struct Resolved {
+     pipeline_id: Id,
+     /// Stage component ids parallel to [`STAGE_KINDS`].
+@@ -164,14 +186,21 @@ struct Resolved {
+     groups: Vec<FixtureGroup>,
+     /// §8.4 `solver_ms_per_query` budget value.
+     budget_ms: u64,
++    /// §5 run plan built from the experiment entry; its content hash is
++    /// the manifest's `run_plan_hash`.
++    plan: RunPlan,
++    /// §4.4 raw-byte hash of [`TOOLCHAIN_FILE`].
++    toolchain_manifest_hash: Hash,
+ }
+ 
+ /// Resolve `experiment_id` against the §8.4 registry surface. Whole-set
+ /// semantic validation is `ckc registry check`'s job; resolution diagnoses
+ /// exactly the references this run needs, each failure one command-scope
+-/// `schema_invalid` diagnostic.
++/// `schema_invalid` diagnostic. The toolchain manifest read rides last:
++/// every producer (and later both manifests) carries its hash, so a run
++/// that cannot attest its toolchain mints nothing.
+ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolved> {
+-    let corpora = load(root, "registry/corpora.yaml", parse_corpora, shell);
++    let corpora = load(root, CORPORA_FILE, parse_corpora, shell);
+     let candidates = load(root, "registry/candidates.yaml", parse_candidates, shell);
+     let experiments = load(root, "registry/experiments.yaml", parse_experiments, shell);
+     let (Some(corpora), Some(candidates), Some(experiments)) = (corpora, candidates, experiments)
+@@ -260,12 +289,38 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
+     if unresolved {
+         return None;
+     }
++    let toolchain_manifest_hash = match std::fs::read(root.join(TOOLCHAIN_FILE)) {
++        Ok(bytes) => hash_bytes(&bytes),
++        Err(e) => {
++            shell.diagnostic(invalid_diagnostic(vec![
++                (static_id("file"), TOOLCHAIN_FILE.to_owned()),
++                (static_id("reason"), format!("read {TOOLCHAIN_FILE}: {e}")),
++            ]));
++            return None;
++        }
++    };
+     Some(Resolved {
+         pipeline_id: pipeline.id.clone(),
+         components,
+         documents,
+         groups: experiment.fixture_groups.clone(),
+         budget_ms,
++        plan: RunPlan {
++            experiment_id: experiment.id.clone(),
++            fixture_groups: experiment
++                .fixture_groups
++                .iter()
++                .map(|g| g.group_id.clone())
++                .collect(),
++            pipelines: vec![experiment.pipeline.clone()],
++            seed: experiment.seed,
++            budget: experiment
++                .budget
++                .iter()
++                .map(|(k, v)| (k.clone(), *v))
++                .collect(),
++        },
++        toolchain_manifest_hash,
+     })
+ }
+ 
+@@ -591,11 +646,19 @@ fn trace_stage(
+ /// landed source-graph envelopes, the landed verifier results, the raw
+ /// lexicon-byte hash, and the adapter's live solver identity, validate it,
+ /// and land it at the run root as `report.json` — the path the DAG's
+-/// hashless sink node already names. Input hashes are the §4.3 set of
+-/// every consumed envelope's content hash; one stage event closes the
+-/// stage with the report's content hash or the first failure diagnostic.
++/// hashless sink node already names. The landed payload then renders as
++/// `report.md` (read back byte-identical, the [`materialize_queries`]
++/// discipline), and the §5/§4.6 provenance pair lands as `manifest.json` +
++/// `replay_manifest.json` over [`manifest_inputs`]' gathered run state.
++/// Input hashes are the §4.3 set of every consumed envelope's content
++/// hash; one stage event closes the stage with the report's content hash
++/// (the manifests and the view attest or derive from accepted artifacts;
++/// they carry no content hash of their own) or the first failure
++/// diagnostic.
+ #[allow(clippy::too_many_arguments)]
+ fn report_stage(
++    root: &Path,
++    docs: &[DocTrace],
+     graphs: &[ArtifactEnvelope<SourceGraph>],
+     groups: &[GroupTrace],
+     bundle: &ArtifactEnvelope<TraceBundle>,
+@@ -646,7 +709,43 @@ fn report_stage(
+         )
+         .map_err(|e| fail(e.to_string()))
+     })
+-    .and_then(|report| land(shell, "report.json", report));
++    .and_then(|report| land(shell, "report.json", report))
++    .and_then(|report| {
++        // §7.2 derived view: rendered from the read-back payload (disk
++        // truth), landed beside the canonical record.
++        let body = render_markdown(&report.payload);
++        let path = shell
++            .write_under("report.md", body.as_bytes())
++            .map_err(|e| fail(format!("report.md: {e}")))?;
++        let read_back =
++            std::fs::read(&path).map_err(|e| fail(format!("report.md: read back: {e}")))?;
++        if read_back != body.as_bytes() {
++            return Err(fail(
++                "report.md: read back diverges from the rendering".to_owned(),
++            ));
++        }
++        Ok(report)
++    })
++    .and_then(|report| {
++        let inputs = manifest_inputs(
++            root,
++            docs,
++            groups,
++            bundle,
++            lineage,
++            &report,
++            lexicon_hash,
++            solver_identity,
++            resolved,
++            shell,
++        )
++        .map_err(&fail)?;
++        let (manifest, replay) = assemble_manifests(&inputs)
++            .map_err(|e| fail(format!("manifest assembly: {e}")))?;
++        land_record(shell, "manifest.json", &manifest)?;
++        land_record(shell, "replay_manifest.json", &replay)?;
++        Ok(report)
++    });
+ 
+     let (started_at, ended_at, duration_ms) = clock.stop();
+     let (outcome, diagnostics, output_hashes) = match landed {
+@@ -670,6 +769,111 @@ fn report_stage(
+     });
+ }
+ 
++/// Gather the run state the §5/§4.6 manifests attest, one value per
++/// [`ManifestInputs`] fact (failures name their reason; the report stage
++/// scopes them): the resolved §5 plan and toolchain hash; the §4.6 replay
++/// command reconstructed in semantic order from the experiment id and the
++/// shell's `--out` token; the build-baked [`GIT_COMMIT`]; raw-byte hashes
++/// of [`LOCKFILE`] and [`CORPORA_FILE`] read at the invocation root; the
++/// lexicon hash and live solver identity the run already holds; `os` +
++/// `arch` environment facts; input hashes = the corpus documents' raw
++/// source-byte hashes; output hashes = every landed envelope's content
++/// hash — the document layers, the group pair, the trace pair, and the
++/// report itself ([`assemble_manifests`] owns canonical ordering).
++#[allow(clippy::too_many_arguments)]
++fn manifest_inputs(
++    root: &Path,
++    docs: &[DocTrace],
++    groups: &[GroupTrace],
++    bundle: &ArtifactEnvelope<TraceBundle>,
++    lineage: &ArtifactEnvelope<LineageIndex>,
++    report: &ArtifactEnvelope<Report>,
++    lexicon_hash: &Hash,
++    solver_identity: &SolverIdentity,
++    resolved: &Resolved,
++    shell: &Shell,
++) -> Result<ManifestInputs, String> {
++    let Some(out_dir) = shell.out_dir() else {
++        return Err("manifests: run shell has no output directory".to_owned());
++    };
++    let mut command: Vec<String> = ["ckc", "run", "--experiment"].map(str::to_owned).to_vec();
++    command.push(resolved.plan.experiment_id.to_string());
++    command.push("--out".to_owned());
++    command.push(out_dir.display().to_string());
++
++    let lockfile = std::fs::read(root.join(LOCKFILE))
++        .map_err(|e| format!("manifests: read {LOCKFILE}: {e}"))?;
++    let corpora = std::fs::read(root.join(CORPORA_FILE))
++        .map_err(|e| format!("manifests: read {CORPORA_FILE}: {e}"))?;
++
++    let mut output_hashes: Vec<Hash> = vec![
++        bundle.content_hash.clone(),
++        lineage.content_hash.clone(),
++        report.content_hash.clone(),
++    ];
++    for doc in docs {
++        output_hashes.extend(doc.source_graph.iter().map(|(_, h)| h.clone()));
++        output_hashes.extend(doc.segments.iter().map(|(_, h)| h.clone()));
++        output_hashes.extend(doc.normalization.iter().map(|(_, h)| h.clone()));
++        output_hashes.extend(doc.bundle.iter().map(|b| b.content_hash.clone()));
++    }
++    for group in groups {
++        output_hashes.extend(group.compiled.iter().map(|c| c.content_hash.clone()));
++        output_hashes.extend(
++            group
++                .verifier_results
++                .iter()
++                .map(|v| v.content_hash.clone()),
++        );
++    }
++
++    Ok(ManifestInputs {
++        plan: resolved.plan.clone(),
++        command,
++        git_commit: GIT_COMMIT.to_owned(),
++        toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
++        lockfile_hashes: vec![(static_id("cargo.lock"), hash_bytes(&lockfile))],
++        corpus_hash: hash_bytes(&corpora),
++        lexicon_hash: lexicon_hash.clone(),
++        environment_profile: vec![
++            (static_id("arch"), std::env::consts::ARCH.to_owned()),
++            (static_id("os"), std::env::consts::OS.to_owned()),
++        ],
++        solver_identity: solver_identity.clone(),
++        input_hashes: docs.iter().map(|d| d.source_hash.clone()).collect(),
++        output_hashes,
++    })
++}
++
++/// The manifests' write boundary: emit the bare §5/§4.6 record as
++/// canonical bytes under `rel`, strict-read the file back, and require the
++/// read-back value equal — [`land`]'s discipline for records that carry no
++/// envelope (the manifests attest envelopes; nothing envelopes them).
++fn land_record<P: Canonical + CanonRead + PartialEq>(
++    shell: &Shell,
++    rel: &str,
++    record: &P,
++) -> Result<(), DiagnosticRecord> {
++    let fail = |reason: String| {
++        invalid_diagnostic(vec![
++            (static_id("artifact"), rel.to_owned()),
++            (static_id("reason"), reason),
++        ])
++    };
++    let bytes =
++        canonical_payload_bytes(record).map_err(|e| fail(format!("canonical emission: {e}")))?;
++    let path = shell
++        .write_under(rel, &bytes)
++        .map_err(|e| fail(e.to_string()))?;
++    let read_back = std::fs::read(&path).map_err(|e| fail(format!("read back: {e}")))?;
++    let parsed: P =
++        read_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
++    if parsed != *record {
++        return Err(fail("read-back value diverges from the record".to_owned()));
++    }
++    Ok(())
++}
++
+ /// Materialize the landed compiled artifact's query bodies as the §8.3
+ /// `groups/<gid>/smt/<query-id>.smt2` files, each read back and checked
+ /// byte-identical to its [`ckc_smt::QueryBody`] body — solver-bound text
+@@ -930,14 +1134,13 @@ fn stage_diagnostic(
+     ])
+ }
+ 
+-/// §4.4 producer for one stage execution. The toolchain manifest hash is
+-/// the zero placeholder until cli-runner.4.1b.2b mints run manifests.
++/// §4.4 producer for one stage execution; the toolchain manifest hash is
++/// the [`TOOLCHAIN_FILE`] raw-byte hash resolution recorded.
+ fn producer(resolved: &Resolved, stage_index: usize) -> Producer {
+     Producer {
+         candidate_id: resolved.pipeline_id.clone(),
+         component_id: resolved.components[stage_index].clone(),
+-        toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64)))
+-            .expect("the zero digest matches the Hash grammar"),
++        toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
+     }
+ }
+ 
+@@ -1425,6 +1628,10 @@ stages:
+             "corpus/fixtures/tiny.html",
+             "<html><body><p>本文。</p></body></html>",
+         );
++        // Provenance files the resolved producer and the report stage's
++        // manifests hash (raw bytes; never parsed).
++        write(TOOLCHAIN_FILE, "[toolchain]\nchannel = \"test\"\n");
++        write(LOCKFILE, "# staged lockfile\n");
+     }
+ 
+     // §4.4 valid remainder: a document whose corpus file is missing takes a
+diff --git a/crates/ckc-cli/src/shell.rs b/crates/ckc-cli/src/shell.rs
+index 688ded5..e4791ce 100644
+--- a/crates/ckc-cli/src/shell.rs
++++ b/crates/ckc-cli/src/shell.rs
+@@ -173,6 +173,12 @@ impl Shell {
+         &self.run_id
+     }
+ 
++    /// The output directory as the dispatcher received it — the report
++    /// stage's `--out` token when reconstructing the §4.6 replay command.
++    pub(crate) fn out_dir(&self) -> Option<&Path> {
++        self.out_dir.as_deref()
++    }
++
+     /// Every §7.4 record raised so far, append-ordered — the report
+     /// stage's diagnostics-summary source.
+     pub(crate) fn ledger(&self) -> &[DiagnosticRecord] {
+diff --git a/crates/ckc-cli/tests/cli_shell.rs b/crates/ckc-cli/tests/cli_shell.rs
+index 8e6b7a0..20654f9 100644
+--- a/crates/ckc-cli/tests/cli_shell.rs
++++ b/crates/ckc-cli/tests/cli_shell.rs
+@@ -107,7 +107,10 @@ fn run_writes_only_under_its_out_dir() {
+             "groups",
+             "lineage_index.json",
+             "logs",
++            "manifest.json",
++            "replay_manifest.json",
+             "report.json",
++            "report.md",
+             "trace_bundle.json"
+         ]
+     );
+diff --git a/crates/ckc-cli/tests/run_oracle.rs b/crates/ckc-cli/tests/run_oracle.rs
+index 6c847f8..f23b82c 100644
+--- a/crates/ckc-cli/tests/run_oracle.rs
++++ b/crates/ckc-cli/tests/run_oracle.rs
+@@ -194,7 +194,10 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
+         "lineage_index.json".into(),
+         "logs/diagnostics.jsonl".into(),
+         "logs/events.jsonl".into(),
++        "manifest.json".into(),
++        "replay_manifest.json".into(),
+         "report.json".into(),
++        "report.md".into(),
+         "trace_bundle.json".into(),
+     ];
+ 
+diff --git a/rust-toolchain.toml b/rust-toolchain.toml
+new file mode 100644
+index 0000000..0f87b44
+--- /dev/null
++++ b/rust-toolchain.toml
+@@ -0,0 +1,2 @@
++[toolchain]
++channel = "1.96.0"
