@@ -57,7 +57,11 @@ git history.
   cli-runner.3a 2026-06-11: trace types + assembly + ckc-run wiring scheduled as one unit
   against this anchor — 975 uncompiled lines plus full run.rs/shell.rs reads by compaction;
   reverted, split .3a.1/.2/.3 with the decisions pinned in the lines and each Reading slice
-  excluding files its half leaves untouched); a spec-byte
+  excluding files its half leaves untouched); an assembly fn plus its live-pipeline pin
+  battery = two units (7th overrun, cli-runner.3a.2 2026-06-11: assemble_trace + hand-off
+  structs compiled clean, but the live battery — reading slice alone spanning run.rs, the
+  verify-stage tests, the normalize.rs helpers — was unwritten at compaction; reverted,
+  split .3a.2a synthetic-tests / .3a.2b live-pins); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors
@@ -72,7 +76,9 @@ git history.
   (loader / binding / builder) = three units; statement builder over a prebuilt binding
   core = one unit; exception attachment + determinism tests = one unit. Practices: house
   new type families in fresh modules (extending a ~2K-line module costs a full-file read);
-  land a compiling skeleton before the full test battery; pin expected shapes from observed
+  land a compiling skeleton before the full test battery; salvage a reverted session's
+  compiling half as a committed `.agent/wip-<unit>.patch` the redo line points at (apply,
+  verify against the line, delete in the closing commit); pin expected shapes from observed
   output, never hand-computed; cite only checked roadmap lines as measured anchors.
   At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
   for readability (alignment padding, inline result comments, illustrative declaration or

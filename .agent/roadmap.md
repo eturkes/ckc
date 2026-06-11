@@ -62,26 +62,63 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + gold assert. 47% 93K/200K 7cae297
 - [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
   71% 142K/200K _
-- [ ] cli-runner.3a.2: Trace assembly in the trace module (still no run.rs contact): pub hand-off
-  structs DocTrace (document_id, corpus-relative fixture path, raw-byte source hash, landed
-  (Id, Hash) per stage, bundle envelope — landings as Options) and GroupTrace (group_id, fixtures,
-  compiled + verifier_results envelopes as Options); assemble_trace(docs, groups) ->
-  (TraceBundle, LineageIndex) skipping absent pieces: per doc the chain source →extract→
-  source_graph →segment→ segments →normalize→ normalization →assemble→ ir_bundle with node ids =
-  artifact ids, paths = §8.3 run-relative paths, hashes = envelope content hashes; per group each
-  member ir_bundle →compile→ compiled →verify→ verifier_results →report→ the one static report
-  node (static id, path report.json, no hash). One claim row per verifier result: ordinal = index
-  in the group's results vector (plan order = §7.2 source-then-hash; §8.6 pins: overlap row
-  finding.group.m1_conflict.0, deontic contradiction finding.group.m1_conflict.1); evidence =
-  recorded unsat core else the row's query :named assertions, names ctx.<rule_id> / a.<rule_id>
-  from constraint fc.<rule_id>; rule/region ids via the compiled assertion_map; report_ref = the
-  report node. Lineage: one row per finding x member document; statements via the
-  `rules[k] ← statements[k]` index invariant on the member bundle, segments from those
-  statements, regions from the rule. Sort every set by canonical_sort_key, then validate() both.
-  Tests drive the real stages over the fixtures (pattern: the verify-stage tests) and assert the
-  §8.6 pins incl. core `[a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]` and
-  the null-group rows. Reading: trace.rs, ckc-smt artifact.rs + result.rs, SPEC §8.6, §7.1.
+- [ ] cli-runner.3a.2a: Trace assembly in the trace module (still no run.rs contact). Reference
+  implementation from the reverted first attempt: .agent/wip-3a.2a.patch — apply or transcribe,
+  verify against this line, trim its test imports to the synthetic surface, delete it in the
+  closing commit. Pub hand-off structs DocTrace (document_id, fixture_path: corpus-relative
+  String, source_hash: raw-byte Hash, source_graph/segments/normalization: Option<(Id, Hash)>,
+  bundle: Option<ArtifactEnvelope<IrBundle>> — the whole envelope; claims/lineage read payload
+  layers) and GroupTrace (group_id, fixtures, compiled + verifier_results envelope Options);
+  infallible assemble_trace(&[DocTrace], &[GroupTrace]) -> (TraceBundle, LineageIndex) — trace
+  shapes emit canonically by construction, expect() inside. DAG: the one static report node
+  always present (static id, path report.json, hash None); per doc a source node (id =
+  document_id, path = fixture_path, hash = source_hash) then present landings in stage order as
+  nodes (id/hash from the landing, path = artifacts/<doc-id>/<kind>.json, ir_bundle node from
+  the envelope's artifact_id/content_hash), each edged from the nearest present predecessor
+  with the target kind's operation(); per group compiled + verifier_results nodes (paths
+  groups/<gid>/{compiled,verifier_results}.json), compile edges from each member's present
+  ir_bundle node (lookup keyed by document_id), compiled →verify→ verifier_results →report→
+  report. Claims iff compiled AND results present, one row per result: ordinal = index in the
+  results vector; pair = the query_plan entry whose overlap or deontic slot equals the row's
+  query_id (no match → skip); finding_id = finding.<group_id>.<ordinal>; evidence = recorded
+  unsat core verbatim, else both pair constraint ids fc.-stripped and prefixed ctx. (overlap
+  slot matched) / a. (deontic); rule/region ids = assertion_map union over the pair's two
+  constraints; conflict_kind = deontic_direction_conflict iff category semantic_contradiction;
+  report_ref = the report node. Lineage per claim x member fixture: member bundle required,
+  doc_rules = the claim's rules prefixed <fixture>.rule. (empty → skip row); each rule's
+  position k in norm.rules gives its source_region_ids and clinical.statements[k] →
+  statement_id + source_segment_ids. Sort every emitted set by canonical_sort_key, then
+  validate() both. Tests stay synthetic — no fixtures, no Z3, no IrBundle values: empty inputs
+  (lone report node); a bundle-less full chain; a gapped doc (segments absent → one
+  normalize-operation edge bridging source_graph → normalization); a bare group (no nodes); a
+  results-only group (node + report edge, no verify edge, no claims); hand-built
+  CompiledArtifact + VerifierResults pinning ordinals, evidence fallback naming, assertion_map
+  unions, conflict_kind, and the lineage skip paths — live fixture values land in
+  cli-runner.3a.2b. Reading: trace.rs, ckc-smt artifact.rs + result.rs, SPEC §7.1, §8.3.
   Consumes cli-runner.3a.1. Gate: `cargo test -p ckc-cli trace::`.
+- [ ] cli-runner.3a.2b: Live fixture pins for assemble_trace (tests only; production trace.rs
+  and run.rs untouched): trace.rs test helpers mirroring run.rs's two pipelines through the pub
+  stage surface — fixture/lexicon/producer helpers per the normalize.rs test pattern, a generic
+  envelope wrap (schema id schema.<kind>, content_hash(payload), canonicalization_policy_hash(),
+  empty effects/trace_refs/diagnostics/runtime_metadata); live_doc = extract
+  (synthetic_fixture_html family, Provenance::Synthetic, DataClass::None) → segment → normalize
+  → DocIr::from_graph + canonical union of the segment/normalization envelope diagnostics →
+  ckc_core::assemble → bundle.validate against the source graph → DocTrace with every landing
+  Some, fixture_path corpus/fixtures/<file>, source_hash = hash_bytes(raw); live_group = compile
+  over member (formal, norm) pairs → verify under a live Z3Adapter with a generous budget →
+  GroupTrace. One test: docs m1_guideline_a/b + m1_control, group.m1_conflict = [a, b],
+  group.m1_null = [a, control] → assemble_trace, both validate Ok; assert the node/edge census
+  with §8.3 paths and chain/compile/verify/report edge spot checks; claims:
+  finding.group.m1_conflict.0 = the overlap row (sat, no conflict_kind, evidence = both ctx.*
+  assertions), finding.group.m1_conflict.1 = the deontic row (semantic_contradiction, unsat,
+  deontic_direction_conflict, core verbatim `[a.fixture.m1_guideline_a.rule.0,
+  a.fixture.m1_guideline_b.rule.0]`), finding.group.m1_null.0 = the documented-null overlap row
+  (unsat, evidence [ctx.fixture.m1_control.rule.0, ctx.fixture.m1_guideline_a.rule.0]); lineage:
+  docA rows carry the §8.6 regions [r.2, r.3] and the normalize.rs-pinned statement + segments
+  [seg.2, seg.3]; docB/control row values pinned from observed gate output, never hand-computed.
+  Pattern: the verdict.rs live tests. Reading: trace.rs, run.rs (mirror only), ckc-smt
+  verdict.rs live tests, normalize.rs test helpers, SPEC §8.6. Consumes cli-runner.3a.2a. Gate:
+  `cargo test -p ckc-cli trace::`.
 - [ ] cli-runner.3a.3: Trace stage wired into ckc run: STAGE_KINDS gains trace as the seventh
   resolved component (stage.m1.trace in registry/candidates.yaml); document_pipeline returns its
   DocTrace (corpus path, hash_bytes source hash, landed ids+hashes, bundle envelope),
@@ -91,7 +128,7 @@ bare headers; git history retains all removed text.
   → one trace stage event. Update run.rs document_stages test (18 events, command event last) and
   the run_oracle.rs §8.3 sweep (+2 files, strict-read, assert the §8.6 finding row and the
   hashless report node). Reading: run.rs, run_oracle.rs, SPEC §8.3 + §4.6 events. Consumes
-  cli-runner.3a.2. Gate: `cargo test --workspace`.
+  cli-runner.3a.2b. Gate: `cargo test --workspace`.
 - [ ] cli-runner.3b: ckc trace command: --run + --finding resolve through LineageIndex to the full
   chain source spans → segments → statements → rules → named assertions → solver verdict →
   finding, printed in both directions (§8.5 item 7 shape). Closes §8.5 item 7. Reading: SPEC §7.1,
