@@ -325,7 +325,7 @@ mod tests {
     fn sample_manifest() -> RunManifest {
         RunManifest {
             run_plan_hash: sample_plan().plan_hash().unwrap(),
-            git_commit: "8d0ba4e7aea6410a1e517f7357a5776f50a4b824".to_owned(),
+            git_commit: "0d424a397281bc8a276f4dd666c433a89d6b1228".to_owned(),
             toolchain_manifest_hash: h('a'),
             lockfile_hashes: vec![(id("cargo.lock"), h('b'))],
             corpus_hash: h('c'),
@@ -417,7 +417,7 @@ mod tests {
             concat!(
                 r#"{{"corpus_hash":"{c}","#,
                 r#""environment_profile":{{"arch":"x86_64","os":"linux"}},"#,
-                r#""git_commit":"8d0ba4e7aea6410a1e517f7357a5776f50a4b824","#,
+                r#""git_commit":"0d424a397281bc8a276f4dd666c433a89d6b1228","#,
                 r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,
                 r#""output_hashes":["{e}"],"run_plan_hash":"{plan}","#,
                 r#""solver_identity":{{"solver_id":"z3","version":"4.13.4"}},"#,

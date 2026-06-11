@@ -5,19 +5,6 @@ sessions operating under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.
 The document is optimized for machine reading: stable `§` anchors, tables over prose, one fact in
 one place, sections sized for selective loading.
 
-Revision r2 (2026-06-11): build plan resequenced — the weak-model lift PoC is M2 (before
-comparison), invented IR/DSLs gained standalone milestone M4, autoresearch moved to M5, sources
-merged into M6 expansion; §9–§13 rewritten to match.
-
-Revision r3 (2026-06-12): stage arc named in §0 (research instrument → guideline auditor →
-CDS backend); M7 auditor-product contract (§13.3) and Stage III CDS-backend contract (§13.4)
-added; §6 gains `condition_unsatisfiable` and `exception_resolved_conflict` (M3) plus
-`priority_ambiguity` and `source_support_mismatch` (M7); §7.2 gains finding severity,
-review-question fields, and the manuscript bundle; §13.1 gains the OCR lane, textbook family,
-JLAC codes, unit normalization, and M6 acceptance themes; gate `G-EXEC-EVAL`. Inputs: container probes (clingo raw-vs-
-resolved, Z3 assert-soft correction sets, Lean per-instance reflection, cvc5 replay of the
-recorded m1 run) — see the commit introducing this revision.
-
 ## §0 Mission, thesis, posture
 
 CKC is a headless research harness that maps public Japanese clinical-guideline knowledge into

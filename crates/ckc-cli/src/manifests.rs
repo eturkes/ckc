@@ -189,7 +189,7 @@ mod tests {
             ]
             .map(str::to_owned)
             .to_vec(),
-            git_commit: "bb9c524fffffffffffffffffffffffffffffffff".to_owned(),
+            git_commit: "79bc570fffffffffffffffffffffffffffffffff".to_owned(),
             toolchain_manifest_hash: hash('a'),
             lockfile_hashes: vec![
                 (id("rust-toolchain.lock"), hash('b')),

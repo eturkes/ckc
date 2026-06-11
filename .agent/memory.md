@@ -7,7 +7,7 @@ git history.
 
 ## Policy
 
-- [2026-06-11] Context hygiene (user directive; background: `git show a4a4f0e`): keep every
+- Context hygiene (user directive; background: `git show 531f586`): keep every
   session lean and phrased in project vocabulary (stages, units, gates, artifacts) — plain
   operational words over research jargon in memory, roadmap, commits, and code alike.
   Consult `docs/` through read-only subagents so its vocabulary stays out of
@@ -17,29 +17,29 @@ git history.
   Checked roadmap items collapse to one-line stubs (full unit text in git history).
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- [2026-06-11] Lexgate guards the durable tree: `bash .agent/lexgate.sh` with modes `hook`
+- Lexgate guards the durable tree: `bash .agent/lexgate.sh` with modes `hook`
   (write-time, wired in settings.json), `pre-commit` (installed in .git/hooks; `install`
   restores it), `sweep` (review sessions run it), `check` (missing parts → stop and ask the
   user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only, gitignored,
-  Read-denied, user-maintained (recalibrated 2026-06-11 to vocabulary with no legitimate
+  Read-denied, user-maintained (recalibrated to vocabulary with no legitimate
   in-project use); a clean session treats the gate as pass/fail only and a failure as
   rewording work on the cited lines (the gate cites file:line, never echoes matches). When a
   cited line's flagged term names a legitimate project component, report a pattern bug
   instead of rewording. Sanctioned containers: docs/ and corpus/fixtures/ — consult them via
   read-only subagents instructed to answer in project vocabulary without verbatim quotes.
-- [2026-06-11] LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
+- LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
   whose concrete syntax gets hand-authored or byte-pinned in-repo (active:
   rust, bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets:
   lean4, alloy, egglog) — compendium-catalogued families whose registry presence is YAML
   data carry no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server
-  (2026-05 audit); Isabelle's LSP and any Python LSP land
+  (audited); Isabelle's LSP and any Python LSP land
   only with their adoption decisions (§13 additional-targets row; §13.1 adapter boundary).
   dolmen-lsp deploys as a standalone copied binary with the opam tree removed — rebuild
   recipe in its plugin README.
 
 ## Lessons
 
-- Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus five
+- Unit sizing rules (consolidated from roadmap `NN%` annotations and
   observed 200K overruns; case studies in git history). Target: one conceptual deliverable
   plus one gate, finishable AND committable in one window with margin; prefer more, smaller
   units. Plan-time obligations (a violation is a planning bug): resolve semantic contract
@@ -54,44 +54,43 @@ git history.
   artifact = two units; a multi-invariant validator plus full rejection coverage = two
   units; a derivation fn with its fixture-pinned battery plus an attachment sub-feature =
   two units; a type family plus assembly plus validation = three units (6th overrun,
-  cli-runner.3a 2026-06-11: trace types + assembly + ckc-run wiring scheduled as one unit
+  cli-runner.3a: trace types + assembly + ckc-run wiring scheduled as one unit
   against this anchor — 975 uncompiled lines plus full run.rs/shell.rs reads by compaction;
   reverted, split .3a.1/.2/.3 with the decisions pinned in the lines and each Reading slice
   excluding files its half leaves untouched); an assembly fn plus its live-pipeline pin
-  battery = two units (7th overrun, cli-runner.3a.2 2026-06-11: assemble_trace + hand-off
+  battery = two units (7th overrun, cli-runner.3a.2: assemble_trace + hand-off
   structs compiled clean, but the live battery — reading slice alone spanning run.rs, the
   verify-stage tests, the normalize.rs helpers — was unwritten at compaction; reverted,
   split .3a.2a synthetic-tests / .3a.2b live-pins); minting a split rule re-audits every
   remaining unchecked line against it in the same recovery commit (8th overrun,
-  cli-runner.4.1a 2026-06-11: types + validation + assembly + synthetic battery as one unit —
+  cli-runner.4.1a: types + validation + assembly + synthetic battery as one unit —
   the exact shape the 6th-overrun rule bans, left unaudited by both later recovery sessions;
   the full report.rs draft was written but never built at compaction; reverted, split
   .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a live-pin
   battery over the run binary is a unit on its own — pairing it with assembly (7th overrun)
-  or with stage wiring overruns (9th overrun, cli-runner.4.1b.1 2026-06-11: the 8th-overrun
+  or with stage wiring overruns (9th overrun, cli-runner.4.1b.1: the 8th-overrun
   core/wiring pre-split still left run.rs threading + the exp.m1_spine report pins on one
   line; compacted at the workspace-suite rerun with work otherwise done, landed
   user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a recovery split
   is itself plan work — audit its replacement lines against every standing rule and the
-  open-decision ceiling within the recovery commit (10th overrun, cli-runner.4.1b.2b
-  2026-06-11: the 9th-overrun recovery named that rule yet left wiring + live pins paired
+  open-decision ceiling within the recovery commit (10th overrun, cli-runner.4.1b.2b: the 9th-overrun recovery named that rule yet left wiring + live pins paired
   and ~6 provenance decisions open on the .2b line — toolchain-manifest identity, git-commit
   source, environment profile, replay argv, hash sources; the window went to decision
   derivation + run.rs threading, compacted with the pin battery unwritten; reverted,
   decisions + salvage patch pinned into .2b.1, pins split to .2b.2); a spec-byte
   amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
-  preamble (4th overrun, stage-normalize.2 2026-06-11: decision + §8.6 amendment + mirrors
+  preamble (4th overrun, stage-normalize.2: decision + §8.6 amendment + mirrors
   consumed ~half the window before the derivation module; compacted at the test gate,
-  reverted, split into .2a/.2b with the decisions written into the roadmap lines). Measured anchors:
-  canonical JSON = five units (~62-69% each); a strict reader (writer-inverse) fills a
-  window solo; crate foundations ~81% (pair only with a small type surface — 5th overrun,
-  smt-emit.1 2026-06-11: foundation + two durable payload modules, each canonical impls +
-  multi-rule validator + pin/rejection battery, compacted at the lint step with work
-  otherwise done; schedule one payload module per foundation unit); registry entry
-  types ~69%; a five-layer recursive type family ~3 units; a lexicon-driven derivation half
-  (loader / binding / builder) = three units; statement builder over a prebuilt binding
-  core = one unit; exception attachment + determinism tests = one unit. Practices: house
+  reverted, split into .2a/.2b with the decisions written into the roadmap lines). Measured
+  anchors (checked roadmap stubs carry the `NN%` figures): canonical JSON = five units;
+  crate foundations pair only with a small type surface (5th overrun, smt-emit.1:
+  foundation + two durable payload modules, each canonical impls + multi-rule validator
+  + pin/rejection battery, compacted at the lint step with work otherwise done; schedule
+  one payload module per foundation unit); a five-layer recursive type family = three
+  units; a lexicon-driven derivation half (loader / binding / builder) = three units;
+  statement builder over a prebuilt binding core = one unit; exception attachment +
+  determinism tests = one unit. Practices: house
   new type families in fresh modules (extending a ~2K-line module costs a full-file read);
   land a compiling skeleton before the full test battery; salvage a reverted session's
   compiling half as a committed `.agent/wip-<unit>.patch` the redo line points at (apply,
@@ -103,36 +102,36 @@ git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
-- [2026-06-10] WebSearch 400s on this model line (the API rejects the forced tool_choice
+- WebSearch 400s on this model line (the API rejects the forced tool_choice
   the search sub-request uses; the error arrives INLINE in an ok-looking result — read
-  result bodies). Still broken 2026-06-11; re-test after a Claude Code update or model-line
+  result bodies). Re-test after a Claude Code update or model-line
   change, drop this clause when healed. Workflow agent() `schema` verified unaffected.
   Working channels: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox curl
   gets a bot wall); crates.io via curl with a `-A` user-agent header (403 without) — detail
   /api/v1/crates/NAME, search /crates?q=; GitHub /search/repositories?q=; Wikipedia
   opensearch. Meta-rule: the session that FIRST hits an environment/tool failure records it
   in that same session.
-- [2026-06-10] Turn-halting `API Error: <ConnectionTerminated error_code:0 ...>` = the
+- Turn-halting `API Error: <ConnectionTerminated error_code:0 ...>` = the
   upstream HTTP/2 connection rotated mid-stream (GOAWAY surfacing through the Headroom
   proxy); mid-stream POSTs are SDK-unretryable, so the turn halts. Transient and
   content-independent. Recovery: session context survives — `git status` to confirm tree
   state, then continue the interrupted action.
-- [2026-06-09] RTK mangles `git commit` carrying multiple `-m` values with non-ASCII (§,
+- RTK mangles `git commit` carrying multiple `-m` values with non-ASCII (§,
   em-dash): args drop/split, the commit silently never lands while RTK prints ok (the add
   staged). Commit such messages from a file — `git commit -F <path>`, then rm it. Plain
   single-`-m` ASCII commits are safe.
-- [2026-06-09] Serena symbolic tools erroring `Active languages: [...]`: add the language
+- Serena symbolic tools erroring `Active languages: [...]`: add the language
   to `.serena/project.yml` `languages:` (first entry = fallback LS), then ask the user to
   /mcp-reconnect serena (config is read only at startup); verify with a symbol call (the
   first may lag on indexing). rustup keeps rust-analyzer current. Serena startup
   regenerates project.yml to its full annotated template whenever keys are missing — track
   the file exactly as Serena writes it; stripping it re-dirties the tree every session.
-- [2026-06-10] Headroom-compressed Reads re-wrap long prose lines (roadmap.md, Rust
+- Headroom-compressed Reads re-wrap long prose lines (roadmap.md, Rust
   doc-comment blocks), so an Edit old_string assembled from such a Read can miss the file's
   real wrap points. Print the target lines raw (`sed -n`/grep) and anchor on those bytes;
   the Edit error's `\uXXXX` hint points the wrong way. Recurs in every closing commit that
   edits roadmap.md.
-- [2026-06-10] Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
+- Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
   parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
   code spans). Serena get_diagnostics_for_file routes non-code files to the fallback LS and
   is useless there; Marksman diagnostics reach the session only via the harness
@@ -141,24 +140,26 @@ git history.
   document" warnings — hence docs/ sweep-exclusion lives in `.rgignore` (rg-only,
   Marksman-invisible) and link diagnostics are trustworthy. Ignore files are read at folder
   scan, not watched: such fixes clear at the next LSP start.
-- [2026-06-10] Serena replace_symbol_body spans the preceding doc comment AND outer
+- Serena replace_symbol_body spans the preceding doc comment AND outer
   `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
   way). Include the leading `///` lines and every attribute, or edit inner regions with
   replace_content instead. Recurs with derive-heavy enums.
-- [2026-06-10, ext. 2026-06-11] RTK rewriting can falsify output, both directions: `diff`
+- RTK rewriting can falsify output, both directions: `diff`
   printed "identical" for differing files; standalone `grep` becomes rg (write rg-syntax
   patterns) while piped/compound grep falls through to real grep (plain `grep -E`; rg-only
   flags fail); a bare `rg` call can become real grep; combined grep short flags reparse as
-  rg flags (`grep -rln` ran as rg `-r ln` = --replace ln: zero output, no error). Treat
+  rg flags (`grep -rln` ran as rg `-r ln` = --replace ln: zero output, no error); `git log`
+  piped output silently truncates at 50 entries with no marker — full listings and
+  counts via `rtk proxy git log` or `git rev-list --count`. Treat
   unexpected empty/odd search output as rewrite-suspect and re-run under `rtk proxy rg`;
   prove byte-equality with `cmp`/`sha256sum` only; real diffs via `git diff --no-index` or
   `rtk proxy diff`. Critical wherever byte-compatibility is the acceptance bar.
-- [2026-06-10] Editing-tool string parameters decode `\uXXXX` escapes — and only those
+- Editing-tool string parameters decode `\uXXXX` escapes — and only those
   (`\n`, `\xNN` pass through) — so source that must contain a literal backslash-u gets
   silently corrupted and often still compiles. Express such bytes without that substring
   (byte-array literal with `0x5c` for the backslash) and read the region back after
   writing. Recurs in escape-syntax tests (wire parsers).
-- [2026-06-11] Subagent window = session window; the launch flag decides both. The user
+- Subagent window = session window; the launch flag decides both. The user
   toggles 200K/1M solely by prefixing `claude` with `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
   (terminal-only; settings carry only model slugs); the flag gates the 1M beta header
   process-wide (v2.1.170 short-circuits both 1M paths: `[1m]` suffix parse and the
@@ -176,13 +177,12 @@ git history.
   `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
   `.message.usage`; rejected requests log no usage). compaction.sh reads the same flag and
   gauges the main loop only.
-- [2026-06-11] Fable 5 refusal fallback silently switches a session to Opus mid-flight
+- Fable 5 refusal fallback silently switches a session to Opus mid-flight
   (`type=system subtype=model_refusal_fallback` transcript event, flagged "cybersecurity or
   biology topics"). One-way and in-context invisible — the post-switch assistant continues
   unaware. Trigger: raw Japanese clinical fixture text entering context via whole-fixture
   reads; probabilistic, not deterministic (three switches, then an identical-vocabulary
-  session stayed on fable). Mitigation: `Read(./corpus/fixtures/**)` is settings-denied
-  (2026-06-11) — work with fixtures through code, tests, and path-scoped greps. Handling:
+  session stayed on fable). Mitigation: `Read(./corpus/fixtures/**)` is settings-denied — work with fixtures through code, tests, and path-scoped greps. Handling:
   Opus-mode output is discarded; the user monitors for the switch — on any suspicion of
   degraded-model output, stop and report. A session's self-report is zero evidence;
   evidence channels: the Headroom proxy log (request bytes, per-response model ids),
@@ -193,4 +193,4 @@ git history.
   recurrence in fixture-reading units (acceptance-m1 ran clean under redacted printing:
   audit scripts compare bytes in code and print Japanese-bearing JSON/markdown only
   through a redactor mapping such runs to `<ja Nch hash>` — reuse for M2 model-I/O work).
-  Full case detail (transcript ids, timestamps, trigger tokens): `git show 4e9af1e`.
+  Full case detail (transcript ids, timestamps, trigger tokens): `git show 2270c2b`.
