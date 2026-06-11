@@ -109,11 +109,14 @@ git history.
   `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
   way). Include the leading `///` lines and every attribute, or edit inner regions with
   replace_content instead. Recurs with derive-heavy enums.
-- [2026-06-10] RTK rewriting can falsify output: `diff` printed "identical" for differing
-  files; standalone `grep` becomes rg (write rg-syntax patterns), while piped/compound grep
-  falls through to real grep (write plain `grep -E`; rg-only flags fail). Prove
-  byte-equality with `cmp`/`sha256sum` only; real diffs via `git diff --no-index` or `rtk
-  proxy diff`. Critical wherever byte-compatibility is the acceptance bar.
+- [2026-06-10, ext. 2026-06-11] RTK rewriting can falsify output, both directions: `diff`
+  printed "identical" for differing files; standalone `grep` becomes rg (write rg-syntax
+  patterns) while piped/compound grep falls through to real grep (plain `grep -E`; rg-only
+  flags fail); a bare `rg` call can become real grep; combined grep short flags reparse as
+  rg flags (`grep -rln` ran as rg `-r ln` = --replace ln: zero output, no error). Treat
+  unexpected empty/odd search output as rewrite-suspect and re-run under `rtk proxy rg`;
+  prove byte-equality with `cmp`/`sha256sum` only; real diffs via `git diff --no-index` or
+  `rtk proxy diff`. Critical wherever byte-compatibility is the acceptance bar.
 - [2026-06-10] Editing-tool string parameters decode `\uXXXX` escapes — and only those
   (`\n`, `\xNN` pass through) — so source that must contain a literal backslash-u gets
   silently corrupted and often still compiles. Express such bytes without that substring
