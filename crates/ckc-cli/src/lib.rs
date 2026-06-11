@@ -84,11 +84,22 @@
 //!   run state (no I/O): §5 plan-hash linkage, canonical set/map storage,
 //!   shared fields and expected-vs-output hashes mirrored between the two
 //!   records; the run landing writes both with cli-runner.4.1b.2b.
+//! - [`replay`] — §4.6 replay core (cli-runner.4.2a), no shell contact:
+//!   [`replay::execute`] strict-reads a prior run's `replay_manifest.json`,
+//!   re-executes the recorded experiment through the full run pipeline
+//!   into an empty scratch directory (a fresh §8.3 layout under a
+//!   replay-owned internal shell), and compares accepted-artifact content
+//!   hashes, runtime metadata excluded by construction — a match is the
+//!   §4.6 re-run-equals-prior property, divergence a `replay_mismatch`
+//!   carrying the symmetric difference, a missing solver
+//!   `replay_identity_unsupported`; the `ckc replay` command joins with
+//!   cli-runner.4.2b.
 #![forbid(unsafe_code)]
 
 pub mod extract;
 pub mod manifests;
 pub mod normalize;
+pub mod replay;
 pub mod report;
 pub mod rules;
 pub mod segment;

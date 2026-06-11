@@ -75,14 +75,8 @@ bare headers; git history retains all removed text.
 - [x] cli-runner.4.1b.2a: report.md rendering + manifest assembly cores. 65% 131K/200K f020d2c
 - [x] cli-runner.4.1b.2b.1: ckc run lands report.md + run/replay manifests.
   33% 65K/200K 72baf4b
-- [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K _
-- [ ] cli-runner.4.2a: replay core in a replay module, no shell contact: re-execute from
-  replay_manifest.json over the same inputs into a scratch directory and compare canonical
-  content hashes for all accepted artifacts, runtime metadata excluded; symmetric-difference
-  diagnostics on mismatch and replay_identity_unsupported for missing tools; matching hashes
-  yield ok; re-run-equals-prior idempotency test over a fixture run. Reading: SPEC §4.6 replay
-  semantics, §8.3 layout, §7.4 replay codes. Consumes cli-runner.4.1b.2b.1 manifests and the
-  complete run pipeline. Gate: `cargo test -p ckc-cli replay::`.
+- [x] cli-runner.4.1b.2b.2: live pins for the report.md + manifests trio. 50% 100K/200K 05566a8
+- [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K _
 - [ ] cli-runner.4.2b: ckc replay command over the replay core — CLI surface, run-layout
   resolution, diagnostics rendering. Closes §8.5 item 8. Reading: shell.rs dispatch, the trace
   command as the pattern. Consumes cli-runner.4.2a. Gate: `cargo test --workspace`.
