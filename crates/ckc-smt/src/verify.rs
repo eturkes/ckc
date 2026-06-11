@@ -10,8 +10,8 @@
 //! `solver_execution_failure` ([`RunOutcome::failure_code`]) — diagnostic
 //! codes, kept distinct from the §6 categories smt-verify.b derives.
 //! Verdict/core/model s-expression parsing and [`VerifierResult`] assembly
-//! land there; this module never interprets output beyond the leading
-//! token.
+//! live in `verdict`; this module never interprets output beyond the
+//! leading token.
 //!
 //! [`VerifierResult`]: crate::VerifierResult
 
@@ -185,7 +185,7 @@ impl std::error::Error for AdapterError {}
 /// is exactly `sat`/`unsat`/`unknown`. `timeout` is budget-minted by the
 /// runner, never parsed, so the text `timeout` (like any other reply) gives
 /// `None`.
-fn leading_verdict(stdout: &str) -> Option<SolverVerdict> {
+pub(crate) fn leading_verdict(stdout: &str) -> Option<SolverVerdict> {
     match stdout.lines().next()?.trim() {
         "sat" => Some(SolverVerdict::Sat),
         "unsat" => Some(SolverVerdict::Unsat),

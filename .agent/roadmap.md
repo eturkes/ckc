@@ -53,17 +53,8 @@ bare headers; git history retains all removed text.
 - [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K 22787f9
 - [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K 2d190a6
 - [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K b662324
-- [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K _
-- [ ] smt-verify.b: Verdict parsing and §6 categories completing verify: s-expression reader over
-  get-model and get-unsat-core output; pipe-quote stripping; cores normalized to canonical Id sets
-  sorted by canonical_sort_key and compared set-based; witness model recorded on sat; category
-  mapping — Q2 unsat semantic_contradiction, Q2 sat semantic_no_conflict, Q1 unsat closes the pair
-  as the documented-null path of semantic_no_conflict, unknown stays unknown — with raw
-  sat/unsat/unknown/timeout tokens preserved distinctly; VerifierResult assembly + validate.
-  Integration runs plan + emit + live z3 over the §8.6 pair and control pair: Q1 sat with model,
-  Q2 unsat with the expected core, control Q1 unsat. Reading: SPEC §6 verdict parsing +
-  categories, §8.6 expectations, §4.4 verifier_authority, §8.3 verify row. Consumes smt-verify.a,
-  smt-emit.2/.3a/.3b. Gate: `cargo test -p ckc-smt`.
+- [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K 92e9c4b
+- [x] smt-verify.b: verdict parsing + §6 categories completing verify. 74% 147K/200K _
 - [ ] cli-runner.2a: Run scaffolding + document pipeline in a run module: resolve exp.m1_spine
   through the registries (cli-runner.1.2 loaders); create the §8.3 run layout under --out; per
   document run extract → segment → normalize → assemble (thin wrapper: core-ir.4 assemble +
