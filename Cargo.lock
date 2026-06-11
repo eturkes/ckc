@@ -103,6 +103,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckc-smt"
+version = "0.1.0"
+dependencies = [
+ "ckc-core",
+ "serde",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

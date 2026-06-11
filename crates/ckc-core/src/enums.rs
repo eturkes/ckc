@@ -10,17 +10,19 @@
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    emit_map, emit_set, emit_string, emit_string_policy, read_map, read_set, read_string,
-    read_string_policy,
+    emit_map, emit_set, emit_string_policy, read_map, read_set, read_string_policy,
 };
-use crate::id::{Hash, Id, ValidationError};
+use crate::id::{Hash, Id};
 use crate::strings::StringPolicy;
 
 /// Define a fieldless SPEC §4.4 enum: variants in declaration order, an
 /// [`ALL`](Outcome::ALL) table, the `as_str`/`parse` spelling pair, and
 /// [`Canonical`]/[`CanonRead`] impls over the bare identifier_ascii string.
 /// Serde impls reuse the same spelling, so YAML surfaces (the §8.4
-/// registries) and canonical bytes agree on every value.
+/// registries) and canonical bytes agree on every value. `#[macro_export]` +
+/// `$crate::` paths let sibling crates (ckc-smt) define their §4.4-style
+/// value sets through the same generator.
+#[macro_export]
 macro_rules! fieldless_enum {
     (
         $(#[$meta:meta])*
@@ -45,10 +47,10 @@ macro_rules! fieldless_enum {
 
             /// Inverse of [`as_str`](Self::as_str); any other token fails with
             /// [`ValidationError::Enum`].
-            pub fn parse(token: &str) -> Result<Self, ValidationError> {
+            pub fn parse(token: &str) -> Result<Self, $crate::ValidationError> {
                 match token {
                     $($text => Ok($name::$variant),)+
-                    other => Err(ValidationError::Enum(format!(
+                    other => Err($crate::ValidationError::Enum(format!(
                         concat!(stringify!($name), " has no value {:?}"),
                         other
                     ))),
@@ -56,16 +58,16 @@ macro_rules! fieldless_enum {
             }
         }
 
-        impl Canonical for $name {
-            fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
-                emit_string(out, self.as_str());
+        impl $crate::Canonical for $name {
+            fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), $crate::CanonError> {
+                $crate::emit_string(out, self.as_str());
                 Ok(())
             }
         }
 
-        impl CanonRead for $name {
-            fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
-                Ok($name::parse(&read_string(r)?)?)
+        impl $crate::CanonRead for $name {
+            fn read(r: &mut $crate::Reader<'_>) -> Result<Self, $crate::CanonReadError> {
+                Ok($name::parse(&$crate::read_string(r)?)?)
             }
         }
 
@@ -401,6 +403,7 @@ impl CanonRead for TotalOperationResult {
 mod tests {
     use super::*;
     use crate::canon::{canonical_payload_bytes, read_canonical};
+    use crate::id::ValidationError;
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
     fn canon<T: Canonical>(value: &T) -> String {

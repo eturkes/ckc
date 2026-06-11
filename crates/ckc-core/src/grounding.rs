@@ -20,12 +20,12 @@ use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    emit_array, emit_raw_map, emit_set, emit_string, emit_string_policy, emit_u64, read_array,
-    read_raw_map, read_set, read_string, read_string_policy, read_u64,
+    emit_array, emit_raw_map, emit_set, emit_string_policy, emit_u64, read_array, read_raw_map,
+    read_set, read_string_policy, read_u64,
 };
 use crate::enums::fieldless_enum;
 use crate::hash::hash_bytes;
-use crate::id::{Hash, Id, ValidationError};
+use crate::id::{Hash, Id};
 use crate::strings::StringPolicy;
 
 fieldless_enum! {

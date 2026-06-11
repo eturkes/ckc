@@ -33,12 +33,12 @@ use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    canonical_sort_key, emit_set, emit_string, read_set, read_string,
+    canonical_sort_key, emit_set, read_set,
 };
 use crate::enums::{DiagnosticCode, DiagnosticRecord, emit_payload, fieldless_enum, read_payload};
 use crate::grounding::{GroundingError, SourceGraph};
 use crate::hash::{content_hash, hash_bytes};
-use crate::id::{Hash, Id, ValidationError};
+use crate::id::{Hash, Id};
 use crate::ir::{
     Action, ClinicalIr, ContextAtom, ContextExpr, DocIr, FormalConstraint, FormalIr, IrError,
     NormIr, NormRule, QuantityInterval, RefLocalizer, SegmentIr, Structural, directions_opposed,

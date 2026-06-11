@@ -47,14 +47,9 @@ bare headers; git history retains all removed text.
 - [x] stage-normalize.2a: rule-id scheme + §8.6/§8.2 re-pin + Normalization payload.
   63% 127K/200K 86414f1
 - [x] stage-normalize.2b: NormRule derivation + normalize() stage envelope.
-  74% 149K/200K _
-- [ ] smt-emit.1: ckc-smt crate foundation: workspace member depending on ckc-core; CompiledArtifact
-  (target id, logic, query plan, query bodies, named-assertion records mapping assertion ids to IR
-  rule ids and source region ids, target metadata, diagnostics) and VerifierResult (per-query §6
-  category, sat/unsat/unknown/timeout detail, model or unsat core, solver identity, diagnostics)
-  with canonical impls, validation, round-trip tests. Reading: SPEC §3 crate table, §5
-  CompiledArtifact/VerifierResult rows, §6 categories and profile fields, §8.6 payload instances.
-  Consumes the canon stack. Gate: `cargo test -p ckc-smt`.
+  74% 149K/200K dcfe7e4
+- [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
+  >=90% compacted/200K _
 - [ ] smt-emit.2: Eligibility scan and contradiction-query planning over FormalIR per fixture group,
   in a plan module: normalized-action sameness keys, §6 direction-group opposition (positive vs
   against or contraindicating), two-query plan per eligible pair (Q1 context_overlap asserting both

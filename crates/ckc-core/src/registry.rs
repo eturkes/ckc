@@ -20,12 +20,9 @@ use std::fmt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::canon::{
-    CanonError, CanonRead, CanonReadError, Canonical, Reader, emit_string, read_string,
-};
 use crate::enums::{Authority, Origin, fieldless_enum};
 use crate::grounding::Provenance;
-use crate::id::{Id, ValidationError};
+use crate::id::Id;
 
 fieldless_enum! {
     /// SPEC §8.4 stage-component determinism class. Every M1 component is

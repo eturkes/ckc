@@ -39,7 +39,7 @@ git history.
 
 ## Lessons
 
-- Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus four
+- Unit sizing rules (consolidated 2026-06-11 from roadmap `NN%` annotations plus five
   observed 200K overruns; case studies in git history). Target: one conceptual deliverable
   plus one gate, finishable AND committable in one window with margin; prefer more, smaller
   units. Plan-time obligations (a violation is a planning bug): resolve semantic contract
@@ -60,7 +60,10 @@ git history.
   consumed ~half the window before the derivation module; compacted at the test gate,
   reverted, split into .2a/.2b with the decisions written into the roadmap lines). Measured anchors:
   canonical JSON = five units (~62-69% each); a strict reader (writer-inverse) fills a
-  window solo; crate foundations ~81% (pair only with a small type surface); registry entry
+  window solo; crate foundations ~81% (pair only with a small type surface — 5th overrun,
+  smt-emit.1 2026-06-11: foundation + two durable payload modules, each canonical impls +
+  multi-rule validator + pin/rejection battery, compacted at the lint step with work
+  otherwise done; schedule one payload module per foundation unit); registry entry
   types ~69%; a five-layer recursive type family ~3 units; a lexicon-driven derivation half
   (loader / binding / builder) = three units; statement builder over a prebuilt binding
   core = one unit; exception attachment + determinism tests = one unit. Practices: house

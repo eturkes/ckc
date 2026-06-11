@@ -41,8 +41,8 @@ use std::fmt;
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
-    emit_array, emit_i64, emit_set, emit_string, emit_u64, emit_union, read_array, read_i64,
-    read_set, read_string, read_u64, read_union,
+    emit_array, emit_i64, emit_set, emit_u64, emit_union, read_array, read_i64, read_set, read_u64,
+    read_union,
 };
 use crate::enums::{
     BindingStatus, DiagnosticCode, DiagnosticRecord, Direction, emit_payload, fieldless_enum,
