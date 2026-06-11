@@ -30,8 +30,12 @@
 //! scans for verbs, modality phrases (reading = (direction, strength);
 //! `implies_action` the kind fallback), and certainty phrases. Slot
 //! misses and ambiguities withhold the statement as §7.4 records;
-//! ambiguous certainty keeps it, certainty-free. Exception clause
-//! attachment (`stage-normalize.1e`) completes the stage's first half.
+//! ambiguous certainty keeps it, certainty-free. Exception segments
+//! (`stage-normalize.1e`) attach their exact/synonym concepts as
+//! [`ExceptionClause`]s (`exc.<k>` counting attached clauses) to the
+//! nearest preceding kept statement, whose `source_segment_ids` gains the
+//! segment; a concept-free exception or one with no preceding statement
+//! records a Residual and drops the clause, bindings emitting either way.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -40,9 +44,9 @@ use serde::Deserialize;
 
 use ckc_core::{
     Action, BindingStatus, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
-    DiagnosticCode, DiagnosticRecord, Direction, Hash, Id, Outcome, QuantityInterval, SegmentIr,
-    SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength, StringPolicy, TerminologyBinding,
-    hash_bytes,
+    DiagnosticCode, DiagnosticRecord, Direction, ExceptionClause, Hash, Id, Outcome,
+    QuantityInterval, SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength,
+    StringPolicy, TerminologyBinding, hash_bytes,
 };
 
 use crate::shell::static_id;
@@ -675,17 +679,19 @@ pub fn clinical_ir(
         let spans = index.segment_spans(segment);
         let (mut b, mut d) = bind_segment(&spans, &concepts, &lexicon.system, bindings.len());
         diagnostics.append(&mut d);
-        if segment.kind == SegmentKind::Recommendation
-            && let Some(statement) = build_statement(
+        if segment.kind == SegmentKind::Recommendation {
+            if let Some(statement) = build_statement(
                 segment,
                 &spans,
                 &b,
                 &tables,
                 statements.len(),
                 &mut diagnostics,
-            )
-        {
-            statements.push(statement);
+            ) {
+                statements.push(statement);
+            }
+        } else {
+            attach_exception(segment, &b, &mut statements, &mut diagnostics);
         }
         bindings.append(&mut b);
     }
@@ -906,6 +912,60 @@ fn build_statement(
         exceptions: vec![],
         source_segment_ids: vec![segment.segment_id.clone()],
     })
+}
+
+/// The per-segment exception attacher behind [`clinical_ir`]: the exception
+/// segment's exact/synonym binding codes become the clause atoms of
+/// `exc.<k>` (`k` counting attached clauses document-wide), pushed onto the
+/// nearest preceding kept statement, whose `source_segment_ids` gains the
+/// segment. Zero concepts (`terminology_unmapped`) or no preceding statement
+/// (`semantic_slot_missing`) record one Residual and drop the clause; the
+/// segment's bindings emit either way.
+fn attach_exception(
+    segment: &ClinicalSegment,
+    bindings: &[TerminologyBinding],
+    statements: &mut [ClinicalStatement],
+    diagnostics: &mut Vec<DiagnosticRecord>,
+) {
+    // Id sorts yield canonical set order (id chars never escape).
+    let mut codes: Vec<Id> = bindings
+        .iter()
+        .filter(|b| matches!(b.status, BindingStatus::Exact | BindingStatus::Synonym))
+        .map(|b| b.code.clone())
+        .collect();
+    codes.sort();
+    codes.dedup();
+    if codes.is_empty() {
+        diagnostics.push(slot_diag(
+            DiagnosticCode::TerminologyUnmapped,
+            Outcome::Residual,
+            "no exception concept".to_owned(),
+            segment,
+        ));
+        return;
+    }
+    let next: usize = statements.iter().map(|s| s.exceptions.len()).sum();
+    let Some(statement) = statements.last_mut() else {
+        diagnostics.push(slot_diag(
+            DiagnosticCode::SemanticSlotMissing,
+            Outcome::Residual,
+            "no preceding statement".to_owned(),
+            segment,
+        ));
+        return;
+    };
+    let mut region_ids = segment.region_ids.clone();
+    region_ids.sort();
+    region_ids.dedup();
+    statement.exceptions.push(ExceptionClause {
+        exception_id: Id::new(format!("exc.{next}")).expect("counter ids match the Id grammar"),
+        atoms: codes.into_iter().map(ContextAtom::Concept).collect(),
+        region_ids,
+    });
+    statement
+        .source_segment_ids
+        .push(segment.segment_id.clone());
+    statement.source_segment_ids.sort();
 }
 
 /// Render an ambiguous-slot detail: the distinct readings sorted by their
@@ -1247,7 +1307,10 @@ mod tests {
 
     use crate::extract::{ExtractConfig, extract};
     use crate::segment::segment;
-    use ckc_core::{ArtifactEnvelope, ClinicalSegment, DataClass, Producer, Provenance};
+    use ckc_core::{
+        ArtifactEnvelope, ClinicalSegment, DataClass, Producer, Provenance,
+        canonical_payload_bytes, read_canonical,
+    };
 
     fn producer() -> Producer {
         Producer {
@@ -1790,5 +1853,246 @@ mod tests {
                 "no action target",
             ]
         );
+    }
+
+    // --- exception clauses ---
+
+    // guideline_a's full statement, pinned from observed output: the
+    // exception segment's cond.renal_severe becomes exc.0 on the kept
+    // statement, whose source_segment_ids span the recommendation and
+    // exception segments.
+    #[test]
+    fn committed_guideline_a_attaches_exception() {
+        let lexicon = load_lexicon(&committed()).unwrap();
+        let (ir, diagnostics) = derived(&fixture("m1_guideline_a.html"), &lexicon);
+        assert!(
+            diagnostics.is_empty(),
+            "derives diagnostic-free, got {diagnostics:?}"
+        );
+        assert_eq!(
+            ir.statements,
+            vec![ClinicalStatement {
+                statement_id: id("stmt.0"),
+                population: vec![ContextAtom::Concept(id("pop.adult"))],
+                condition: vec![ContextAtom::Concept(id("cond.sepsis"))],
+                action: Action::new(id("act.administer"), id("drug.abx_a")),
+                modality: Direction::For,
+                strength: Strength::Strong,
+                certainty: None,
+                exceptions: vec![ExceptionClause {
+                    exception_id: id("exc.0"),
+                    atoms: vec![ContextAtom::Concept(id("cond.renal_severe"))],
+                    region_ids: vec![id("r.3")],
+                }],
+                source_segment_ids: vec![id("seg.2"), id("seg.3")],
+            }]
+        );
+    }
+
+    // One inline case per miss — the clause drops while the segments'
+    // bindings still emit, one §7.4 Residual naming the miss: an
+    // unknown-text exception after a kept statement leaves it
+    // exception-free (terminology_unmapped); a lone exception with no
+    // preceding statement binds but attaches nowhere
+    // (semantic_slot_missing).
+    #[test]
+    fn exception_misses_drop_clause() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: drug.x\n",
+                "    surface: [薬X]\n",
+                "actions:\n",
+                "  - id: act.give\n",
+                "    surface: [投与する]\n",
+                "modality:\n",
+                "  - surface: 推奨する\n",
+                "    direction: for\n",
+                "    strength: strong\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let source = extracted(
+            "<!DOCTYPE html><html><body><p>薬Xを投与するを推奨する。</p><p>不明の場合を除く。</p></body></html>"
+                .as_bytes(),
+        );
+        let segments = SegmentIr {
+            segments: vec![
+                ClinicalSegment {
+                    segment_id: id("seg.0"),
+                    kind: SegmentKind::Recommendation,
+                    region_ids: vec![id("r.0")],
+                },
+                ClinicalSegment {
+                    segment_id: id("seg.1"),
+                    kind: SegmentKind::Exception,
+                    region_ids: vec![id("r.1")],
+                },
+            ],
+        };
+        let (ir, diagnostics) = clinical_ir(&source.payload, &segments, &lexicon);
+        let [statement] = ir.statements.as_slice() else {
+            panic!("statement kept, got {:?}", ir.statements);
+        };
+        assert!(statement.exceptions.is_empty(), "left exception-free");
+        assert_eq!(statement.source_segment_ids, vec![id("seg.0")]);
+        assert_eq!(ir.bindings.len(), 1, "recommendation binding emits");
+        let [diag] = diagnostics.as_slice() else {
+            panic!("one record, got {diagnostics:?}");
+        };
+        assert_eq!(diag.code, DiagnosticCode::TerminologyUnmapped);
+        assert_eq!(diag.outcome, Outcome::Residual);
+        assert_eq!(
+            diag.payload,
+            vec![
+                (id("detail"), "no exception concept".to_owned()),
+                (id("segment"), "seg.1".to_owned()),
+            ],
+        );
+        assert_eq!(diag.region_ids, vec![id("r.1")]);
+
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: cond.a\n",
+                "    surface: [甲]\n",
+                "actions: []\n",
+                "modality: []\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let source = extracted(
+            "<!DOCTYPE html><html><body><p>甲の場合を除く。</p></body></html>".as_bytes(),
+        );
+        let segments = SegmentIr {
+            segments: vec![ClinicalSegment {
+                segment_id: id("seg.0"),
+                kind: SegmentKind::Exception,
+                region_ids: vec![id("r.0")],
+            }],
+        };
+        let (ir, diagnostics) = clinical_ir(&source.payload, &segments, &lexicon);
+        assert!(ir.statements.is_empty());
+        assert_eq!(
+            ir.bindings,
+            vec![binding(
+                "bind.0",
+                "cond.a",
+                BindingStatus::Exact,
+                &[],
+                &["r.0"]
+            )],
+            "exception binding emits"
+        );
+        let [diag] = diagnostics.as_slice() else {
+            panic!("one record, got {diagnostics:?}");
+        };
+        assert_eq!(diag.code, DiagnosticCode::SemanticSlotMissing);
+        assert_eq!(diag.outcome, Outcome::Residual);
+        assert_eq!(
+            diag.payload,
+            vec![
+                (id("detail"), "no preceding statement".to_owned()),
+                (id("segment"), "seg.0".to_owned()),
+            ],
+        );
+        assert_eq!(diag.region_ids, vec![id("r.0")]);
+    }
+
+    // Accumulation: one recommendation then two exception segments — the
+    // clauses land as exc.0 and exc.1 on the one statement, each with its
+    // own atoms and regions, source_segment_ids accumulating all three
+    // segments in canonical set order.
+    #[test]
+    fn exceptions_accumulate_on_one_statement() {
+        let lexicon = load_lexicon(
+            concat!(
+                "system: ckc.lex\n",
+                "concepts:\n",
+                "  - id: cond.a\n",
+                "    surface: [甲]\n",
+                "  - id: cond.b\n",
+                "    surface: [乙]\n",
+                "  - id: drug.x\n",
+                "    surface: [薬X]\n",
+                "actions:\n",
+                "  - id: act.give\n",
+                "    surface: [投与する]\n",
+                "modality:\n",
+                "  - surface: 推奨する\n",
+                "    direction: for\n",
+                "    strength: strong\n",
+                "certainty: []\n",
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let source = extracted(
+            "<!DOCTYPE html><html><body><p>薬Xを投与するを推奨する。</p><p>甲を除く。</p><p>乙を除く。</p></body></html>"
+                .as_bytes(),
+        );
+        let segments = SegmentIr {
+            segments: vec![
+                ClinicalSegment {
+                    segment_id: id("seg.0"),
+                    kind: SegmentKind::Recommendation,
+                    region_ids: vec![id("r.0")],
+                },
+                ClinicalSegment {
+                    segment_id: id("seg.1"),
+                    kind: SegmentKind::Exception,
+                    region_ids: vec![id("r.1")],
+                },
+                ClinicalSegment {
+                    segment_id: id("seg.2"),
+                    kind: SegmentKind::Exception,
+                    region_ids: vec![id("r.2")],
+                },
+            ],
+        };
+        let (ir, diagnostics) = clinical_ir(&source.payload, &segments, &lexicon);
+        assert!(diagnostics.is_empty(), "got {diagnostics:?}");
+        let [statement] = ir.statements.as_slice() else {
+            panic!("one statement, got {:?}", ir.statements);
+        };
+        assert_eq!(
+            statement.exceptions,
+            vec![
+                ExceptionClause {
+                    exception_id: id("exc.0"),
+                    atoms: vec![ContextAtom::Concept(id("cond.a"))],
+                    region_ids: vec![id("r.1")],
+                },
+                ExceptionClause {
+                    exception_id: id("exc.1"),
+                    atoms: vec![ContextAtom::Concept(id("cond.b"))],
+                    region_ids: vec![id("r.2")],
+                },
+            ]
+        );
+        assert_eq!(
+            statement.source_segment_ids,
+            vec![id("seg.0"), id("seg.1"), id("seg.2")]
+        );
+    }
+
+    // Double derivation over the exception-bearing fixture is
+    // byte-identical, and the bytes strict-read back to the derived value.
+    #[test]
+    fn clinical_ir_derivation_is_deterministic() {
+        let lexicon = load_lexicon(&committed()).unwrap();
+        let html = fixture("m1_guideline_a.html");
+        let (first, _) = derived(&html, &lexicon);
+        let (second, _) = derived(&html, &lexicon);
+        let bytes = canonical_payload_bytes(&first).unwrap();
+        assert_eq!(bytes, canonical_payload_bytes(&second).unwrap());
+        let read: ClinicalIr = read_canonical(&bytes).unwrap();
+        assert_eq!(read, first);
     }
 }

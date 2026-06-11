@@ -28,7 +28,10 @@
 //!   shared surfaces `ambiguous` with a `terminology_ambiguous` record);
 //!   statement building ([`normalize::clinical_ir`]: slot readings building
 //!   at most one §5 ClinicalStatement per recommendation segment, misses and
-//!   ambiguities withholding it as §7.4 records).
+//!   ambiguities withholding it as §7.4 records; exception segments
+//!   attaching their concepts as ExceptionClauses to the nearest preceding
+//!   kept statement, concept-free or statement-less exceptions dropping the
+//!   clause as a Residual).
 #![forbid(unsafe_code)]
 
 pub mod extract;

@@ -41,23 +41,9 @@ bare headers; git history retains all removed text.
 - [x] stage-normalize.1a: lexicon loader. 60% 119K/200K 690347c
 - [x] stage-normalize.1b: mention binding. 69% 138K/200K 01312c0
 - [x] stage-normalize.1c: behavior-frozen binding-core refactor. 53% 105K/200K e7b7acd
-- [x] stage-normalize.1d: recommendation statement builder. 68% 136K/200K _
-- [ ] stage-normalize.1e: Exception clauses completing clinical_ir: an exception segment's
-  exact/synonym binding codes become ContextAtom::Concept atoms sorted+deduped in
-  ExceptionClause {exception_id = exc.<k> counting attached clauses, atoms, region_ids = the
-  segment's regions} pushed onto the NEAREST PRECEDING kept statement, whose source_segment_ids
-  gains the exception segment id (re-sorted to canonical set order); zero concepts ->
-  terminology_unmapped Residual ("no exception concept") and the clause drops; no preceding kept
-  statement -> semantic_slot_missing Residual ("no preceding statement"); bindings emit in both
-  miss cases; diagnostic shape per .1d. Tests: pin guideline_a's full statement from observed
-  output (one exception clause naming cond.renal_severe, source_segment_ids spanning
-  recommendation and exception segments); inline miss cases (unknown-text exception after a kept
-  statement leaves it exception-free; lone exception with no statement); accumulation (one
-  recommendation then two exceptions -> exc.0 and exc.1 on one statement); double clinical_ir
-  derivation byte-identical via canonical_payload_bytes plus read_canonical::<ClinicalIr>
-  strict-read. lib.rs sentence. Reading: SPEC §8.3 normalize row, §5 exception contract; ir.rs
-  ExceptionClause; normalize.rs (edit target). Consumes stage-normalize.1d. Gate: `cargo test -p
-  ckc-cli normalize::`.
+- [x] stage-normalize.1d: recommendation statement builder. 68% 136K/200K eca4462
+- [x] stage-normalize.1e: exception clause attachment completing clinical_ir.
+  51% 102K/200K _
 - [ ] stage-normalize.2: Normalize stage second half: derive NormRules with guarded DNF contexts;
   exceptions compile to negated conjuncts whose regions join source_region_ids; lexicon interval
   semantics yield quantity-interval atoms (adult/child age bounds); canonical bytes reproduce §8.6
