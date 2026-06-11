@@ -1,4 +1,4 @@
-# Category 6: Clinical Rule Semantics, Temporal Reasoning, and Argumentation
+# Clinical Rule Semantics, Temporal Reasoning, and Argumentation
 
 ## 1. Defeasible Logic for Exceptions and Weak/Strong Recommendations
 

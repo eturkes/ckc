@@ -902,10 +902,10 @@ V3 adds `prompts|schemas` (the schema export feeds V3's grammar constraints); V4
 `evaluators|gates` (gate evidence objects); V5 adds `source_processors|policies`; V6 adds
 `indexes` with retrieval.
 
-`docs/` is the committed research compendium — ten method-category deep-research
-reports plus the agent-language catalogue. Registry-seeding and elaboration units mine it through
-read-only subagents and cite `file §section` in registry notes; main sessions keep their
-own context lean.
+`docs/` is the committed research compendium — method-category deep-research
+reports plus the agent-language catalogue, scope-pruned to the build plan (pruned surveys live
+in git history). Registry-seeding and elaboration units mine it through read-only subagents and
+cite `file §section` in registry notes; main sessions keep their own context lean.
 
 ## §15 Gates
 

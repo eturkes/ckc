@@ -1,4 +1,4 @@
-# Category 9: Evaluation, Clinical Validation, and Human-Centered CDS
+# Evaluation, Clinical Validation, and Human-Centered CDS
 
 ## 1. Gold-Standard Guideline-to-IR Corpus with Clinician/Formalist Adjudication
 

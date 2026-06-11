@@ -1,4 +1,4 @@
-# Category 2: Japan-Specific Clinical Guideline, Terminology, and Health Data Standards
+# Japan-Specific Clinical Guideline, Terminology, and Health Data Standards
 
 ## 1. Minds Guideline Library and Minds/GRADE Methodology
 

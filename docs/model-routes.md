@@ -1,4 +1,4 @@
-# Category 8: Language Models, Constrained Decoding, and Agentic Autoformalization
+# Language Models, Constrained Decoding, and Agentic Autoformalization
 
 ## 1. Closed Frontier Model Ensembles: GPT-5.5, Claude Opus 4.7, Gemini 3.1 Pro
 ### Purpose

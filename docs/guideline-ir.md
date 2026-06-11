@@ -1,4 +1,4 @@
-# Category 1: Computable Guideline IR, CDS Standards, and Workflow Interfaces
+# Computable Guideline IR, CDS Standards, and Workflow Interfaces
 
 ## 1. CQL/ELM Clinical Logic IR
 

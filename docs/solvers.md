@@ -1,4 +1,4 @@
-# Category 5: Automated Reasoning, Constraint Solving, and Collision Detection
+# Automated Reasoning, Constraint Solving, and Collision Detection
 
 ## 1. SMT-LIB Encodings with Z3, cvc5, and Bitwuzla
 
