@@ -110,6 +110,17 @@ git history.
   silently corrupted and often still compiles. Express such bytes without that substring
   (byte-array literal with `0x5c` for the backslash) and read the region back after
   writing. Recurs in escape-syntax tests (wire parsers).
+- [2026-06-11] Agent-tool subagents run at the stock 200K context window even when the main
+  session runs at 1M — the 1M window does not propagate. The overflow surfaces as an INLINE
+  `Prompt is too long` string in the Agent result (tool_uses > 0, subagent_tokens 0), with
+  no exception raised. Evidence: two whole-file rewrite agents died after last successful
+  calls at 176K/145K input tokens (next request projected past 200K) while the same
+  session's main loop ran at 485K; no subagent call ever exceeded 200K. Per-agent
+  transcripts: `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl`
+  (assistant `.message.usage` records; rejected requests log no usage). Sizing rule: budget
+  every subagent at 200K — a read+rewrite agent handles ~40KB of text comfortably (~100K
+  peak); chunk larger rewrites at section boundaries and stage outputs for main-session
+  assembly. compaction.sh gauges the main loop only.
 - [2026-06-11] Fable 5 refusal fallback silently switches a session to Opus mid-flight
   (`type=system subtype=model_refusal_fallback` transcript event, flagged "cybersecurity or
   biology topics"). One-way and in-context invisible — the post-switch assistant continues
