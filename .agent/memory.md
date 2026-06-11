@@ -7,42 +7,35 @@ git history.
 
 ## Policy
 
-- [2026-06-11] Context hygiene (user directive; rationale and full background: `git show
-  46d95e2`): keep every session's context lean and phrased in project vocabulary (stages,
-  units, gates, artifacts) — plain operational words over research jargon, in memory,
-  roadmap, commits, and code alike. Consult `docs/` surveys through read-only subagents
-  so their vocabulary stays out of the main window; a root `.ignore`
-  keeps ripgrep-backed sweeps (subagent Grep tool, `rtk proxy rg`) out of `docs/`, while
-  Bash `grep -r` still enters it — scope Bash greps by path; deliberate docs searches use
-  `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths. Checked roadmap
-  items collapse to one-line stubs; full unit text lives in git history. Implement sessions
-  match patterns from the latest unit-scoped commit (`git log --oneline`), not bare HEAD,
-  when HEAD is hygiene/memory work. If degraded-model output is ever suspected: a session's
-  self-report is zero evidence; evidence channels are the Headroom proxy log (request bytes,
-  per-response model ids), transcript jq for fallback events, and paired A/B task batteries
-  scored by objective gates; CKC's deterministic gates and replay manifests are the standing
-  mitigation. The clinical-text fallback entry below stays authoritative for its visible
-  case.
+- [2026-06-11] Context hygiene (user directive; background: `git show 46d95e2`): keep every
+  session lean and phrased in project vocabulary (stages, units, gates, artifacts) — plain
+  operational words over research jargon in memory, roadmap, commits, and code alike.
+  Consult `docs/` through read-only subagents so its vocabulary stays out of
+  the main window. Root `.ignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
+  rg`) out of `docs/`; Bash `grep -r` still enters it — scope Bash greps by path; deliberate
+  docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
+  Checked roadmap items collapse to one-line stubs (full unit text in git history).
+  Implement sessions match patterns from the latest unit-scoped commit (`git log
+  --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
 - [2026-06-11] Lexgate guards the durable tree: `bash .agent/lexgate.sh` with modes `hook`
   (write-time, wired in settings.json), `pre-commit` (installed in .git/hooks; `install`
-  restores it), `sweep` (review sessions run it), `check` (when it reports missing parts,
-  stop and ask the user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only,
-  gitignored, Read-denied, user-maintained; a clean session treats the gate as pass/fail
-  only and a failure as rewording work on the cited lines (the gate cites file:line and
-  never echoes matches). Patterns are scoped to vocabulary with no legitimate in-project
-  use (user-recalibrated 2026-06-11); when a cited line's flagged term names a legitimate
-  project component, report the hit to the user as a pattern bug instead of rewording. docs/ and corpus/fixtures/ are the sanctioned containers; consult
-  them via read-only subagents instructed to answer in project vocabulary without verbatim
-  quotes.
-
+  restores it), `sweep` (review sessions run it), `check` (missing parts → stop and ask the
+  user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only, gitignored,
+  Read-denied, user-maintained (recalibrated 2026-06-11 to vocabulary with no legitimate
+  in-project use); a clean session treats the gate as pass/fail only and a failure as
+  rewording work on the cited lines (the gate cites file:line, never echoes matches). When a
+  cited line's flagged term names a legitimate project component, report a pattern bug
+  instead of rewording. Sanctioned containers: docs/ and corpus/fixtures/ — consult them via
+  read-only subagents instructed to answer in project vocabulary without verbatim quotes.
 - [2026-06-11] LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
-  whose concrete syntax gets hand-authored or byte-pinned in-repo (active: rust,
-  bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets: lean4,
-  alloy, egglog) — compendium-catalogued families whose registry presence is YAML data carry
-  no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server (2026-05 audit); Isabelle's LSP and any Python LSP land only with
-  their adoption decisions (§13 additional-targets row; §12 adapter boundary). dolmen-lsp
-  deploys as a standalone copied binary with the opam tree removed — rebuild recipe in its
-  plugin README.
+  whose concrete syntax gets hand-authored or byte-pinned in-repo (active:
+  rust, bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets:
+  lean4, alloy, egglog) — compendium-catalogued families whose registry presence is YAML
+  data carry no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server
+  (2026-05 audit); Isabelle's LSP and any Python LSP land
+  only with their adoption decisions (§13 additional-targets row; §12 adapter boundary).
+  dolmen-lsp deploys as a standalone copied binary with the opam tree removed — rebuild
+  recipe in its plugin README.
 
 ## Lessons
 
@@ -53,29 +46,28 @@ git history.
   decisions INTO the roadmap line (more than ~2 left open = re-scope); research and pin any
   new external dependency (exact version + features) in the line; pre-split
   multi-deliverable stacks BEFORE scheduling — mid-session overrun recovery is
-  user-initiated (stop, bring the tree clean, report; the user restores and re-scopes).
-  Split rules: a feature needing a refactor of existing code to share internals takes the
-  refactor as its own behavior-frozen unit FIRST (existing tests are the gate, zero test
-  edits); a format walker plus committed-fixture integration splits into walker-core
-  (inline-literal tests) then format-completion + fixture-integration; a nontrivial
-  algorithm plus a second authored artifact is two units; a multi-invariant validator plus
-  full rejection coverage is two units; a derivation fn with its fixture-pinned battery plus
-  an attachment sub-feature is two units; a type family plus assembly plus validation is
-  three units. Measured anchors: canonical JSON = five units (~62-69% each); a strict
-  reader (writer-inverse) fills a window solo; crate foundations run ~81% (pair only with a
-  small type surface); registry entry types ~69%; a five-layer recursive type family ~3
-  units; a lexicon-driven derivation half (loader / binding / builder) = three units;
-  statement builder over a prebuilt binding core = one unit; exception attachment +
-  determinism tests = one unit. Practices: house new type families in fresh modules
-  (extending a ~2K-line module costs a full-file read); land a compiling skeleton before
-  the full test battery; pin expected shapes from observed output, never hand-computed;
-  cite only checked roadmap lines as measured anchors.
+  user-initiated (stop, bring the tree clean, report). Split rules: a feature needing a
+  refactor of existing code to share internals takes the refactor as its own
+  behavior-frozen unit FIRST (existing tests the gate, zero test edits); a format walker
+  plus committed-fixture integration = walker-core (inline-literal tests) then
+  format-completion + fixture-integration; a nontrivial algorithm plus a second authored
+  artifact = two units; a multi-invariant validator plus full rejection coverage = two
+  units; a derivation fn with its fixture-pinned battery plus an attachment sub-feature =
+  two units; a type family plus assembly plus validation = three units. Measured anchors:
+  canonical JSON = five units (~62-69% each); a strict reader (writer-inverse) fills a
+  window solo; crate foundations ~81% (pair only with a small type surface); registry entry
+  types ~69%; a five-layer recursive type family ~3 units; a lexicon-driven derivation half
+  (loader / binding / builder) = three units; statement builder over a prebuilt binding
+  core = one unit; exception attachment + determinism tests = one unit. Practices: house
+  new type families in fresh modules (extending a ~2K-line module costs a full-file read);
+  land a compiling skeleton before the full test battery; pin expected shapes from observed
+  output, never hand-computed; cite only checked roadmap lines as measured anchors.
 - [2026-06-10] WebSearch 400s on this model line (the API rejects the forced tool_choice
   the search sub-request uses; the error arrives INLINE in an ok-looking result — read
-  result bodies). Re-test after a Claude Code update or model-line change; drop this clause
-  when healed. Workflow agent() `schema` is verified unaffected (live canary). Working
-  channels: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox curl gets a
-  bot wall); crates.io via curl with a `-A` user-agent header (403 without) — detail
+  result bodies). Still broken 2026-06-11; re-test after a Claude Code update or model-line
+  change, drop this clause when healed. Workflow agent() `schema` verified unaffected.
+  Working channels: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox curl
+  gets a bot wall); crates.io via curl with a `-A` user-agent header (403 without) — detail
   /api/v1/crates/NAME, search /crates?q=; GitHub /search/repositories?q=; Wikipedia
   opensearch. Meta-rule: the session that FIRST hits an environment/tool failure records it
   in that same session.
@@ -121,12 +113,16 @@ git history.
 - [2026-06-11] Fable 5 refusal fallback silently switches a session to Opus mid-flight
   (`type=system subtype=model_refusal_fallback` transcript event, flagged "cybersecurity or
   biology topics"). One-way and in-context invisible — the post-switch assistant continues
-  the unit unaware. Trigger: raw Japanese clinical fixture text entering context via
-  whole-fixture reads; probabilistic, not deterministic (three switches, then an
-  identical-vocabulary session stayed on fable). Handling: Opus-mode output is discarded;
-  the user monitors for the switch — on any suspicion of degraded-model output, stop and
-  report. Expect recurrence in fixture-reading units (stage-normalize.2, cli-runner.2,
-  acceptance-v1). Forensics: per-record models via `jq '.message.model'` over assistant
-  records in `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the
-  fallback event is the switch marker. Full case detail (transcript ids, timestamps,
-  trigger tokens): `git show 14e520b`.
+  unaware. Trigger: raw Japanese clinical fixture text entering context via whole-fixture
+  reads; probabilistic, not deterministic (three switches, then an identical-vocabulary
+  session stayed on fable). Mitigation: `Read(./corpus/fixtures/**)` is settings-denied
+  (2026-06-11) — work with fixtures through code, tests, and path-scoped greps. Handling:
+  Opus-mode output is discarded; the user monitors for the switch — on any suspicion of
+  degraded-model output, stop and report. A session's self-report is zero evidence;
+  evidence channels: the Headroom proxy log (request bytes, per-response model ids),
+  transcript jq over assistant records (`jq '.message.model'` in
+  `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback
+  event is the switch marker), and paired A/B task batteries scored by objective gates;
+  CKC's deterministic gates and replay manifests are the standing mitigation. Expect
+  recurrence in fixture-reading units (stage-normalize.2, cli-runner.2, acceptance-v1).
+  Full case detail (transcript ids, timestamps, trigger tokens): `git show 14e520b`.

@@ -3,51 +3,51 @@
 ## 1. OWL 2 EL/RL/DL Ontology Profiles
 
 ### Purpose
-W3C standardized subsets of the OWL 2 Web Ontology Language that trade expressivity for tractable reasoning. Profiles let clinical knowledge engineers choose a fragment whose worst-case complexity matches their workload (large TBox classification, query answering over large ABox, or rule-based inference).
+W3C-standardized OWL 2 subsets trading expressivity for tractable reasoning; engineers pick a fragment whose worst-case complexity matches the workload (large TBox classification, query answering over large ABox, or rule-based inference).
 
 ### Maintainer/Standards body
-W3C OWL Working Group. Current normative reference: "OWL 2 Web Ontology Language Profiles (Second Edition)," W3C Recommendation, 11 December 2012, edited by Boris Motik, Bernardo Cuenca Grau, Ian Horrocks, Zhe Wu, Achille Fokoue, Carsten Lutz. OWL 2 Direct Semantics and RDF-Based Semantics are normative companion documents.
+W3C OWL Working Group. Normative ref: "OWL 2 Web Ontology Language Profiles (Second Edition)," W3C Recommendation, 11 December 2012, eds. Boris Motik, Bernardo Cuenca Grau, Ian Horrocks, Zhe Wu, Achille Fokoue, Carsten Lutz. OWL 2 Direct Semantics and RDF-Based Semantics are normative companions.
 
 ### Conceptual model
-- TBox (terminology: class/property axioms), RBox (role hierarchy/characteristics), ABox (assertions about individuals).
-- OWL 2 DL: SROIQ(D) description logic; class expressions with nominals, qualified cardinality, inverse roles, role chains, datatypes.
-- OWL 2 EL: based on EL++; supports existential restrictions, intersection, class equivalence, role chains, reflexive roles; no disjunction, no universal restrictions, no negation.
-- OWL 2 QL: based on DL-Lite_R; supports inclusion axioms suitable for query rewriting against relational data.
+- TBox (class/property axioms), RBox (role hierarchy/characteristics), ABox (individual assertions).
+- OWL 2 DL: SROIQ(D); class expressions with nominals, qualified cardinality, inverse roles, role chains, datatypes.
+- OWL 2 EL: based on EL++; existential restrictions, intersection, class equivalence, role chains, reflexive roles; no disjunction, universal restrictions, or negation.
+- OWL 2 QL: based on DL-Lite_R; inclusion axioms suitable for query rewriting against relational data.
 - OWL 2 RL: syntactic restriction implementable by Datalog/rule engines.
 - OWL 2 Full: RDF-based semantics, undecidable in general.
 
 ### Expressiveness/Semantics
-- EL: PTime classification; ideal for large terminologies (SNOMED CT, GO, FMA). Cannot express cardinality, disjunctions, or universal restrictions.
+- EL: PTime classification; ideal for large terminologies (SNOMED CT, GO, FMA). No cardinality, disjunctions, or universal restrictions.
 - QL: NLogSpace data complexity; conjunctive query answering by FOL rewriting.
 - RL: PTime combined complexity for instance checking via rules.
 - DL: N2ExpTime worst-case combined complexity for satisfiability; full expressivity for clinical constraints like disjointness, role chains (`hasPart o partOf -> hasPart`), enumerated value sets.
-- Profiles are mutually incomparable: each contains constructors absent from the others.
+- Profiles mutually incomparable: each has constructors absent from the others.
 
 ### Composability/Modularity
-- `owl:imports` axiom pulls full ontology graphs; locality-based modules (⊥-/⊤-locality, Cuenca Grau et al.) extract conservative sub-modules.
+- `owl:imports` pulls full ontology graphs; locality-based modules (⊥-/⊤-locality, Cuenca Grau et al.) extract conservative sub-modules.
 - Profile membership is syntactic; mixing axioms across profiles drops to OWL 2 DL or Full.
-- Annotation axioms are profile-agnostic; punning allows the same IRI to be class and individual under direct semantics.
+- Annotation axioms profile-agnostic; punning allows same IRI as class and individual under direct semantics.
 
 ### Suitability for autoformalization to IR
-- OWL 2 EL is the dominant target for autoformalization of large clinical terminologies: classification is fast; axioms are mostly Horn-like, reducing LLM generation ambiguity; idempotency testable by classified-hierarchy hashing.
-- Risk: LLMs frequently emit axioms outside the chosen profile (e.g., universal restrictions), requiring ROBOT `reduce`/`relax` and profile validation steps.
+- OWL 2 EL dominant target for autoformalizing large clinical terminologies: fast classification; mostly Horn-like axioms reduce LLM generation ambiguity; idempotency testable by classified-hierarchy hashing.
+- Risk: LLMs frequently emit axioms outside the chosen profile (e.g., universal restrictions), needing ROBOT `reduce`/`relax` and profile validation.
 
 ### Formal verification potential
-- Decidable consistency checking, class satisfiability, subsumption, instance checking, conjunctive query answering (the last decidable in EL/QL/RL; open for full OWL 2 DL).
+- Decidable consistency checking, class satisfiability, subsumption, instance checking, conjunctive query answering (last decidable in EL/QL/RL; open for full OWL 2 DL).
 - Contradiction detection = unsatisfiable class detection or proof of `owl:Nothing` entailment.
-- Justification/explanation services in ELK, Pellet, HermiT produce minimal axiom sets for inferences — directly usable for guideline conflict traceability.
+- Justification/explanation in ELK, Pellet, HermiT produces minimal axiom sets for inferences — usable for guideline conflict traceability.
 
 ### Tooling/Ecosystem maturity
-- Reasoners: ELK (EL, parallel; per Kazakov, Krötzsch, Simančík, "The Incredible ELK," Journal of Automated Reasoning 53(1):1-61, 2014, doi:10.1007/s10817-013-9296-3; SNOMED CT can be classified by ELK in as little as 5 seconds on a quad-core computer vs. ~25 seconds for Snorocket and ~10 minutes for CEL/jcel; Protégé Wiki notes "less than 4 seconds on a modern laptop"); HermiT (DL); Pellet/Openllet; FaCT++; Konclude; RDFox (RL/Datalog).
+- Reasoners: ELK (EL, parallel; Kazakov, Krötzsch, Simančík, "The Incredible ELK," Journal of Automated Reasoning 53(1):1-61, 2014, doi:10.1007/s10817-013-9296-3; SNOMED CT classified by ELK in as little as 5 seconds on a quad-core vs. ~25 seconds for Snorocket and ~10 minutes for CEL/jcel; Protégé Wiki notes "less than 4 seconds on a modern laptop"); HermiT (DL); Pellet/Openllet; FaCT++; Konclude; RDFox (RL/Datalog).
 - Editors: Protégé 5.x, WebProtégé.
 - Libraries: OWL API (Java), owlready2 (Python), funowl, py-horned-owl.
 - Serializations: OWL/XML, RDF/XML, Manchester, Functional, OBO (subset), Turtle.
 
 ### Japan-specific considerations
-- DBCLS hosts numerous OBO/OWL ontologies via TogoGenome, NBDC RDF portal (60 datasets / 221.1 billion triples as of 2026); BioHackathon 2025 (BH25, Mie/VISON, 14-20 September 2025) produced `on2vec` (Steinberg, Kulmanov, Queralt-Rosinach, Chiba, Ellis et al., BioHackrXiv 2025) for OWL→vector embedding. BodyParts3D (DBCLS, CC BY-SA 2.1 JP, v3.0 with 1,523 body parts keyed by FMA IDs) is distributed in OWL-compatible structures. Life Science Dictionary (LSD) operation transferred to DBCLS on 31 March 2026.
+- DBCLS hosts numerous OBO/OWL ontologies via TogoGenome, NBDC RDF portal (60 datasets / 221.1 billion triples as of 2026); BioHackathon 2025 (BH25, Mie/VISON, 14-20 September 2025) produced `on2vec` (Steinberg, Kulmanov, Queralt-Rosinach, Chiba, Ellis et al., BioHackrXiv 2025) for OWL→vector embedding. BodyParts3D (DBCLS, CC BY-SA 2.1 JP, v3.0 with 1,523 body parts keyed by FMA IDs) distributed in OWL-compatible structures. Life Science Dictionary (LSD) operation transferred to DBCLS on 31 March 2026.
 
 ### Interoperability with other methods
-- Underpins SKOS (SKOS Core is itself in OWL 2 Full).
+- Underpins SKOS (SKOS Core itself in OWL 2 Full).
 - BFO/DOLCE formalized in OWL; ROBOT/ODK/DOSDP serialize to OWL.
 - MIREOT trims OWL imports.
 - SHACL validates instance data against ontology; SHACL 1.2 Rules adds inference complementary to OWL.
@@ -57,23 +57,23 @@ W3C OWL Working Group. Current normative reference: "OWL 2 Web Ontology Language
 ### Limitations/Known issues
 - Worst-case reasoning blow-up under DL semantics.
 - Open-world assumption clashes with closed clinical data semantics ("no allergy recorded" ≠ "no allergy").
-- Unique Name Assumption absent — patient identifiers must be explicitly disjoint.
-- Negation is monotonic; defeasible clinical rules cannot be expressed natively.
+- No Unique Name Assumption — patient identifiers must be explicitly disjoint.
+- Negation monotonic; defeasible clinical rules not natively expressible.
 
 ### Training data proxy
-- Very high: tens of thousands of GitHub repositories tagged `owl-ontology`; W3C documents extensively in LLM pretraining; Protégé tutorials on YouTube; Stack Overflow tag `owl` has tens of thousands of questions. Japanese-language documentation moderate (DBCLS/NBDC tutorials, BioHackathon writeups).
+- Very high: tens of thousands of GitHub repos tagged `owl-ontology`; W3C docs extensive in LLM pretraining; Protégé tutorials on YouTube; Stack Overflow tag `owl` has tens of thousands of questions. Japanese docs moderate (DBCLS/NBDC tutorials, BioHackathon writeups).
 
 ## 2. SHACL 1.2 Validation Shapes
 
 ### Purpose
-Shapes Constraint Language defines a declarative way to describe, validate, and infer over RDF graphs by stating the structural conditions data must satisfy. Used to express data-quality constraints on FHIR-RDF, guideline IR triples, and clinical knowledge graphs.
+Shapes Constraint Language: declarative way to describe, validate, and infer over RDF graphs by stating structural conditions data must satisfy. Used for data-quality constraints on FHIR-RDF, guideline IR triples, clinical knowledge graphs.
 
 ### Maintainer/Standards body
-W3C Data Shapes Working Group. SHACL 1.0 Recommendation: 20 July 2017. SHACL 1.2 First Public Working Drafts published 18 March 2025 (Core and SPARQL Extensions); Working Drafts updated through 16 May 2026 (Core), with SHACL 1.2 Node Expressions FPWD published 8 January 2026. SHACL 1.2 Rules FPWD published 2025; SHACL 1.2 Node Expressions and SHACL 1.2 Profiling also Working Drafts. The Data Shapes Working Group charter extends through December 2026, with SHACL 1.2 expected to reach Recommendation in late 2026 or early 2027. Editors of 1.2 Core: Holger Knublauch, Thomas Bergwinkl, Yousouf Taghzouti, Jesse Wright.
+W3C Data Shapes Working Group. SHACL 1.0 Recommendation: 20 July 2017. SHACL 1.2 First Public Working Drafts published 18 March 2025 (Core and SPARQL Extensions); Working Drafts updated through 16 May 2026 (Core), with SHACL 1.2 Node Expressions FPWD published 8 January 2026. SHACL 1.2 Rules FPWD published 2025; Node Expressions and Profiling also Working Drafts. Data Shapes WG charter extends through December 2026, with SHACL 1.2 expected to reach Recommendation in late 2026 or early 2027. Editors of 1.2 Core: Holger Knublauch, Thomas Bergwinkl, Yousouf Taghzouti, Jesse Wright.
 
 ### Conceptual model
 - A shapes graph (RDF) declares Node Shapes (`sh:NodeShape`) and Property Shapes (`sh:PropertyShape`).
-- Targeting: by class (`sh:targetClass`), by node (`sh:targetNode`), by subject/object of predicate, or by SPARQL.
+- Targeting: by class (`sh:targetClass`), node (`sh:targetNode`), subject/object of predicate, or SPARQL.
 - Constraint components: `sh:datatype`, `sh:class`, `sh:minCount`, `sh:maxCount`, `sh:pattern`, `sh:node`, `sh:qualifiedValueShape`, `sh:and`/`sh:or`/`sh:not`/`sh:xone`, `sh:sparql`.
 - Validation report (`sh:ValidationReport`) is RDF; results have severity (`sh:Violation`, `sh:Warning`, `sh:Info`).
 - 1.2 additions: Derived Properties, list-syntax unions of datatypes/classes, constraints on RDF 1.2 reification (triple terms), SHACL Rules with declarative inference, SHACL Node Expressions, SHACL Profiling.
@@ -82,25 +82,25 @@ W3C Data Shapes Working Group. SHACL 1.0 Recommendation: 20 July 2017. SHACL 1.2
 - SHACL Core: closed-world, per-shape, deterministic validation. Recursion semantics left to implementations.
 - SHACL-SPARQL: arbitrary SPARQL queries as constraint components — Turing-complete validation.
 - SHACL Rules (1.2 WD): forward-chaining inference distinct from OWL entailment.
-- Can express closed-world constraints OWL cannot (e.g., "every Patient resource MUST have exactly one birthDate"), key constraints, and string-pattern validation.
+- Can express closed-world constraints OWL cannot (e.g., "every Patient resource MUST have exactly one birthDate"), key constraints, string-pattern validation.
 
 ### Composability/Modularity
-- Shapes graphs are RDF and compose via `owl:imports` or by union.
+- Shapes graphs are RDF and compose via `owl:imports` or union.
 - `sh:node` enables shape reuse; `sh:and` and `sh:property` chains compose constraints.
 - SHACL 1.2 Profiling (`sh:Profile`) lets implementers declare supported subsets.
 - SHACL 1.2 Packaging recommendation: group shapes into `owl:Ontology` instances; link with `rdfs:isDefinedBy` and `owl:imports`.
 
 ### Suitability for autoformalization to IR
 - Excellent constraint surface for guideline IR: required slots, value-set bindings, cardinality of clinical statements.
-- LLM-generated shapes are testable — apply to a corpus of example RDF and inspect violations.
+- LLM-generated shapes testable — apply to a corpus of example RDF and inspect violations.
 - Idempotency: shape IRIs and target classes must be deterministically minted; otherwise duplicate shapes accumulate.
-- Pairs naturally with OWL: OWL for entailment-based reasoning, SHACL for closed-world validation.
+- Pairs with OWL: OWL for entailment-based reasoning, SHACL for closed-world validation.
 
 ### Formal verification potential
 - Validation = model checking against a shapes graph.
 - SHACL semantics decidable for Core (no recursion); SPARQL extensions inherit SPARQL complexity.
 - Cannot natively express transitive constraints across unbounded paths without `sh:path` with `*`/`+` operators.
-- Contradiction detection between guidelines: encode each guideline's claims as shapes; conflicts surface as violations on shared data.
+- Cross-guideline contradiction detection: encode each guideline's claims as shapes; conflicts surface as violations on shared data.
 
 ### Tooling/Ecosystem maturity
 - TopBraid SHACL API (Java, reference), pySHACL (Python), Apache Jena SHACL, RDF4J SHACL, Zazuko `shacl-engine`.
@@ -108,15 +108,15 @@ W3C Data Shapes Working Group. SHACL 1.0 Recommendation: 20 July 2017. SHACL 1.2
 - Editors: TopBraid Composer, Stardog Studio.
 
 ### Japan-specific considerations
-- DBCLS RDF Portal datasets often ship SHACL constraints for validation; SSBD Ontology (RIKEN, Yamagata, Kyoda, Itoga, Fujisawa, arXiv:2508.02084) explicitly cites SHACL-style validation. Japanese-language SHACL tutorials are sparse but present at LOD Challenge Japan.
+- DBCLS RDF Portal datasets often ship SHACL constraints for validation; SSBD Ontology (RIKEN, Yamagata, Kyoda, Itoga, Fujisawa, arXiv:2508.02084) explicitly cites SHACL-style validation. Japanese SHACL tutorials sparse but present at LOD Challenge Japan.
 
 ### Interoperability with other methods
 - Complements OWL profiles: SHACL closed-world validation, OWL open-world entailment.
 - Named graphs/TriG: SHACL 1.2 can target named graphs via SPARQL extensions and PROV-O datasets.
-- SKOS: SHACL shapes commonly used to validate SKOS thesauri.
+- SKOS: SHACL shapes commonly validate SKOS thesauri.
 - ROBOT does not natively run SHACL but can chain with pyshacl in ODK pipelines.
-- Category 1: FHIR Shorthand → SHACL conversions exist (BabelFSH toolkit); FHIR-RDF can be validated by SHACL; openEHR archetypes (ADL) have been mapped to SHACL by community projects.
-- Category 2: SS-MIX2 export validation can be expressed as SHACL once converted to RDF.
+- Category 1: FHIR Shorthand → SHACL conversions exist (BabelFSH toolkit); FHIR-RDF can be validated by SHACL; openEHR archetypes (ADL) mapped to SHACL by community projects.
+- Category 2: SS-MIX2 export validation expressible as SHACL once converted to RDF.
 
 ### Limitations/Known issues
 - Recursion semantics underspecified — implementations diverge.
@@ -130,22 +130,22 @@ W3C Data Shapes Working Group. SHACL 1.0 Recommendation: 20 July 2017. SHACL 1.2
 ## 3. RDF Named Graphs / TriG for Source-Scoped Guideline Claims
 
 ### Purpose
-Mechanism to package sets of triples (a graph) under an IRI so that statements can be attributed, dated, versioned, or scoped to a source — essential for tracking which guideline made which claim and managing provenance of LLM-generated assertions.
+Mechanism to package sets of triples (a graph) under an IRI so statements can be attributed, dated, versioned, or scoped to a source — essential for tracking which guideline made which claim and managing provenance of LLM-generated assertions.
 
 ### Maintainer/Standards body
-W3C. RDF 1.1 (25 February 2014) introduced datasets/named graphs normatively. RDF 1.2 Concepts and Abstract Data Model and RDF 1.2 Semantics reached Candidate Recommendation status on 7 April 2026 (call for implementations issued; not expected to advance to Recommendation any earlier than 5 May 2026) and add triple terms (RDF-star), keeping named graphs. RDF 1.2 TriG and N-Quads remain textual serializations for datasets.
+W3C. RDF 1.1 (25 February 2014) introduced datasets/named graphs normatively. RDF 1.2 Concepts and Abstract Data Model and RDF 1.2 Semantics reached Candidate Recommendation on 7 April 2026 (call for implementations issued; not expected to advance to Recommendation earlier than 5 May 2026) and add triple terms (RDF-star), keeping named graphs. RDF 1.2 TriG and N-Quads remain textual serializations for datasets.
 
 ### Conceptual model
-- An RDF Dataset = one default graph + zero or more named graphs `(IRI, graph)` pairs.
+- RDF Dataset = one default graph + zero or more named graphs `(IRI, graph)` pairs.
 - TriG: Turtle extended with graph statements `<g> { ... }`.
 - N-Quads: line-oriented `<s> <p> <o> <g> .`.
 - RDF 1.2 triple terms `<< s p o >>` enable annotation of individual triples directly (RDF-star); reifying triple denotes the proposition without asserting it.
 - Quad stores (Jena TDB2, Virtuoso, Stardog, GraphDB, Oxigraph) treat the graph component as a first-class index dimension.
 
 ### Expressiveness/Semantics
-- A named graph is itself an RDF graph; the IRI labeling it is metadata-accessible.
-- No standard formal semantics for what a named graph means about its triples — interpretation is application-specific.
-- Common convention: the IRI denotes a "claim/state" or "provenance bundle." PROV-O `prov:Bundle` formalizes this.
+- A named graph is itself an RDF graph; the labeling IRI is metadata-accessible.
+- No standard formal semantics for what a named graph means about its triples — interpretation application-specific.
+- Common convention: IRI denotes a "claim/state" or "provenance bundle." PROV-O `prov:Bundle` formalizes this.
 - SPARQL 1.1+ has `GRAPH`, `FROM`, `FROM NAMED`; SPARQL Update has `INSERT DATA { GRAPH <g> { ... } }`.
 
 ### Composability/Modularity
@@ -153,19 +153,19 @@ W3C. RDF 1.1 (25 February 2014) introduced datasets/named graphs normatively. RD
 - Versioning by minting a fresh graph IRI per ontology release; OpenCitations Data Model is a published exemplar.
 
 ### Suitability for autoformalization to IR
-- Strong: scoping each guideline's IR to its own named graph yields per-source provenance "for free," enables straightforward diff between guideline versions (set difference of triples), and supports per-guideline override semantics.
+- Strong: scoping each guideline's IR to its own named graph yields per-source provenance "for free," enables straightforward diff between guideline versions (set difference of triples), supports per-guideline override semantics.
 - Idempotency: with stable graph IRIs (deterministic from guideline DOI + section + chunk) re-runs of an LLM produce overwriteable graphs.
 - Per-graph SHACL validation supported in 1.2 via SPARQL extensions.
 
 ### Formal verification potential
-- Contradiction detection across guidelines is a query problem: `SELECT ?g1 ?g2 WHERE { GRAPH ?g1 { ?x :recommends ?A } . GRAPH ?g2 { ?x :recommends ?B } . FILTER(?A != ?B) }`.
-- Combined with reasoning: a quad-aware reasoner (e.g., RDFox with named graphs) can detect cross-graph inconsistencies.
+- Cross-guideline contradiction detection is a query problem: `SELECT ?g1 ?g2 WHERE { GRAPH ?g1 { ?x :recommends ?A } . GRAPH ?g2 { ?x :recommends ?B } . FILTER(?A != ?B) }`.
+- With reasoning: a quad-aware reasoner (e.g., RDFox with named graphs) can detect cross-graph inconsistencies.
 - RDF-star reification supports confidence/uncertainty annotations on individual claims for downstream non-monotonic reasoning.
 
 ### Tooling/Ecosystem maturity
 - Quad stores: Apache Jena Fuseki/TDB2, Virtuoso, Stardog, GraphDB, Oxigraph (Rust), Blazegraph, RDFox.
 - Parsers: rdflib (Python), Apache Jena, N3.js, Comunica.
-- SPARQL endpoints with named-graph support are ubiquitous.
+- SPARQL endpoints with named-graph support ubiquitous.
 
 ### Japan-specific considerations
 - NBDC RDF Portal (60 datasets, 221.1 billion triples as of 2026) exposes per-dataset SPARQL endpoints, each effectively a named-graph-scoped store. TogoVar (DBCLS, Mitsuhashi et al., Hum Genome Var 2022, doi:10.1038/s41439-022-00222-9) integrates Japanese variation datasets per named graph (JGA-WGS, ToMMo 8.3KJPN, GEM-J WGA). PDBj RDF and the DBCLS Med2RDF effort routinely use TriG/N-Quads.
@@ -174,30 +174,30 @@ W3C. RDF 1.1 (25 February 2014) introduced datasets/named graphs normatively. RD
 - Carries PROV-O annotations to record `prov:wasGeneratedBy` (LLM run), `prov:wasDerivedFrom` (guideline PDF), `prov:generatedAtTime`.
 - SHACL 1.2 SPARQL Extensions can target graphs.
 - OWL: `owl:imports` is graph-level; named graphs let an ontology be served from multiple URIs without breaking imports.
-- Category 1: FHIR Provenance resource (R5) is conceptually parallel; openEHR's COMPOSITION-level versioning maps to named-graph snapshots.
+- Category 1: FHIR Provenance resource (R5) conceptually parallel; openEHR's COMPOSITION-level versioning maps to named-graph snapshots.
 - Category 2: MID-NET and NDB pseudonymous extracts can be partitioned per cohort using named graphs.
 
 ### Limitations/Known issues
 - No universal semantics for nesting/inheritance between named graphs.
-- "Triple bloat" if PROV-O is materialized exhaustively per triple — RDF-star mitigates but tooling support is uneven.
+- "Triple bloat" if PROV-O materialized exhaustively per triple — RDF-star mitigates but tooling support uneven.
 - SPARQL `GRAPH` semantics differ subtly across endpoints.
 - Quoted triples (RDF-star) are new; downstream tools (SHACL validators, OWL reasoners) treat them inconsistently.
 
 ### Training data proxy
-- High for RDF/TriG basics, moderate for advanced quad patterns. RDF-star is recent (2024+), so LLM coverage is shallower. Japanese RDF documentation moderate via DBCLS workshops and JST-funded RDF Portal docs.
+- High for RDF/TriG basics, moderate for advanced quad patterns. RDF-star recent (2024+), so LLM coverage shallower. Japanese RDF docs moderate via DBCLS workshops and JST-funded RDF Portal docs.
 
 ## 4. SKOS and FHIR ValueSet/ConceptMap Governance
 
 ### Purpose
-SKOS is a lightweight RDF vocabulary for representing thesauri, classifications, and subject heading schemes; FHIR ValueSet/ConceptMap are HL7 resources for managing terminology bindings and translations in clinical systems. Used together to govern controlled vocabularies referenced by clinical guidelines.
+SKOS is a lightweight RDF vocabulary for thesauri, classifications, and subject heading schemes; FHIR ValueSet/ConceptMap are HL7 resources for managing terminology bindings and translations in clinical systems. Used together to govern controlled vocabularies referenced by clinical guidelines.
 
 ### Maintainer/Standards body
-- SKOS: W3C Recommendation 18 August 2009; Semantic Web Deployment Working Group; editors Alistair Miles and Sean Bechhofer. Namespace `http://www.w3.org/2004/02/skos/core#`. Status: stable; no successor recommendation.
-- FHIR Terminology: HL7 International. Current published version FHIR R5 (5.0.0, March 2023); R6 in active balloting (v6.0.0-ballot4 generated 18 May 2026, full Normative ANSI ballot; final R6 expected in 2027 or later, subject to multiple ballot rounds). ConceptMap relationship vocabulary explicitly references SKOS in R5/R6: "well-known relationships, such as those from the Simple Knowledge Organization System (SKOS), should be used where possible."
+- SKOS: W3C Recommendation 18 August 2009; Semantic Web Deployment Working Group; editors Alistair Miles and Sean Bechhofer. Namespace `http://www.w3.org/2004/02/skos/core#`. Status: stable; no successor.
+- FHIR Terminology: HL7 International. Current published version FHIR R5 (5.0.0, March 2023); R6 in active balloting (v6.0.0-ballot4 generated 18 May 2026, full Normative ANSI ballot; final R6 expected 2027 or later, subject to multiple ballot rounds). ConceptMap relationship vocabulary explicitly references SKOS in R5/R6: "well-known relationships, such as those from the Simple Knowledge Organization System (SKOS), should be used where possible."
 
 ### Conceptual model
 - SKOS: `skos:Concept` instances grouped into `skos:ConceptScheme`; relations `skos:broader`/`skos:narrower`/`skos:related`; labels `skos:prefLabel`, `skos:altLabel`, `skos:hiddenLabel` (per-language); mapping relations `skos:exactMatch`, `skos:closeMatch`, `skos:broadMatch`, `skos:narrowMatch`, `skos:relatedMatch`.
-- FHIR CodeSystem: defines codes and their meaning; ValueSet: a named, versioned selection (intension or extension) from one or more CodeSystems; ConceptMap: directed mappings between ValueSets with relationships (`equivalent`, `source-is-narrower-than-target`, etc.).
+- FHIR CodeSystem: defines codes and meaning; ValueSet: a named, versioned selection (intension or extension) from one or more CodeSystems; ConceptMap: directed mappings between ValueSets with relationships (`equivalent`, `source-is-narrower-than-target`, etc.).
 - Governance pattern (MedCom DK and similar IGs): independent semantic versioning per artifact (Major.Minor.Patch) plus IG-level version; `$expand`, `$validate-code`, `$translate` operations.
 
 ### Expressiveness/Semantics
@@ -210,7 +210,7 @@ SKOS is a lightweight RDF vocabulary for representing thesauri, classifications,
 - FHIR canonical URLs + version strings provide stable composition; ImplementationGuide resources bundle CodeSystem/ValueSet/ConceptMap artifacts.
 
 ### Suitability for autoformalization to IR
-- SKOS is an attractive lightweight IR for terminology-heavy portions of guidelines (lists of conditions, drug classes). LLMs converge well because the vocabulary is small.
+- SKOS is an attractive lightweight IR for terminology-heavy guideline portions (lists of conditions, drug classes). LLMs converge well because the vocabulary is small.
 - FHIR ValueSet JSON is highly structured — LLMs can emit valid ValueSets reliably with schema-constrained decoding.
 - Idempotency depends on deterministic concept URI minting.
 - Limitation: SKOS cannot encode logical class definitions; guideline conditional logic must go elsewhere (CQL, FHIR PlanDefinition).
@@ -226,7 +226,7 @@ SKOS is a lightweight RDF vocabulary for representing thesauri, classifications,
 - BabelFSH (Wiedekopf, Ohlsen, Kock-Schoppenhauer, Ingenerf, J Biomed Semantics 16:18, 2025, doi:10.1186/s13326-025-00343-4) converts SKOS/OWL-style terminologies to FHIR CodeSystem/ValueSet/ConceptMap.
 
 ### Japan-specific considerations
-- Japanese MeSH (J-MeSH) is not openly licensed; JAMAS Thesaurus 10th edition (January 2023, 33,165 headwords, ~90% MeSH-derived, revised every 4 years since 1983) has restricted use.
+- Japanese MeSH (J-MeSH) not openly licensed; JAMAS Thesaurus 10th edition (January 2023, 33,165 headwords, ~90% MeSH-derived, revised every 4 years since 1983) has restricted use.
 - Life Science Dictionary (LSD), developed since 1993 by Kyoto University LSD Project (Prof. Shuji Kaneko, CC-BY-ND 2.1 JP) — operation transferred to DBCLS as of 31 March 2026.
 - Open alternatives: `open-japanese-mesh` (Yamada & Tateisi, Genomics Inform 18(2):e22, 2020; 12,457-word Japanese-MeSH dictionary at github.com/roy29fuku/open-japanese-mesh) and O-JMeSH (Soares, Tateisi, Takatsuki, Yamaguchi, Genomics Inform 19(3):e26, 2021, doi:10.5808/gi.21014).
 - MEDIS-DC standard masters (病名/手術処置/臨床検査/医薬品HOT) are tabular and freely downloadable from medis.or.jp. Current reference "標準マスターの概要と使い方 第24版" (July 2025, 11 masters); 病名マスター v2.1 contained 19,032 terms.
@@ -241,7 +241,7 @@ SKOS is a lightweight RDF vocabulary for representing thesauri, classifications,
 
 ### Limitations/Known issues
 - SKOS lacks rich semantics for compositional terminologies like SNOMED CT post-coordinated expressions.
-- FHIR ConceptMap's `dependsOn` is underused and inconsistently implemented.
+- FHIR ConceptMap's `dependsOn` underused and inconsistently implemented.
 - Governance of bilingual labels (Japanese/English) requires explicit `xml:lang` discipline that LLM outputs frequently miss.
 - Round-tripping SNOMED CT compositional grammar between SKOS and OWL EL loses information.
 
@@ -251,7 +251,7 @@ SKOS is a lightweight RDF vocabulary for representing thesauri, classifications,
 ## 5. OBO Foundry Methods: ROBOT, ODK, DOSDP
 
 ### Purpose
-A coordinated tool chain for building, releasing, and quality-checking biomedical ontologies according to OBO Foundry principles: ROBOT automates ontology operations; ODK packages best-practice build pipelines; DOSDP parameterizes axiom templates with YAML+TSV data.
+Coordinated tool chain for building, releasing, and quality-checking biomedical ontologies per OBO Foundry principles: ROBOT automates ontology operations; ODK packages best-practice build pipelines; DOSDP parameterizes axiom templates with YAML+TSV data.
 
 ### Maintainer/Standards body
 OBO Foundry Operations Committee (community-governed, NIH/EMBL/MRC backed). Key maintainers: James Overton, Becky Tauber (ROBOT); Nicolas Matentzoglu, Chris Mungall (ODK); David Osumi-Sutherland, Jim Balhoff (DOSDP).
@@ -261,8 +261,8 @@ OBO Foundry Operations Committee (community-governed, NIH/EMBL/MRC backed). Key 
 - Documented in Jackson et al. 2019 (ROBOT, BMC Bioinformatics 20:407, doi:10.1186/s12859-019-3002-3) and Matentzoglu et al. 2022 (ODK, Database/Oxford Academic, baac087, doi:10.1093/database/baac087).
 
 ### Conceptual model
-- ROBOT: command-line pipeline (`robot extract --method MIREOT ... | robot reason --reasoner ELK | robot reduce | robot annotate ...`); each operation is a function over OWL ontologies, composable via Unix pipes.
-- ODK: scaffolds a Git repository with `src/ontology/<onto>-edit.owl`, Makefile targets (`make prepare_release`, `make test`), GitHub Actions CI, Dockerized toolchain. Source files separate from release artifacts; release variants `-base`, `-full`, `-simple`.
+- ROBOT: command-line pipeline (`robot extract --method MIREOT ... | robot reason --reasoner ELK | robot reduce | robot annotate ...`); each operation a function over OWL ontologies, composable via Unix pipes.
+- ODK: scaffolds a Git repo with `src/ontology/<onto>-edit.owl`, Makefile targets (`make prepare_release`, `make test`), GitHub Actions CI, Dockerized toolchain. Source files separate from release artifacts; release variants `-base`, `-full`, `-simple`.
 - DOSDP: YAML pattern declares variables, axiom templates (Manchester syntax with placeholders); a TSV provides per-row variable bindings; `dosdp-tools` generates OWL axioms.
 
 ### Expressiveness/Semantics
@@ -272,13 +272,13 @@ OBO Foundry Operations Committee (community-governed, NIH/EMBL/MRC backed). Key 
 
 ### Composability/Modularity
 - ROBOT `extract` supports MIREOT, SLME (⊥/⊤ locality), STAR, BOT, TOP methods.
-- ODK pipeline imports are configured in YAML (`product:` definitions); imports refreshed by `make refresh-imports`.
-- DOSDP patterns can themselves import other patterns (`from:` directive).
+- ODK pipeline imports configured in YAML (`product:` definitions); imports refreshed by `make refresh-imports`.
+- DOSDP patterns can import other patterns (`from:` directive).
 
 ### Suitability for autoformalization to IR
-- DOSDP is uniquely well-suited as an LLM target: the LLM fills a TSV row given source text, then deterministic tools materialize axioms. This separation of generation from formalization sharply improves convergence/idempotency.
-- ROBOT operations are idempotent by construction (set-based axiom manipulation) — repeated runs converge to the same release artifact.
-- ODK enforces a release process that yields reproducible IRIs and version IRIs.
+- DOSDP uniquely well-suited as an LLM target: LLM fills a TSV row given source text, then deterministic tools materialize axioms. This separation of generation from formalization sharply improves convergence/idempotency.
+- ROBOT operations idempotent by construction (set-based axiom manipulation) — repeated runs converge to the same release artifact.
+- ODK enforces a release process yielding reproducible IRIs and version IRIs.
 
 ### Formal verification potential
 - ROBOT `verify` runs SPARQL queries that must return no rows (gate the build).
@@ -287,12 +287,12 @@ OBO Foundry Operations Committee (community-governed, NIH/EMBL/MRC backed). Key 
 - ODK's QC step gates merges on consistency, profile conformance, structural checks.
 
 ### Tooling/Ecosystem maturity
-- ROBOT GitHub repository ontodev/robot: 304 stars, 79 forks as of May 2026; used by ~all major OBO ontologies (GO, HPO, Mondo, Uberon, ChEBI).
+- ROBOT GitHub repo ontodev/robot: 304 stars, 79 forks as of May 2026; used by ~all major OBO ontologies (GO, HPO, Mondo, Uberon, ChEBI).
 - ODK: Docker image with ROBOT, owltools, fastobo-validator, dosdp-tools, OAK, Konclude, Apache Jena. "Seed my repo" generator scaffolds new ontologies.
 - DOSDP-tools, OAK (Ontology Access Kit), sssom-py form a complementary Python ecosystem.
 
 ### Japan-specific considerations
-- DBCLS BioHackathon series (BH25 in Mie/VISON, 14-20 September 2025) actively uses ROBOT/ODK in cross-ontology integration sessions; on2vec (OWL→vector via graph neural networks and sentence transformers; Steinberg, Kulmanov, Queralt-Rosinach, Chiba, Ellis et al., BioHackrXiv 2025) emerged from BH25. Japanese ontology authors (Kozaki, Yamagata) at JAIST/RIKEN/UTokyo publish using ROBOT pipelines. Japanese-language tutorials scarce; OBO Academy docs English-first.
+- DBCLS BioHackathon series (BH25 in Mie/VISON, 14-20 September 2025) actively uses ROBOT/ODK in cross-ontology integration sessions; on2vec (OWL→vector via graph neural networks and sentence transformers; Steinberg, Kulmanov, Queralt-Rosinach, Chiba, Ellis et al., BioHackrXiv 2025) emerged from BH25. Japanese ontology authors (Kozaki, Yamagata) at JAIST/RIKEN/UTokyo publish using ROBOT pipelines. Japanese tutorials scarce; OBO Academy docs English-first.
 
 ### Interoperability with other methods
 - Implements MIREOT (ROBOT `extract --method MIREOT`).
@@ -326,9 +326,9 @@ Upper (foundational) ontologies provide top-level categories (continuants/occurr
 - DOLCE: descriptivist/cognitive; endurants vs. perdurants, qualities (with `Quale` for cognitive abstractions like color), abstracts (mathematical/conceptual entities). Allows "objects of thought" as basic units that BFO rejects.
 
 ### Expressiveness/Semantics
-- BFO 2020 is axiomatized in OWL and Common Logic (CL); CL version normative for ISO conformance.
+- BFO 2020 axiomatized in OWL and Common Logic (CL); CL version normative for ISO conformance.
 - DOLCE axiomatized in first-order logic (DOLCE-FOL) with an OWL approximation DOLCE-Lite.
-- BFO is realist; DOLCE permits cognitive/conceptual entities.
+- BFO realist; DOLCE permits cognitive/conceptual entities.
 - Mapping studies (Temal et al.; Seyed 2009 Nature Precedings npre.2009.3481.1; AKENATON project): ~100% BFO category coverage in DOLCE and ~81% reverse — six equivalence relations and thirteen subsumption relations established.
 
 ### Composability/Modularity
@@ -337,7 +337,7 @@ Upper (foundational) ontologies provide top-level categories (continuants/occurr
 
 ### Suitability for autoformalization to IR
 - BFO provides a small, stable, well-documented vocabulary — LLMs anchor clinical concepts to BFO categories consistently across runs (e.g., "Diabetes Mellitus" → `bfo:Disposition`).
-- DOLCE richer but cognitive layer more ambiguous, leading to lower LLM convergence in clinical contexts.
+- DOLCE richer but cognitive layer more ambiguous, lowering LLM convergence in clinical contexts.
 - For a CDS IR, BFO + OGMS (Ontology for General Medical Science) is the most idiomatic anchoring.
 
 ### Formal verification potential
@@ -363,7 +363,7 @@ Upper (foundational) ontologies provide top-level categories (continuants/occurr
 ### Limitations/Known issues
 - BFO's realism excludes "patient-reported subjective experiences" as native entities, requiring workarounds (IAO information content entities).
 - DOLCE's complexity raises onboarding cost; LLM coverage thinner.
-- Both upper ontologies are debated philosophically; pragmatic mid-level ontologies (CCO, OGMS, IDO) absorb most modeling load.
+- Both upper ontologies debated philosophically; pragmatic mid-level ontologies (CCO, OGMS, IDO) absorb most modeling load.
 - ICD-10 mapping to BFO/DOLCE incomplete (Héja, Varga, Surján, "Design principles of DOLCE-based formal representation of ICD10," Stud Health Technol Inform 2008;136:821-826).
 
 ### Training data proxy
@@ -380,11 +380,11 @@ Originally Mélanie Courtot, Frank Gibson, Allyson L. Lister, James Malone, Dani
 ### Conceptual model
 - Specify: external class IRI, its direct asserted parent in source, and a (configurable) superclass in target.
 - Bring in minimal triple set: rdfs:label, IAO definitions, selected annotation axioms.
-- Three import "cases" depending on whether one needs (1) the class only, (2) the class plus annotations, (3) the class plus structural context.
+- Three import "cases" depending on whether one needs (1) the class only, (2) class plus annotations, (3) class plus structural context.
 
 ### Expressiveness/Semantics
 - Preserves IRIs from source ontology (URL persistence).
-- Does not preserve full logical context; some entailments from the source are lost.
+- Does not preserve full logical context; some source entailments lost.
 - Locality-based module extraction (SLME, used by ROBOT `extract --method BOT/TOP/STAR`) is a logically conservative alternative; MIREOT is "lighter but less safe."
 
 ### Composability/Modularity
@@ -397,7 +397,7 @@ Originally Mélanie Courtot, Frank Gibson, Allyson L. Lister, James Malone, Dani
 
 ### Formal verification potential
 - The imported slice can be reasoned over with ELK/HermiT alongside the local ontology.
-- Inconsistencies introduced by partial imports are detectable but may be artifacts of missing axioms — diagnostic care needed.
+- Inconsistencies from partial imports detectable but may be artifacts of missing axioms — diagnostic care needed.
 
 ### Tooling/Ecosystem maturity
 - OntoFox web server (Xiang, Courtot, Brinkman, Ruttenberg, He et al.); ROBOT `extract --method MIREOT --upper-term ... --lower-term ...`; Protégé MIREOT plugin (UAMS-DBMI/MIREOT-plugin on GitHub).
@@ -437,13 +437,13 @@ Automated systems that compute mappings between ontologies (e.g., FMA↔SNOMED C
 - Output: alignments as 5-tuples (entity1, entity2, relation, confidence, type) — increasingly serialized as SSSOM TSV.
 
 ### Expressiveness/Semantics
-- Alignments are typically equivalence (`owl:equivalentClass`, `skos:exactMatch`), subsumption (`rdfs:subClassOf`, `skos:broadMatch`/`narrowMatch`), or relatedness.
+- Alignments typically equivalence (`owl:equivalentClass`, `skos:exactMatch`), subsumption (`rdfs:subClassOf`, `skos:broadMatch`/`narrowMatch`), or relatedness.
 - Coherence: alignment is coherent iff union of source + target + alignment has no unsatisfiable classes.
 - Repair = removing a minimal subset of mappings to restore coherence.
 
 ### Composability/Modularity
 - Both systems use locality-based modularization to scale to FMA/SNOMED/NCI sizes (tens of thousands of classes).
-- OAEI Large BioMed reference alignments are refined with ALCOMO + LogMap repair, with disagreement-flagged mappings marked "?" (e.g., FMA-NCI: 2,686 "=" + 338 "?"; FMA-SNOMED: 6,026 "=" + 2,982 "?"; SNOMED-NCI: 17,210 "=" + 1,634 "?").
+- OAEI Large BioMed reference alignments refined with ALCOMO + LogMap repair, with disagreement-flagged mappings marked "?" (e.g., FMA-NCI: 2,686 "=" + 338 "?"; FMA-SNOMED: 6,026 "=" + 2,982 "?"; SNOMED-NCI: 17,210 "=" + 1,634 "?").
 
 ### Suitability for autoformalization to IR
 - LLM-generated cross-guideline mappings benefit from automated repair: feed LLM candidate `skos:exactMatch` triples into LogMap/AML for coherence repair.
@@ -494,7 +494,7 @@ Identify mentions of clinical entities (diseases, drugs, anatomical sites, lab t
 
 ### Conceptual model
 - Standard NLP pipeline: tokenization (MeCab/Sudachi/Juman++) → BERT/RoBERTa encoding → BIO sequence labeling for NER → candidate generation via dictionary + dense vector matching → reranking/disambiguation.
-- MedNER-J adds positive/negative classification (a mention's polarity: "C" = positive symptom/disease, "CN" = negative).
+- MedNER-J adds positive/negative classification (mention polarity: "C" = positive symptom/disease, "CN" = negative).
 - For cross-lingual linking, mention → Japanese standard term → mapping (via O-JMeSH or open-japanese-mesh) → MeSH/UMLS CUI.
 
 ### Expressiveness/Semantics
@@ -521,12 +521,12 @@ Identify mentions of clinical entities (diseases, drugs, anatomical sites, lab t
 - JMedLoRA (Sukeda, Suzuki, Sakaji, Kodera, UTokyo, arXiv:2310.10083) for LoRA fine-tuning of LLMs on Japanese medical text.
 
 ### Japan-specific considerations
-- License complexity: JMedRoBERTa is CC-BY-NC-SA-4.0 (non-commercial); MANBYO is open but license terms are loose; JAMAS Thesaurus is restricted. Commercial CDS deployment requires careful licensing audit.
-- UMLS Japanese MeSH translation is created by JAMAS; access requires UMLS Metathesaurus license.
+- License complexity: JMedRoBERTa is CC-BY-NC-SA-4.0 (non-commercial); MANBYO is open but license terms loose; JAMAS Thesaurus restricted. Commercial CDS deployment requires careful licensing audit.
+- UMLS Japanese MeSH translation created by JAMAS; access requires UMLS Metathesaurus license.
 - Real EHR data hard to access; SS-MIX2 archives, MID-NET, and NDB pseudonymous data are gated.
 
 ### Interoperability with other methods
-- Output codes plug into FHIR Coding (Category 1) and into named-graph-scoped guideline triples (Category 3).
+- Output codes plug into FHIR Coding (Category 1) and named-graph-scoped guideline triples (Category 3).
 - Output IRIs/codes can feed SKOS concept schemes for terminology normalization governance.
 - LogMap/AML can align Japanese-extracted concept schemes against SNOMED CT/UMLS.
 - Category 2: directly relevant for MEDIS masters, MedDRA/J, ICD-10/11 JP, YJ/HOT codes, JLAC10 lab codes.
@@ -534,7 +534,7 @@ Identify mentions of clinical entities (diseases, drugs, anatomical sites, lab t
 ### Limitations/Known issues
 - Domain shift: models trained on academic papers (JMedRoBERTa) underperform on EHR / pharmaceutical-care notes.
 - Negation, hedging, and family history inconsistently handled.
-- Code coverage gaps: 28.3% (~17,000 of ~62,000) of EHR-derived symptom/disease expressions are NOT covered by ICD10対応標準病名マスター (NAIST sociocom MANBYO pre-survey, sociocom.jp/~data/2018-manbyo/), hence the MANBYO supplementation.
+- Code coverage gaps: 28.3% (~17,000 of ~62,000) of EHR-derived symptom/disease expressions NOT covered by ICD10対応標準病名マスター (NAIST sociocom MANBYO pre-survey, sociocom.jp/~data/2018-manbyo/), hence the MANBYO supplementation.
 - No publicly available large-scale Japanese clinical NER gold standard at MIMIC-IV scale.
 
 ### Training data proxy
@@ -543,7 +543,7 @@ Identify mentions of clinical entities (diseases, drugs, anatomical sites, lab t
 ## 10. Versioned Ontology/Terminology Diffing and Change-Impact Analysis
 
 ### Purpose
-Tools and methods to compare ontology versions, classify changes (effectual vs. ineffectual; safe vs. breaking), and propagate the impact of changes to downstream applications (annotations, ML models, CDS rules).
+Tools and methods to compare ontology versions, classify changes (effectual vs. ineffectual; safe vs. breaking), and propagate change impact to downstream applications (annotations, ML models, CDS rules).
 
 ### Maintainer/Standards body
 - Bubastis: EMBL-EBI SPOT team (GitHub EBISPOT/bubastis); integrated into BioPortal/OntoPortal, runs automatically per new ontology release.
@@ -578,12 +578,12 @@ Tools and methods to compare ontology versions, classify changes (effectual vs. 
 
 ### Tooling/Ecosystem maturity
 - ROBOT diff is stable and widely used in OBO release pipelines.
-- Bubastis (EBISPOT/bubastis) is mature, integrated into BioPortal/OntoPortal end points, runs automatically per ontology release.
+- Bubastis (EBISPOT/bubastis) mature, integrated into BioPortal/OntoPortal endpoints, runs automatically per ontology release.
 - KGCL is newer (2023–2025), part of OBO tooling roadmap; integrated with Ontobot (LLM-based change agent).
-- Hegde et al. (Database 2025) reports from a pre-publication community survey on ontology change tracking that 82% of ontology users rate staying informed about changes as "extremely or very important."
+- Hegde et al. (Database 2025) reports from a pre-publication community survey that 82% of ontology users rate staying informed about changes as "extremely or very important."
 
 ### Japan-specific considerations
-- DBCLS does not publish a Japanese-specific diff tool; uses ROBOT diff/Bubastis. TogoVar versioning uses dataset-level snapshots in named graphs. MEDIS-DC publishes versioned masters annually but does not provide formal diff tooling — third parties (HL7 Japan, MEDIS subscribers) compute deltas ad hoc.
+- DBCLS does not publish a Japanese-specific diff tool; uses ROBOT diff/Bubastis. TogoVar versioning uses dataset-level snapshots in named graphs. MEDIS-DC publishes versioned masters annually but provides no formal diff tooling — third parties (HL7 Japan, MEDIS subscribers) compute deltas ad hoc.
 
 ### Interoperability with other methods
 - Pairs with ROBOT/ODK release workflows.
@@ -596,7 +596,7 @@ Tools and methods to compare ontology versions, classify changes (effectual vs. 
 - Axiom-level diff produces noise; users want change operations.
 - Cross-format diffing (OBO vs. OWL/XML vs. Turtle) requires normalization first (ROBOT canonical).
 - No standard for FHIR Terminology change-impact analysis equivalent to KGCL.
-- Embedding-based ontology versions (vector indices) are not diffable at axiom level; "mind the change, bridge the gap" research (Babaei Giglou et al.) addresses this.
+- Embedding-based ontology versions (vector indices) not diffable at axiom level; "mind the change, bridge the gap" research (Babaei Giglou et al.) addresses this.
 
 ### Training data proxy
 - Moderate for ROBOT diff and Bubastis; low for KGCL (new). Stack Overflow presence minimal. Japanese: minimal.

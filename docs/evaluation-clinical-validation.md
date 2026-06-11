@@ -3,82 +3,78 @@
 ## 1. Gold-Standard Guideline-to-IR Corpus with Clinician/Formalist Adjudication
 
 ### Purpose
-Construct dual-annotated corpora of clinical practice guideline (CPG) text paired with formal intermediate representation (IR), to train, evaluate, and regression-test autoformalization pipelines and serve as a frozen "gold standard" for semantic equivalence judgments.
+Dual-annotated corpora of clinical practice guideline (CPG) text paired with formal intermediate representation (IR); train/evaluate/regression-test autoformalization pipelines; frozen "gold standard" for semantic equivalence judgments.
 
 ### Maintainer/Standards body
-No single steward. Reference precedents: GLIF3 (InterMed Collaboratory: Columbia, Harvard/Brigham & Women's, Stanford); Asbru library (Vienna University of Technology / Ben-Gurion University, Asgaard project); PROforma exemplars (Cancer Research UK ACL → OpenClinical.net / InferMed Arezzo / Oxford Tallis); EBM-NLP (Nye et al., ACL 2018; Northeastern / UT Austin / KCL); CPG-on-FHIR (HL7 CDS WG, package `hl7.fhir.uv.cpg#2.0.0` STU2, FHIR R4); GGPONC 2.0 (Charité / German Guideline Program in Oncology) for SNOMED-CT-grounded German oncology corpus.
+No single steward. Precedents: GLIF3 (InterMed Collaboratory: Columbia, Harvard/Brigham & Women's, Stanford); Asbru library (Vienna University of Technology / Ben-Gurion University, Asgaard project); PROforma exemplars (Cancer Research UK ACL → OpenClinical.net / InferMed Arezzo / Oxford Tallis); EBM-NLP (Nye et al., ACL 2018; Northeastern / UT Austin / KCL); CPG-on-FHIR (HL7 CDS WG, package `hl7.fhir.uv.cpg#2.0.0` STU2, FHIR R4); GGPONC 2.0 (Charité / German Guideline Program in Oncology), SNOMED-CT-grounded German oncology corpus.
 
 ### Conceptual model
-Each corpus item = `(source_passage, IR_artifact, provenance_metadata, adjudication_trace)`. Adjudication is two-stage: (a) independent annotation by ≥2 annotators (one clinical, one formal-methods); (b) adjudication by a third senior reviewer when disagreement exceeds threshold. IAA computed with Cohen's κ (two annotators, categorical), Fleiss' κ (≥3 annotators), Krippendorff's α (interval/missing data), or γ-agreement for span-level (GGPONC 2.0 reports γ = .94 on SNOMED-CT top-level annotation).
+Item = `(source_passage, IR_artifact, provenance_metadata, adjudication_trace)`. Two-stage adjudication: (a) independent annotation by ≥2 annotators (one clinical, one formal-methods); (b) third senior reviewer when disagreement exceeds threshold. IAA: Cohen's κ (two annotators, categorical), Fleiss' κ (≥3 annotators), Krippendorff's α (interval/missing data), γ-agreement for span-level (GGPONC 2.0 reports γ = .94 on SNOMED-CT top-level annotation).
 
 ### Expressiveness/Semantics
-Schema determined by target IR. JSON Schema for the IR annotation envelope + nested formal payload (e.g., CQL ELM, FHIR PlanDefinition/ActivityDefinition, GLIF3 flowchart node, Asbru plan, PROforma task network, OWL axiom, SMT-LIB, Lean term). Annotation captures: recommendation strength, GRADE certainty, deontic operator, temporal qualifier, eligibility constraint, action class, evidence citation, exception clauses.
+Schema = target IR. JSON Schema for IR annotation envelope + nested formal payload (CQL ELM, FHIR PlanDefinition/ActivityDefinition, GLIF3 flowchart node, Asbru plan, PROforma task network, OWL axiom, SMT-LIB, Lean term). Annotation captures: recommendation strength, GRADE certainty, deontic operator, temporal qualifier, eligibility constraint, action class, evidence citation, exception clauses.
 
 ### Composability/Modularity
-Items sliced at the recommendation / CQ (Clinical Question) granularity, aligning with Minds CQ structure. Corpus is composable across guideline pairs (enables Method 3 contradiction benchmarks) and across IR targets (multi-target reference allows comparing IR languages).
+Items sliced at recommendation / CQ (Clinical Question) granularity, aligning with Minds CQ structure. Composable across guideline pairs (enables Method 3 contradiction benchmarks) and across IR targets (multi-target reference compares IR languages).
 
 ### Suitability for autoformalization to IR
-Direct: this is the canonical evaluation substrate. Train/dev/test splits stratified by guideline, society, and recommendation type. Supports few-shot retrieval, supervised fine-tuning, RLHF reward modeling, and held-out integrity testing. EBM-NLP (4,993 abstracts; PICO spans; MIT license, GitHub `bepnye/EBM-NLP`) provides PICO-level supervision; CPG-on-FHIR pilots (WHO SMART Guidelines for ANC, immunizations; CDC opioid prescribing) provide whole-recommendation supervision.
+Direct: canonical evaluation substrate. Train/dev/test splits stratified by guideline, society, recommendation type. Supports few-shot retrieval, supervised fine-tuning, RLHF reward modeling, held-out integrity testing. EBM-NLP (4,993 abstracts; PICO spans; MIT license, GitHub `bepnye/EBM-NLP`) = PICO-level supervision; CPG-on-FHIR pilots (WHO SMART Guidelines for ANC, immunizations; CDC opioid prescribing) = whole-recommendation supervision.
 
 ### Formal verification potential
-Indirect. Corpus is the test oracle for downstream verification: each gold IR must itself type-check, parse, and pass round-trip identity under the IR's own conformance tools (e.g., CQL-to-ELM, FHIR `$validate`, Asbru parser). Verification of IR consistency is delegated to Methods 3 and 5.
+Indirect; corpus is test oracle for downstream verification. Each gold IR must type-check, parse, pass round-trip identity under the IR's own conformance tools (CQL-to-ELM, FHIR `$validate`, Asbru parser). IR-consistency verification delegated to Methods 3 and 5.
 
 ### Tooling/Ecosystem maturity
-Mature general NLP annotation tooling (brat, INCEpTION, Prodigy, Label Studio, MAE). Clinical-domain corpora published: EBM-NLP, GGPONC 2.0 (ACL Anthology 2022.lrec-1.389). Adjudication protocol patterns are well-established (TRUST process; iterative guideline refinement with intra-/inter-annotator F-measure ≥ 0.93 reported in clinical syntactic parsing work).
+Mature general NLP annotation tooling (brat, INCEpTION, Prodigy, Label Studio, MAE). Clinical-domain corpora published: EBM-NLP, GGPONC 2.0 (ACL Anthology 2022.lrec-1.389). Adjudication protocols established (TRUST process; iterative guideline refinement with intra-/inter-annotator F-measure ≥ 0.93 reported in clinical syntactic parsing work).
 
 ### Japan-specific considerations
-Minds (JCQHC) publishes `Minds 診療ガイドライン作成マニュアル 2020 Ver. 3.0`; recommendations are structured at the CQ level following GRADE. No publicly released JSON/XML schema for Minds diagnostic guidelines was located. Society guidelines (e.g., JCS/JHFS 2025 Heart Failure Guideline, published in full-text XML on J-STAGE) are candidate raw inputs. JP Core v1.2.0 (released December 2024 by the JAMI NeXEHRS Academic Research Group) provides Japan-localized FHIR profiles for the IR target side. AMED funding mechanisms (e.g., the program that has supported JRS J-MID since 2017) are the realistic pathway for corpus construction; no AMED-funded autoformalization-of-CPG project (2022–2025) was specifically identified. JCQHC adjudication infrastructure (Minds peer review committees) is a natural fit for clinician annotation.
+Minds (JCQHC) publishes `Minds 診療ガイドライン作成マニュアル 2020 Ver. 3.0`; recommendations structured at CQ level following GRADE. No public JSON/XML schema for Minds diagnostic guidelines located. Society guidelines (JCS/JHFS 2025 Heart Failure Guideline, full-text XML on J-STAGE) are candidate raw inputs. JP Core v1.2.0 (released December 2024 by JAMI NeXEHRS Academic Research Group) = Japan-localized FHIR profiles for IR target side. AMED funding (e.g. program supporting JRS J-MID since 2017) is the realistic corpus-construction pathway; no AMED-funded autoformalization-of-CPG project (2022–2025) specifically identified. JCQHC adjudication infrastructure (Minds peer review committees) fits clinician annotation.
 
 ### Interoperability
-Output IR fields map to: Category 1 FHIR R4 (PlanDefinition, ActivityDefinition, Library, Measure); CQL ELM; openEHR archetypes; Category 2 OWL/SHACL ontology bindings (SNOMED CT, LOINC, ICD-10/11, JLAC10, YJ codes); Category 3 deontic and defeasible logic literals; Category 4 Lean/Rocq/Isabelle term constructors; Category 5 SMT-LIB; Category 6 retrieval signals. Provenance fields (BPMN/DMN traces) link to Category 8.
+IR fields map to: Category 1 FHIR R4 (PlanDefinition, ActivityDefinition, Library, Measure), CQL ELM, openEHR archetypes; Category 2 OWL/SHACL ontology bindings (SNOMED CT, LOINC, ICD-10/11, JLAC10, YJ codes); Category 3 deontic and defeasible logic literals; Category 4 Lean/Rocq/Isabelle term constructors; Category 5 SMT-LIB; Category 6 retrieval signals. Provenance fields (BPMN/DMN traces) link to Category 8.
 
 ### Limitations/Known issues
-Annotation cost (clinical + formalist labor); IAA degrades on long, ambiguous, deontically-rich passages; GLIF3 and Asbru never produced a large public annotated corpus; PROforma exemplars (CREDO, LISA, ORAMA) are small. Selection bias toward English-language CPGs. Risk of "schema lock-in" — the choice of IR shapes future annotations.
+Annotation cost (clinical + formalist labor); IAA degrades on long, ambiguous, deontically-rich passages; GLIF3 and Asbru never produced a large public annotated corpus; PROforma exemplars (CREDO, LISA, ORAMA) are small. Selection bias toward English-language CPGs. "Schema lock-in" — IR choice shapes future annotations.
 
 ### Training data proxy
 Moderate. GitHub (`bepnye/EBM-NLP`, `cqframework/`, `HL7/cqf-recommendations`), AMIA / MedInfo / JAMIA / npj Digital Medicine / JBI literature; weaker for Japanese (J-STAGE 医療情報学雑誌, JAMI proceedings).
 
----
-
 ## 2. Semantic Equivalence, Idempotency, and Convergence Benchmarks
 
 ### Purpose
-Quantify multi-run consistency of LLM autoformalization: same input → same (or semantically equivalent) IR across runs, prompt paraphrases, and model versions.
+Quantify multi-run consistency of LLM autoformalization: same input → same (or semantically equivalent) IR across runs, prompt paraphrases, model versions.
 
 ### Maintainer/Standards body
-No formal body. Methodological precedents: ProofNet (Azerbayev et al., arXiv:2302.12433, Lean 3 + mathlib, 371 parallel statement–proof items); FormalAlign (arXiv:2410.10135, dual-loss alignment scoring; reported Alignment-Selection Score 99.21% vs GPT-4 88.91% on FormL4-Basic); BEq / BEq+ (Poiroux, Weiss, Kunčak, Bosselut, arXiv:2406.07222, "Reliable Evaluation and Benchmarks for Statement Autoformalization"; reference-based metric correlated with human eval; current techniques achieve up to 45.1% on undergraduate-math autoformalization); ProofNetVerif (labeled correct/incorrect autoformalization pairs).
+No formal body. Precedents: ProofNet (Azerbayev et al., arXiv:2302.12433, Lean 3 + mathlib, 371 parallel statement–proof items); FormalAlign (arXiv:2410.10135, dual-loss alignment scoring; Alignment-Selection Score 99.21% vs GPT-4 88.91% on FormL4-Basic); BEq / BEq+ (Poiroux, Weiss, Kunčak, Bosselut, arXiv:2406.07222, "Reliable Evaluation and Benchmarks for Statement Autoformalization"; reference-based metric correlated with human eval; current techniques up to 45.1% on undergraduate-math autoformalization); ProofNetVerif (labeled correct/incorrect autoformalization pairs).
 
 ### Conceptual model
-Run autoformalizer N times on identical input. Metrics: (i) syntactic identity rate, (ii) AST-level graph-isomorphism rate over canonicalized IR, (iii) logical-equivalence rate via ATP / SMT under a shared theory, (iv) embedding-cosine + neural alignment (FormalAlign-style), (v) idempotency = `f(f(x)) ≡ f(x)`, (vi) round-trip = `informalize(formalize(x)) ≈ x`. Convergence rate = fraction of runs landing in the dominant equivalence class. Test-retest reliability via Krippendorff's α on categorical IR features.
+Run autoformalizer N times on identical input. Metrics: (i) syntactic identity rate, (ii) AST-level graph-isomorphism rate over canonicalized IR, (iii) logical-equivalence rate via ATP / SMT under shared theory, (iv) embedding-cosine + neural alignment (FormalAlign-style), (v) idempotency = `f(f(x)) ≡ f(x)`, (vi) round-trip = `informalize(formalize(x)) ≈ x`. Convergence rate = fraction of runs in dominant equivalence class. Test-retest reliability via Krippendorff's α on categorical IR features.
 
 ### Expressiveness/Semantics
-Equivalence is theory-relative. Surface-string equivalence < α-equivalence < β-η-equivalence < first-order logical equivalence < theory-modulo equivalence (SMT, ASP). BLEU/BERTScore are explicitly inadequate for formal-language equivalence.
+Equivalence is theory-relative: surface-string < α-equivalence < β-η-equivalence < first-order logical equivalence < theory-modulo equivalence (SMT, ASP). BLEU/BERTScore explicitly inadequate for formal-language equivalence.
 
 ### Composability/Modularity
-Composable with Method 1 (gold corpus) for reference-based equivalence (BEq+), and with Method 5 (metamorphic relations) where idempotency is itself an MR. Pluggable equivalence checkers: SMT solver (Z3, cvc5), tactic-based proof (Lean `decide`, `omega`), ELM AST normalizer, OWL reasoner (HermiT, Pellet).
+Composable with Method 1 (gold corpus) for reference-based equivalence (BEq+), and Method 5 (idempotency is itself an MR). Pluggable equivalence checkers: SMT solver (Z3, cvc5), tactic-based proof (Lean `decide`, `omega`), ELM AST normalizer, OWL reasoner (HermiT, Pellet).
 
 ### Suitability for autoformalization to IR
-Central. Idempotency is the operational success criterion specified by the user. Convergence rate is a direct optimization target. FormalAlign-style alignment training and BEq+ reference-based scoring are directly portable substrates.
+Central. Idempotency = operational success criterion specified by the user. Convergence rate = direct optimization target. FormalAlign-style alignment training and BEq+ reference-based scoring directly portable.
 
 ### Formal verification potential
-High — equivalence checking is itself a verification task; passes through SAT/SMT/ATP. False-equivalence risk (incomplete proof procedure → conservative inequality).
+High — equivalence checking is itself verification; via SAT/SMT/ATP. False-equivalence risk (incomplete proof procedure → conservative inequality).
 
 ### Tooling/Ecosystem maturity
 Mature for math (Lean mathlib, ProofNet); immature for clinical IR. CQL-to-ELM canonicalization exists but no consensus semantic-equivalence benchmark for clinical guidelines. FHIR `$validate` is structural, not semantic.
 
 ### Japan-specific considerations
-No Japanese-language autoformalization benchmark identified. JAMI / JSAI / 言語処理学会 venues are appropriate publication outlets; PMDA's 2024 "Report on AI-based SaMD" (PMDA file 000266100) emphasises transparency, data quality and reproducibility — idempotency metrics directly support PMDA reproducibility expectations.
+No Japanese-language autoformalization benchmark identified. JAMI / JSAI / 言語処理学会 = publication outlets; PMDA's 2024 "Report on AI-based SaMD" (PMDA file 000266100) emphasises transparency, data quality and reproducibility — idempotency metrics directly support PMDA reproducibility expectations.
 
 ### Interoperability
-Equivalence checkers consume Category 4 (Lean, Isabelle, Rocq) and Category 5 (SMT-LIB, ASP) backends. AST canonicalization layers attach to Category 1 IRs. Test harness can emit Category 8 traces (BPMN/DMN execution paths).
+Equivalence checkers consume Category 4 (Lean, Isabelle, Rocq) and Category 5 (SMT-LIB, ASP) backends. AST canonicalization layers attach to Category 1 IRs. Harness can emit Category 8 traces (BPMN/DMN execution paths).
 
 ### Limitations/Known issues
-Logical equivalence is undecidable in general; theory-restricted decision procedures must be chosen. ATP timeouts conflate "different" with "unproved equivalent". Embedding metrics (BERTScore, BLEU) systematically over-reward surface similarity.
+Logical equivalence undecidable in general; theory-restricted decision procedures must be chosen. ATP timeouts conflate "different" with "unproved equivalent". Embedding metrics (BERTScore, BLEU) systematically over-reward surface similarity.
 
 ### Training data proxy
 Strong in AI/math (ProofNet, FormalAlign, MiniF2F on arXiv, NeurIPS, ICLR). Weak in clinical NLP — gap to be filled.
-
----
 
 ## 3. Contradiction/Collision Benchmark with Synthetic and Real Cross-Guideline Cases
 
@@ -86,19 +82,19 @@ Strong in AI/math (ProofNet, FormalAlign, MiniF2F on arXiv, NeurIPS, ICLR). Weak
 Measure precision/recall of contradiction detection between recommendations from two or more guidelines covering overlapping clinical territory (multimorbidity, drug-drug interaction, screening thresholds, anticoagulation/antiplatelet regimens, oncology dosing).
 
 ### Maintainer/Standards body
-Research-community-driven. Key precedents: GLINDA (Stanford BMIR + VA, Musen/Tu; combined BioSTORM with ATHENA-EON; demonstrated on JNC-7 + VA CKD); the BPMN-derived constraint-solver framework for multimorbidity polypharmacy (PMC6993806); the disagreement-detection system between guidelines and new evidence (PMC8861732, oncology trial-vs-guideline detection); contradiction modeling (arXiv:1708.00850, mammography ACOG vs USPSTF case study). Note: GLINDA (Stanford) and GLIDE (McMaster/Yale, Shiffman et al.) are distinct projects often conflated in the literature.
+Research-community-driven. Precedents: GLINDA (Stanford BMIR + VA, Musen/Tu; combined BioSTORM with ATHENA-EON; demonstrated on JNC-7 + VA CKD); BPMN-derived constraint-solver framework for multimorbidity polypharmacy (PMC6993806); disagreement-detection between guidelines and new evidence (PMC8861732, oncology trial-vs-guideline detection); contradiction modeling (arXiv:1708.00850, mammography ACOG vs USPSTF case study). GLINDA (Stanford) and GLIDE (McMaster/Yale, Shiffman et al.) are distinct projects often conflated in the literature.
 
 ### Conceptual model
-Benchmark = `{(guideline_pair, patient_context, expected_conflict_label, expected_resolution)}`. Sources: (a) synthetic pairs generated by perturbing single guidelines (negation, threshold shift, eligibility narrowing); (b) curated real-world pairs (AHA vs ESC anticoagulation, ACOG vs USPSTF mammography, JCS vs ESC heart failure, ASCO vs ESMO oncology). Metrics: precision, recall, F1 on contradiction class; resolution-suggestion accuracy; clinician utility rating.
+Benchmark = `{(guideline_pair, patient_context, expected_conflict_label, expected_resolution)}`. Sources: (a) synthetic pairs from perturbing single guidelines (negation, threshold shift, eligibility narrowing); (b) curated real-world pairs (AHA vs ESC anticoagulation, ACOG vs USPSTF mammography, JCS vs ESC heart failure, ASCO vs ESMO oncology). Metrics: precision, recall, F1 on contradiction class; resolution-suggestion accuracy; clinician utility rating.
 
 ### Expressiveness/Semantics
 Conflicts decomposed into: direct (logical negation), action (drug A vs drug B simultaneously), temporal (incompatible ordering), threshold (different cutoffs on same variable), epistemic (different evidence grading). Captured in defeasible/deontic logic (Category 3) or as constraint-system violations.
 
 ### Composability/Modularity
-Pairs constructed from Method 1 corpus items. Conflict detectors are plug-in modules over the IR — SMT for threshold/arithmetic, ASP for normative conflicts, OWL reasoning for ontological inconsistency, BPMN/DMN simulators for workflow clashes.
+Pairs constructed from Method 1 corpus items. Conflict detectors plug in over the IR — SMT for threshold/arithmetic, ASP for normative conflicts, OWL reasoning for ontological inconsistency, BPMN/DMN simulators for workflow clashes.
 
 ### Suitability for autoformalization to IR
-A primary downstream validation task: if the IR is correct, contradictions must be detectable mechanically. Negative results indicate either autoformalization failure or genuine guideline incompatibility.
+Primary downstream validation: if the IR is correct, contradictions must be detectable mechanically. Negative results indicate either autoformalization failure or genuine guideline incompatibility.
 
 ### Formal verification potential
 Highest of any Category-9 method. Native to SMT/SAT/ASP and theorem provers. The PMC6993806 framework demonstrates constraint-solver-based conflict detection with a metric for selecting "best" resolutions.
@@ -107,7 +103,7 @@ Highest of any Category-9 method. Native to SMT/SAT/ASP and theorem provers. The
 Low: no widely-adopted public benchmark. TREAT (Treat Acutely) and similar projects are localized. Most published work uses ad-hoc two-guideline pairs.
 
 ### Japan-specific considerations
-Critical for Japan: Japanese society guidelines (JCS, JSH, JDS, JSN, JGES, JSCO) often diverge from ESC/AHA/ASCO due to population-specific evidence (e.g., DOAC dosing thresholds for low-body-weight Japanese patients, JCS atrial fibrillation guidance vs ESC). The CDS must adjudicate or surface these. Minds CQ structure facilitates pair construction. JADER (PMDA, publicly downloadable CSV since 2012) provides empirical DDI grounding.
+Critical for Japan: Japanese society guidelines (JCS, JSH, JDS, JSN, JGES, JSCO) often diverge from ESC/AHA/ASCO due to population-specific evidence (e.g. DOAC dosing thresholds for low-body-weight Japanese patients, JCS atrial fibrillation guidance vs ESC). The CDS must adjudicate or surface these. Minds CQ structure facilitates pair construction. JADER (PMDA, publicly downloadable CSV since 2012) provides empirical DDI grounding.
 
 ### Interoperability
 Consumes Categories 1–5 IRs; emits explanations consumable by Category 7 (retrieval/citation) and Category 10 (explanation evaluation). DDI cross-checking integrates with HL7 CDS Hooks `medication-prescribe` hook.
@@ -117,8 +113,6 @@ Ground-truth "true contradiction" labels require senior clinician adjudication a
 
 ### Training data proxy
 Moderate. JAMIA, JBI, AIME (CIG workshop series), AMIA proceedings. Drug-interaction conflicts well-covered in pharmacovigilance literature; oncology and cardiology guideline-harmonization literature exists.
-
----
 
 ## 4. CQL/FHIR/DMN Conformance and Unit-Test Suites
 
@@ -137,7 +131,7 @@ Mechanically verify that an IR (or its execution engine) conforms to standard sp
 Black-box conformance: `(spec_section_id, test_input, expected_output, tolerance)`. BDD layer (Cucumber / Gherkin) wraps "Given–When–Then" patient scenarios. Inferno's Ruby DSL adds `assert_conformance_to_logical_model`, `assert_must_support_elements_present`, `resource_is_valid?`.
 
 ### Expressiveness/Semantics
-CQL: full HL7-specified semantics (set/list/interval, temporal, terminology operators). FHIR: structural + Must-Support + terminology binding. DMN: FEEL expressions + decision-table hit policies. All are deterministic and finitely-decidable.
+CQL: full HL7-specified semantics (set/list/interval, temporal, terminology operators). FHIR: structural + Must-Support + terminology binding. DMN: FEEL expressions + decision-table hit policies. All deterministic and finitely-decidable.
 
 ### Composability/Modularity
 Highly modular: each test case is a self-contained file. Inferno Test Kits compose into Test Suites; DMN TCK tests target specific FEEL constructs.
@@ -163,18 +157,16 @@ Conformance ≠ clinical correctness. Inferno tests check IG conformance, not pa
 ### Training data proxy
 Strong (CQL/FHIR/DMN heavily represented on GitHub; HL7 Confluence; AMIA Clinical Informatics Conference 2025 posters reference these).
 
----
-
 ## 5. Metamorphic and Property-Based Tests for Guideline-to-IR Transformations
 
 ### Purpose
 Generate test cases via metamorphic relations (MRs) and randomized property-based generators; detect autoformalizer faults without an oracle.
 
 ### Maintainer/Standards body
-Methodological foundations: Chen, Cheung, Yiu (1998) for metamorphic testing; QuickCheck (Claessen & Hughes 2000, Haskell) → Hypothesis (David MacIver, Python), fast-check (TypeScript), ScalaCheck. METAL framework (arXiv:2312.06056) and follow-ups (arXiv:2511.02108 — extending MT to LLMs across NLP tasks; arXiv:2603.24774 — MT-LLM survey "From Untestable to Testable"; arXiv:2406.06864 — "Validating LLM-Generated Programs with Metamorphic Prompt Testing") extend MT to LLMs.
+Foundations: Chen, Cheung, Yiu (1998) for metamorphic testing; QuickCheck (Claessen & Hughes 2000, Haskell) → Hypothesis (David MacIver, Python), fast-check (TypeScript), ScalaCheck. METAL framework (arXiv:2312.06056) and follow-ups (arXiv:2511.02108 — extending MT to LLMs across NLP tasks; arXiv:2603.24774 — MT-LLM survey "From Untestable to Testable"; arXiv:2406.06864 — "Validating LLM-Generated Programs with Metamorphic Prompt Testing") extend MT to LLMs.
 
 ### Conceptual model
-Define metamorphic relations: paraphrase invariance (`f(paraphrase(x)) ≡ f(x)`); idempotency (`f(f(x)) ≡ f(x)`); commutativity of merging unrelated CQs; monotonicity of recommendation strength under stricter eligibility; associativity of conjunctive eligibility. Property generators sample synthetic CQs and check invariants over thousands of runs. The MT-LLM survey reports a manually-validated true-positive rate of ~62% across 937 oracle violations.
+MRs: paraphrase invariance (`f(paraphrase(x)) ≡ f(x)`); idempotency (`f(f(x)) ≡ f(x)`); commutativity of merging unrelated CQs; monotonicity of recommendation strength under stricter eligibility; associativity of conjunctive eligibility. Property generators sample synthetic CQs and check invariants over thousands of runs. The MT-LLM survey reports a manually-validated true-positive rate of ~62% across 937 oracle violations.
 
 ### Expressiveness/Semantics
 MRs express necessary conditions on transformation, not full specification. Property tests cover Hyland-style preconditions/postconditions. Strong for robustness/fairness; weak for semantic correctness without an oracle.
@@ -183,7 +175,7 @@ MRs express necessary conditions on transformation, not full specification. Prop
 Highly composable: MRs are first-class objects, parametrized over input distributions, transformation operators, and equivalence predicates.
 
 ### Suitability for autoformalization to IR
-Direct fit. Idempotency (a stated success criterion) is implementable as an MR. Paraphrase invariance tests robustness to Japanese ↔ English rendering or to surface variation in Minds CQ phrasing. Property-based testing fits clinical-rule evaluators: recommendation-strength monotonicity under eligibility tightening, etc.
+Direct fit. Idempotency (a stated success criterion) implementable as an MR. Paraphrase invariance tests robustness to Japanese ↔ English rendering or to surface variation in Minds CQ phrasing. Property-based testing fits clinical-rule evaluators: recommendation-strength monotonicity under eligibility tightening, etc.
 
 ### Formal verification potential
 MRs are sound necessary-condition checks. Property tests do not constitute formal verification but increase coverage and fault-discovery rate. Per arXiv:2406.06864 ("Validating LLM-Generated Programs with Metamorphic Prompt Testing"): "metamorphic prompt testing is able to detect 75% of the erroneous programs generated by GPT-4, with a false positive rate of 8.6%" on HumanEval.
@@ -202,8 +194,6 @@ False-positive rate ~38% in published LLM-MT studies; MR design is itself a rese
 
 ### Training data proxy
 Strong in software-engineering literature (ICSE, ISSTA, ICSME, ASE); growing in NLP (ACL, EMNLP); thin in clinical-MT.
-
----
 
 ## 6. Shadow-Mode / Silent-Trial CDS Evaluation
 
@@ -243,15 +233,13 @@ Selection bias if shadow population differs from intended deployment; "label lea
 ### Training data proxy
 Moderate (JAMIA, NEJM Catalyst, Nat Med, npj Digital Medicine).
 
----
-
 ## 7. Alert-Fatigue Mitigation and Tiered Alert Governance
 
 ### Purpose
 Reduce nuisance alerting (overall pooled DDI override prevalence of 90%, CI95% 85–95%, across 11 studies and 570,776 prescriptions per Felisberto et al., Health Informatics Journal 2024;30(2), doi:10.1177/14604582241263242) by tiering severity, suppressing low-value alerts, and instituting alert governance.
 
 ### Maintainer/Standards body
-Methodological precedents: Ancker JS, Edwards A, Nosal S, Hauser D, Mauer E, Kaushal R. "Effects of workload, work complexity, and repeated alerts on alert fatigue in a clinical decision support system." BMC Med Inform Decis Mak 2017;17:36 (doi:10.1186/s12911-017-0430-8); Phansalkar, van der Sijs, Tucker et al., JAMIA 2013;20(3):489–93 (consensus list of 33 class-based low-priority DDIs that should be non-interruptive); van der Sijs et al. JAMIA 2008;15:439 ("Turning off frequently overridden drug alerts: limited opportunities for doing it safely"); Bates/Kuperman ten commandments (JAMIA 2003;10(6):523–30); I-MeDeSA instrument (Zachariah et al., JAMIA 2011 Suppl 1:i62). CDS Hooks (HL7 STU2 v2.0.1, March 2025; CC-BY-4.0) provides "information card", "suggestion card", "app link card" types as a tiering mechanism.
+Precedents: Ancker JS, Edwards A, Nosal S, Hauser D, Mauer E, Kaushal R. "Effects of workload, work complexity, and repeated alerts on alert fatigue in a clinical decision support system." BMC Med Inform Decis Mak 2017;17:36 (doi:10.1186/s12911-017-0430-8); Phansalkar, van der Sijs, Tucker et al., JAMIA 2013;20(3):489–93 (consensus list of 33 class-based low-priority DDIs that should be non-interruptive); van der Sijs et al. JAMIA 2008;15:439 ("Turning off frequently overridden drug alerts: limited opportunities for doing it safely"); Bates/Kuperman ten commandments (JAMIA 2003;10(6):523–30); I-MeDeSA instrument (Zachariah et al., JAMIA 2011 Suppl 1:i62). CDS Hooks (HL7 STU2 v2.0.1, March 2025; CC-BY-4.0) provides "information card", "suggestion card", "app link card" types as a tiering mechanism.
 
 ### Conceptual model
 Three-tier (or four-tier) design: hard-stop (must acknowledge with override reason) / soft-stop (interruptive but dismissible) / informational (non-interruptive, in-line). Governance committee reviews override rates, false-positive rates, time-to-action, and alert-to-action ratio. Contextual relevance scoring multiplies a base severity by patient-context factors.
@@ -272,7 +260,7 @@ Low; tiering is a policy decision. Can be checked for consistency (no rule both 
 Mature in commercial EHRs (Epic, Cerner). Open: CDS Hooks library `hl7.fhir.uv.cds-hooks-library` v1.0.1 (R4, generated 2025-03-12). Governance practices documented but not standardized.
 
 ### Japan-specific considerations
-Japanese hospital adoption of DDI knowledge bases (e.g., JAPIC, IMSpro) varies; PMDA-regulated SaMD must follow IEC 62366-1 usability requirements when interruptive alerts are involved. JADER can inform localized priority of DDI alerts. AAMI HE75:2025 alignment with FDA HF expectations affects design of Japan-marketed SaMD as well.
+Japanese hospital adoption of DDI knowledge bases (e.g. JAPIC, IMSpro) varies; PMDA-regulated SaMD must follow IEC 62366-1 usability requirements when interruptive alerts are involved. JADER can inform localized priority of DDI alerts. AAMI HE75:2025 alignment with FDA HF expectations affects design of Japan-marketed SaMD as well.
 
 ### Interoperability
 Receives Category 3 deontic/argumentation severity; emits via CDS Hooks (Category 1). Override-rate metrics feed Category 12 RE-AIM Implementation dimension.
@@ -283,18 +271,16 @@ Receives Category 3 deontic/argumentation severity; emits via CDS Hooks (Categor
 ### Training data proxy
 Strong (JAMIA, Health Affairs, AMIA Annual Symposium proceedings).
 
----
-
 ## 8. CDS Five Rights
 
 ### Purpose
-Apply Osheroff et al.'s five-dimensional design heuristic to ensure CDS interventions deliver the right information, to the right person, in the right format, through the right channel, at the right time.
+Apply Osheroff et al.'s five-dimensional design heuristic to deliver the right information, to the right person, in the right format, through the right channel, at the right time.
 
 ### Maintainer/Standards body
 Originated by Jerome Osheroff et al. (HIMSS guidebook "Improving Outcomes with Clinical Decision Support: An Implementer's Guide," 2nd ed., 2012); endorsed by AHRQ (CDS Connect); CMS recommends the framework as best practice for health-IT-enabled QI.
 
 ### Conceptual model
-A configuration space spanned by five orthogonal axes: information (evidence-based, actionable), person (clinician/patient/caregiver/care-team), format (alert/order set/info button/dashboard/storyboard BPA), channel (EHR/portal/mobile/SMS), time (pre-encounter/at-order/post-result/longitudinal).
+Five orthogonal axes: information (evidence-based, actionable), person (clinician/patient/caregiver/care-team), format (alert/order set/info button/dashboard/storyboard BPA), channel (EHR/portal/mobile/SMS), time (pre-encounter/at-order/post-result/longitudinal).
 
 ### Expressiveness/Semantics
 Heuristic, not formal. Operationalized via CDS/QI Worksheets and Health Service Blueprints.
@@ -323,8 +309,6 @@ Imprecise definitions; not a substitute for usability engineering. Conflated wit
 ### Training data proxy
 Strong (AHRQ documents, AMIA, HIMSS).
 
----
-
 ## 9. Human Factors Engineering and ISO 9241-210 User-Centered Design
 
 ### Purpose
@@ -334,16 +318,16 @@ Apply the human-centred design process to reduce use-error risk and improve usab
 ISO 9241-210:2019 (Ergonomics of human-system interaction — Part 210: Human-centred design for interactive systems; ISO TC 159/SC 4); IEC 62366-1:2015 +A1:2020 / ANSI/AAMI/IEC 62366-1:2015 (R2021)+AMD1:2020 (Medical devices — Application of usability engineering); ANSI/AAMI HE75:2009 (R2018), updated as HE75:2025 (maps HFE activities to design controls per AAMI TIR59); ISO 14971:2019 (risk-management linkage). JIS Z 8520:2022 is the Japanese national adoption (IDT translation) of ISO 9241-110:2020 "Interaction principles" (replacing the earlier JIS Z 8520:2008 "Dialogue principles"); JIS Z 8521 corresponds to ISO 9241-11.
 
 ### Conceptual model
-Iterative loop: (1) understand context of use → (2) specify user requirements → (3) produce design solutions → (4) evaluate against requirements. Evaluation modalities: formative (during design) and summative (validation). Specific techniques: HFMEA, cognitive walkthrough, think-aloud, NASA-TLX (workload), SUS, usability testing with ≥15 participants per user group.
+Iterative loop: (1) understand context of use → (2) specify user requirements → (3) produce design solutions → (4) evaluate against requirements. Modalities: formative (during design) and summative (validation). Techniques: HFMEA, cognitive walkthrough, think-aloud, NASA-TLX (workload), SUS, usability testing with ≥15 participants per user group.
 
 ### Expressiveness/Semantics
-Process standard, not product standard. Outputs include Use Specification, User Interface Specification, Known Use Errors, Usability Engineering File (UEF), URRA (use-related risk analysis).
+Process standard, not product standard. Outputs: Use Specification, User Interface Specification, Known Use Errors, Usability Engineering File (UEF), URRA (use-related risk analysis).
 
 ### Composability/Modularity
 Modular activities; HE75:2025 explicitly maps HFE activities to medical-device design controls.
 
 ### Suitability for autoformalization to IR
-Indirect; HFE governs the human-facing surface of the CDS, not the IR itself. However, IR fields should support generation of formative-evaluation artifacts (use-case scripts, error scenarios).
+Indirect; HFE governs the human-facing surface of the CDS, not the IR itself. IR fields should support generation of formative-evaluation artifacts (use-case scripts, error scenarios).
 
 ### Formal verification potential
 None.
@@ -363,18 +347,16 @@ Resource-intensive; small-N summative tests under-power statistical claims; LLM-
 ### Training data proxy
 Strong (AAMI, IEC, ISO documents; JEITA Healthcare IT Committee publications).
 
----
-
 ## 10. Explanation Quality Evaluation: Traceability, Proof Readability, Clinical Actionability
 
 ### Purpose
-Rate the quality of CDS explanations along axes of citation precision, proof/derivation readability, clinical actionability, and decision-time utility.
+Rate CDS explanation quality along axes of citation precision, proof/derivation readability, clinical actionability, and decision-time utility.
 
 ### Maintainer/Standards body
-No standard. Methodological inputs: G-Eval (Liu et al., "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment", EMNLP 2023, arXiv:2303.16634; LLM-as-judge with chain-of-thought, log-probability-weighted scoring; Spearman 0.514 on summarization SummEval); MedThink-Bench with LLM-w-Rationale (Pearson r up to 0.87 vs. expert evaluation at 1.4% of evaluation time, npj Digital Medicine 2025/2026, PMC12796170, doi:10.1038/s41746-025-02208-7); Naproche/Naproche-SAD (controlled-NL proof checker, Cramer et al.); ForTheL (formal-theory-language for natural-style mathematics).
+No standard. Inputs: G-Eval (Liu et al., "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment", EMNLP 2023, arXiv:2303.16634; LLM-as-judge with chain-of-thought, log-probability-weighted scoring; Spearman 0.514 on summarization SummEval); MedThink-Bench with LLM-w-Rationale (Pearson r up to 0.87 vs. expert evaluation at 1.4% of evaluation time, npj Digital Medicine 2025/2026, PMC12796170, doi:10.1038/s41746-025-02208-7); Naproche/Naproche-SAD (controlled-NL proof checker, Cramer et al.); ForTheL (formal-theory-language for natural-style mathematics).
 
 ### Conceptual model
-Multi-dimensional rubric per explanation: (a) citation precision (% statements with verifiable, correct source), (b) proof readability (controlled-NL score; cyclomatic complexity of derivation; expert Likert), (c) clinical actionability (Likert: would the explanation change my action?), (d) faithfulness (does the explanation reflect the IR's actual reasoning, not post-hoc rationalization?), (e) decision-time efficiency (seconds-to-comprehend).
+Per-explanation rubric: (a) citation precision (% statements with verifiable, correct source), (b) proof readability (controlled-NL score; cyclomatic complexity of derivation; expert Likert), (c) clinical actionability (Likert: would the explanation change my action?), (d) faithfulness (does the explanation reflect the IR's actual reasoning, not post-hoc rationalization?), (e) decision-time efficiency (seconds-to-comprehend).
 
 ### Expressiveness/Semantics
 Mix of automatable (citation match, lexical overlap with IR predicates) and human-judgment metrics. G-Eval and LLM-w-Rationale provide scalable proxies but suffer from position bias and verbosity bias (per "The Silent Judge", arXiv:2509.26072).
@@ -402,8 +384,6 @@ LLM-judge calibration drifts across model versions; explanations risk plausible-
 
 ### Training data proxy
 Moderate (NeurIPS, EMNLP, ACL; npj Digital Medicine — MedThink-Bench).
-
----
 
 ## 11. Equity, Subgroup, External-Validation, and Calibration Analyses
 
@@ -443,8 +423,6 @@ TRIPOD+AI compliance in published literature remains incomplete: Singh (Cureus 2
 ### Training data proxy
 Strong (BMJ, Nat Med, npj Digital Medicine, JAMIA).
 
----
-
 ## 12. Implementation Science Frameworks: CFIR, NASSS, RE-AIM
 
 ### Purpose
@@ -462,7 +440,7 @@ CFIR — Damschroder et al., Implement Sci 2009;4:50 (doi:10.1186/1748-5908-4-50
 Qualitative determinant frameworks (CFIR, NASSS) + mixed-method outcome framework (RE-AIM). Often used jointly: CFIR/NASSS to diagnose facilitators/barriers; RE-AIM to quantify impact.
 
 ### Composability/Modularity
-Frameworks are commonly combined (RE-AIM + CFIR for CDS implementation per the Breathewell study, PMC7063029; NASSS-informed CDS scoping review, PMC10373265). Each construct/dimension is independently assessable.
+Frameworks commonly combined (RE-AIM + CFIR for CDS implementation per the Breathewell study, PMC7063029; NASSS-informed CDS scoping review, PMC10373265). Each construct/dimension is independently assessable.
 
 ### Suitability for autoformalization to IR
 Not applicable to IR construction; applicable to system deployment. NASSS specifically flags "embedding & adaptation over time" — relevant for autoformalization pipelines requiring periodic re-formalization as guidelines update.
@@ -474,7 +452,7 @@ None.
 Mature: re-aim.org, CFIR Guide (cfirguide.org), NASSS-CAT instrument for complexity assessment.
 
 ### Japan-specific considerations
-Japanese healthcare delivery has distinct constraints: universal insurance with biennial fee-schedule revision (診療報酬改定) materially affects CDS adoption economics; high physician autonomy and society-guideline authority shape inner-setting culture; consolidating role of Designated Functional Hospitals (特定機能病院). MHLW Society 5.0 / 医療DX推進本部 sets national digital-transformation goals. AMED implementation-science funding tracks exist. Sustainability (RE-AIM Maintenance, NASSS Embedding) is sharply constrained by reimbursement coverage of SaMD (Dash for SaMD2 includes reimbursement-pathway updates).
+Distinct constraints: universal insurance with biennial fee-schedule revision (診療報酬改定) materially affects CDS adoption economics; high physician autonomy and society-guideline authority shape inner-setting culture; consolidating role of Designated Functional Hospitals (特定機能病院). MHLW Society 5.0 / 医療DX推進本部 sets national digital-transformation goals. AMED implementation-science funding tracks exist. Sustainability (RE-AIM Maintenance, NASSS Embedding) is sharply constrained by reimbursement coverage of SaMD (Dash for SaMD2 includes reimbursement-pathway updates).
 
 ### Interoperability
 Outputs link to Category 8 (BPMN/workflow embedding), Category 11 (RE-AIM Effectiveness aligns with TRIPOD/CONSORT outcome reporting), Category 10 (NASSS Adopters dimension shapes explanation requirements).
