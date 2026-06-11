@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>CKC M2 PoC</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 1rem 1.25rem 3rem; color: #1c1c1c; background: #fff; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; border-bottom: 2px solid #222; padding-bottom: .5rem; }
+h1 { font-size: 1.35rem; margin: 0; }
+h2 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; border-bottom: 1px solid #ccc; padding-bottom: .2rem; }
+h3 { font-size: .95rem; margin: .2rem 0 .4rem; }
+.hctl { display: flex; align-items: baseline; gap: .75rem; }
+#runid { font-family: ui-monospace, monospace; font-size: .85rem; color: #555; }
+.lang { display: inline-flex; gap: .25rem; }
+.lang button { border: 1px solid #888; background: #f5f5f5; padding: .15rem .6rem; cursor: pointer; font: inherit; }
+.lang button.active { background: #222; color: #fff; border-color: #222; }
+#error { border: 2px solid #b3261e; background: #fdecea; color: #5f1410; padding: .8rem 1rem; margin: 1rem 0; font-family: ui-monospace, monospace; white-space: pre-wrap; }
+#loading { margin: 1rem 0; color: #555; }
+.banner { font-size: 1.2rem; font-weight: 600; border: 1px solid #bbb; border-radius: 8px; background: #fafafa; padding: .9rem 1rem; margin: 1.2rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { border: 1px solid #ccc; padding: .3rem .55rem; text-align: left; vertical-align: top; }
+th { background: #f0f0f0; font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; }
+.ok { background: #d9f0d9; }
+.bad { background: #f7d4d4; }
+.gray { background: #e3e3e3; color: #444; }
+.pos { background: #d9f0d9; }
+.neg { background: #f7d4d4; }
+.chip { padding: .05rem .4rem; border-radius: 4px; }
+.cols { display: flex; gap: 1rem; align-items: flex-start; }
+.cols .col { flex: 1 1 0; }
+.finding { border: 1px solid #ddd; border-left: 4px solid #888; border-radius: 4px; padding: .6rem .8rem; margin: .6rem 0; }
+.fhead { font-weight: 600; font-family: ui-monospace, monospace; font-size: .85rem; color: #333; }
+.fsent { margin: .35rem 0 .5rem; }
+blockquote { margin: .3rem 0 .3rem .5rem; padding: .25rem .6rem; border-left: 3px solid #bbb; background: #f8f8f8; font-size: .92rem; }
+.qlabel { font-weight: 600; font-size: .8rem; color: #555; margin-right: .4rem; }
+footer { margin-top: 2rem; }
+table.kv td { font-family: ui-monospace, monospace; font-size: .8rem; }
+table.kv td:first-child { color: #555; width: 16rem; }
+.status { font-size: .9rem; }
+.muted { color: #777; font-size: .8rem; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="title"></h1>
+  <div class="hctl">
+    <span id="runid"></span>
+    <span class="lang"><button id="btn-en" type="button">EN</button><button id="btn-ja" type="button">JA</button></span>
+  </div>
+</header>
+<div id="error" hidden></div>
+<div id="loading" data-i18n="loading"></div>
+<main id="main" hidden>
+  <div id="banner" class="banner"></div>
+  <section><h2 data-i18n="s_metrics"></h2><div id="metrics"></div></section>
+  <section><h2 data-i18n="s_matrix"></h2><div id="matrix"></div></section>
+  <section><h2 data-i18n="s_taxonomy"></h2><div id="taxonomy"></div></section>
+  <section><h2 data-i18n="s_findings"></h2><div id="findings"></div></section>
+  <footer><h2 data-i18n="s_identity"></h2><div id="identity"></div></footer>
+</main>
+<script>
+"use strict";
+var I18N = {
+"en": /*EN*/{
+ "banner_lead": "Verdict accuracy (greedy s0)",
+ "delta": "delta",
+ "err_load": "Failed to load report",
+ "fail": "FAIL",
+ "gold_gate": "gold gate",
+ "groups": "groups",
+ "h_code": "failure code",
+ "h_count": "count",
+ "h_delta": "delta (ir - direct)",
+ "h_direct": "direct_smt",
+ "h_direct_s0": "direct s0",
+ "h_gold": "gold",
+ "h_group": "group",
+ "h_ir": "single_ir",
+ "h_ir_s0": "ir s0",
+ "h_kind": "kind",
+ "h_metric": "metric",
+ "loading": "Loading report...",
+ "m_admission_rate": "admission rate",
+ "m_syntactic_validity": "syntactic validity",
+ "m_verdict_accuracy_greedy": "verdict accuracy (greedy)",
+ "m_verdict_stability": "verdict stability",
+ "note_scope": "Measured rates on locked synthetic fixtures; no clinical claims.",
+ "pass": "pass",
+ "pts": "pts",
+ "quote_a": "rule A (ja)",
+ "quote_b": "rule B (ja)",
+ "replay": "replay",
+ "run": "run",
+ "s_findings": "Findings",
+ "s_identity": "Identity and provenance",
+ "s_matrix": "Group verdict matrix",
+ "s_metrics": "Metrics",
+ "s_taxonomy": "Failure taxonomy",
+ "title": "CKC M2 PoC - short-hop translation report",
+ "vs": "vs"
+}/*NE*/,
+"ja": /*JA*/{
+ "banner_lead": "\u5224\u5b9a\u7cbe\u5ea6 (greedy s0)",
+ "delta": "\u5dee\u5206",
+ "err_load": "\u30ec\u30dd\u30fc\u30c8\u306e\u8aad\u307f\u8fbc\u307f\u306b\u5931\u6557\u3057\u307e\u3057\u305f",
+ "fail": "\u4e0d\u5408\u683c",
+ "gold_gate": "\u30b4\u30fc\u30eb\u30c9\u30b2\u30fc\u30c8",
+ "groups": "\u30b0\u30eb\u30fc\u30d7",
+ "h_code": "\u5931\u6557\u30b3\u30fc\u30c9",
+ "h_count": "\u4ef6\u6570",
+ "h_delta": "\u5dee\u5206 (ir - direct)",
+ "h_direct": "direct_smt",
+ "h_direct_s0": "direct s0",
+ "h_gold": "\u6b63\u89e3",
+ "h_group": "\u30b0\u30eb\u30fc\u30d7",
+ "h_ir": "single_ir",
+ "h_ir_s0": "ir s0",
+ "h_kind": "\u7a2e\u5225",
+ "h_metric": "\u6307\u6a19",
+ "loading": "\u30ec\u30dd\u30fc\u30c8\u3092\u8aad\u307f\u8fbc\u307f\u4e2d...",
+ "m_admission_rate": "\u53d7\u7406\u7387",
+ "m_syntactic_validity": "\u69cb\u6587\u59a5\u5f53\u7387",
+ "m_verdict_accuracy_greedy": "\u5224\u5b9a\u7cbe\u5ea6 (greedy)",
+ "m_verdict_stability": "\u5224\u5b9a\u5b89\u5b9a\u6027",
+ "note_scope": "\u56fa\u5b9a\u3055\u308c\u305f\u5408\u6210\u30d5\u30a3\u30af\u30b9\u30c1\u30e3\u4e0a\u3067\u6e2c\u5b9a\u3057\u305f\u5024\u3067\u3042\u308a\u3001\u81e8\u5e8a\u7684\u306a\u4e3b\u5f35\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
+ "pass": "\u5408\u683c",
+ "pts": "\u30dd\u30a4\u30f3\u30c8",
+ "quote_a": "\u898f\u5247A (\u539f\u6587)",
+ "quote_b": "\u898f\u5247B (\u539f\u6587)",
+ "replay": "\u30ea\u30d7\u30ec\u30a4",
+ "run": "\u5b9f\u884c",
+ "s_findings": "\u6240\u898b",
+ "s_identity": "\u8b58\u5225\u60c5\u5831\u3068\u6765\u6b74",
+ "s_matrix": "\u30b0\u30eb\u30fc\u30d7\u5224\u5b9a\u30de\u30c8\u30ea\u30af\u30b9",
+ "s_metrics": "\u6307\u6a19",
+ "s_taxonomy": "\u5931\u6557\u5206\u985e",
+ "title": "CKC M2 PoC - \u77ed\u30db\u30c3\u30d7\u7ffb\u8a33\u30ec\u30dd\u30fc\u30c8",
+ "vs": "\u5bfe"
+}/*AJ*/
+};
+var RD = "route.direct_smt";
+var RI = "route.single_ir";
+var METRICS = ["syntactic_validity", "admission_rate", "verdict_accuracy_greedy", "verdict_stability"];
+var MKEY = {
+ "syntactic_validity": "m_syntactic_validity",
+ "admission_rate": "m_admission_rate",
+ "verdict_accuracy_greedy": "m_verdict_accuracy_greedy",
+ "verdict_stability": "m_verdict_stability"
+};
+var S = { lang: "en", report: null, url: "", error: "" };
+
+function t(k) {
+  var d = I18N[S.lang];
+  return (d && Object.prototype.hasOwnProperty.call(d, k)) ? d[k] : I18N.en[k];
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  });
+}
+function pct(m) { return (m.value * 100).toFixed(1) + "% (" + m.num + "/" + m.den + ")"; }
+function signedPts(d) { var p = d * 100; return (p > 0 ? "+" : "") + p.toFixed(1) + " " + t("pts"); }
+function deltaCls(d) { return d > 1e-9 ? "pos" : (d < -1e-9 ? "neg" : ""); }
+function metricOf(rep, route, name) {
+  var m = rep.metrics;
+  if (m[route] && m[route][name]) { return m[route][name]; }
+  return m[name][route];
+}
+function taxFor(rep, route) {
+  var tx = rep.taxonomy;
+  if (tx[route]) { return tx[route]; }
+  var out = {};
+  Object.keys(tx).forEach(function (c) {
+    if (tx[c] && typeof tx[c] === "object" && route in tx[c]) { out[c] = tx[c][route]; }
+  });
+  return out;
+}
+function vCls(v, gold) { return v === "incomputable" ? "gray" : (v === gold ? "ok" : "bad"); }
+function shortHash(v) {
+  if (typeof v === "string" && /^[0-9a-fA-F]{16,}$/.test(v)) { return v.slice(0, 12) + ".."; }
+  return String(v);
+}
+function sortedFindings(rep) {
+  return rep.findings.slice().sort(function (a, b) {
+    return a.group < b.group ? -1 : (a.group > b.group ? 1 : 0);
+  });
+}
+function applyI18n() {
+  document.documentElement.lang = S.lang;
+  document.title = t("title");
+  var nodes = document.querySelectorAll("[data-i18n]");
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].textContent = t(nodes[i].getAttribute("data-i18n"));
+  }
+  document.getElementById("btn-en").className = S.lang === "en" ? "active" : "";
+  document.getElementById("btn-ja").className = S.lang === "ja" ? "active" : "";
+}
+function renderBanner(rep) {
+  var md = metricOf(rep, RD, "verdict_accuracy_greedy");
+  var mi = metricOf(rep, RI, "verdict_accuracy_greedy");
+  var d = rep.baseline_delta.verdict_accuracy_greedy.delta;
+  document.getElementById("banner").innerHTML =
+    esc(t("banner_lead")) + ": direct_smt <b>" + esc(pct(md)) + "</b> " + esc(t("vs")) +
+    " single_ir <b>" + esc(pct(mi)) + "</b> &nbsp;|&nbsp; " + esc(t("delta")) +
+    " <b class=\"chip " + deltaCls(d) + "\">" + esc(signedPts(d)) + "</b>";
+}
+function renderMetrics(rep) {
+  var h = "<table><thead><tr><th data-i18n=\"h_metric\"></th><th data-i18n=\"h_direct\"></th><th data-i18n=\"h_ir\"></th><th data-i18n=\"h_delta\"></th></tr></thead><tbody>";
+  for (var i = 0; i < METRICS.length; i++) {
+    var name = METRICS[i];
+    var d = rep.baseline_delta[name].delta;
+    h += "<tr><td>" + esc(t(MKEY[name])) + "</td>" +
+      "<td class=\"num\">" + esc(pct(metricOf(rep, RD, name))) + "</td>" +
+      "<td class=\"num\">" + esc(pct(metricOf(rep, RI, name))) + "</td>" +
+      "<td class=\"num " + deltaCls(d) + "\">" + esc(signedPts(d)) + "</td></tr>";
+  }
+  document.getElementById("metrics").innerHTML = h + "</tbody></table>";
+}
+function renderMatrix(rep) {
+  var rows = sortedFindings(rep);
+  var h = "<table><thead><tr><th data-i18n=\"h_group\"></th><th data-i18n=\"h_kind\"></th><th data-i18n=\"h_gold\"></th><th data-i18n=\"h_direct_s0\"></th><th data-i18n=\"h_ir_s0\"></th></tr></thead><tbody>";
+  for (var i = 0; i < rows.length; i++) {
+    var f = rows[i];
+    h += "<tr><td>" + esc(f.group) + "</td><td>" + esc(f.kind) + "</td><td>" + esc(f.gold) + "</td>" +
+      "<td class=\"" + vCls(f.direct_greedy, f.gold) + "\">" + esc(f.direct_greedy) + "</td>" +
+      "<td class=\"" + vCls(f.ir_greedy, f.gold) + "\">" + esc(f.ir_greedy) + "</td></tr>";
+  }
+  document.getElementById("matrix").innerHTML = h + "</tbody></table>";
+}
+function renderTaxonomy(rep) {
+  var h = "<div class=\"cols\">";
+  var pairs = [[RD, "h_direct"], [RI, "h_ir"]];
+  for (var i = 0; i < pairs.length; i++) {
+    var tx = taxFor(rep, pairs[i][0]);
+    var codes = Object.keys(tx).sort();
+    h += "<div class=\"col\"><h3 data-i18n=\"" + pairs[i][1] + "\"></h3>" +
+      "<table><thead><tr><th data-i18n=\"h_code\"></th><th data-i18n=\"h_count\"></th></tr></thead><tbody>";
+    if (codes.length === 0) { h += "<tr><td colspan=\"2\">-</td></tr>"; }
+    for (var j = 0; j < codes.length; j++) {
+      h += "<tr><td>" + esc(codes[j]) + "</td><td class=\"num\">" + esc(tx[codes[j]]) + "</td></tr>";
+    }
+    h += "</tbody></table></div>";
+  }
+  document.getElementById("taxonomy").innerHTML = h + "</div>";
+}
+function renderFindings(rep) {
+  var rows = sortedFindings(rep);
+  var h = "";
+  for (var i = 0; i < rows.length; i++) {
+    var f = rows[i];
+    var sent = S.lang === "ja" ? f.ja : f.en;
+    h += "<div class=\"finding\"><div class=\"fhead\">" + esc(f.group) + " &middot; " + esc(f.kind) + "</div>" +
+      "<p class=\"fsent\">" + esc(sent) + "</p>" +
+      "<blockquote lang=\"ja\"><span class=\"qlabel\" data-i18n=\"quote_a\"></span>" + esc(f.quote_a) + "</blockquote>" +
+      "<blockquote lang=\"ja\"><span class=\"qlabel\" data-i18n=\"quote_b\"></span>" + esc(f.quote_b) + "</blockquote></div>";
+  }
+  document.getElementById("findings").innerHTML = h;
+}
+function flat(prefix, v, out) {
+  if (v !== null && typeof v === "object") {
+    var ks = Object.keys(v).sort();
+    for (var i = 0; i < ks.length; i++) {
+      flat(prefix ? prefix + "." + ks[i] : ks[i], v[ks[i]], out);
+    }
+  } else {
+    out.push([prefix, shortHash(v)]);
+  }
+}
+function renderIdentity(rep) {
+  var rows = [];
+  flat("", rep.identities, rows);
+  var h = "<table class=\"kv\"><tbody>";
+  for (var i = 0; i < rows.length; i++) {
+    h += "<tr><td>" + esc(rows[i][0]) + "</td><td>" + esc(rows[i][1]) + "</td></tr>";
+  }
+  h += "</tbody></table>";
+  var rp = rep.replay.status;
+  var rpCls = rp === "match" ? "ok" : (rp === "mismatch" ? "bad" : "gray");
+  var gg = rep.gold_gate;
+  h += "<p class=\"status\"><span data-i18n=\"replay\"></span>: <span class=\"chip " + rpCls + "\">" + esc(rp) + "</span>" +
+    " &nbsp; <span data-i18n=\"gold_gate\"></span>: <span class=\"chip " + (gg.pass ? "ok" : "bad") + "\">" +
+    esc(gg.pass ? t("pass") : t("fail")) + "</span> (" + esc(gg.groups) + " <span data-i18n=\"groups\"></span>)</p>";
+  h += "<p class=\"muted\" data-i18n=\"note_scope\"></p>";
+  document.getElementById("identity").innerHTML = h;
+}
+function renderAll() {
+  var err = document.getElementById("error");
+  if (S.error) {
+    err.hidden = false;
+    err.textContent = t("err_load") + ": " + S.url + "\n" + S.error;
+  } else {
+    err.hidden = true;
+  }
+  if (S.report) {
+    document.getElementById("runid").textContent = t("run") + ": " + S.report.run_id;
+    renderBanner(S.report);
+    renderMetrics(S.report);
+    renderMatrix(S.report);
+    renderTaxonomy(S.report);
+    renderFindings(S.report);
+    renderIdentity(S.report);
+  }
+  applyI18n();
+}
+function setLang(l) {
+  S.lang = l === "ja" ? "ja" : "en";
+  try { localStorage.setItem("ckc_m2_lang", S.lang); } catch (e) {}
+  renderAll();
+}
+(function () {
+  var saved = new URLSearchParams(location.search).get("lang") || "";
+  if (saved !== "ja" && saved !== "en") {
+    try { saved = localStorage.getItem("ckc_m2_lang") || ""; } catch (e) {}
+  }
+  S.lang = saved === "ja" ? "ja" : "en";
+  document.getElementById("btn-en").onclick = function () { setLang("en"); };
+  document.getElementById("btn-ja").onclick = function () { setLang("ja"); };
+  var run = new URLSearchParams(location.search).get("run");
+  S.url = "../runs/" + (run ? run : "latest") + "/report.json";
+  applyI18n();
+  fetch(S.url).then(function (r) {
+    if (!r.ok) { throw new Error("HTTP " + r.status); }
+    return r.json();
+  }).then(function (rep) {
+    S.report = rep;
+    document.getElementById("loading").hidden = true;
+    document.getElementById("main").hidden = false;
+    renderAll();
+  }).catch(function (e) {
+    S.report = null;
+    S.error = String(e && e.message ? e.message : e);
+    document.getElementById("loading").hidden = true;
+    document.getElementById("main").hidden = true;
+    renderAll();
+  });
+})();
+</script>
+</body>
+</html>

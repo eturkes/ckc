@@ -1,0 +1,492 @@
+{
+ "groups": [
+  {
+   "en": "A pregnant patient aged 65 or older triggers both forbid and require for aspirin.",
+   "gold_verdict": "conflict",
+   "id": "g01",
+   "kind": "conflict",
+   "members": [
+    "r01a",
+    "r01b"
+   ]
+  },
+  {
+   "en": "A patient aged 75 or older with hepatic impairment triggers both require and forbid for warfarin.",
+   "gold_verdict": "conflict",
+   "id": "g02",
+   "kind": "conflict",
+   "members": [
+    "r02a",
+    "r02b"
+   ]
+  },
+  {
+   "en": "An adult aged 18 or older with renal impairment triggers both forbid and require for ibuprofen.",
+   "gold_verdict": "conflict",
+   "id": "g03",
+   "kind": "conflict",
+   "members": [
+    "r03a",
+    "r03b"
+   ]
+  },
+  {
+   "en": "A pregnant patient without renal impairment triggers both forbid and require for methotrexate.",
+   "gold_verdict": "conflict",
+   "id": "g04",
+   "kind": "conflict",
+   "members": [
+    "r04a",
+    "r04b"
+   ]
+  },
+  {
+   "en": "A patient under 18 who is on an anticoagulant (thus also at most 70) triggers both forbid and require for aspirin.",
+   "gold_verdict": "conflict",
+   "id": "g05",
+   "kind": "conflict",
+   "members": [
+    "r05a",
+    "r05b"
+   ]
+  },
+  {
+   "en": "Age at least 18 and age under 18 cannot hold together, so the rules never co-apply.",
+   "gold_verdict": "no_conflict",
+   "id": "g06",
+   "kind": "null_disjoint",
+   "members": [
+    "r06a",
+    "r06b"
+   ]
+  },
+  {
+   "en": "Pregnant and not pregnant cannot hold together, so the rules never co-apply.",
+   "gold_verdict": "no_conflict",
+   "id": "g07",
+   "kind": "null_disjoint",
+   "members": [
+    "r07a",
+    "r07b"
+   ]
+  },
+  {
+   "en": "The rules target different drugs (aspirin vs ibuprofen), so they cannot conflict.",
+   "gold_verdict": "no_conflict",
+   "id": "g08",
+   "kind": "null_diff_action",
+   "members": [
+    "r08a",
+    "r08b"
+   ]
+  },
+  {
+   "en": "The rules target different drugs (methotrexate vs warfarin), so they cannot conflict.",
+   "gold_verdict": "no_conflict",
+   "id": "g09",
+   "kind": "null_diff_action",
+   "members": [
+    "r09a",
+    "r09b"
+   ]
+  },
+  {
+   "en": "Both rules forbid aspirin; two rules in the same direction cannot conflict.",
+   "gold_verdict": "no_conflict",
+   "id": "g10",
+   "kind": "null_same_direction",
+   "members": [
+    "r10a",
+    "r10b"
+   ]
+  }
+ ],
+ "items": [
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "pregnant"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g01",
+   "id": "r01a",
+   "ja_text": "\u598a\u5a20\u4e2d\u306e\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 65,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g01",
+   "id": "r01b",
+   "ja_text": "65\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_warfarin",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 75,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g02",
+   "id": "r02a",
+   "ja_text": "75\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u306f\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_warfarin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "hepatic_impairment"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g02",
+   "id": "r02b",
+   "ja_text": "\u809d\u6a5f\u80fd\u969c\u5bb3\u306e\u3042\u308b\u60a3\u8005\u306b\u306f\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_ibuprofen",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "renal_impairment"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g03",
+   "id": "r03a",
+   "ja_text": "\u814e\u6a5f\u80fd\u969c\u5bb3\u306e\u3042\u308b\u60a3\u8005\u306b\u306f\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_ibuprofen",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g03",
+   "id": "r03b",
+   "ja_text": "18\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u306f\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_methotrexate",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "pregnant"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g04",
+   "id": "r04a",
+   "ja_text": "\u598a\u5a20\u4e2d\u306e\u60a3\u8005\u306b\u306f\u30e1\u30c8\u30c8\u30ec\u30ad\u30b5\u30fc\u30c8\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_methotrexate",
+    "conditions": [
+     {
+      "op": "=",
+      "value": false,
+      "var": "renal_impairment"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g04",
+   "id": "r04b",
+   "ja_text": "\u814e\u6a5f\u80fd\u969c\u5bb3\u306e\u306a\u3044\u60a3\u8005\u306b\u306f\u30e1\u30c8\u30c8\u30ec\u30ad\u30b5\u30fc\u30c8\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "<",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g05",
+   "id": "r05a",
+   "ja_text": "18\u6b73\u672a\u6e80\u306e\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "on_anticoagulant"
+     },
+     {
+      "op": "<=",
+      "value": 70,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g05",
+   "id": "r05b",
+   "ja_text": "\u6297\u51dd\u56fa\u85ac\u670d\u7528\u4e2d\u304b\u306470\u6b73\u4ee5\u4e0b\u306e\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_ibuprofen",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g06",
+   "id": "r06a",
+   "ja_text": "18\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u5bfe\u3057\u3066\u306f\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_ibuprofen",
+    "conditions": [
+     {
+      "op": "<",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g06",
+   "id": "r06b",
+   "ja_text": "18\u6b73\u672a\u6e80\u306e\u60a3\u8005\u306b\u306f\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_warfarin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "pregnant"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g07",
+   "id": "r07a",
+   "ja_text": "\u598a\u5a20\u4e2d\u306e\u60a3\u8005\u306b\u306f\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_warfarin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": false,
+      "var": "pregnant"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g07",
+   "id": "r07b",
+   "ja_text": "\u598a\u5a20\u3057\u3066\u3044\u306a\u3044\u60a3\u8005\u306b\u306f\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "renal_impairment"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g08",
+   "id": "r08a",
+   "ja_text": "\u814e\u6a5f\u80fd\u969c\u5bb3\u306e\u3042\u308b\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_ibuprofen",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "renal_impairment"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g08",
+   "id": "r08b",
+   "ja_text": "\u814e\u6a5f\u80fd\u969c\u5bb3\u306e\u3042\u308b\u60a3\u8005\u306b\u306f\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_methotrexate",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "require"
+   },
+   "group": "g09",
+   "id": "r09a",
+   "ja_text": "18\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u306f\u30e1\u30c8\u30c8\u30ec\u30ad\u30b5\u30fc\u30c8\u3092\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_warfarin",
+    "conditions": [
+     {
+      "op": ">=",
+      "value": 18,
+      "var": "age"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g09",
+   "id": "r09b",
+   "ja_text": "18\u6b73\u4ee5\u4e0a\u306e\u60a3\u8005\u306b\u306f\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "hepatic_impairment"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g10",
+   "id": "r10a",
+   "ja_text": "\u809d\u6a5f\u80fd\u969c\u5bb3\u306e\u3042\u308b\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  },
+  {
+   "gold_ir": {
+    "action": "drug_aspirin",
+    "conditions": [
+     {
+      "op": "=",
+      "value": true,
+      "var": "renal_impairment"
+     }
+    ],
+    "direction": "forbid"
+   },
+   "group": "g10",
+   "id": "r10b",
+   "ja_text": "\u814e\u6a5f\u80fd\u969c\u5bb3\u3092\u6709\u3059\u308b\u60a3\u8005\u306b\u306f\u30a2\u30b9\u30d4\u30ea\u30f3\u3092\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"
+  }
+ ],
+ "version": "m2poc-1",
+ "vocab": {
+  "actions": [
+   {
+    "en": "aspirin",
+    "id": "drug_aspirin",
+    "ja": "\u30a2\u30b9\u30d4\u30ea\u30f3"
+   },
+   {
+    "en": "warfarin",
+    "id": "drug_warfarin",
+    "ja": "\u30ef\u30eb\u30d5\u30a1\u30ea\u30f3"
+   },
+   {
+    "en": "ibuprofen",
+    "id": "drug_ibuprofen",
+    "ja": "\u30a4\u30d6\u30d7\u30ed\u30d5\u30a7\u30f3"
+   },
+   {
+    "en": "methotrexate",
+    "id": "drug_methotrexate",
+    "ja": "\u30e1\u30c8\u30c8\u30ec\u30ad\u30b5\u30fc\u30c8"
+   }
+  ],
+  "directions": [
+   "require",
+   "forbid"
+  ],
+  "variables": [
+   {
+    "en": "patient age in years",
+    "id": "age",
+    "ja": "\u5e74\u9f62",
+    "smt_type": "Int"
+   },
+   {
+    "en": "patient is pregnant",
+    "id": "pregnant",
+    "ja": "\u598a\u5a20\u4e2d",
+    "smt_type": "Bool"
+   },
+   {
+    "en": "patient has renal impairment",
+    "id": "renal_impairment",
+    "ja": "\u814e\u6a5f\u80fd\u969c\u5bb3",
+    "smt_type": "Bool"
+   },
+   {
+    "en": "patient has hepatic impairment",
+    "id": "hepatic_impairment",
+    "ja": "\u809d\u6a5f\u80fd\u969c\u5bb3",
+    "smt_type": "Bool"
+   },
+   {
+    "en": "patient is on an anticoagulant",
+    "id": "on_anticoagulant",
+    "ja": "\u6297\u51dd\u56fa\u85ac\u670d\u7528\u4e2d",
+    "smt_type": "Bool"
+   }
+  ]
+ }
+}
