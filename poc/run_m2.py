@@ -1,4 +1,4 @@
-"""M2 PoC CLI orchestrator. Run from repo root: python3 poc/run_m2.py <subcommand>."""
+"""M2 PoC CLI orchestrator, revision 2. Run from repo root: python3 poc/run_m2.py <subcommand>."""
 import argparse
 import hashlib
 import json
@@ -18,6 +18,7 @@ MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e
 SERVER_BIN = POC / "vendor" / "llama-b9601" / "llama-server"
 PORT = 8077
 MAX_TOKENS = 320
+ROUTE_KEYS = ("direct", "ir", "stacked", "hop", "layered")
 
 
 def jdump_bytes(obj):
@@ -36,6 +37,25 @@ def sample_params(n):
     if n == 0:
         return {"seed": 4242, "temperature": 0, "top_p": None}
     return {"seed": 4251 + n, "temperature": 0.7, "top_p": 0.9}
+
+
+def select_keys(arg, canon, label):
+    """all|csv -> selected keys in canonical order; unknown keys assert."""
+    if arg == "all":
+        return list(canon)
+    want = arg.split(",")
+    for w in want:
+        assert w in canon, f"unknown {label} {w}"
+    return [k for k in canon if k in want]
+
+
+def content_of(response):
+    """RAW content string of a chat response; '' when absent. Never validated."""
+    try:
+        c = response["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        return ""
+    return c if isinstance(c, str) else ""
 
 
 def refresh_latest(run_id):
@@ -95,25 +115,21 @@ def cmd_run(args):
     rec_dir = run_dir / "records"
     rec_dir.mkdir(parents=True, exist_ok=True)
 
+    group_ids = select_keys(args.groups, [g["id"] for g in dataset["groups"]], "group")
+    source_keys = select_keys(args.sources, [s["key"] for s in dataset["sources"]], "source")
+    route_keys = select_keys(args.routes, ROUTE_KEYS, "route")
+
     gold_gate(dataset, routes, verdict)
 
-    groups = dataset["groups"]
-    if args.groups != "all":
-        by_id = {g["id"]: g for g in groups}
-        groups = [by_id[w] for w in args.groups.split(",")]
+    groups_by_id = {g["id"]: g for g in dataset["groups"]}
     items = {it["id"]: it for it in dataset["items"]}
-    item_ids = [m for g in groups for m in g["members"]]
-
-    route_list = args.routes.split(",")
-    for rt in route_list:
-        assert rt in ("direct", "ir"), f"unknown route {rt}"
+    item_ids = [m for gid in group_ids for m in groups_by_id[gid]["members"]]
 
     prompts = routes.build_prompts(dataset["vocab"])
-    rf_ir = {"type": "json_schema",
-             "json_schema": {"name": "rule_ir", "strict": True,
-                             "schema": routes.ir_json_schema(dataset["vocab"])}}
+    stages = routes.route_stages(dataset["vocab"])
 
-    todo = [(i, rt, n) for i in item_ids for rt in route_list for n in range(args.k)]
+    todo = [(i, src, rt, n) for i in item_ids for src in source_keys
+            for rt in route_keys for n in range(args.k)]
     n_total = len(todo)
     n_done = 0
 
@@ -122,28 +138,41 @@ def cmd_run(args):
         if not args.no_server:
             server.start(run_dir / "server.log")
         write_json(run_dir / "server_props.json", server.props())
-        for iid, rt, n in todo:
-            rec_path = rec_dir / f"{iid}.{rt}.s{n}.json"
+        for iid, src, rt, n in todo:
+            rec_path = rec_dir / f"{iid}.{src}.{rt}.s{n}.json"
             if rec_path.exists():
                 n_done += 1
-                print(f"{iid} {rt} s{n} skip {n_done}/{n_total}", flush=True)
+                print(f"{iid} {src} {rt} s{n} skip {n_done}/{n_total}", flush=True)
                 continue
             p = sample_params(n)
-            messages = [
-                {"role": "system", "content": prompts[rt]["system"]},
-                {"role": "user", "content":
-                 prompts[rt]["user_template"].replace("{JA_TEXT}", items[iid]["ja_text"])},
-            ]
-            res = llm.chat(PORT, messages, seed=p["seed"], temperature=p["temperature"],
-                           top_p=p["top_p"], max_tokens=MAX_TOKENS,
-                           response_format=rf_ir if rt == "ir" else None)
-            write_json(rec_path, {"item": iid, "route": rt, "sample": n,
-                                  "request": res["request"], "response": res["response"],
-                                  "duration_ms": res["duration_ms"],
-                                  "seed": p["seed"], "temperature": p["temperature"]})
-            ok = "ok" if res["response"].get("choices") else "err"
+            calls = []
+            prev_content = ""
+            for st in stages[rt]:
+                tpl = prompts[rt][st["stage"]]
+                user = tpl["user_template"]
+                for slot in st["slots"]:
+                    val = items[iid]["ja_texts"][src] if slot == "JA_TEXT" else prev_content
+                    user = user.replace("{" + slot + "}", val)
+                messages = [{"role": "system", "content": tpl["system"]},
+                            {"role": "user", "content": user}]
+                rf = None
+                if st["schema"] is not None:
+                    rf = {"type": "json_schema",
+                          "json_schema": {"name": f"{rt}_{st['stage']}",
+                                          "strict": True, "schema": st["schema"]}}
+                res = llm.chat(PORT, messages, seed=p["seed"],
+                               temperature=p["temperature"], top_p=p["top_p"],
+                               max_tokens=MAX_TOKENS, response_format=rf)
+                calls.append({"stage": st["stage"], "request": res["request"],
+                              "response": res["response"],
+                              "duration_ms": res["duration_ms"]})
+                prev_content = content_of(res["response"])
+            write_json(rec_path, {"item": iid, "source": src, "route": rt,
+                                  "sample": n, "seed": p["seed"],
+                                  "temperature": p["temperature"], "calls": calls})
+            ok = "ok" if all(c["response"].get("choices") for c in calls) else "err"
             n_done += 1
-            print(f"{iid} {rt} s{n} {ok} {n_done}/{n_total}", flush=True)
+            print(f"{iid} {src} {rt} s{n} {ok} {n_done}/{n_total}", flush=True)
     finally:
         server.stop()
     do_score(args.run_id)
@@ -176,8 +205,9 @@ def main():
     rp = sub.add_parser("run")
     rp.add_argument("--run-id", required=True)
     rp.add_argument("--groups", default="all")
-    rp.add_argument("--k", type=int, default=4)
-    rp.add_argument("--routes", default="direct,ir")
+    rp.add_argument("--k", type=int, default=5)
+    rp.add_argument("--routes", default="all")
+    rp.add_argument("--sources", default="all")
     rp.add_argument("--no-server", action="store_true")
     for name in ("score", "replay"):
         p = sub.add_parser(name)

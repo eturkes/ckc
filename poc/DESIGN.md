@@ -1,10 +1,14 @@
-# M2 PoC design contract (throwaway branch poc-m2-oneshot)
+# M2 PoC design contract, revision 2 (throwaway branch poc-m2-oneshot)
 
-One-shot PoC of SPEC §9 short-hop translation: claim 1's minimal pair on this laptop.
-A weak local model translates synthetic Japanese clinical rules into an executable
-formal target via two routes; a real solver scores both routes against gold. Stack
-deviates from spec deliberately: Python stdlib + llama-server HTTP + z3 subprocess.
-Speed over robustness; evaluation real, never mocked.
+Revision 2 widens the SPEC sec.9 short-hop PoC from a 2-route minimal pair to a
+5 x 5 x 5 matrix: 5 routes (the sec.9 pair plus the three sec.10 route shapes adapted to
+PoC scale), 5 surface-style source families re-expressing the same 20 rules and 10
+gold groups, k=5 samples per item x source x route. One weak local model translates
+synthetic Japanese clinical rules into an executable formal target; a real solver
+scores every route against shared gold. Stack deviates from spec deliberately:
+Python stdlib + llama-server HTTP + z3 subprocess. Speed over robustness;
+evaluation real, never mocked. Revision 1 (the 2-route contract and its recorded
+run `m2`) lives in git history; code targets revision 2 only.
 
 Authoritative for all build agents. Interfaces here are exact; deviations break peers.
 
@@ -14,6 +18,7 @@ Authoritative for all build agents. Interfaces here are exact; deviations break 
 - ASCII-only in: final messages, Python source, HTML/JS source, this design, printed
   output. Japanese exists ONLY inside dataset.json string values (file itself is
   ASCII via JSON \uXXXX escapes) and in model I/O record values (same escaping).
+  This design pins required Japanese substrings as \uXXXX escape sequences.
 - Every JSON file written by any code: `json.dump(..., ensure_ascii=True, sort_keys=True)`.
 - Stdout printing of model/dataset text is forbidden; print ids, codes, counts,
   hashes. Error paths route strings through `redact.redact(s)`.
@@ -28,8 +33,8 @@ Authoritative for all build agents. Interfaces here are exact; deviations break 
 
 ```
 poc/
-  DESIGN.md  README.md (post-build summary)  .gitignore
-  dataset.json            A1
+  DESIGN.md  README.md (post-run summary)  .gitignore
+  dataset.json            A1 (version m2poc-2)
   run_m2.py               A2 (CLI orchestrator)
   m2/__init__.py          A2 (empty)
   m2/llm.py  m2/redact.py A2
@@ -52,10 +57,26 @@ with `sys.path.insert(0, str(Path(__file__).parent))` in run_m2.py.
 - llama-server: `poc/vendor/llama-b9601/llama-server`, build 9601 (4c6595503),
   port 8077, args: `-m <gguf> --host 127.0.0.1 --port 8077 -c 4096 -t 8`
 - z3 4.13.3 on PATH; invoke `z3 -T:5 <file.smt2>`.
-- Routes: `route.direct_smt`, `route.single_ir`. Experiment id: `exp.m2_shorthop_poc`.
-- Samples per item per route: s0 greedy `{"temperature": 0, "seed": 4242}`;
-  s1..s3 stability `{"temperature": 0.7, "top_p": 0.9, "seed": 4251+k}` (k=1..3).
-  `"max_tokens": 320` all samples. K_SAMPLES = 4.
+- Routes (short key = code/records/filenames; full id = report metrics tables):
+
+| key | full id | calls/sample | stages |
+| --- | --- | --- | --- |
+| direct | route.direct_smt | 1 | main |
+| ir | route.single_ir | 1 | main |
+| stacked | route.stacked_ir | 2 | frame, rows |
+| hop | route.ir_hop_chain | 3 | surface, ground, typed |
+| layered | route.ckc_layered | 3 | segment, statement, rule |
+
+- Route key order everywhere: direct, ir, stacked, hop, layered.
+- Sources: 5 families (see dataset section); key order: directive, insert, table,
+  prose, morph.
+- Experiment id: `exp.m2poc_5x5x5`. K_SAMPLES = 5.
+- Samples per item x source x route: s0 greedy `{"temperature": 0, "seed": 4242}`;
+  s1..s4 stability `{"temperature": 0.7, "top_p": 0.9, "seed": 4251+n}` (n=1..4,
+  so 4252..4255). `"max_tokens": 320` on every call. Every call within one sample
+  uses that sample's params.
+- Scale check: 20 items x 5 sources x 5 routes x 5 samples = 2500 records;
+  20 x 5 x 5 x (1+1+2+3+3) = 5000 calls.
 
 ## Vocabulary (canonical symbols)
 
@@ -67,26 +88,26 @@ Condition ops: age: `>=  <=  >  <  =` with integer value 0..130;
 bool vars: `=` with value true|false. Conditions in a rule are a conjunction (AND).
 Empty conditions = rule always applies.
 
-## dataset.json (A1)
+## dataset.json (A1, version m2poc-2)
 
 ```json
-{"version": "m2poc-1",
- "vocab": {
-   "variables": [{"id": "age", "smt_type": "Int", "ja": "<surface>", "en": "patient age in years"}, ...],
-   "actions":   [{"id": "drug_aspirin", "ja": "<katakana>", "en": "aspirin"}, ...],
-   "directions": ["require", "forbid"]},
- "items": [{"id": "r01a", "group": "g01", "ja_text": "<one Japanese sentence>",
-            "gold_ir": {"action": "drug_aspirin", "direction": "forbid",
-                        "conditions": [{"var": "pregnant", "op": "=", "value": true}]}}, ...],
- "groups": [{"id": "g01", "kind": "conflict", "members": ["r01a", "r01b"],
-             "gold_verdict": "conflict", "en": "<one-line rationale>"}, ...]}
+{"version": "m2poc-2",
+ "vocab": {... byte-identical to m2poc-1 vocab ...},
+ "sources": [{"key": "directive", "id": "src.directive",
+              "en": "concise directive guideline sentence", "ja": "<short label>"},
+             {"key": "insert", "id": "src.package_insert", "en": "...", "ja": "..."},
+             {"key": "table", "id": "src.table_row", "en": "...", "ja": "..."},
+             {"key": "prose", "id": "src.verbose_prose", "en": "...", "ja": "..."},
+             {"key": "morph", "id": "src.metamorphic", "en": "...", "ja": "..."}],
+ "items": [{"id": "r01a", "group": "g01",
+            "ja_texts": {"directive": "...", "insert": "...", "table": "...",
+                         "prose": "...", "morph": "..."},
+            "gold_ir": {... unchanged from m2poc-1 ...}}, ...],
+ "groups": [... unchanged from m2poc-1 ...]}
 ```
 
-20 items, 10 groups. gold_verdict: `conflict` | `no_conflict`. Group table (exact;
-A1 composes one natural Japanese guideline sentence per item — concise directive
-style, e.g. patient-condition phrase + drug + administer/do-not-administer ending;
-drug names in katakana; condition phrasing unambiguous and mechanically faithful
-to gold_ir; sentence must contain nothing beyond its gold_ir content):
+20 items, 10 groups, gold_ir and group table unchanged from m2poc-1 (semantic
+content is held fixed; only the surface family varies). Group table (exact):
 
 | group | kind | member a | member b | gold |
 | --- | --- | --- | --- | --- |
@@ -101,9 +122,41 @@ to gold_ir; sentence must contain nothing beyond its gold_ir content):
 | g09 | null_diff_action | require drug_methotrexate if age>=18 | forbid drug_warfarin if age>=18 | no_conflict |
 | g10 | null_same_direction | forbid drug_aspirin if hepatic_impairment=true | forbid drug_aspirin if renal_impairment=true | no_conflict |
 
-Item ids: r01a/r01b .. r10a/r10b matching group order. File must be pure ASCII:
-compose with raw Japanese in memory, then write via
-`json.dump(obj, f, ensure_ascii=True, sort_keys=True, indent=1)`.
+Item ids r01a/r01b .. r10a/r10b matching group order. File pure ASCII: compose raw
+Japanese in memory, write via `json.dump(obj, f, ensure_ascii=True, sort_keys=True,
+indent=1)`.
+
+Every family text must be mechanically faithful to its item's gold_ir: every gold
+condition expressed exactly once, zero conditions or clinical facts beyond gold_ir,
+drug name as the vocab katakana surface, direction unambiguous. Register varies;
+content does not.
+
+### Family pins
+
+- `directive`: the 20 m2poc-1 `ja_text` strings copied byte-identical (continuity
+  with recorded run m2).
+- `insert`: package-insert register. Line starts with header
+  `"\u3010\u7981\u5fcc\u3011"` (forbid items) or `"\u3010\u6295\u4e0e\u3011"`
+  (require items); ends with `"\u6295\u4e0e\u3057\u306a\u3044\u3053\u3068\u3002"`
+  (forbid) or `"\u6295\u4e0e\u3059\u308b\u3053\u3068\u3002"` (require). Patient
+  class as a noun phrase + `"\u306e\u60a3\u8005\u306b\u306f"`; condition phrasing
+  otherwise free.
+- `table`: terse fragment row, exactly three fields joined by ASCII `/`, ASCII `:`
+  after each field name: `"\u6761\u4ef6"` (conditions; 2+ joined with
+  `"\u304b\u3064"`), `"\u85ac\u5264"` (drug katakana), `"\u6307\u793a"` (value
+  `"\u6295\u4e0e"` for require, `"\u6295\u4e0e\u4e0d\u53ef"` for forbid). No
+  sentence-final period, no polite endings.
+- `prose`: verbose formal register, one sentence, subordinate clauses allowed;
+  contains `"\u60a3\u8005\u306b\u304a\u3044\u3066\u306f"`; ends
+  `"\u3082\u306e\u3068\u3059\u308b\u3002"`; require items contain
+  `"\u6295\u4e0e\u3092\u884c\u3046"`, forbid items
+  `"\u6295\u4e0e\u3092\u884c\u308f\u306a\u3044"`. Extra words are discourse
+  function only, never added content.
+- `morph`: deterministic transform of the item's `directive` string, applied as
+  whole-string replacements in this order: (1) each ASCII digit 0-9 to its
+  full-width form U+FF10..U+FF19; (2) `"\u3001"` -> `"\uff0c"` and `"\u3002"` ->
+  `"\uff0e"`; (3) `"\u6b73"` -> `"\u624d"`; (4) `"\u3053\u3068"` -> `"\u4e8b"`.
+  Compute via code, never freehand; the audit recomputes and byte-compares.
 
 ## Routes and formal shapes
 
@@ -113,7 +166,14 @@ formula is an SMT-LIB Bool term over canonical variables, e.g.
 `(and (= on_anticoagulant true) (<= age 70))`, single condition `(>= age 65)`,
 empty conditions `true`.
 
-### route.direct_smt (A3 parse)
+IR shape (the shared final JSON form; single_ir output, hop stage `typed` output,
+layered stage `rule` output, and stacked after frame+rows merge):
+`{"action": <enum>, "direction": <enum>, "conditions": [{"var": <enum>, "op": <enum>, "value": int|bool}, ...]}`
+`compile_ir(ir) -> ParsedRule`: deterministic; conditions -> formula
+(`(= var true)` form for bools; `(op var int)` for age; 2+ conds nest in one `(and ...)`
+in given order; 0 conds -> `true`). Unchanged from revision 1.
+
+### route.direct_smt (key `direct`, 1 call, stage `main`)
 
 Model must output exactly:
 
@@ -123,45 +183,111 @@ Model must output exactly:
 ; action=<action_id> direction=<require|forbid>
 ```
 
-`parse_direct(text) -> (ParsedRule|None, failure_code|None)`:
-strip code fences if present; find `(define-fun applies () Bool` and extract the
-balanced-paren body -> formula; regex the metadata comment
-`;\s*action=(\S+)\s+direction=(\S+)`. Missing either, unbalanced parens, or empty
-formula -> `(None, "target_parse_error")`. Model declare-const lines are discarded
-(canonical decls are supplied downstream); used_vars = canonical var ids appearing
-as tokens in formula. Vocabulary/type errors surface later via z3 (admit).
+`parse_direct(text) -> (ParsedRule|None, failure_code|None)`: unchanged from
+revision 1 (fence strip, balanced-paren body extraction, metadata comment regex;
+failures -> `(None, "target_parse_error")`).
 
-### route.single_ir (A3 parse + compile)
+### route.single_ir (key `ir`, 1 call, stage `main`)
 
-IR JSON: `{"action": <enum>, "direction": <enum>, "conditions": [{"var": <enum>, "op": <enum>, "value": int|bool}, ...]}`
-`ir_json_schema(vocab) -> dict`: JSON Schema with enums from dataset vocab,
-additionalProperties false everywhere, value via `"anyOf": [{"type":"integer"},{"type":"boolean"}]`,
-required all three keys. Server enforces it as grammar; admit re-checks structurally.
-`parse_ir(text) -> (dict|None, "target_parse_error"|None)`: json.loads, must be dict.
-`compile_ir(ir) -> ParsedRule`: deterministic; conditions -> formula
-(`(= var true)` form for bools; `(op var int)` for age; 2+ conds nest in one `(and ...)`
-in given order; 0 conds -> `true`).
+`parse_ir(text) -> (dict|None, "target_parse_error"|None)`: json.loads, must be
+dict. `ir_json_schema(vocab) -> dict`: unchanged from revision 1 (enums from
+vocab, additionalProperties false everywhere, value via anyOf int|bool, required
+all three keys). Server enforces as grammar; admit re-checks structurally.
+
+### route.stacked_ir (key `stacked`, 2 calls)
+
+Existing-IR stack: a PICO-style frame, then typed condition rows.
+
+- Stage `frame` schema `stacked_frame_schema(vocab)`:
+  `{"population_ja": <string>, "intervention": <enum action ids>, "stance": <enum ["do","do_not"]>}`
+  object, additionalProperties false, required all three. population_ja = the
+  patient-condition phrase copied from the sentence (string content unchecked).
+- Stage `rows` schema `stacked_rows_schema(vocab)`:
+  `{"rows": [<condition item identical to ir_json_schema conditions items>]}`
+  object, additionalProperties false, required ["rows"].
+- `compile_stacked(frame, rows_obj) -> ir-shaped dict`:
+  `{"action": frame["intervention"], "direction": {"do": "require", "do_not": "forbid"}[frame["stance"]], "conditions": rows_obj["rows"]}`.
+
+### route.ir_hop_chain (key `hop`, 3 calls)
+
+Chain of adjacent dialects, each hop a minimal delta; the sentence is visible to
+hop 1 ONLY -- later hops see only the previous hop's output. Information must
+survive the chain.
+
+- Stage `surface` schema `hop_surface_schema()` (no vocab enums):
+  `{"drug_ja": <string>, "polarity": <enum ["do","do_not"]>, "when_ja": [<string>, ...]}`
+  required all three. Prompt sees the rule sentence only (no vocabulary block).
+- Stage `ground` schema `hop_ground_schema(vocab)`:
+  `{"action": <enum action ids>, "polarity": <enum ["do","do_not"]>, "when_ja": [<string>, ...]}`
+  required all three. Prompt sees: actions vocab lines + `{PRIOR_JSON}`. Delta:
+  ground drug_ja to its canonical id; instruction says copy polarity/when_ja
+  unchanged (not enforced by admission).
+- Stage `typed` schema = `ir_json_schema(vocab)`. Prompt sees: variables vocab
+  lines + ops line + direction mapping line + `{PRIOR_JSON}`. Delta: type the
+  when_ja phrases into condition objects; polarity do->require, do_not->forbid.
+
+### route.ckc_layered (key `layered`, 3 calls)
+
+CKC layers stage by stage; the sentence is visible at EVERY stage; each stage
+deepens typing (classify -> semi-typed statement -> fully typed rule).
+
+- Stage `segment` schema `layered_segment_schema()` (no vocab enums):
+  `{"kind": <enum ["recommendation","contraindication"]>, "drug_ja": <string>}`
+  required both. Prompt sees the rule sentence only.
+- Stage `statement` schema `layered_statement_schema(vocab)`:
+  `{"action": <enum action ids>, "modality": <enum ["must","must_not"]>, "condition_phrases_ja": [<string>, ...]}`
+  required all three. Prompt sees: actions vocab lines + `{PRIOR_JSON}` + sentence.
+- Stage `rule` schema = `ir_json_schema(vocab)`. Prompt sees: full vocab block +
+  direction line + ops line + `{PRIOR_JSON}` + sentence.
 
 ### Prompts (A3)
 
-`build_prompts(vocab) -> {"direct": {"system": str, "user_template": str}, "ir": {...}}`
-user_template has one `{JA_TEXT}` slot (use .replace, not .format — formulas carry braces).
-Both prompts carry an identical vocabulary block built from dataset.json vocab:
-lines `<ja> = <id> (Int 0..130 | Bool)` for variables, `<ja> = <id>` for actions —
-the only place Japanese enters prompts besides the rule sentence; build it from
-loaded data, never literals. Both carry direction semantics one-liner
-(require = must administer; forbid = must not administer) and ONE worked example
-(same example rule both routes, expressed in that route's output format):
-example rule = require drug_ibuprofen if age>=12 (not in dataset). English
-instruction text; output-format block exact per route ("Output exactly this format,
-nothing else"). System prompts one line each, e.g. direct: "You translate one
-Japanese clinical rule into SMT-LIB. Output only the required format." ir: same
-with JSON.
+`build_prompts(vocab) -> {route_key: {stage_name: {"system": str, "user_template": str}}}`
+for all five routes; single-call routes use stage name `main`. The `direct` and
+`ir` `main` system/user_template strings stay byte-identical to the revision 1
+builders (behavior continuity). user_templates carry slots `{JA_TEXT}`,
+`{PRIOR_JSON}`, `{FRAME_JSON}` (consume with .replace, never .format -- formulas
+and JSON carry braces). Slot table (exact):
 
-`prompt_sha(prompts) -> {"direct": sha256-of-canonical-json, "ir": ...}` over
-`json.dumps(prompts[route], sort_keys=True, ensure_ascii=True)`.
+| route | stage | slots | response_format schema |
+| --- | --- | --- | --- |
+| direct | main | JA_TEXT | none |
+| ir | main | JA_TEXT | ir_json_schema |
+| stacked | frame | JA_TEXT | stacked_frame_schema |
+| stacked | rows | JA_TEXT, FRAME_JSON | stacked_rows_schema |
+| hop | surface | JA_TEXT | hop_surface_schema |
+| hop | ground | PRIOR_JSON | hop_ground_schema |
+| hop | typed | PRIOR_JSON | ir_json_schema |
+| layered | segment | JA_TEXT | layered_segment_schema |
+| layered | statement | JA_TEXT, PRIOR_JSON | layered_statement_schema |
+| layered | rule | JA_TEXT, PRIOR_JSON | ir_json_schema |
+
+routes.py exposes this as data:
+`route_stages(vocab) -> {route_key: [{"stage": str, "schema": dict|None, "slots": [str, ...]}, ...]}`
+(stage order = call order; schema None only for direct/main).
+
+Vocabulary blocks built from loaded dataset vocab, never literals: `_vocab_block`
+(all lines, as revision 1), `_actions_block` (action lines only), `_vars_block`
+(variable lines only). Direction semantics one-liner as revision 1; ops line as
+revision 1 ir prompt; hop `typed` and layered `rule` prompts also carry the
+mapping line `polarity/modality: do|must -> require, do_not|must_not -> forbid`
+(adapted per route). Every stage prompt carries ONE worked example (same example
+rule everywhere: require drug_ibuprofen if age>=12, not in dataset), expressed in
+that stage's input/output shape; multi-stage examples show the example prior JSON
+too. English instruction text; output-format block exact per stage ("Output
+exactly this format, nothing else" for direct; JSON stages may say "Output only
+the required JSON"). System prompts one line each. Japanese enters prompts ONLY
+via vocab ja fields and the {JA_TEXT} slot.
+
+`prompt_sha(prompts) -> {route_key: sha256}` over
+`json.dumps(prompts[route_key], sort_keys=True, ensure_ascii=True)` (route
+subtree, so multi-stage routes hash their stage dict).
+`schema_shas(vocab) -> {route_key: {stage: sha256}}` over the same canonical dump
+of each JSON stage schema (direct omitted).
 
 ## m2/llm.py + run_m2.py (A2)
+
+m2/llm.py unchanged from revision 1:
 
 ```python
 class LlamaServer:
@@ -171,148 +297,213 @@ class LlamaServer:
     def props(self) -> dict: ...     # GET /props json
 def chat(port, messages, seed, temperature, top_p=None, max_tokens=320,
          response_format=None, timeout_s=300) -> dict:
-    # POST /v1/chat/completions {"messages":..., "seed":..., "temperature":...,
-    #  "max_tokens":..., (+top_p), (+response_format)}; urllib; returns
-    # {"request": <body dict>, "response": <full response json>, "duration_ms": int}
+    # returns {"request": <body dict>, "response": <full response json>, "duration_ms": int}
 ```
 
-response_format for single_ir (OpenAI shape; A2 verifies live in smoke):
-`{"type": "json_schema", "json_schema": {"name": "rule_ir", "strict": true, "schema": <ir_json_schema>}}`
+response_format wrap for a JSON stage (OpenAI shape, verified live in revision 1):
+`{"type": "json_schema", "json_schema": {"name": "<route>_<stage>", "strict": true, "schema": <schema>}}`
 Content extraction: `response["choices"][0]["message"]["content"]`.
 
-m2/redact.py: `redact(s) -> s` if all chars < U+0080 else `<ja {len(s)} {sha256(s.encode())[:8].hex()}>`.
+m2/redact.py unchanged: `redact(s) -> s` if all chars < U+0080 else
+`<ja {len(s)} {sha256(s.encode())[:8].hex()}>`.
 
 run_m2.py subcommands (argparse):
-- `setup-check`: binaries exist, model sha matches design, z3 --version, print ok lines.
-- `run --run-id ID [--groups all|gNN,..] [--k 4] [--routes direct,ir] [--no-server]`:
-  load dataset; gold gate first (see score); start server (log runs/ID/server.log);
-  for item x route x sample s0..s(k-1): skip if record exists (resume); build
-  messages from prompts; chat(); write record
-  `runs/ID/records/<item>.<route>.s<n>.json` =
-  `{"item": id, "route": route, "sample": n, "request": ..., "response": ...,
-    "duration_ms": ..., "seed": ..., "temperature": ...}`; print progress line
-  `<item> <route> s<n> <http_ok> <n_done>/<n_total>`; stop server; then score.
+- `setup-check`: unchanged (binaries exist, model sha, z3 --version, ok lines).
+- `run --run-id ID [--groups all|gNN,..] [--k 5] [--routes all|direct,ir,..] [--sources all|directive,table,..] [--no-server]`:
+  load dataset; validate route keys against the route table and source keys
+  against dataset sources; gold gate first (unchanged -- gold is shared across
+  sources, gate runs once); start server (log runs/ID/server.log); save
+  server_props.json. todo order: for item in group-order item ids, for source in
+  source key order, for route in route key order, for n in 0..k-1. Resume: skip
+  when the record file exists. Per todo entry, call stages sequentially per
+  `route_stages`: build messages `[{"role": "system", ...}, {"role": "user", ...}]`
+  from `prompts[route][stage]`; fill `{JA_TEXT}` with
+  `items[iid]["ja_texts"][source_key]`; fill `{FRAME_JSON}`/`{PRIOR_JSON}` with
+  the RAW content string of the immediately preceding stage call ("" when that
+  call failed to produce content) -- the runner never validates stage output, it
+  only threads strings; response_format from the stage schema (None for direct).
+  Write record
+  `runs/ID/records/<item>.<source_key>.<route_key>.s<n>.json` =
+  `{"item": id, "source": source_key, "route": route_key, "sample": n,
+    "seed": ..., "temperature": ...,
+    "calls": [{"stage": str, "request": ..., "response": ..., "duration_ms": int}, ...]}`
+  (calls in stage order; single-call routes have one entry, stage "main").
+  Progress line `<item> <source> <route> s<n> <ok> <n_done>/<n_total>` where ok
+  requires every call's response to carry choices; stop server; then score.
 - `score --run-id ID`: m2.score.score_run(run_dir, dataset) -> writes report.json,
   report.md, report.ja.md, refreshes `runs/latest` symlink (relative, replace).
-- `replay --run-id ID`: recompute report dict from records; byte-compare canonical
-  dump EXCLUDING key "replay" vs existing file's dump excluding "replay"; rewrite
-  report.json with replay.status = "match"|"mismatch" (+ report.md/.ja.md re-render);
-  print status. Exit 1 on mismatch.
+- `replay --run-id ID`: unchanged mechanism (recompute report dict from records;
+  byte-compare canonical dumps excluding key "replay"; rewrite with replay.status;
+  exit 1 on mismatch).
 
-Route name constants: "direct" and "ir" in code/records/filenames; report.json uses
-full ids route.direct_smt / route.single_ir in metrics tables (map at score time).
+K default 5. Smoke recipe (post-build gate):
+`run --run-id smoke2 --groups g01 --sources directive,table --routes all --k 1`
+= 2 items x 2 sources x 5 routes = 20 records, 40 calls; then `score` + `replay`
+on smoke2 must pass.
 
-## m2/admit.py + m2/verdict.py 8(A4)
+## m2/admit.py + m2/verdict.py (A4)
 
 ```python
-CANON_DECLS = "(declare-const age Int)\n(declare-const pregnant Bool)\n..."  # all five
+CANON_DECLS = "(declare-const age Int)\n..."  # all five, unchanged
 def run_z3(smt_text, timeout_s=5) -> {"status": "sat"|"unsat"|"unknown"|"error", "stdout": str, "stderr": str}
-    # tmp file under the run dir, subprocess z3 -T:5; status from first stdout line; (error ...) anywhere -> error
-def admit_direct(text) -> AdmissionResult
-def admit_ir(text, vocab) -> AdmissionResult
-# AdmissionResult dict: {"syntactic_valid": bool, "admitted": bool,
+def admit_route(route_key, contents, vocab) -> AdmissionResult
+# contents: list of per-stage content strings from a record's calls, stage order.
+# AdmissionResult: {"syntactic_valid": bool, "admitted": bool,
 #   "failure_code": None|"target_parse_error"|"ai_schema_violation"|"solver_execution_failure",
+#   "failed_stage": None|str,   # stage name of the first failing stage
 #   "rule": ParsedRule|None}
 ```
 
-admit_direct: parse_direct -> fail => syntactic_valid False, code target_parse_error.
-Else z3-check `CANON_DECLS + (define-fun applies () Bool <formula>) + (assert applies) + (check-sat)`:
-z3 error => syntactic_valid False, target_parse_error (off-vocabulary symbols land
-here deliberately). Else syntactic_valid True; then action/direction in enums else
-ai_schema_violation; admitted = both gates pass.
-admit_ir: parse_ir fail => target_parse_error (grammar should prevent; truncation
-can still cause it). Else structural check against vocab enums/ops/types/ranges
-(int 0..130 for age, bool for bool vars) => violation = ai_schema_violation,
-syntactic_valid True (it parsed as JSON). Pass => compile_ir, plus same z3 sanity
-parse as direct (must never fail; if it does, solver_execution_failure). admitted
-= structural pass.
+Dispatch per route_key:
+- `direct`: revision 1 admit_direct semantics on contents[0] (parse_direct fail ->
+  syntactic_valid False, target_parse_error; else z3 sanity check of
+  `CANON_DECLS + (define-fun applies () Bool <formula>) + (assert applies) + (check-sat)`,
+  z3 error -> syntactic_valid False, target_parse_error -- off-vocabulary symbols
+  land here deliberately; else syntactic_valid True, then action/direction in
+  enums else ai_schema_violation). failed_stage "main" on any failure.
+- `ir`: revision 1 admit_ir semantics on contents[0] (json parse fail ->
+  target_parse_error, syntactic_valid False; structural check against vocab
+  enums/ops/types/ranges -- int 0..130 for age with any of the 5 ops, bool vars op
+  `=` value bool -- violation -> ai_schema_violation with syntactic_valid True;
+  pass -> compile_ir + z3 sanity parse which must never fail, if it does ->
+  solver_execution_failure). failed_stage "main" on any failure.
+- `stacked` / `hop` / `layered` (uniform pattern): walk stages in order. JSON
+  parse of stage content must yield a dict -> else syntactic_valid False,
+  target_parse_error, failed_stage = that stage. After ALL stages parse,
+  syntactic_valid True; then structural check each stage against its OWN schema
+  shape (enums/types/ranges; string-array fields must be lists of str; condition
+  items checked exactly like ir) in stage order -- first violation ->
+  ai_schema_violation, failed_stage = that stage. Cross-stage copy instructions
+  are NOT enforced. Pass -> final ir-shaped dict (stacked: compile_stacked merge;
+  hop/typed and layered/rule: the final stage object) -> compile_ir + z3 sanity
+  parse (must never fail; if it does -> solver_execution_failure).
+- admitted = every gate above passes (including z3 sanity). rule = ParsedRule on
+  admission, else None.
 
 ```python
 def group_verdict(rule_a, rule_b) -> {"verdict": "conflict"|"no_conflict"|"incomputable",
                                       "reason": str, "z3": dict|None}
 ```
-Either rule None -> incomputable/member_inadmissible. action differs ->
-no_conflict/different_action. direction same -> no_conflict/same_direction. Else
-overlap query: CANON_DECLS + `(assert <fa>)` + `(assert <fb>)` + `(check-sat)`:
-sat -> conflict/overlap_sat; unsat -> no_conflict/overlap_unsat; unknown|error ->
-incomputable/solver_error. z3 key = run_z3 result + the query text.
+Unchanged from revision 1 (member None -> incomputable/member_inadmissible;
+different action -> no_conflict/different_action; same direction ->
+no_conflict/same_direction; else overlap query sat -> conflict/overlap_sat,
+unsat -> no_conflict/overlap_unsat, unknown|error -> incomputable/solver_error).
 
 ## m2/score.py + m2/report.py (A5)
 
-`score_run(run_dir: Path, dataset: dict) -> report: dict` then writers. Steps:
-1. Gold gate: for each group, group_verdict(compile_ir(gold_a), compile_ir(gold_b))
-   must equal gold_verdict (assert; this calibrates the instrument with real z3).
-   Report field `gold_gate: {"pass": true, "groups": 10}`.
-2. Read all records. For each: admit via route's admit fn on content string ->
-   raw_row `{"item", "group", "route", "sample", "seed", "syntactic_valid",
-   "admitted", "failure_code", "duration_ms", "output_sha256": sha256 of content}`.
-3. group_rows: per group x route x sample index: verdict via group_verdict on the
-   two members' AdmissionResult rules; `{"group", "route", "sample", "verdict",
-   "reason", "gold", "correct": verdict==gold}`.
-4. metrics per route (rational dicts `{"num": int, "den": int, "value": float}`):
-   syntactic_validity (valid samples/all samples), admission_rate (admitted/all),
-   verdict_accuracy_greedy (correct s0 groups/10), verdict_stability (groups whose
-   4 sample verdicts are computable AND identical / 10).
-5. baseline_delta: per metric `{"route.direct_smt": v, "route.single_ir": v,
-   "delta": ir-direct}` (floats, round 4).
-6. taxonomy per route: counts of failure_code over raw rows + group reasons
-   member_inadmissible/solver_error + greedy verdict errors as
+`score_run(run_dir: Path, dataset: dict) -> report: dict` then writers. Constants:
+`ROUTE_IDS = {"direct": "route.direct_smt", "ir": "route.single_ir", "stacked": "route.stacked_ir", "hop": "route.ir_hop_chain", "layered": "route.ckc_layered"}`;
+source key -> id from dataset sources. Steps:
+
+1. Gold gate: unchanged -- for each group, group_verdict over compile_ir of the two
+   gold_irs must equal gold_verdict (assert). Field `gold_gate: {"pass": true, "groups": 10}`.
+2. Read all records (trust the json keys item/source/route/sample, not filenames).
+   contents = per call `response["choices"][0]["message"]["content"]`, "" when
+   absent. admit_route -> raw_row
+   `{"item", "group", "source": <source id>, "route": <route id>, "sample",
+     "seed", "syntactic_valid", "admitted", "failure_code", "failed_stage",
+     "duration_ms_total": <sum over calls>,
+     "output_sha256": sha256 of json.dumps(contents, ensure_ascii=True).encode()}`.
+3. group_rows: per group x source x sample: verdict via group_verdict on the two
+   members' rules from that source+sample ->
+   `{"group", "source": <id>, "route": <id>, "sample", "verdict", "reason",
+     "gold", "correct": verdict==gold}`.
+4. metrics (rational dicts `{"num": int, "den": int, "value": float}` per cell;
+   4 metric keys: syntactic_validity, admission_rate, verdict_accuracy_greedy,
+   verdict_stability -- stability = groups whose k sample verdicts are all
+   computable AND identical):
+   `"metrics": {"pooled": {<route id>: {<metric>: cell}},`
+   `            "by_source": {<source id>: {<route id>: {<metric>: cell}}}}`.
+   Denominators derive from records actually read (partial runs score their
+   covered cells): by_source validity/admission = samples read for that source x
+   route, greedy = groups with an s0 group_row, stability = groups with all k
+   samples present; pooled sums the by_source numerators and denominators.
+   Full-run values: 100/10/10 per source cell, 500/50/50 pooled.
+5. baseline_delta (floats round 4; direct's delta = 0.0):
+   `{<metric>: {"pooled": {<route id>: {"value": v, "delta": v - v_direct}},`
+   `            "by_source": {<source id>: {<route id>: {"value": v, "delta": ...}}}}}`.
+6. taxonomy: `{"pooled": {<route id>: {<code>: n}}, "by_source": {<source id>: {<route id>: {<code>: n}}}}`.
+   Codes: failure_code counts over all raw rows + group reasons
+   member_inadmissible/solver_error over all group rows + greedy verdict errors as
    false_positive_conflict (verdict conflict, gold no_conflict) /
-   false_negative_conflict (gold conflict, verdict no_conflict or incomputable).
-7. findings: per group `{"group", "kind", "gold", "direct_greedy": verdict,
-   "ir_greedy": verdict, "quote_a": items ja_text, "quote_b": ..., "en": one
-   sentence "gold X; direct route said Y; IR route said Z", "ja": same sentence
-   in Japanese}`. JA template strings live in report.py as \uXXXX escape literals.
+   false_negative_conflict (gold conflict, verdict no_conflict or incomputable)
+   over s0 group rows. Zero counts omitted.
+7. findings: one per source x group cell having at least one s0 group_row
+   (full run: 50):
+   `{"source": <id>, "group", "kind", "gold",
+     "greedy": {<route id>: <s0 verdict>},
+     "quote_a": <that source family's ja_texts for member a>, "quote_b": ...,
+     "en": "gold X; direct A; single-IR B; stacked C; hop-chain D; layered E",
+     "ja": same sentence in Japanese}`.
+   JA template strings live in report.py as \uXXXX escape literals.
 8. identities: model sha + name, llama_cpp_build "b9601 (4c6595503)", z3_version
-   (live `z3 --version` output), dataset_sha256, ir_schema_sha256, prompt_sha
-   per route, server_props subset (model path, n_ctx) read from
-   runs/ID/server_props.json if A2 saved it (A2: save props() there during run).
-9. config echo (seeds, k, max_tokens, port) + `"replay": {"status": "not_yet_replayed"}`
-   + experiment id + run_id + counts.
+   (live `z3 --version` output), dataset_sha256, prompt_sha per route key,
+   schema_sha256 = schema_shas(vocab), server_props subset (model path, n_ctx)
+   from runs/ID/server_props.json.
+9. echo blocks: `"sources": <dataset sources array verbatim>`,
+   `"routes": [{"key": k, "id": ROUTE_IDS[k]} in route order]`,
+   config (k, seeds map s0..s4, temperature, top_p, max_tokens, port, route keys,
+   source keys), counts (records read, calls read, items/groups/sources covered),
+   `"replay": {"status": "not_yet_replayed"}`, experiment id, run_id.
 
 Canonical bytes: `(json.dumps(report, ensure_ascii=True, sort_keys=True, indent=1) + "\n").encode()`.
-report.md / report.ja.md: `render_md(report, lang) -> str` purely from the report
-dict: title + identity block, gold gate line, metrics table per route, baseline
-delta table, group verdict matrix (group/kind/gold/direct/ir, mark wrong cells
-`*`), taxonomy table, findings list (quotes included; in report.md JA quotes stay
-as-is — file is UTF-8 markdown rendered from escaped JSON so writing decoded JA
-into report.ja.md/report.md is acceptable there and only there), replay line.
-All JA literal templates in source as \uXXXX escapes. Deterministic: no
-timestamps anywhere in report.json/md (duration_ms lives in raw rows only).
+Deterministic: no timestamps anywhere (durations only inside raw rows).
+
+report.md / report.ja.md: `render_md(report, lang)` purely from the report dict:
+title + identity block; gold gate line; pooled metrics table (rows = 4 metrics,
+cols = 5 routes); pooled baseline-delta table (rows = metrics, cols = the 4
+non-direct routes, delta vs direct); per source (5 blocks): metrics table + greedy
+verdict matrix (rows g01..g10: kind, gold, then one col per route's s0 verdict,
+wrong cells marked `*`); pooled taxonomy table (rows = codes, cols = routes);
+findings: ONLY rows where at least one route's greedy verdict is wrong, plus one
+line "N all-correct source x group rows omitted"; replay line. Quoted Japanese
+spans stay verbatim in both renderings (they are quotes; the md files are UTF-8
+renderings of escaped JSON). All JA literal templates in source as \uXXXX escapes.
 
 ## ui/index.html (A6)
 
-Single file, vanilla JS/CSS, no CDN. Loads `../runs/latest/report.json` via
-fetch with `?run=<id>` override (`../runs/<id>/report.json`). Serve:
-`python3 -m http.server 8076 -d poc` then http://127.0.0.1:8076/ui/.
-Header: title + run id + EN | JA toggle buttons (persist choice in localStorage,
-default EN, set `<html lang>`). i18n dict in source: `{en: {...}, ja: {...}}`,
-ja values as \uXXXX escapes; elements carry data-i18n keys. Sections:
-1. Verdict banner: per-route verdict_accuracy_greedy + the delta, one big line.
-2. Metrics table: rows = 4 metrics, cols = direct | single_ir | delta (delta cell
-   green when ir > direct, red when lower).
-3. Group matrix: rows g01..g10: kind, gold, direct s0 verdict, ir s0 verdict;
-   wrong cells red, correct green, incomputable gray.
-4. Taxonomy: two columns of code:count.
-5. Findings: per group, lang-dependent sentence (en/ja field) + the two quoted
-   Japanese spans (always shown verbatim, both languages — they are quotes).
-6. Identity footer: model, build, z3, hashes (truncate 12 chars), replay status,
-   gold gate. Layout: clean, compact, system-ui font, max-width 960px, the two
-   route columns visually paired. No external requests beyond the report fetch.
-```
+Single file, vanilla JS/CSS, no CDN. Loads `../runs/latest/report.json` via fetch
+with `?run=<id>` override; `?lang=` override; EN | JA toggle persisted in
+localStorage (default EN, set `<html lang>`); i18n dict in source, ja values as
+\uXXXX escapes; elements carry data-i18n keys. Source labels (en/ja) from the
+report's sources echo; route columns in route order everywhere. Sections:
+1. Verdict banner: pooled verdict_accuracy_greedy for all 5 routes on one line,
+   best non-direct delta vs direct called out.
+2. Scope tabs: Pooled | one tab per source (label from sources echo). Tabs switch
+   sections 3-5 between pooled and that source's slice.
+3. Metrics table: rows = 4 metrics, cols = 5 routes; per non-direct cell show the
+   delta vs direct in the same scope, green when above direct, red when below.
+4. Group matrix: rows g01..g10 (kind, gold) x route s0 verdict cols; wrong red,
+   correct green, incomputable gray. Pooled tab: per-cell "n/5 sources correct"
+   coloring (green 5/5, red 0/5, amber between) -- tooltip lists the per-source
+   verdicts.
+5. Taxonomy: code x route count grid for the scope.
+6. Findings: filter = scope (tab) + default "only rows with a wrong greedy
+   verdict" toggle; per row the lang-dependent sentence (en/ja field) + the two
+   quoted Japanese spans verbatim.
+7. Identity footer: model, build, z3, dataset/prompt/schema hashes (truncate 12),
+   replay status, gold gate, experiment id, counts.
+Layout: clean, compact, system-ui font, max-width 1200px, the five route columns
+visually paired. No external requests beyond the report fetch.
 
 ## Audit stage
 
-B1 (after A1): re-derive every group's verdict from gold_irs by hand-reasoning,
-cross-check ja_text wording against gold_ir and the design table semantics; output
-ASCII table group:ok/mismatch + issues. B2 (after all authors): py_compile all,
-`python3 -c` import chain, signature cross-check vs this design, dataset
-structural check (ids/refs/enums/ASCII purity), fix mechanical seams in place,
-report what changed.
+B1 (after A1): per family x item: recompute morph from directive and
+byte-compare; check every family pin substring (headers, endings, field skeleton);
+faithfulness cross-check of each ja_texts value against gold_ir (each condition
+exactly once, no extra content, drug katakana matches vocab, direction matches
+gold); ids/groups/vocab byte-identical to m2poc-1; sources array exact; file
+ASCII purity. Output ASCII table family x check: ok/issue counts; fix issues in
+place and re-run.
+
+B2 (after all authors): py_compile all, `python3 -c` import chain, signature
+cross-check vs this design, dataset structural check (ids/refs/enums/ASCII
+purity), the smoke recipe, fix mechanical seams in place, report what changed.
 
 ## Metrics intent (for report wording)
 
 Locked synthetic fixture measurement, instrument = the deterministic gate chain
-(grammar/admission/z3) shared by both routes; the only varying factor is the
-translation route. Findings wording: measured rates on synthetic fixtures, no
-clinical claims. The headline artifact is the baseline_delta table.
+(grammar/admission/z3) shared by all routes; the varying factors are the
+translation route and the surface family of the same underlying rules. Findings
+wording: measured rates on synthetic fixtures, no clinical claims. The headline
+artifacts are the pooled baseline_delta table and the per-source metric matrix.
