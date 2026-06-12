@@ -19,6 +19,3 @@ __pycache__/
 # Generated corpus inputs and run outputs (SPEC §3); commit only when license-safe
 /corpus/raw/
 /runs/
-
-# lexgate pattern dir: local-only, user-maintained (see memory Policy)
-/.agent/lexgate.d/

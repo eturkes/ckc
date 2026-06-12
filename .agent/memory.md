@@ -17,16 +17,6 @@ git history.
   Checked roadmap items collapse to one-line stubs (full unit text in git history).
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- Lexgate guards the durable tree: `bash .agent/lexgate.sh` with modes `hook`
-  (write-time, wired in settings.json), `pre-commit` (installed in .git/hooks; `install`
-  restores it), `sweep` (review sessions run it), `check` (missing parts → stop and ask the
-  user), `scan <path>`. Patterns live in `.agent/lexgate.d/` — local-only, gitignored,
-  Read-denied, user-maintained (recalibrated to vocabulary with no legitimate
-  in-project use); a clean session treats the gate as pass/fail only and a failure as
-  rewording work on the cited lines (the gate cites file:line, never echoes matches). When a
-  cited line's flagged term names a legitimate project component, report a pattern bug
-  instead of rewording. Sanctioned containers: docs/ and corpus/fixtures/ — consult them via
-  read-only subagents instructed to answer in project vocabulary without verbatim quotes.
 - LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
   whose concrete syntax gets hand-authored or byte-pinned in-repo (active:
   rust, bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets:
@@ -199,4 +189,6 @@ git history.
   recurrence in fixture-reading units (acceptance-m1 ran clean under redacted printing:
   audit scripts compare bytes in code and print Japanese-bearing JSON/markdown only
   through a redactor mapping such runs to `<ja Nch hash>` — reuse for M2 model-I/O work).
+  The lexgate write-time vocabulary gate is removed (user directive 2026-06-12): its cases
+  follow this same handling, and lexgate mentions in git history are obsolete.
   Full case detail (transcript ids, timestamps, trigger tokens): `git show 2270c2b`.
