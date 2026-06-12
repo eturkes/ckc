@@ -92,15 +92,18 @@ git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
-- WebSearch 400s on this model line (the API rejects the forced tool_choice
-  the search sub-request uses; the error arrives INLINE in an ok-looking result — read
-  result bodies). Re-test after a Claude Code update or model-line
-  change, drop this clause when healed. Workflow agent() `schema` verified unaffected.
-  Working channels: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox curl
-  gets a bot wall); crates.io via curl with a `-A` user-agent header (403 without) — detail
-  /api/v1/crates/NAME, search /crates?q=; GitHub /search/repositories?q=; Wikipedia
-  opensearch. Meta-rule: the session that FIRST hits an environment/tool failure records it
-  in that same session.
+- Web search default: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox
+  curl gets a bot wall). Targeted channels: crates.io via curl with a `-A` user-agent
+  header (403 without) — detail /api/v1/crates/NAME, search /crates?q=; GitHub
+  /search/repositories?q=; Wikipedia opensearch. The WebSearch tool 400s on this model
+  line (the API rejects its forced tool_choice; the error arrives INLINE in an ok-looking
+  result) — a PreToolUse hook (`.claude/hooks/deny-websearch.sh`, wired in settings.json)
+  denies it with this redirect; Workflow agent() `schema` verified unaffected. Re-test on
+  Claude Code update or model-line change (last 2026-06-12: still broken): drop the
+  settings.json hooks entry, ToolSearch-load WebSearch, one query, read the body; healed →
+  delete hook script + entry and collapse this entry to its working-channels half.
+  Meta-rule: the session that FIRST hits an environment/tool failure records it in that
+  same session.
 - Turn-halting `API Error: <ConnectionTerminated error_code:0 ...>` = the
   upstream HTTP/2 connection rotated mid-stream (GOAWAY surfacing through the Headroom
   proxy); mid-stream POSTs are SDK-unretryable, so the turn halts. Transient and
