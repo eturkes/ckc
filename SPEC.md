@@ -7,52 +7,61 @@ one place, sections sized for selective loading.
 
 ## §0 Mission, thesis, posture
 
-CKC is a headless research harness that maps public Japanese clinical-guideline knowledge into
-compact, reusable, source-grounded IR components; compiles them deterministically to formal
-targets (SMT-LIB first); and surfaces contradictions and documented null results with end-to-end
-machine-checkable evidence.
+CKC is a clinical knowledge compiler: a headless research harness that translates clinical text
+in any language (public Japanese guideline corpora through M7) into compact, reusable,
+source-grounded IR components; compiles them deterministically to machine-evaluable mathematical
+targets (SMT-LIB first; proof assistants such as Lean 4 join per §13); and surfaces
+contradictions and documented null results with end-to-end machine-checkable evidence.
 
-Thesis under test, as three falsifiable claims, ordered by dependency — each claim builds on
-its predecessors' machinery, and test order matches (M2, M3, M5). §2 schedules the experiments,
-§7.3 defines the metrics. The layered component IR is the instrument, not a claim: layering is
-a route variable inside claim 1, reuse generalization is what claim 2's coverage measures, and
-the layered-versus-direct payoff lands as M3's architecture ablation (§10):
+Thesis under test, as three initial experiments, ordered by dependency — each consumes its
+predecessors' machinery. §2 schedules them, §7.3 defines the metrics. The layered component IR
+is the instrument, not a hypothesis: layering is a route variable inside experiment 1, reuse
+generalization is what experiment 2's coverage measures, and the layered-versus-direct payoff
+lands as M3's architecture ablation (§10):
 
-1. Short-hop translation (models in the loop): how reliably a weak local model translates
-   clinical Japanese into an executable formal target depends on the IR configuration the route
-   targets; staged, grammar-constrained, short-hop routes — layered and hop-chain forms
-   included — tame model non-determinism and beat direct one-leap emission on the §7.3
-   route-quality and conflict-quality families. Tested at M2; widened at M3–M4.
-2. Model-free runtime (models at development time only): a compact admitted mapping layer —
-   authored and maintained by AI agents, where hand-encoding once made expert systems
-   prohibitive — covers fresh documents deterministically with zero runtime model calls; its
-   quality is an optimization problem: maximize coverage and reuse, minimize mapping-set size.
-   Tested at M3.
-3. Autonomous optimization: a bounded autonomous loop over declared surfaces, scored by an
-   immutable evaluator, measurably improves the objectives of claims 1–2 — from lexicon repair
-   up to search over the IR-combination space — while every attempt stays ledgered and
-   replayable. Tested at M5.
+1. Multi-hop translation (models in the loop): does translation through multiple small model
+   calls between specific intermediate representations beat direct one-leap emission into a
+   machine-evaluable formal target, and which route configuration is best? Reliability is
+   hypothesized to depend on the IR configuration the route targets: staged,
+   grammar-constrained, short-hop routes — layered and hop-chain forms included — tame model
+   non-determinism on the §7.3 route-quality and conflict-quality families. Tested at M2
+   (minimal pair); the configuration ranking widens over existing and invented forms at M3–M4;
+   experiment 2's protocol extends the configuration search at M5.
+2. Deterministic mapping by optimization (models at development time only): an optimization
+   protocol designs and maintains a deterministic mapping — a compact admitted expert system
+   with minimized surface area, authored by AI agents where hand-encoding once made expert
+   systems prohibitive — that covers fresh documents with zero runtime model calls. The
+   objective: maximize coverage and reuse, minimize mapping-set size. Coverage tested at M3;
+   the bounded autonomous protocol — declared surfaces, immutable evaluator, every attempt
+   ledgered and replayable, from lexicon repair up to search over the IR-combination space —
+   lands at M5.
+3. Revision surfacing (the compiler applied): once a corpus is compiled into the target
+   mathematical representation, does the result highlight guidelines and companion sources in
+   need of revision? Seeded at M1 (one synthetic contradiction, one documented null result);
+   answered on real public corpora at M6–M7, where findings become source-grounded,
+   adjudicated revision candidates.
 
-Documented null results are first-class outcomes for all three claims.
+Documented null results are first-class outcomes for all three experiments.
 
 Stage arc: the plan realizes CKC in three stages, each gated by its predecessor. Stage I —
-research instrument (M1–M5): prove claims 1–3 on synthetic corpora; "executable" means compiled
-to solver-checked formal targets; locked Stage I measurements anchor a methods manuscript.
-Stage II — guideline auditor (M6–M7): the compiler's first application — static analysis of
-real public corpora surfacing source-grounded revision candidates for guideline authors,
-adjudicated and rendered bilingual; Stage I is the auditor's validity argument (measured
-translation reliability, deterministic coverage with zero runtime model calls), and the
-auditor's adjudicated findings anchor a second manuscript. Stage III — CDS backend (§13.4,
-contract-only): the compiler's runtime target — admitted knowledge evaluated over patient
-contexts; "executable" extends to runtime evaluation; every capability sits behind §15 gates.
+research instrument (M1–M5): prove experiments 1–2 on synthetic corpora; "machine-evaluable"
+means compiled to solver-checked formal targets; locked Stage I measurements anchor a methods
+manuscript. Stage II — guideline auditor (M6–M7): experiment 3 answered at full strength —
+static analysis of real public corpora surfacing source-grounded revision candidates for
+guideline authors, adjudicated and rendered bilingual; Stage I is the auditor's validity
+argument (measured translation reliability, deterministic coverage with zero runtime model
+calls), and the auditor's adjudicated findings anchor a second manuscript. Stage III — CDS
+backend (§13.4, contract-only): the compiler's runtime target — admitted knowledge evaluated
+over patient contexts; machine evaluation extends to runtime evaluation; every capability sits
+behind §15 gates.
 
-North-star demonstration (M6 era): cross-source conflict surfacing over real public corpora —
-e.g. a guideline recommendation versus a PMDA package-insert contraindication — traced from
-Japanese source spans through IR and named SMT assertions to solver cores, replayable from
-content hashes alone. Behind it sits an asymptotic ideal: ever more minimal admitted mapping and
-axiom sets representing ever more clinical knowledge — a single global axiom in the unreachable
-limit — which orients compactness and autonomous optimization (`G-MDL`) while staying outside
-every report's claims.
+North-star demonstration (M6 era, experiment 3's flagship): cross-source conflict surfacing over
+real public corpora — e.g. a guideline recommendation versus a PMDA package-insert
+contraindication — traced from Japanese source spans through IR and named SMT assertions to
+solver cores, replayable from content hashes alone. Behind it sits an asymptotic ideal: ever
+more minimal admitted mapping and axiom sets representing ever more clinical knowledge — a
+single global axiom in the unreachable limit — which orients experiment 2's compactness
+objective and optimization protocol (`G-MDL`) while staying outside every report's claims.
 
 Research posture: every output is research evidence. Accepted
 semantics come from admission (schema validity, grounding, canonical bytes, applicable
@@ -129,12 +138,12 @@ assembling the full harness before the first end-to-end result.
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
 | M1 spine | Layered pipeline end-to-end on synthetic Japanese fixtures: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one null result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_spine` + §8 checklist |
-| M2 short-hop PoC | First experiment, claim 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_shorthop` + §9 |
-| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; model-free coverage experiment (claim 1 across the route axis; claim 2 via the coverage experiment and compactness front; layered-versus-direct as architecture ablation). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
-| M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (claim 1, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
-| M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a locked evaluator, optimizing translation reliability, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (claim 3). | `ckc research loop --experiment exp.m5_loop` + §12 |
+| M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 fixtures via `route.direct_smt` versus one IR-mediated route; scored on validity/admission/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
+| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict metrics; metamorphic variant fixtures; ranked comparison report; model-free coverage experiment (experiment 1 across the route axis; experiment 2 via the coverage experiment and compactness front; layered-versus-direct as architecture ablation). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
+| M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-masked concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the locked evaluator (experiment 1, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
+| M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a locked evaluator, optimizing translation reliability, reuse, and coverage; full attempt ledger; driver-portable — local driver for acceptance, Claude-session driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-driven growth: retrieval, richer rule semantics, additional solvers/targets, corpus scale, matrix scale-out, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 contract elaborated at M5 acceptance; §13.2 per candidate |
-| M7 auditor product | Reviewer-facing audit over M6 corpora: finding triage (severity, bilingual review questions), weighted minimal-correction-set revision localization, cvc5 cross-check on blocking/major findings, Lean per-instance reflection anchor, adjudication records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
+| M7 auditor product | Reviewer-facing audit over M6 corpora (experiment 3): finding triage (severity, bilingual review questions), weighted minimal-correction-set revision localization, cvc5 cross-check on blocking/major findings, Lean per-instance reflection anchor, adjudication records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
 
 Scope note: M1–M5 are the current PoC horizon (Stage I); M6–M7 stay in this file as compact
 forward contracts (Stage II) so PoC decisions remain production-compatible; Stage III is
@@ -748,12 +757,12 @@ measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closi
 `documented_null_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to
 the core and back.
 
-## §9 M2 — Short-hop translation PoC (contract; elaborate at M1 acceptance)
+## §9 M2 — Multi-hop translation PoC (contract; elaborate at M1 acceptance)
 
-Intent: the first experiment — claim 1's minimal pair on this laptop. Establish as a locked
-measurement that a weak local model translating clinical Japanese directly into an executable
-formal target is unreliable, and that one IR-mediated route measurably improves reliability on the
-same inputs; publish the result as a bilingual research report. The M1 spine is the instrument:
+Intent: experiment 1's minimal pair on this laptop. Establish as a locked measurement that a
+weak local model translating clinical Japanese directly into a machine-evaluable formal target
+is unreliable, and that one IR-mediated route measurably improves reliability on the same
+inputs; publish the result as a bilingual research report. The M1 spine is the instrument:
 its deterministic pipeline supplies the gold verdicts and the calibrated compile → verify back
 end that scores both routes, so route failures attribute to translation, not to the instrument.
 
@@ -793,15 +802,15 @@ Committed direction:
   component store, the deterministic direct pipeline, model-free coverage, ablations.
 
 Acceptance themes (finalized at elaboration): both routes execute over identical locked inputs
-(`exp.m2_shorthop`); recorded model I/O replays byte-stably; raw rows emit before the
+(`exp.m2_multihop`); recorded model I/O replays byte-stably; raw rows emit before the
 baseline-delta table; expected conflict/null outcomes hold per gold for admitted translations;
 the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
 ## §10 M3 — IR variation and comparison (contract; elaborate at M2 acceptance)
 
-Intent: widen claim 1 across the route axis — vary and layer existing IR forms — and take the
-claim-2 measurements with the full evaluator; the layered-versus-direct architecture ablation
-quantifies reuse and convergence on a corpus designed to exercise them.
+Intent: widen experiment 1 across the route axis — vary and layer existing IR forms — and take
+experiment 2's measurements with the full evaluator; the layered-versus-direct architecture
+ablation quantifies reuse and convergence on a corpus designed to exercise them.
 
 Committed direction:
 
@@ -829,7 +838,8 @@ Committed direction:
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
   `compactness_front.json` join the trace exports — the front doubles as the
-  mapping-minimization view (claim 2's optimization objective, measured deterministically here).
+  mapping-minimization view (experiment 2's optimization objective, measured
+  deterministically here).
 - Path visualizations per §7.1 (per-finding chain; cross-document component convergence).
 - Metrics per §7.3 over both pipelines and every route; the per-metric layered-minus-direct
   deltas are the staged pipeline's §7.3 baseline-delta measurement; `candidate_diff.json` compares segment,
@@ -843,8 +853,8 @@ Committed direction:
   `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by fixtures.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_grounding_off`.
-- Model-free coverage experiment (`exp.m3_coverage`, claim 2): fixture set A builds mappings and
-  admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
+- Model-free coverage experiment (`exp.m3_coverage`, experiment 2): fixture set A builds mappings
+  and admitted entries join the lexicon/component store; fixture set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus gold, mapping-set size versus coverage on the compactness front, and
   apply-phase model-call count (zero) against a model-per-document baseline. Apply-phase path
@@ -863,10 +873,10 @@ complete; the coverage report emits with raw rows first.
 
 ## §11 M4 — Invented IR/DSLs (contract; elaborate at M3 acceptance)
 
-Intent: claim 1 extended to invented forms — project-born IR/DSLs designed for weak-model translation
-reliability and deterministic compilation, evaluated with the same instrument as every existing
-IR form, in singular and layered configurations. A documented null result — no invented form
-beats the §10 field — is a first-class outcome.
+Intent: experiment 1 extended to invented forms — project-born IR/DSLs designed for weak-model
+translation reliability and deterministic compilation, evaluated with the same instrument as
+every existing IR form, in singular and layered configurations. A documented null result — no
+invented form beats the §10 field — is a first-class outcome.
 
 Committed direction:
 
@@ -895,10 +905,10 @@ recorded model I/O replays byte-stably; §0 vocabulary holds.
 
 ## §12 M5 — Autonomous optimization PoC (contract; elaborate at M4 acceptance)
 
-Intent: claim 3 — `ckc research loop --experiment exp.m5_loop` runs a bounded
-propose → patch → run → score → classify → promote/reject → replay → ledger cycle that improves
-claims 1–2's objectives under an immutable evaluator. The PoC runs on laptop budgets; the loop
-contract is built to outgrow them.
+Intent: experiment 2's optimization protocol — `ckc research loop --experiment exp.m5_loop`
+runs a bounded propose → patch → run → score → classify → promote/reject → replay → ledger
+cycle that improves experiments 1–2's objectives under an immutable evaluator. The PoC runs on
+laptop budgets; the loop contract is built to outgrow them.
 
 Committed direction:
 
@@ -936,7 +946,7 @@ Committed direction:
   registered, exercised on user request. Long-horizon loops run on the agent driver when scale
   demands; evaluator locks, admission, and ledgers stay identical across drivers.
 - Standing long-run objectives: route/IR-combination search over the `registry/methods.yaml`
-  universe (§14) — existing formalisms and the §11 invented-DSL program; the claim-1
+  universe (§14) — existing formalisms and the §11 invented-DSL program; the experiment-1
   configuration space is combinatorial — and mapping-set minimization toward the §0 asymptotic
   ideal, under `G-MDL` for any calibrated minimality claim.
 - Scale-out — `ExperimentPlan` matrices with compatibility filters, pairwise/fractional designs,
@@ -1008,11 +1018,11 @@ The §2 conservation rule keeps this table in sync with `registry/methods.yaml`.
 
 ### §13.3 M7 — Auditor product (contract; elaborate at M6 acceptance)
 
-Intent: Stage II's reviewer-facing deliverable — the compiler as guideline auditor. Real-corpus
-findings become adjudicable revision candidates with formal evidence, rendered bilingual and
-exported as a manuscript bundle; a documented absence of defects in an audited corpus is itself
-a publishable null result. Container probes for every committed backend ran 2026-06-12 (r3
-revision commit).
+Intent: Stage II's reviewer-facing deliverable — the compiler as guideline auditor, answering
+experiment 3. Real-corpus findings become adjudicable revision candidates with formal evidence,
+rendered bilingual and exported as a manuscript bundle; a documented absence of defects in an
+audited corpus is itself a publishable null result. Container probes for every committed
+backend ran 2026-06-12 (r3 revision commit).
 
 Committed direction:
 
