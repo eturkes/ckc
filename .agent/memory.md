@@ -139,7 +139,12 @@ git history.
   (Folder.fs ignoreFiles); an ignored markdown target turns valid links into "non-existent
   document" warnings — hence docs/ sweep-exclusion lives in `.rgignore` (rg-only,
   Marksman-invisible) and link diagnostics are trustworthy. Ignore files are read at folder
-  scan, not watched: such fixes clear at the next LSP start.
+  scan, not watched: such fixes clear at the next LSP start. Marksman is settled (kept
+  deliberately 2026-06): both warning shapes are real 1-line fixes (backtick the notation /
+  repair the link) — apply and move on, reporting only the fix. Diagnostics are
+  unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
+  links the same code 2/Warning, so any filter kills the signal too); the off-switch is
+  markdown-lsp@ckc-lsps in settings.json enabledPlugins.
 - Serena replace_symbol_body spans the preceding doc comment AND outer
   `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
   way). Include the leading `///` lines and every attribute, or edit inner regions with
