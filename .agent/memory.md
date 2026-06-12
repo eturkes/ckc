@@ -140,9 +140,10 @@ git history.
   document" warnings — hence docs/ sweep-exclusion lives in `.rgignore` (rg-only,
   Marksman-invisible) and link diagnostics are trustworthy. Ignore files are read at folder
   scan, not watched: such fixes clear at the next LSP start. Marksman is settled (kept
-  deliberately 2026-06): both warning shapes are real 1-line fixes (backtick the notation /
-  repair the link) — apply and move on, reporting only the fix. Diagnostics are
-  unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
+  deliberately 2026-06): all three warning shapes are real quick fixes — phantom reflink:
+  backtick the notation; non-existent document: repair the link; "Ambiguous link": target
+  doc has >1 H1 (title_from_heading registers every H1 as a title; keep one, demote the
+  rest) — apply and move on, reporting only the fix. Diagnostics are unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
   links the same code 2/Warning, so any filter kills the signal too); the off-switch is
   markdown-lsp@ckc-lsps in settings.json enabledPlugins.
 - Serena replace_symbol_body spans the preceding doc comment AND outer
