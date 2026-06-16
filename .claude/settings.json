@@ -11,21 +11,7 @@
       "Read(./.serena/cache/**)",
       "Read(./.serena/memories/**)",
       "Read(./.serena/project.local.yml)",
-      "Read(./.claude/marketplace/**)",
-      "Read(./.agent/lexgate.d/**)"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.agent/lexgate.sh hook"
-          }
-        ]
-      }
+      "Read(./.claude/marketplace/**)"
     ]
   },
   "enabledPlugins": {

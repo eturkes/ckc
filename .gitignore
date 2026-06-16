@@ -1,9 +1,3 @@
-# Headroom introduces .serena/: project.yml is the tracked LSP config, while
-# cache/, project.local.yml, and memories/ are ignored. See CLAUDE.md.
-.serena/cache/
-.serena/project.local.yml
-.serena/memories/
-
 # Rust build output (Cargo.lock is committed, not ignored)
 target/
 
@@ -19,6 +13,3 @@ __pycache__/
 # Generated corpus inputs and run outputs (SPEC §3); commit only when license-safe
 /corpus/raw/
 /runs/
-
-# lexgate pattern dir: local-only, user-maintained (see memory Policy)
-/.agent/lexgate.d/

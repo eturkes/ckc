@@ -1,7 +1,7 @@
 # CKC — Clinical Knowledge Compiler
 
-Design authority for this repository. Sole implementers and readers: Claude (Fable 5 family)
-sessions operating under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
+Design authority for this repository. Sole implementers and readers: Claude sessions operating
+under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
 The document is optimized for machine reading: stable `§` anchors, tables over prose, one fact in
 one place, sections sized for selective loading.
 
@@ -95,13 +95,6 @@ Unit discipline:
   its gate before staging.
 - A projected unit overrun is a stop-and-report: recovery (restore to the last commit, re-scope
   the roadmap) is always user-initiated.
-
-Working style (Fable 5):
-
-- When you have enough information to act, act; bring contract-changing decisions, destructive
-  actions, and genuine scope changes to the user, and proceed on everything else.
-- Audit every progress claim against a tool result from the current session; report failures with
-  their output, and state verified results plainly.
 
 Session shapes — context sizing, plan-session workflows, subagent policy — live in the session
 command and the `.agent/protocol-*.md` files it routes to; commit, compaction, and memory
@@ -203,7 +196,7 @@ Repository layout (target state; built up by the M1 units):
 │                                          # grows per milestone (§14)
 ├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
-├── .agent/{memory.md,roadmap.md,compaction.sh,lexgate.sh,protocol-plan.md,protocol-review.md}
+├── .agent/{memory.md,roadmap.md,compaction.sh,protocol-plan.md,protocol-review.md}
 └── .claude/
 ```
 
