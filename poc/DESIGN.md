@@ -1,10 +1,11 @@
 # M2-M4 PoC design contract (throwaway branch poc-m2-3-4)
 
 Scope: this PoC spans SPEC M2-M4 on one throwaway branch. M2 (sec.9 short-hop
-pair) and M3 (sec.10 route trio) are specified and measured at revision 2 below;
-M4 (sec.11 invented-DSL routes: grammar-masked concrete syntax, deterministic
-parse -> IR -> compile) is the planned extension and gets its own contract
-revision before its routes enter the matrix. This revision adds no M4 interface.
+pair) and M3 (sec.10 route trio) are specified and measured at revision 2 below
+(5-route field, run matrix5); M4 (sec.11 invented-DSL routes: grammar-masked
+concrete syntax, deterministic parse -> IR -> compile) is specified at revision 3
+in the closing "Revision 3 -- M4 invented DSLs" section, widening the field from
+5 to 9 routes (two project-born DSL candidates, each singular + hop-layered).
 
 Revision 2 widens the SPEC sec.9 short-hop PoC from a 2-route minimal pair to a
 5 x 5 x 5 matrix: 5 routes (the sec.9 pair plus the three sec.10 route shapes adapted to
@@ -14,7 +15,7 @@ synthetic Japanese clinical rules into an executable formal target; a real solve
 scores every route against shared gold. Stack deviates from spec deliberately:
 Python stdlib + llama-server HTTP + z3 subprocess. Speed over robustness;
 evaluation real, never mocked. Revision 1 (the 2-route contract and its recorded
-run `m2`) lives in git history; code targets revision 2 only.
+run `m2`) lives in git history; code targets the current revision (2-3).
 
 Authoritative for all build agents. Interfaces here are exact; deviations break peers.
 
@@ -45,6 +46,7 @@ poc/
   m2/__init__.py          A2 (empty)
   m2/llm.py  m2/redact.py A2
   m2/routes.py            A3
+  m2/grammars.py          (rev-3 DSL GBNF builders)
   m2/admit.py m2/verdict.py A4
   m2/score.py m2/report.py  A5
   ui/index.html           A6
@@ -72,17 +74,25 @@ with `sys.path.insert(0, str(Path(__file__).parent))` in run_m2.py.
 | stacked | route.stacked_ir | 2 | frame, rows |
 | hop | route.ir_hop_chain | 3 | surface, ground, typed |
 | layered | route.ckc_layered | 3 | segment, statement, rule |
+| dsl | route.ckc_dsl | 1 | main |
+| dslh | route.ckc_dsl_hop | 3 | surface, ground, typed |
+| dslk | route.ckc_dsl_kw | 1 | main |
+| dslkh | route.ckc_dsl_kw_hop | 3 | surface, ground, typed |
 
-- Route key order everywhere: direct, ir, stacked, hop, layered.
+The last four (dsl, dslh, dslk, dslkh) are the rev-3 M4 DSL routes; full
+interfaces in the "Revision 3" section. Route key order everywhere: direct, ir,
+stacked, hop, layered, dsl, dslh, dslk, dslkh.
 - Sources: 5 families (see dataset section); key order: directive, insert, table,
   prose, morph.
-- Experiment id: `exp.m2poc_5x5x5`. K_SAMPLES = 5.
+- Experiment id: rev-2 5-route field `exp.m2poc_5x5x5` (run matrix5); rev-3
+  9-route DSL field `exp.m2poc_dsl`. K_SAMPLES = 5.
 - Samples per item x source x route: s0 greedy `{"temperature": 0, "seed": 4242}`;
   s1..s4 stability `{"temperature": 0.7, "top_p": 0.9, "seed": 4251+n}` (n=1..4,
   so 4252..4255). `"max_tokens": 320` on every call. Every call within one sample
   uses that sample's params.
-- Scale check: 20 items x 5 sources x 5 routes x 5 samples = 2500 records;
-  20 x 5 x 5 x (1+1+2+3+3) = 5000 calls.
+- Scale check (rev-2): 20 items x 5 sources x 5 routes x 5 samples = 2500
+  records; 20 x 5 x 5 x (1+1+2+3+3) = 5000 calls. Rev-3 9-route field: 20 x 5 x 9
+  x 5 = 4500 records; 20 x 5 x 5 x (1+1+2+3+3+1+3+1+3) = 9000 calls.
 
 ## Vocabulary (canonical symbols)
 
@@ -502,9 +512,10 @@ gold); ids/groups/vocab byte-identical to m2poc-1; sources array exact; file
 ASCII purity. Output ASCII table family x check: ok/issue counts; fix issues in
 place and re-run.
 
-B2 (after all authors): py_compile all, `python3 -c` import chain, signature
-cross-check vs this design, dataset structural check (ids/refs/enums/ASCII
-purity), the smoke recipe, fix mechanical seams in place, report what changed.
+B2 (after all authors): py_compile all (incl. m2/grammars.py), `python3 -c`
+import chain, signature cross-check vs this design, dataset structural check
+(ids/refs/enums/ASCII purity), the smoke recipe, fix mechanical seams in place,
+report what changed. Rev-3 DSL gates live in the "Revision 3" section.
 
 ## Metrics intent (for report wording)
 
@@ -513,3 +524,312 @@ Locked synthetic fixture measurement, instrument = the deterministic gate chain
 translation route and the surface family of the same underlying rules. Findings
 wording: measured rates on synthetic fixtures, no clinical claims. The headline
 artifacts are the pooled baseline_delta table and the per-source metric matrix.
+
+## Revision 3 -- M4 invented DSLs (route field 5 -> 9)
+
+Revision 3 adds SPEC sec.11's invented IR/DSLs: two project-born DSL candidates
+under a GBNF grammar mask, each in a singular and a hop-layered config (4 new
+routes), parsed deterministically into the SAME IR dict the five rev-2 routes
+share, then `compile_ir` (unchanged) -> z3. Dataset, sources, gold, seeds, and
+the five rev-2 routes stay byte-identical to rev-2; the DSL run is a 9-route
+superset.
+
+Thesis (sec.11; the bar is route.single_ir, the rev-2 winner, and
+route.direct_smt, the M2 baseline): rev-2 pinned the discriminating gate at
+admission-time type coherence -- the var/op/value coupling JSON-Schema -> GBNF
+cannot express, so the IR routes saturate syntactic validity yet still leak
+incoherent conditions. A hand-written GBNF DOES couple var/op/value, so a
+grammar-masked DSL drives BOTH syntactic_validity and admission_rate toward
+~100% and pushes the signal onto verdict_accuracy and stability (semantic
+mistranslation the grammar cannot prevent). The two candidates hold grammar
+strength fixed (both tight) and vary token compactness -- the sec.11 design
+dimension, a sec.12 seed coordinate: candidate T is a terse infix line,
+candidate K a verbose keyword block. A documented null result (no DSL beats
+single_ir) is first-class.
+
+Unit sequencing: dsl-impl is one unit at the PoC's 1M context, built in two
+internally-gated passes in a single commit. Pass 1 (SINGULAR): m2/grammars.py
+(terse + keyword grammars, grammar_shas), the two canonical parsers, the chat
+grammar field, run threading, score's ROUTE_KEYS/ROUTE_IDS + dual baseline, and
+routes dsl + dslk -- smoked green. Pass 2 (HOP): the shared surface/ground DSL
+dialects and routes dslh + dslkh -- smoked green. dsl-run then runs all nine and
+adds the report/UI widening + README rows; poc-accept ranks the DSL field
+against single_ir and direct.
+
+### Candidate syntaxes
+
+Both candidates parse to the rev-2 IR dict
+`{"action": <enum>, "direction": <enum>, "conditions": [{"var","op","value"}, ...]}`
+and reuse `compile_ir`. Canonical examples (g01a forbid-aspirin-if-pregnant;
+g05b require-aspirin-if-anticoag-and-age<=70; an empty-guard require):
+
+Candidate T -- terse infix (route.ckc_dsl singular, route.ckc_dsl_hop layered):
+```
+forbid drug_aspirin when pregnant=true
+require drug_aspirin when on_anticoagulant=true & age<=70
+require drug_ibuprofen
+```
+Candidate K -- keyword block (route.ckc_dsl_kw singular, route.ckc_dsl_kw_hop):
+```
+RULE forbid drug_aspirin
+GUARD pregnant = true
+```
+```
+RULE require drug_aspirin
+GUARD on_anticoagulant = true AND age <= 70
+```
+```
+RULE require drug_ibuprofen
+GUARD none
+```
+T omits `when` for an empty guard; K writes `GUARD none`. K is token-heavier for
+the identical rule -- the compactness axis. The grammar pins spacing exactly
+(T: no spaces around `=`/ops; K: spaces, ` AND `, a newline), so the parsers are
+total on grammar output.
+
+### GBNF grammars (m2/grammars.py)
+
+New asset module; builders read the loaded dataset vocab so action/var/direction
+enums never drift (action = `vocab.actions` ids; boolvar = the Bool-typed
+`vocab.variables` ids; age is the lone Int var; direction = `vocab.directions`).
+The age value is pinned to the exact 0..130 range in the grammar (admission
+re-checks as a safety net). `grammar_shas(vocab) -> {route_key: {stage: sha256}}`
+over the GBNF text of each grammar-bearing stage, mirroring `schema_shas`. GBNF
+strings are ASCII; the `\n` in a char class is the two-character newline escape.
+
+`dsl_terse_gbnf(vocab)` (route.ckc_dsl main, route.ckc_dsl_hop typed):
+```
+root      ::= direction " " action guard?
+guard     ::= " when " cond (" & " cond)*
+direction ::= "forbid" | "require"
+action    ::= "drug_aspirin" | "drug_warfarin" | "drug_ibuprofen" | "drug_methotrexate"
+cond      ::= boolcond | agecond
+boolcond  ::= boolvar "=" boolval
+boolvar   ::= "pregnant" | "renal_impairment" | "hepatic_impairment" | "on_anticoagulant"
+boolval   ::= "true" | "false"
+agecond   ::= "age" ageop ageval
+ageop     ::= ">=" | "<=" | ">" | "<" | "="
+ageval    ::= "130" | "12" [0-9] | "1" [0-1] [0-9] | [1-9] [0-9] | [0-9]
+```
+The boolvar/boolval and age/ageop/ageval coupling is the grammar's whole point:
+`pregnant>=65` is unreachable. `ageval` is exactly 0..130 (no leading zeros).
+
+`dsl_kw_gbnf(vocab)` (route.ckc_dsl_kw main, route.ckc_dsl_kw_hop typed):
+```
+root      ::= "RULE " direction " " action "\n" "GUARD " guardbody
+guardbody ::= "none" | cond (" AND " cond)*
+direction ::= "forbid" | "require"
+action    ::= <as terse>
+cond      ::= boolcond | agecond
+boolcond  ::= boolvar " = " boolval
+boolvar   ::= <as terse>
+boolval   ::= "true" | "false"
+agecond   ::= "age " ageop " " ageval
+ageop     ::= ">=" | "<=" | ">" | "<" | "="
+ageval    ::= <as terse>
+```
+Same coupling, verbose surface (RULE/GUARD/AND keywords, spaces around `=`/ops,
+a newline).
+
+`dsl_surface_gbnf()` (shared; both hop routes' surface stage; no vocab, drug +
+phrases are free Japanese, like hop_surface_schema):
+```
+root      ::= direction " " raw guard?
+guard     ::= " when " raw (" & " raw)*
+direction ::= "forbid" | "require"
+raw       ::= char+
+char      ::= [^ &\n]
+```
+`raw` is any run of non-space, non-`&`, non-newline characters, so Japanese drug
+names and condition phrases pass while ` when ` and ` & ` stay delimiters.
+
+`dsl_ground_gbnf(vocab)` (shared; both hop routes' ground stage):
+```
+root      ::= direction " " action guard?
+guard     ::= " when " raw (" & " raw)*
+direction ::= "forbid" | "require"
+action    ::= <vocab action ids>
+raw       ::= char+
+char      ::= [^ &\n]
+```
+Delta from surface: the drug slot becomes the canonical action enum; phrases stay
+free Japanese.
+
+### DSL parsers (m2/routes.py)
+
+Deterministic, total on grammar output, lenient on surrounding whitespace; they
+STRUCTURE only -- vocab validation stays in admission (`_ir_structural_ok`),
+mirroring the rev-2 parse_ir/admit split. All return `(obj|None, code|None)`,
+code `"target_parse_error"` on shape mismatch.
+
+`parse_dsl_terse(text) -> (ir_dict|None, code)`: strip; partition on the first
+` when ` into head + guardpart; `head` matches `^(forbid|require) (\S+)$` ->
+direction, action; conditions = [] when no guard else `guardpart.split(" & ")`,
+each matched as age `^age(>=|<=|>|<|=)(\d+)$` (var "age", int value) or bool
+`^([a-z_]+)=(true|false)$` (op "=", bool value); any non-match -> parse error.
+Returns `{"action","direction","conditions":[{"var","op","value"}, ...]}`.
+
+`parse_dsl_kw(text) -> (ir_dict|None, code)`: strip; split lines; line 0
+`^RULE (forbid|require) (\S+)$`; line 1 `^GUARD (.+)$` -> body; conditions = []
+when body == "none" else `body.split(" AND ")`, each matched as age
+`^age (>=|<=|>|<|=) (\d+)$` or bool `^([a-z_]+) = (true|false)$` (spaces); any
+non-match -> parse error. Same ir_dict shape.
+
+`parse_dsl_surface(text) -> ({"direction","drug","conds":[str]}|None, code)`:
+strip; partition ` when `; head `^(forbid|require) (\S+)$` -> direction, drug;
+conds = [] or `guardpart.split(" & ")`.
+`parse_dsl_ground(text) -> ({"direction","action","conds":[str]}|None, code)`:
+identical, the second head token named `action` (enum-checked in admission).
+
+### route_stages, chat grammar field, run threading
+
+The stage descriptor gains a `grammar` slot:
+`route_stages(vocab) -> {route_key: [{"stage", "schema": dict|None, "grammar": str|None, "slots": [...]}, ...]}`.
+A JSON stage has `grammar` None and `schema` driving `response_format` (rev-2
+unchanged); a DSL stage has `schema` None and `grammar` the GBNF string;
+direct/main keeps both None. New entries (stage order = call order):
+
+| route | stage | slots | grammar |
+| --- | --- | --- | --- |
+| dsl | main | JA_TEXT | dsl_terse |
+| dslk | main | JA_TEXT | dsl_kw |
+| dslh | surface | JA_TEXT | dsl_surface |
+| dslh | ground | PRIOR_JSON | dsl_ground |
+| dslh | typed | PRIOR_JSON | dsl_terse |
+| dslkh | surface | JA_TEXT | dsl_surface |
+| dslkh | ground | PRIOR_JSON | dsl_ground |
+| dslkh | typed | PRIOR_JSON | dsl_kw |
+
+dslh/dslkh share surface + ground (grammar AND prompt) and diverge only at
+`typed` (terse vs keyword), mirroring route.ir_hop_chain stage for stage except
+the wire dialect -- the controlled "DSL landing vs JSON-IR landing" contrast. The
+`{PRIOR_JSON}` slot carries the prior stage's raw string verbatim (the runner
+already threads it); for DSL that string is the previous DSL line. Later hops see
+only the prior line (no sentence), as in route.ir_hop_chain.
+
+`m2/llm.py`: `chat(..., grammar=None)` adds `body["grammar"] = grammar` when set
+(verified live on b9601: `/v1/chat/completions` honors a GBNF `grammar` body
+field). A stage carries EITHER `response_format` (JSON) OR `grammar` (DSL), never
+both.
+
+`m2/run_m2.py`: per stage pass `grammar=st["grammar"]` to `chat` (None for JSON
+stages); validate `--routes` keys against `route_stages(vocab)` keys (a route
+whose stages are not yet wired is rejected, not silently skipped); the DSL run's
+experiment id is `exp.m2poc_dsl`.
+
+### Prompts (DSL stages, m2/routes.py build_prompts)
+
+Same recipe as rev-2: English instructions, ONE worked example per stage built
+from vocab ja fields (the example rule require drug_ibuprofen if age>=12, reusing
+`ibu_ja`/`age_ja`/`ex_cond`), an exact output-format block,
+`_vocab_block`/`_actions_block`/`_vars_block` reused, Japanese only via vocab ja
+fields and the {JA_TEXT} slot. Per stage:
+
+- dsl/main: full vocab head + direction line + the terse format
+  (`<direction> <action_id> [when <cond> & <cond> ...]`, cond = `age<op><0-130>`
+  or `<bool_var>=<true|false>`, omit `when` for none) + ops line + example
+  `require drug_ibuprofen when age>=12`. Slots [JA_TEXT].
+- dslk/main: full vocab head + the keyword format (two lines
+  `RULE <direction> <action_id>` / `GUARD <cond> AND <cond> ...`, `GUARD none`
+  for none) + ops line + the two-line example. Slots [JA_TEXT].
+- {dslh,dslkh}/surface (shared prompt): "write one line
+  `<direction> <drug as written> [when <phrase> & ...]`; direction forbid or
+  require" + example `require <ibu_ja> when <ex_cond>`. Slots [JA_TEXT].
+- {dslh,dslkh}/ground (shared): actions head + "replace the drug name with its
+  action id; keep direction and phrases unchanged" + example
+  `require <ibu_ja> when <ex_cond>` -> `require drug_ibuprofen when <ex_cond>`.
+  Slots [PRIOR_JSON].
+- dslh/typed: vars head + ops + "type each condition phrase as `age<op><0-130>`
+  or `<bool_var>=<true|false>`; keep direction and action" + example
+  `require drug_ibuprofen when <ex_cond>` -> `require drug_ibuprofen when age>=12`.
+  Slots [PRIOR_JSON]. dslkh/typed: same instruction, the keyword output shape.
+
+`prompt_sha` (rev-2, iterates the prompts subtree) extends automatically;
+`schema_shas` is unchanged (DSL stages carry no schema); `grammar_shas` is new.
+
+### Admission (m2/admit.py)
+
+`admit_route` dispatch gains: dsl -> `admit_dsl(c0, vocab, parse_dsl_terse)`;
+dslk -> `admit_dsl(c0, vocab, parse_dsl_kw)`; dslh ->
+`_admit_dsl_hop(contents, vocab, parse_dsl_terse)`; dslkh ->
+`_admit_dsl_hop(contents, vocab, parse_dsl_kw)` (c0 = contents[0] if contents
+else "").
+
+`admit_dsl(text, vocab, parser)`: parser -> ir; ir None -> (False, False, code,
+"main", None); not `_ir_structural_ok(ir, vocab)` -> (True, False,
+"ai_schema_violation", "main", None); else `compile_ir` + z3 sanity, z3 error ->
+(True, False, "solver_execution_failure", "main", None); else admitted.
+
+`_admit_dsl_hop(contents, vocab, typed_parser)`: pad contents to 3; parse
+surface, ground, typed in order (parse_dsl_surface, parse_dsl_ground,
+typed_parser) -- first parse failure -> syntactic_valid False,
+target_parse_error, that stage. After all parse, syntactic_valid True; structural
+pass in order: ground `action` in vocab action ids else ai_schema_violation at
+"ground"; typed `_ir_structural_ok` else ai_schema_violation at "typed" (surface
+needs no extra check -- its regex pins direction and a non-empty drug). Then
+`compile_ir(typed_ir)` + z3 sanity (error -> solver_execution_failure at
+"typed"). This mirrors rev-2 `_admit_multi`'s parse-all-then-check-all shape,
+keeping per-stage failure attribution comparable across routes.
+
+### Scoring + report (m2/score.py, m2/report.py)
+
+- `ROUTE_KEYS = ("direct","ir","stacked","hop","layered","dsl","dslh","dslk","dslkh")`;
+  `ROUTE_IDS` adds dsl->route.ckc_dsl, dslh->route.ckc_dsl_hop,
+  dslk->route.ckc_dsl_kw, dslkh->route.ckc_dsl_kw_hop. (Authored whole in
+  dsl-impl-core; hop routes simply have no records until dsl-impl-hop, scored as
+  empty cells per the rev-2 partial-run rule.)
+- baseline_delta gains a SECOND baseline: each cell becomes
+  `{"value", "delta", "delta_ir"}` where `delta` is vs route.direct_smt (rev-2,
+  unchanged -- direct's delta 0.0) and `delta_ir` is vs route.single_ir
+  (single_ir's delta_ir 0.0). sec.11 measures deltas against direct_smt AND the
+  rev-2 field winner; the roadmap names single_ir as that bar. delta_ir is null
+  only when single_ir is absent from a scope (full run: always present).
+  render_md keeps the rev-2 vs-direct table from `delta`; dsl-run adds a
+  vs-single_ir table from `delta_ir`.
+- `FINDING_LABELS` adds dsl->"dsl", dslh->"dsl-hop", dslk->"dsl-kw",
+  dslkh->"dsl-kw-hop" (ASCII, no \uXXXX needed); finding_en/finding_ja already
+  iterate route order, so the per-finding sentences extend automatically
+  (.get fallback keeps them safe before the labels land).
+- report identities (step 8) add `grammar_sha256 = grammar_shas(vocab)` beside
+  schema_sha256. All metric/taxonomy/per-source tables widen to 9 route columns
+  by iterating ROUTE_KEYS (no per-route literals to touch).
+
+### UI (ui/index.html, dsl-run)
+
+Route columns extend to 9 from the routes echo (already route-driven). The
+verdict banner adds the best DSL route's pooled verdict_accuracy_greedy and its
+delta vs single_ir (the headline M4 claim). The metrics table shows, per DSL
+cell, the delta vs single_ir alongside the existing delta vs direct. No new
+external requests.
+
+### Run, audit, gates
+
+The DSL run (`exp.m2poc_dsl`, a new run id) is a 9-route superset over the rev-2
+inputs; because dataset/sources/gold/seeds and the five rev-2 routes are
+byte-identical to matrix5, dsl-run MAY seed the run dir with matrix5's
+five-route records (resume skips existing files) and run only the four DSL
+routes, or run all nine fresh -- either scores identically.
+
+B2 also py_compiles m2/grammars.py, import-chains it, and cross-checks the DSL
+parser/grammar/admit/score signatures against this section. dsl-impl smoke checkpoints (one
+per pass; k=1, one group, one source; include direct + ir so both baseline-delta
+tables carry their baselines -- render_md is robust to absent routes, rendering
+"-"):
+- pass 1 singular: `run --run-id smoke_dslc --groups g01 --sources directive --routes direct,ir,dsl,dslk --k 1`
+  then `score` + `replay`.
+- pass 2 hop: `run --run-id smoke_dslh --groups g01 --sources directive --routes direct,ir,dslh,dslkh --k 1`
+  then `score` + `replay`.
+ASCII discipline holds: GBNF strings, parsers, and prompts are ASCII; Japanese
+enters only via vocab ja fields, the {JA_TEXT} slot, and recorded model I/O
+(the surface/ground DSL outputs carry Japanese phrases, redacted in stdout).
+
+### Metrics intent (M4)
+
+A tight grammar collapses syntactic_validity and admission_rate toward ~100% for
+the DSL routes, so the discriminating signal moves to verdict_accuracy and
+stability (the grammar cannot prevent semantic mistranslation). T-vs-K isolates
+token compactness; the hop configs mirror route.ir_hop_chain except the landing
+dialect, isolating whether an invented DSL landing beats a JSON-IR landing on the
+final typing hop. Baselines: route.direct_smt (the weak baseline) and
+route.single_ir (the rev-2 field winner, the bar M4 must clear). A documented
+null result -- no DSL form beats single_ir -- is a first-class outcome (sec.11).
