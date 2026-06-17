@@ -57,13 +57,15 @@ class LlamaServer:
 
 
 def chat(port, messages, seed, temperature, top_p=None, max_tokens=320,
-         response_format=None, timeout_s=300):
+         response_format=None, grammar=None, timeout_s=300):
     body = {"messages": messages, "seed": seed, "temperature": temperature,
             "max_tokens": max_tokens}
     if top_p is not None:
         body["top_p"] = top_p
     if response_format is not None:
         body["response_format"] = response_format
+    if grammar is not None:
+        body["grammar"] = grammar  # GBNF mask; a stage carries this XOR response_format
     req = urllib.request.Request(
         f"http://127.0.0.1:{port}/v1/chat/completions",
         data=json.dumps(body, ensure_ascii=True).encode(),

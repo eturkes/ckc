@@ -8,9 +8,21 @@ import hashlib
 import json
 import re
 
+from m2 import grammars
+
 CANON_VARS = ("age", "pregnant", "renal_impairment", "hepatic_impairment",
               "on_anticoagulant")
 OPS = (">=", "<=", ">", "<", "=")
+
+# rev-3 DSL parse regexes. terse: no spaces around =/ops; kw: spaces, RULE/GUARD,
+# ' AND '. Both head shapes share _DSL_HEAD (surface/ground reuse it too).
+_DSL_HEAD = re.compile(r"^(forbid|require) (\S+)$")
+_DSL_T_AGE = re.compile(r"^age(>=|<=|>|<|=)(\d+)$")
+_DSL_T_BOOL = re.compile(r"^([a-z_]+)=(true|false)$")
+_DSL_K_RULE = re.compile(r"^RULE (forbid|require) (\S+)$")
+_DSL_K_GUARD = re.compile(r"^GUARD (.+)$")
+_DSL_K_AGE = re.compile(r"^age (>=|<=|>|<|=) (\d+)$")
+_DSL_K_BOOL = re.compile(r"^([a-z_]+) = (true|false)$")
 
 _DEFINE_RE = re.compile(r"\(define-fun\s+applies\s*\(\s*\)\s*Bool\b")
 _META_RE = re.compile(r";\s*action=(\S+)\s+direction=(\S+)")
@@ -70,6 +82,91 @@ def parse_ir(text):
     if not isinstance(obj, dict):
         return None, "target_parse_error"
     return obj, None
+
+
+# --- rev-3 DSL parsers: deterministic, total on grammar output, lenient on
+# surrounding whitespace. They STRUCTURE only; vocab validation stays in
+# admission (_ir_structural_ok), mirroring the parse_ir/admit split.
+
+
+def _dsl_type_conds(raw_conds, age_re, bool_re):
+    """Typed condition dicts from DSL cond tokens; None on any non-match.
+    [] input -> [] (empty guard), distinct from None (parse error)."""
+    out = []
+    for c in raw_conds:
+        m = age_re.match(c)
+        if m:
+            out.append({"var": "age", "op": m.group(1), "value": int(m.group(2))})
+            continue
+        m = bool_re.match(c)
+        if m:
+            out.append({"var": m.group(1), "op": "=", "value": m.group(2) == "true"})
+            continue
+        return None
+    return out
+
+
+def parse_dsl_terse(text):
+    """Terse line -> (ir_dict|None, code). Partition on the first ' when '."""
+    s = text.strip()
+    if " when " in s:
+        head, _, guardpart = s.partition(" when ")
+        raw_conds = guardpart.split(" & ")
+    else:
+        head, raw_conds = s, []
+    m = _DSL_HEAD.match(head)
+    if m is None:
+        return None, "target_parse_error"
+    conditions = _dsl_type_conds(raw_conds, _DSL_T_AGE, _DSL_T_BOOL)
+    if conditions is None:
+        return None, "target_parse_error"
+    return {"action": m.group(2), "direction": m.group(1),
+            "conditions": conditions}, None
+
+
+def parse_dsl_kw(text):
+    """Keyword block -> (ir_dict|None, code). Two lines: RULE then GUARD."""
+    lines = text.strip().split("\n")
+    if len(lines) != 2:
+        return None, "target_parse_error"
+    m0 = _DSL_K_RULE.match(lines[0])
+    m1 = _DSL_K_GUARD.match(lines[1])
+    if m0 is None or m1 is None:
+        return None, "target_parse_error"
+    body = m1.group(1)
+    if body == "none":
+        conditions = []
+    else:
+        conditions = _dsl_type_conds(body.split(" AND "), _DSL_K_AGE, _DSL_K_BOOL)
+        if conditions is None:
+            return None, "target_parse_error"
+    return {"action": m0.group(2), "direction": m0.group(1),
+            "conditions": conditions}, None
+
+
+def _parse_dsl_phrase_line(text, slot_key):
+    """surface/ground shared shape: '<dir> <token>' + free ' & ' phrases."""
+    s = text.strip()
+    if " when " in s:
+        head, _, guardpart = s.partition(" when ")
+        conds = guardpart.split(" & ")
+    else:
+        head, conds = s, []
+    m = _DSL_HEAD.match(head)
+    if m is None:
+        return None, "target_parse_error"
+    return {"direction": m.group(1), slot_key: m.group(2), "conds": conds}, None
+
+
+def parse_dsl_surface(text):
+    """Surface line -> ({direction, drug, conds}|None, code)."""
+    return _parse_dsl_phrase_line(text, "drug")
+
+
+def parse_dsl_ground(text):
+    """Ground line -> ({direction, action, conds}|None, code); action enum-checked
+    in admission."""
+    return _parse_dsl_phrase_line(text, "action")
 
 
 def _sval(v):
@@ -223,38 +320,67 @@ def layered_statement_schema(vocab):
 
 
 def route_stages(vocab):
-    """-> {route_key: [{"stage", "schema", "slots"}, ...]} in call order.
-    schema None only for direct/main. Runner uses schema as response_format
-    and slots to fill the user_template; admit walks the same stage order."""
+    """-> {route_key: [{"stage", "schema", "grammar", "slots"}, ...]} in call
+    order. A JSON stage has grammar None and schema driving response_format; a
+    DSL stage has schema None and grammar the GBNF string; direct/main has both
+    None. Runner uses schema/grammar on the wire and slots to fill the
+    user_template; admit walks the same stage order."""
     ir_schema = ir_json_schema(vocab)
+    g = grammars.dsl_stage_grammars(vocab)
     return {
         "direct": [
-            {"stage": "main", "schema": None, "slots": ["JA_TEXT"]},
+            {"stage": "main", "schema": None, "grammar": None,
+             "slots": ["JA_TEXT"]},
         ],
         "ir": [
-            {"stage": "main", "schema": ir_schema, "slots": ["JA_TEXT"]},
+            {"stage": "main", "schema": ir_schema, "grammar": None,
+             "slots": ["JA_TEXT"]},
         ],
         "stacked": [
             {"stage": "frame", "schema": stacked_frame_schema(vocab),
-             "slots": ["JA_TEXT"]},
+             "grammar": None, "slots": ["JA_TEXT"]},
             {"stage": "rows", "schema": stacked_rows_schema(vocab),
-             "slots": ["JA_TEXT", "FRAME_JSON"]},
+             "grammar": None, "slots": ["JA_TEXT", "FRAME_JSON"]},
         ],
         "hop": [
             {"stage": "surface", "schema": hop_surface_schema(),
-             "slots": ["JA_TEXT"]},
+             "grammar": None, "slots": ["JA_TEXT"]},
             {"stage": "ground", "schema": hop_ground_schema(vocab),
-             "slots": ["PRIOR_JSON"]},
+             "grammar": None, "slots": ["PRIOR_JSON"]},
             {"stage": "typed", "schema": ir_schema,
-             "slots": ["PRIOR_JSON"]},
+             "grammar": None, "slots": ["PRIOR_JSON"]},
         ],
         "layered": [
             {"stage": "segment", "schema": layered_segment_schema(),
-             "slots": ["JA_TEXT"]},
+             "grammar": None, "slots": ["JA_TEXT"]},
             {"stage": "statement", "schema": layered_statement_schema(vocab),
-             "slots": ["JA_TEXT", "PRIOR_JSON"]},
+             "grammar": None, "slots": ["JA_TEXT", "PRIOR_JSON"]},
             {"stage": "rule", "schema": ir_schema,
-             "slots": ["JA_TEXT", "PRIOR_JSON"]},
+             "grammar": None, "slots": ["JA_TEXT", "PRIOR_JSON"]},
+        ],
+        "dsl": [
+            {"stage": "main", "schema": None, "grammar": g["dsl"]["main"],
+             "slots": ["JA_TEXT"]},
+        ],
+        "dslh": [
+            {"stage": "surface", "schema": None,
+             "grammar": g["dslh"]["surface"], "slots": ["JA_TEXT"]},
+            {"stage": "ground", "schema": None,
+             "grammar": g["dslh"]["ground"], "slots": ["PRIOR_JSON"]},
+            {"stage": "typed", "schema": None,
+             "grammar": g["dslh"]["typed"], "slots": ["PRIOR_JSON"]},
+        ],
+        "dslk": [
+            {"stage": "main", "schema": None, "grammar": g["dslk"]["main"],
+             "slots": ["JA_TEXT"]},
+        ],
+        "dslkh": [
+            {"stage": "surface", "schema": None,
+             "grammar": g["dslkh"]["surface"], "slots": ["JA_TEXT"]},
+            {"stage": "ground", "schema": None,
+             "grammar": g["dslkh"]["ground"], "slots": ["PRIOR_JSON"]},
+            {"stage": "typed", "schema": None,
+             "grammar": g["dslkh"]["typed"], "slots": ["PRIOR_JSON"]},
         ],
     }
 
@@ -279,6 +405,8 @@ def _vocab_block(vocab):
 _DIRECTION_LINE = "Directions: require = must administer; forbid = must not administer."
 _OPS_LINE = ("Ops: >= <= > < = for age; = for Bool variables with value true or "
              "false. All conditions AND together; use [] if there are none.")
+_DSL_OPS_LINE = ("Ops: >= <= > < = for age; = for Bool variables with value "
+                 "true or false.")
 _POLARITY_LINE = "Polarity mapping: do -> require, do_not -> forbid."
 _MODALITY_LINE = "Modality mapping: must -> require, must_not -> forbid."
 _EX_RULE = "Example rule: patients aged 12 or older must receive ibuprofen."
@@ -290,11 +418,12 @@ _EX_IR = ('{"action": "drug_ibuprofen", "direction": "require", '
 
 def build_prompts(vocab):
     """-> {route_key: {stage: {"system": str, "user_template": str}}} for all
-    five routes; single-call routes use stage "main". direct/main and ir/main
-    are byte-identical to the revision 1 builders. Every stage carries one
-    worked example (require drug_ibuprofen if age>=12); multi-stage examples
-    show the example prior JSON. Japanese in templates comes only from vocab
-    ja fields; consume slots with .replace, never .format."""
+    nine routes; single-call routes use stage "main". The five rev-2 routes are
+    byte-identical to rev-2; dslh/dslkh share surface + ground prompts and
+    diverge at typed. Every stage carries one worked example (require
+    drug_ibuprofen if age>=12); multi-stage examples show the example prior
+    line/JSON. Japanese in templates comes only from vocab ja fields; consume
+    slots with .replace, never .format."""
     head = ("Vocabulary (Japanese = symbol):\n" + _vocab_block(vocab)
             + "\n\n" + _DIRECTION_LINE + "\n")
     actions_head = ("Drugs (Japanese = action id):\n" + _actions_block(vocab)
@@ -434,6 +563,70 @@ def build_prompts(vocab):
         + "Statement JSON: " + ex_statement + "\n"
         + _EX_IR + "\n"
         + "\nRule: {JA_TEXT}\nStatement JSON: {PRIOR_JSON}")
+    dsl_main_user = (
+        head
+        + "\nOutput exactly one line in this format, nothing else:\n"
+        + "<direction> <action_id> [when <cond> & <cond> ...]\n"
+        + "Each cond is age<op><0-130> (e.g. age>=12) or <bool_var>=<true|false> "
+        + "(e.g. pregnant=true); join conds with ' & '; omit 'when' if there are "
+        + "none.\n"
+        + _DSL_OPS_LINE + "\n"
+        + "\n" + _EX_RULE + "\n"
+        + "require drug_ibuprofen when age>=12\n"
+        + "\nRule: {JA_TEXT}")
+    dslk_main_user = (
+        head
+        + "\nOutput exactly two lines in this format, nothing else:\n"
+        + "RULE <direction> <action_id>\n"
+        + "GUARD <cond> AND <cond> ...\n"
+        + "Each cond is 'age <op> <0-130>' (e.g. age >= 12) or "
+        + "'<bool_var> = <true|false>' (e.g. pregnant = true); join conds with "
+        + "' AND '; write GUARD none if there are no conditions.\n"
+        + _DSL_OPS_LINE + "\n"
+        + "\n" + _EX_RULE + "\n"
+        + "RULE require drug_ibuprofen\nGUARD age >= 12\n"
+        + "\nRule: {JA_TEXT}")
+    dsl_surface_user = (
+        "From the Japanese rule sentence write one line in this format:\n"
+        + "<direction> <drug as written> [when <phrase> & <phrase> ...]\n"
+        + "direction is forbid or require; copy the drug name and each condition "
+        + "phrase exactly as written; join phrases with ' & '; omit 'when' if "
+        + "there are none.\n"
+        + "\n" + _EX_RULE + "\n"
+        + "require " + ibu_ja + " when " + ex_cond + "\n"
+        + "\nRule: {JA_TEXT}")
+    dsl_ground_user = (
+        actions_head
+        + "\nRewrite the input line: replace the drug name with its action id "
+        + "from the table above; keep the direction and every condition phrase "
+        + "unchanged.\n"
+        + "\n" + _EX_RULE + "\n"
+        + "Input line: require " + ibu_ja + " when " + ex_cond + "\n"
+        + "require drug_ibuprofen when " + ex_cond + "\n"
+        + "\nInput line: {PRIOR_JSON}")
+    dslh_typed_user = (
+        vars_head
+        + "\n" + _DSL_OPS_LINE + "\n"
+        + "\nRewrite the input line into a typed rule: keep the direction and "
+        + "action; type each condition phrase as age<op><0-130> or "
+        + "<bool_var>=<true|false>.\n"
+        + "\n" + _EX_RULE + "\n"
+        + "Input line: require drug_ibuprofen when " + ex_cond + "\n"
+        + "require drug_ibuprofen when age>=12\n"
+        + "\nInput line: {PRIOR_JSON}")
+    dslkh_typed_user = (
+        vars_head
+        + "\n" + _DSL_OPS_LINE + "\n"
+        + "\nRewrite the input line into a typed rule on two lines:\n"
+        + "RULE <direction> <action_id>\n"
+        + "GUARD <cond> AND <cond> ...\n"
+        + "keep the direction and action; type each condition phrase as "
+        + "'age <op> <0-130>' or '<bool_var> = <true|false>'; write GUARD none "
+        + "if there are no conditions.\n"
+        + "\n" + _EX_RULE + "\n"
+        + "Input line: require drug_ibuprofen when " + ex_cond + "\n"
+        + "RULE require drug_ibuprofen\nGUARD age >= 12\n"
+        + "\nInput line: {PRIOR_JSON}")
 
     return {
         "direct": {
@@ -497,6 +690,56 @@ def build_prompts(vocab):
                            "fully typed rule as JSON. Output only the required "
                            "JSON."),
                 "user_template": rule_user,
+            },
+        },
+        "dsl": {
+            "main": {
+                "system": ("You translate one Japanese clinical rule into a "
+                           "compact rule line. Output only the required format."),
+                "user_template": dsl_main_user,
+            },
+        },
+        "dslh": {
+            "surface": {
+                "system": ("You extract a direction, drug, and condition "
+                           "phrases from one Japanese rule sentence as one line. "
+                           "Output only the required format."),
+                "user_template": dsl_surface_user,
+            },
+            "ground": {
+                "system": ("You ground the drug name in one rule line to its "
+                           "canonical action id. Output only the required format."),
+                "user_template": dsl_ground_user,
+            },
+            "typed": {
+                "system": ("You rewrite one rule line into a fully typed rule "
+                           "line. Output only the required format."),
+                "user_template": dslh_typed_user,
+            },
+        },
+        "dslk": {
+            "main": {
+                "system": ("You translate one Japanese clinical rule into a "
+                           "keyword rule block. Output only the required format."),
+                "user_template": dslk_main_user,
+            },
+        },
+        "dslkh": {
+            "surface": {
+                "system": ("You extract a direction, drug, and condition "
+                           "phrases from one Japanese rule sentence as one line. "
+                           "Output only the required format."),
+                "user_template": dsl_surface_user,
+            },
+            "ground": {
+                "system": ("You ground the drug name in one rule line to its "
+                           "canonical action id. Output only the required format."),
+                "user_template": dsl_ground_user,
+            },
+            "typed": {
+                "system": ("You rewrite one rule line into a fully typed keyword "
+                           "rule block. Output only the required format."),
+                "user_template": dslkh_typed_user,
             },
         },
     }

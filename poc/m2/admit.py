@@ -165,6 +165,45 @@ def _admit_multi(route_key, contents, vocab):
     return _result(True, True, None, None, rule)
 
 
+def admit_dsl(text, vocab, parser):
+    """rev-3 singular DSL gate (route.ckc_dsl, route.ckc_dsl_kw); parser is
+    parse_dsl_terse or parse_dsl_kw. failed_stage 'main' on any failure."""
+    ir, code = parser(text)
+    if ir is None:
+        return _result(False, False, code, "main", None)
+    if not _ir_structural_ok(ir, vocab):
+        return _result(True, False, "ai_schema_violation", "main", None)
+    rule = routes.compile_ir(ir)
+    if _z3_sanity(rule["formula"])["status"] == "error":
+        return _result(True, False, "solver_execution_failure", "main", None)
+    return _result(True, True, None, None, rule)
+
+
+def _admit_dsl_hop(contents, vocab, typed_parser):
+    """rev-3 hop DSL gate (route.ckc_dsl_hop, route.ckc_dsl_kw_hop): parse
+    surface, ground, typed in order (all-parse, then check-all), mirroring
+    _admit_multi. typed_parser is parse_dsl_terse or parse_dsl_kw."""
+    actions = {a["id"] for a in vocab["actions"]}
+    stages = ("surface", "ground", "typed")
+    parsers = (routes.parse_dsl_surface, routes.parse_dsl_ground, typed_parser)
+    texts = list(contents) + [""] * (len(stages) - len(contents))
+    objs = []
+    for stage, parser, text in zip(stages, parsers, texts):
+        obj, code = parser(text)
+        if obj is None:
+            return _result(False, False, code, stage, None)
+        objs.append(obj)
+    if objs[1]["action"] not in actions:
+        return _result(True, False, "ai_schema_violation", "ground", None)
+    typed_ir = objs[2]
+    if not _ir_structural_ok(typed_ir, vocab):
+        return _result(True, False, "ai_schema_violation", "typed", None)
+    rule = routes.compile_ir(typed_ir)
+    if _z3_sanity(rule["formula"])["status"] == "error":
+        return _result(True, False, "solver_execution_failure", "typed", None)
+    return _result(True, True, None, None, rule)
+
+
 def admit_route(route_key, contents, vocab):
     """contents = per-stage content strings from a record's calls, stage order.
     -> AdmissionResult {syntactic_valid, admitted, failure_code, failed_stage, rule}."""
@@ -172,4 +211,13 @@ def admit_route(route_key, contents, vocab):
         return admit_direct(contents[0] if contents else "")
     if route_key == "ir":
         return admit_ir(contents[0] if contents else "", vocab)
+    c0 = contents[0] if contents else ""
+    if route_key == "dsl":
+        return admit_dsl(c0, vocab, routes.parse_dsl_terse)
+    if route_key == "dslk":
+        return admit_dsl(c0, vocab, routes.parse_dsl_kw)
+    if route_key == "dslh":
+        return _admit_dsl_hop(contents, vocab, routes.parse_dsl_terse)
+    if route_key == "dslkh":
+        return _admit_dsl_hop(contents, vocab, routes.parse_dsl_kw)
     return _admit_multi(route_key, contents, vocab)

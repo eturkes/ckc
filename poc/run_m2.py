@@ -18,7 +18,6 @@ MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e
 SERVER_BIN = POC / "vendor" / "llama-b9601" / "llama-server"
 PORT = 8077
 MAX_TOKENS = 320
-ROUTE_KEYS = ("direct", "ir", "stacked", "hop", "layered")
 
 
 def jdump_bytes(obj):
@@ -115,18 +114,18 @@ def cmd_run(args):
     rec_dir = run_dir / "records"
     rec_dir.mkdir(parents=True, exist_ok=True)
 
+    prompts = routes.build_prompts(dataset["vocab"])
+    stages = routes.route_stages(dataset["vocab"])
+
     group_ids = select_keys(args.groups, [g["id"] for g in dataset["groups"]], "group")
     source_keys = select_keys(args.sources, [s["key"] for s in dataset["sources"]], "source")
-    route_keys = select_keys(args.routes, ROUTE_KEYS, "route")
+    route_keys = select_keys(args.routes, list(stages), "route")
 
     gold_gate(dataset, routes, verdict)
 
     groups_by_id = {g["id"]: g for g in dataset["groups"]}
     items = {it["id"]: it for it in dataset["items"]}
     item_ids = [m for gid in group_ids for m in groups_by_id[gid]["members"]]
-
-    prompts = routes.build_prompts(dataset["vocab"])
-    stages = routes.route_stages(dataset["vocab"])
 
     todo = [(i, src, rt, n) for i in item_ids for src in source_keys
             for rt in route_keys for n in range(args.k)]
@@ -162,7 +161,8 @@ def cmd_run(args):
                                           "strict": True, "schema": st["schema"]}}
                 res = llm.chat(PORT, messages, seed=p["seed"],
                                temperature=p["temperature"], top_p=p["top_p"],
-                               max_tokens=MAX_TOKENS, response_format=rf)
+                               max_tokens=MAX_TOKENS, response_format=rf,
+                               grammar=st.get("grammar"))
                 calls.append({"stage": st["stage"], "request": res["request"],
                               "response": res["response"],
                               "duration_ms": res["duration_ms"]})

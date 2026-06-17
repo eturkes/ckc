@@ -12,21 +12,26 @@ import json
 import subprocess
 from pathlib import Path
 
-from m2 import admit, routes, verdict
+from m2 import admit, grammars, routes, verdict
 from m2 import report as report_mod
 
-ROUTE_KEYS = ("direct", "ir", "stacked", "hop", "layered")
+ROUTE_KEYS = ("direct", "ir", "stacked", "hop", "layered",
+              "dsl", "dslh", "dslk", "dslkh")
 ROUTE_IDS = {
     "direct": "route.direct_smt",
     "ir": "route.single_ir",
     "stacked": "route.stacked_ir",
     "hop": "route.ir_hop_chain",
     "layered": "route.ckc_layered",
+    "dsl": "route.ckc_dsl",
+    "dslh": "route.ckc_dsl_hop",
+    "dslk": "route.ckc_dsl_kw",
+    "dslkh": "route.ckc_dsl_kw_hop",
 }
 MODEL_NAME = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
 MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
 LLAMA_BUILD = "b9601 (4c6595503)"
-EXPERIMENT_ID = "exp.m2poc_5x5x5"
+EXPERIMENT_ID = "exp.m2poc_dsl"
 PORT = 8077
 MAX_TOKENS = 320
 
@@ -188,17 +193,25 @@ def score_run(run_dir, dataset):
               for rk in ROUTE_KEYS if rk in pooled_nums}
     metrics = {"pooled": pooled, "by_source": by_source}
 
-    # 5. baseline delta per metric, value + delta vs direct (direct delta 0.0).
+    # 5. baseline delta per metric: value + delta vs direct (rev-2; direct delta
+    # 0.0) + delta_ir vs single_ir (rev-3; single_ir delta_ir 0.0). delta_ir is
+    # None only when single_ir is absent from a scope (full run: always present).
     def delta_scope(per_route):
         d_id = ROUTE_IDS["direct"]
         if d_id not in per_route:
             return None
+        ir_id = ROUTE_IDS["ir"]
+        ir_present = ir_id in per_route
         out = {}
         for m in metric_names:
             dv = per_route[d_id][m]["value"]
+            iv = per_route[ir_id][m]["value"] if ir_present else None
             out[m] = {
                 rid: {"value": cells[m]["value"],
-                      "delta": 0.0 if rid == d_id else _r4(cells[m]["value"] - dv)}
+                      "delta": 0.0 if rid == d_id else _r4(cells[m]["value"] - dv),
+                      "delta_ir": (None if not ir_present else
+                                   0.0 if rid == ir_id else
+                                   _r4(cells[m]["value"] - iv))}
                 for rid, cells in per_route.items()}
         return out
 
@@ -288,6 +301,7 @@ def score_run(run_dir, dataset):
             json.dumps(dataset, ensure_ascii=True, sort_keys=True, indent=1).encode()),
         "prompt_sha": routes.prompt_sha(prompts),
         "schema_sha256": routes.schema_shas(vocab),
+        "grammar_sha256": grammars.grammar_shas(vocab),
         "server_props": server_props,
     }
 

@@ -22,17 +22,17 @@ routes, ranked against the existing five-route field on the locked z3 evaluator.
 - [x] dsl-design: DESIGN.md rev-3 — §11 DSL routes, two compactness candidates
   (T terse / K keyword), each singular + 3-call hop; GBNF builders, DSL parsers,
   dual baseline (vs direct + single_ir), matrix slotting; dsl-impl consolidated
-  to one unit at 1M. 20% 205K/1M _
-- [ ] dsl-impl: implement the four §11 DSL routes per the rev-3 contract
-  ("Revision 3" section) in two internally-gated passes — singular (dsl, dslk)
-  then hop (dslh, dslkh): `m2/grammars.py` (GBNF builders + grammar_shas), the
-  DSL parsers, chat grammar field, run threading, admit dispatch, and score
-  ROUTE_KEYS/ROUTE_IDS + dual baseline (`m2/routes.py`, `m2/grammars.py`,
-  `m2/admit.py`, `m2/llm.py`, `m2/run_m2.py`, `m2/score.py`). Reading: rev-3
-  `DESIGN.md`; `git show HEAD` route/admit/score patterns; existing `single_ir`
-  + `ir_hop_chain` routes. Gate: `python3 -m py_compile` on changed modules +
-  the rev-3 smoke recipes (`smoke_dslc` singular, `smoke_dslh` hop), each
-  `run`+`score`+`replay` green.
+  to one unit at 1M. 20% 205K/1M 0d2524a
+- [x] dsl-impl: four §11 DSL routes (dsl/dslk singular, dslh/dslkh 3-call hop)
+  on a GBNF mask, parsed to the shared rev-2 IR -> compile_ir. New
+  `m2/grammars.py` (terse+kw+surface+ground builders, dsl_stage_grammars,
+  grammar_shas); `routes.py` DSL parsers + route_stages grammar slot + DSL
+  prompts; `admit.py` admit_dsl/_admit_dsl_hop dispatch; `llm.py` chat grammar
+  field; `run_m2.py` validates --routes vs route_stages + threads grammar;
+  `score.py` 9-route ROUTE_KEYS/IDS + delta_ir (vs single_ir) + grammar_sha256
+  + EXPERIMENT_ID exp.m2poc_dsl. rev-2 routes byte-identical (prompt/schema sha
+  match matrix5). Gate green: py_compile + smoke_dslc (singular) + smoke_dslh
+  (hop), each run+score+replay (replay byte-match). 17% 170K/1M _
 - [ ] dsl-run: run the 9-route field (`exp.m2poc_dsl`) over 5 sources × k5 (MAY
   reuse matrix5's five-route records); `score` → `report.{json,md,ja.md}`;
   `replay` byte-stability; add to `m2/report.py` the vs-single_ir delta table +
