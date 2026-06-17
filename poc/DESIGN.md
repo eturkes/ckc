@@ -1,4 +1,10 @@
-# M2 PoC design contract, revision 2 (throwaway branch poc-m2-oneshot)
+# M2-M4 PoC design contract (throwaway branch poc-m2-3-4)
+
+Scope: this PoC spans SPEC M2-M4 on one throwaway branch. M2 (sec.9 short-hop
+pair) and M3 (sec.10 route trio) are specified and measured at revision 2 below;
+M4 (sec.11 invented-DSL routes: grammar-masked concrete syntax, deterministic
+parse -> IR -> compile) is the planned extension and gets its own contract
+revision before its routes enter the matrix. This revision adds no M4 interface.
 
 Revision 2 widens the SPEC sec.9 short-hop PoC from a 2-route minimal pair to a
 5 x 5 x 5 matrix: 5 routes (the sec.9 pair plus the three sec.10 route shapes adapted to

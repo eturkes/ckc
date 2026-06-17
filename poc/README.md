@@ -1,13 +1,17 @@
-# M2 short-hop translation PoC, revision 2 (throwaway, branch poc-m2-oneshot)
+# M2-M4 translation PoC (throwaway, branch poc-m2-3-4)
 
-SPEC sec.9 PoC widened to a 5 x 5 x 5 matrix: 5 routes (sec.9 pair + sec.10 trio
-at PoC scale), 5 surface-style source families re-expressing the same 20 synthetic
-Japanese rules and 10 gold groups, k=5 samples. Weak local model
+Scope: SPEC M2-M4 on one throwaway branch. M2 (sec.9 short-hop pair) and M3
+(sec.10 route trio) are built and measured below at revision 2; M4 (sec.11
+invented-DSL routes) is the planned extension and is not yet in the matrix.
+
+Revision 2 widens the SPEC sec.9 PoC to a 5 x 5 x 5 matrix: 5 routes (sec.9 pair
++ sec.10 trio at PoC scale), 5 surface-style source families re-expressing the
+same 20 synthetic Japanese rules and 10 gold groups, k=5 samples. Weak local model
 (Qwen2.5-1.5B-Instruct Q4_K_M, llama.cpp b9601, CPU) translates; real z3 4.13.3
 scores every route against shared gold. Contract: `DESIGN.md`. Stack deviates from
 the spec by design: Python stdlib + llama-server HTTP + z3 subprocess.
 
-## Recorded result (run id `matrix5`, 2500 records / 5000 live calls, replay match)
+## Recorded result — M2-M3 route field (run id `matrix5`, 2500 records / 5000 live calls, replay match)
 
 Pooled over 5 sources (100 outputs per route cell, 50 group cells):
 
