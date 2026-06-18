@@ -8,9 +8,13 @@ hard-won facts easily re-forgotten under token pressure. Consolidate aggressivel
 history retains pre-consolidation text.
 
 ## Policy
-- Branch poc-m2-3-4 (the M2-M4 PoC) runs sessions at 1M context, user-launched,
-  overriding the default 200K. Stamp completed roadmap items `NN% NNNK/1M`; size
-  units for 1M headroom (skip 200K-driven over-splitting). The /session-prompt
-  protocol's 200K wording is the default, not this branch.
+- Branch poc-m2-3-4 (the M2-M4 PoC) runs sessions at 1M context (user-launched,
+  overriding the default 200K); size units for 1M headroom.
 
 ## Lessons
+- Subagents inherit the launching session's context-window size (launch-set and
+  process-wide); one that exhausts its window dies mid-task with no result, so
+  size each subagent's reading slice with margin.
+- `Explore`-type subagents are edit-restricted but still hold `Bash`, so they can
+  mutate the tree; after any subagent fan-out, `git status` and reconcile stray
+  paths before staging.

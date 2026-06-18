@@ -3,9 +3,8 @@
 Drives the throwaway M2-M4 translation PoC in `poc/` (Python, spec-deviating by
 design). The production build plan — SPEC §2's real milestones (M2 = Rust
 `exp.m2_shorthop`, …) — lives on `main`; this roadmap is throwaway, do not merge
-it back. Format and stamp semantics are unchanged (see /session-prompt): one open
-milestone over an ordered unit checklist; unchecked lines carry the full unit
-spec; checked items collapse to `- [x] <id>: <gist>. NN% NNNK/200K <hash>`;
+it back. Format: one open milestone over an ordered unit checklist; unchecked lines
+carry the full unit spec; checked items collapse to `- [x] <id>: <gist>.`;
 closed milestones persist as bare headers; git history retains removed text. PoC
 units cite `poc/DESIGN.md` (+ SPEC §9-§11) as contract and Python gates
 (`python3 -m py_compile` + `run_m2.py run`/`score`/`replay`), not cargo.
@@ -22,7 +21,7 @@ routes, ranked against the existing five-route field on the locked z3 evaluator.
 - [x] dsl-design: DESIGN.md rev-3 — §11 DSL routes, two compactness candidates
   (T terse / K keyword), each singular + 3-call hop; GBNF builders, DSL parsers,
   dual baseline (vs direct + single_ir), matrix slotting; dsl-impl consolidated
-  to one unit at 1M. 20% 205K/1M 0d2524a
+  to one unit at 1M.
 - [x] dsl-impl: four §11 DSL routes (dsl/dslk singular, dslh/dslkh 3-call hop)
   on a GBNF mask, parsed to the shared rev-2 IR -> compile_ir. New
   `m2/grammars.py` (terse+kw+surface+ground builders, dsl_stage_grammars,
@@ -32,7 +31,7 @@ routes, ranked against the existing five-route field on the locked z3 evaluator.
   `score.py` 9-route ROUTE_KEYS/IDS + delta_ir (vs single_ir) + grammar_sha256
   + EXPERIMENT_ID exp.m2poc_dsl. rev-2 routes byte-identical (prompt/schema sha
   match matrix5). Gate green: py_compile + smoke_dslc (singular) + smoke_dslh
-  (hop), each run+score+replay (replay byte-match). 17% 170K/1M _
+  (hop), each run+score+replay (replay byte-match).
 - [ ] dsl-run: run the 9-route field (`exp.m2poc_dsl`) over 5 sources × k5 (MAY
   reuse matrix5's five-route records); `score` → `report.{json,md,ja.md}`;
   `replay` byte-stability; add to `m2/report.py` the vs-single_ir delta table +

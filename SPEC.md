@@ -1,7 +1,7 @@
 # CKC — Clinical Knowledge Compiler
 
 Design authority for this repository. Sole implementers and readers: Claude sessions operating
-under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
+under CLAUDE.md, `.claude/commands/{session-prompt,codex-review}.md`, and `.agent/`.
 The document is optimized for machine reading: stable `§` anchors, tables over prose, one fact in
 one place, sections sized for selective loading.
 
@@ -81,13 +81,13 @@ in a state the next session can trust.
 
 Sources of truth, in order: user instructions > CLAUDE.md > this spec > `.agent/roadmap.md`
 (build plan) > `.agent/memory.md` (lessons). Sessions load §1–§2 plus the reading slice their
-roadmap unit names; wider loading is reserved for spec-maintenance sessions.
+roadmap unit names; wider loading is reserved for spec-maintenance work.
 
 Unit discipline:
 
 - One roadmap unit = one conceptual deliverable + one gate command, finishable and committable in
-  a single 200K context window with margin. Calibrate from neighbouring units' `NN%` annotations
-  and the sizing lessons in memory; pre-split units that stack a crate foundation, a
+  a single context window with margin. Calibrate from `.agent/compaction.sh` and the sizing
+  lessons in memory; pre-split units that stack a crate foundation, a
   writer-inverse, a recursive type family, or an algorithm plus a second authored artifact.
 - Build exactly the unit's deliverable; choose the simplest implementation that passes the gate.
   Record genuine future needs as roadmap candidates for the unit that will consume them.
@@ -96,18 +96,17 @@ Unit discipline:
 - A projected unit overrun is a stop-and-report: recovery (restore to the last commit, re-scope
   the roadmap) is always user-initiated.
 
-Session shapes — context sizing, plan-session workflows, subagent policy — live in the session
-command and the `.agent/protocol-*.md` files it routes to; commit, compaction, and memory
+The session flow lives in `.claude/commands/session-prompt.md` (roadmap-driven work) and
+`.claude/commands/codex-review.md` (adversarial review); commit, compaction, and memory
 discipline live in CLAUDE.md and `.agent/memory.md`.
 
-Spec evolution: the spec grows in place. When a milestone closes (its closing review lands), the
-plan session that opens the next milestone is an elaboration session while that milestone's
-contract section is still compact: expand it into full normative text (workflow-driven; mine
-`docs/` through subagents), present the diff to the user for review, then seed
-`.agent/roadmap.md` with the milestone's header and units. Elaboration sessions may also amend
-earlier sections when implementation evidence justifies it; contract-affecting amendments reach
-the user before any unit consumes them. Acceptance sessions mark the milestone header in the
-roadmap with the evidence run id and add the local tag `accept/m<n>`.
+Spec evolution: the spec grows in place. When a milestone closes, opening the next one
+begins by elaborating its contract section while it is still compact: expand it into full
+normative text (mining `docs/` as needed), present the diff to the user for review, then seed
+`.agent/roadmap.md` with the milestone's header and units. Elaboration may also amend earlier
+sections when implementation evidence justifies it; contract-affecting amendments reach the user
+before any unit consumes them. On acceptance, mark the milestone header in the roadmap with the
+evidence run id and add the local tag `accept/m<n>`.
 
 Normative language: declarative present tense states binding contract. SHOULD marks a strong
 default whose alternative is recorded in a registry, manifest, or gate evidence. MAY marks
@@ -134,16 +133,15 @@ forward contracts (Stage II) so PoC decisions remain production-compatible; Stag
 contract-only (§13.4).
 
 Roadmap protocol: `.agent/roadmap.md`, consumed by the session command, carries one milestone at
-a time: a header stamped with the commits that open (`plan`) and close (`review`) it, over an
-ordered unit checklist whose completed items record context usage and commit hash; closed
-milestones persist as bare headers. The plan session that opens a milestone authors its whole
+a time: a header recording the commits that open and close the milestone, over an ordered unit
+checklist; closed milestones persist as bare headers. Opening a milestone authors its whole
 checklist from the milestone's spec section; the milestone is complete when its acceptance item
-passes in a dedicated acceptance session and the closing review stamps the header. Lines marked
-`user-selected` get scope confirmation from the user before work begins.
+passes and the header is stamped. Lines marked `user-selected` get scope confirmation from the
+user before work begins.
 
 Conservation rule: deferred capabilities remain represented — each appears in a
-milestone contract (§9–§13), the registry backlog (§14), or a gate (§15). Elaboration sessions
-check deferred items against this rule as the sole scope source.
+milestone contract (§9–§13), the registry backlog (§14), or a gate (§15). Elaboration
+checks deferred items against this rule as the sole scope source.
 
 ## §3 Architecture and repository
 
@@ -196,7 +194,7 @@ Repository layout (target state; built up by the M1 units):
 │                                          # grows per milestone (§14)
 ├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
-├── .agent/{memory.md,roadmap.md,compaction.sh,protocol-plan.md,protocol-review.md}
+├── .agent/{memory.md,roadmap.md,compaction.sh}
 └── .claude/
 ```
 
