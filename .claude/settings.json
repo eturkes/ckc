@@ -15,19 +15,16 @@
     ]
   },
   "enabledPlugins": {
-    "json-lsp@ckc-lsps": true,
-    "yaml-lsp@ckc-lsps": true,
-    "markdown-lsp@ckc-lsps": true,
-    "toml-lsp@ckc-lsps": true,
-    "html-lsp@ckc-lsps": true,
-    "xml-lsp@ckc-lsps": true,
-    "lean4-lsp@ckc-lsps": true,
-    "alloy-lsp@ckc-lsps": true,
-    "dolmen-lsp@ckc-lsps": true,
-    "egglog-lsp@ckc-lsps": true
+    "yaml-lsp@ckc": true,
+    "toml-lsp@ckc": true,
+    "xml-lsp@ckc": true,
+    "lean4-lsp@ckc": true,
+    "alloy-lsp@ckc": true,
+    "dolmen-lsp@ckc": true,
+    "egglog-lsp@ckc": true
   },
   "extraKnownMarketplaces": {
-    "ckc-lsps": {
+    "ckc": {
       "source": {
         "source": "directory",
         "path": ".claude/marketplace"
