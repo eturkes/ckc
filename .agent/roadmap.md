@@ -15,8 +15,10 @@ units cite `poc/DESIGN.md` (+ SPEC §9-§11) as contract and Python gates
 
 Contract: `poc/DESIGN.md` (implements SPEC §9-§11 in Python; throwaway). Built:
 M2 §9 short-hop pair + M3 §10 route trio at rev-2, run `matrix5` (28de59e
-short-hop → accc7b5 widen → 1c8d276 results). Remaining: M4 §11 invented-DSL
-routes, ranked against the existing five-route field on the locked z3 evaluator.
+short-hop → accc7b5 widen → 1c8d276 results); M4 §11 invented-DSL field at rev-3,
+run `matrix9` (4500 records / 9000 calls, replay match). Remaining: poc-accept --
+rank the DSL field against single_ir/direct on the locked z3 evaluator and tag the
+PoC.
 
 - [x] dsl-design: DESIGN.md rev-3 — §11 DSL routes, two compactness candidates
   (T terse / K keyword), each singular + 3-call hop; GBNF builders, DSL parsers,
@@ -32,13 +34,16 @@ routes, ranked against the existing five-route field on the locked z3 evaluator.
   + EXPERIMENT_ID exp.m2poc_dsl. rev-2 routes byte-identical (prompt/schema sha
   match matrix5). Gate green: py_compile + smoke_dslc (singular) + smoke_dslh
   (hop), each run+score+replay (replay byte-match).
-- [ ] dsl-run: run the 9-route field (`exp.m2poc_dsl`) over 5 sources × k5 (MAY
-  reuse matrix5's five-route records); `score` → `report.{json,md,ja.md}`;
-  `replay` byte-stability; add to `m2/report.py` the vs-single_ir delta table +
-  9-route widening and to `ui/` the 9 columns + dual-baseline banner; add the DSL
-  rows/columns to `poc/README.md`, keeping the M2-M3 figures. Reading: rev-3
-  `DESIGN.md`; `m2/report.py`, `ui/`. Gate: `run_m2.py run`/`score`/`replay`
-  green (replay byte-match).
+- [x] dsl-run: ran the 9-route field (run `matrix9`, exp.m2poc_dsl; seeded
+  matrix5's 2500 rev-2 records + 2000 fresh DSL = 4500 records / 9000 calls; score
+  + replay byte-match). report.py vs-single_ir delta table + grammar_sha256
+  display + 9-route widening (title de-staled); ui/ dual-baseline banner (best-DSL
+  vs single_ir) + per-DSL delta_ir chips; README M4 result block (M2-M3 figures
+  kept). Result: GBNF mask drives DSL syntactic-validity + admission to ~100%
+  (mechanism confirmed) yet no DSL beats single_ir -- all four collapse to 50%
+  greedy via a stable forbid/require polarity error on conflict pairs
+  (no_conflict/same_direction); T (terse) dominates K (keyword, truncation-prone).
+  First-class null per SPEC §11.
 - [ ] poc-accept: rank the DSL route(s) against the existing five-route field on
   the locked z3 evaluator — the bar is `route.single_ir` (the rev-2 winner on
   all four metrics) and `route.direct_smt` (the M2 baseline); claim 1 extended

@@ -1,5 +1,5 @@
-# M2 PoC routes (A3, revision 2): parsers/compilers, per-stage JSON schemas,
-# route stage table, prompt builders for all five routes. Stdlib only. ASCII
+# M2 PoC routes (A3, revision 2-3): parsers/compilers, per-stage JSON schemas,
+# route stage table, prompt builders for all nine routes. Stdlib only. ASCII
 # only; Japanese enters prompts solely via vocab ja fields and the {JA_TEXT}
 # slot. Slots ({JA_TEXT}, {PRIOR_JSON}, {FRAME_JSON}) consume with .replace,
 # never .format. Contract: poc/DESIGN.md.

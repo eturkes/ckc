@@ -1,4 +1,4 @@
-"""M2 PoC report rendering (A5, revision 2): markdown + canonical bytes.
+"""M2 PoC report rendering (A5, revision 2-3): markdown + canonical bytes.
 
 Design: poc/DESIGN.md. Pure functions of the report dict; no timestamps.
 JA literals below are unicode escape sequences; source bytes are ASCII.
@@ -9,10 +9,12 @@ import json
 METRIC_ORDER = ("syntactic_validity", "admission_rate",
                 "verdict_accuracy_greedy", "verdict_stability")
 FINDING_LABELS = {"direct": "direct", "ir": "single-IR", "stacked": "stacked",
-                  "hop": "hop-chain", "layered": "layered"}
+                  "hop": "hop-chain", "layered": "layered",
+                  "dsl": "dsl", "dslh": "dsl-hop", "dslk": "dsl-kw",
+                  "dslkh": "dsl-kw-hop"}
 
 L_EN = {
-    "title": "M2 PoC 5x5x5 report",
+    "title": "M2-M4 PoC report",
     "identity": "Identity",
     "gold_gate": "Gold gate",
     "pass": "PASS",
@@ -22,6 +24,7 @@ L_EN = {
     "metric": "metric",
     "pooled": "pooled",
     "baseline_delta": "Baseline delta",
+    "baseline_delta_ir": "Baseline delta vs single-IR",
     "matrix": "Greedy verdict matrix",
     "group": "group",
     "kind": "kind",
@@ -42,7 +45,7 @@ JA_FINDING_HEAD = '\u6b63\u89e3\u306f%s\u3002'
 JA_FINDING_SEG = '%s\u7d4c\u8def\u306f%s\u3068\u5224\u5b9a'
 JA_JOIN = '\u3001'
 JA_END = '\u3002'
-L_JA = {'title': 'M2 PoC 5x5x5 \u30ec\u30dd\u30fc\u30c8', 'identity': '\u8b58\u5225\u60c5\u5831', 'gold_gate': '\u30b4\u30fc\u30eb\u30c9\u30b2\u30fc\u30c8', 'pass': '\u5408\u683c', 'fail': '\u4e0d\u5408\u683c', 'groups_word': '\u30b0\u30eb\u30fc\u30d7', 'metrics': '\u6307\u6a19', 'metric': '\u6307\u6a19', 'pooled': '\u5168\u4f53', 'baseline_delta': '\u30d9\u30fc\u30b9\u30e9\u30a4\u30f3\u5dee\u5206', 'matrix': '\u30b0\u30ea\u30fc\u30c7\u30a3\u5224\u5b9a\u30de\u30c8\u30ea\u30af\u30b9', 'group': '\u30b0\u30eb\u30fc\u30d7', 'kind': '\u7a2e\u5225', 'gold': '\u6b63\u89e3', 'taxonomy': '\u5931\u6557\u5206\u985e', 'code': '\u30b3\u30fc\u30c9', 'findings': '\u6240\u898b', 'quote_a': '\u5f15\u7528A', 'quote_b': '\u5f15\u7528B', 'omitted': '\u5168\u30eb\u30fc\u30c8\u6b63\u89e3\u306e\u30bd\u30fc\u30b9\u00d7\u30b0\u30eb\u30fc\u30d7\u884c\u3092%d\u4ef6\u7701\u7565\u3002', 'replay': '\u30ea\u30d7\u30ec\u30a4'}
+L_JA = {'title': 'M2-M4 PoC \u30ec\u30dd\u30fc\u30c8', 'identity': '\u8b58\u5225\u60c5\u5831', 'gold_gate': '\u30b4\u30fc\u30eb\u30c9\u30b2\u30fc\u30c8', 'pass': '\u5408\u683c', 'fail': '\u4e0d\u5408\u683c', 'groups_word': '\u30b0\u30eb\u30fc\u30d7', 'metrics': '\u6307\u6a19', 'metric': '\u6307\u6a19', 'pooled': '\u5168\u4f53', 'baseline_delta': '\u30d9\u30fc\u30b9\u30e9\u30a4\u30f3\u5dee\u5206', 'baseline_delta_ir': '\u30d9\u30fc\u30b9\u30e9\u30a4\u30f3\u5dee\u5206 (single-IR\u6bd4)', 'matrix': '\u30b0\u30ea\u30fc\u30c7\u30a3\u5224\u5b9a\u30de\u30c8\u30ea\u30af\u30b9', 'group': '\u30b0\u30eb\u30fc\u30d7', 'kind': '\u7a2e\u5225', 'gold': '\u6b63\u89e3', 'taxonomy': '\u5931\u6557\u5206\u985e', 'code': '\u30b3\u30fc\u30c9', 'findings': '\u6240\u898b', 'quote_a': '\u5f15\u7528A', 'quote_b': '\u5f15\u7528B', 'omitted': '\u5168\u30eb\u30fc\u30c8\u6b63\u89e3\u306e\u30bd\u30fc\u30b9\u00d7\u30b0\u30eb\u30fc\u30d7\u884c\u3092%d\u4ef6\u7701\u7565\u3002', 'replay': '\u30ea\u30d7\u30ec\u30a4'}
 
 L = {"en": L_EN, "ja": L_JA}
 
@@ -116,6 +119,9 @@ def render_md(report, lang):
     for rk in route_keys:
         for stage, sha in idn["schema_sha256"].get(rk, {}).items():
             out.append("- schema_sha256.%s.%s: %s" % (rk, stage, sha))
+    for rk in route_keys:
+        for stage, sha in idn.get("grammar_sha256", {}).get(rk, {}).items():
+            out.append("- grammar_sha256.%s.%s: %s" % (rk, stage, sha))
     sp = idn["server_props"]
     if sp is None:
         out.append("- server_props: -")
@@ -149,6 +155,21 @@ def render_md(report, lang):
                          else "%s (%+.4f)" % (d["value"], d["delta"]))
         rows.append(cells)
     out += _table([t["metric"]] + nd_ids, rows)
+    out.append("")
+    # pooled baseline delta vs single_ir, non-single_ir cols
+    ni_ids = [rid for rid in route_ids if rid != "route.single_ir"]
+    out.append("## %s (%s)" % (t["baseline_delta_ir"], t["pooled"]))
+    out.append("")
+    rows = []
+    for name in METRIC_ORDER:
+        scope = report["baseline_delta"][name]["pooled"]
+        cells = [_mname(name, lang)]
+        for rid in ni_ids:
+            d = scope.get(rid)
+            cells.append("-" if d is None or d.get("delta_ir") is None
+                         else "%s (%+.4f)" % (d["value"], d["delta_ir"]))
+        rows.append(cells)
+    out += _table([t["metric"]] + ni_ids, rows)
     out.append("")
     # per-source blocks: metrics + greedy verdict matrix
     for s in report["sources"]:

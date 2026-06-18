@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>CKC M2 PoC</title>
+<title>CKC M2-M4 PoC</title>
 <style>
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
@@ -43,6 +43,7 @@ td.num, td .num { font-variant-numeric: tabular-nums; }
 .neg { background: #f7d4d4; }
 .chip { padding: .05rem .4rem; border-radius: 4px; }
 .dchip { display: inline-block; font-size: .78rem; padding: 0 .3rem; border-radius: 3px; }
+.dchip.ir { border: 1px dashed #999; }
 .fctl { margin: .4rem 0 .8rem; display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; }
 .finding { border: 1px solid #ddd; border-left: 4px solid #888; border-radius: 4px; padding: .6rem .8rem; margin: .6rem 0; }
 .fhead { font-weight: 600; font-family: ui-monospace, monospace; font-size: .85rem; color: #333; }
@@ -116,11 +117,13 @@ var I18N = {
  "tab_pooled": "Pooled",
  "tab_pooled_sub": "all sources",
  "tax_empty": "no failure codes in this scope",
- "title": "CKC M2 PoC - short-hop translation report (5x5x5)",
+ "title": "CKC M2-M4 PoC - translation route report",
  "v_conflict": "conflict",
  "v_incomputable": "incomputable",
  "v_no_conflict": "no_conflict",
- "vs_direct": "vs direct"
+ "vs_direct": "vs direct",
+ "vs_ir": "vs single-IR",
+ "best_dsl": "best DSL"
 },
 "ja": {
  "banner_lead": "\u5224\u5b9a\u7cbe\u5ea6 (greedy s0)",
@@ -159,11 +162,13 @@ var I18N = {
  "tab_pooled": "\u5168\u4f53",
  "tab_pooled_sub": "\u5168\u30bd\u30fc\u30b9",
  "tax_empty": "\u3053\u306e\u30b9\u30b3\u30fc\u30d7\u3067\u306f\u5931\u6557\u30b3\u30fc\u30c9\u306a\u3057",
- "title": "CKC M2 PoC - \u77ed\u30db\u30c3\u30d7\u7ffb\u8a33\u30ec\u30dd\u30fc\u30c8 (5x5x5)",
+ "title": "CKC M2-M4 PoC - \u7ffb\u8a33\u7d4c\u8def\u30ec\u30dd\u30fc\u30c8",
  "v_conflict": "\u77db\u76fe",
  "v_incomputable": "\u8a08\u7b97\u4e0d\u80fd",
  "v_no_conflict": "\u77db\u76fe\u306a\u3057",
- "vs_direct": "direct\u6bd4"
+ "vs_direct": "direct\u6bd4",
+ "vs_ir": "single-IR\u6bd4",
+ "best_dsl": "DSL\u3067\u6700\u826f"
 }
 };
 var ROUTES_FALLBACK = [
@@ -174,6 +179,7 @@ var ROUTES_FALLBACK = [
  { "key": "layered", "id": "route.ckc_layered" }
 ];
 var METRICS = ["syntactic_validity", "admission_rate", "verdict_accuracy_greedy", "verdict_stability"];
+var DSL_KEYS = { "dsl": 1, "dslh": 1, "dslk": 1, "dslkh": 1 };
 var MKEY = {
  "syntactic_validity": "m_syntactic_validity",
  "admission_rate": "m_admission_rate",
@@ -193,6 +199,7 @@ function esc(s) {
 }
 function pct(cell) { return (cell.value * 100).toFixed(1) + "% (" + cell.num + "/" + cell.den + ")"; }
 function signedPts(d) { var p = d * 100; return (p > 0 ? "+" : "") + p.toFixed(1) + " " + t("pts"); }
+function signedPtsShort(d) { var p = d * 100; return (p > 0 ? "+" : "") + p.toFixed(1); }
 function deltaCls(d) { return d > 1e-9 ? "pos" : (d < -1e-9 ? "neg" : ""); }
 function vCls(v, gold) { return v === "incomputable" ? "gray" : (v === gold ? "ok" : "bad"); }
 function vlabel(v) { var k = VKEY[v]; return k ? t(k) : String(v); }
@@ -220,6 +227,13 @@ function deltaOf(rep, metric, scope, rid) {
   var obj = scope === "pooled" ? bd.pooled : (bd.by_source || {})[scope];
   if (!obj || !obj[rid] || typeof obj[rid].delta !== "number") { return null; }
   return obj[rid].delta;
+}
+function deltaIrOf(rep, metric, scope, rid) {
+  var bd = rep.baseline_delta && rep.baseline_delta[metric];
+  if (!bd) { return null; }
+  var obj = scope === "pooled" ? bd.pooled : (bd.by_source || {})[scope];
+  if (!obj || !obj[rid] || typeof obj[rid].delta_ir !== "number") { return null; }
+  return obj[rid].delta_ir;
 }
 function taxOf(rep, scope) {
   var tx = rep.taxonomy || {};
@@ -289,6 +303,19 @@ function renderBanner(rep) {
     h += "<span class=\"bcall\">" + esc(t("best_nd")) + ": " + esc(best.label) +
       " <b class=\"chip " + deltaCls(best.d) + "\">" + esc(signedPts(best.d)) + "</b> (" + esc(t("vs_direct")) + ")</span>";
   }
+  var bestDsl = null;
+  for (var kk = 0; kk < routes.length; kk++) {
+    var rr = routes[kk];
+    if (!DSL_KEYS[rr.key] || !pd[rr.id] || typeof pd[rr.id].delta_ir !== "number") { continue; }
+    if (bestDsl === null || pd[rr.id].delta_ir > bestDsl.dlt) {
+      var accCell = per[rr.id] && per[rr.id].verdict_accuracy_greedy;
+      bestDsl = { label: routeLabel(rr), dlt: pd[rr.id].delta_ir, acc: accCell ? (accCell.value * 100).toFixed(1) + "%" : "-" };
+    }
+  }
+  if (bestDsl !== null) {
+    h += "<span class=\"bcall\">" + esc(t("best_dsl")) + ": " + esc(bestDsl.label) +
+      " <b>" + esc(bestDsl.acc) + "</b> <b class=\"chip " + deltaCls(bestDsl.dlt) + "\">" + esc(signedPts(bestDsl.dlt)) + "</b> (" + esc(t("vs_ir")) + ")</span>";
+  }
   document.getElementById("banner").innerHTML = h;
 }
 function renderTabs(rep) {
@@ -324,6 +351,12 @@ function renderMetrics(rep) {
         var d = deltaOf(rep, name, S.scope, rt.id);
         if (d !== null) {
           inner += " <span class=\"dchip " + deltaCls(d) + "\" title=\"" + esc(t("delta") + " (" + t("vs_direct") + ")") + "\">" + esc(signedPts(d)) + "</span>";
+        }
+        if (DSL_KEYS[rt.key]) {
+          var dir = deltaIrOf(rep, name, S.scope, rt.id);
+          if (dir !== null) {
+            inner += " <span class=\"dchip ir " + deltaCls(dir) + "\" title=\"" + esc(t("delta") + " (" + t("vs_ir") + ")") + "\">IR " + esc(signedPtsShort(dir)) + "</span>";
+          }
         }
       }
       h += "<td>" + inner + "</td>";

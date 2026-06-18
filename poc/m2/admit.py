@@ -1,4 +1,4 @@
-# A4 admission gates (revision 2) for all five routes via admit_route.
+# A4 admission gates (revision 2-3) for all nine routes via admit_route.
 # Contract: poc/DESIGN.md. verdict.py supplies CANON_DECLS/run_z3 unchanged.
 from m2 import routes
 from m2.verdict import CANON_DECLS, run_z3

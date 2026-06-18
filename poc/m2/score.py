@@ -1,4 +1,4 @@
-"""M2 PoC scoring (A5, revision 2): build the report dict from run records.
+"""M2 PoC scoring (A5, revision 2-3): build the report dict from run records.
 
 Design: poc/DESIGN.md. score_run(run_dir, dataset) is deterministic for a
 fixed (run_dir, dataset, machine); no timestamps anywhere. Records are

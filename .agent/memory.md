@@ -18,3 +18,15 @@ history retains pre-consolidation text.
 - `Explore`-type subagents are edit-restricted but still hold `Bash`, so they can
   mutate the tree; after any subagent fan-out, `git status` and reconcile stray
   paths before staging.
+- Headroom round-trips unicode for `\uXXXX` ASCII-escape literals (report.py JA
+  strings, ui/ i18n): author Edit old/new_string in DECODED unicode (the match
+  layer accepts it) and the write path re-escapes to ASCII on disk (verified 0
+  non-ASCII bytes). JA edits stay ASCII-clean without hand-escaping; still
+  byte-check after (`open(...,"rb")`, count b>=0x80).
+- `Read(./runs/**)`-style denies also block Bash file-readers (`grep PAT file`,
+  cat/tail) on those paths, but Python `open()` bypasses -- inspect run
+  records/reports with a `python3 - <<'PY'` snippet, not grep-on-file. grep from a
+  pipe (stdin) is fine.
+- Harness blocks `sleep N; <cmd>` chains (use the completion notification or a
+  single poll command) and denies compound bash mixing `$(...)` with denied-path
+  args -- keep polls to one plain command.
