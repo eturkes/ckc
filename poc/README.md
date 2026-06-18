@@ -116,6 +116,61 @@ Readings (measured rates on synthetic fixtures; no clinical claims):
   (ir_hop_chain 66.0% greedy) beats both DSL hops (50.0%). An invented-DSL landing
   does not beat the JSON-IR landing here.
 
+## M4 acceptance -- claim 1 extended to invented forms (run id `matrix9`)
+
+Claim 1 asks whether staged, grammar-constrained routes beat the direct one-leap
+baseline on BOTH sec.7.3 metric families: route quality (schema-valid + admission +
+k-sample convergence rates -- here syntactic validity, admission, stability) and
+conflict quality (conflict-task accuracy -- here greedy verdict accuracy). Greedy is
+the discriminating rate: the only one tracking conflict correctness over
+well-formedness. Ranked over all 9 routes on the locked z3 evaluator by greedy, the
+invented-DSL routes against the full sec.10 field (the measured pooled rows are the
+two tables above; report.json carries the raw per-sample rows):
+
+| rank | route | greedy | vs direct | vs single_ir |
+| --- | --- | --- | --- | --- |
+| 1 | single_ir | 98.0% | +18.0 | 0.0 |
+| 2 | direct_smt | 80.0% | 0.0 | -18.0 |
+| 3 | ir_hop_chain | 66.0% | -14.0 | -32.0 |
+| 4 | stacked_ir | 58.0% | -22.0 | -40.0 |
+| 5 | ckc_dsl (T) | 50.0% | -30.0 | -48.0 |
+| 5 | ckc_dsl_hop (T) | 50.0% | -30.0 | -48.0 |
+| 5 | ckc_dsl_kw_hop (K) | 50.0% | -30.0 | -48.0 |
+| 8 | ckc_layered | 42.0% | -38.0 | -56.0 |
+| 9 | ckc_dsl_kw (K) | 38.0% | -42.0 | -60.0 |
+
+Verdict -- claim 1 does NOT extend to the invented DSL forms in full; a first-class
+null (sec.11: no invented form beats the sec.10 field), the break localized by family:
+- Route quality: every DSL route BEATS direct -- validity 95.8-100% vs 93.2%,
+  admission 95.8-100% vs 93.2%, stability 68-100% vs 58%. The grammar-as-admission
+  mechanism closes the validity->admission gap no JSON-IR route does (admission ==
+  syntactic validity on all four; 0 ai_schema_violation vs 8-149 across the four
+  JSON-IR routes; 0 false_positive_conflict). The claim's route-quality half holds.
+- Conflict quality: every DSL route FALLS BELOW direct -- greedy 38-50% vs 80% (-30
+  to -42 pts); the best invented forms (ckc_dsl, ckc_dsl_hop, ckc_dsl_kw_hop, tied at
+  50.0%) sit 48 under single_ir, ahead of only ckc_layered and the truncating
+  ckc_dsl_kw. Each DSL route misses all 25 conflict cells (false_negative_conflict =
+  25/25), predominantly a same-direction polarity error (same_direction in 23-25 of
+  25; ckc_dsl spends 2 on different_action). The grammar pins a well-formed direction
+  token, not the right one. The claim's conflict-quality half breaks.
+
+Claim 1 needs both families, so the invented forms fail it. The DSL leads over
+single_ir are route-quality-only: ckc_dsl and ckc_dsl_kw_hop top it on validity,
+admission, and stability (ckc_dsl_hop on admission and stability; ckc_dsl_kw on none),
+but for the 100%-stability routes that stability splits into 25 stably-RIGHT null
+cells and 25 stably-WRONG conflict cells -- the wrong half is exactly what sinks
+conflict quality. single_ir stays the sole route winning conflict-task accuracy; the
+mechanism win is real and orthogonal to it.
+
+sec.11 acceptance themes met: two invented candidates (T terse, K keyword), each run
+singular and layered (4 routes) over inputs locked byte-identical to matrix5 (the
+2500 reused rev-2 records match byte-for-byte; dataset/model/z3 identities match in
+report.json); ranked against the sec.10 field with the measured rows first; recorded
+model I/O replays byte-stably (replay match, gold gate pass); sec.0 vocabulary holds
+-- admission decides, the null is reported, nothing promoted. Comparison reproduced
+cell-for-cell from `runs/matrix9/report.json` at acceptance (pooled metrics, both
+baseline-delta sets, per-source, taxonomy).
+
 ## Use
 
 ```bash

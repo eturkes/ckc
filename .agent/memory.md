@@ -36,3 +36,20 @@ history retains pre-consolidation text.
   record (authored under different prompts) would score silently under fresh shas.
   matrix9's reuse of matrix5 was verified clean (records byte-identical, rev-2
   metrics + shas match); re-verify whenever seeding spans a prompt/schema change.
+- Claim-1 "beats direct" is a PER-FAMILY test (SPEC §7.3), not a greedy-only one:
+  route quality = syntactic_validity + admission + verdict_stability
+  (schema-valid/admission/k-convergence); conflict quality = greedy verdict accuracy
+  (conflict-task accuracy). score.py/report.py do not tag metrics by family. The M4
+  DSL forms split the verdict -- all four beat direct on the route-quality three
+  (and close the validity->admission gap the JSON-IR routes leave open) yet all fall
+  below direct on conflict quality, so the full claim fails (first-class null, §11).
+  A high stability on a conflict-missing route is split k-convergence: stably-right
+  null cells + stably-wrong conflict cells -- stability is route-quality, not
+  correctness. Assess each invented/route form against BOTH families before any
+  "beats/does-not-beat" claim.
+- Codex-review honesty: in the review prompt describe only DONE work as done.
+  Stating deferred roadmap/memory edits as completed made Codex (correctly) flag the
+  git-status mismatch -- a wasted finding and a dented prompt. The review also caught
+  real prose overreach in the acceptance writeup (false "all four"/"T forms" route
+  labels, "misses identically", "stably wrong" applied to the right null half);
+  ground every per-route claim in the exact pooled/taxonomy cell before asserting it.
