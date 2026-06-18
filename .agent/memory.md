@@ -30,3 +30,9 @@ history retains pre-consolidation text.
 - Harness blocks `sleep N; <cmd>` chains (use the completion notification or a
   single poll command) and denies compound bash mixing `$(...)` with denied-path
   args -- keep polls to one plain command.
+- Run-dir seeding (copy a prior run's records; resume skips by exact filename)
+  reuses records by PATH only -- score.py trusts each record's content/keys while
+  stamping the CURRENT prompt/schema/grammar shas + identities, so a stale seeded
+  record (authored under different prompts) would score silently under fresh shas.
+  matrix9's reuse of matrix5 was verified clean (records byte-identical, rev-2
+  metrics + shas match); re-verify whenever seeding spans a prompt/schema change.

@@ -39,11 +39,14 @@ PoC.
   + replay byte-match). report.py vs-single_ir delta table + grammar_sha256
   display + 9-route widening (title de-staled); ui/ dual-baseline banner (best-DSL
   vs single_ir) + per-DSL delta_ir chips; README M4 result block (M2-M3 figures
-  kept). Result: GBNF mask drives DSL syntactic-validity + admission to ~100%
-  (mechanism confirmed) yet no DSL beats single_ir -- all four collapse to 50%
-  greedy via a stable forbid/require polarity error on conflict pairs
-  (no_conflict/same_direction); T (terse) dominates K (keyword, truncation-prone).
-  First-class null per SPEC §11.
+  kept). Result: the GBNF mask makes admission == syntactic-validity for every DSL route
+  (closes the validity->admission gap the JSON-Schema IR routes leave open;
+  mechanism confirmed) yet no DSL beats single_ir on greedy verdict accuracy.
+  dsl/dslh/dslkh collapse to 50% via a stable forbid/require polarity error on
+  conflict pairs (no_conflict/same_direction); dslk drops to 38% (keyword verbosity
+  truncates at max_tokens, losing all conflicts AND 6 null cells). T dominates K at
+  the singular level; hop neutralizes K's truncation (dslkh back to 50%) but not the
+  polarity collapse. First-class null per SPEC §11.
 - [ ] poc-accept: rank the DSL route(s) against the existing five-route field on
   the locked z3 evaluator — the bar is `route.single_ir` (the rev-2 winner on
   all four metrics) and `route.direct_smt` (the M2 baseline); claim 1 extended

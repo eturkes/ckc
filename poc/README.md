@@ -81,28 +81,37 @@ Greedy verdict accuracy by source family (n/10 groups), DSL routes:
 | metamorphic | 5 | 5 | 3 | 5 |
 
 Readings (measured rates on synthetic fixtures; no clinical claims):
-- Mechanism confirmed: the GBNF couples var/op/value and pins the action/direction
-  enums, so the DSL routes saturate BOTH syntactic validity and admission at ~100%
-  (T-singular and K-hop hit 100%/100%) -- closing the admission gap the JSON-Schema
-  IR routes leave open (single_ir 98.2%, rev-2 IR-stack routes 69.6-85.6%). Zero
-  ai_schema_violation and zero false_positive_conflict for every DSL route.
-- Null result (first-class, sec.11): no invented DSL beats single_ir; all four sit
-  far below it (greedy -48.0 to -60.0 vs single_ir, -30.0 to -42.0 vs direct). The
-  grammar moved the bottleneck from syntax/admission to semantics, where the weak
-  model fails.
-- The failure is systematic and stable, not noisy: every DSL route gets all 5 null
-  groups right and all 5 conflict groups wrong (exactly 5/10), identically across
-  all 5 sources and -- for T-singular and K-hop -- all k=5 samples (stability
-  100%). Cause is a direction-polarity collapse: on a conflict pair the model emits
-  the same forbid|require token for both members (no_conflict, same_direction in
-  23-25 of 25 cells), so z3 never sees an opposing-direction overlap. The grammar
-  guarantees a well-formed direction token, not the right one.
-- Compactness (T vs K): T dominates. ckc_dsl_kw is truncation-prone -- under
-  max_tokens=320 the weak model loops `AND age >= 0 AND age <= 130 ...` and the
-  line is cut mid-condition (21 target_parse_error / 500 vs 0 for ckc_dsl), costing
-  validity, admission, accuracy, and stability. Hop-layering rescues K's robustness
-  (ckc_dsl_kw_hop back to 100%/100%, since the typed stage sees only the short
-  prior DSL line, not the verbose sentence) but not its accuracy.
+- Mechanism confirmed (the real signal): the GBNF couples var/op/value and pins the
+  action/direction enums, so for every DSL route admission EQUALS syntactic validity
+  -- the grammar closes the validity->admission gap the JSON-Schema IR routes leave
+  wide open (single_ir 99.8% -> 98.2%; the rev-2 IR-stack routes saturate validity
+  near 100% yet admit only 69.6-85.6%). Zero ai_schema_violation and zero
+  false_positive_conflict for every DSL route. Absolute levels: dsl and dslkh
+  100%/100%, dslh 99.6%/99.6%, dslk 95.8%/95.8% (truncation, below).
+- Null result (first-class, sec.11): no DSL beats single_ir on the discriminating
+  metric, greedy verdict accuracy (single_ir 98.0%; DSL 50/50/38/50%, i.e. -48 to
+  -60 pts vs single_ir and -30 to -42 vs direct). Where DSL routes do top single_ir
+  -- dsl and dslkh on validity/admission/stability, dslh on admission/stability --
+  the stability lead is the stability of a WRONG answer. The grammar moved the
+  bottleneck from syntax/admission to semantics, where the weak model fails.
+- Conflict miss is a stable direction-polarity collapse: dsl, dslh, and dslkh each
+  get all 5 null groups right and all 5 conflict groups wrong (exactly 25/50 = 50%),
+  identically across all 5 sources and -- for dsl and dslkh -- all k=5 samples
+  (stability 100%). On a conflict pair the model emits the same forbid|require token
+  for both members (no_conflict, same_direction in 23-25 of 25 conflict cells), so
+  z3 never sees an opposing-direction overlap. The grammar guarantees a well-formed
+  direction token, not the right one.
+- Compactness (T vs K), a second and mechanical failure: the verbose keyword block
+  is truncation-prone -- under max_tokens=320 the weak model loops `AND age >= 0 AND
+  age <= 130 ...` and the line is cut mid-condition (21 target_parse_error / 500 for
+  ckc_dsl_kw vs 0 for ckc_dsl). Singular ckc_dsl_kw therefore drops to 95.8%/95.8%
+  and 38% greedy: it misses all 25 conflicts AND loses 6 null cells to incomputable
+  (member_inadmissible). So T dominates K at the singular level on every metric.
+- Hop-layering neutralizes the truncation but not the semantics: in the hop chain
+  the typed stage sees only the short prior DSL line, not the verbose sentence, so
+  ckc_dsl_kw_hop recovers to 100%/100% and its 6 lost null cells return (38% ->
+  50%), landing at the SAME 50% polarity collapse as the T hops (ckc_dsl_kw_hop >=
+  ckc_dsl_hop on every metric). Conflict detection is never recovered.
 - DSL landing vs JSON-IR landing on the final typing hop: the JSON-IR hop
   (ir_hop_chain 66.0% greedy) beats both DSL hops (50.0%). An invented-DSL landing
   does not beat the JSON-IR landing here.
