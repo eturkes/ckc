@@ -108,3 +108,20 @@ history retains pre-consolidation text.
 - score.py identity was stale (1.5b/b9601) after the 7B switch touched only
   run_m2.py; now MODEL_NAME/SHA/LLAMA_BUILD/EXPERIMENT_ID match the live runtime.
   Keep score.py identity in lockstep with run_m2.py on any runtime bump.
+- Iteration loop (agreed): k=1 is the DEFAULT (greedy, all 20 items ~2-3min) since
+  exact_ir_match is greedy (n=0) -- k=3 does NOT improve the headline comparison,
+  it only feeds stability. Run k=3 only for an occasional stability snapshot on a
+  group subset. On this iGPU k=3 is ~3x slower (~15min for 8 items, the 2-stage
+  reason route dominates) -- not a fast-iteration setting.
+- k=3 stability snapshot (oblique g01/g02/g03/g09, n=8, error-dense so single_ir
+  reads low): reason_ir is more faithful (greedy 0.88 vs single_ir 0.50; mean over
+  3 samples 0.83) but LESS stable -- self-consistency (all 3 samples identical IR)
+  0.75 vs single_ir 0.88, verdict_stability 0.75 vs 1.0. The temperature on the
+  free reason stage adds output variance; single_ir is stably-mediocre. Candidate
+  fixes if variance matters: greedy (temp-0) reason stage or self-consistency vote.
+  verdict stays 1.0 for both (still useless for discrimination). Faithfulness
+  stability is computed by-hand from records (per route/sample exact-match +
+  identical-IR signature); it is NOT a score.py metric (kept greedy-only by choice).
+- `direct` is needed in a run only for delta_scope (delta-vs-direct); drop it for
+  iteration and read raw exact_ir_match values. `repair_ir` is implemented + wired
+  but parked untested (slowest, 3 stages) -- test at k=1 before judging it.

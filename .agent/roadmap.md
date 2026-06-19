@@ -28,14 +28,15 @@ production milestones live on `main`.
   the constrained IR commit), `exact_ir_match` greedy faithfulness metric in
   METRIC_ORDER; score.py identity synced to live 7B/b9704. Demonstrated single_ir
   0.70 < reason_ir 0.90 on oblique exact_ir_match (verdict 1.0 for both).
-- [ ] m5-scale: run `repair_ir` on full oblique (draft->audit->commit; terse audit
-  wired) and widen to k=5 + more/all sources; confirm reason_ir (and whichever of
-  the several routes win) clears single_ir on pooled exact_ir_match. Gate:
-  `run_m2.py run --sources oblique --routes direct,ir,reason_ir,repair_ir --k 5`
-  then `score`; reason_ir exact_ir_match > single_ir. Keep iteration <5min with
-  k=1 + `--groups`/`--routes` subsets while tuning; scale only the confirming run.
-  Combine routes into one report by merging route-named records + server_props.json
-  then `score` (no re-run).
+- [ ] m5-scale: test `repair_ir` at k=1 on full oblique (draft->audit->commit;
+  terse audit wired) -- does the 2nd sophisticated route also clear single_ir on
+  exact_ir_match? Then widen to more/all sources. Iterate at k=1 (DEFAULT, greedy,
+  all 20 items ~2-3min; exact_ir_match is greedy so k=1 suffices for the headline);
+  take k=3 stability snapshots on a `--groups` subset only when needed (k=3 ~3x
+  slower). Gate: `run_m2.py run --sources oblique --routes ir,reason_ir[,repair_ir]
+  --k 1` then `score`; route exact_ir_match > single_ir. `direct` only needed for
+  delta-vs-direct. Combine routes into one report by merging route-named records +
+  server_props.json then `score` (no re-run).
 - [ ] m5-doc: sync poc/DESIGN.md + README.md to rev-4 -- the `oblique` source, the
   `exact_ir_match` metric and the verdict-coarseness lesson, the `reason_ir`/
   `repair_ir` routes, and the single_ir-insufficiency finding. Docs still describe
