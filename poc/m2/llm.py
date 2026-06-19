@@ -7,12 +7,14 @@ from pathlib import Path
 
 
 class LlamaServer:
-    def __init__(self, server_bin, model_path, port=8077, ctx=4096, threads=8):
+    def __init__(self, server_bin, model_path, port=8077, ctx=4096, threads=8,
+                 n_gpu_layers=99):
         self.server_bin = Path(server_bin)
         self.model_path = Path(model_path)
         self.port = port
         self.ctx = ctx
         self.threads = threads
+        self.n_gpu_layers = n_gpu_layers  # 99 offloads all layers (Vulkan); 0 = CPU
         self.proc = None
         self.log = None
 
@@ -21,7 +23,8 @@ class LlamaServer:
         self.proc = subprocess.Popen(
             [str(self.server_bin), "-m", str(self.model_path),
              "--host", "127.0.0.1", "--port", str(self.port),
-             "-c", str(self.ctx), "-t", str(self.threads)],
+             "-c", str(self.ctx), "-t", str(self.threads),
+             "-ngl", str(self.n_gpu_layers)],
             stdout=self.log, stderr=subprocess.STDOUT,
             cwd=str(self.server_bin.parent))
         deadline = time.monotonic() + 180

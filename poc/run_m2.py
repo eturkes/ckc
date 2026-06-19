@@ -13,10 +13,11 @@ from m2 import llm
 POC = Path(__file__).resolve().parent
 RUNS = POC / "runs"
 DATASET_PATH = POC / "dataset.json"
-MODEL_PATH = POC / "vendor" / "qwen2.5-1.5b-instruct-q4_k_m.gguf"
-MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
-SERVER_BIN = POC / "vendor" / "llama-b9601" / "llama-server"
+MODEL_PATH = POC / "vendor" / "qwen2.5-7b-instruct-q4_k_m.gguf"
+MODEL_SHA256 = "1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49"
+SERVER_BIN = POC / "vendor" / "llama-b9704-vulkan" / "llama-server"
 PORT = 8077
+NGL = 99  # GPU layers to offload (Vulkan, Intel LNL iGPU); 99 = all, 0 = CPU
 MAX_TOKENS = 320
 
 
@@ -132,7 +133,7 @@ def cmd_run(args):
     n_total = len(todo)
     n_done = 0
 
-    server = llm.LlamaServer(SERVER_BIN, MODEL_PATH, port=PORT)
+    server = llm.LlamaServer(SERVER_BIN, MODEL_PATH, port=PORT, n_gpu_layers=NGL)
     try:
         if not args.no_server:
             server.start(run_dir / "server.log")

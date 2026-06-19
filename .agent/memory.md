@@ -11,6 +11,28 @@ history retains pre-consolidation text.
 - Branch poc-m2-3-4 (the M2-M4 PoC) runs sessions at 1M context (user-launched,
   overriding the default 200K); size units for 1M headroom.
 
+## Runtime
+- Active model: Qwen2.5-7B-Instruct Q4_K_M at poc/vendor/qwen2.5-7b-instruct-q4_k_m.gguf
+  (merged from the official Qwen 2-shard split via `llama-gguf-split --merge`).
+  run_m2.py constants MODEL_PATH/MODEL_SHA256/SERVER_BIN/NGL point here; the prior
+  1.5B + llama-b9601 CPU build stay vendored alongside but unwired (baseline kept).
+  All of poc/vendor/ is gitignored (local-only); replacing the model breaks no
+  committed artifact.
+- GPU: Intel Lunar Lake iGPU (PCI 8086:64a0, `xe` driver), Vulkan via Mesa ANV.
+  llama.cpp prebuilt `ubuntu-vulkan-x64` (b9704, flattened at vendor/llama-b9704-vulkan/)
+  runs as-is -- libvulkan1 + mesa-vulkan-drivers ship preinstalled, so no SDK/source
+  build. llm.py always passes `-ngl 99` (offload all). Confirm offload with
+  `llama-bench -ngl 99` (backend column reads `Vulkan`); b9704's server.log is terse
+  and omits the per-layer offload summary, so the device line + tok/s are the in-log
+  evidence.
+- Perf on this shared-LPDDR5x iGPU: Vulkan offload speeds prompt-processing ~34%
+  (pp128 ~174 vs CPU ~130 tok/s) but token-generation is memory-bandwidth-bound and
+  ties CPU (tg ~10 tok/s either way). Expect no tg speedup from the iGPU; a faster
+  backend cannot beat the bandwidth wall, so chase pp, not tg.
+- llama.cpp props schema drifts across builds: b9704 `/props` nests n_ctx under
+  `default_generation_settings.n_ctx` (top-level n_ctx absent); score.py already falls
+  back to the nested path. Re-verify that extraction on any llama.cpp build bump.
+
 ## Lessons
 - Subagents inherit the launching session's context-window size (launch-set and
   process-wide); one that exhausts its window dies mid-task with no result, so
