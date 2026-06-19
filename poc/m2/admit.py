@@ -220,4 +220,8 @@ def admit_route(route_key, contents, vocab):
         return _admit_dsl_hop(contents, vocab, routes.parse_dsl_terse)
     if route_key == "dslkh":
         return _admit_dsl_hop(contents, vocab, routes.parse_dsl_kw)
+    if route_key in ("reason_ir", "repair_ir"):
+        # Final stage emits the IR JSON; preceding free-text/draft stages are
+        # not separately gated -- the last stage's rule drives the verdict.
+        return admit_ir(contents[-1] if contents else "", vocab)
     return _admit_multi(route_key, contents, vocab)

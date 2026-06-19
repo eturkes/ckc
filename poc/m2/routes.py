@@ -382,6 +382,23 @@ def route_stages(vocab):
             {"stage": "typed", "schema": None,
              "grammar": g["dslkh"]["typed"], "slots": ["PRIOR_JSON"]},
         ],
+        # rev-4 reasoning routes: a free-text (unconstrained) stage precedes the
+        # constrained IR emit, so the model may reason before committing. Both
+        # end in the ir_schema stage; admission reads the final stage as IR.
+        "reason_ir": [
+            {"stage": "reason", "schema": None, "grammar": None,
+             "slots": ["JA_TEXT"]},
+            {"stage": "commit", "schema": ir_schema, "grammar": None,
+             "slots": ["JA_TEXT", "PRIOR_JSON"]},
+        ],
+        "repair_ir": [
+            {"stage": "draft", "schema": ir_schema, "grammar": None,
+             "slots": ["JA_TEXT"]},
+            {"stage": "audit", "schema": None, "grammar": None,
+             "slots": ["JA_TEXT", "PRIOR_JSON"]},
+            {"stage": "commit", "schema": ir_schema, "grammar": None,
+             "slots": ["JA_TEXT", "PRIOR_JSON"]},
+        ],
     }
 
 
@@ -627,6 +644,48 @@ def build_prompts(vocab):
         + "Input line: require drug_ibuprofen when " + ex_cond + "\n"
         + "RULE require drug_ibuprofen\nGUARD age >= 12\n"
         + "\nInput line: {PRIOR_JSON}")
+    reason_user = (
+        head
+        + "\nWork out the rule before it is formalized. Resolve any brand, "
+        + "chemical, or abbreviated drug name to an action id; resolve indirect "
+        + "wording (recommended/indicated -> require; not recommended/"
+        + "contraindicated/should avoid/refrain -> forbid); resolve every age "
+        + "phrase to a number (an adult is age>=18; a minor is age<18) and keep "
+        + "true/false polarity.\n"
+        + "Answer in exactly three short lines, nothing else:\n"
+        + "DRUG: <action_id> -- short reason\n"
+        + "DIRECTION: <require|forbid> -- short reason\n"
+        + "CONDITIONS: <var op value>, ... (or none) -- short reason\n"
+        + "\nRule: {JA_TEXT}")
+    reason_commit_user = (
+        head
+        + "\nUsing the analysis below, output the final rule exactly in this "
+        + "format, nothing else:\n"
+        + _IR_FORMAT + "\n"
+        + _OPS_LINE + "\n"
+        + "\n" + _EX_RULE + "\n"
+        + _EX_IR + "\n"
+        + "\nRule: {JA_TEXT}\nAnalysis: {PRIOR_JSON}")
+    repair_audit_user = (
+        head
+        + "\nYou are given the rule sentence and a draft JSON rule. Check the "
+        + "draft against the sentence -- watch for brand/chemical/abbreviated "
+        + "drug names, indirect wording, age conventions (an adult is age>=18, a "
+        + "minor is age<18), and true/false polarity -- and state the CORRECT "
+        + "values in exactly three short lines, nothing else:\n"
+        + "DRUG: <action_id>\n"
+        + "DIRECTION: <require|forbid>\n"
+        + "CONDITIONS: <var op value>, ... (or none)\n"
+        + "\nRule: {JA_TEXT}\nDraft JSON: {PRIOR_JSON}")
+    repair_commit_user = (
+        head
+        + "\nUsing the sentence and the check below, output the corrected final "
+        + "rule exactly in this format, nothing else:\n"
+        + _IR_FORMAT + "\n"
+        + _OPS_LINE + "\n"
+        + "\n" + _EX_RULE + "\n"
+        + _EX_IR + "\n"
+        + "\nRule: {JA_TEXT}\nCheck: {PRIOR_JSON}")
 
     return {
         "direct": {
@@ -740,6 +799,38 @@ def build_prompts(vocab):
                 "system": ("You rewrite one rule line into a fully typed keyword "
                            "rule block. Output only the required format."),
                 "user_template": dslkh_typed_user,
+            },
+        },
+        "reason_ir": {
+            "reason": {
+                "system": ("You analyze one Japanese clinical rule step by step "
+                           "before it is formalized. Write a short plain-text "
+                           "analysis, not JSON."),
+                "user_template": reason_user,
+            },
+            "commit": {
+                "system": ("You output the final clinical rule as JSON, using the "
+                           "provided analysis. Output only the required format."),
+                "user_template": reason_commit_user,
+            },
+        },
+        "repair_ir": {
+            "draft": {
+                "system": ("You translate one Japanese clinical rule into JSON. "
+                           "Output only the required format."),
+                "user_template": ir_user,
+            },
+            "audit": {
+                "system": ("You audit a draft clinical rule against its sentence "
+                           "and state the corrected fields. Write a short "
+                           "plain-text check, not JSON."),
+                "user_template": repair_audit_user,
+            },
+            "commit": {
+                "system": ("You output the corrected clinical rule as JSON, using "
+                           "the sentence and the check. Output only the required "
+                           "format."),
+                "user_template": repair_commit_user,
             },
         },
     }

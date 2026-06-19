@@ -9,6 +9,7 @@ report.ja.md via report.canonical_bytes / report.render_md.
 """
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from m2 import admit, grammars, routes, verdict
 from m2 import report as report_mod
 
 ROUTE_KEYS = ("direct", "ir", "stacked", "hop", "layered",
-              "dsl", "dslh", "dslk", "dslkh")
+              "dsl", "dslh", "dslk", "dslkh", "reason_ir", "repair_ir")
 ROUTE_IDS = {
     "direct": "route.direct_smt",
     "ir": "route.single_ir",
@@ -27,13 +28,36 @@ ROUTE_IDS = {
     "dslh": "route.ckc_dsl_hop",
     "dslk": "route.ckc_dsl_kw",
     "dslkh": "route.ckc_dsl_kw_hop",
+    "reason_ir": "route.reason_then_ir",
+    "repair_ir": "route.draft_repair_ir",
 }
-MODEL_NAME = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
-MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
-LLAMA_BUILD = "b9601 (4c6595503)"
-EXPERIMENT_ID = "exp.m2poc_dsl"
+MODEL_NAME = "qwen2.5-7b-instruct-q4_k_m.gguf"
+MODEL_SHA256 = "1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49"
+LLAMA_BUILD = "b9704-vulkan"
+EXPERIMENT_ID = "exp.m2poc_oblique"
 PORT = 8077
 MAX_TOKENS = 320
+
+
+_TERM_RE = re.compile(r"\([^()]+\)")
+
+
+def _formula_terms(formula):
+    """Order-independent leaf-term set of a compiled formula. 'true' -> set();
+    '(>= age 65)' -> {'(>= age 65)'}; '(and A B)' -> {A, B}."""
+    return frozenset(_TERM_RE.findall(formula))
+
+
+def _exact_ir_match(rule, gold_ir):
+    """True iff the compiled rule equals the gold IR on action, direction, and
+    the full condition set -- faithfulness, finer than the conflict verdict
+    (which ignores threshold/convention errors that preserve overlap)."""
+    if not rule:
+        return False
+    gold = routes.compile_ir(gold_ir)
+    return (rule["action"] == gold["action"]
+            and rule["direction"] == gold["direction"]
+            and _formula_terms(rule["formula"]) == _formula_terms(gold["formula"]))
 
 
 def _sha256(data):
@@ -107,10 +131,12 @@ def score_run(run_dir, dataset):
 
     raw_rows = []
     cell_raw = {}  # (source_key, route_key) -> [AdmissionResult, ...]
+    cell_exact = {}  # (source_key, route_key) -> [greedy exact-match bool, ...]
     for key in sorted(res, key=lambda t: (t[0], s_ix[t[1]], r_ix[t[2]], t[3])):
         iid, sk, rk, n = key
         ar = res[key]
         seed, dur, osha = meta[key]
+        exact = _exact_ir_match(ar.get("rule"), items[iid]["gold_ir"])
         raw_rows.append({
             "item": iid,
             "group": item_group[iid],
@@ -124,8 +150,11 @@ def score_run(run_dir, dataset):
             "failed_stage": ar["failed_stage"],
             "duration_ms_total": dur,
             "output_sha256": osha,
+            "exact_match": exact,
         })
         cell_raw.setdefault((sk, rk), []).append(ar)
+        if n == 0:  # greedy faithfulness, paired with verdict_accuracy_greedy
+            cell_exact.setdefault((sk, rk), []).append(exact)
 
     # 3. group rows: solver verdict per group x source x route x sample.
     group_rows = []
@@ -171,6 +200,8 @@ def score_run(run_dir, dataset):
             "syntactic_validity": (sum(a["syntactic_valid"] for a in ars), len(ars)),
             "admission_rate": (sum(a["admitted"] for a in ars), len(ars)),
             "verdict_accuracy_greedy": (sum(r["correct"] for r in g0), len(g0)),
+            "exact_ir_match": (sum(cell_exact.get((sk, rk), [])),
+                               len(cell_exact.get((sk, rk), []))),
             "verdict_stability": (stable, len(full)),
         }
 

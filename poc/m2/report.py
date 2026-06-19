@@ -7,11 +7,13 @@ Quoted Japanese spans from the report dict render verbatim in both langs.
 import json
 
 METRIC_ORDER = ("syntactic_validity", "admission_rate",
-                "verdict_accuracy_greedy", "verdict_stability")
+                "verdict_accuracy_greedy", "exact_ir_match",
+                "verdict_stability")
 FINDING_LABELS = {"direct": "direct", "ir": "single-IR", "stacked": "stacked",
                   "hop": "hop-chain", "layered": "layered",
                   "dsl": "dsl", "dslh": "dsl-hop", "dslk": "dsl-kw",
-                  "dslkh": "dsl-kw-hop"}
+                  "dslkh": "dsl-kw-hop", "reason_ir": "reason-IR",
+                  "repair_ir": "draft-repair"}
 
 L_EN = {
     "title": "M2-M4 PoC report",
@@ -40,7 +42,7 @@ L_EN = {
 
 # --- JA literals (ASCII unicode escapes) ---
 VERDICT_JA = {'conflict': '\u77db\u76fe', 'no_conflict': '\u77db\u76fe\u306a\u3057', 'incomputable': '\u8a08\u7b97\u4e0d\u80fd'}
-METRIC_JA = {'syntactic_validity': '\u69cb\u6587\u59a5\u5f53\u7387', 'admission_rate': '\u53d7\u7406\u7387', 'verdict_accuracy_greedy': '\u5224\u5b9a\u7cbe\u5ea6(\u30b0\u30ea\u30fc\u30c7\u30a3)', 'verdict_stability': '\u5224\u5b9a\u5b89\u5b9a\u6027'}
+METRIC_JA = {'syntactic_validity': '\u69cb\u6587\u59a5\u5f53\u7387', 'admission_rate': '\u53d7\u7406\u7387', 'verdict_accuracy_greedy': '\u5224\u5b9a\u7cbe\u5ea6(\u30b0\u30ea\u30fc\u30c7\u30a3)', 'exact_ir_match': '\u5b8c\u5168\u4e00\u81f4\u7387', 'verdict_stability': '\u5224\u5b9a\u5b89\u5b9a\u6027'}
 JA_FINDING_HEAD = '\u6b63\u89e3\u306f%s\u3002'
 JA_FINDING_SEG = '%s\u7d4c\u8def\u306f%s\u3068\u5224\u5b9a'
 JA_JOIN = '\u3001'

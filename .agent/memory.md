@@ -71,3 +71,40 @@ history retains pre-consolidation text.
   real prose overreach in the acceptance writeup (false "all four"/"T forms" route
   labels, "misses identically", "stably wrong" applied to the right null half);
   ground every per-route claim in the exact pooled/taxonomy cell before asserting it.
+
+## M5 single_ir-insufficiency (exp.m2poc_oblique)
+- The conflict verdict (verdict_accuracy_greedy) is COARSE: it turns on drug +
+  direction + overlap-satisfiability only, so it tolerates wrong numeric
+  thresholds/conventions that preserve overlap. Qwen2.5-7B scores verdict 1.0 on
+  the new `oblique` surface family yet faithfulness is far lower -- surface
+  difficulty alone cannot dent the verdict, only faithfulness. To separate route
+  quality on this dataset use `exact_ir_match` (score.py `_exact_ir_match`: action
+  + direction + order-independent condition-term set vs compiled gold, greedy n=0),
+  added to METRIC_ORDER. A bigger verdict-level gap would need verdict-flipping
+  traps (direction/drug) or structural complexity, not threshold fuzz.
+- `oblique` family (dataset rev-4, 6th source): same 20 gold rules, indirect
+  surfaces (drug synonyms アセチルサリチル酸/MTX/ワーファリン, oblique polarity
+  推奨されない->forbid/適応->require, age conventions 高齢者=65/後期高齢者=75/成人=18,
+  negation 非妊娠=false). Gold/z3/scoring untouched -- surfaces never gold-gated.
+- Demonstration (oblique, k=1, all 10 groups): exact_ir_match direct 0.20,
+  single_ir 0.70, reason_then_ir 0.90. reason_ir (free terse 3-line reasoning ->
+  constrained IR commit) recovers single_ir's convention errors WHEN the convention
+  is hinted in-prompt (adult=18, minor=18) and dropped-negation errors; it does NOT
+  fix genuine model knowledge gaps (後期高齢者 stays 65 not 75) and can introduce a
+  new error (70歳を超えない =<=70 misread as <70). single_ir's drug+direction stay
+  perfect even on oblique -> the 7B one-shots common synonyms/polarity.
+- New routes (routes.py route_stages + build_prompts; admit.py admit_route ->
+  admit_ir(contents[-1]); score ROUTE_KEYS/IDS; report FINDING_LABELS): `reason_ir`
+  (reason free-text -> commit ir_schema) and `repair_ir` (draft ir_schema -> audit
+  free-text -> commit ir_schema). A `schema:None,grammar:None` stage is
+  UNCONSTRAINED free text -- that is the reasoning room single_ir lacks.
+- Fast-iteration knobs: run_m2.py already has --sources/--routes/--groups/--k;
+  k=1 = greedy only (the discriminating sample). The free-text stage dominates
+  latency (max_tokens 320 @ ~10 tok/s); a terse fixed-line output prompt caps it
+  ~5s vs ~25s (~10s/item for a 2-stage route). Combine routes into one report
+  WITHOUT re-running: copy each route's records into one run dir + a
+  server_props.json, then `score --run-id` (records are route-named, no collision;
+  honest only when all share current code/model/dataset).
+- score.py identity was stale (1.5b/b9601) after the 7B switch touched only
+  run_m2.py; now MODEL_NAME/SHA/LLAMA_BUILD/EXPERIMENT_ID match the live runtime.
+  Keep score.py identity in lockstep with run_m2.py on any runtime bump.
