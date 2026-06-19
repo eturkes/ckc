@@ -162,8 +162,8 @@ git history.
   toggles 200K/1M solely by prefixing `claude` with `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
   (terminal-only; settings carry only model slugs); the flag gates the 1M beta header
   process-wide (v2.1.170 short-circuits both 1M paths: `[1m]` suffix parse and the
-  always-1M fable/opus allowlist). Flag on — every non-review session — leaves the global
-  `CLAUDE_CODE_SUBAGENT_MODEL=claude-fable-5[1m]` slug silently inert: every subagent caps
+  always-1M model allowlist). Flag on — every non-review session — leaves the global
+  `CLAUDE_CODE_SUBAGENT_MODEL=<model>[1m]` slug silently inert: every subagent caps
   at 200K. Flag off (review sessions): subagents get 1M via both paths. The slug keeps
   `[1m]` by user choice; a subagent env block echoing it verifies model selection only,
   never the effective window. Overflow = hard mid-task death (subagents never compact):
@@ -176,22 +176,3 @@ git history.
   `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
   `.message.usage`; rejected requests log no usage). compaction.sh reads the same flag and
   gauges the main loop only.
-- Fable 5 refusal fallback silently switches a session to Opus mid-flight
-  (`type=system subtype=model_refusal_fallback` transcript event, flagged "cybersecurity or
-  biology topics"). One-way and in-context invisible — the post-switch assistant continues
-  unaware. Trigger: raw Japanese clinical fixture text entering context via whole-fixture
-  reads; probabilistic, not deterministic (three switches, then an identical-vocabulary
-  session stayed on fable). Mitigation: `Read(./corpus/fixtures/**)` is settings-denied — work with fixtures through code, tests, and path-scoped greps. Handling:
-  Opus-mode output is discarded; the user monitors for the switch — on any suspicion of
-  degraded-model output, stop and report. A session's self-report is zero evidence;
-  evidence channels: the Headroom proxy log (request bytes, per-response model ids),
-  transcript jq over assistant records (`jq '.message.model'` in
-  `~/.claude/projects/-run-host-home-eturkes-Projects-ckc/<session>.jsonl`; the fallback
-  event is the switch marker), and paired A/B task batteries scored by objective gates;
-  CKC's deterministic gates and replay manifests are the standing mitigation. Expect
-  recurrence in fixture-reading units (acceptance-m1 ran clean under redacted printing:
-  audit scripts compare bytes in code and print Japanese-bearing JSON/markdown only
-  through a redactor mapping such runs to `<ja Nch hash>` — reuse for M2 model-I/O work).
-  The lexgate write-time vocabulary gate is removed (user directive 2026-06-12): its cases
-  follow this same handling, and lexgate mentions in git history are obsolete.
-  Full case detail (transcript ids, timestamps, trigger tokens): `git show 2270c2b`.

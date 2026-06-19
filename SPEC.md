@@ -1,6 +1,6 @@
 # CKC — Clinical Knowledge Compiler
 
-Design authority for this repository. Sole implementers and readers: Claude (Fable 5 family)
+Design authority for this repository. Sole implementers and readers: Claude
 sessions operating under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
 The document is optimized for machine reading: stable `§` anchors, tables over prose, one fact in
 one place, sections sized for selective loading.
@@ -105,7 +105,7 @@ Unit discipline:
 - A projected unit overrun is a stop-and-report: recovery (restore to the last commit, re-scope
   the roadmap) is always user-initiated.
 
-Working style (Fable 5):
+Working style:
 
 - When you have enough information to act, act; bring contract-changing decisions, destructive
   actions, and genuine scope changes to the user, and proceed on everything else.
