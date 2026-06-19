@@ -547,7 +547,7 @@ dimension, a sec.12 seed coordinate: candidate T is a terse infix line,
 candidate K a verbose keyword block. A documented null result (no DSL beats
 single_ir) is first-class.
 
-Unit sequencing: dsl-impl is one unit at the PoC's 1M context, built in two
+Unit sequencing: dsl-impl is one unit, built in two
 internally-gated passes in a single commit. Pass 1 (SINGULAR): m2/grammars.py
 (terse + keyword grammars, grammar_shas), the two canonical parsers, the chat
 grammar field, run threading, score's ROUTE_KEYS/ROUTE_IDS + dual baseline, and

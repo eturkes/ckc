@@ -7,10 +7,6 @@ SPEC.md, CLAUDE.md, the codebase, git history, and the runtime environment, espe
 hard-won facts easily re-forgotten under token pressure. Consolidate aggressively; git
 history retains pre-consolidation text.
 
-## Policy
-- Branch poc-m2-3-4 (the M2-M4 PoC) runs sessions at 1M context (user-launched,
-  overriding the default 200K); size units for 1M headroom.
-
 ## Runtime
 - Active model: Qwen2.5-7B-Instruct Q4_K_M at poc/vendor/qwen2.5-7b-instruct-q4_k_m.gguf
   (merged from the official Qwen 2-shard split via `llama-gguf-split --merge`).
