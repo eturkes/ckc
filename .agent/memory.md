@@ -125,3 +125,15 @@ history retains pre-consolidation text.
 - `direct` is needed in a run only for delta_scope (delta-vs-direct); drop it for
   iteration and read raw exact_ir_match values. `repair_ir` is implemented + wired
   but parked untested (slowest, 3 stages) -- test at k=1 before judging it.
+- ui/index.html (the HTML "translation route report") fetches runs/<run>/report.json
+  and is DYNAMIC for routes (rep.routes) + sources (rep.sources) -- new routes/
+  sources appear automatically. But the METRIC list is HARDCODED in 5 spots: the
+  `METRICS` array, `MKEY`, I18N.en + I18N.ja labels (`m_<metric>`), and the IR-delta
+  chip guard (was DSL-only; broadened to reason_ir/repair_ir). Adding a score.py
+  metric needs all five or it silently won't render. Verify a render headlessly:
+  `python3 -m http.server 8099 --bind 127.0.0.1` (from poc/) then
+  `"$(chromiumfish path)" --headless --no-sandbox --virtual-time-budget=9000
+  --dump-dom "http://127.0.0.1:8099/ui/index.html?run=<run>&lang=en"`. The banner is
+  still verdict-centric (shows 100% for both single_ir/reason_ir); the faithfulness
+  story lives in the metrics table (exact-IR match row). `latest` symlink repoints
+  to the most recently SCORED run, so pass `?run=oblique_demo` for the 3-route demo.

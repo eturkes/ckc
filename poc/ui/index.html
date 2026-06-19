@@ -98,6 +98,7 @@ var I18N = {
  "m_admission_rate": "admission rate",
  "m_syntactic_validity": "syntactic validity",
  "m_verdict_accuracy_greedy": "verdict accuracy (greedy)",
+ "m_exact_ir_match": "exact-IR match",
  "m_verdict_stability": "verdict stability",
  "no_rows": "no rows in this scope",
  "note_scope": "Measured rates on locked synthetic fixtures; no clinical claims.",
@@ -143,6 +144,7 @@ var I18N = {
  "m_admission_rate": "\u53d7\u7406\u7387",
  "m_syntactic_validity": "\u69cb\u6587\u59a5\u5f53\u7387",
  "m_verdict_accuracy_greedy": "\u5224\u5b9a\u7cbe\u5ea6(\u30b0\u30ea\u30fc\u30c7\u30a3)",
+ "m_exact_ir_match": "\u5b8c\u5168\u4e00\u81f4\u7387",
  "m_verdict_stability": "\u5224\u5b9a\u5b89\u5b9a\u6027",
  "no_rows": "\u3053\u306e\u30b9\u30b3\u30fc\u30d7\u306b\u884c\u306a\u3057",
  "note_scope": "\u56fa\u5b9a\u3055\u308c\u305f\u5408\u6210\u30d5\u30a3\u30af\u30b9\u30c1\u30e3\u4e0a\u3067\u6e2c\u5b9a\u3057\u305f\u5024\u3067\u3042\u308a\u3001\u81e8\u5e8a\u7684\u306a\u4e3b\u5f35\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
@@ -178,12 +180,13 @@ var ROUTES_FALLBACK = [
  { "key": "hop", "id": "route.ir_hop_chain" },
  { "key": "layered", "id": "route.ckc_layered" }
 ];
-var METRICS = ["syntactic_validity", "admission_rate", "verdict_accuracy_greedy", "verdict_stability"];
+var METRICS = ["syntactic_validity", "admission_rate", "verdict_accuracy_greedy", "exact_ir_match", "verdict_stability"];
 var DSL_KEYS = { "dsl": 1, "dslh": 1, "dslk": 1, "dslkh": 1 };
 var MKEY = {
  "syntactic_validity": "m_syntactic_validity",
  "admission_rate": "m_admission_rate",
  "verdict_accuracy_greedy": "m_verdict_accuracy_greedy",
+ "exact_ir_match": "m_exact_ir_match",
  "verdict_stability": "m_verdict_stability"
 };
 var VKEY = { "conflict": "v_conflict", "no_conflict": "v_no_conflict", "incomputable": "v_incomputable" };
@@ -352,7 +355,7 @@ function renderMetrics(rep) {
         if (d !== null) {
           inner += " <span class=\"dchip " + deltaCls(d) + "\" title=\"" + esc(t("delta") + " (" + t("vs_direct") + ")") + "\">" + esc(signedPts(d)) + "</span>";
         }
-        if (DSL_KEYS[rt.key]) {
+        if (DSL_KEYS[rt.key] || rt.key === "reason_ir" || rt.key === "repair_ir") {
           var dir = deltaIrOf(rep, name, S.scope, rt.id);
           if (dir !== null) {
             inner += " <span class=\"dchip ir " + deltaCls(dir) + "\" title=\"" + esc(t("delta") + " (" + t("vs_ir") + ")") + "\">IR " + esc(signedPtsShort(dir)) + "</span>";
