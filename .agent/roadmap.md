@@ -40,4 +40,7 @@ production milestones live on `main`.
 - [ ] m5-doc: sync poc/DESIGN.md + README.md to rev-4 -- the `oblique` source, the
   `exact_ir_match` metric and the verdict-coarseness lesson, the `reason_ir`/
   `repair_ir` routes, and the single_ir-insufficiency finding. Docs still describe
-  the closed 9-route verdict-only PoC.
+  the closed 9-route verdict-only PoC. NOTE: the HTML report (poc/ui/index.html) was
+  already rewritten this session into a single-screen 2-metric bar comparison
+  (faithful logic vs conflict call) with de-jargoned human labels; doc text +
+  screenshots must describe THAT, not the old 6-section/source-tab report.

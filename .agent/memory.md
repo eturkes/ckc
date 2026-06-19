@@ -125,15 +125,33 @@ history retains pre-consolidation text.
 - `direct` is needed in a run only for delta_scope (delta-vs-direct); drop it for
   iteration and read raw exact_ir_match values. `repair_ir` is implemented + wired
   but parked untested (slowest, 3 stages) -- test at k=1 before judging it.
-- ui/index.html (the HTML "translation route report") fetches runs/<run>/report.json
-  and is DYNAMIC for routes (rep.routes) + sources (rep.sources) -- new routes/
-  sources appear automatically. But the METRIC list is HARDCODED in 5 spots: the
-  `METRICS` array, `MKEY`, I18N.en + I18N.ja labels (`m_<metric>`), and the IR-delta
-  chip guard (was DSL-only; broadened to reason_ir/repair_ir). Adding a score.py
-  metric needs all five or it silently won't render. Verify a render headlessly:
-  `python3 -m http.server 8099 --bind 127.0.0.1` (from poc/) then
-  `"$(chromiumfish path)" --headless --no-sandbox --virtual-time-budget=9000
-  --dump-dom "http://127.0.0.1:8099/ui/index.html?run=<run>&lang=en"`. The banner is
-  still verdict-centric (shows 100% for both single_ir/reason_ir); the faithfulness
-  story lives in the metrics table (exact-IR match row). `latest` symlink repoints
-  to the most recently SCORED run, so pass `?run=oblique_demo` for the 3-route demo.
+- ui/index.html REWRITTEN to a single-screen, at-a-glance comparison (user task,
+  was a 6-section multi-tab report; 24.6K->14.3K). Still fetches runs/<run>/
+  report.json + DYNAMIC for routes. Layout = methods (rep.routes WITH pooled data,
+  sorted by faithfulness desc) x two bar columns: FAITHFUL=`exact_ir_match` (teal,
+  the differentiating staircase) and VERDICT=`verdict_accuracy_greedy` (gray, the
+  saturated flat wall) -- the teal-vs-gray + staircase-vs-wall contrast IS the
+  conclusion, no prose. The other 3 metrics (syntactic_validity/admission_rate/
+  verdict_stability) moved to per-row hover tooltips. Footer = counts.groups +
+  prettyModel(model_name) + temp0 + gold_gate + replay chip. DROPPED: banner,
+  per-group matrix, taxonomy, findings cards, identity hash table, source tabs
+  (only oblique has data in M5). Metric wiring now centralized: `FAITHFUL`/`VERDICT`
+  consts + `SECONDARY` array + `ROUTE_NAME` map + `I18N` (no more 5-spot hardcode).
+- De-jargoned for humans (user ask): gold/"gold gate" -> "answer key verified",
+  verdict -> "Conflict call", exact-IR match -> "Faithful logic / exact match to
+  reference", greedy s0 -> "temp 0 (single best guess)", route keys -> natural names
+  via ROUTE_NAME (single_ir="Translate in one step", reason_then_ir="Reason, then
+  translate", direct_smt="Direct (no translation)"). JA kept, now literal UTF-8
+  (charset utf-8), not \u escapes -- screenshots confirmed both langs render.
+- CSS gotcha that ate a render: a flex ITEM is blockified but ITS CHILDREN are not.
+  Bar `.fill` (a <span> inside the flex-item `.bar`) needs `display:block` or its
+  width%/height% are silently ignored -> all bars looked full/identical. Always
+  display:block the fill.
+- Verify the UI render with a SCREENSHOT, not --dump-dom: serve poc/ (`python3 -m
+  http.server 8099`), then `"$(chromiumfish path)" --headless --no-sandbox
+  --force-device-scale-factor=2 --window-size=900,560 --virtual-time-budget=5000
+  --screenshot=/tmp/x.png "http://localhost:8099/ui/index.html?run=<run>&lang=en"`,
+  then Read the PNG. chromiumfish only fetches/caches the chrome binary (`path`).
+- `latest` manually repointed to oblique_demo so the bare report opens on the
+  headline 3-route staircase (90/70/20 faithful vs 100/100/90 verdict). run_m2
+  refresh_latest resets it to the most-recent scored run, so pin via `?run=`.

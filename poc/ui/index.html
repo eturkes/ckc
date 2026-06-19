@@ -4,194 +4,185 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>CKC M2-M4 PoC</title>
+<title>CKC translation faithfulness</title>
 <style>
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+  --ink: #1b2027;
+  --ink-soft: #5c6672;
+  --line: #e7eaee;
+  --teal: #0f766e;
+  --teal-bar: #14b8a6;
+  --teal-track: #e6f6f3;
+  --gray-bar: #b6bfc9;
+  --gray-track: #eef1f4;
+  --ok-bg: #e7f5ec; --ok-ink: #1d6b3a;
+  --bad-bg: #fbe3e1; --bad-ink: #9a2820;
+}
 * { box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem 1.25rem 3rem; color: #1c1c1c; background: #fff; }
-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; border-bottom: 2px solid #222; padding-bottom: .5rem; }
-h1 { font-size: 1.35rem; margin: 0; }
-h2 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; border-bottom: 1px solid #ccc; padding-bottom: .2rem; }
-.hctl { display: flex; align-items: baseline; gap: .75rem; }
-#runid { font-family: ui-monospace, monospace; font-size: .85rem; color: #555; }
+body {
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  max-width: 880px; margin: 0 auto; padding: 2.2rem 1.4rem 4rem;
+  color: var(--ink); background: #fff; line-height: 1.45;
+}
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.htitle h1 {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1.75rem; font-weight: 600; margin: 0; letter-spacing: -0.01em;
+}
+.htitle .tag { color: var(--ink-soft); font-size: .82rem; margin-top: .2rem; }
+.hmeta { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: .45rem; }
+#runid { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .78rem; color: var(--ink-soft); }
 .lang { display: inline-flex; gap: .25rem; }
-.lang button { border: 1px solid #888; background: #f5f5f5; padding: .15rem .6rem; cursor: pointer; font: inherit; }
-.lang button.active { background: #222; color: #fff; border-color: #222; }
-#error { border: 2px solid #b3261e; background: #fdecea; color: #5f1410; padding: .8rem 1rem; margin: 1rem 0; font-family: ui-monospace, monospace; white-space: pre-wrap; }
-#loading { margin: 1rem 0; color: #555; }
-.banner { border: 1px solid #bbb; border-radius: 8px; background: #fafafa; padding: .8rem 1rem; margin: 1.2rem 0; display: flex; flex-wrap: wrap; gap: .35rem 1.1rem; align-items: baseline; font-size: 1rem; }
-.banner .blead { font-weight: 600; }
-.banner .bitem { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.banner .bcall { white-space: nowrap; border-left: 2px solid #bbb; padding-left: 1rem; }
-.tabs { position: sticky; top: 0; z-index: 5; background: #fff; display: flex; flex-wrap: wrap; gap: .4rem; padding: .5rem 0; border-bottom: 1px solid #ddd; margin: 1rem 0; }
-.tabs button { border: 1px solid #888; background: #f5f5f5; padding: .3rem .7rem; cursor: pointer; font: inherit; text-align: left; }
-.tabs button b { display: block; font-size: .9rem; }
-.tabs button small { display: block; font-size: .68rem; color: #666; max-width: 11rem; }
-.tabs button.active { background: #222; color: #fff; border-color: #222; }
-.tabs button.active small { color: #ccc; }
-table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-th, td { border: 1px solid #ccc; padding: .3rem .55rem; text-align: left; vertical-align: top; }
-th { background: #f0f0f0; font-weight: 600; }
-th.basecol { background: #e2e8f0; }
-td.num, td .num { font-variant-numeric: tabular-nums; }
-.ok { background: #d9f0d9; }
-.bad { background: #f7d4d4; }
-.mid { background: #fbecc2; }
-.gray { background: #e3e3e3; color: #444; }
-.empty { color: #999; }
-.pos { background: #d9f0d9; }
-.neg { background: #f7d4d4; }
-.chip { padding: .05rem .4rem; border-radius: 4px; }
-.dchip { display: inline-block; font-size: .78rem; padding: 0 .3rem; border-radius: 3px; }
-.dchip.ir { border: 1px dashed #999; }
-.fctl { margin: .4rem 0 .8rem; display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; }
-.finding { border: 1px solid #ddd; border-left: 4px solid #888; border-radius: 4px; padding: .6rem .8rem; margin: .6rem 0; }
-.fhead { font-weight: 600; font-family: ui-monospace, monospace; font-size: .85rem; color: #333; }
-.fsent { margin: .35rem 0 .5rem; }
-blockquote { margin: .3rem 0 .3rem .5rem; padding: .25rem .6rem; border-left: 3px solid #bbb; background: #f8f8f8; font-size: .92rem; }
-.qlabel { font-weight: 600; font-size: .8rem; color: #555; margin-right: .4rem; }
-footer { margin-top: 2rem; }
-table.kv td { font-family: ui-monospace, monospace; font-size: .8rem; }
-table.kv td:first-child { color: #555; width: 18rem; }
-.status { font-size: .9rem; }
-.muted { color: #777; font-size: .8rem; }
+.lang button {
+  border: 1px solid #c7ccd3; background: #f6f7f9; color: var(--ink);
+  padding: .12rem .55rem; cursor: pointer; font: inherit; font-size: .8rem; border-radius: 5px;
+}
+.lang button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+#error {
+  border: 1px solid #d8736a; background: #fbe3e1; color: #7c241c;
+  padding: .8rem 1rem; margin: 1.4rem 0; border-radius: 6px;
+  font-family: ui-monospace, monospace; white-space: pre-wrap; font-size: .85rem;
+}
+#loading { margin: 2rem 0; color: var(--ink-soft); }
+main { margin-top: 2rem; }
+
+.cmp { display: grid; grid-template-columns: minmax(9.5rem, 1.1fr) 2fr 2fr; column-gap: 1.6rem; }
+.empty { grid-column: 1 / -1; color: var(--ink-soft); padding: 1.5rem 0; }
+.ch { font-size: .82rem; font-weight: 600; padding: 0 0 .55rem; border-bottom: 2px solid var(--line); }
+.ch .sub { display: block; font-weight: 400; font-size: .72rem; color: var(--ink-soft); margin-top: .1rem; }
+.ch.faithful { color: var(--teal); }
+.ch.verdict { color: var(--ink-soft); }
+.ch.spacer { border-bottom-color: transparent; }
+
+.mname {
+  display: flex; align-items: center; min-height: 2.9rem;
+  border-bottom: 1px solid var(--line); font-weight: 500; font-size: .96rem;
+}
+.cell {
+  display: flex; align-items: center; gap: .7rem; min-height: 2.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.bar { flex: 1; height: 1.25rem; border-radius: 4px; overflow: hidden; }
+.bar.faithful { background: var(--teal-track); }
+.bar.verdict { background: var(--gray-track); }
+.fill { display: block; height: 100%; min-width: 3px; border-radius: 4px 0 0 4px; }
+.fill.faithful { background: var(--teal-bar); }
+.fill.verdict { background: var(--gray-bar); }
+.val { width: 3.4rem; text-align: right; font-variant-numeric: tabular-nums; font-size: .92rem; }
+.val.faithful { font-weight: 600; color: var(--teal); }
+.val.verdict { color: var(--ink-soft); }
+.val.none { color: #aab2bc; }
+.cell.row-top, .mname.row-top { padding-top: .3rem; }
+
+.prov {
+  margin-top: 1.9rem; padding-top: 1rem; border-top: 1px solid var(--line);
+  color: var(--ink-soft); font-size: .82rem;
+  display: flex; flex-wrap: wrap; gap: .35rem .7rem; align-items: center;
+}
+.prov .dot { color: #c7ccd3; }
+.prov .mono { font-family: ui-monospace, monospace; }
+.chip { padding: .08rem .5rem; border-radius: 999px; font-size: .76rem; font-weight: 600; }
+.chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.chip.bad { background: var(--bad-bg); color: var(--bad-ink); }
 [hidden] { display: none !important; }
+@media (max-width: 540px) {
+  .cmp { grid-template-columns: 1fr; row-gap: 0; }
+  .ch.spacer { display: none; }
+  .ch { padding-top: 1rem; }
+  .mname { border-bottom: none; padding-top: 1rem; font-weight: 600; }
+  .cell { padding-bottom: .2rem; }
+}
 </style>
 </head>
 <body>
 <header>
-  <h1 data-i18n="title"></h1>
-  <div class="hctl">
-    <span id="runid"></span>
+  <div class="htitle">
+    <h1 data-i18n="title"></h1>
+    <div class="tag" data-i18n="tag"></div>
+  </div>
+  <div class="hmeta">
     <span class="lang"><button id="btn-en" type="button">EN</button><button id="btn-ja" type="button">JA</button></span>
+    <span id="runid"></span>
   </div>
 </header>
 <div id="error" hidden></div>
 <div id="loading" data-i18n="loading"></div>
 <main id="main" hidden>
-  <div id="banner" class="banner"></div>
-  <nav id="tabs" class="tabs"></nav>
-  <section><h2 data-i18n="s_metrics"></h2><div id="metrics"></div></section>
-  <section><h2 data-i18n="s_matrix"></h2><div id="matrix"></div></section>
-  <section><h2 data-i18n="s_taxonomy"></h2><div id="taxonomy"></div></section>
-  <section><h2 data-i18n="s_findings"></h2><div id="fctl" class="fctl"></div><div id="findings"></div></section>
-  <footer><h2 data-i18n="s_identity"></h2><div id="identity"></div></footer>
+  <div id="cmp" class="cmp"></div>
+  <div id="prov" class="prov"></div>
 </main>
 <script>
 "use strict";
 var I18N = {
-"en": {
- "banner_lead": "Verdict accuracy (greedy s0)",
- "best_nd": "best non-direct",
- "delta": "delta",
- "err_load": "Failed to load report",
- "fail": "FAIL",
- "gold_gate": "gold gate",
- "groups": "groups",
- "h_code": "failure code",
- "h_gold": "gold",
- "h_group": "group",
- "h_kind": "kind",
- "h_metric": "metric",
- "legend_pooled": "cell = sources correct at s0 (green = all, red = none, amber = some)",
- "loading": "Loading report...",
- "m_admission_rate": "admission rate",
- "m_syntactic_validity": "syntactic validity",
- "m_verdict_accuracy_greedy": "verdict accuracy (greedy)",
- "m_exact_ir_match": "exact-IR match",
- "m_verdict_stability": "verdict stability",
- "no_rows": "no rows in this scope",
- "note_scope": "Measured rates on locked synthetic fixtures; no clinical claims.",
- "only_wrong": "only wrong rows",
- "pass": "pass",
- "pts": "pts",
- "quote_a": "rule A (ja)",
- "quote_b": "rule B (ja)",
- "replay": "replay",
- "rows_shown": "rows shown",
- "run": "run",
- "s_findings": "Findings",
- "s_identity": "Identity and provenance",
- "s_matrix": "Greedy verdict matrix (s0)",
- "s_metrics": "Metrics",
- "s_taxonomy": "Failure taxonomy",
- "tab_pooled": "Pooled",
- "tab_pooled_sub": "all sources",
- "tax_empty": "no failure codes in this scope",
- "title": "CKC M2-M4 PoC - translation route report",
- "v_conflict": "conflict",
- "v_incomputable": "incomputable",
- "v_no_conflict": "no_conflict",
- "vs_direct": "vs direct",
- "vs_ir": "vs single-IR",
- "best_dsl": "best DSL"
-},
-"ja": {
- "banner_lead": "\u5224\u5b9a\u7cbe\u5ea6 (greedy s0)",
- "best_nd": "direct\u4ee5\u5916\u3067\u6700\u826f",
- "delta": "\u5dee\u5206",
- "err_load": "\u30ec\u30dd\u30fc\u30c8\u306e\u8aad\u307f\u8fbc\u307f\u306b\u5931\u6557\u3057\u307e\u3057\u305f",
- "fail": "\u4e0d\u5408\u683c",
- "gold_gate": "\u30b4\u30fc\u30eb\u30c9\u30b2\u30fc\u30c8",
- "groups": "\u30b0\u30eb\u30fc\u30d7",
- "h_code": "\u5931\u6557\u30b3\u30fc\u30c9",
- "h_gold": "\u6b63\u89e3",
- "h_group": "\u30b0\u30eb\u30fc\u30d7",
- "h_kind": "\u7a2e\u5225",
- "h_metric": "\u6307\u6a19",
- "legend_pooled": "\u30bb\u30eb = s0\u3067\u6b63\u89e3\u3057\u305f\u30bd\u30fc\u30b9\u6570 (\u7dd1=\u5168\u3066, \u8d64=0, \u6a59=\u4e00\u90e8)",
- "loading": "\u30ec\u30dd\u30fc\u30c8\u3092\u8aad\u307f\u8fbc\u307f\u4e2d...",
- "m_admission_rate": "\u53d7\u7406\u7387",
- "m_syntactic_validity": "\u69cb\u6587\u59a5\u5f53\u7387",
- "m_verdict_accuracy_greedy": "\u5224\u5b9a\u7cbe\u5ea6(\u30b0\u30ea\u30fc\u30c7\u30a3)",
- "m_exact_ir_match": "\u5b8c\u5168\u4e00\u81f4\u7387",
- "m_verdict_stability": "\u5224\u5b9a\u5b89\u5b9a\u6027",
- "no_rows": "\u3053\u306e\u30b9\u30b3\u30fc\u30d7\u306b\u884c\u306a\u3057",
- "note_scope": "\u56fa\u5b9a\u3055\u308c\u305f\u5408\u6210\u30d5\u30a3\u30af\u30b9\u30c1\u30e3\u4e0a\u3067\u6e2c\u5b9a\u3057\u305f\u5024\u3067\u3042\u308a\u3001\u81e8\u5e8a\u7684\u306a\u4e3b\u5f35\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
- "only_wrong": "\u8aa4\u5224\u5b9a\u306e\u884c\u306e\u307f",
- "pass": "\u5408\u683c",
- "pts": "\u30dd\u30a4\u30f3\u30c8",
- "quote_a": "\u898f\u5247A (\u539f\u6587)",
- "quote_b": "\u898f\u5247B (\u539f\u6587)",
- "replay": "\u30ea\u30d7\u30ec\u30a4",
- "rows_shown": "\u8868\u793a\u4ef6\u6570",
- "run": "\u5b9f\u884c",
- "s_findings": "\u6240\u898b",
- "s_identity": "\u8b58\u5225\u60c5\u5831\u3068\u6765\u6b74",
- "s_matrix": "\u30b0\u30ea\u30fc\u30c7\u30a3\u5224\u5b9a\u30de\u30c8\u30ea\u30af\u30b9 (s0)",
- "s_metrics": "\u6307\u6a19",
- "s_taxonomy": "\u5931\u6557\u5206\u985e",
- "tab_pooled": "\u5168\u4f53",
- "tab_pooled_sub": "\u5168\u30bd\u30fc\u30b9",
- "tax_empty": "\u3053\u306e\u30b9\u30b3\u30fc\u30d7\u3067\u306f\u5931\u6557\u30b3\u30fc\u30c9\u306a\u3057",
- "title": "CKC M2-M4 PoC - \u7ffb\u8a33\u7d4c\u8def\u30ec\u30dd\u30fc\u30c8",
- "v_conflict": "\u77db\u76fe",
- "v_incomputable": "\u8a08\u7b97\u4e0d\u80fd",
- "v_no_conflict": "\u77db\u76fe\u306a\u3057",
- "vs_direct": "direct\u6bd4",
- "vs_ir": "single-IR\u6bd4",
- "best_dsl": "DSL\u3067\u6700\u826f"
-}
+  en: {
+    title: "Translation faithfulness",
+    tag: "CKC · M2–M4 proof of concept",
+    loading: "Loading results…",
+    err_load: "Could not load results",
+    col_method: "Method",
+    col_faithful: "Faithful logic",
+    col_faithful_sub: "exact match to the reference",
+    col_verdict: "Conflict call",
+    col_verdict_sub: "decision correct?",
+    run: "run",
+    pairs: "rule pairs",
+    temp0: "temp 0 (single best guess)",
+    keyok: "answer key verified",
+    keybad: "answer key FAILED",
+    replay_match: "replay matches",
+    replay_bad: "replay mismatch",
+    tip_validity: "valid syntax",
+    tip_admission: "passed validation",
+    tip_stability: "answer consistency",
+    empty: "No method results in this run."
+  },
+  ja: {
+    title: "翻訳の忠実度",
+    tag: "CKC · M2–M4 概念実証",
+    loading: "結果を読み込み中…",
+    err_load: "結果を読み込めませんでした",
+    col_method: "手法",
+    col_faithful: "忠実な論理",
+    col_faithful_sub: "参照と完全一致",
+    col_verdict: "矛盾判定",
+    col_verdict_sub: "判断は正しいか",
+    run: "実行",
+    pairs: "ルール対",
+    temp0: "temp 0（最善の一推論）",
+    keyok: "正解キー検証済み",
+    keybad: "正解キー検証失敗",
+    replay_match: "再現一致",
+    replay_bad: "再現不一致",
+    tip_validity: "構文妥当",
+    tip_admission: "受理",
+    tip_stability: "判定の一貫性",
+    empty: "この実行には手法の結果がありません。"
+  }
 };
-var ROUTES_FALLBACK = [
- { "key": "direct", "id": "route.direct_smt" },
- { "key": "ir", "id": "route.single_ir" },
- { "key": "stacked", "id": "route.stacked_ir" },
- { "key": "hop", "id": "route.ir_hop_chain" },
- { "key": "layered", "id": "route.ckc_layered" }
+// Plain-language name for each translation method (route). Falls back to the raw id.
+var ROUTE_NAME = {
+  "route.reason_then_ir":  { en: "Reason, then translate", ja: "推論してから翻訳" },
+  "route.draft_repair_ir": { en: "Draft, then repair",     ja: "下書きして修正" },
+  "route.single_ir":       { en: "Translate in one step",  ja: "一度に翻訳" },
+  "route.stacked_ir":      { en: "Stacked translation",    ja: "段階的に翻訳" },
+  "route.ir_hop_chain":    { en: "Hop-chain translation",  ja: "連鎖翻訳" },
+  "route.ckc_layered":     { en: "Layered translation",    ja: "層化翻訳" },
+  "route.ckc_dsl":         { en: "DSL translation",        ja: "DSL翻訳" },
+  "route.ckc_dsl_hop":     { en: "DSL hop-chain",          ja: "DSL連鎖" },
+  "route.ckc_dsl_kw":      { en: "DSL keyword",            ja: "DSLキーワード" },
+  "route.ckc_dsl_kw_hop":  { en: "DSL keyword hop",        ja: "DSLキーワード連鎖" },
+  "route.direct_smt":      { en: "Direct (no translation)",ja: "直接（翻訳なし）" }
+};
+var FAITHFUL = "exact_ir_match";
+var VERDICT = "verdict_accuracy_greedy";
+var SECONDARY = [
+  ["syntactic_validity", "tip_validity"],
+  ["admission_rate", "tip_admission"],
+  ["verdict_stability", "tip_stability"]
 ];
-var METRICS = ["syntactic_validity", "admission_rate", "verdict_accuracy_greedy", "exact_ir_match", "verdict_stability"];
-var DSL_KEYS = { "dsl": 1, "dslh": 1, "dslk": 1, "dslkh": 1 };
-var MKEY = {
- "syntactic_validity": "m_syntactic_validity",
- "admission_rate": "m_admission_rate",
- "verdict_accuracy_greedy": "m_verdict_accuracy_greedy",
- "exact_ir_match": "m_exact_ir_match",
- "verdict_stability": "m_verdict_stability"
-};
-var VKEY = { "conflict": "v_conflict", "no_conflict": "v_no_conflict", "incomputable": "v_incomputable" };
 var HEX_RE = new RegExp("^[0-9a-f]{16,}$", "i");
-var S = { lang: "en", scope: "pooled", onlyWrong: true, report: null, url: "", error: "" };
+var S = { lang: "en", report: null, url: "", error: "" };
 
 function t(k) {
   var d = I18N[S.lang];
@@ -200,78 +191,100 @@ function t(k) {
 function esc(s) {
   return String(s).split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;").split("\"").join("&quot;");
 }
-function pct(cell) { return (cell.value * 100).toFixed(1) + "% (" + cell.num + "/" + cell.den + ")"; }
-function signedPts(d) { var p = d * 100; return (p > 0 ? "+" : "") + p.toFixed(1) + " " + t("pts"); }
-function signedPtsShort(d) { var p = d * 100; return (p > 0 ? "+" : "") + p.toFixed(1); }
-function deltaCls(d) { return d > 1e-9 ? "pos" : (d < -1e-9 ? "neg" : ""); }
-function vCls(v, gold) { return v === "incomputable" ? "gray" : (v === gold ? "ok" : "bad"); }
-function vlabel(v) { var k = VKEY[v]; return k ? t(k) : String(v); }
-function shortHash(v) {
-  if (typeof v === "string" && v.length >= 16 && HEX_RE.test(v)) { return v.slice(0, 12) + ".."; }
-  return String(v);
+function routeName(id) {
+  var m = ROUTE_NAME[id];
+  if (m) { return S.lang === "ja" ? m.ja : m.en; }
+  return id.indexOf("route.") === 0 ? id.slice(6) : String(id);
 }
-function routeList(rep) {
-  var rs = rep && rep.routes;
-  return (rs && rs.length) ? rs : ROUTES_FALLBACK;
+function pctNum(v) { var p = Math.round(v * 1000) / 10; return String(p); }
+function cellOf(per, rid, metric) {
+  var r = per[rid];
+  return (r && r[metric]) ? r[metric] : null;
 }
-function routeLabel(r) {
-  var id = r.id || r.key || "";
-  return id.indexOf("route.") === 0 ? id.slice(6) : id;
+function prettyModel(n) {
+  n = String(n || "").replace(/\.gguf$/i, "");
+  if (!n) { return ""; }
+  var quant = (n.match(/q\d+_k(?:_[ms])?|q\d+_\d+|iq\d+\w*|f16|bf16/i) || [])[0] || "";
+  var base = n.replace(/-instruct.*/i, "").replace(/[._-]?(q\d.*|iq\d.*|f16.*|bf16.*)$/i, "");
+  base = base.replace(/qwen/i, "Qwen").replace(/llama/i, "Llama").replace(/mistral/i, "Mistral")
+             .replace(/(\d)b\b/i, "$1B");
+  return quant ? base + " (" + quant.toUpperCase() + ")" : base;
 }
-function sourceList(rep) { return (rep && rep.sources) ? rep.sources : []; }
-function perRouteMetrics(rep, scope) {
-  var m = rep.metrics || {};
-  if (scope === "pooled") { return m.pooled || {}; }
-  return (m.by_source && m.by_source[scope]) ? m.by_source[scope] : {};
-}
-function deltaOf(rep, metric, scope, rid) {
-  var bd = rep.baseline_delta && rep.baseline_delta[metric];
-  if (!bd) { return null; }
-  var obj = scope === "pooled" ? bd.pooled : (bd.by_source || {})[scope];
-  if (!obj || !obj[rid] || typeof obj[rid].delta !== "number") { return null; }
-  return obj[rid].delta;
-}
-function deltaIrOf(rep, metric, scope, rid) {
-  var bd = rep.baseline_delta && rep.baseline_delta[metric];
-  if (!bd) { return null; }
-  var obj = scope === "pooled" ? bd.pooled : (bd.by_source || {})[scope];
-  if (!obj || !obj[rid] || typeof obj[rid].delta_ir !== "number") { return null; }
-  return obj[rid].delta_ir;
-}
-function taxOf(rep, scope) {
-  var tx = rep.taxonomy || {};
-  if (scope === "pooled") { return tx.pooled || {}; }
-  return (tx.by_source && tx.by_source[scope]) ? tx.by_source[scope] : {};
-}
-function findingsIndex(rep) {
-  var by = {}, meta = {}, gids = [];
-  var fs = rep.findings || [];
-  for (var i = 0; i < fs.length; i++) {
-    var f = fs[i];
-    if (!by[f.source]) { by[f.source] = {}; }
-    by[f.source][f.group] = f;
-    if (!meta[f.group]) {
-      meta[f.group] = { id: f.group, kind: f.kind, gold: f.gold };
-      gids.push(f.group);
-    }
-  }
-  gids.sort();
-  return { by: by, groups: gids.map(function (g) { return meta[g]; }) };
-}
-function isWrong(f) {
-  var g = f.greedy || {};
-  var ks = Object.keys(g);
-  for (var i = 0; i < ks.length; i++) {
-    if (g[ks[i]] !== f.gold) { return true; }
-  }
-  return false;
-}
-function routeHead(routes, lead) {
-  var h = "<tr>" + lead;
+// Methods that have at least one of the two headline metrics, sorted by faithfulness (then verdict).
+function methodsToShow(rep) {
+  var routes = (rep.routes && rep.routes.length) ? rep.routes : [];
+  var per = (rep.metrics && rep.metrics.pooled) || {};
+  var rows = [];
   for (var i = 0; i < routes.length; i++) {
-    h += "<th" + (routes[i].key === "direct" ? " class=\"basecol\"" : "") + ">" + esc(routeLabel(routes[i])) + "</th>";
+    var id = routes[i].id;
+    var f = cellOf(per, id, FAITHFUL);
+    var v = cellOf(per, id, VERDICT);
+    if (!f && !v) { continue; }
+    rows.push({ id: id, faithful: f, verdict: v });
   }
-  return h + "</tr>";
+  rows.sort(function (a, b) {
+    var fa = a.faithful ? a.faithful.value : -1, fb = b.faithful ? b.faithful.value : -1;
+    if (fb !== fa) { return fb - fa; }
+    var va = a.verdict ? a.verdict.value : -1, vb = b.verdict ? b.verdict.value : -1;
+    return vb - va;
+  });
+  return rows;
+}
+function secondaryTip(per, id) {
+  var bits = [];
+  for (var i = 0; i < SECONDARY.length; i++) {
+    var c = cellOf(per, id, SECONDARY[i][0]);
+    if (c) { bits.push(t(SECONDARY[i][1]) + " " + pctNum(c.value) + "%"); }
+  }
+  return bits.join("  ·  ");
+}
+function barCell(cell, kind, topClass) {
+  if (!cell) {
+    return "<div class=\"cell " + topClass + "\"><span class=\"val none\">–</span></div>";
+  }
+  var w = (cell.value * 100).toFixed(1);
+  var tip = cell.num + "/" + cell.den;
+  return "<div class=\"cell " + topClass + "\" title=\"" + esc(tip) + "\">" +
+    "<span class=\"bar " + kind + "\"><span class=\"fill " + kind + "\" style=\"width:" + w + "%\"></span></span>" +
+    "<span class=\"val " + kind + "\">" + esc(pctNum(cell.value)) + "%</span></div>";
+}
+function renderComparison(rep) {
+  var per = (rep.metrics && rep.metrics.pooled) || {};
+  var rows = methodsToShow(rep);
+  if (rows.length === 0) {
+    document.getElementById("cmp").innerHTML = "<div class=\"empty\">" + esc(t("empty")) + "</div>";
+    return;
+  }
+  var h = "<div class=\"ch spacer\">" + esc(t("col_method")) + "</div>" +
+    "<div class=\"ch faithful\">" + esc(t("col_faithful")) +
+      "<span class=\"sub\">" + esc(t("col_faithful_sub")) + "</span></div>" +
+    "<div class=\"ch verdict\">" + esc(t("col_verdict")) +
+      "<span class=\"sub\">" + esc(t("col_verdict_sub")) + "</span></div>";
+  for (var i = 0; i < rows.length; i++) {
+    var tc = i === 0 ? "row-top" : "";
+    var tip = secondaryTip(per, rows[i].id);
+    h += "<div class=\"mname " + tc + "\"" + (tip ? " title=\"" + esc(tip) + "\"" : "") + ">" +
+      esc(routeName(rows[i].id)) + "</div>";
+    h += barCell(rows[i].faithful, "faithful", tc);
+    h += barCell(rows[i].verdict, "verdict", tc);
+  }
+  document.getElementById("cmp").innerHTML = h;
+}
+function renderProvenance(rep) {
+  var parts = [];
+  var counts = rep.counts || {};
+  var n = counts.groups;
+  if (typeof n === "number") { parts.push("<span>" + n + " " + esc(t("pairs")) + "</span>"); }
+  var model = prettyModel(rep.identities && rep.identities.model_name);
+  if (model) { parts.push("<span class=\"mono\">" + esc(model) + "</span>"); }
+  parts.push("<span>" + esc(t("temp0")) + "</span>");
+  var gg = rep.gold_gate || {};
+  parts.push("<span class=\"chip " + (gg.pass ? "ok" : "bad") + "\">" +
+    esc(gg.pass ? t("keyok") : t("keybad")) + "</span>");
+  var rp = rep.replay ? rep.replay.status : "";
+  if (rp === "match") { parts.push("<span class=\"chip ok\">" + esc(t("replay_match")) + "</span>"); }
+  else if (rp === "mismatch") { parts.push("<span class=\"chip bad\">" + esc(t("replay_bad")) + "</span>"); }
+  document.getElementById("prov").innerHTML = parts.join("<span class=\"dot\">·</span>");
 }
 function applyI18n() {
   document.documentElement.lang = S.lang;
@@ -283,257 +296,33 @@ function applyI18n() {
   document.getElementById("btn-en").className = S.lang === "en" ? "active" : "";
   document.getElementById("btn-ja").className = S.lang === "ja" ? "active" : "";
 }
-function renderBanner(rep) {
-  var routes = routeList(rep);
-  var per = (rep.metrics && rep.metrics.pooled) || {};
-  var h = "<span class=\"blead\">" + esc(t("banner_lead")) + ":</span>";
-  for (var i = 0; i < routes.length; i++) {
-    var rt = routes[i];
-    var cell = per[rt.id] && per[rt.id].verdict_accuracy_greedy;
-    h += "<span class=\"bitem\">" + esc(routeLabel(rt)) + " " +
-      (cell ? "<b title=\"" + esc(cell.num + "/" + cell.den) + "\">" + esc((cell.value * 100).toFixed(1) + "%") + "</b>"
-            : "<b class=\"empty\">-</b>") + "</span>";
-  }
-  var bd = rep.baseline_delta && rep.baseline_delta.verdict_accuracy_greedy;
-  var pd = (bd && bd.pooled) || {};
-  var best = null;
-  for (var j = 0; j < routes.length; j++) {
-    var r2 = routes[j];
-    if (r2.key === "direct" || !pd[r2.id] || typeof pd[r2.id].delta !== "number") { continue; }
-    if (best === null || pd[r2.id].delta > best.d) { best = { label: routeLabel(r2), d: pd[r2.id].delta }; }
-  }
-  if (best !== null) {
-    h += "<span class=\"bcall\">" + esc(t("best_nd")) + ": " + esc(best.label) +
-      " <b class=\"chip " + deltaCls(best.d) + "\">" + esc(signedPts(best.d)) + "</b> (" + esc(t("vs_direct")) + ")</span>";
-  }
-  var bestDsl = null;
-  for (var kk = 0; kk < routes.length; kk++) {
-    var rr = routes[kk];
-    if (!DSL_KEYS[rr.key] || !pd[rr.id] || typeof pd[rr.id].delta_ir !== "number") { continue; }
-    if (bestDsl === null || pd[rr.id].delta_ir > bestDsl.dlt) {
-      var accCell = per[rr.id] && per[rr.id].verdict_accuracy_greedy;
-      bestDsl = { label: routeLabel(rr), dlt: pd[rr.id].delta_ir, acc: accCell ? (accCell.value * 100).toFixed(1) + "%" : "-" };
-    }
-  }
-  if (bestDsl !== null) {
-    h += "<span class=\"bcall\">" + esc(t("best_dsl")) + ": " + esc(bestDsl.label) +
-      " <b>" + esc(bestDsl.acc) + "</b> <b class=\"chip " + deltaCls(bestDsl.dlt) + "\">" + esc(signedPts(bestDsl.dlt)) + "</b> (" + esc(t("vs_ir")) + ")</span>";
-  }
-  document.getElementById("banner").innerHTML = h;
-}
-function renderTabs(rep) {
-  var el = document.getElementById("tabs");
-  var srcs = sourceList(rep);
-  var h = "<button type=\"button\" data-scope=\"pooled\"" + (S.scope === "pooled" ? " class=\"active\"" : "") +
-    "><b data-i18n=\"tab_pooled\"></b><small data-i18n=\"tab_pooled_sub\"></small></button>";
-  for (var i = 0; i < srcs.length; i++) {
-    var s = srcs[i];
-    var lbl = S.lang === "ja" ? s.ja : s.en;
-    h += "<button type=\"button\" data-scope=\"" + esc(s.id) + "\"" + (S.scope === s.id ? " class=\"active\"" : "") +
-      " title=\"" + esc(s.id) + "\"><b>" + esc(s.key) + "</b><small>" + esc(lbl) + "</small></button>";
-  }
-  el.innerHTML = h;
-  var btns = el.querySelectorAll("button");
-  for (var j = 0; j < btns.length; j++) {
-    btns[j].onclick = function () { S.scope = this.getAttribute("data-scope"); renderAll(); };
-  }
-}
-function renderMetrics(rep) {
-  var routes = routeList(rep);
-  var per = perRouteMetrics(rep, S.scope);
-  var h = "<table><thead>" + routeHead(routes, "<th data-i18n=\"h_metric\"></th>") + "</thead><tbody>";
-  for (var m = 0; m < METRICS.length; m++) {
-    var name = METRICS[m];
-    h += "<tr><td>" + esc(t(MKEY[name])) + "</td>";
-    for (var r = 0; r < routes.length; r++) {
-      var rt = routes[r];
-      var cell = per[rt.id] ? per[rt.id][name] : null;
-      if (!cell) { h += "<td class=\"empty\">-</td>"; continue; }
-      var inner = "<span class=\"num\">" + esc(pct(cell)) + "</span>";
-      if (rt.key !== "direct") {
-        var d = deltaOf(rep, name, S.scope, rt.id);
-        if (d !== null) {
-          inner += " <span class=\"dchip " + deltaCls(d) + "\" title=\"" + esc(t("delta") + " (" + t("vs_direct") + ")") + "\">" + esc(signedPts(d)) + "</span>";
-        }
-        if (DSL_KEYS[rt.key] || rt.key === "reason_ir" || rt.key === "repair_ir") {
-          var dir = deltaIrOf(rep, name, S.scope, rt.id);
-          if (dir !== null) {
-            inner += " <span class=\"dchip ir " + deltaCls(dir) + "\" title=\"" + esc(t("delta") + " (" + t("vs_ir") + ")") + "\">IR " + esc(signedPtsShort(dir)) + "</span>";
-          }
-        }
-      }
-      h += "<td>" + inner + "</td>";
-    }
-    h += "</tr>";
-  }
-  document.getElementById("metrics").innerHTML = h + "</tbody></table>";
-}
-function renderMatrix(rep) {
-  var el = document.getElementById("matrix");
-  var routes = routeList(rep);
-  var idx = findingsIndex(rep);
-  if (idx.groups.length === 0) {
-    el.innerHTML = "<p class=\"muted\" data-i18n=\"no_rows\"></p>";
-    return;
-  }
-  var srcs = sourceList(rep);
-  var h = "<table><thead>" + routeHead(routes,
-    "<th data-i18n=\"h_group\"></th><th data-i18n=\"h_kind\"></th><th data-i18n=\"h_gold\"></th>") + "</thead><tbody>";
-  for (var g = 0; g < idx.groups.length; g++) {
-    var grp = idx.groups[g];
-    h += "<tr><td>" + esc(grp.id) + "</td><td>" + esc(grp.kind) + "</td><td>" + esc(vlabel(grp.gold)) + "</td>";
-    for (var r = 0; r < routes.length; r++) {
-      var rid = routes[r].id;
-      if (S.scope === "pooled") {
-        var ent = [];
-        for (var s = 0; s < srcs.length; s++) {
-          var f = idx.by[srcs[s].id] && idx.by[srcs[s].id][grp.id];
-          var v = (f && f.greedy) ? f.greedy[rid] : null;
-          if (v !== null && v !== undefined) { ent.push({ k: srcs[s].key, v: v }); }
-        }
-        if (ent.length === 0) { h += "<td class=\"empty\">-</td>"; continue; }
-        var nc = 0, tip = [];
-        for (var e = 0; e < ent.length; e++) {
-          if (ent[e].v === grp.gold) { nc++; }
-          tip.push(ent[e].k + ": " + vlabel(ent[e].v));
-        }
-        var cls = nc === ent.length ? "ok" : (nc === 0 ? "bad" : "mid");
-        h += "<td class=\"num " + cls + "\" title=\"" + esc(tip.join("\n")) + "\">" + nc + "/" + ent.length + "</td>";
-      } else {
-        var f2 = idx.by[S.scope] && idx.by[S.scope][grp.id];
-        var v2 = (f2 && f2.greedy) ? f2.greedy[rid] : null;
-        if (v2 === null || v2 === undefined) { h += "<td class=\"empty\">-</td>"; }
-        else { h += "<td class=\"" + vCls(v2, grp.gold) + "\">" + esc(vlabel(v2)) + "</td>"; }
-      }
-    }
-    h += "</tr>";
-  }
-  h += "</tbody></table>";
-  if (S.scope === "pooled") { h += "<p class=\"muted\" data-i18n=\"legend_pooled\"></p>"; }
-  el.innerHTML = h;
-}
-function renderTaxonomy(rep) {
-  var el = document.getElementById("taxonomy");
-  var routes = routeList(rep);
-  var tax = taxOf(rep, S.scope);
-  var codes = {};
-  Object.keys(tax).forEach(function (rid) {
-    Object.keys(tax[rid] || {}).forEach(function (c) { codes[c] = true; });
-  });
-  var list = Object.keys(codes).sort();
-  if (list.length === 0) {
-    el.innerHTML = "<p class=\"muted\" data-i18n=\"tax_empty\"></p>";
-    return;
-  }
-  var h = "<table><thead>" + routeHead(routes, "<th data-i18n=\"h_code\"></th>") + "</thead><tbody>";
-  for (var i = 0; i < list.length; i++) {
-    h += "<tr><td>" + esc(list[i]) + "</td>";
-    for (var r = 0; r < routes.length; r++) {
-      var rid = routes[r].id;
-      if (!tax[rid]) { h += "<td class=\"empty\">-</td>"; }
-      else { h += "<td class=\"num\">" + esc(tax[rid][list[i]] || 0) + "</td>"; }
-    }
-    h += "</tr>";
-  }
-  document.getElementById("taxonomy").innerHTML = h + "</tbody></table>";
-}
-function renderFindings(rep) {
-  var fs = rep.findings || [];
-  var scoped = [];
-  for (var i = 0; i < fs.length; i++) {
-    if (S.scope === "pooled" || fs[i].source === S.scope) { scoped.push(fs[i]); }
-  }
-  var rows = [];
-  for (var j = 0; j < scoped.length; j++) {
-    if (!S.onlyWrong || isWrong(scoped[j])) { rows.push(scoped[j]); }
-  }
-  document.getElementById("fctl").innerHTML =
-    "<label><input type=\"checkbox\" id=\"onlywrong\"> <span data-i18n=\"only_wrong\"></span></label>" +
-    "<span class=\"muted\">" + esc(t("rows_shown")) + ": " + rows.length + " / " + scoped.length + "</span>";
-  var cb = document.getElementById("onlywrong");
-  cb.checked = S.onlyWrong;
-  cb.onchange = function () { S.onlyWrong = this.checked; renderAll(); };
-  var h = "";
-  if (rows.length === 0) { h = "<p class=\"muted\" data-i18n=\"no_rows\"></p>"; }
-  for (var n = 0; n < rows.length; n++) {
-    var f = rows[n];
-    var sent = S.lang === "ja" ? f.ja : f.en;
-    h += "<div class=\"finding\"><div class=\"fhead\">" + esc(f.source) + " &middot; " + esc(f.group) + " &middot; " + esc(f.kind) + "</div>" +
-      "<p class=\"fsent\">" + esc(sent) + "</p>" +
-      "<blockquote lang=\"ja\"><span class=\"qlabel\" data-i18n=\"quote_a\"></span>" + esc(f.quote_a) + "</blockquote>" +
-      "<blockquote lang=\"ja\"><span class=\"qlabel\" data-i18n=\"quote_b\"></span>" + esc(f.quote_b) + "</blockquote></div>";
-  }
-  document.getElementById("findings").innerHTML = h;
-}
-function flat(prefix, v, out) {
-  if (v !== null && typeof v === "object") {
-    var ks = Object.keys(v).sort();
-    for (var i = 0; i < ks.length; i++) {
-      flat(prefix ? prefix + "." + ks[i] : ks[i], v[ks[i]], out);
-    }
-  } else {
-    out.push([prefix, shortHash(v)]);
-  }
-}
-function renderIdentity(rep) {
-  var rows = [];
-  flat("", rep.identities || {}, rows);
-  flat("", { "experiment": rep.experiment, "counts": rep.counts || {} }, rows);
-  var h = "<table class=\"kv\"><tbody>";
-  for (var i = 0; i < rows.length; i++) {
-    h += "<tr><td>" + esc(rows[i][0]) + "</td><td>" + esc(rows[i][1]) + "</td></tr>";
-  }
-  h += "</tbody></table>";
-  var rp = rep.replay ? rep.replay.status : "-";
-  var rpCls = rp === "match" ? "ok" : (rp === "mismatch" ? "bad" : "gray");
-  var gg = rep.gold_gate || { "pass": false, "groups": 0 };
-  h += "<p class=\"status\"><span data-i18n=\"replay\"></span>: <span class=\"chip " + rpCls + "\">" + esc(rp) + "</span>" +
-    " &nbsp; <span data-i18n=\"gold_gate\"></span>: <span class=\"chip " + (gg.pass ? "ok" : "bad") + "\">" +
-    esc(gg.pass ? t("pass") : t("fail")) + "</span> (" + esc(gg.groups) + " <span data-i18n=\"groups\"></span>)</p>";
-  h += "<p class=\"muted\" data-i18n=\"note_scope\"></p>";
-  document.getElementById("identity").innerHTML = h;
-}
-function renderAll() {
+function render() {
   var err = document.getElementById("error");
-  if (S.error) {
-    err.hidden = false;
-    err.textContent = t("err_load") + ": " + S.url + "\n" + S.error;
-  } else {
-    err.hidden = true;
-  }
+  if (S.error) { err.hidden = false; err.textContent = t("err_load") + ": " + S.url + "\n" + S.error; }
+  else { err.hidden = true; }
   if (S.report) {
     var rep = S.report;
-    if (S.scope !== "pooled") {
-      var ok = false;
-      var srcs = sourceList(rep);
-      for (var i = 0; i < srcs.length; i++) { if (srcs[i].id === S.scope) { ok = true; break; } }
-      if (!ok) { S.scope = "pooled"; }
-    }
     document.getElementById("runid").textContent = t("run") + ": " + rep.run_id;
-    renderBanner(rep);
-    renderTabs(rep);
-    renderMetrics(rep);
-    renderMatrix(rep);
-    renderTaxonomy(rep);
-    renderFindings(rep);
-    renderIdentity(rep);
+    renderComparison(rep);
+    renderProvenance(rep);
   }
   applyI18n();
 }
 function setLang(l) {
   S.lang = l === "ja" ? "ja" : "en";
   try { localStorage.setItem("ckc_m2_lang", S.lang); } catch (e) {}
-  renderAll();
+  render();
 }
 (function () {
-  var saved = new URLSearchParams(location.search).get("lang") || "";
+  var qs = new URLSearchParams(location.search);
+  var saved = qs.get("lang") || "";
   if (saved !== "ja" && saved !== "en") {
     try { saved = localStorage.getItem("ckc_m2_lang") || ""; } catch (e) {}
   }
   S.lang = saved === "ja" ? "ja" : "en";
   document.getElementById("btn-en").onclick = function () { setLang("en"); };
   document.getElementById("btn-ja").onclick = function () { setLang("ja"); };
-  var run = new URLSearchParams(location.search).get("run");
+  var run = qs.get("run");
   S.url = "../runs/" + (run ? encodeURIComponent(run) : "latest") + "/report.json";
   applyI18n();
   fetch(S.url).then(function (r) {
@@ -543,13 +332,13 @@ function setLang(l) {
     S.report = rep;
     document.getElementById("loading").hidden = true;
     document.getElementById("main").hidden = false;
-    renderAll();
+    render();
   }).catch(function (e) {
     S.report = null;
     S.error = String(e && e.message ? e.message : e);
     document.getElementById("loading").hidden = true;
     document.getElementById("main").hidden = true;
-    renderAll();
+    render();
   });
 })();
 </script>
