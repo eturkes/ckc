@@ -92,7 +92,7 @@ impl From<CanonError> for ExtractError {
     }
 }
 
-/// Parse `html` and build the wrapped source graph: walk the body,
+/// Parse `html` and build the wrapped source document graph: walk the body,
 /// validate the graph (residual-licensed), and wrap it per §4.4 —
 /// `schema.source_document_graph`, artifact id `<document_id>.source_document_graph`,
 /// `deterministic_compiler` origin under `mechanical_evidence_status`, empty

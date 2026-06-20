@@ -31,7 +31,7 @@ fieldless_enum! {
         SolverExecutionFailure => "solver_execution_failure",
         /// The query completed without witnessing a contradiction.
         SemanticNoConflict => "semantic_no_conflict",
-        /// The query's unsat verdict satisfying_examples a contradiction; the unsat
+        /// The query's unsat verdict witnesses a contradiction; the unsat
         /// core names the contributing assertions.
         SemanticContradiction => "semantic_contradiction",
         /// The solver returned unknown or hit its per-query budget (the

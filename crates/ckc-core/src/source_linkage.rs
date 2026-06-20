@@ -1,4 +1,4 @@
-//! SPEC §4.5 source source_linkage: the typed layer every semantic claim resolves
+//! SPEC §4.5 source linkage: the typed layer every semantic claim resolves
 //! back to.
 //!
 //! [`SourceDocumentGraph`] is the one-per-document artifact extract emits: a finite
@@ -8,7 +8,7 @@
 //! resolve, spans agree with their derived texts and hashes, and every textual
 //! node is spanned or named by an `extraction_uncertain` residual. The
 //! claim-side half of §4.5 (`source_region_ids` / `synthetic_test_source_id` on
-//! semantic claims) lands with the IR layers; wrapper-wrapping the graph as
+//! semantic claims) lands with the IR layers; wrapping the graph as
 //! `source_document_graph.json` is the extract processing_stage's job.
 //!
 //! Offsets are UTF-8 byte offsets, half-open `[start, end)`: a span addresses
@@ -558,7 +558,7 @@ impl fmt::Display for SourceLinkageError {
 
 impl std::error::Error for SourceLinkageError {}
 
-/// SPEC §4.5 source graph: one artifact per document, emitted by extract.
+/// SPEC §4.5 source document graph: one artifact per document, emitted by extract.
 /// `nodes` and `spans` are arrays whose order is semantic (document order,
 /// reading order); `anchors` and `regions` are sets, so input order never
 /// reaches the canonical bytes — identical source bytes and extraction config

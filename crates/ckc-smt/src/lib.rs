@@ -1,6 +1,6 @@
 //! ckc-smt — FormalIR → SMT-LIB compilation and verification for the
-//! Clinical Knowledge Compiler (SPEC §3 crate table: emission, query
-//! planning, assertion maps, solver invocation, verdict parsing). This
+//! Clinical Knowledge Compiler (SPEC §3 crate table: emission, solver-query
+//! planning, assertion-to-source maps, solver invocation, solver-result parsing). This
 //! crate owns the two §5 durable payloads plus planning, emission, the Z3
 //! adapter, and §6 verdict/core/model interpretation — the complete
 //! compile and verify processing_stage cores. Surface by module:

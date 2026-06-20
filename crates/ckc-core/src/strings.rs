@@ -42,7 +42,7 @@ pub enum StringPolicy {
     IdentifierAscii,
     /// NFKC plus semantic whitespace folding (no case or punctuation folding).
     DiagnosticText,
-    /// NFKC display text (renderer provenance recorded separately).
+    /// NFKC rendered text (renderer provenance recorded separately).
     RenderedText,
 }
 

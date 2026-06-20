@@ -1,5 +1,5 @@
-# ckc-smt — FormalIR → SMT-LIB emission, query planning, assertion maps,
-# solver invocation, verdict parsing (SPEC §3 crate table); built up unit by
+# ckc-smt — FormalIR → SMT-LIB emission, solver-query planning, assertion-to-source maps,
+# solver invocation, solver-result parsing (SPEC §3 crate table); built up unit by
 # unit.
 [package]
 name = "ckc-smt"

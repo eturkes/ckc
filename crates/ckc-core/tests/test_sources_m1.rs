@@ -152,7 +152,7 @@ fn test_source_paths_resolve_and_carry_spec_sentences() {
 
 // The reference file matches the §8.2 expectations entry for entry: the conflict
 // group expects the cross-document unsat core as a set, the control group a
-// documented null result.
+// documented no-conflict result.
 #[test]
 fn reference_matches_spec_expectations() {
     let (_, _, experiments, reference) = load_set();

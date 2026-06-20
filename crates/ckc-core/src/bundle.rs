@@ -21,7 +21,7 @@
 //! their structural bytes.
 //!
 //! [`IrBundle::validate`] enforces the §5 IR invariants over a stored bundle
-//! and its source graph in a pinned order — DocIR re-derivation, source_linkage
+//! and its source document graph in a pinned order — DocIR re-derivation, source_linkage
 //! with residuals licensed by `extraction_uncertain` doc diagnostics,
 //! per-pool id uniqueness, support/reference resolution, key and interval
 //! coherence, the NormIR→FormalIR projection, §6 plan-pair eligibility, and
@@ -509,7 +509,7 @@ fn context_atoms(expr: &ContextExpr) -> impl Iterator<Item = &ContextAtom> {
 /// A SPEC §5 IR-bundle invariant failed ([`IrBundle::validate`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BundleError {
-    /// DocIR derivation from the source graph failed outright.
+    /// DocIR derivation from the source document graph failed outright.
     Doc(IrError),
     /// The stored DocIR is not the graph's derivation.
     DocLayerMismatch,
@@ -903,7 +903,7 @@ mod tests {
         id(&format!("{p}{tail}"))
     }
 
-    /// Source graph behind [`test_source_p`]: document root, CQ heading,
+    /// Source document graph behind [`test_source_p`]: document root, CQ heading,
     /// recommendation paragraph, exception sentence — each textual node
     /// spanned — and one region per test_source ref target.
     fn graph_p(p: &str) -> SourceDocumentGraph {

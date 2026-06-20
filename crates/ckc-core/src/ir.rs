@@ -670,8 +670,8 @@ fieldless_enum! {
 pub struct Action {
     pub kind: Id,
     pub target: Id,
-    /// Normalized target key `kind:target` (M1; M3 joins discriminating
-    /// slots). [`new`](Self::new) derives it; bundle validation
+    /// Normalized target key `kind:target` (M1; M3 joins distinguishing
+    /// fields). [`new`](Self::new) derives it; bundle validation
     /// (`IrBundle::validate`) re-checks a stored key against its derivation,
     /// the [`SourceTextSpan`](crate::source_linkage::SourceTextSpan) precedent for
     /// derived fields.

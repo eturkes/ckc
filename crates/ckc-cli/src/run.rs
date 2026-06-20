@@ -24,7 +24,7 @@
 //! and groups to proceed (§4.4 valid-remainder rule). A group whose member
 //! bundle is missing fails its compile processing_stage rather than compiling a
 //! partial group: a cross-document verdict over fewer documents than the
-//! group declares would document a null result the test_sources never earned.
+//! group declares would document a no-conflict result the test_sources never earned.
 //! Producer values are runner-owned: candidate = the experiment's pipeline,
 //! component = the registry processing_stage component, toolchain manifest hash = the
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
@@ -176,7 +176,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
 /// The runner's resolved view of one experiment: the pipeline candidate,
 /// its processing_stage component ids, the unique corpus documents across the test_source
 /// groups in first-appearance order, the groups themselves in evaluation
-/// order, the per-query solver budget, the §5 plan the run executes, and
+/// order, the per-query solver resource limit, the §5 plan the run executes, and
 /// the toolchain manifest hash every producer carries.
 struct Resolved {
     pipeline_id: Id,
@@ -848,7 +848,7 @@ fn manifest_inputs(
 /// The manifests' write boundary: emit the bare §5/§4.6 record as
 /// canonical bytes under `rel`, strict-read the file back, and require the
 /// read-back value equal — [`land`]'s discipline for records that carry no
-/// wrapper (the manifests attest wrappers; nothing wrappers them).
+/// wrapper (the manifests attest wrappers; nothing wraps them).
 fn land_record<P: Canonical + CanonRead + PartialEq>(
     shell: &Shell,
     rel: &str,
@@ -902,11 +902,11 @@ fn materialize_queries(
 }
 
 /// The §8.3 assemble processing_stage, the thin core-ir.4/.5 wrapper: derive the DocIR
-/// view from the source graph and its extraction diagnostics, assemble the
+/// view from the source document graph and its extraction diagnostics, assemble the
 /// five-layer bundle (bundle-level diagnostics = canonical-set union of the
 /// segments and normalization wrapper diagnostics; extraction diagnostics
 /// stay in DocIr per the §5 bundle row; M1 test_sources inject no assumptions),
-/// validate it against the graph, and wrapper it.
+/// validate it against the graph, and wrap it.
 fn assemble_bundle(
     entry: &CorpusEntry,
     resolved: &Resolved,
@@ -1332,7 +1332,7 @@ mod tests {
         assert!(trace.diagnostics.is_empty());
         assert!(trace.resource_counters.is_empty());
         // The report processing_stage: every consumed wrapper's content hash as
-        // input — the trace pair, three source graphs, two verifier
+        // input — the trace pair, three source document graphs, two verifier
         // results — and the landed report as output.
         let report = &events[17];
         assert_eq!(report.processing_stage, static_id("report"));
@@ -1494,7 +1494,7 @@ mod tests {
         );
 
         // Null group: the disjoint-interval Q1 answers unsat, closing the
-        // pair as the documented null result — no Q2 run, no satisfying_example.
+        // pair as the documented no-conflict result — no Q2 run, no satisfying_example.
         let null: ArtifactWrapper<ckc_smt::VerifierResults> =
             strict_at(&out, "groups/group.m1_no_conflict/verifier_results.json");
         let rs = &null.payload.results;

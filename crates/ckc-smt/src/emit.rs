@@ -31,7 +31,7 @@ use crate::{AssertionRecord, CompiledArtifact, QueryBody, SmtLogic, plan_queries
 
 /// SPEC §6 Q1 context_overlap (QF_LRA): both conditioned contexts as
 /// `ctx.<rule_id>` named assertions; sat yields the recorded overlap
-/// satisfying_example, unsat closes the pair as the documented null result. `a`/`b`
+/// satisfying_example, unsat closes the pair as the documented no-conflict result. `a`/`b`
 /// are the pair's constraints in slot order.
 pub fn emit_overlap_query(
     pair: &ContradictionQueryPair,

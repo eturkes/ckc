@@ -365,21 +365,21 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
     assert_eq!(trace_out.status.code(), Some(0));
     let chain = "\
 trace finding.group.m1_conflict.1 run m1
-forward source spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
+forward source text spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
 document test_source.m1_guideline_a path corpus/test_sources/m1_guideline_a.html
-  source spans: r.2 r.3
+  source text spans: r.2 r.3
   segments: seg.2 seg.3
   statements: stmt.0
   rules: test_source.m1_guideline_a.rule.0
 document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
-  source spans: r.2
+  source text spans: r.2
   segments: seg.2
   statements: stmt.0
   rules: test_source.m1_guideline_b.rule.0
 named assertions: a.test_source.m1_guideline_a.rule.0 a.test_source.m1_guideline_b.rule.0
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
 finding: finding.group.m1_conflict.1 report report
-reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source spans
+reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source text spans
 finding: finding.group.m1_conflict.1 report report
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
 named assertions: a.test_source.m1_guideline_a.rule.0 a.test_source.m1_guideline_b.rule.0
@@ -387,12 +387,12 @@ document test_source.m1_guideline_a path corpus/test_sources/m1_guideline_a.html
   rules: test_source.m1_guideline_a.rule.0
   statements: stmt.0
   segments: seg.2 seg.3
-  source spans: r.2 r.3
+  source text spans: r.2 r.3
 document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
   rules: test_source.m1_guideline_b.rule.0
   statements: stmt.0
   segments: seg.2
-  source spans: r.2
+  source text spans: r.2
 ";
     let stdout = String::from_utf8(trace_out.stdout).unwrap();
     let tail = stdout
@@ -445,7 +445,7 @@ document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
 /// The report processing_stage's live pins (`cargo test -p ckc-cli report::`): the
 /// §7.2 partition over the recorded §8.6 world — one finding, one
 /// documented null — with every quoted span resolving through its landed
-/// source graph to the raw test_source bytes (§8.5 item 9), the corpus and
+/// source document graph to the raw test_source bytes (§8.5 item 9), the corpus and
 /// lexicon rows recomputed from the files in force, and the solver
 /// identity matching the recorded verifier results. The trio pin extends
 /// the surface: `report_en.md` as the landed payload's exact rendering and
@@ -458,7 +458,7 @@ mod report {
 
     /// Pin one row's evidence: the quoted spans carry exactly the
     /// `(document, region, span)` triples, each text equal to its span's
-    /// `raw_text` in the document's landed source graph and present in
+    /// `raw_text` in the document's landed source document graph and present in
     /// the raw test_source file — quoted Japanese spans resolving to test_source
     /// bytes.
     fn assert_spans_ground(
@@ -488,7 +488,7 @@ mod report {
                 .spans
                 .iter()
                 .find(|s| s.span_id == span.span_id)
-                .expect("quoted span exists in its landed source graph")
+                .expect("quoted span exists in its landed source document graph")
                 .raw_text;
             assert_eq!(&span.text, raw, "{}/{}", span.document_id, span.span_id);
             assert!(!span.text.is_empty());
@@ -555,7 +555,7 @@ mod report {
         assert_eq!(report.producer.pipeline_step_id, id("processing_stage.m1.report"));
         assert!(report.diagnostics.is_empty());
 
-        // Input set: the trace pair, the three source graphs, the two
+        // Input set: the trace pair, the three source document graphs, the two
         // verifier results — every wrapper the assembly consumed.
         let trace: ArtifactWrapper<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
         let lineage: ArtifactWrapper<LineageIndex> =
@@ -776,7 +776,7 @@ mod report {
         assert_eq!(output_hashes.len(), 18, "one content-equal pair");
 
         // The §5/§4.6 records land bare — the manifests attest wrappers;
-        // nothing wrappers them — so the bar is the canonical read.
+        // nothing wraps them — so the bar is the strict canonical read.
         let manifest: RunManifest =
             read_strict_canonical(&std::fs::read(run_dir.join("manifest.json")).unwrap()).unwrap();
         let replay: ReplayManifest =

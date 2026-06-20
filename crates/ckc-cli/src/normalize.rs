@@ -358,7 +358,7 @@ fn check_interval(owner: &Id, q: &QuantityInterval) -> Result<(), LexiconError> 
 ///
 /// Each segment's regions resolve to their spans, scanned in reading order
 /// (a span named by several regions scans once, every naming region
-/// source_linkage its matches); each span's `search_text` is scanned greedy
+/// source-linking its matches); each span's `search_text` is scanned greedy
 /// left-to-right longest-match against the concept surfaces, a match
 /// consuming its bytes. The candidate set is every concept sharing the
 /// matched surface: a singleton binds its concept — `exact` when the

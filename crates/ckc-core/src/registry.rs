@@ -139,7 +139,7 @@ pub struct ReferenceEntry {
     /// Expected unsat-core assertion names, compared as a set.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub expected_unsat_core: BTreeSet<Id>,
-    /// Whether the group's expected finding is a documented null result.
+    /// Whether the group's expected finding is a documented no-conflict result.
     #[serde(default, skip_serializing_if = "is_false")]
     pub expected_no_conflict_result: bool,
 }

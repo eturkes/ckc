@@ -83,7 +83,7 @@ const DEFINITION_HEADING_MARKER: &str = "定義";
 /// Segment `source`'s graph and wrap the result per §4.4 —
 /// `schema.segments`, artifact id `<document_id>.segments`,
 /// `deterministic_compiler` origin under `mechanical_evidence_status`, the
-/// consumed source graph's content hash as the one input hash, misses in
+/// consumed source document graph's content hash as the one input hash, misses in
 /// the wrapper diagnostics, payload hashes computed here.
 pub fn segment(
     source: &ArtifactWrapper<SourceDocumentGraph>,
@@ -464,7 +464,7 @@ mod tests {
     }
 
     // §4.4 wrapper shape: ids, deterministic_compiler origin under
-    // mechanical_evidence_status, the consumed source graph's content hash as
+    // mechanical_evidence_status, the consumed source document graph's content hash as
     // the one input hash, empty sets.
     #[test]
     fn wrapper_shape() {

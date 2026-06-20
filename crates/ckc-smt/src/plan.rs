@@ -19,7 +19,7 @@ use ckc_core::{ContradictionQueryPair, FormalConstraint, FormalIr, Id, direction
 /// action sameness) and [`directions_opposed`] holds (one direction
 /// positive, the other against or contraindicating). Contexts never gate
 /// eligibility: disjoint-context pairs stay planned, and Q1 later closes
-/// them as the documented null result (§6).
+/// them as the documented no-conflict result (§6).
 ///
 /// Each pair normalizes to `constraint_a_id < constraint_b_id` by id bytes
 /// (unique across a group's documents — rule ids embed document ids, §8.6),

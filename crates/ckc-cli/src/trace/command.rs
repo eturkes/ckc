@@ -1,7 +1,7 @@
 //! `ckc trace` (SPEC §8.5 item 7): resolve one finding through the run's
 //! §7.1 pair — the claim row and source nodes from `trace_bundle.json`,
 //! the per-document reference rows from `lineage_index.json` — into the
-//! full chain source spans → segments → statements → rules → named
+//! full chain source text spans → segments → statements → rules → named
 //! assertions → solver verdict → finding, rendered in both directions as
 //! the command's stdout body. Both artifacts cross the §8.5 item 3 bar
 //! (strict canonical read, wrapper and payload re-validation) and the
@@ -167,7 +167,7 @@ fn resolve<'a>(
 }
 
 /// The §8.5 item 7 layer labels, derivation order.
-const LAYERS: [&str; 4] = ["source spans", "segments", "statements", "rules"];
+const LAYERS: [&str; 4] = ["source text spans", "segments", "statements", "rules"];
 
 /// Render the chain in both directions: forward walks derivation order
 /// (per-document layers, then the claim's assertions → verdict → finding),
@@ -177,7 +177,7 @@ fn render(chain: &Chain<'_>, run_id: &Id) -> Vec<u8> {
     let mut out = String::new();
     out.push_str(&format!("trace {} run {run_id}\n", chain.claim.finding_id));
     out.push_str(
-        "forward source spans -> segments -> statements -> rules -> named assertions \
+        "forward source text spans -> segments -> statements -> rules -> named assertions \
          -> solver verdict -> finding\n",
     );
     for doc in &chain.documents {
@@ -186,7 +186,7 @@ fn render(chain: &Chain<'_>, run_id: &Id) -> Vec<u8> {
     claim_block(&mut out, chain.claim, true);
     out.push_str(
         "reverse finding -> solver verdict -> named assertions -> rules -> statements \
-         -> segments -> source spans\n",
+         -> segments -> source text spans\n",
     );
     claim_block(&mut out, chain.claim, false);
     for doc in &chain.documents {
@@ -402,21 +402,21 @@ mod tests {
         let chain = execute(tmp.path(), &id("finding.group.g1.0"), &mut shell).unwrap();
         let expected = "\
 trace finding.group.g1.0 run run.none
-forward source spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
+forward source text spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
 document doc.a path corpus/test_sources/doc.a.html
-  source spans: r.2
+  source text spans: r.2
   segments: seg.4
   statements: doc.a.stmt.0
   rules: doc.a.rule.0
 document doc.b path corpus/test_sources/doc.b.html
-  source spans: r.3
+  source text spans: r.3
   segments: seg.6
   statements: doc.b.stmt.0
   rules: doc.b.rule.0
 named assertions: a.doc.a.rule.0 a.doc.b.rule.0
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.g1 pair pair.1 query pair.1.deontic
 finding: finding.group.g1.0 report report
-reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source spans
+reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source text spans
 finding: finding.group.g1.0 report report
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.g1 pair pair.1 query pair.1.deontic
 named assertions: a.doc.a.rule.0 a.doc.b.rule.0
@@ -424,12 +424,12 @@ document doc.a path corpus/test_sources/doc.a.html
   rules: doc.a.rule.0
   statements: doc.a.stmt.0
   segments: seg.4
-  source spans: r.2
+  source text spans: r.2
 document doc.b path corpus/test_sources/doc.b.html
   rules: doc.b.rule.0
   statements: doc.b.stmt.0
   segments: seg.6
-  source spans: r.3
+  source text spans: r.3
 ";
         assert_eq!(String::from_utf8(chain).unwrap(), expected);
         let (outcome, diagnostics) = finished(shell);

@@ -57,19 +57,19 @@ behind §15 gates.
 
 ideal demonstration (M6 era, experiment 3's flagship): cross-source conflict surfacing over
 real public corpora — e.g. a guideline recommendation versus a PMDA drug labeling
-contraindication — traced from Japanese source spans through IR and named SMT assertions to
+contraindication — traced from Japanese source text spans through IR and named SMT assertions to
 solver cores, replayable from content hashes alone. Behind it sits an asymptotic ideal: ever
 more minimal accepted mapping and axiom sets representing ever more clinical knowledge — a
 single global axiom in the unreachable limit — which orients experiment 2's compactness
 objective and optimization protocol (`G-MDL`) while staying outside every report's claims.
 
-Research posture: every output is research evidence. Accepted
+Research position: every output is research evidence. Accepted
 semantics come from acceptance (schema validity, source linkage, canonical bytes, applicable
 compiler/verifier checks, trace, replay, evidence criteria) — independent of proposer identity.
 AI, retrieval, agents, and humans all propose; acceptance decides. Reports describe results with this
 vocabulary: `research harness`, `candidate`, `review candidate`, `formalization-QA`,
 `text-quality analysis`, `source-grounded`, `schema-valid`, `verifier-checked`, `replayable`,
-`requires human review`, `locked measurement`, `synthetic test_source measurement`,
+`requires human review`, `locked measurement`, `synthetic test source measurement`,
 `raw benchmark output`, `documented no-conflict result`. Clinical, patient-care, CDS-runtime, SaMD,
 deployment, and regulatory claims sit behind the gates in §15 and enter reports only after their
 gates pass.
@@ -78,7 +78,7 @@ Claim tiers:
 
 | Tier | Meaning |
 | --- | --- |
-| `s0_replayable` | Artifact bytes replay; schema/trace checks pass over locked inputs. |
+| `s0_replayable` | Byte-for-byte reproducibility; schema/trace checks pass over locked inputs. |
 | `s1_accepted` | s0 plus deterministic validation/acceptance. |
 | `s2_research_evidence` | s1 plus valid benchmark/gate evidence for a stated research claim. |
 | `s3_clinical_regulatory` | s2 plus clinical/regulatory/deployment assurance evidence. |
@@ -255,7 +255,7 @@ then hash order.
 | `semantic_en` | NFKC, whitespace/punctuation folding, lowercase ASCII; for controlled-vocabulary identifiers. |
 | `identifier_ascii` | Require `[a-z0-9_:./-]+`; store bytes exactly. |
 | `diagnostic_text` | NFKC plus semantic whitespace folding. |
-| `rendered_text` | NFKC display text with renderer provenance. |
+| `rendered_text` | NFKC rendered text with renderer provenance. |
 
 ### §4.3 Canonical payload bytes
 
@@ -401,7 +401,7 @@ unit of the thesis.
 | `CompiledArtifact` | Target id, logic, query plan, query bodies, named-assertion records (assertion id → rule ids → region ids), diagnostics. |
 | `VerifierResult` | Per-query status (§6 categories), model or unsat core, solver identity, diagnostics. |
 | `TraceBundle` | Derivation DAG + claim-evidence rows; M3 adds reuse/compactness graphs. |
-| `LineageIndex` | Query index: artifact/finding ↔ source spans ↔ rules ↔ assertions ↔ verdicts ↔ report. |
+| `LineageIndex` | Query index: artifact/finding ↔ source text spans ↔ rules ↔ assertions ↔ verdicts ↔ report. |
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
@@ -441,8 +441,8 @@ join at M6 as additional systems behind the same TerminologyBinding requirements
 Semantic policy invariants:
 
 ```text
-Action sameness = same action kind + terminology-representative target + (M3) discriminating
-slots, via normalized target keys.
+Action sameness = same action kind + terminology-representative target + (M3) distinguishing
+fields, via normalized target keys.
 Strength and certainty are proof-visible annotations; conflict logic consumes direction and
 normalized action/context.
 Missing required policy emits Residual(missing_policy); duplicate policy keys with different
@@ -544,7 +544,7 @@ Intent: every claim is a path through artifacts; every miss is a typed data.
 query index; `ckc trace` resolves a finding to the full chain in both directions. M3 adds
 component-reuse and compactness exports plus deterministic path visualizations: `trace_graph.dot`
 (sorted nodes/edges) and per-finding Mermaid blocks in `report_en.md`, rendering the chain from
-Japanese source span to solver verdict and the convergence of documents onto shared mapping
+Japanese source text span to solver verdict and the convergence of documents onto shared mapping
 components; rendering to images is a view concern with renderer identity recorded. M5 adds
 attempt-ledger rows to the trace exports (§12). The lineage index and derivation DAG subsume
 dedicated mapping-hypergraph and axiom-dependency exports at test source scale; those exports
@@ -685,7 +685,7 @@ declared input artifact kinds are produced by its predecessors.
    derived from both documents.
 6. `group.m1_no_conflict` yields `semantic_no_conflict` and a `documented_no_conflict_result` entry in the
    report, evidenced by the Q1 unsat (disjoint age intervals).
-7. `ckc trace --run runs/m1 --finding <finding-id>` prints the complete chain: source spans →
+7. `ckc trace --run runs/m1 --finding <finding-id>` prints the complete chain: source text spans →
    segments → statements → rules → named assertions → solver verdict → report finding.
 8. `ckc replay runs/m1` reports matching canonical content hashes for all accepted artifacts.
 9. `report_en.md`/`report.json` carry findings, the no-conflict result, diagnostics, solver identity, and
@@ -693,7 +693,7 @@ declared input artifact kinds are produced by its predecessors.
 
 ### §8.6 Worked thread (docA × docB)
 
-Source span (docA): 「成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する」 + exception
+Source text span (docA): 「成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する」 + exception
 span 「ただし、重度腎機能障害のある患者を除く」.
 
 Ids: `rule_id = <document_id>.rule.<k>` in derivation order (`rules[k]` derives from
@@ -857,13 +857,13 @@ Committed direction:
   and accepted entries join the lexicon/component store; test source set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus reference, mapping-set size versus coverage on the compactness front, and
-  application phase model-call count (zero) against a model-per-document baseline. Apply-phase path
+  application phase model-call count (zero) against a model-per-document baseline. Application phase path
   graphs (§7.1) contain zero model nodes — the runtime removal made visible.
 - `registry/methods.yaml` seeded from the `docs/` compendium (§14).
 - Wording: route results are locked measurements (s0/s1 raw rows); runtime reference fidelity
-  claims sit behind `G-RUNTIME-ORACLE`.
+  claims sit behind `G-RUNTIME-REFERENCE`.
 
-Acceptance sketch (finalized when M3's roadmap units are authored): all registered routes and
+Acceptance overview (finalized when M3's roadmap units are authored): all registered routes and
 both deterministic pipelines run over all test source groups; metrics emit exact-fraction raw rows;
 hash-convergence asserts identical component hashes across metamorphic variants for the layered
 pipeline; the comparison report ranks pipelines and routes with raw rows visible; recorded model
@@ -1026,7 +1026,7 @@ backend ran 2026-06-12 (r3 revision commit).
 
 Committed direction:
 
-- Revision localization: per finding cluster, weighted minimal correction sets via solver
+- Revision targeting: per finding cluster, weighted minimal correction sets via solver
   soft-assertions (Z3 `assert-soft`; weights from strength, certainty, and source evidence status
   class, declared in the experiment registry); MARCO-style MUS/MCS enumeration in the Rust
   adapter when clusters outgrow single calls. Findings render "these k passages jointly imply
@@ -1055,7 +1055,7 @@ Committed direction:
   per-kind defect statistics for the Stage II paper.
 
 Acceptance themes (finalized at elaboration): an auditor run over the M6 corpus emits review-classified,
-localized, cross-checked, anchor-checked findings; a reviewer walks source span → rule →
+localized, cross-checked, anchor-checked findings; a reviewer walks source text span → rule →
 assertion → verdict → review question entirely offline in `report.html`; human review records
 round-trip without mutating findings; the bundle exports; replay holds.
 
@@ -1065,11 +1065,11 @@ The compiler's runtime target, kept visible so Stage I/II decisions stay compati
 Capabilities enter only behind their gates, each as a registered candidate citing its
 compendium row: a three-valued rule evaluator over typed patient contexts (`applicable |
 not_applicable | unknown` plus conflict statuses; open-world missing-data semantics;
-`G-EXEC-EVAL` adoption defines the semantics before any build), FHIR-family interop exports
+`G-RULE-EVAL` adoption defines the semantics before any build), FHIR-family interop exports
 (JP Core patient substrate, Clinical Reasoning packaging, CQL/ELM where expressible, lossiness
 recorded per export), EHR ingestion (SS-MIX2, CDS Hooks/SMART), live-patient data
-(`G-LIVE-PATIENT`), probabilistic and world-model semantics (`G-PROB`, `G-WORLD-MODEL`),
-clinical deployment evidence status (`G-S3`).
+(`G-LIVE-PATIENT`), probabilistic and world-model semantics (`G-PROB-REASONING`, `G-WORLD-MODEL`),
+clinical deployment evidence status (`G-CLINICAL-REGULATORY`).
 
 ## §14 Registries and research compendium
 
@@ -1100,20 +1100,20 @@ stand on their own.
 | `G-SOURCE-PERMISSION` | New source family, redistribution mode, or export class. | `SourcePermissionProfile` |
 | `G-REFERENCE-CORPUS` | Human-reviewed/released corpus-quality claims. | `ReferenceCorpusEvidence` |
 | `G-EXTRACTOR-ADAPTER` | Extractor promotion or generalized extraction-quality claims. | `ExtractorAdapterRecord` |
-| `G-RET-PARITY` | Retrieval-quality claims. | `RetrievalParityReport` |
+| `G-RET-QUALITY` | Retrieval-quality claims. | `RetrievalParityReport` |
 | `G-PORTFOLIO` | Multi-verifier agreement/robustness claims. | `VerifierPortfolioReport` |
-| `G-AIR-FULL` | Richer abstract-domain logic affecting accepted outputs. | `AIRDomainRecord` |
+| `G-ABSTRACT-DOMAIN-LOGIC-FULL` | Richer abstract-domain logic affecting accepted outputs. | `AIRDomainRecord` |
 | `G-REBIND` | Proof/trace transport across source or terminology editions. | `RebindingEvidence` |
-| `G-EMIN` | Released benchmarks, corpus-scale or calibrated performance claims. | `BenchmarkRelease`, `EMinReport` |
+| `G-BENCHMARK-RELEASE` | Released benchmarks, corpus-scale or calibrated performance claims. | `BenchmarkRelease`, `EMinReport` |
 | `G-EVALUATOR-MIGRATION` | Changes to test sources/reference/schemas/metrics/evaluator code for future scoring. | `EvaluatorMigrationEvidence` |
 | `G-MDL` | Calibrated compression/Pareto/model-selection claims. | `MDLEvidence` |
-| `G-RUNTIME-ORACLE` | Runtime-model-call or IR-processing stage oracle fidelity claims. | `RuntimeOracleReport` |
+| `G-RUNTIME-REFERENCE` | Runtime-model-call or IR-processing stage oracle fidelity claims. | `RuntimeOracleReport` |
 | `G-AUTO-PROMOTE` | Automated registry/status promotion of accepted generators, prompts, policies, compilers, verifier adapters, metric/report code. | `AutoPromotionEvidence` |
-| `G-PROB` | Probabilistic semantics affecting accepted outputs. | `ProbabilisticProfileRecord` |
+| `G-PROB-REASONING` | Probabilistic semantics affecting accepted outputs. | `ProbabilisticProfileRecord` |
 | `G-WORLD-MODEL` | Latent-state/multimodal observations affecting outputs. | `WorldModelProfileRecord` |
-| `G-EXEC-EVAL` | Patient-context rule-evaluation semantics in any shipped output. | `ExecEvalProfileRecord` |
+| `G-RULE-EVAL` | Patient-context rule-evaluation semantics in any shipped output. | `ExecEvalProfileRecord` |
 | `G-LIVE-PATIENT` | Any patient-derived data entering CKC. | `GovernedPatientDataProfile` |
-| `G-S3` | Clinical/regulatory/deployment evidence status claims. | `S3AssuranceEvidence` |
+| `G-CLINICAL-REGULATORY` | Clinical/regulatory/deployment evidence status claims. | `S3AssuranceEvidence` |
 
 Gate invariants: gate evidence is replayable or explicitly marked non-authoritative; candidate
 loops run inside locked experiments, with evaluator changes governed separately before any

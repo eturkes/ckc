@@ -238,7 +238,7 @@ fn prepare_scratch(scratch: &Path) -> Result<(), DiagnosticRecord> {
 }
 
 /// Strict-read one bare canonical record (the manifests attest wrappers;
-/// nothing wrappers them), failures as reason text for the caller's §7.4
+/// nothing wraps them), failures as reason text for the caller's §7.4
 /// record.
 fn read_record<T: CanonRead>(path: &Path) -> Result<T, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read: {e}"))?;

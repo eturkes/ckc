@@ -1,7 +1,7 @@
 //! SPEC §7.2 report payload — the canonical [`Report`], the run layout's
 //! `report.json` (§8.3) and the derivation DAG's sink. Contents at M1:
-//! findings and documented null results partitioned from the §7.1
-//! claim-evidence rows, quoted Japanese source spans resolved per member
+//! findings and documented no-conflict results partitioned from the §7.1
+//! claim-evidence rows, quoted Japanese source text spans resolved per member
 //! document, a code-keyed §7.4 diagnostics summary, corpus and lexicon
 //! hashes, solver identity, the replay-status slot, and §0-vocabulary
 //! wording. This module owns the types, their canonical bytes, structural
@@ -18,7 +18,7 @@
 //!   §6 conflict kind and recorded core.
 //! - `semantic_no_conflict` closing its pair — overlap unsat (disjoint
 //!   contexts) or deontic sat (shared context, consistent directions) → a
-//!   documented null result, carrying neither (Q1 runs produce-models, so
+//!   documented no-conflict result, carrying neither (Q1 runs produce-models, so
 //!   even its unsat records no core).
 //! - `semantic_no_conflict` on a sat overlap probe: the pair-eligibility
 //!   satisfying_example, not an outcome — no report row.
@@ -60,11 +60,11 @@ fieldless_enum! {
     /// stays within the §0 vocabulary). M1 rows use
     /// [`SyntheticTestSourceMeasurement`](Wording::SyntheticTestSourceMeasurement)
     /// (findings) and
-    /// [`DocumentedNoConflictResult`](Wording::DocumentedNoConflictResult) (null
+    /// [`DocumentedNoConflictResult`](Wording::DocumentedNoConflictResult) (no-conflict
     /// results); the rest join with their milestones.
     Wording {
         Candidate => "candidate",
-        DocumentedNoConflictResult => "documented null result",
+        DocumentedNoConflictResult => "documented no-conflict result",
         FormalizationQa => "formalization-QA",
         LockedMeasurement => "locked measurement",
         RawBenchmarkOutput => "raw benchmark output",
@@ -74,13 +74,13 @@ fieldless_enum! {
         ReviewCandidate => "review candidate",
         SchemaValid => "schema-valid",
         SourceGrounded => "source-grounded",
-        SyntheticTestSourceMeasurement => "synthetic test_source measurement",
+        SyntheticTestSourceMeasurement => "synthetic test source measurement",
         TextQualityAnalysis => "text-quality analysis",
         VerifierChecked => "verifier-checked",
     }
 }
 
-/// One quoted source span (§7.2 "quoted spans", §8.5 item 9): a member
+/// One quoted source text span (§7.2 "quoted spans", §8.5 item 9): a member
 /// document's region resolved through its SourceDocumentGraph to one span's raw
 /// test_source bytes. Region and span ids are document-local (§8.6), so every
 /// row carries its `document_id`; a multi-span region yields one row per
@@ -126,7 +126,7 @@ impl CanonRead for QuotedSpan {
 }
 
 /// SPEC §7.2 report row, used by both partitions: a finding (conflict kind
-/// and core present, verdict unsat) or a documented null result (both
+/// and core present, verdict unsat) or a documented no-conflict result (both
 /// absent). Keyed by its §7.1 trace finding id; evidence sets ride from
 /// the claim row (`assertion_ids` the claim-evidence set: the recorded
 /// core when one exists, else the query's named assertions), `core` is the
@@ -269,7 +269,7 @@ impl Report {
                         rule: if is_finding {
                             "findings require verdict unsat"
                         } else {
-                            "null results require verdict sat or unsat"
+                            "no-conflict results require verdict sat or unsat"
                         },
                     });
                 }
@@ -561,8 +561,8 @@ pub fn assemble_report(
     }
     let findings = canonical_set(findings)?;
     let no_conflict_results = canonical_set(no_conflict_results)?;
-    // §0-label bytes order the pair: "documented null result" sorts before
-    // "synthetic test_source measurement".
+    // §0-label bytes order the pair: "documented no-conflict result" sorts before
+    // "synthetic test source measurement".
     let mut wording = Vec::new();
     if !no_conflict_results.is_empty() {
         wording.push(Wording::DocumentedNoConflictResult);
@@ -585,7 +585,7 @@ pub fn assemble_report(
 /// SPEC §7.2 `report_en.md` body: the deterministic markdown rendering of a
 /// validated [`Report`] — a pure function of the canonical value, §7.2
 /// contents in §7.2 prose order (corpus and lexicon hashes, findings,
-/// documented null results, diagnostics summary, solver identity, replay
+/// documented no-conflict results, diagnostics summary, solver identity, replay
 /// status), headings and labels drawn from §7.2/§0 vocabulary, ids and
 /// hashes verbatim in code spans, quoted-span texts verbatim as plain
 /// text (§8.5 item 9 resolves them to test_source bytes). Empty content slots
@@ -611,7 +611,7 @@ pub fn render_markdown(report: &Report) -> String {
     md.push_str("\n## Findings\n");
     render_rows(&mut md, &report.findings);
 
-    md.push_str("\n## Documented null results\n");
+    md.push_str("\n## Documented no-conflict results\n");
     render_rows(&mut md, &report.no_conflict_results);
 
     md.push_str("\n## Diagnostics summary\n\n");
@@ -762,9 +762,9 @@ pub enum ReportError {
     ZeroCount(Id),
     /// A finding id appears in both partitions or twice in one.
     DuplicateFindingId(Id),
-    /// `conflict_kind` is absent on a finding or present on a null result.
+    /// `conflict_kind` is absent on a finding or present on a no-conflict result.
     ConflictKindPresence(Id),
-    /// `core` is absent on a finding or present on a null result.
+    /// `core` is absent on a finding or present on a no-conflict result.
     CorePresence(Id),
     /// A row's verdict breaks its partition's §6 rule.
     VerdictRule { finding_id: Id, rule: &'static str },
@@ -825,13 +825,13 @@ impl std::fmt::Display for ReportError {
             ReportError::ConflictKindPresence(id) => {
                 write!(
                     f,
-                    "row {id} breaks conflict-kind presence: findings carry it, null results omit it"
+                    "row {id} breaks conflict-kind presence: findings carry it, no-conflict results omit it"
                 )
             }
             ReportError::CorePresence(id) => {
                 write!(
                     f,
-                    "row {id} breaks core presence: findings carry the unsat core, null results omit it"
+                    "row {id} breaks core presence: findings carry the unsat core, no-conflict results omit it"
                 )
             }
             ReportError::VerdictRule { finding_id, rule } => {
@@ -847,13 +847,13 @@ impl std::fmt::Display for ReportError {
                 write!(f, "row {finding_id} quotes span {span_id} with no text")
             }
             ReportError::DuplicateGraph(id) => {
-                write!(f, "two source graphs claim document {id}")
+                write!(f, "two source document graphs claim document {id}")
             }
             ReportError::DuplicateResult(id) => {
                 write!(f, "two verifier results claim query {id}")
             }
             ReportError::MissingGraph(id) => {
-                write!(f, "document {id} has no input source graph")
+                write!(f, "document {id} has no input source document graph")
             }
             ReportError::MissingRegion {
                 document_id,
@@ -926,7 +926,7 @@ mod tests {
     }
 
     /// Hand-built §8.6-shaped report: one deontic finding with its core,
-    /// one Q1-unsat null result, every set and map hand-sorted into
+    /// one Q1-unsat no-conflict result, every set and map hand-sorted into
     /// canonical order (ASCII span texts keep the byte pin stable).
     fn valid_report() -> Report {
         Report {
@@ -984,7 +984,7 @@ mod tests {
             labels,
             vec![
                 "candidate",
-                "documented null result",
+                "documented no-conflict result",
                 "formalization-QA",
                 "locked measurement",
                 "raw benchmark output",
@@ -994,7 +994,7 @@ mod tests {
                 "review candidate",
                 "schema-valid",
                 "source-grounded",
-                "synthetic test_source measurement",
+                "synthetic test source measurement",
                 "text-quality analysis",
                 "verifier-checked",
             ]
@@ -1029,7 +1029,7 @@ mod tests {
     /// The full canonical bytes of [`valid_report`], pinned from observed
     /// output: alphabetical members, optionals omitted on the null row,
     /// u64 counts as §4.3 string-wrapped integers.
-    const PINNED_REPORT: &str = r#"{"corpus_hashes":{"test_source.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","test_source.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"findings":[{"assertion_ids":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"claim_tier":"s1_accepted","conflict_kind":"deontic_direction_conflict","core":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"test_source.a","region_id":"r.0","span_id":"s.0","text":"administer drug A"},{"document_id":"test_source.b","region_id":"r.0","span_id":"s.0","text":"withhold drug A"}],"region_ids":["r.0"],"rule_ids":["test_source.a.rule.0","test_source.b.rule.0"],"verdict":"unsat","wording":"synthetic test_source measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","no_conflict_results":[{"assertion_ids":["ctx.test_source.a.rule.1","ctx.test_source.b.rule.1"],"claim_tier":"s1_accepted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"test_source.a","region_id":"r.1","span_id":"s.1","text":"adults eighteen and over"},{"document_id":"test_source.b","region_id":"r.1","span_id":"s.1","text":"children under eighteen"}],"region_ids":["r.1"],"rule_ids":["test_source.a.rule.1","test_source.b.rule.1"],"verdict":"unsat","wording":"documented null result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented null result","synthetic test_source measurement"]}"#;
+    const PINNED_REPORT: &str = r#"{"corpus_hashes":{"test_source.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","test_source.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"findings":[{"assertion_ids":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"claim_tier":"s1_accepted","conflict_kind":"deontic_direction_conflict","core":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"test_source.a","region_id":"r.0","span_id":"s.0","text":"administer drug A"},{"document_id":"test_source.b","region_id":"r.0","span_id":"s.0","text":"withhold drug A"}],"region_ids":["r.0"],"rule_ids":["test_source.a.rule.0","test_source.b.rule.0"],"verdict":"unsat","wording":"synthetic test source measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","no_conflict_results":[{"assertion_ids":["ctx.test_source.a.rule.1","ctx.test_source.b.rule.1"],"claim_tier":"s1_accepted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"test_source.a","region_id":"r.1","span_id":"s.1","text":"adults eighteen and over"},{"document_id":"test_source.b","region_id":"r.1","span_id":"s.1","text":"children under eighteen"}],"region_ids":["r.1"],"rule_ids":["test_source.a.rule.1","test_source.b.rule.1"],"verdict":"unsat","wording":"documented no-conflict result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented no-conflict result","synthetic test source measurement"]}"#;
 
     #[test]
     fn no_conflict_row_omits_conflict_kind_and_core_bytes() {
@@ -1180,7 +1180,7 @@ mod tests {
             report.validate(),
             Err(ReportError::VerdictRule {
                 finding_id: id("finding.group.g2.0"),
-                rule: "null results require verdict sat or unsat",
+                rule: "no-conflict results require verdict sat or unsat",
             })
         );
     }
@@ -1377,7 +1377,7 @@ mod tests {
     /// collide (document-local counters), a conflict group whose overlap
     /// probe answered sat (sequence_number 0, no report row) and whose deontic
     /// query cored (sequence_number 1, the finding), and a null group closed by an
-    /// unsat overlap probe (sequence_number 0, the documented null result).
+    /// unsat overlap probe (sequence_number 0, the documented no-conflict result).
     struct World {
         bundle: TraceBundle,
         lineage: LineageIndex,
@@ -1656,7 +1656,7 @@ mod tests {
         let text = String::from_utf8(bytes).unwrap();
         assert!(
             text.contains(
-                r#""wording":["documented null result","synthetic test_source measurement"]"#
+                r#""wording":["documented no-conflict result","synthetic test source measurement"]"#
             )
         );
         assert!(
@@ -1875,7 +1875,7 @@ mod tests {
     /// null row, span texts plain and verbatim.
     const PINNED_MARKDOWN: &str = r#"# CKC report
 
-wording: documented null result, synthetic test_source measurement
+wording: documented no-conflict result, synthetic test source measurement
 
 ## Corpus
 
@@ -1890,7 +1890,7 @@ lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 ### `finding.group.g1.1`
 
-synthetic test_source measurement; claim tier `s1_accepted`.
+synthetic test source measurement; claim tier `s1_accepted`.
 
 - conflict kind: `deontic_direction_conflict`
 - query: `q.g1.pair1.deontic`, verdict `unsat`
@@ -1902,11 +1902,11 @@ synthetic test_source measurement; claim tier `s1_accepted`.
   - `test_source.a` `r.0` `s.0`: administer drug A
   - `test_source.b` `r.0` `s.0`: withhold drug A
 
-## Documented null results
+## Documented no-conflict results
 
 ### `finding.group.g2.0`
 
-documented null result; claim tier `s1_accepted`.
+documented no-conflict result; claim tier `s1_accepted`.
 
 - query: `q.g2.pair1.overlap`, verdict `unsat`
 - rules: `test_source.a.rule.1`, `test_source.b.rule.1`
@@ -1975,7 +1975,7 @@ lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 none.
 
-## Documented null results
+## Documented no-conflict results
 
 none.
 

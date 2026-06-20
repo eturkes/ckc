@@ -194,7 +194,7 @@ impl CanonRead for RunManifest {
 /// solver identity, expected output hashes — a provenance/attestation record
 /// over content hashes. `ckc replay` re-executes `command` over the same
 /// inputs and compares canonical content hashes; mismatches emit
-/// symmetric-difference diagnostics and missing external tools emit
+/// mismatch diagnostics and missing external tools emit
 /// `replay_identity_unsupported`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplayManifest {

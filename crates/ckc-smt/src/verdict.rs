@@ -38,7 +38,7 @@ const STREAM_HEAD_CHARS: usize = 160;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryRole {
     /// Q1 `context_overlap`: sat records the overlap satisfying_example model; unsat
-    /// closes the pair as the documented null result (§6).
+    /// closes the pair as the documented no-conflict result (§6).
     ContextOverlap,
     /// Q2 `deontic_consistency`: unsat is the semantic contradiction, its
     /// core naming the contributing assertions; sat documents no conflict.
@@ -50,7 +50,7 @@ pub enum QueryRole {
 /// results in plan order — pair k's `context_overlap` first, its
 /// `deontic_consistency` only when Q1 answered sat (§6: Q2 runs for pairs
 /// with a sat Q1; every other Q1 fate leaves the pair closed as the
-/// documented null result or undecided, with no Q2 result).
+/// documented no-conflict result or undecided, with no Q2 result).
 ///
 /// `artifact` must satisfy [`CompiledArtifact::validate`]; bodies out of
 /// plan order are a caller bug and panic, like emitter slot order.
@@ -252,7 +252,7 @@ fn exit_fate(outcome: &RunOutcome) -> String {
         RunOutcome::ExitFailure { code: Some(code) } => format!("exit code {code}"),
         RunOutcome::ExitFailure { code: None } => "signal-terminated".to_owned(),
         RunOutcome::Timeout | RunOutcome::SpawnFailure { .. } => {
-            unreachable!("handled before verdict parsing")
+            unreachable!("handled before solver-result parsing")
         }
     }
 }
@@ -831,7 +831,7 @@ mod tests {
     }
 
     // §8.6 control group on live z3: disjoint age intervals leave Q1
-    // unsat, closing the pair as the documented null result — one clean
+    // unsat, closing the pair as the documented no-conflict result — one clean
     // semantic_no_conflict, no Q2 result.
     #[test]
     fn live_control_pair_closes_no_conflict() {
