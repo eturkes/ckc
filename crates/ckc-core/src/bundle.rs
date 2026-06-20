@@ -21,7 +21,7 @@
 //! their structural bytes.
 //!
 //! [`IrBundle::validate`] enforces the §5 IR invariants over a stored bundle
-//! and its source graph in a pinned order — DocIR re-derivation, grounding
+//! and its source graph in a pinned order — DocIR re-derivation, source_linkage
 //! with residuals licensed by `extraction_uncertain` doc diagnostics,
 //! per-pool id uniqueness, support/reference resolution, key and interval
 //! coherence, the NormIR→FormalIR projection, §6 plan-pair eligibility, and
@@ -36,12 +36,12 @@ use crate::canon::{
     canonical_sort_key, emit_set, read_set,
 };
 use crate::enums::{DiagnosticCode, DiagnosticRecord, emit_payload, fieldless_enum, read_payload};
-use crate::grounding::{GroundingError, SourceGraph};
+use crate::source_linkage::{SourceLinkageError, SourceDocumentGraph};
 use crate::hash::{content_hash, hash_bytes};
 use crate::id::{Hash, Id};
 use crate::ir::{
     Action, ClinicalIr, ContextAtom, ContextExpr, DocIr, FormalConstraint, FormalIr, IrError,
-    NormIr, NormRule, QuantityInterval, RefLocalizer, SegmentIr, Structural, directions_opposed,
+    NormIr, NormativeRule, QuantityInterval, RefLocalizer, SegmentIr, Structural, directions_opposed,
     emit_structural_record_set, emit_structural_ref_set, structural_hash,
 };
 
@@ -66,7 +66,7 @@ fieldless_enum! {
 /// (`action`/`concept`), whose canonical bytes are their structural bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentRecord {
-    pub component_id: Id,
+    pub pipeline_step_id: Id,
     pub kind: ComponentKind,
     pub structural_hash: Hash,
     pub use_sites: Vec<Id>,
@@ -75,8 +75,8 @@ pub struct ComponentRecord {
 impl Canonical for ComponentRecord {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("component_id", |b| self.component_id.emit_canonical(b))?;
         obj.member("kind", |b| self.kind.emit_canonical(b))?;
+        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
         obj.member("structural_hash", |b| {
             self.structural_hash.emit_canonical(b)
         })?;
@@ -88,13 +88,13 @@ impl Canonical for ComponentRecord {
 impl CanonRead for ComponentRecord {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let component_id = obj.member("component_id", Id::read)?;
         let kind = obj.member("kind", ComponentKind::read)?;
+        let pipeline_step_id = obj.member("pipeline_step_id", Id::read)?;
         let structural_hash = obj.member("structural_hash", Hash::read)?;
         let use_sites = obj.member("use_sites", read_set::<Id>)?;
         obj.close()?;
         Ok(ComponentRecord {
-            component_id,
+            pipeline_step_id,
             kind,
             structural_hash,
             use_sites,
@@ -463,7 +463,7 @@ pub fn derive_components(
 
 /// Build a record with use sites sorted by id bytes and deduped.
 fn record(
-    component_id: Id,
+    pipeline_step_id: Id,
     kind: ComponentKind,
     structural_hash: Hash,
     mut use_sites: Vec<Id>,
@@ -471,7 +471,7 @@ fn record(
     use_sites.sort_by(|a, b| a.as_str().cmp(b.as_str()));
     use_sites.dedup();
     ComponentRecord {
-        component_id,
+        pipeline_step_id,
         kind,
         structural_hash,
         use_sites,
@@ -513,8 +513,8 @@ pub enum BundleError {
     Doc(IrError),
     /// The stored DocIR is not the graph's derivation.
     DocLayerMismatch,
-    /// A §4.5 grounding invariant failed (residuals licensed first).
-    Grounding(GroundingError),
+    /// A §4.5 source_linkage invariant failed (residuals licensed first).
+    SourceLinkage(SourceLinkageError),
     /// Two entities in one id pool share an id.
     Duplicate { pool: &'static str, id: Id },
     /// A reference names an id its pool does not define.
@@ -545,7 +545,7 @@ impl fmt::Display for BundleError {
         match self {
             BundleError::Doc(e) => write!(f, "doc layer derivation: {e}"),
             BundleError::DocLayerMismatch => write!(f, "stored DocIR is not its graph derivation"),
-            BundleError::Grounding(e) => write!(f, "grounding: {e}"),
+            BundleError::SourceLinkage(e) => write!(f, "source_linkage: {e}"),
             BundleError::Duplicate { pool, id } => write!(f, "duplicate {pool} id {id}"),
             BundleError::Dangling { pool, id } => write!(f, "reference to undefined {pool} {id}"),
             BundleError::EmptySupport(id) => write!(f, "segment {id} supports nothing"),
@@ -580,7 +580,7 @@ impl From<CanonError> for BundleError {
 impl IrBundle {
     /// Enforce the SPEC §5 IR invariants over a stored bundle and its source
     /// graph, in a pinned order: (1) the DocIR layer re-derives equal from
-    /// `graph`; (2) grounding holds, unspanned textual nodes licensed by the
+    /// `graph`; (2) source_linkage holds, unspanned textual nodes licensed by the
     /// regions of `extraction_uncertain` doc diagnostics; (3) ids are unique
     /// per pool; (4) segment support is nonempty, then every region ref
     /// resolves; (5) statements re-derive keys, cohere intervals, and cite
@@ -589,7 +589,7 @@ impl IrBundle {
     /// projection; (8) plan pairs are §6-eligible; (9) the component index
     /// re-derives equal; (10) layer hashes, then the bundle hash, re-derive
     /// equal. [`assemble`] output over a valid graph passes by construction.
-    pub fn validate(&self, graph: &SourceGraph) -> Result<(), BundleError> {
+    pub fn validate(&self, graph: &SourceDocumentGraph) -> Result<(), BundleError> {
         // (1) DocIR re-derives equal from the graph and the carried
         // extraction diagnostics.
         let derived =
@@ -598,7 +598,7 @@ impl IrBundle {
             return Err(BundleError::DocLayerMismatch);
         }
 
-        // (2) Grounding, residual textual nodes licensed by the regions of
+        // (2) SourceLinkage, residual textual nodes licensed by the regions of
         // extraction_uncertain doc diagnostics (step 1 resolved them).
         let regions: HashMap<&Id, &[Id]> = graph
             .regions
@@ -614,7 +614,7 @@ impl IrBundle {
             .filter_map(|region_id| regions.get(region_id))
             .flat_map(|nodes| nodes.iter().cloned())
             .collect();
-        graph.validate(&residuals).map_err(BundleError::Grounding)?;
+        graph.validate(&residuals).map_err(BundleError::SourceLinkage)?;
 
         // (3) Id uniqueness per pool.
         unique(
@@ -714,7 +714,7 @@ impl IrBundle {
         // (7) FormalIR is NormIR's projection: every stored constraint names
         // a rule and equals its projection; the sequence is total, in rule
         // order (covers id derivation, omission, and reordering).
-        let rules: HashMap<&Id, &NormRule> =
+        let rules: HashMap<&Id, &NormativeRule> =
             self.norm.rules.iter().map(|r| (&r.rule_id, r)).collect();
         for c in &self.formal.constraints {
             let rule = rules.get(&c.rule_id).ok_or_else(|| BundleError::Dangling {
@@ -806,7 +806,7 @@ impl IrBundle {
     }
 }
 
-/// One id pool admits each id once.
+/// One id pool accepts each id once.
 fn unique<'a>(pool: &'static str, ids: impl Iterator<Item = &'a Id>) -> Result<(), BundleError> {
     let mut seen: HashSet<&Id> = HashSet::new();
     for id in ids {
@@ -886,10 +886,10 @@ fn check_interval(q: &QuantityInterval) -> Result<(), BundleError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canon::read_canonical;
+    use crate::canon::read_strict_canonical;
     use crate::enums::Direction;
-    use crate::grounding::{
-        DataClass, NodeKind, Provenance, SourceDocument, SourceNode, SourceRegion, SourceSpan,
+    use crate::source_linkage::{
+        DataClass, NodeKind, Provenance, SourceDocument, SourceNode, EvidenceRegion, SourceTextSpan,
     };
     use crate::ir::tests::{
         atom_c, atom_ge, atom_nc, binding_p, canon, diag, dnf1, id, pair_p, round_trip, rule_p,
@@ -903,26 +903,26 @@ mod tests {
         id(&format!("{p}{tail}"))
     }
 
-    /// Source graph behind [`fixture_p`]: document root, CQ heading,
+    /// Source graph behind [`test_source_p`]: document root, CQ heading,
     /// recommendation paragraph, exception sentence — each textual node
-    /// spanned — and one region per fixture ref target.
-    fn graph_p(p: &str) -> SourceGraph {
+    /// spanned — and one region per test_source ref target.
+    fn graph_p(p: &str) -> SourceDocumentGraph {
         let node = |kind, tail: &str, parent: Option<&str>| SourceNode {
             node_id: pid(p, tail),
             kind,
             parent_id: parent.map(|t| pid(p, t)),
             attrs: vec![],
         };
-        let region = |tail: &str, node_tail: &str, span_tail: &str| SourceRegion {
+        let region = |tail: &str, node_tail: &str, span_tail: &str| EvidenceRegion {
             region_id: pid(p, tail),
             node_ids: vec![pid(p, node_tail)],
             span_ids: vec![pid(p, span_tail)],
             anchor_ids: vec![],
         };
-        SourceGraph {
+        SourceDocumentGraph {
             document: SourceDocument {
                 document_id: pid(p, "doc.a"),
-                source_family: id("synthetic_fixture_html"),
+                source_family: id("synthetic_test_source_html"),
                 provenance: Provenance::Synthetic,
                 raw_hash: hash_bytes(b"raw"),
                 content_hash: hash_bytes(b"content"),
@@ -935,9 +935,9 @@ mod tests {
                 node(NodeKind::Paragraph, "n.exc", Some("n.doc")),
             ],
             spans: vec![
-                SourceSpan::derive(pid(p, "s.cq1"), pid(p, "n.cq1"), 0, "cq1".to_owned(), 1),
-                SourceSpan::derive(pid(p, "s.rec"), pid(p, "n.rec"), 0, "rec".to_owned(), 2),
-                SourceSpan::derive(pid(p, "s.exc"), pid(p, "n.exc"), 0, "exc".to_owned(), 3),
+                SourceTextSpan::derive(pid(p, "s.cq1"), pid(p, "n.cq1"), 0, "cq1".to_owned(), 1),
+                SourceTextSpan::derive(pid(p, "s.rec"), pid(p, "n.rec"), 0, "rec".to_owned(), 2),
+                SourceTextSpan::derive(pid(p, "s.exc"), pid(p, "n.exc"), 0, "exc".to_owned(), 3),
             ],
             anchors: vec![],
             regions: vec![
@@ -966,9 +966,9 @@ mod tests {
 
     /// The §8.6 worked-rule family as one coherent document under a rename
     /// prefix: the DocIR view derived from [`graph_p`], the CQ +
-    /// recommendation segments, the ir.rs binding/statement/rule fixtures,
+    /// recommendation segments, the ir.rs binding/statement/rule test_sources,
     /// one assumption, one bundle diagnostic.
-    fn fixture_p(
+    fn test_source_p(
         p: &str,
     ) -> (
         DocIr,
@@ -1011,7 +1011,7 @@ mod tests {
     }
 
     fn assemble_p(p: &str) -> IrBundle {
-        let (doc, segment, clinical, norm, assumptions, diagnostics) = fixture_p(p);
+        let (doc, segment, clinical, norm, assumptions, diagnostics) = test_source_p(p);
         assemble(doc, segment, clinical, norm, assumptions, diagnostics).unwrap()
     }
 
@@ -1057,12 +1057,12 @@ mod tests {
         round_trip(assumption);
         let unnormalized = br#"{"assumption_id":"a","payload":{"k":"a  b"},"region_ids":[]}"#;
         assert!(matches!(
-            read_canonical::<Assumption>(unnormalized),
+            read_strict_canonical::<Assumption>(unnormalized),
             Err(CanonReadError::Unnormalized(_))
         ));
     }
 
-    // Pins the derived index over the worked fixture: every record's id,
+    // Pins the derived index over the worked test_source: every record's id,
     // kind, and use sites, in stored (= canonical set) order, plus the hash
     // vocabulary split (structural for components, content for vocabulary).
     #[test]
@@ -1073,7 +1073,7 @@ mod tests {
             .iter()
             .map(|r| {
                 (
-                    r.component_id.as_str(),
+                    r.pipeline_step_id.as_str(),
                     r.kind.as_str(),
                     r.use_sites.iter().map(Id::as_str).collect(),
                 )
@@ -1115,7 +1115,7 @@ mod tests {
             bundle
                 .components
                 .iter()
-                .find(|r| r.component_id.as_str() == want)
+                .find(|r| r.pipeline_step_id.as_str() == want)
                 .unwrap()
         };
         assert_eq!(
@@ -1179,7 +1179,7 @@ mod tests {
         let by_id = |want: &str| {
             records
                 .iter()
-                .find(|r| r.component_id.as_str() == want)
+                .find(|r| r.pipeline_step_id.as_str() == want)
                 .unwrap()
         };
         // both constraints cite the worked pair
@@ -1228,7 +1228,7 @@ mod tests {
             content_hash(&renamed).unwrap()
         );
 
-        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = test_source_p("");
         norm.rules[0].context = dnf1(vec![
             atom_c("cond.pneumonia"),
             atom_nc("cond.renal_severe"),
@@ -1239,7 +1239,7 @@ mod tests {
     }
 
     // Pins the ten-field bundle shape byte-exactly over the smallest
-    // assemblable bundle, and round-trips the full fixture.
+    // assemblable bundle, and round-trips the full test_source.
     #[test]
     fn bundle_round_trip_and_canonical_shape() {
         let minimal = assemble(
@@ -1319,7 +1319,7 @@ mod tests {
     /// Two opposed rules over one action plus the §8.6 worked plan pair —
     /// the smt-emit.2 flow: assemble, fill the plan, restamp.
     fn two_rule_bundle() -> IrBundle {
-        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = test_source_p("");
         let mut against = rule_p("");
         against.rule_id = id("rule.b.contra1");
         against.direction = Direction::Against;
@@ -1338,7 +1338,7 @@ mod tests {
     }
 
     // §4.5 coverage degrades to typed residuals: an unspanned textual node
-    // fails grounding bare and passes once an extraction_uncertain doc
+    // fails source_linkage bare and passes once an extraction_uncertain doc
     // diagnostic licenses its region's nodes.
     #[test]
     fn validate_licenses_residual_nodes() {
@@ -1349,22 +1349,22 @@ mod tests {
             parent_id: Some(id("n.doc")),
             attrs: vec![],
         });
-        graph.regions.push(SourceRegion {
+        graph.regions.push(EvidenceRegion {
             region_id: id("r.resid"),
             node_ids: vec![id("n.resid")],
             span_ids: vec![],
             anchor_ids: vec![],
         });
-        let (_, segment, clinical, norm, assumptions, diagnostics) = fixture_p("");
+        let (_, segment, clinical, norm, assumptions, diagnostics) = test_source_p("");
         let doc = DocIr::from_graph(&graph, vec![]).unwrap();
         let bare = assemble(doc, segment, clinical, norm, assumptions, diagnostics).unwrap();
         assert_eq!(
             bare.validate(&graph),
-            Err(BundleError::Grounding(
-                GroundingError::UnspannedTextualNode(id("n.resid"))
+            Err(BundleError::SourceLinkage(
+                SourceLinkageError::UnspannedTextualNode(id("n.resid"))
             ))
         );
-        let (_, segment, clinical, norm, assumptions, diagnostics) = fixture_p("");
+        let (_, segment, clinical, norm, assumptions, diagnostics) = test_source_p("");
         let licensed = vec![diag(DiagnosticCode::ExtractionUncertain, "r.resid")];
         let doc = DocIr::from_graph(&graph, licensed).unwrap();
         assemble(doc, segment, clinical, norm, assumptions, diagnostics)
@@ -1570,7 +1570,7 @@ mod tests {
             (q(None, Some(17), None, Some(18)), None),
         ];
         for (interval, want) in table {
-            let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+            let (doc, segment, clinical, mut norm, assumptions, diagnostics) = test_source_p("");
             norm.rules[0].context = dnf1(vec![ContextAtom::Interval(interval)]);
             let got = assemble(doc, segment, clinical, norm, assumptions, diagnostics)
                 .unwrap()
@@ -1587,7 +1587,7 @@ mod tests {
             }
         }
         // statement atoms run the same check (population here)
-        let (doc, segment, mut clinical, norm, assumptions, diagnostics) = fixture_p("");
+        let (doc, segment, mut clinical, norm, assumptions, diagnostics) = test_source_p("");
         clinical.statements[0].population = vec![ContextAtom::Interval(q(None, None, None, None))];
         assert_eq!(
             assemble(doc, segment, clinical, norm, assumptions, diagnostics)
@@ -1628,7 +1628,7 @@ mod tests {
             "action key mismatch",
         );
         // both rules `for`: eligibility's direction half fails
-        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = fixture_p("");
+        let (doc, segment, clinical, mut norm, assumptions, diagnostics) = test_source_p("");
         let mut second = rule_p("");
         second.rule_id = id("rule.b.contra1");
         norm.rules.push(second);

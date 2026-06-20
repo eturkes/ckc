@@ -1,4 +1,4 @@
-//! SPEC §7.1 trace payloads — the trace stage's durable shapes:
+//! SPEC §7.1 trace payloads — the trace processing_stage's durable shapes:
 //! [`TraceBundle`] (`trace_bundle.json`), the run's derivation DAG plus
 //! claim-evidence rows, and [`LineageIndex`] (`lineage_index.json`), its
 //! per-(finding, document) query index.
@@ -6,8 +6,8 @@
 //! This module owns the types, their canonical bytes (every collection a
 //! canonical set sorted by [`canonical_sort_key`]), structural validation,
 //! and assembly: [`assemble_trace`] builds both payloads over the run's
-//! landed stage artifacts, handed off per document as [`DocTrace`] and per
-//! fixture group as [`GroupTrace`] by the §8.3 trace stage in
+//! landed processing_stage artifacts, handed off per document as [`DocTrace`] and per
+//! test_source group as [`GroupTrace`] by the §8.3 trace processing_stage in
 //! [`crate::run`]. The [`command`] submodule is the pair's consumer:
 //! `ckc trace` (§8.5 item 7).
 
@@ -16,7 +16,7 @@ pub(crate) mod command;
 use std::collections::BTreeMap;
 
 use ckc_core::{
-    ArtifactEnvelope, CanonError, CanonRead, CanonReadError, Canonical, Hash, Id, IrBundle,
+    ArtifactWrapper, CanonError, CanonRead, CanonReadError, Canonical, Hash, Id, IrBundle,
     ObjectEmitter, ObjectReader, Reader, canonical_sort_key, emit_set, emit_string, fieldless_enum,
     read_set, read_string,
 };
@@ -29,19 +29,19 @@ fieldless_enum! {
     /// class on the source → report chain. Declaration order is
     /// [`rank`](TraceNodeKind::rank) order; edges ascend strictly.
     TraceNodeKind {
-        /// A corpus fixture document (raw bytes, corpus-relative path).
+        /// A corpus test_source document (raw bytes, corpus-relative path).
         Source => "source",
-        /// The extract stage's SourceGraph artifact.
-        SourceGraph => "source_graph",
-        /// The segment stage's ClinicalSegments artifact.
+        /// The extract processing_stage's SourceDocumentGraph artifact.
+        SourceDocumentGraph => "source_document_graph",
+        /// The segment processing_stage's ClinicalSegments artifact.
         Segments => "segments",
-        /// The normalize stage's statement + rule layers artifact.
+        /// The normalize processing_stage's statement + rule layers artifact.
         Normalization => "normalization",
-        /// The assemble stage's five-layer IRBundle artifact.
+        /// The assemble processing_stage's five-layer IRBundle artifact.
         IrBundle => "ir_bundle",
-        /// The compile stage's per-group CompiledArtifact.
+        /// The compile processing_stage's per-group CompiledArtifact.
         Compiled => "compiled",
-        /// The verify stage's per-group VerifierResults artifact.
+        /// The verify processing_stage's per-group VerifierResults artifact.
         VerifierResults => "verifier_results",
         /// The run's one report node (`report.json`), the DAG sink — the
         /// only kind without a content hash.
@@ -55,7 +55,7 @@ impl TraceNodeKind {
     pub fn rank(self) -> u8 {
         match self {
             TraceNodeKind::Source => 0,
-            TraceNodeKind::SourceGraph => 1,
+            TraceNodeKind::SourceDocumentGraph => 1,
             TraceNodeKind::Segments => 2,
             TraceNodeKind::Normalization => 3,
             TraceNodeKind::IrBundle => 4,
@@ -65,12 +65,12 @@ impl TraceNodeKind {
         }
     }
 
-    /// The §8.3 stage that produces nodes of this kind — the operation
+    /// The §8.3 processing_stage that produces nodes of this kind — the operation
     /// every incoming edge carries; sources have no producer.
     pub fn operation(self) -> Option<TraceOperation> {
         match self {
             TraceNodeKind::Source => None,
-            TraceNodeKind::SourceGraph => Some(TraceOperation::Extract),
+            TraceNodeKind::SourceDocumentGraph => Some(TraceOperation::Extract),
             TraceNodeKind::Segments => Some(TraceOperation::Segment),
             TraceNodeKind::Normalization => Some(TraceOperation::Normalize),
             TraceNodeKind::IrBundle => Some(TraceOperation::Assemble),
@@ -82,8 +82,8 @@ impl TraceNodeKind {
 }
 
 fieldless_enum! {
-    /// SPEC §7.1 edge label: the §8.3 stage kind that derived the target
-    /// node, spelled exactly as the run's stage events spell it.
+    /// SPEC §7.1 edge label: the §8.3 processing_stage kind that derived the target
+    /// node, spelled exactly as the run's processing_stage events spell it.
     TraceOperation {
         Extract => "extract",
         Segment => "segment",
@@ -106,7 +106,7 @@ fieldless_enum! {
 
 /// SPEC §7.1 DAG node: one durable artifact (or source document) at its
 /// run-relative path (§8.3 layout; sources corpus-relative).
-/// `content_hash` is the envelope content hash (sources: the raw-byte
+/// `content_hash` is the wrapper content hash (sources: the raw-byte
 /// hash) and is absent exactly on the report node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceNode {
@@ -150,7 +150,7 @@ impl CanonRead for TraceNode {
 }
 
 /// SPEC §7.1 operation-labeled DAG edge: `to` was derived from `from` by
-/// the `operation` stage.
+/// the `operation` processing_stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceEdge {
     pub from: Id,
@@ -278,8 +278,8 @@ impl TraceBundle {
     ///    (`rank(from) < rank(to)`); `operation` is the target kind's
     ///    producing operation.
     /// 4. Claims: `finding_id` takes the §7.2 form
-    ///    `finding.<group_id>.<ordinal>` (ordinal a canonical decimal)
-    ///    with each group's ordinals dense from 0; `query_id` extends
+    ///    `finding.<group_id>.<sequence_number>` (sequence_number a canonical decimal)
+    ///    with each group's sequence_numbers dense from 0; `query_id` extends
     ///    `pair_id` by a non-empty `.`-suffix; category ↔ verdict per the
     ///    §6 rules and `conflict_kind` present exactly on
     ///    `semantic_contradiction` rows; evidence sets non-empty canonical
@@ -333,15 +333,15 @@ impl TraceBundle {
             }
         }
         check_canonical_set("claims", &self.claims)?;
-        let mut ordinals: BTreeMap<&str, Vec<u64>> = BTreeMap::new();
+        let mut sequence_numbers: BTreeMap<&str, Vec<u64>> = BTreeMap::new();
         for claim in &self.claims {
-            let Some(ordinal) = parse_finding_ordinal(&claim.finding_id, &claim.group_id) else {
+            let Some(sequence_number) = parse_finding_sequence_number(&claim.finding_id, &claim.group_id) else {
                 return Err(TraceError::FindingIdForm(claim.finding_id.clone()));
             };
-            ordinals
+            sequence_numbers
                 .entry(claim.group_id.as_str())
                 .or_default()
-                .push(ordinal);
+                .push(sequence_number);
             let (query, pair) = (claim.query_id.as_str(), claim.pair_id.as_str());
             if query.len() <= pair.len() + 1
                 || !query.starts_with(pair)
@@ -384,10 +384,10 @@ impl TraceBundle {
                 });
             }
         }
-        for (group, mut ords) in ordinals {
+        for (group, mut ords) in sequence_numbers {
             ords.sort_unstable();
             if ords.iter().enumerate().any(|(i, o)| *o != i as u64) {
-                return Err(TraceError::FindingOrdinals(
+                return Err(TraceError::FindingSequenceNumbers(
                     Id::new(group).expect("group ids are valid"),
                 ));
             }
@@ -528,53 +528,53 @@ impl CanonRead for LineageIndex {
     }
 }
 
-/// One document's per-stage landings for [`assemble_trace`] — the run
-/// hand-off (the document pipeline fills it as stages land): identity
-/// and corpus grounding, then each §8.3 landing as an Option in chain
-/// order, present exactly when its stage landed the artifact.
+/// One document's per-processing_stage landings for [`assemble_trace`] — the run
+/// hand-off (the document pipeline fills it as processing_stages land): identity
+/// and corpus source_linkage, then each §8.3 landing as an Option in chain
+/// order, present exactly when its processing_stage landed the artifact.
 #[derive(Debug, Clone)]
 pub struct DocTrace {
     pub document_id: Id,
-    /// Corpus-relative fixture path (§8.2), the source node's `path`.
-    pub fixture_path: String,
+    /// Corpus-relative test_source path (§8.2), the source node's `path`.
+    pub test_source_path: String,
     /// Raw source-byte hash, the source node's content hash.
     pub source_hash: Hash,
-    /// Landed (artifact id, envelope content hash) per document stage.
-    pub source_graph: Option<(Id, Hash)>,
+    /// Landed (artifact id, wrapper content hash) per document processing_stage.
+    pub source_document_graph: Option<(Id, Hash)>,
     pub segments: Option<(Id, Hash)>,
     pub normalization: Option<(Id, Hash)>,
     /// The assemble landing rides whole: lineage reads its rule, statement,
     /// and segment layers.
-    pub bundle: Option<ArtifactEnvelope<IrBundle>>,
+    pub bundle: Option<ArtifactWrapper<IrBundle>>,
 }
 
-/// One fixture group's landings for [`assemble_trace`] — the run hand-off
-/// (the group pipeline fills it as stages land): the §8.4 member set,
+/// One test_source group's landings for [`assemble_trace`] — the run hand-off
+/// (the group pipeline fills it as processing_stages land): the §8.4 member set,
 /// then the two group landings riding whole — claims read the compiled
 /// plan and assertion map beside the verifier results.
 #[derive(Debug, Clone)]
 pub struct GroupTrace {
     pub group_id: Id,
     /// Member document ids in §8.4 registry order.
-    pub fixtures: Vec<Id>,
-    pub compiled: Option<ArtifactEnvelope<CompiledArtifact>>,
-    pub verifier_results: Option<ArtifactEnvelope<VerifierResults>>,
+    pub test_sources: Vec<Id>,
+    pub compiled: Option<ArtifactWrapper<CompiledArtifact>>,
+    pub verifier_results: Option<ArtifactWrapper<VerifierResults>>,
 }
 
 /// Assemble the run's [`TraceBundle`] and [`LineageIndex`] over the landed
-/// stage artifacts (§7.1), skipping absent pieces.
+/// processing_stage artifacts (§7.1), skipping absent pieces.
 ///
 /// DAG: one static report node (id `report`, path `report.json`, hashless)
-/// as the sink; per document the §8.3 chain source →extract→ source_graph
+/// as the sink; per document the §8.3 chain source →extract→ source_document_graph
 /// →segment→ segments →normalize→ normalization →assemble→ ir_bundle —
 /// node ids the artifact ids, paths the §8.3 run-relative layout, hashes
-/// the envelope content hashes, each present landing edged from its
+/// the wrapper content hashes, each present landing edged from its
 /// nearest present predecessor; per group every member ir_bundle →compile→
 /// compiled →verify→ verifier_results →report→ the report node.
 ///
-/// Claims: one row per verifier result, ordinal = its index in the group's
+/// Claims: one row per verifier result, sequence_number = its index in the group's
 /// plan-ordered results vector (§7.2 finding ids; a result resolving to no
-/// plan pair contributes nothing, surfacing downstream as an ordinal gap).
+/// plan pair contributes nothing, surfacing downstream as an sequence_number gap).
 /// Evidence is the recorded unsat core, else the row's query `:named`
 /// assertions — `ctx.<rule_id>`/`a.<rule_id>` from the pair's
 /// `fc.<rule_id>` constraints; rule and region ids union the
@@ -605,16 +605,16 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
         nodes.push(TraceNode {
             node_id: doc.document_id.clone(),
             kind: TraceNodeKind::Source,
-            path: doc.fixture_path.clone(),
+            path: doc.test_source_path.clone(),
             content_hash: Some(doc.source_hash.clone()),
         });
         let dir = format!("artifacts/{}", doc.document_id);
         let mut prev = &doc.document_id;
         for (landing, kind, file) in [
             (
-                &doc.source_graph,
-                TraceNodeKind::SourceGraph,
-                "source_graph",
+                &doc.source_document_graph,
+                TraceNodeKind::SourceDocumentGraph,
+                "source_document_graph",
             ),
             (&doc.segments, TraceNodeKind::Segments, "segments"),
             (
@@ -666,8 +666,8 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 path: format!("{dir}/compiled.json"),
                 content_hash: Some(compiled.content_hash.clone()),
             });
-            for fixture in &group.fixtures {
-                if let Some(bundle_id) = bundle_nodes.get(fixture.as_str()) {
+            for test_source in &group.test_sources {
+                if let Some(bundle_id) = bundle_nodes.get(test_source.as_str()) {
                     edges.push(TraceEdge {
                         from: (*bundle_id).clone(),
                         operation: TraceOperation::Compile,
@@ -700,8 +700,8 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
         let (Some(compiled), Some(results)) = (&group.compiled, &group.verifier_results) else {
             continue;
         };
-        for (ordinal, result) in results.payload.results.iter().enumerate() {
-            let Some(pair) = compiled.payload.query_plan.iter().find(|p| {
+        for (sequence_number, result) in results.payload.results.iter().enumerate() {
+            let Some(pair) = compiled.payload.solver_query_plan.iter().find(|p| {
                 p.context_overlap_query_id == result.query_id
                     || p.deontic_consistency_query_id == result.query_id
             }) else {
@@ -733,7 +733,7 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
             };
             let mut rule_ids = Vec::new();
             let mut region_ids = Vec::new();
-            for (assertion_id, record) in &compiled.payload.assertion_map {
+            for (assertion_id, record) in &compiled.payload.assertion_to_source_map {
                 let bound = assertion_id
                     .as_str()
                     .strip_prefix("ctx.")
@@ -745,18 +745,18 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 }
             }
             let rule_ids = canonical_id_set(rule_ids);
-            let finding_id = Id::new(format!("finding.{}.{ordinal}", group.group_id))
+            let finding_id = Id::new(format!("finding.{}.{sequence_number}", group.group_id))
                 .expect("a valid group id keeps the Id grammar under the finding prefix");
 
-            for fixture in &group.fixtures {
+            for test_source in &group.test_sources {
                 let Some(bundle) = docs
                     .iter()
-                    .find(|d| d.document_id == *fixture)
+                    .find(|d| d.document_id == *test_source)
                     .and_then(|d| d.bundle.as_ref())
                 else {
                     continue;
                 };
-                let rule_prefix = format!("{fixture}.rule.");
+                let rule_prefix = format!("{test_source}.rule.");
                 let doc_rules: Vec<Id> = rule_ids
                     .iter()
                     .filter(|r| r.as_str().starts_with(&rule_prefix))
@@ -786,7 +786,7 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 }
                 rows.push(LineageRow {
                     finding_id: finding_id.clone(),
-                    document_id: fixture.clone(),
+                    document_id: test_source.clone(),
                     region_ids: canonical_id_set(doc_regions),
                     rule_ids: doc_rules,
                     segment_ids: canonical_id_set(segment_ids),
@@ -901,10 +901,10 @@ fn category_verdict_rule(
     }
 }
 
-/// Parse the §7.2 finding-id form `finding.<group_id>.<ordinal>` against
-/// the row's group, yielding the ordinal; the ordinal is a canonical
+/// Parse the §7.2 finding-id form `finding.<group_id>.<sequence_number>` against
+/// the row's group, yielding the sequence_number; the sequence_number is a canonical
 /// decimal — ASCII digits with no leading zero unless exactly `0`.
-fn parse_finding_ordinal(finding_id: &Id, group_id: &Id) -> Option<u64> {
+fn parse_finding_sequence_number(finding_id: &Id, group_id: &Id) -> Option<u64> {
     let digits = finding_id
         .as_str()
         .strip_prefix("finding.")?
@@ -944,11 +944,11 @@ pub enum TraceError {
     /// The edge into `to` carries an operation other than its kind's
     /// producing operation.
     EdgeOperation { to: Id, operation: TraceOperation },
-    /// The named finding id lacks the §7.2 `finding.<group_id>.<ordinal>`
+    /// The named finding id lacks the §7.2 `finding.<group_id>.<sequence_number>`
     /// form over its row's group.
     FindingIdForm(Id),
-    /// The named group's finding ordinals are not dense from 0.
-    FindingOrdinals(Id),
+    /// The named group's finding sequence_numbers are not dense from 0.
+    FindingSequenceNumbers(Id),
     /// The row's query id does not extend its pair id.
     QueryOutsidePair { query_id: Id, pair_id: Id },
     /// The row's category disagrees with its verdict (`rule` names the §6
@@ -1006,10 +1006,10 @@ impl std::fmt::Display for TraceError {
             ),
             TraceError::FindingIdForm(id) => write!(
                 f,
-                "finding id {id} is not finding.<group_id>.<ordinal> over its group"
+                "finding id {id} is not finding.<group_id>.<sequence_number> over its group"
             ),
-            TraceError::FindingOrdinals(group) => {
-                write!(f, "group {group} finding ordinals are not dense from 0")
+            TraceError::FindingSequenceNumbers(group) => {
+                write!(f, "group {group} finding sequence_numbers are not dense from 0")
             }
             TraceError::QueryOutsidePair { query_id, pair_id } => {
                 write!(f, "query {query_id} is not under pair {pair_id}")
@@ -1045,8 +1045,8 @@ impl std::error::Error for TraceError {}
 mod tests {
     use super::*;
     use ckc_core::{
-        Authority, ContradictionQueryPair, Origin, Producer, SolverIdentity,
-        canonical_payload_bytes, read_canonical,
+        EvidenceStatus, ContradictionQueryPair, Origin, Producer, SolverIdentity,
+        canonical_payload_bytes, read_strict_canonical,
     };
     use ckc_smt::{AssertionRecord, VerifierResult};
 
@@ -1058,7 +1058,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -1073,19 +1073,19 @@ mod tests {
     /// docA's source node: corpus-relative path, raw-byte hash.
     fn source_node() -> TraceNode {
         TraceNode {
-            node_id: id("fixture.m1_guideline_a"),
+            node_id: id("test_source.m1_guideline_a"),
             kind: TraceNodeKind::Source,
-            path: "corpus/fixtures/m1_guideline_a.html".to_owned(),
+            path: "corpus/test_sources/m1_guideline_a.html".to_owned(),
             content_hash: Some(hash('a')),
         }
     }
 
-    /// docA's extract landing: §8.3 run-relative path, envelope hash.
+    /// docA's extract landing: §8.3 run-relative path, wrapper hash.
     fn graph_node() -> TraceNode {
         TraceNode {
-            node_id: id("fixture.m1_guideline_a.source_graph"),
-            kind: TraceNodeKind::SourceGraph,
-            path: "artifacts/fixture.m1_guideline_a/source_graph.json".to_owned(),
+            node_id: id("test_source.m1_guideline_a.source_document_graph"),
+            kind: TraceNodeKind::SourceDocumentGraph,
+            path: "artifacts/test_source.m1_guideline_a/source_document_graph.json".to_owned(),
             content_hash: Some(hash('b')),
         }
     }
@@ -1102,13 +1102,13 @@ mod tests {
 
     fn extract_edge() -> TraceEdge {
         TraceEdge {
-            from: id("fixture.m1_guideline_a"),
+            from: id("test_source.m1_guideline_a"),
             operation: TraceOperation::Extract,
-            to: id("fixture.m1_guideline_a.source_graph"),
+            to: id("test_source.m1_guideline_a.source_document_graph"),
         }
     }
 
-    /// §8.6 overlap row: finding ordinal 0, sat, no conflict kind, ctx
+    /// §8.6 overlap row: finding sequence_number 0, sat, no conflict kind, ctx
     /// assertions.
     fn overlap_claim() -> ClaimEvidenceRow {
         ClaimEvidenceRow {
@@ -1120,19 +1120,19 @@ mod tests {
             verdict: Some(SolverVerdict::Sat),
             conflict_kind: None,
             assertion_ids: vec![
-                id("ctx.fixture.m1_guideline_a.rule.0"),
-                id("ctx.fixture.m1_guideline_b.rule.0"),
+                id("ctx.test_source.m1_guideline_a.rule.0"),
+                id("ctx.test_source.m1_guideline_b.rule.0"),
             ],
             rule_ids: vec![
-                id("fixture.m1_guideline_a.rule.0"),
-                id("fixture.m1_guideline_b.rule.0"),
+                id("test_source.m1_guideline_a.rule.0"),
+                id("test_source.m1_guideline_b.rule.0"),
             ],
             region_ids: vec![id("r.2"), id("r.3")],
             report_ref: id("report"),
         }
     }
 
-    /// §8.6 deontic row: finding ordinal 1, unsat, the M1 conflict kind,
+    /// §8.6 deontic row: finding sequence_number 1, unsat, the M1 conflict kind,
     /// the cross-document core as assertions.
     fn deontic_claim() -> ClaimEvidenceRow {
         ClaimEvidenceRow {
@@ -1144,12 +1144,12 @@ mod tests {
             verdict: Some(SolverVerdict::Unsat),
             conflict_kind: Some(ConflictKind::DeonticDirectionConflict),
             assertion_ids: vec![
-                id("a.fixture.m1_guideline_a.rule.0"),
-                id("a.fixture.m1_guideline_b.rule.0"),
+                id("a.test_source.m1_guideline_a.rule.0"),
+                id("a.test_source.m1_guideline_b.rule.0"),
             ],
             rule_ids: vec![
-                id("fixture.m1_guideline_a.rule.0"),
-                id("fixture.m1_guideline_b.rule.0"),
+                id("test_source.m1_guideline_a.rule.0"),
+                id("test_source.m1_guideline_b.rule.0"),
             ],
             region_ids: vec![id("r.2"), id("r.3")],
             report_ref: id("report"),
@@ -1177,9 +1177,9 @@ mod tests {
     fn sample_row() -> LineageRow {
         LineageRow {
             finding_id: id("finding.group.m1_conflict.1"),
-            document_id: id("fixture.m1_guideline_a"),
+            document_id: id("test_source.m1_guideline_a"),
             region_ids: vec![id("r.2"), id("r.3")],
-            rule_ids: vec![id("fixture.m1_guideline_a.rule.0")],
+            rule_ids: vec![id("test_source.m1_guideline_a.rule.0")],
             segment_ids: vec![id("seg.3")],
             statement_ids: vec![id("st.0")],
         }
@@ -1203,7 +1203,7 @@ mod tests {
             .map(|k| k.operation().unwrap())
             .collect();
         assert_eq!(produced, TraceOperation::ALL.to_vec());
-        assert_eq!(canon(&TraceNodeKind::SourceGraph), "\"source_graph\"");
+        assert_eq!(canon(&TraceNodeKind::SourceDocumentGraph), "\"source_document_graph\"");
         assert_eq!(canon(&TraceOperation::Extract), "\"extract\"");
         assert_eq!(
             canon(&ConflictKind::DeonticDirectionConflict),
@@ -1224,8 +1224,8 @@ mod tests {
             canon(&sample_bundle()),
             concat!(
                 r#"{"claims":["#,
-                r#"{"assertion_ids":["a.fixture.m1_guideline_a.rule.0","#,
-                r#""a.fixture.m1_guideline_b.rule.0"],"#,
+                r#"{"assertion_ids":["a.test_source.m1_guideline_a.rule.0","#,
+                r#""a.test_source.m1_guideline_b.rule.0"],"#,
                 r#""category":"semantic_contradiction","#,
                 r#""conflict_kind":"deontic_direction_conflict","#,
                 r#""finding_id":"finding.group.m1_conflict.1","#,
@@ -1233,29 +1233,29 @@ mod tests {
                 r#""pair_id":"q.m1_conflict.pair1","#,
                 r#""query_id":"q.m1_conflict.pair1.deontic","#,
                 r#""region_ids":["r.2","r.3"],"report_ref":"report","#,
-                r#""rule_ids":["fixture.m1_guideline_a.rule.0","#,
-                r#""fixture.m1_guideline_b.rule.0"],"verdict":"unsat"},"#,
-                r#"{"assertion_ids":["ctx.fixture.m1_guideline_a.rule.0","#,
-                r#""ctx.fixture.m1_guideline_b.rule.0"],"#,
+                r#""rule_ids":["test_source.m1_guideline_a.rule.0","#,
+                r#""test_source.m1_guideline_b.rule.0"],"verdict":"unsat"},"#,
+                r#"{"assertion_ids":["ctx.test_source.m1_guideline_a.rule.0","#,
+                r#""ctx.test_source.m1_guideline_b.rule.0"],"#,
                 r#""category":"semantic_no_conflict","#,
                 r#""finding_id":"finding.group.m1_conflict.0","#,
                 r#""group_id":"group.m1_conflict","#,
                 r#""pair_id":"q.m1_conflict.pair1","#,
                 r#""query_id":"q.m1_conflict.pair1.overlap","#,
                 r#""region_ids":["r.2","r.3"],"report_ref":"report","#,
-                r#""rule_ids":["fixture.m1_guideline_a.rule.0","#,
-                r#""fixture.m1_guideline_b.rule.0"],"verdict":"sat"}],"#,
-                r#""edges":[{"from":"fixture.m1_guideline_a","operation":"extract","#,
-                r#""to":"fixture.m1_guideline_a.source_graph"}],"#,
+                r#""rule_ids":["test_source.m1_guideline_a.rule.0","#,
+                r#""test_source.m1_guideline_b.rule.0"],"verdict":"sat"}],"#,
+                r#""edges":[{"from":"test_source.m1_guideline_a","operation":"extract","#,
+                r#""to":"test_source.m1_guideline_a.source_document_graph"}],"#,
                 r#""nodes":[{"content_hash":"#,
                 r#""sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","#,
-                r#""kind":"source","node_id":"fixture.m1_guideline_a","#,
-                r#""path":"corpus/fixtures/m1_guideline_a.html"},"#,
+                r#""kind":"source","node_id":"test_source.m1_guideline_a","#,
+                r#""path":"corpus/test_sources/m1_guideline_a.html"},"#,
                 r#"{"content_hash":"#,
                 r#""sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","#,
-                r#""kind":"source_graph","#,
-                r#""node_id":"fixture.m1_guideline_a.source_graph","#,
-                r#""path":"artifacts/fixture.m1_guideline_a/source_graph.json"},"#,
+                r#""kind":"source_document_graph","#,
+                r#""node_id":"test_source.m1_guideline_a.source_document_graph","#,
+                r#""path":"artifacts/test_source.m1_guideline_a/source_document_graph.json"},"#,
                 r#"{"kind":"report","node_id":"report","path":"report.json"}]}"#
             )
         );
@@ -1272,10 +1272,10 @@ mod tests {
         assert_eq!(
             canon(&sample_index()),
             concat!(
-                r#"{"rows":[{"document_id":"fixture.m1_guideline_a","#,
+                r#"{"rows":[{"document_id":"test_source.m1_guideline_a","#,
                 r#""finding_id":"finding.group.m1_conflict.1","#,
                 r#""region_ids":["r.2","r.3"],"#,
-                r#""rule_ids":["fixture.m1_guideline_a.rule.0"],"#,
+                r#""rule_ids":["test_source.m1_guideline_a.rule.0"],"#,
                 r#""segment_ids":["seg.3"],"statement_ids":["st.0"]}]}"#
             )
         );
@@ -1322,10 +1322,10 @@ mod tests {
         // Unique node ids: the graph node renamed onto the source id (set
         // order survives — bytes sort by hash).
         let mut dup_id = sample_bundle();
-        dup_id.nodes[1].node_id = id("fixture.m1_guideline_a");
+        dup_id.nodes[1].node_id = id("test_source.m1_guideline_a");
         assert_eq!(
             dup_id.validate(),
-            Err(TraceError::DuplicateNodeId(id("fixture.m1_guideline_a")))
+            Err(TraceError::DuplicateNodeId(id("test_source.m1_guideline_a")))
         );
         // Non-empty paths.
         let mut empty_path = sample_bundle();
@@ -1349,7 +1349,7 @@ mod tests {
         bare.nodes = vec![graph_node(), report_node(), hashless];
         assert_eq!(
             bare.validate(),
-            Err(TraceError::HashPresence(id("fixture.m1_guideline_a")))
+            Err(TraceError::HashPresence(id("test_source.m1_guideline_a")))
         );
         // At most one report node.
         let mut second = sample_bundle();
@@ -1389,15 +1389,15 @@ mod tests {
         // Strict rank ascent: graph (1) -> source (0).
         let mut rank = sample_bundle();
         rank.edges[0] = TraceEdge {
-            from: id("fixture.m1_guideline_a.source_graph"),
+            from: id("test_source.m1_guideline_a.source_document_graph"),
             operation: TraceOperation::Extract,
-            to: id("fixture.m1_guideline_a"),
+            to: id("test_source.m1_guideline_a"),
         };
         assert_eq!(
             rank.validate(),
             Err(TraceError::EdgeRank {
-                from: id("fixture.m1_guideline_a.source_graph"),
-                to: id("fixture.m1_guideline_a"),
+                from: id("test_source.m1_guideline_a.source_document_graph"),
+                to: id("test_source.m1_guideline_a"),
             })
         );
         // Operation must be the target kind's producer.
@@ -1406,7 +1406,7 @@ mod tests {
         assert_eq!(
             op.validate(),
             Err(TraceError::EdgeOperation {
-                to: id("fixture.m1_guideline_a.source_graph"),
+                to: id("test_source.m1_guideline_a.source_document_graph"),
                 operation: TraceOperation::Segment,
             })
         );
@@ -1424,10 +1424,10 @@ mod tests {
 
     #[test]
     fn validation_rejects_claim_form_breaks() {
-        // Finding id form: leading-zero ordinal, foreign group, bad prefix.
+        // Finding id form: leading-zero sequence_number, foreign group, bad prefix.
         for bad in [
             "finding.group.m1_conflict.01",
-            "finding.group.m1_null.0",
+            "finding.group.m1_no_conflict.0",
             "found.group.m1_conflict.0",
         ] {
             let mut bundle = sample_bundle();
@@ -1441,12 +1441,12 @@ mod tests {
                 "{bad}"
             );
         }
-        // Ordinals dense from 0 per group: ordinal 1 alone.
+        // SequenceNumbers dense from 0 per group: sequence_number 1 alone.
         let mut sparse = sample_bundle();
         sparse.claims = vec![deontic_claim()];
         assert_eq!(
             sparse.validate(),
-            Err(TraceError::FindingOrdinals(id("group.m1_conflict")))
+            Err(TraceError::FindingSequenceNumbers(id("group.m1_conflict")))
         );
         // Query outside its pair.
         let mut outside = sample_bundle();
@@ -1535,8 +1535,8 @@ mod tests {
         let mut unsorted = sample_bundle();
         unsorted.claims = vec![ClaimEvidenceRow {
             rule_ids: vec![
-                id("fixture.m1_guideline_b.rule.0"),
-                id("fixture.m1_guideline_a.rule.0"),
+                id("test_source.m1_guideline_b.rule.0"),
+                id("test_source.m1_guideline_a.rule.0"),
             ],
             ..overlap_claim()
         }];
@@ -1550,14 +1550,14 @@ mod tests {
         // report_ref must be the report node — a non-report node fails...
         let mut wrong = sample_bundle();
         wrong.claims = vec![ClaimEvidenceRow {
-            report_ref: id("fixture.m1_guideline_a"),
+            report_ref: id("test_source.m1_guideline_a"),
             ..overlap_claim()
         }];
         assert_eq!(
             wrong.validate(),
             Err(TraceError::ReportRef {
                 finding_id: id("finding.group.m1_conflict.0"),
-                report_ref: id("fixture.m1_guideline_a"),
+                report_ref: id("test_source.m1_guideline_a"),
             })
         );
         // ...as does a claim with no report node in the DAG.
@@ -1595,7 +1595,7 @@ mod tests {
             pair_dup.validate(),
             Err(TraceError::DuplicateLineageRow {
                 finding_id: id("finding.group.m1_conflict.1"),
-                document_id: id("fixture.m1_guideline_a"),
+                document_id: id("test_source.m1_guideline_a"),
             })
         );
         // Empty reference set.
@@ -1620,26 +1620,26 @@ mod tests {
         );
     }
 
-    /// Envelope wrap for hand-built group payloads: assembly reads
+    /// Wrapper wrap for hand-built group payloads: assembly reads
     /// `artifact_id`, `content_hash`, and `payload` only, so the metadata
     /// fields carry inert synthetic values and `fill` pins the hash the
     /// node must copy.
-    fn envelope<P>(artifact_id: &str, kind: &str, fill: char, payload: P) -> ArtifactEnvelope<P> {
-        ArtifactEnvelope {
+    fn wrapper<P>(artifact_id: &str, kind: &str, fill: char, payload: P) -> ArtifactWrapper<P> {
+        ArtifactWrapper {
             schema_id: id(&format!("schema.{kind}")),
             artifact_id: id(artifact_id),
             artifact_kind: id(kind),
             producer: Producer {
-                candidate_id: id("cand.test"),
-                component_id: id("comp.test"),
+                pipeline_id: id("cand.test"),
+                pipeline_step_id: id("comp.test"),
                 toolchain_manifest_hash: hash('f'),
             },
             input_hashes: vec![],
             content_hash: hash(fill),
             canonicalization_policy_hash: hash('f'),
             origin: Origin::DeterministicCompiler,
-            authority: Authority::CompilerAuthority,
-            accepted_effects: vec![],
+            evidence_status: EvidenceStatus::CompilerEvidenceStatus,
+            external_effects: vec![],
             trace_refs: vec![],
             diagnostics: vec![],
             runtime_metadata: vec![],
@@ -1651,9 +1651,9 @@ mod tests {
     fn bare_doc(doc: &str) -> DocTrace {
         DocTrace {
             document_id: id(doc),
-            fixture_path: format!("corpus/fixtures/{doc}.html"),
+            test_source_path: format!("corpus/test_sources/{doc}.html"),
             source_hash: hash('a'),
-            source_graph: None,
+            source_document_graph: None,
             segments: None,
             normalization: None,
             bundle: None,
@@ -1663,7 +1663,7 @@ mod tests {
     /// doc.full with the three pre-bundle landings present.
     fn chain_doc() -> DocTrace {
         DocTrace {
-            source_graph: Some((id("doc.full.source_graph"), hash('b'))),
+            source_document_graph: Some((id("doc.full.source_document_graph"), hash('b'))),
             segments: Some((id("doc.full.segments"), hash('c'))),
             normalization: Some((id("doc.full.normalization"), hash('d'))),
             ..bare_doc("doc.full")
@@ -1685,7 +1685,7 @@ mod tests {
     fn compiled_payload() -> CompiledArtifact {
         CompiledArtifact {
             target_id: id("target.smtlib2"),
-            query_plan: vec![ContradictionQueryPair {
+            solver_query_plan: vec![ContradictionQueryPair {
                 pair_id: id("q.g1.pair1"),
                 action_key: id("act.administer:drug.x"),
                 constraint_a_id: id("fc.doc.a.rule.0"),
@@ -1694,7 +1694,7 @@ mod tests {
                 deontic_consistency_query_id: id("q.g1.pair1.deontic"),
             }],
             query_bodies: vec![],
-            assertion_map: vec![
+            assertion_to_source_map: vec![
                 (id("a.doc.a.rule.0"), record("doc.a.rule.0", &["r.1"])),
                 (id("a.doc.b.rule.0"), record("doc.b.rule.0", &["r.9"])),
                 (
@@ -1732,14 +1732,14 @@ mod tests {
     fn claims_group(results: Vec<VerifierResult>) -> GroupTrace {
         GroupTrace {
             group_id: id("group.g1"),
-            fixtures: vec![id("doc.a"), id("doc.b")],
-            compiled: Some(envelope(
+            test_sources: vec![id("doc.a"), id("doc.b")],
+            compiled: Some(wrapper(
                 "group.g1.compiled",
                 "compiled",
                 'b',
                 compiled_payload(),
             )),
-            verifier_results: Some(envelope(
+            verifier_results: Some(wrapper(
                 "group.g1.verifier_results",
                 "verifier_results",
                 'e',
@@ -1784,7 +1784,7 @@ mod tests {
     }
 
     // A bundle-less full chain: source + three landings at §8.3 paths with
-    // the landing hashes, chain edges in stage order.
+    // the landing hashes, chain edges in processing_stage order.
     #[test]
     fn assemble_full_chain_doc() {
         let (bundle, index) = assemble_trace(&[chain_doc()], &[]);
@@ -1793,7 +1793,7 @@ mod tests {
         assert_eq!(bundle.nodes.len(), 5);
         let source = node(&bundle, "doc.full");
         assert_eq!(source.kind, TraceNodeKind::Source);
-        assert_eq!(source.path, "corpus/fixtures/doc.full.html");
+        assert_eq!(source.path, "corpus/test_sources/doc.full.html");
         assert_eq!(source.content_hash, Some(hash('a')));
         let segments = node(&bundle, "doc.full.segments");
         assert_eq!(segments.kind, TraceNodeKind::Segments);
@@ -1804,11 +1804,11 @@ mod tests {
             &bundle,
             "doc.full",
             TraceOperation::Extract,
-            "doc.full.source_graph"
+            "doc.full.source_document_graph"
         ));
         assert!(has_edge(
             &bundle,
-            "doc.full.source_graph",
+            "doc.full.source_document_graph",
             TraceOperation::Segment,
             "doc.full.segments"
         ));
@@ -1821,7 +1821,7 @@ mod tests {
         assert!(bundle.claims.is_empty());
     }
 
-    // Segments absent: one normalize edge bridges source_graph →
+    // Segments absent: one normalize edge bridges source_document_graph →
     // normalization (nearest present predecessor).
     #[test]
     fn assemble_gapped_doc() {
@@ -1833,7 +1833,7 @@ mod tests {
         assert_eq!(bundle.edges.len(), 2);
         assert!(has_edge(
             &bundle,
-            "doc.full.source_graph",
+            "doc.full.source_document_graph",
             TraceOperation::Normalize,
             "doc.full.normalization"
         ));
@@ -1844,7 +1844,7 @@ mod tests {
     fn assemble_bare_group() {
         let group = GroupTrace {
             group_id: id("group.g1"),
-            fixtures: vec![id("doc.a")],
+            test_sources: vec![id("doc.a")],
             compiled: None,
             verifier_results: None,
         };
@@ -1862,9 +1862,9 @@ mod tests {
     fn assemble_results_only_group() {
         let group = GroupTrace {
             group_id: id("group.g1"),
-            fixtures: vec![],
+            test_sources: vec![],
             compiled: None,
-            verifier_results: Some(envelope(
+            verifier_results: Some(wrapper(
                 "group.g1.verifier_results",
                 "verifier_results",
                 'e',
@@ -1888,7 +1888,7 @@ mod tests {
         assert!(index.rows.is_empty());
     }
 
-    // The hand-built claims battery: ordinals from the results vector,
+    // The hand-built claims battery: sequence_numbers from the results vector,
     // core-verbatim vs ctx.-fallback evidence, assertion-map unions over
     // the pair's two constraints on both rows, conflict_kind exactly on
     // semantic_contradiction — and both lineage skip paths (doc.a rides
@@ -1973,11 +1973,11 @@ mod tests {
         }
     }
 
-    // A skipped result keeps its index: the lone claim lands at ordinal 1
+    // A skipped result keeps its index: the lone claim lands at sequence_number 1
     // with the deontic a.-fallback evidence, and the gap surfaces
-    // downstream as non-dense ordinals.
+    // downstream as non-dense sequence_numbers.
     #[test]
-    fn assemble_claim_ordinal_gap_and_deontic_fallback() {
+    fn assemble_claim_sequence_number_gap_and_deontic_fallback() {
         let results = vec![
             verifier_result(
                 "q.g1.unplanned",
@@ -2002,11 +2002,11 @@ mod tests {
         );
         assert_eq!(
             bundle.validate(),
-            Err(TraceError::FindingOrdinals(id("group.g1")))
+            Err(TraceError::FindingSequenceNumbers(id("group.g1")))
         );
     }
 
-    // --- live fixture pins (cli-runner.3a.2b) ---
+    // --- live test_source pins (cli-runner.3a.2b) ---
 
     use std::time::Duration;
 
@@ -2019,13 +2019,13 @@ mod tests {
     };
     use ckc_smt::{Z3Adapter, compile, verify};
 
-    /// §8.2 committed fixture bytes, repository-rooted.
-    fn fixture(name: &str) -> Vec<u8> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+    /// §8.2 committed test_source bytes, repository-rooted.
+    fn test_source(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/test_sources/");
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
-    /// The committed §5 lexicon authority, loaded.
+    /// The committed §5 lexicon evidence_status, loaded.
     fn committed_lexicon() -> Lexicon {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -2034,11 +2034,11 @@ mod tests {
         load_lexicon(&std::fs::read(path).unwrap()).unwrap()
     }
 
-    /// Inert stage producer (real producer values are run.rs's concern).
+    /// Inert processing_stage producer (real producer values are run.rs's concern).
     fn live_producer() -> Producer {
         Producer {
-            candidate_id: id("cand.m1"),
-            component_id: id("stage.trace"),
+            pipeline_id: id("cand.m1"),
+            pipeline_step_id: id("processing_stage.trace"),
             toolchain_manifest_hash: hash('f'),
         }
     }
@@ -2046,12 +2046,12 @@ mod tests {
     /// The generic live wrap: real content/policy hashes over the payload,
     /// every effect/trace/diagnostic/metadata slot empty — assembly reads
     /// `artifact_id`, `content_hash`, and `payload` only.
-    fn live_envelope<P: Canonical>(
+    fn live_wrapper<P: Canonical>(
         artifact_id: &str,
         kind: &str,
         payload: P,
-    ) -> ArtifactEnvelope<P> {
-        ArtifactEnvelope {
+    ) -> ArtifactWrapper<P> {
+        ArtifactWrapper {
             schema_id: id(&format!("schema.{kind}")),
             artifact_id: id(artifact_id),
             artifact_kind: id(kind),
@@ -2060,8 +2060,8 @@ mod tests {
             content_hash: content_hash(&payload).unwrap(),
             canonicalization_policy_hash: canonicalization_policy_hash(),
             origin: Origin::DeterministicCompiler,
-            authority: Authority::CompilerAuthority,
-            accepted_effects: vec![],
+            evidence_status: EvidenceStatus::CompilerEvidenceStatus,
+            external_effects: vec![],
             trace_refs: vec![],
             diagnostics: vec![],
             runtime_metadata: vec![],
@@ -2069,15 +2069,15 @@ mod tests {
         }
     }
 
-    /// run.rs's document pipeline mirrored through the pub stage surface:
+    /// run.rs's document pipeline mirrored through the pub processing_stage surface:
     /// extract → segment → normalize → DocIr + canonical diagnostic union
     /// → [`ckc_core::assemble`] → graph validation, every landing Some.
     fn live_doc(stem: &str, lexicon: &Lexicon) -> DocTrace {
-        let document_id = id(&format!("fixture.{stem}"));
-        let raw = fixture(&format!("{stem}.html"));
+        let document_id = id(&format!("test_source.{stem}"));
+        let raw = test_source(&format!("{stem}.html"));
         let config = ExtractConfig {
             document_id: document_id.clone(),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: live_producer(),
@@ -2108,15 +2108,15 @@ mod tests {
         bundle.validate(&source.payload).unwrap();
 
         DocTrace {
-            fixture_path: format!("corpus/fixtures/{stem}.html"),
+            test_source_path: format!("corpus/test_sources/{stem}.html"),
             source_hash: hash_bytes(&raw),
-            source_graph: Some((source.artifact_id.clone(), source.content_hash.clone())),
+            source_document_graph: Some((source.artifact_id.clone(), source.content_hash.clone())),
             segments: Some((segments.artifact_id.clone(), segments.content_hash.clone())),
             normalization: Some((
                 normalization.artifact_id.clone(),
                 normalization.content_hash.clone(),
             )),
-            bundle: Some(live_envelope(
+            bundle: Some(live_wrapper(
                 &format!("{document_id}.ir_bundle"),
                 "ir_bundle",
                 bundle,
@@ -2138,13 +2138,13 @@ mod tests {
         let results = verify(adapter, &artifact, Duration::from_secs(30));
         GroupTrace {
             group_id: id(gid),
-            fixtures: members.iter().map(|d| d.document_id.clone()).collect(),
-            compiled: Some(live_envelope(
+            test_sources: members.iter().map(|d| d.document_id.clone()).collect(),
+            compiled: Some(live_wrapper(
                 &format!("{gid}.compiled"),
                 "compiled",
                 artifact,
             )),
-            verifier_results: Some(live_envelope(
+            verifier_results: Some(live_wrapper(
                 &format!("{gid}.verifier_results"),
                 "verifier_results",
                 VerifierResults { results },
@@ -2171,20 +2171,20 @@ mod tests {
         }
     }
 
-    // The §8.6 thread live: the three committed fixtures through the
+    // The §8.6 thread live: the three committed test_sources through the
     // mirrored document pipeline, both §8.4 groups through compile +
     // live-z3 verify, assembled into the validating trace pair — census,
     // §8.3 paths, chain/compile/verify/report edges, the three §8.6 claim
     // rows, and the full lineage index pinned.
     #[test]
-    fn live_fixture_groups_assemble_full_trace() {
+    fn live_test_source_groups_assemble_full_trace() {
         let lexicon = committed_lexicon();
         let a = live_doc("m1_guideline_a", &lexicon);
         let b = live_doc("m1_guideline_b", &lexicon);
         let control = live_doc("m1_control", &lexicon);
         let adapter = Z3Adapter::new().unwrap();
         let conflict = live_group("group.m1_conflict", &[&a, &b], &adapter);
-        let null = live_group("group.m1_null", &[&a, &control], &adapter);
+        let null = live_group("group.m1_no_conflict", &[&a, &control], &adapter);
 
         let (bundle, index) = assemble_trace(&[a, b, control], &[conflict, null]);
         assert_eq!(bundle.validate(), Ok(()));
@@ -2194,7 +2194,7 @@ mod tests {
         // artifacts + 2×2 group artifacts) and the 12 + 4 + 2 + 2 edges.
         for (kind, count) in [
             (TraceNodeKind::Source, 3),
-            (TraceNodeKind::SourceGraph, 3),
+            (TraceNodeKind::SourceDocumentGraph, 3),
             (TraceNodeKind::Segments, 3),
             (TraceNodeKind::Normalization, 3),
             (TraceNodeKind::IrBundle, 3),
@@ -2208,26 +2208,26 @@ mod tests {
         assert_eq!(bundle.nodes.len(), 20);
         assert_eq!(bundle.edges.len(), 20);
 
-        // §8.3 paths: corpus-relative source (hash = the raw fixture
+        // §8.3 paths: corpus-relative source (hash = the raw test_source
         // bytes), run-relative artifacts, the static report sink.
-        let source = node(&bundle, "fixture.m1_guideline_a");
+        let source = node(&bundle, "test_source.m1_guideline_a");
         assert_eq!(source.kind, TraceNodeKind::Source);
-        assert_eq!(source.path, "corpus/fixtures/m1_guideline_a.html");
+        assert_eq!(source.path, "corpus/test_sources/m1_guideline_a.html");
         assert_eq!(
             source.content_hash,
-            Some(hash_bytes(&fixture("m1_guideline_a.html")))
+            Some(hash_bytes(&test_source("m1_guideline_a.html")))
         );
         assert_eq!(
-            node(&bundle, "fixture.m1_guideline_a.ir_bundle").path,
-            "artifacts/fixture.m1_guideline_a/ir_bundle.json"
+            node(&bundle, "test_source.m1_guideline_a.ir_bundle").path,
+            "artifacts/test_source.m1_guideline_a/ir_bundle.json"
         );
         assert_eq!(
             node(&bundle, "group.m1_conflict.compiled").path,
             "groups/group.m1_conflict/compiled.json"
         );
         assert_eq!(
-            node(&bundle, "group.m1_null.verifier_results").path,
-            "groups/group.m1_null/verifier_results.json"
+            node(&bundle, "group.m1_no_conflict.verifier_results").path,
+            "groups/group.m1_no_conflict/verifier_results.json"
         );
         assert_eq!(node(&bundle, "report"), &report_node());
 
@@ -2235,39 +2235,39 @@ mod tests {
         // fan-ins, the null group's control fan-in, verify, report.
         for (from, operation, to) in [
             (
-                "fixture.m1_guideline_a",
+                "test_source.m1_guideline_a",
                 TraceOperation::Extract,
-                "fixture.m1_guideline_a.source_graph",
+                "test_source.m1_guideline_a.source_document_graph",
             ),
             (
-                "fixture.m1_guideline_a.source_graph",
+                "test_source.m1_guideline_a.source_document_graph",
                 TraceOperation::Segment,
-                "fixture.m1_guideline_a.segments",
+                "test_source.m1_guideline_a.segments",
             ),
             (
-                "fixture.m1_guideline_a.segments",
+                "test_source.m1_guideline_a.segments",
                 TraceOperation::Normalize,
-                "fixture.m1_guideline_a.normalization",
+                "test_source.m1_guideline_a.normalization",
             ),
             (
-                "fixture.m1_guideline_a.normalization",
+                "test_source.m1_guideline_a.normalization",
                 TraceOperation::Assemble,
-                "fixture.m1_guideline_a.ir_bundle",
+                "test_source.m1_guideline_a.ir_bundle",
             ),
             (
-                "fixture.m1_guideline_a.ir_bundle",
+                "test_source.m1_guideline_a.ir_bundle",
                 TraceOperation::Compile,
                 "group.m1_conflict.compiled",
             ),
             (
-                "fixture.m1_guideline_b.ir_bundle",
+                "test_source.m1_guideline_b.ir_bundle",
                 TraceOperation::Compile,
                 "group.m1_conflict.compiled",
             ),
             (
-                "fixture.m1_control.ir_bundle",
+                "test_source.m1_control.ir_bundle",
                 TraceOperation::Compile,
-                "group.m1_null.compiled",
+                "group.m1_no_conflict.compiled",
             ),
             (
                 "group.m1_conflict.compiled",
@@ -2295,8 +2295,8 @@ mod tests {
         assert_eq!(
             overlap.assertion_ids,
             vec![
-                id("ctx.fixture.m1_guideline_a.rule.0"),
-                id("ctx.fixture.m1_guideline_b.rule.0"),
+                id("ctx.test_source.m1_guideline_a.rule.0"),
+                id("ctx.test_source.m1_guideline_b.rule.0"),
             ]
         );
         let deontic = claim(&bundle, "finding.group.m1_conflict.1");
@@ -2312,8 +2312,8 @@ mod tests {
         assert_eq!(
             deontic.assertion_ids,
             vec![
-                id("a.fixture.m1_guideline_a.rule.0"),
-                id("a.fixture.m1_guideline_b.rule.0"),
+                id("a.test_source.m1_guideline_a.rule.0"),
+                id("a.test_source.m1_guideline_b.rule.0"),
             ]
         );
         for row in [overlap, deontic] {
@@ -2321,8 +2321,8 @@ mod tests {
             assert_eq!(
                 row.rule_ids,
                 vec![
-                    id("fixture.m1_guideline_a.rule.0"),
-                    id("fixture.m1_guideline_b.rule.0"),
+                    id("test_source.m1_guideline_a.rule.0"),
+                    id("test_source.m1_guideline_b.rule.0"),
                 ]
             );
             assert_eq!(row.region_ids, vec![id("r.2"), id("r.3")]);
@@ -2330,29 +2330,29 @@ mod tests {
         }
         // The documented-null overlap row: disjoint intervals answer
         // unsat, no core recorded, ctx fallback over the pair.
-        let null_row = claim(&bundle, "finding.group.m1_null.0");
-        assert_eq!(null_row.group_id, id("group.m1_null"));
-        assert_eq!(null_row.pair_id, id("q.m1_null.pair1"));
-        assert_eq!(null_row.query_id, id("q.m1_null.pair1.overlap"));
-        assert_eq!(null_row.category, VerifierCategory::SemanticNoConflict);
-        assert_eq!(null_row.verdict, Some(SolverVerdict::Unsat));
-        assert_eq!(null_row.conflict_kind, None);
+        let no_conflict_row = claim(&bundle, "finding.group.m1_no_conflict.0");
+        assert_eq!(no_conflict_row.group_id, id("group.m1_no_conflict"));
+        assert_eq!(no_conflict_row.pair_id, id("q.m1_no_conflict.pair1"));
+        assert_eq!(no_conflict_row.query_id, id("q.m1_no_conflict.pair1.overlap"));
+        assert_eq!(no_conflict_row.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(no_conflict_row.verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(no_conflict_row.conflict_kind, None);
         assert_eq!(
-            null_row.assertion_ids,
+            no_conflict_row.assertion_ids,
             vec![
-                id("ctx.fixture.m1_control.rule.0"),
-                id("ctx.fixture.m1_guideline_a.rule.0"),
+                id("ctx.test_source.m1_control.rule.0"),
+                id("ctx.test_source.m1_guideline_a.rule.0"),
             ]
         );
         assert_eq!(
-            null_row.rule_ids,
+            no_conflict_row.rule_ids,
             vec![
-                id("fixture.m1_control.rule.0"),
-                id("fixture.m1_guideline_a.rule.0"),
+                id("test_source.m1_control.rule.0"),
+                id("test_source.m1_guideline_a.rule.0"),
             ]
         );
-        assert_eq!(null_row.region_ids, vec![id("r.2"), id("r.3")]);
-        assert_eq!(null_row.report_ref, id("report"));
+        assert_eq!(no_conflict_row.region_ids, vec![id("r.2"), id("r.3")]);
+        assert_eq!(no_conflict_row.report_ref, id("report"));
 
         // The full lineage index, pinned from observed output: docA rows
         // carry the §8.6 regions and the normalize.rs-pinned statement +
@@ -2361,9 +2361,9 @@ mod tests {
         let doc_a = |finding: &str| {
             row(
                 finding,
-                "fixture.m1_guideline_a",
+                "test_source.m1_guideline_a",
                 &["r.2", "r.3"],
-                &["fixture.m1_guideline_a.rule.0"],
+                &["test_source.m1_guideline_a.rule.0"],
                 &["seg.2", "seg.3"],
                 &["stmt.0"],
             )
@@ -2371,9 +2371,9 @@ mod tests {
         let doc_b = |finding: &str| {
             row(
                 finding,
-                "fixture.m1_guideline_b",
+                "test_source.m1_guideline_b",
                 &["r.2"],
-                &["fixture.m1_guideline_b.rule.0"],
+                &["test_source.m1_guideline_b.rule.0"],
                 &["seg.2"],
                 &["stmt.0"],
             )
@@ -2382,16 +2382,16 @@ mod tests {
             index.rows,
             vec![
                 row(
-                    "finding.group.m1_null.0",
-                    "fixture.m1_control",
+                    "finding.group.m1_no_conflict.0",
+                    "test_source.m1_control",
                     &["r.2"],
-                    &["fixture.m1_control.rule.0"],
+                    &["test_source.m1_control.rule.0"],
                     &["seg.2"],
                     &["stmt.0"],
                 ),
                 doc_a("finding.group.m1_conflict.0"),
                 doc_a("finding.group.m1_conflict.1"),
-                doc_a("finding.group.m1_null.0"),
+                doc_a("finding.group.m1_no_conflict.0"),
                 doc_b("finding.group.m1_conflict.0"),
                 doc_b("finding.group.m1_conflict.1"),
             ]

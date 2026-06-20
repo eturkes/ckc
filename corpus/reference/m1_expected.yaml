@@ -2,7 +2,7 @@
 - group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict
-  expected_core: [a.fixture.m1_guideline_a.rule.0, a.fixture.m1_guideline_b.rule.0]   # compared as a set
-- group_id: group.m1_null
+  expected_unsat_core: [a.test_source.m1_guideline_a.rule.0, a.test_source.m1_guideline_b.rule.0]   # compared as a set
+- group_id: group.m1_no_conflict
   expected_outcome: semantic_no_conflict
-  expected_null_result: true
+  expected_no_conflict_result: true

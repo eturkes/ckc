@@ -1,4 +1,4 @@
-//! SPEC §5 `CompiledArtifact` — the compile stage's durable payload: target
+//! SPEC §5 `CompiledArtifact` — the compile processing_stage's durable payload: target
 //! id, contradiction-query plan, per-query SMT-LIB bodies, the
 //! named-assertion map, target metadata, diagnostics.
 //!
@@ -84,7 +84,7 @@ impl CanonRead for QueryBody {
 }
 
 /// SPEC §5 named-assertion record — the value under its assertion-id key in
-/// [`CompiledArtifact::assertion_map`], binding the assertion to IR rule ids
+/// [`CompiledArtifact::assertion_to_source_map`], binding the assertion to IR rule ids
 /// and source region ids (§8.5 item 4 audits exactly this). Both lists are
 /// canonical sets: sorted by Id bytes, duplicate-free, non-empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,16 +136,16 @@ impl CanonRead for RawValue {
 /// named-assertion records, diagnostics — plus the roadmap's target
 /// metadata.
 ///
-/// - `query_plan` reuses the §5 [`ContradictionQueryPair`] slots planned
+/// - `solver_query_plan` reuses the §5 [`ContradictionQueryPair`] slots planned
 ///   over FormalIR (minted by [`plan_queries`](crate::plan_queries)).
 /// - `query_bodies` holds the §6 two-query texts in plan order: pair `k`'s
 ///   `context_overlap` then `deontic_consistency`.
-/// - `assertion_map` binds §6 assertion names — `ctx.<rule_id>` (context)
+/// - `assertion_to_source_map` binds §6 assertion names — `ctx.<rule_id>` (context)
 ///   and `a.<rule_id>` (polarity/factual) — to rule and region ids; map
 ///   semantics, stored key-sorted.
 /// - `target_metadata` records identifier-keyed raw-text target facts; map
 ///   semantics, stored key-sorted.
-/// - `diagnostics` carries the stage's §7.4 records in production order.
+/// - `diagnostics` carries the processing_stage's §7.4 records in production order.
 ///
 /// [`validate`](Self::validate) enforces the structural invariants; emission
 /// policy (which logic per slot, the §8.6 byte shapes) lives with the emit
@@ -153,9 +153,9 @@ impl CanonRead for RawValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompiledArtifact {
     pub target_id: Id,
-    pub query_plan: Vec<ContradictionQueryPair>,
+    pub solver_query_plan: Vec<ContradictionQueryPair>,
     pub query_bodies: Vec<QueryBody>,
-    pub assertion_map: Vec<(Id, AssertionRecord)>,
+    pub assertion_to_source_map: Vec<(Id, AssertionRecord)>,
     pub target_metadata: Vec<(Id, String)>,
     pub diagnostics: Vec<DiagnosticRecord>,
 }
@@ -176,7 +176,7 @@ impl CompiledArtifact {
     pub fn validate(&self) -> Result<(), ArtifactError> {
         let mut pair_ids: Vec<&str> = Vec::new();
         let mut query_ids: Vec<&str> = Vec::new();
-        for pair in &self.query_plan {
+        for pair in &self.solver_query_plan {
             if pair.constraint_a_id.as_str() >= pair.constraint_b_id.as_str() {
                 return Err(ArtifactError::PairInvalid {
                     pair_id: pair.pair_id.clone(),
@@ -221,8 +221,8 @@ impl CompiledArtifact {
                 return Err(ArtifactError::EmptyBody(body.query_id.clone()));
             }
         }
-        check_set("assertion_map", self.assertion_map.iter().map(|(k, _)| k))?;
-        for (assertion_id, record) in &self.assertion_map {
+        check_set("assertion_to_source_map", self.assertion_to_source_map.iter().map(|(k, _)| k))?;
+        for (assertion_id, record) in &self.assertion_to_source_map {
             if record.rule_ids.is_empty() || record.region_ids.is_empty() {
                 return Err(ArtifactError::EmptyAssertionRefs(assertion_id.clone()));
             }
@@ -248,12 +248,12 @@ impl CompiledArtifact {
 impl Canonical for CompiledArtifact {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("assertion_map", |b| {
-            emit_map(b, self.assertion_map.iter().map(|(k, v)| (k, v)))
+        obj.member("assertion_to_source_map", |b| {
+            emit_map(b, self.assertion_to_source_map.iter().map(|(k, v)| (k, v)))
         })?;
         obj.member("diagnostics", |b| emit_array(b, &self.diagnostics))?;
         obj.member("query_bodies", |b| emit_array(b, &self.query_bodies))?;
-        obj.member("query_plan", |b| emit_array(b, &self.query_plan))?;
+        obj.member("solver_query_plan", |b| emit_array(b, &self.solver_query_plan))?;
         obj.member("target_id", |b| self.target_id.emit_canonical(b))?;
         obj.member("target_metadata", |b| {
             let texts: Vec<RawValue> = self
@@ -270,10 +270,10 @@ impl Canonical for CompiledArtifact {
 impl CanonRead for CompiledArtifact {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let assertion_map = obj.member("assertion_map", read_map::<Id, AssertionRecord>)?;
+        let assertion_to_source_map = obj.member("assertion_to_source_map", read_map::<Id, AssertionRecord>)?;
         let diagnostics = obj.member("diagnostics", read_array::<DiagnosticRecord>)?;
         let query_bodies = obj.member("query_bodies", read_array::<QueryBody>)?;
-        let query_plan = obj.member("query_plan", read_array::<ContradictionQueryPair>)?;
+        let solver_query_plan = obj.member("solver_query_plan", read_array::<ContradictionQueryPair>)?;
         let target_id = obj.member("target_id", Id::read)?;
         let target_metadata = obj.member("target_metadata", |r| {
             Ok(read_map::<Id, RawValue>(r)?
@@ -284,9 +284,9 @@ impl CanonRead for CompiledArtifact {
         obj.close()?;
         Ok(CompiledArtifact {
             target_id,
-            query_plan,
+            solver_query_plan,
             query_bodies,
-            assertion_map,
+            assertion_to_source_map,
             target_metadata,
             diagnostics,
         })
@@ -380,7 +380,7 @@ impl std::error::Error for ArtifactError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::{DiagnosticCode, Hash, Outcome, canonical_payload_bytes, read_canonical};
+    use ckc_core::{DiagnosticCode, Hash, Outcome, canonical_payload_bytes, read_strict_canonical};
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
     fn canon<T: Canonical>(value: &T) -> String {
@@ -390,7 +390,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -404,8 +404,8 @@ mod tests {
         ContradictionQueryPair {
             pair_id: id("q.m1_conflict.pair1"),
             action_key: id("act.administer:drug.abx_a"),
-            constraint_a_id: id("fc.fixture.m1_guideline_a.rule.0"),
-            constraint_b_id: id("fc.fixture.m1_guideline_b.rule.0"),
+            constraint_a_id: id("fc.test_source.m1_guideline_a.rule.0"),
+            constraint_b_id: id("fc.test_source.m1_guideline_b.rule.0"),
             context_overlap_query_id: id("q.m1_conflict.pair1.overlap"),
             deontic_consistency_query_id: id("q.m1_conflict.pair1.deontic"),
         }
@@ -416,8 +416,8 @@ mod tests {
         ContradictionQueryPair {
             pair_id: id("q.m1_conflict.pair2"),
             action_key: id("act.administer:drug.abx_a"),
-            constraint_a_id: id("fc.fixture.m1_guideline_a.rule.1"),
-            constraint_b_id: id("fc.fixture.m1_guideline_b.rule.1"),
+            constraint_a_id: id("fc.test_source.m1_guideline_a.rule.1"),
+            constraint_b_id: id("fc.test_source.m1_guideline_b.rule.1"),
             context_overlap_query_id: id("q.m1_conflict.pair2.overlap"),
             deontic_consistency_query_id: id("q.m1_conflict.pair2.deontic"),
         }
@@ -435,11 +435,11 @@ mod tests {
     /// regions (docA grounds in r.2+r.3 — recommendation + exception spans —
     /// docB in r.2).
     fn sample_artifact() -> CompiledArtifact {
-        let rule_a = "fixture.m1_guideline_a.rule.0";
-        let rule_b = "fixture.m1_guideline_b.rule.0";
+        let rule_a = "test_source.m1_guideline_a.rule.0";
+        let rule_b = "test_source.m1_guideline_b.rule.0";
         CompiledArtifact {
             target_id: id("target.smtlib2"),
-            query_plan: vec![sample_pair()],
+            solver_query_plan: vec![sample_pair()],
             query_bodies: vec![
                 QueryBody {
                     query_id: id("q.m1_conflict.pair1.overlap"),
@@ -452,21 +452,21 @@ mod tests {
                     body: "(set-logic QF_UF) (check-sat)".to_owned(),
                 },
             ],
-            assertion_map: vec![
+            assertion_to_source_map: vec![
                 (
-                    id("a.fixture.m1_guideline_a.rule.0"),
+                    id("a.test_source.m1_guideline_a.rule.0"),
                     record(rule_a, &["r.2", "r.3"]),
                 ),
                 (
-                    id("a.fixture.m1_guideline_b.rule.0"),
+                    id("a.test_source.m1_guideline_b.rule.0"),
                     record(rule_b, &["r.2"]),
                 ),
                 (
-                    id("ctx.fixture.m1_guideline_a.rule.0"),
+                    id("ctx.test_source.m1_guideline_a.rule.0"),
                     record(rule_a, &["r.2", "r.3"]),
                 ),
                 (
-                    id("ctx.fixture.m1_guideline_b.rule.0"),
+                    id("ctx.test_source.m1_guideline_b.rule.0"),
                     record(rule_b, &["r.2"]),
                 ),
             ],
@@ -478,9 +478,9 @@ mod tests {
     fn empty_artifact() -> CompiledArtifact {
         CompiledArtifact {
             target_id: id("target.smtlib2"),
-            query_plan: vec![],
+            solver_query_plan: vec![],
             query_bodies: vec![],
-            assertion_map: vec![],
+            assertion_to_source_map: vec![],
             target_metadata: vec![],
             diagnostics: vec![],
         }
@@ -508,24 +508,24 @@ mod tests {
         assert_eq!(
             canon(&sample_artifact()),
             concat!(
-                r#"{"assertion_map":{"#,
-                r#""a.fixture.m1_guideline_a.rule.0":{"region_ids":["r.2","r.3"],"#,
-                r#""rule_ids":["fixture.m1_guideline_a.rule.0"]},"#,
-                r#""a.fixture.m1_guideline_b.rule.0":{"region_ids":["r.2"],"#,
-                r#""rule_ids":["fixture.m1_guideline_b.rule.0"]},"#,
-                r#""ctx.fixture.m1_guideline_a.rule.0":{"region_ids":["r.2","r.3"],"#,
-                r#""rule_ids":["fixture.m1_guideline_a.rule.0"]},"#,
-                r#""ctx.fixture.m1_guideline_b.rule.0":{"region_ids":["r.2"],"#,
-                r#""rule_ids":["fixture.m1_guideline_b.rule.0"]}},"#,
+                r#"{"assertion_to_source_map":{"#,
+                r#""a.test_source.m1_guideline_a.rule.0":{"region_ids":["r.2","r.3"],"#,
+                r#""rule_ids":["test_source.m1_guideline_a.rule.0"]},"#,
+                r#""a.test_source.m1_guideline_b.rule.0":{"region_ids":["r.2"],"#,
+                r#""rule_ids":["test_source.m1_guideline_b.rule.0"]},"#,
+                r#""ctx.test_source.m1_guideline_a.rule.0":{"region_ids":["r.2","r.3"],"#,
+                r#""rule_ids":["test_source.m1_guideline_a.rule.0"]},"#,
+                r#""ctx.test_source.m1_guideline_b.rule.0":{"region_ids":["r.2"],"#,
+                r#""rule_ids":["test_source.m1_guideline_b.rule.0"]}},"#,
                 r#""diagnostics":[],"#,
                 r#""query_bodies":["#,
                 r#"{"body":"(set-logic QF_LRA) (check-sat)","logic":"qf_lra","#,
                 r#""query_id":"q.m1_conflict.pair1.overlap"},"#,
                 r#"{"body":"(set-logic QF_UF) (check-sat)","logic":"qf_uf","#,
                 r#""query_id":"q.m1_conflict.pair1.deontic"}],"#,
-                r#""query_plan":[{"action_key":"act.administer:drug.abx_a","#,
-                r#""constraint_a_id":"fc.fixture.m1_guideline_a.rule.0","#,
-                r#""constraint_b_id":"fc.fixture.m1_guideline_b.rule.0","#,
+                r#""solver_query_plan":[{"action_key":"act.administer:drug.abx_a","#,
+                r#""constraint_a_id":"fc.test_source.m1_guideline_a.rule.0","#,
+                r#""constraint_b_id":"fc.test_source.m1_guideline_b.rule.0","#,
                 r#""context_overlap_query_id":"q.m1_conflict.pair1.overlap","#,
                 r#""deontic_consistency_query_id":"q.m1_conflict.pair1.deontic","#,
                 r#""pair_id":"q.m1_conflict.pair1"}],"#,
@@ -537,8 +537,8 @@ mod tests {
         assert_eq!(
             canon(&empty_artifact()),
             concat!(
-                r#"{"assertion_map":{},"diagnostics":[],"query_bodies":[],"#,
-                r#""query_plan":[],"target_id":"target.smtlib2","target_metadata":{}}"#
+                r#"{"assertion_to_source_map":{},"diagnostics":[],"query_bodies":[],"#,
+                r#""solver_query_plan":[],"target_id":"target.smtlib2","target_metadata":{}}"#
             )
         );
     }
@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(sample_artifact().validate(), Ok(()));
         assert_eq!(empty_artifact().validate(), Ok(()));
         let mut two = sample_artifact();
-        two.query_plan.push(other_pair());
+        two.solver_query_plan.push(other_pair());
         two.query_bodies.extend([
             QueryBody {
                 query_id: id("q.m1_conflict.pair2.overlap"),
@@ -590,7 +590,7 @@ mod tests {
     fn validation_rejects_plan_breaks() {
         // Constraint order: a >= b.
         let mut swapped = sample_artifact();
-        let pair = &mut swapped.query_plan[0];
+        let pair = &mut swapped.solver_query_plan[0];
         std::mem::swap(&mut pair.constraint_a_id, &mut pair.constraint_b_id);
         assert_eq!(
             swapped.validate(),
@@ -603,7 +603,7 @@ mod tests {
         let mut dup_pair = sample_artifact();
         let mut clone = other_pair();
         clone.pair_id = id("q.m1_conflict.pair1");
-        dup_pair.query_plan.push(clone);
+        dup_pair.solver_query_plan.push(clone);
         assert_eq!(
             dup_pair.validate(),
             Err(ArtifactError::Duplicate {
@@ -615,7 +615,7 @@ mod tests {
         let mut dup_query = sample_artifact();
         let mut clone = other_pair();
         clone.context_overlap_query_id = id("q.m1_conflict.pair1.overlap");
-        dup_query.query_plan.push(clone);
+        dup_query.solver_query_plan.push(clone);
         assert_eq!(
             dup_query.validate(),
             Err(ArtifactError::Duplicate {
@@ -661,56 +661,56 @@ mod tests {
     fn validation_rejects_assertion_breaks() {
         // Keys stored out of canonical map order.
         let mut unsorted = sample_artifact();
-        unsorted.assertion_map.swap(0, 1);
+        unsorted.assertion_to_source_map.swap(0, 1);
         assert_eq!(
             unsorted.validate(),
             Err(ArtifactError::Unsorted {
-                pool: "assertion_map",
-                id: id("a.fixture.m1_guideline_a.rule.0"),
+                pool: "assertion_to_source_map",
+                id: id("a.test_source.m1_guideline_a.rule.0"),
             })
         );
         // Duplicate key.
         let mut dup = sample_artifact();
-        let entry = dup.assertion_map[0].clone();
-        dup.assertion_map.insert(1, entry);
+        let entry = dup.assertion_to_source_map[0].clone();
+        dup.assertion_to_source_map.insert(1, entry);
         assert_eq!(
             dup.validate(),
             Err(ArtifactError::Duplicate {
-                pool: "assertion_map",
-                id: id("a.fixture.m1_guideline_a.rule.0"),
+                pool: "assertion_to_source_map",
+                id: id("a.test_source.m1_guideline_a.rule.0"),
             })
         );
         // Prefix outside a./ctx. (key sits in sorted position, so the form
         // check itself fires).
         let mut form = sample_artifact();
-        form.assertion_map[3].0 = id("z.fixture.m1_guideline_b.rule.0");
+        form.assertion_to_source_map[3].0 = id("z.test_source.m1_guideline_b.rule.0");
         assert_eq!(
             form.validate(),
             Err(ArtifactError::AssertionForm(id(
-                "z.fixture.m1_guideline_b.rule.0"
+                "z.test_source.m1_guideline_b.rule.0"
             )))
         );
         // Suffix rule absent from rule_ids.
         let mut unbound = sample_artifact();
-        unbound.assertion_map[0].1.rule_ids = vec![id("fixture.m1_guideline_b.rule.0")];
+        unbound.assertion_to_source_map[0].1.rule_ids = vec![id("test_source.m1_guideline_b.rule.0")];
         assert_eq!(
             unbound.validate(),
             Err(ArtifactError::AssertionForm(id(
-                "a.fixture.m1_guideline_a.rule.0"
+                "a.test_source.m1_guideline_a.rule.0"
             )))
         );
         // Empty refs.
         let mut refs = sample_artifact();
-        refs.assertion_map[0].1.region_ids.clear();
+        refs.assertion_to_source_map[0].1.region_ids.clear();
         assert_eq!(
             refs.validate(),
             Err(ArtifactError::EmptyAssertionRefs(id(
-                "a.fixture.m1_guideline_a.rule.0"
+                "a.test_source.m1_guideline_a.rule.0"
             )))
         );
         // Region set stored unsorted.
         let mut regions = sample_artifact();
-        regions.assertion_map[0].1.region_ids = vec![id("r.3"), id("r.2")];
+        regions.assertion_to_source_map[0].1.region_ids = vec![id("r.3"), id("r.2")];
         assert_eq!(
             regions.validate(),
             Err(ArtifactError::Unsorted {

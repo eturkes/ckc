@@ -13,7 +13,7 @@
 //! semantic_en      semantic_ja, then lowercase ASCII letters only
 //! identifier_ascii require non-empty [a-z0-9_:./-]+; store bytes exactly (fallible)
 //! diagnostic_text  NFKC, fold whitespace to U+0020, collapse runs, trim
-//! view_text        NFKC (renderer provenance recorded by the producer)
+//! rendered_text        NFKC (renderer provenance recorded by the producer)
 //! ```
 //!
 //! NFKC (the only nontrivial Unicode operation) is delegated to
@@ -43,7 +43,7 @@ pub enum StringPolicy {
     /// NFKC plus semantic whitespace folding (no case or punctuation folding).
     DiagnosticText,
     /// NFKC display text (renderer provenance recorded separately).
-    ViewText,
+    RenderedText,
 }
 
 impl StringPolicy {
@@ -52,7 +52,7 @@ impl StringPolicy {
     pub fn normalize(&self, input: &str) -> Result<String, ValidationError> {
         let out = match self {
             StringPolicy::RawSource => input.to_string(),
-            StringPolicy::SourceNfkc | StringPolicy::ViewText => nfkc(input),
+            StringPolicy::SourceNfkc | StringPolicy::RenderedText => nfkc(input),
             StringPolicy::DiagnosticText => fold_whitespace(&nfkc(input)),
             StringPolicy::SemanticJa => fold_punctuation(&fold_whitespace(&nfkc(input))),
             StringPolicy::SemanticEn => {
@@ -141,7 +141,7 @@ mod tests {
             (StringPolicy::SemanticEn, "\"semantic_en\""),
             (StringPolicy::IdentifierAscii, "\"identifier_ascii\""),
             (StringPolicy::DiagnosticText, "\"diagnostic_text\""),
-            (StringPolicy::ViewText, "\"view_text\""),
+            (StringPolicy::RenderedText, "\"rendered_text\""),
         ];
         for (policy, name) in cases {
             let json = serde_json::to_string(&policy).unwrap();
@@ -201,10 +201,10 @@ mod tests {
     }
 
     #[test]
-    fn view_text_matches_source_nfkc() {
+    fn rendered_text_matches_source_nfkc() {
         for input in ["Ａ１", "café\u{3000}x", "\u{FB01}ne"] {
             assert_eq!(
-                StringPolicy::ViewText.normalize(input).unwrap(),
+                StringPolicy::RenderedText.normalize(input).unwrap(),
                 StringPolicy::SourceNfkc.normalize(input).unwrap()
             );
         }

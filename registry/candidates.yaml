@@ -1,60 +1,60 @@
 # SPEC §8.4 candidate components: pipe.layered_ckcir_to_smt chains the eight
-# §8.3 stage components; input/output artifact kinds (§8.3 artifact names)
+# §8.3 processing_stage components; input/output artifact kinds (§8.3 artifact names)
 # satisfy the chain rule checked by `ckc registry check`. Input lists declare
-# what each stage actually reads; extract is the chain head (corpus document
+# what each processing_stage actually reads; extract is the chain head (corpus document
 # input, no artifact kinds). All M1 components are deterministic (§8.1
 # runtime_ai: false).
 pipelines:
   - id: pipe.layered_ckcir_to_smt
-    stages:
-      - stage.m1.extract
-      - stage.m1.segment
-      - stage.m1.normalize
-      - stage.m1.assemble
-      - stage.m1.compile
-      - stage.m1.verify
-      - stage.m1.trace
-      - stage.m1.report
-stages:
-  - id: stage.m1.extract
+    processing_stages:
+      - processing_stage.m1.extract
+      - processing_stage.m1.segment
+      - processing_stage.m1.normalize
+      - processing_stage.m1.assemble
+      - processing_stage.m1.compile
+      - processing_stage.m1.verify
+      - processing_stage.m1.trace
+      - processing_stage.m1.report
+processing_stages:
+  - id: processing_stage.m1.extract
     kind: extract
     determinism: deterministic
     input_artifact_kinds: []
-    output_artifact_kinds: [source_graph]
-  - id: stage.m1.segment
+    output_artifact_kinds: [source_document_graph]
+  - id: processing_stage.m1.segment
     kind: segment
     determinism: deterministic
-    input_artifact_kinds: [source_graph]
+    input_artifact_kinds: [source_document_graph]
     output_artifact_kinds: [segments]
-  - id: stage.m1.normalize
+  - id: processing_stage.m1.normalize
     kind: normalize
     determinism: deterministic
-    input_artifact_kinds: [source_graph, segments]
+    input_artifact_kinds: [source_document_graph, segments]
     output_artifact_kinds: [normalization]
-  - id: stage.m1.assemble
+  - id: processing_stage.m1.assemble
     kind: assemble
     determinism: deterministic
-    input_artifact_kinds: [source_graph, segments, normalization]
+    input_artifact_kinds: [source_document_graph, segments, normalization]
     output_artifact_kinds: [ir_bundle]
-  - id: stage.m1.compile
+  - id: processing_stage.m1.compile
     kind: compile
     determinism: deterministic
     input_artifact_kinds: [ir_bundle]
     output_artifact_kinds: [compiled, smt_query]
-  - id: stage.m1.verify
+  - id: processing_stage.m1.verify
     kind: verify
     determinism: deterministic
     input_artifact_kinds: [compiled, smt_query]
     output_artifact_kinds: [verifier_results]
-  - id: stage.m1.trace
+  - id: processing_stage.m1.trace
     kind: trace
     determinism: deterministic
     input_artifact_kinds:
-      [source_graph, segments, normalization, ir_bundle, compiled, verifier_results]
+      [source_document_graph, segments, normalization, ir_bundle, compiled, verifier_results]
     output_artifact_kinds: [trace_bundle, lineage_index]
-  - id: stage.m1.report
+  - id: processing_stage.m1.report
     kind: report
     determinism: deterministic
     input_artifact_kinds:
-      [source_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
+      [source_document_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
     output_artifact_kinds: [report, run_manifest, replay_manifest]

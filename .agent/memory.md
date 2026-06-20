@@ -8,7 +8,7 @@ git history.
 ## Policy
 
 - Context hygiene (user directive; background: `git show 531f586`): keep every
-  session lean and phrased in project vocabulary (stages, units, gates, artifacts) — plain
+  session lean and phrased in project vocabulary (processing stages, units, gates, artifacts) — plain
   operational words over research jargon in memory, roadmap, commits, and code alike.
   Consult `docs/` through read-only subagents so its vocabulary stays out of
   the main window. Root `.rgignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
@@ -32,17 +32,17 @@ git history.
 - Unit sizing rules (consolidated from roadmap `NN%` annotations and
   observed 200K overruns; case studies in git history). Target: one conceptual deliverable
   plus one gate, finishable AND committable in one window with margin; prefer more, smaller
-  units. Plan-time obligations (a violation is a planning bug): resolve semantic contract
+  units. Plan-time obligations (a violation is a planning bug): resolve semantic requirements
   decisions INTO the roadmap line (more than ~2 left open = re-scope); research and pin any
   new external dependency (exact version + features) in the line; pre-split
   multi-deliverable stacks BEFORE scheduling — mid-session overrun recovery is
   user-initiated (stop, bring the tree clean, report). Split rules: a feature needing a
   refactor of existing code to share internals takes the refactor as its own
-  behavior-frozen unit FIRST (existing tests the gate, zero test edits); a format walker
-  plus committed-fixture integration = walker-core (inline-literal tests) then
-  format-completion + fixture-integration; a nontrivial algorithm plus a second authored
+  behavior-locked unit FIRST (existing tests the gate, zero test edits); a format walker
+  plus committed test-source integration = walker-core (inline-literal tests) then
+  format-completion + test-source integration; a nontrivial algorithm plus a second authored
   artifact = two units; a multi-invariant validator plus full rejection coverage = two
-  units; a derivation fn with its fixture-pinned battery plus an attachment sub-feature =
+  units; a derivation fn with its test-source-pinned battery plus an attachment sub-feature =
   two units; a type family plus assembly plus validation = three units (6th overrun,
   cli-runner.3a: trace types + assembly + ckc-run wiring scheduled as one unit
   against this anchor — 975 uncompiled lines plus full run.rs/shell.rs reads by compaction;
@@ -58,7 +58,7 @@ git history.
   the full report.rs draft was written but never built at compaction; reverted, split
   .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a live-pin
   battery over the run binary is a unit on its own — pairing it with assembly (7th overrun)
-  or with stage wiring overruns (9th overrun, cli-runner.4.1b.1: the 8th-overrun
+  or with processing stage wiring overruns (9th overrun, cli-runner.4.1b.1: the 8th-overrun
   core/wiring pre-split still left run.rs threading + the exp.m1_spine report pins on one
   line; compacted at the workspace-suite rerun with work otherwise done, landed
   user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a recovery split
@@ -68,7 +68,7 @@ git history.
   source, environment profile, replay argv, hash sources; the window went to decision
   derivation + run.rs threading, compacted with the pin battery unwritten; reverted,
   decisions + salvage patch pinned into .2b.1, pins split to .2b.2); a spec-byte
-  amendment (re-pin + gold/test mirror sweep) bundled with new feature code = two units —
+  amendment (re-pin + reference/test mirror sweep) bundled with new feature code = two units —
   an open decision whose resolution amends pinned bytes is a deliverable, not a session
   preamble (4th overrun, stage-normalize.2: decision + §8.6 amendment + mirrors
   consumed ~half the window before the derivation module; compacted at the test gate,
@@ -171,8 +171,10 @@ git history.
   long` (tool_uses > 0, subagent_tokens 0, no exception, no result); pinned by a probe of
   ~19K-token reads dying at read 10, the 200K boundary. Sizing: in 200K sessions budget
   every subagent at 200K with margin — a read+rewrite agent handles ~40KB text (~100K
-  peak); chunk larger rewrites at section boundaries and stage outputs for main-session
+  peak); chunk larger rewrites at section boundaries and processing stage outputs for main-session
   assembly. Per-agent transcripts:
   `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
   `.message.usage`; rejected requests log no usage). compaction.sh reads the same flag and
   gauges the main loop only.
+
+- Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).

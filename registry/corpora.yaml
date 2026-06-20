@@ -1,17 +1,17 @@
-# SPEC §8.2/§8.4 corpus admissions: synthetic fixtures, ai_generated origin
-# admitted under source_authority (admission-over-proposer authority).
-- id: fixture.m1_guideline_a
-  path: corpus/fixtures/m1_guideline_a.html
+# SPEC §8.2/§8.4 corpus acceptances: synthetic test_sources, ai_generated origin
+# accepted under source_evidence_status (acceptance-over-proposer evidence_status).
+- id: test_source.m1_guideline_a
+  path: corpus/test_sources/m1_guideline_a.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic
-- id: fixture.m1_guideline_b
-  path: corpus/fixtures/m1_guideline_b.html
+- id: test_source.m1_guideline_b
+  path: corpus/test_sources/m1_guideline_b.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic
-- id: fixture.m1_control
-  path: corpus/fixtures/m1_control.html
+- id: test_source.m1_control
+  path: corpus/test_sources/m1_control.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic

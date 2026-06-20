@@ -1,15 +1,15 @@
-//! SPEC §4.5 source grounding: the typed layer every semantic claim resolves
+//! SPEC §4.5 source source_linkage: the typed layer every semantic claim resolves
 //! back to.
 //!
-//! [`SourceGraph`] is the one-per-document artifact extract emits: a finite
-//! node tree plus the [`SourceSpan`]s, [`SourceAnchor`]s, and [`SourceRegion`]s
-//! that make document text addressable. [`validate`](SourceGraph::validate)
+//! [`SourceDocumentGraph`] is the one-per-document artifact extract emits: a finite
+//! node tree plus the [`SourceTextSpan`]s, [`SourceAnchor`]s, and [`EvidenceRegion`]s
+//! that make document text addressable. [`validate`](SourceDocumentGraph::validate)
 //! enforces the §4.5 invariants that are mechanical at this layer: references
 //! resolve, spans agree with their derived texts and hashes, and every textual
 //! node is spanned or named by an `extraction_uncertain` residual. The
-//! claim-side half of §4.5 (`source_region_ids` / `synthetic_fixture_id` on
-//! semantic claims) lands with the IR layers; envelope-wrapping the graph as
-//! `source_graph.json` is the extract stage's job.
+//! claim-side half of §4.5 (`source_region_ids` / `synthetic_test_source_id` on
+//! semantic claims) lands with the IR layers; wrapper-wrapping the graph as
+//! `source_document_graph.json` is the extract processing_stage's job.
 //!
 //! Offsets are UTF-8 byte offsets, half-open `[start, end)`: a span addresses
 //! its parent node's extracted text, an anchor addresses its parent span's
@@ -30,7 +30,7 @@ use crate::strings::StringPolicy;
 
 fieldless_enum! {
     /// SPEC §4.5 node kind: the closed set of structural units a
-    /// [`SourceGraph`] may contain.
+    /// [`SourceDocumentGraph`] may contain.
     NodeKind {
         Document => "document",
         Section => "section",
@@ -48,11 +48,11 @@ fieldless_enum! {
 
 impl NodeKind {
     /// Kinds that always bear extracted text. The §4.5 coverage invariant
-    /// binds here: a textual node carries at least one [`SourceSpan`] or is
+    /// binds here: a textual node carries at least one [`SourceTextSpan`] or is
     /// named by a typed `extraction_uncertain` residual. The structural kinds
     /// (`document`, `section`, `list`, `table`) hold any text they own —
     /// e.g. a section heading — through spans attached directly to them, which
-    /// stays the producer's contract (§8.3).
+    /// stays the producer's requirements (§8.3).
     pub fn is_textual(self) -> bool {
         matches!(
             self,
@@ -98,12 +98,12 @@ fieldless_enum! {
 /// over raw bytes (a source document is an external file, not an accepted
 /// artifact): `raw_hash` covers the bytes as acquired, `content_hash` the
 /// decoded content extract consumed — equal when no transport or charset
-/// decoding applies, as with the M1 fixtures. Distinct from the envelope's
+/// decoding applies, as with the M1 test_sources. Distinct from the wrapper's
 /// canonical-payload `content_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceDocument {
     pub document_id: Id,
-    /// Open vocabulary (e.g. `synthetic_fixture_html`); §15 gates new families.
+    /// Open vocabulary (e.g. `synthetic_test_source_html`); §15 gates new families.
     pub source_family: Id,
     pub provenance: Provenance,
     pub raw_hash: Hash,
@@ -145,7 +145,7 @@ impl CanonRead for SourceDocument {
     }
 }
 
-/// One node of the §4.5 graph. Array position in [`SourceGraph::nodes`] is
+/// One node of the §4.5 graph. Array position in [`SourceDocumentGraph::nodes`] is
 /// document order; the unique `document`-kind root comes first and every other
 /// node's parent precedes it (which keeps the tree acyclic by construction).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,7 +156,7 @@ pub struct SourceNode {
     pub parent_id: Option<Id>,
     /// Extractor-emitted structure the kind list cannot carry, as identifier
     /// keys to raw-text values — e.g. `row`/`col`/`header` on a `cell` node
-    /// preserve the §8.2 table relations. Map semantics; the producing stage
+    /// preserve the §8.2 table relations. Map semantics; the producing processing_stage
     /// owns the vocabulary.
     pub attrs: Vec<(Id, String)>,
 }
@@ -194,9 +194,9 @@ impl CanonRead for SourceNode {
 /// SPEC §4.5 stable text span: the addressable unit of document text.
 /// `nfkc_text`, `search_text`, `text_hash`, and the offset width are pure
 /// derivations of `raw_text` ([`derive`](Self::derive) computes them;
-/// [`SourceGraph::validate`] re-checks them).
+/// [`SourceDocumentGraph::validate`] re-checks them).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceSpan {
+pub struct SourceTextSpan {
     pub span_id: Id,
     /// The node whose extracted text this span addresses.
     pub node_id: Id,
@@ -211,13 +211,13 @@ pub struct SourceSpan {
     /// `raw_text` under §4.2 `semantic_ja`, the M1 search normal form.
     pub search_text: String,
     /// Position in the document's total reading order; strictly increasing
-    /// along [`SourceGraph::spans`].
+    /// along [`SourceDocumentGraph::spans`].
     pub reading_order: u64,
     /// §4.4 `_hash` over `raw_text`'s raw bytes.
     pub text_hash: Hash,
 }
 
-impl SourceSpan {
+impl SourceTextSpan {
     /// Build a span from the extractor-known fields, computing every derived
     /// field: `end` from `raw_text`'s byte length, the two normalized texts,
     /// and `text_hash`.
@@ -227,7 +227,7 @@ impl SourceSpan {
         start: u64,
         raw_text: String,
         reading_order: u64,
-    ) -> SourceSpan {
+    ) -> SourceTextSpan {
         let nfkc_text = StringPolicy::SourceNfkc
             .normalize(&raw_text)
             .expect("source_nfkc is infallible");
@@ -236,7 +236,7 @@ impl SourceSpan {
             .expect("semantic_ja is infallible");
         let text_hash = hash_bytes(raw_text.as_bytes());
         let end = start + raw_text.len() as u64;
-        SourceSpan {
+        SourceTextSpan {
             span_id,
             node_id,
             start,
@@ -250,10 +250,10 @@ impl SourceSpan {
     }
 
     /// Check every derived field against its derivation from `raw_text`.
-    fn check_derived(&self) -> Result<(), GroundingError> {
+    fn check_derived(&self) -> Result<(), SourceLinkageError> {
         let len = self.raw_text.len() as u64;
         if self.start >= self.end || self.end - self.start != len {
-            return Err(GroundingError::SpanOffsets {
+            return Err(SourceLinkageError::SpanOffsets {
                 span_id: self.span_id.clone(),
                 start: self.start,
                 end: self.end,
@@ -264,7 +264,7 @@ impl SourceSpan {
             .normalize(&self.raw_text)
             .expect("source_nfkc is infallible");
         if self.nfkc_text != nfkc {
-            return Err(GroundingError::SpanDerived {
+            return Err(SourceLinkageError::SpanDerived {
                 span_id: self.span_id.clone(),
                 field: "nfkc_text",
             });
@@ -273,13 +273,13 @@ impl SourceSpan {
             .normalize(&self.raw_text)
             .expect("semantic_ja is infallible");
         if self.search_text != search {
-            return Err(GroundingError::SpanDerived {
+            return Err(SourceLinkageError::SpanDerived {
                 span_id: self.span_id.clone(),
                 field: "search_text",
             });
         }
         if self.text_hash != hash_bytes(self.raw_text.as_bytes()) {
-            return Err(GroundingError::SpanDerived {
+            return Err(SourceLinkageError::SpanDerived {
                 span_id: self.span_id.clone(),
                 field: "text_hash",
             });
@@ -288,7 +288,7 @@ impl SourceSpan {
     }
 }
 
-impl Canonical for SourceSpan {
+impl Canonical for SourceTextSpan {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("end", |b| {
@@ -319,7 +319,7 @@ impl Canonical for SourceSpan {
     }
 }
 
-impl CanonRead for SourceSpan {
+impl CanonRead for SourceTextSpan {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
         let end = obj.member("end", read_u64)?;
@@ -338,7 +338,7 @@ impl CanonRead for SourceSpan {
         let start = obj.member("start", read_u64)?;
         let text_hash = obj.member("text_hash", Hash::read)?;
         obj.close()?;
-        Ok(SourceSpan {
+        Ok(SourceTextSpan {
             span_id,
             node_id,
             start,
@@ -353,7 +353,7 @@ impl CanonRead for SourceSpan {
 }
 
 /// SPEC §4.5 subspan anchor: marks a mention, quantity, modality, negation,
-/// temporal cue, or table value inside one [`SourceSpan`].
+/// temporal cue, or table value inside one [`SourceTextSpan`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceAnchor {
     pub anchor_id: Id,
@@ -368,7 +368,7 @@ pub struct SourceAnchor {
 impl SourceAnchor {
     /// The anchored slice of `span`'s `raw_text`; `None` when the offsets fall
     /// out of range or off character boundaries (valid graphs never do).
-    pub fn text_in<'a>(&self, span: &'a SourceSpan) -> Option<&'a str> {
+    pub fn text_in<'a>(&self, span: &'a SourceTextSpan) -> Option<&'a str> {
         let start = usize::try_from(self.start).ok()?;
         let end = usize::try_from(self.end).ok()?;
         span.raw_text.get(start..end)
@@ -414,11 +414,11 @@ impl CanonRead for SourceAnchor {
 
 /// SPEC §4.5 region: the unit of evidence — a closed support set over nodes
 /// (cells included), spans, and anchors. Closure — naming everything the
-/// supported claim relies on — is the producer's contract; this layer enforces
+/// supported claim relies on — is the producer's requirements; this layer enforces
 /// that the set is nonempty and every named ref resolves, which is what makes
 /// region ids quotable in reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceRegion {
+pub struct EvidenceRegion {
     pub region_id: Id,
     /// Set semantics, as are the two below.
     pub node_ids: Vec<Id>,
@@ -426,7 +426,7 @@ pub struct SourceRegion {
     pub anchor_ids: Vec<Id>,
 }
 
-impl Canonical for SourceRegion {
+impl Canonical for EvidenceRegion {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("anchor_ids", |b| emit_set(b, &self.anchor_ids))?;
@@ -437,7 +437,7 @@ impl Canonical for SourceRegion {
     }
 }
 
-impl CanonRead for SourceRegion {
+impl CanonRead for EvidenceRegion {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
         let anchor_ids = obj.member("anchor_ids", read_set::<Id>)?;
@@ -445,7 +445,7 @@ impl CanonRead for SourceRegion {
         let region_id = obj.member("region_id", Id::read)?;
         let span_ids = obj.member("span_ids", read_set::<Id>)?;
         obj.close()?;
-        Ok(SourceRegion {
+        Ok(EvidenceRegion {
             region_id,
             node_ids,
             span_ids,
@@ -454,7 +454,7 @@ impl CanonRead for SourceRegion {
     }
 }
 
-/// Which id pool a [`GroundingError`] reference names.
+/// Which id pool a [`SourceLinkageError`] reference names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefKind {
     Node,
@@ -475,9 +475,9 @@ impl RefKind {
     }
 }
 
-/// A SPEC §4.5 grounding invariant failed ([`SourceGraph::validate`]).
+/// A SPEC §4.5 source_linkage invariant failed ([`SourceDocumentGraph::validate`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GroundingError {
+pub enum SourceLinkageError {
     /// The node array's root shape is wrong (carries the violated rule).
     Root(&'static str),
     /// A second `document`-kind node appeared.
@@ -509,22 +509,22 @@ pub enum GroundingError {
     UnspannedTextualNode(Id),
 }
 
-impl fmt::Display for GroundingError {
+impl fmt::Display for SourceLinkageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GroundingError::Root(rule) => write!(f, "node tree: {rule}"),
-            GroundingError::ExtraDocumentNode(id) => write!(f, "second document node {id}"),
-            GroundingError::MissingParent(id) => write!(f, "non-root node {id} carries no parent"),
-            GroundingError::Duplicate { kind, id } => {
+            SourceLinkageError::Root(rule) => write!(f, "node tree: {rule}"),
+            SourceLinkageError::ExtraDocumentNode(id) => write!(f, "second document node {id}"),
+            SourceLinkageError::MissingParent(id) => write!(f, "non-root node {id} carries no parent"),
+            SourceLinkageError::Duplicate { kind, id } => {
                 write!(f, "duplicate {} id {id}", kind.as_str())
             }
-            GroundingError::Dangling { kind, id, from } => {
+            SourceLinkageError::Dangling { kind, id, from } => {
                 write!(f, "{from} references undefined {} {id}", kind.as_str())
             }
-            GroundingError::ReadingOrder { span_id } => {
+            SourceLinkageError::ReadingOrder { span_id } => {
                 write!(f, "span {span_id} breaks strictly increasing reading_order")
             }
-            GroundingError::SpanOffsets {
+            SourceLinkageError::SpanOffsets {
                 span_id,
                 start,
                 end,
@@ -533,13 +533,13 @@ impl fmt::Display for GroundingError {
                 f,
                 "span {span_id} offsets [{start},{end}) disagree with raw_text byte length {len}"
             ),
-            GroundingError::SpanDerived { span_id, field } => {
+            SourceLinkageError::SpanDerived { span_id, field } => {
                 write!(
                     f,
                     "span {span_id} field {field} does not derive from raw_text"
                 )
             }
-            GroundingError::AnchorOffsets {
+            SourceLinkageError::AnchorOffsets {
                 anchor_id,
                 start,
                 end,
@@ -547,8 +547,8 @@ impl fmt::Display for GroundingError {
                 f,
                 "anchor {anchor_id} offsets [{start},{end}) fall outside its span's raw_text or off character boundaries"
             ),
-            GroundingError::EmptyRegion(id) => write!(f, "region {id} supports nothing"),
-            GroundingError::UnspannedTextualNode(id) => write!(
+            SourceLinkageError::EmptyRegion(id) => write!(f, "region {id} supports nothing"),
+            SourceLinkageError::UnspannedTextualNode(id) => write!(
                 f,
                 "textual node {id} has no span and no extraction_uncertain residual"
             ),
@@ -556,7 +556,7 @@ impl fmt::Display for GroundingError {
     }
 }
 
-impl std::error::Error for GroundingError {}
+impl std::error::Error for SourceLinkageError {}
 
 /// SPEC §4.5 source graph: one artifact per document, emitted by extract.
 /// `nodes` and `spans` are arrays whose order is semantic (document order,
@@ -565,40 +565,40 @@ impl std::error::Error for GroundingError {}
 /// give identical graph bytes provided the producer derives ids and order
 /// deterministically.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceGraph {
+pub struct SourceDocumentGraph {
     pub document: SourceDocument,
     pub nodes: Vec<SourceNode>,
-    pub spans: Vec<SourceSpan>,
+    pub spans: Vec<SourceTextSpan>,
     pub anchors: Vec<SourceAnchor>,
-    pub regions: Vec<SourceRegion>,
+    pub regions: Vec<EvidenceRegion>,
 }
 
-impl SourceGraph {
+impl SourceDocumentGraph {
     /// Enforce the §4.5 invariants that are mechanical at this layer.
     /// `residual_node_ids` names the nodes the producer covered with typed
     /// `extraction_uncertain` residual diagnostics (which live in the
-    /// envelope, not the payload): a textual node must carry a span or appear
+    /// wrapper, not the payload): a textual node must carry a span or appear
     /// there. The remaining checks need no outside input: the node array is a
     /// rooted tree in document order, ids are pool-unique, every reference
     /// resolves, span offsets/texts/hashes are self-consistent, reading order
     /// strictly increases, anchors address real subspans, and regions are
     /// nonempty.
-    pub fn validate(&self, residual_node_ids: &[Id]) -> Result<(), GroundingError> {
+    pub fn validate(&self, residual_node_ids: &[Id]) -> Result<(), SourceLinkageError> {
         match self.nodes.first() {
-            None => return Err(GroundingError::Root("nodes is empty")),
+            None => return Err(SourceLinkageError::Root("nodes is empty")),
             Some(root) => {
                 if root.kind != NodeKind::Document {
-                    return Err(GroundingError::Root("first node must be the document node"));
+                    return Err(SourceLinkageError::Root("first node must be the document node"));
                 }
                 if root.parent_id.is_some() {
-                    return Err(GroundingError::Root("the document node carries a parent"));
+                    return Err(SourceLinkageError::Root("the document node carries a parent"));
                 }
             }
         }
         let mut node_pos: HashMap<&Id, usize> = HashMap::new();
         for (i, node) in self.nodes.iter().enumerate() {
             if node_pos.insert(&node.node_id, i).is_some() {
-                return Err(GroundingError::Duplicate {
+                return Err(SourceLinkageError::Duplicate {
                     kind: RefKind::Node,
                     id: node.node_id.clone(),
                 });
@@ -607,13 +607,13 @@ impl SourceGraph {
                 continue;
             }
             if node.kind == NodeKind::Document {
-                return Err(GroundingError::ExtraDocumentNode(node.node_id.clone()));
+                return Err(SourceLinkageError::ExtraDocumentNode(node.node_id.clone()));
             }
             let Some(parent) = &node.parent_id else {
-                return Err(GroundingError::MissingParent(node.node_id.clone()));
+                return Err(SourceLinkageError::MissingParent(node.node_id.clone()));
             };
             if node_pos.get(parent).is_none_or(|&p| p >= i) {
-                return Err(GroundingError::Dangling {
+                return Err(SourceLinkageError::Dangling {
                     kind: RefKind::Node,
                     id: parent.clone(),
                     from: node.node_id.clone(),
@@ -621,18 +621,18 @@ impl SourceGraph {
             }
         }
 
-        let mut spans_by_id: HashMap<&Id, &SourceSpan> = HashMap::new();
+        let mut spans_by_id: HashMap<&Id, &SourceTextSpan> = HashMap::new();
         let mut spanned_nodes: HashSet<&Id> = HashSet::new();
         let mut prev_order: Option<u64> = None;
         for span in &self.spans {
             if spans_by_id.insert(&span.span_id, span).is_some() {
-                return Err(GroundingError::Duplicate {
+                return Err(SourceLinkageError::Duplicate {
                     kind: RefKind::Span,
                     id: span.span_id.clone(),
                 });
             }
             if !node_pos.contains_key(&span.node_id) {
-                return Err(GroundingError::Dangling {
+                return Err(SourceLinkageError::Dangling {
                     kind: RefKind::Node,
                     id: span.node_id.clone(),
                     from: span.span_id.clone(),
@@ -640,7 +640,7 @@ impl SourceGraph {
             }
             spanned_nodes.insert(&span.node_id);
             if prev_order.is_some_and(|p| span.reading_order <= p) {
-                return Err(GroundingError::ReadingOrder {
+                return Err(SourceLinkageError::ReadingOrder {
                     span_id: span.span_id.clone(),
                 });
             }
@@ -651,20 +651,20 @@ impl SourceGraph {
         let mut anchor_ids: HashSet<&Id> = HashSet::new();
         for anchor in &self.anchors {
             if !anchor_ids.insert(&anchor.anchor_id) {
-                return Err(GroundingError::Duplicate {
+                return Err(SourceLinkageError::Duplicate {
                     kind: RefKind::Anchor,
                     id: anchor.anchor_id.clone(),
                 });
             }
             let Some(span) = spans_by_id.get(&anchor.span_id) else {
-                return Err(GroundingError::Dangling {
+                return Err(SourceLinkageError::Dangling {
                     kind: RefKind::Span,
                     id: anchor.span_id.clone(),
                     from: anchor.anchor_id.clone(),
                 });
             };
             if anchor.start >= anchor.end || anchor.text_in(span).is_none() {
-                return Err(GroundingError::AnchorOffsets {
+                return Err(SourceLinkageError::AnchorOffsets {
                     anchor_id: anchor.anchor_id.clone(),
                     start: anchor.start,
                     end: anchor.end,
@@ -675,7 +675,7 @@ impl SourceGraph {
         let mut region_ids: HashSet<&Id> = HashSet::new();
         for region in &self.regions {
             if !region_ids.insert(&region.region_id) {
-                return Err(GroundingError::Duplicate {
+                return Err(SourceLinkageError::Duplicate {
                     kind: RefKind::Region,
                     id: region.region_id.clone(),
                 });
@@ -684,9 +684,9 @@ impl SourceGraph {
                 && region.span_ids.is_empty()
                 && region.anchor_ids.is_empty()
             {
-                return Err(GroundingError::EmptyRegion(region.region_id.clone()));
+                return Err(SourceLinkageError::EmptyRegion(region.region_id.clone()));
             }
-            let dangling = |kind: RefKind, id: &Id| GroundingError::Dangling {
+            let dangling = |kind: RefKind, id: &Id| SourceLinkageError::Dangling {
                 kind,
                 id: id.clone(),
                 from: region.region_id.clone(),
@@ -714,14 +714,14 @@ impl SourceGraph {
                 && !spanned_nodes.contains(&node.node_id)
                 && !residuals.contains(&node.node_id)
             {
-                return Err(GroundingError::UnspannedTextualNode(node.node_id.clone()));
+                return Err(SourceLinkageError::UnspannedTextualNode(node.node_id.clone()));
             }
         }
         Ok(())
     }
 }
 
-impl Canonical for SourceGraph {
+impl Canonical for SourceDocumentGraph {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("anchors", |b| emit_set(b, &self.anchors))?;
@@ -733,16 +733,16 @@ impl Canonical for SourceGraph {
     }
 }
 
-impl CanonRead for SourceGraph {
+impl CanonRead for SourceDocumentGraph {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
         let anchors = obj.member("anchors", read_set::<SourceAnchor>)?;
         let document = obj.member("document", SourceDocument::read)?;
         let nodes = obj.member("nodes", read_array::<SourceNode>)?;
-        let regions = obj.member("regions", read_set::<SourceRegion>)?;
-        let spans = obj.member("spans", read_array::<SourceSpan>)?;
+        let regions = obj.member("regions", read_set::<EvidenceRegion>)?;
+        let spans = obj.member("spans", read_array::<SourceTextSpan>)?;
         obj.close()?;
-        Ok(SourceGraph {
+        Ok(SourceDocumentGraph {
             document,
             nodes,
             spans,
@@ -755,7 +755,7 @@ impl CanonRead for SourceGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canon::{canonical_payload_bytes, read_canonical};
+    use crate::canon::{canonical_payload_bytes, read_strict_canonical};
     use crate::hash::content_hash;
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
@@ -766,7 +766,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -791,7 +791,7 @@ mod tests {
     fn sample_document() -> SourceDocument {
         SourceDocument {
             document_id: id("doc.a"),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             raw_hash: h('a'),
             content_hash: h('a'),
@@ -804,8 +804,8 @@ mod tests {
     const P1_RAW: &str = "成人には１０ｍｇを投与する。";
     const CQ1_RAW: &str = "ＣＱ１：高血圧の治療";
 
-    fn sample_graph() -> SourceGraph {
-        SourceGraph {
+    fn sample_graph() -> SourceDocumentGraph {
+        SourceDocumentGraph {
             document: sample_document(),
             nodes: vec![
                 node(NodeKind::Document, "n.doc", None),
@@ -814,8 +814,8 @@ mod tests {
                 node(NodeKind::Paragraph, "n.p1", Some("n.sec")),
             ],
             spans: vec![
-                SourceSpan::derive(id("s.cq1"), id("n.cq1"), 0, CQ1_RAW.to_owned(), 1),
-                SourceSpan::derive(id("s.p1"), id("n.p1"), 0, P1_RAW.to_owned(), 2),
+                SourceTextSpan::derive(id("s.cq1"), id("n.cq1"), 0, CQ1_RAW.to_owned(), 1),
+                SourceTextSpan::derive(id("s.p1"), id("n.p1"), 0, P1_RAW.to_owned(), 2),
             ],
             anchors: vec![
                 SourceAnchor {
@@ -834,13 +834,13 @@ mod tests {
                 },
             ],
             regions: vec![
-                SourceRegion {
+                EvidenceRegion {
                     region_id: id("r.cq1"),
                     node_ids: vec![id("n.cq1")],
                     span_ids: vec![id("s.cq1")],
                     anchor_ids: vec![id("a.m1")],
                 },
-                SourceRegion {
+                EvidenceRegion {
                     region_id: id("r.p1"),
                     node_ids: vec![],
                     span_ids: vec![id("s.p1")],
@@ -851,7 +851,7 @@ mod tests {
     }
 
     /// `sample_graph` with `spans[1]` (s.p1) replaced.
-    fn with_p1_span(span: SourceSpan) -> SourceGraph {
+    fn with_p1_span(span: SourceTextSpan) -> SourceDocumentGraph {
         let mut graph = sample_graph();
         graph.spans[1] = span;
         graph
@@ -928,7 +928,7 @@ mod tests {
             concat!(
                 r#"{{"content_hash":"{0}","data_class":"none","document_id":"doc.a","#,
                 r#""provenance":"synthetic","raw_hash":"{0}","#,
-                r#""source_family":"synthetic_fixture_html"}}"#
+                r#""source_family":"synthetic_test_source_html"}}"#
             ),
             h('a').as_str(),
         );
@@ -978,7 +978,7 @@ mod tests {
     // carry Japanese text as raw UTF-8 (no escaping beyond the minimal set).
     #[test]
     fn span_derive_and_canonical_bytes() {
-        let span = SourceSpan::derive(id("s.p1"), id("n.p1"), 12, P1_RAW.to_owned(), 2);
+        let span = SourceTextSpan::derive(id("s.p1"), id("n.p1"), 12, P1_RAW.to_owned(), 2);
         assert_eq!(span.end, 12 + P1_RAW.len() as u64);
         assert_eq!(span.nfkc_text, "成人には10mgを投与する。");
         assert_eq!(span.search_text, "成人には10mgを投与する.");
@@ -999,7 +999,7 @@ mod tests {
     // Pins the graph's five-field shape with empty collections.
     #[test]
     fn graph_canonical_bytes_minimal() {
-        let graph = SourceGraph {
+        let graph = SourceDocumentGraph {
             document: sample_document(),
             nodes: vec![node(NodeKind::Document, "n.doc", None)],
             spans: vec![],
@@ -1053,35 +1053,35 @@ mod tests {
         graph.nodes.clear();
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Root("nodes is empty"))
+            Err(SourceLinkageError::Root("nodes is empty"))
         );
 
         let mut graph = sample_graph();
         graph.nodes[0].kind = NodeKind::Section;
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Root("first node must be the document node"))
+            Err(SourceLinkageError::Root("first node must be the document node"))
         );
 
         let mut graph = sample_graph();
         graph.nodes[0].parent_id = Some(id("n.sec"));
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Root("the document node carries a parent"))
+            Err(SourceLinkageError::Root("the document node carries a parent"))
         );
 
         let mut graph = sample_graph();
         graph.nodes[2] = node(NodeKind::Document, "n.doc2", Some("n.doc"));
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::ExtraDocumentNode(id("n.doc2")))
+            Err(SourceLinkageError::ExtraDocumentNode(id("n.doc2")))
         );
 
         let mut graph = sample_graph();
         graph.nodes[1].parent_id = None;
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::MissingParent(id("n.sec")))
+            Err(SourceLinkageError::MissingParent(id("n.sec")))
         );
     }
 
@@ -1091,7 +1091,7 @@ mod tests {
         graph.nodes[3] = node(NodeKind::Paragraph, "n.cq1", Some("n.sec"));
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Duplicate {
+            Err(SourceLinkageError::Duplicate {
                 kind: RefKind::Node,
                 id: id("n.cq1")
             })
@@ -1101,7 +1101,7 @@ mod tests {
         graph.spans[1].span_id = id("s.cq1");
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::Duplicate {
+            Err(SourceLinkageError::Duplicate {
                 kind: RefKind::Span,
                 ..
             })
@@ -1111,7 +1111,7 @@ mod tests {
         graph.anchors[1].anchor_id = id("a.m1");
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::Duplicate {
+            Err(SourceLinkageError::Duplicate {
                 kind: RefKind::Anchor,
                 ..
             })
@@ -1121,7 +1121,7 @@ mod tests {
         graph.regions[1].region_id = id("r.cq1");
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::Duplicate {
+            Err(SourceLinkageError::Duplicate {
                 kind: RefKind::Region,
                 ..
             })
@@ -1135,7 +1135,7 @@ mod tests {
         graph.nodes.swap(1, 2);
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Dangling {
+            Err(SourceLinkageError::Dangling {
                 kind: RefKind::Node,
                 id: id("n.sec"),
                 from: id("n.cq1")
@@ -1146,7 +1146,7 @@ mod tests {
         graph.spans[1].node_id = id("n.zzz");
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Dangling {
+            Err(SourceLinkageError::Dangling {
                 kind: RefKind::Node,
                 id: id("n.zzz"),
                 from: id("s.p1")
@@ -1157,7 +1157,7 @@ mod tests {
         graph.anchors[1].span_id = id("s.zzz");
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::Dangling {
+            Err(SourceLinkageError::Dangling {
                 kind: RefKind::Span,
                 id: id("s.zzz"),
                 from: id("a.q1")
@@ -1178,7 +1178,7 @@ mod tests {
             }
             assert_eq!(
                 graph.validate(&[]),
-                Err(GroundingError::Dangling {
+                Err(SourceLinkageError::Dangling {
                     kind,
                     id: id("x.zzz"),
                     from: id("r.p1")
@@ -1188,7 +1188,7 @@ mod tests {
         }
 
         let mut graph = sample_graph();
-        graph.regions[1] = SourceRegion {
+        graph.regions[1] = EvidenceRegion {
             region_id: id("r.empty"),
             node_ids: vec![],
             span_ids: vec![],
@@ -1196,7 +1196,7 @@ mod tests {
         };
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::EmptyRegion(id("r.empty")))
+            Err(SourceLinkageError::EmptyRegion(id("r.empty")))
         );
     }
 
@@ -1207,7 +1207,7 @@ mod tests {
         span.reading_order = 1;
         assert_eq!(
             with_p1_span(span).validate(&[]),
-            Err(GroundingError::ReadingOrder {
+            Err(SourceLinkageError::ReadingOrder {
                 span_id: id("s.p1")
             })
         );
@@ -1216,7 +1216,7 @@ mod tests {
         span.end += 1;
         assert!(matches!(
             with_p1_span(span).validate(&[]),
-            Err(GroundingError::SpanOffsets { .. })
+            Err(SourceLinkageError::SpanOffsets { .. })
         ));
 
         // empty offsets are rejected before the length comparison
@@ -1224,23 +1224,23 @@ mod tests {
         span.end = span.start;
         assert!(matches!(
             with_p1_span(span).validate(&[]),
-            Err(GroundingError::SpanOffsets { .. })
+            Err(SourceLinkageError::SpanOffsets { .. })
         ));
 
         for (field, tamper) in [
             (
                 "nfkc_text",
-                &(|s: &mut SourceSpan| s.nfkc_text = s.raw_text.clone())
-                    as &dyn Fn(&mut SourceSpan),
+                &(|s: &mut SourceTextSpan| s.nfkc_text = s.raw_text.clone())
+                    as &dyn Fn(&mut SourceTextSpan),
             ),
-            ("search_text", &|s: &mut SourceSpan| s.search_text.push('!')),
-            ("text_hash", &|s: &mut SourceSpan| s.text_hash = h('b')),
+            ("search_text", &|s: &mut SourceTextSpan| s.search_text.push('!')),
+            ("text_hash", &|s: &mut SourceTextSpan| s.text_hash = h('b')),
         ] {
             let mut span = sample_graph().spans[1].clone();
             tamper(&mut span);
             assert_eq!(
                 with_p1_span(span).validate(&[]),
-                Err(GroundingError::SpanDerived {
+                Err(SourceLinkageError::SpanDerived {
                     span_id: id("s.p1"),
                     field
                 })
@@ -1255,7 +1255,7 @@ mod tests {
         graph.anchors[1].end = 100;
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::AnchorOffsets { .. })
+            Err(SourceLinkageError::AnchorOffsets { .. })
         ));
 
         // byte 13 sits inside the three-byte １ — not a character boundary
@@ -1263,7 +1263,7 @@ mod tests {
         graph.anchors[1].start = 13;
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::AnchorOffsets { .. })
+            Err(SourceLinkageError::AnchorOffsets { .. })
         ));
 
         // empty anchors mark nothing
@@ -1271,7 +1271,7 @@ mod tests {
         graph.anchors[1].end = graph.anchors[1].start;
         assert!(matches!(
             graph.validate(&[]),
-            Err(GroundingError::AnchorOffsets { .. })
+            Err(SourceLinkageError::AnchorOffsets { .. })
         ));
     }
 
@@ -1285,7 +1285,7 @@ mod tests {
             .push(node(NodeKind::Paragraph, "n.p2", Some("n.sec")));
         assert_eq!(
             graph.validate(&[]),
-            Err(GroundingError::UnspannedTextualNode(id("n.p2")))
+            Err(SourceLinkageError::UnspannedTextualNode(id("n.p2")))
         );
         graph.validate(&[id("n.p2")]).unwrap();
 

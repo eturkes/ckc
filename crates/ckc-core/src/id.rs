@@ -17,9 +17,9 @@ use num_bigint::BigInt;
 use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
 
-/// Construction/validation failure for a SPEC §4.1 value-type contract. The
+/// Construction/validation failure for a SPEC §4.1 value-type requirements. The
 /// variant names the offending type; the message carries the diagnostic
-/// detail. Later units extend this with their own contract variants.
+/// detail. Later units extend this with their own requirements variants.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationError {
     /// An [`Id`] violated `[a-z][a-z0-9_.:-]*`.

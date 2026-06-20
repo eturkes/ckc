@@ -1,12 +1,12 @@
 //! SPEC §8.5 item 3 workspace oracle: execute `exp.m1_spine` into a temp
-//! dir, sweep the run directory (exact §8.3 file set — a later-stage
+//! dir, sweep the run directory (exact §8.3 file set — a later-processing_stage
 //! artifact entering the layout must join the sweep), strict-read every
 //! accepted artifact with §4.4 re-validation, and assert the experiment's
-//! gold entries over the verifier results — the code oracle behind §8.5
+//! reference entries over the verifier results — the code oracle behind §8.5
 //! items 5 and 6. The [`report`] module pins the landed report surface
-//! — `report.json`, its `report.md` rendering, and the §5/§4.6 manifest
+//! — `report.json`, its `report_en.md` rendering, and the §5/§4.6 manifest
 //! pair — over its own recorded runs: the finding/null partition, the
-//! quoted spans resolving to fixture bytes (§8.5 item 9's code oracle),
+//! quoted spans resolving to test_source bytes (§8.5 item 9's code oracle),
 //! and the run's provenance facts.
 
 use std::collections::BTreeSet;
@@ -15,9 +15,9 @@ use std::process::Command;
 
 use ckc_cli::trace::{ConflictKind, LineageIndex, TraceBundle, TraceNodeKind};
 use ckc_core::{
-    ArtifactEnvelope, CanonRead, Canonical, DiagnosticRecord, EventRecord, GoldEntry, Hash, Id,
-    IrBundle, Normalization, Outcome, SegmentIr, SourceGraph, TotalOperationResult,
-    parse_experiments, parse_gold, read_canonical, read_jsonl,
+    ArtifactWrapper, CanonRead, Canonical, DiagnosticRecord, EventRecord, ReferenceEntry, Hash, Id,
+    IrBundle, Normalization, Outcome, SegmentIr, SourceDocumentGraph, TotalOperationResult,
+    parse_experiments, parse_reference, read_strict_canonical, read_jsonl,
 };
 use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory, VerifierResults};
 
@@ -34,17 +34,17 @@ fn id(text: &str) -> Id {
     text.parse().unwrap()
 }
 
-/// §8.5 item 3's per-artifact bar: strict canonical read of the envelope
+/// §8.5 item 3's per-artifact bar: strict canonical read of the wrapper
 /// bytes, then §4.4 re-validation (content and policy hashes recomputed
 /// from the payload).
-fn strict_read<P: Canonical + CanonRead>(path: &Path) -> ArtifactEnvelope<P> {
+fn strict_read<P: Canonical + CanonRead>(path: &Path) -> ArtifactWrapper<P> {
     let bytes = std::fs::read(path).unwrap();
-    let envelope: ArtifactEnvelope<P> =
-        read_canonical(&bytes).unwrap_or_else(|e| panic!("{}: strict read: {e:?}", path.display()));
-    envelope
+    let wrapper: ArtifactWrapper<P> =
+        read_strict_canonical(&bytes).unwrap_or_else(|e| panic!("{}: strict read: {e:?}", path.display()));
+    wrapper
         .validate()
-        .unwrap_or_else(|e| panic!("{}: envelope invariant: {e:?}", path.display()));
-    envelope
+        .unwrap_or_else(|e| panic!("{}: wrapper invariant: {e:?}", path.display()));
+    wrapper
 }
 
 /// Every file under `root`, as sorted root-relative paths.
@@ -65,9 +65,9 @@ fn files_under(root: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// One gold entry against its group's compiled plan and verifier results.
-fn assert_group_matches_gold(
-    entry: &GoldEntry,
+/// One reference entry against its group's compiled plan and verifier results.
+fn assert_group_matches_reference(
+    entry: &ReferenceEntry,
     compiled: &CompiledArtifact,
     results: &VerifierResults,
 ) {
@@ -80,12 +80,12 @@ fn assert_group_matches_gold(
     if entry.expected_outcome == id("semantic_contradiction") {
         // §8.5 item 5 oracle: exactly one contradiction, riding a
         // deontic-consistency query — M1's deontic_direction_conflict
-        // kind (§6) — with the unsat core matching gold as a set.
+        // kind (§6) — with the unsat core matching reference as a set.
         assert_eq!(contradictions.len(), 1, "{gid}: exactly one contradiction");
         let hit = contradictions[0];
         assert!(
             compiled
-                .query_plan
+                .solver_query_plan
                 .iter()
                 .any(|p| p.deontic_consistency_query_id == hit.query_id),
             "{gid}: the contradiction rides a deontic-consistency query"
@@ -101,7 +101,7 @@ fn assert_group_matches_gold(
             .expect("an unsat verdict carries its core")
             .into_iter()
             .collect();
-        assert_eq!(core, entry.expected_core, "{gid}: unsat core as a set");
+        assert_eq!(core, entry.expected_unsat_core, "{gid}: unsat core as a set");
     } else if entry.expected_outcome == id("semantic_no_conflict") {
         // §8.5 item 6 oracle: every query closed without a contradiction;
         // the documented null is a §6 Q1-unsat closure — the overlap query
@@ -114,9 +114,9 @@ fn assert_group_matches_gold(
                 .all(|r| r.category == VerifierCategory::SemanticNoConflict),
             "{gid}: every query closed semantic_no_conflict"
         );
-        if entry.expected_null_result {
+        if entry.expected_no_conflict_result {
             let closed: Vec<_> = compiled
-                .query_plan
+                .solver_query_plan
                 .iter()
                 .filter(|p| {
                     results.results.iter().any(|r| {
@@ -149,7 +149,7 @@ fn assert_group_matches_gold(
 }
 
 #[test]
-fn run_oracle_strict_reads_artifacts_and_matches_gold() {
+fn run_oracle_strict_reads_artifacts_and_matches_reference() {
     let root = repo_root();
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = tmp.path().join("m1");
@@ -175,7 +175,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
     assert_eq!(results[0].outcome, Outcome::Ok);
 
     // Expectations resolve through the registries: the experiment names its
-    // groups, documents, and gold file.
+    // groups, documents, and reference file.
     let experiments = parse_experiments(
         &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
     )
@@ -184,12 +184,12 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         .iter()
         .find(|e| e.id == id("exp.m1_spine"))
         .unwrap();
-    let gold: Vec<GoldEntry> =
-        parse_gold(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap()).unwrap();
+    let reference: Vec<ReferenceEntry> =
+        parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap()).unwrap();
     assert_eq!(
-        gold.len(),
-        exp.fixture_groups.len(),
-        "one gold entry per fixture group"
+        reference.len(),
+        exp.test_source_groups.len(),
+        "one reference entry per test_source group"
     );
 
     let mut expected_files: Vec<PathBuf> = vec![
@@ -199,41 +199,41 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
         "manifest.json".into(),
         "replay_manifest.json".into(),
         "report.json".into(),
-        "report.md".into(),
+        "report_en.md".into(),
         "trace_bundle.json".into(),
     ];
 
     // Document artifacts: the four §8.3 per-document layers strict-read.
     let documents: BTreeSet<&Id> = exp
-        .fixture_groups
+        .test_source_groups
         .iter()
-        .flat_map(|g| &g.fixtures)
+        .flat_map(|g| &g.test_sources)
         .collect();
     for doc in &documents {
         let dir = PathBuf::from("artifacts").join(doc.to_string());
-        let _: ArtifactEnvelope<SourceGraph> =
-            strict_read(&run_dir.join(dir.join("source_graph.json")));
-        let _: ArtifactEnvelope<SegmentIr> = strict_read(&run_dir.join(dir.join("segments.json")));
-        let _: ArtifactEnvelope<Normalization> =
+        let _: ArtifactWrapper<SourceDocumentGraph> =
+            strict_read(&run_dir.join(dir.join("source_document_graph.json")));
+        let _: ArtifactWrapper<SegmentIr> = strict_read(&run_dir.join(dir.join("segments.json")));
+        let _: ArtifactWrapper<Normalization> =
             strict_read(&run_dir.join(dir.join("normalization.json")));
-        let _: ArtifactEnvelope<IrBundle> = strict_read(&run_dir.join(dir.join("ir_bundle.json")));
+        let _: ArtifactWrapper<IrBundle> = strict_read(&run_dir.join(dir.join("ir_bundle.json")));
         for name in [
             "ir_bundle.json",
             "normalization.json",
             "segments.json",
-            "source_graph.json",
+            "source_document_graph.json",
         ] {
             expected_files.push(dir.join(name));
         }
     }
 
     // Group artifacts: compiled + verifier results strict-read, every
-    // materialized query byte-identical to its compiled body, gold asserted.
-    for group in &exp.fixture_groups {
+    // materialized query byte-identical to its compiled body, reference asserted.
+    for group in &exp.test_source_groups {
         let dir = PathBuf::from("groups").join(group.group_id.to_string());
-        let compiled: ArtifactEnvelope<CompiledArtifact> =
+        let compiled: ArtifactWrapper<CompiledArtifact> =
             strict_read(&run_dir.join(dir.join("compiled.json")));
-        let verifier: ArtifactEnvelope<VerifierResults> =
+        let verifier: ArtifactWrapper<VerifierResults> =
             strict_read(&run_dir.join(dir.join("verifier_results.json")));
         expected_files.push(dir.join("compiled.json"));
         expected_files.push(dir.join("verifier_results.json"));
@@ -248,23 +248,23 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
             );
             expected_files.push(rel);
         }
-        let entry = gold
+        let entry = reference
             .iter()
             .find(|e| e.group_id == group.group_id)
-            .unwrap_or_else(|| panic!("{}: no gold entry", group.group_id));
-        assert_group_matches_gold(entry, &compiled.payload, &verifier.payload);
+            .unwrap_or_else(|| panic!("{}: no reference entry", group.group_id));
+        assert_group_matches_reference(entry, &compiled.payload, &verifier.payload);
     }
 
     // The report joins the §8.5 item 3 bar; its content pins live in the
     // `report` module over its own recorded run.
-    let _: ArtifactEnvelope<ckc_cli::report::Report> = strict_read(&run_dir.join("report.json"));
+    let _: ArtifactWrapper<ckc_cli::report::Report> = strict_read(&run_dir.join("report.json"));
 
     // Trace artifacts: the §7.1 pair strict-read from the run root, both
-    // enveloped by the trace component over the DAG's node content-hash
+    // wrapped by the trace component over the DAG's node content-hash
     // set; the §8.6 finding row and the hashless report node pin the
     // claim surface.
-    let trace: ArtifactEnvelope<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
-    let lineage: ArtifactEnvelope<LineageIndex> = strict_read(&run_dir.join("lineage_index.json"));
+    let trace: ArtifactWrapper<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
+    let lineage: ArtifactWrapper<LineageIndex> = strict_read(&run_dir.join("lineage_index.json"));
     trace.payload.validate().unwrap();
     lineage.payload.validate().unwrap();
     let mut node_hashes: Vec<Hash> = trace
@@ -278,12 +278,12 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
     assert_eq!(trace.schema_id, id("schema.trace_bundle"));
     assert_eq!(trace.artifact_id, id("trace_bundle"));
     assert_eq!(trace.artifact_kind, id("trace_bundle"));
-    assert_eq!(trace.producer.component_id, id("stage.m1.trace"));
+    assert_eq!(trace.producer.pipeline_step_id, id("processing_stage.m1.trace"));
     assert_eq!(trace.input_hashes, node_hashes);
     assert_eq!(lineage.schema_id, id("schema.lineage_index"));
     assert_eq!(lineage.artifact_id, id("lineage_index"));
     assert_eq!(lineage.artifact_kind, id("lineage_index"));
-    assert_eq!(lineage.producer.component_id, id("stage.m1.trace"));
+    assert_eq!(lineage.producer.pipeline_step_id, id("processing_stage.m1.trace"));
     assert_eq!(lineage.input_hashes, node_hashes);
 
     // The DAG sink: exactly one report node, the only hashless one.
@@ -324,15 +324,15 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
     assert_eq!(
         finding.assertion_ids,
         vec![
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_b.rule.0")
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0")
         ]
     );
     assert_eq!(
         finding.rule_ids,
         vec![
-            id("fixture.m1_guideline_a.rule.0"),
-            id("fixture.m1_guideline_b.rule.0")
+            id("test_source.m1_guideline_a.rule.0"),
+            id("test_source.m1_guideline_b.rule.0")
         ]
     );
     assert_eq!(finding.region_ids, vec![id("r.2"), id("r.3")]);
@@ -366,30 +366,30 @@ fn run_oracle_strict_reads_artifacts_and_matches_gold() {
     let chain = "\
 trace finding.group.m1_conflict.1 run m1
 forward source spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
-document fixture.m1_guideline_a path corpus/fixtures/m1_guideline_a.html
+document test_source.m1_guideline_a path corpus/test_sources/m1_guideline_a.html
   source spans: r.2 r.3
   segments: seg.2 seg.3
   statements: stmt.0
-  rules: fixture.m1_guideline_a.rule.0
-document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
+  rules: test_source.m1_guideline_a.rule.0
+document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
   source spans: r.2
   segments: seg.2
   statements: stmt.0
-  rules: fixture.m1_guideline_b.rule.0
-named assertions: a.fixture.m1_guideline_a.rule.0 a.fixture.m1_guideline_b.rule.0
+  rules: test_source.m1_guideline_b.rule.0
+named assertions: a.test_source.m1_guideline_a.rule.0 a.test_source.m1_guideline_b.rule.0
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
 finding: finding.group.m1_conflict.1 report report
 reverse finding -> solver verdict -> named assertions -> rules -> statements -> segments -> source spans
 finding: finding.group.m1_conflict.1 report report
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.m1_conflict pair q.m1_conflict.pair1 query q.m1_conflict.pair1.deontic
-named assertions: a.fixture.m1_guideline_a.rule.0 a.fixture.m1_guideline_b.rule.0
-document fixture.m1_guideline_a path corpus/fixtures/m1_guideline_a.html
-  rules: fixture.m1_guideline_a.rule.0
+named assertions: a.test_source.m1_guideline_a.rule.0 a.test_source.m1_guideline_b.rule.0
+document test_source.m1_guideline_a path corpus/test_sources/m1_guideline_a.html
+  rules: test_source.m1_guideline_a.rule.0
   statements: stmt.0
   segments: seg.2 seg.3
   source spans: r.2 r.3
-document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
-  rules: fixture.m1_guideline_b.rule.0
+document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
+  rules: test_source.m1_guideline_b.rule.0
   statements: stmt.0
   segments: seg.2
   source spans: r.2
@@ -405,26 +405,26 @@ document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
 
     // The null finding resolves through the same chain: the §8.5 item 6
     // Q1 unsat renders as a no-conflict verdict over context assertions.
-    let null_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+    let no_conflict_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
         .args([
             "trace",
             "--run",
             run_dir.to_str().unwrap(),
             "--finding",
-            "finding.group.m1_null.0",
+            "finding.group.m1_no_conflict.0",
         ])
         .current_dir(root)
         .output()
         .unwrap();
-    assert_eq!(null_out.status.code(), Some(0));
-    let null_stdout = String::from_utf8(null_out.stdout).unwrap();
-    assert!(null_stdout.starts_with("trace finding.group.m1_null.0 run m1\n"));
-    assert!(null_stdout.contains(
+    assert_eq!(no_conflict_out.status.code(), Some(0));
+    let no_conflict_stdout = String::from_utf8(no_conflict_out.stdout).unwrap();
+    assert!(no_conflict_stdout.starts_with("trace finding.group.m1_no_conflict.0 run m1\n"));
+    assert!(no_conflict_stdout.contains(
         "solver verdict: unsat category semantic_no_conflict \
-         group group.m1_null pair q.m1_null.pair1 query q.m1_null.pair1.overlap\n"
+         group group.m1_no_conflict pair q.m1_no_conflict.pair1 query q.m1_no_conflict.pair1.overlap\n"
     ));
     assert!(
-        null_stdout.contains("document fixture.m1_control path corpus/fixtures/m1_control.html\n")
+        no_conflict_stdout.contains("document test_source.m1_control path corpus/test_sources/m1_control.html\n")
     );
 
     // Logs parse as their §4.6 record types; an ok total is a pure severity
@@ -442,13 +442,13 @@ document fixture.m1_guideline_b path corpus/fixtures/m1_guideline_b.html
     assert_eq!(files_under(&run_dir), expected_files);
 }
 
-/// The report stage's live pins (`cargo test -p ckc-cli report::`): the
+/// The report processing_stage's live pins (`cargo test -p ckc-cli report::`): the
 /// §7.2 partition over the recorded §8.6 world — one finding, one
 /// documented null — with every quoted span resolving through its landed
-/// source graph to the raw fixture bytes (§8.5 item 9), the corpus and
+/// source graph to the raw test_source bytes (§8.5 item 9), the corpus and
 /// lexicon rows recomputed from the files in force, and the solver
 /// identity matching the recorded verifier results. The trio pin extends
-/// the surface: `report.md` as the landed payload's exact rendering and
+/// the surface: `report_en.md` as the landed payload's exact rendering and
 /// the §5/§4.6 manifest pair attesting the run's provenance.
 mod report {
     use super::*;
@@ -459,13 +459,13 @@ mod report {
     /// Pin one row's evidence: the quoted spans carry exactly the
     /// `(document, region, span)` triples, each text equal to its span's
     /// `raw_text` in the document's landed source graph and present in
-    /// the raw fixture file — quoted Japanese spans resolving to fixture
+    /// the raw test_source file — quoted Japanese spans resolving to test_source
     /// bytes.
     fn assert_spans_ground(
         spans: &[QuotedSpan],
         triples: &[(&str, &str, &str)],
-        graphs: &std::collections::BTreeMap<Id, ArtifactEnvelope<SourceGraph>>,
-        fixtures: &std::collections::BTreeMap<Id, String>,
+        graphs: &std::collections::BTreeMap<Id, ArtifactWrapper<SourceDocumentGraph>>,
+        test_sources: &std::collections::BTreeMap<Id, String>,
     ) {
         let got: Vec<(Id, Id, Id)> = spans
             .iter()
@@ -493,8 +493,8 @@ mod report {
             assert_eq!(&span.text, raw, "{}/{}", span.document_id, span.span_id);
             assert!(!span.text.is_empty());
             assert!(
-                fixtures[&span.document_id].contains(&span.text),
-                "{}/{}: quoted text missing from the raw fixture bytes",
+                test_sources[&span.document_id].contains(&span.text),
+                "{}/{}: quoted text missing from the raw test_source bytes",
                 span.document_id,
                 span.span_id
             );
@@ -502,7 +502,7 @@ mod report {
     }
 
     #[test]
-    fn report_pins_the_partition_and_quoted_fixture_bytes() {
+    fn report_pins_the_partition_and_quoted_test_source_bytes() {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("m1");
@@ -524,47 +524,47 @@ mod report {
             String::from_utf8_lossy(&out.stderr)
         );
 
-        // The fixture documents and their raw bytes, resolved through the
+        // The test_source documents and their raw bytes, resolved through the
         // corpus registry like the run itself resolves them.
         let corpora =
             parse_corpora(&std::fs::read_to_string(root.join("registry/corpora.yaml")).unwrap())
                 .unwrap();
         let docs = [
-            "fixture.m1_control",
-            "fixture.m1_guideline_a",
-            "fixture.m1_guideline_b",
+            "test_source.m1_control",
+            "test_source.m1_guideline_a",
+            "test_source.m1_guideline_b",
         ];
-        let mut fixtures = std::collections::BTreeMap::new();
+        let mut test_sources = std::collections::BTreeMap::new();
         let mut graphs = std::collections::BTreeMap::new();
         for doc in docs {
             let entry = corpora.iter().find(|c| c.id == id(doc)).unwrap();
-            fixtures.insert(
+            test_sources.insert(
                 id(doc),
                 std::fs::read_to_string(root.join(&entry.path)).unwrap(),
             );
-            let graph: ArtifactEnvelope<SourceGraph> =
-                strict_read(&run_dir.join(format!("artifacts/{doc}/source_graph.json")));
+            let graph: ArtifactWrapper<SourceDocumentGraph> =
+                strict_read(&run_dir.join(format!("artifacts/{doc}/source_document_graph.json")));
             graphs.insert(id(doc), graph);
         }
 
-        let report: ArtifactEnvelope<Report> = strict_read(&run_dir.join("report.json"));
+        let report: ArtifactWrapper<Report> = strict_read(&run_dir.join("report.json"));
         report.payload.validate().unwrap();
         assert_eq!(report.schema_id, id("schema.report"));
         assert_eq!(report.artifact_id, id("report"));
         assert_eq!(report.artifact_kind, id("report"));
-        assert_eq!(report.producer.component_id, id("stage.m1.report"));
+        assert_eq!(report.producer.pipeline_step_id, id("processing_stage.m1.report"));
         assert!(report.diagnostics.is_empty());
 
         // Input set: the trace pair, the three source graphs, the two
-        // verifier results — every envelope the assembly consumed.
-        let trace: ArtifactEnvelope<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
-        let lineage: ArtifactEnvelope<LineageIndex> =
+        // verifier results — every wrapper the assembly consumed.
+        let trace: ArtifactWrapper<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));
+        let lineage: ArtifactWrapper<LineageIndex> =
             strict_read(&run_dir.join("lineage_index.json"));
         let mut inputs = vec![trace.content_hash.clone(), lineage.content_hash.clone()];
         inputs.extend(graphs.values().map(|g| g.content_hash.clone()));
         let mut identities = Vec::new();
-        for gid in ["group.m1_conflict", "group.m1_null"] {
-            let verifier: ArtifactEnvelope<VerifierResults> =
+        for gid in ["group.m1_conflict", "group.m1_no_conflict"] {
+            let verifier: ArtifactWrapper<VerifierResults> =
                 strict_read(&run_dir.join(format!("groups/{gid}/verifier_results.json")));
             inputs.push(verifier.content_hash.clone());
             identities.extend(
@@ -585,7 +585,7 @@ mod report {
         let payload = &report.payload;
         let expected_corpus: Vec<(Id, Hash)> = docs
             .iter()
-            .map(|doc| (id(doc), ckc_core::hash_bytes(fixtures[&id(doc)].as_bytes())))
+            .map(|doc| (id(doc), ckc_core::hash_bytes(test_sources[&id(doc)].as_bytes())))
             .collect();
         assert_eq!(payload.corpus_hashes, expected_corpus);
         assert_eq!(
@@ -594,7 +594,7 @@ mod report {
         );
 
         // A clean run rolls up no diagnostics; the replay slot opens
-        // unreplayed; the identity is the live z3 the verify stage used.
+        // unreplayed; the identity is the live z3 the verify processing_stage used.
         assert_eq!(payload.diagnostics_summary, Vec::new());
         assert_eq!(payload.replay_status, ReplayStatus::NotReplayed);
         assert_eq!(payload.solver_identity.solver_id, id("z3"));
@@ -602,8 +602,8 @@ mod report {
         assert_eq!(
             payload.wording,
             vec![
-                Wording::DocumentedNullResult,
-                Wording::SyntheticFixtureMeasurement
+                Wording::DocumentedNoConflictResult,
+                Wording::SyntheticTestSourceMeasurement
             ]
         );
 
@@ -618,80 +618,80 @@ mod report {
             finding.conflict_kind,
             Some(ConflictKind::DeonticDirectionConflict)
         );
-        assert_eq!(finding.claim_tier, ClaimTier::S1Admitted);
-        assert_eq!(finding.wording, Wording::SyntheticFixtureMeasurement);
+        assert_eq!(finding.claim_tier, ClaimTier::S1Accepted);
+        assert_eq!(finding.wording, Wording::SyntheticTestSourceMeasurement);
         let cross_core = vec![
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_b.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0"),
         ];
         assert_eq!(finding.core, Some(cross_core.clone()));
         assert_eq!(finding.assertion_ids, cross_core);
         assert_eq!(
             finding.rule_ids,
             vec![
-                id("fixture.m1_guideline_a.rule.0"),
-                id("fixture.m1_guideline_b.rule.0")
+                id("test_source.m1_guideline_a.rule.0"),
+                id("test_source.m1_guideline_b.rule.0")
             ]
         );
         assert_eq!(finding.region_ids, vec![id("r.2"), id("r.3")]);
         assert_spans_ground(
             &finding.quoted_spans,
             &[
-                ("fixture.m1_guideline_a", "r.2", "s.2"),
-                ("fixture.m1_guideline_a", "r.3", "s.3"),
-                ("fixture.m1_guideline_b", "r.2", "s.2"),
+                ("test_source.m1_guideline_a", "r.2", "s.2"),
+                ("test_source.m1_guideline_a", "r.3", "s.3"),
+                ("test_source.m1_guideline_b", "r.2", "s.2"),
             ],
             &graphs,
-            &fixtures,
+            &test_sources,
         );
 
         // §8.5 item 6's report surface: the disjoint-interval Q1 unsat as
         // the documented null — context assertions, no kind, no core.
-        assert_eq!(payload.null_results.len(), 1);
-        let null = &payload.null_results[0];
-        assert_eq!(null.finding_id, id("finding.group.m1_null.0"));
-        assert_eq!(null.query_id, id("q.m1_null.pair1.overlap"));
+        assert_eq!(payload.no_conflict_results.len(), 1);
+        let null = &payload.no_conflict_results[0];
+        assert_eq!(null.finding_id, id("finding.group.m1_no_conflict.0"));
+        assert_eq!(null.query_id, id("q.m1_no_conflict.pair1.overlap"));
         assert_eq!(null.verdict, SolverVerdict::Unsat);
         assert_eq!(null.conflict_kind, None);
         assert_eq!(null.core, None);
-        assert_eq!(null.claim_tier, ClaimTier::S1Admitted);
-        assert_eq!(null.wording, Wording::DocumentedNullResult);
+        assert_eq!(null.claim_tier, ClaimTier::S1Accepted);
+        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(
             null.assertion_ids,
             vec![
-                id("ctx.fixture.m1_control.rule.0"),
-                id("ctx.fixture.m1_guideline_a.rule.0")
+                id("ctx.test_source.m1_control.rule.0"),
+                id("ctx.test_source.m1_guideline_a.rule.0")
             ]
         );
         assert_eq!(
             null.rule_ids,
             vec![
-                id("fixture.m1_control.rule.0"),
-                id("fixture.m1_guideline_a.rule.0")
+                id("test_source.m1_control.rule.0"),
+                id("test_source.m1_guideline_a.rule.0")
             ]
         );
         assert_eq!(null.region_ids, vec![id("r.2"), id("r.3")]);
         assert_spans_ground(
             &null.quoted_spans,
             &[
-                ("fixture.m1_control", "r.2", "s.2"),
-                ("fixture.m1_guideline_a", "r.2", "s.2"),
-                ("fixture.m1_guideline_a", "r.3", "s.3"),
+                ("test_source.m1_control", "r.2", "s.2"),
+                ("test_source.m1_guideline_a", "r.2", "s.2"),
+                ("test_source.m1_guideline_a", "r.3", "s.3"),
             ],
             &graphs,
-            &fixtures,
+            &test_sources,
         );
     }
 
-    /// The landed trio's live pins over its own recorded run: `report.md`
+    /// The landed trio's live pins over its own recorded run: `report_en.md`
     /// is byte-for-byte the rendering of the strict-read `report.json`
     /// payload with every quoted span's grounded text present — closing
     /// the §8.5 item 9 surface on the derived view — and the §5/§4.6
     /// manifest pair attests the run's provenance: the registry-rebuilt
     /// plan hash, the build-baked commit, raw-byte hashes of the repo
     /// files in force, the `arch`/`os` profile, the recorded solver
-    /// identity, the three fixture input hashes, and the nineteen
-    /// accepted envelopes' output-hash set mirrored verbatim into the
+    /// identity, the three test_source input hashes, and the nineteen
+    /// accepted wrappers' output-hash set mirrored verbatim into the
     /// replay expectation.
     #[test]
     fn report_md_and_manifests_pin_run_provenance() {
@@ -716,46 +716,46 @@ mod report {
             String::from_utf8_lossy(&out.stderr)
         );
 
-        // §7.2 derived view: report.md carries exactly the landed
+        // §7.2 derived view: report_en.md carries exactly the landed
         // payload's rendering, quoted Japanese spans included.
-        let report: ArtifactEnvelope<Report> = strict_read(&run_dir.join("report.json"));
-        let md = std::fs::read(run_dir.join("report.md")).unwrap();
+        let report: ArtifactWrapper<Report> = strict_read(&run_dir.join("report.json"));
+        let md = std::fs::read(run_dir.join("report_en.md")).unwrap();
         assert_eq!(md, render_markdown(&report.payload).into_bytes());
         let md = String::from_utf8(md).unwrap();
         for span in report
             .payload
             .findings
             .iter()
-            .chain(&report.payload.null_results)
+            .chain(&report.payload.no_conflict_results)
             .flat_map(|row| &row.quoted_spans)
         {
             assert!(
                 md.contains(&span.text),
-                "{}/{}: quoted text missing from report.md",
+                "{}/{}: quoted text missing from report_en.md",
                 span.document_id,
                 span.span_id
             );
         }
 
-        // The nineteen accepted envelopes — four layers per document, the
+        // The nineteen accepted wrappers — four layers per document, the
         // compile/verify pair per group, the trace pair, the report —
         // strict-read into the manifests' §4.3 output-hash set.
         let docs = [
-            "fixture.m1_control",
-            "fixture.m1_guideline_a",
-            "fixture.m1_guideline_b",
+            "test_source.m1_control",
+            "test_source.m1_guideline_a",
+            "test_source.m1_guideline_b",
         ];
         let mut output_hashes: Vec<Hash> = vec![report.content_hash.clone()];
         for doc in docs {
             let dir = run_dir.join("artifacts").join(doc);
             output_hashes.extend([
-                strict_read::<SourceGraph>(&dir.join("source_graph.json")).content_hash,
+                strict_read::<SourceDocumentGraph>(&dir.join("source_document_graph.json")).content_hash,
                 strict_read::<SegmentIr>(&dir.join("segments.json")).content_hash,
                 strict_read::<Normalization>(&dir.join("normalization.json")).content_hash,
                 strict_read::<IrBundle>(&dir.join("ir_bundle.json")).content_hash,
             ]);
         }
-        for gid in ["group.m1_conflict", "group.m1_null"] {
+        for gid in ["group.m1_conflict", "group.m1_no_conflict"] {
             let dir = run_dir.join("groups").join(gid);
             output_hashes.extend([
                 strict_read::<CompiledArtifact>(&dir.join("compiled.json")).content_hash,
@@ -766,7 +766,7 @@ mod report {
             strict_read::<TraceBundle>(&run_dir.join("trace_bundle.json")).content_hash,
             strict_read::<LineageIndex>(&run_dir.join("lineage_index.json")).content_hash,
         ]);
-        assert_eq!(output_hashes.len(), 19, "nineteen accepted envelopes");
+        assert_eq!(output_hashes.len(), 19, "nineteen accepted wrappers");
         output_hashes.sort();
         output_hashes.dedup();
         // Content addresses, not files: the control and guideline_b
@@ -775,12 +775,12 @@ mod report {
         // pair into eighteen addresses.
         assert_eq!(output_hashes.len(), 18, "one content-equal pair");
 
-        // The §5/§4.6 records land bare — the manifests attest envelopes;
-        // nothing envelopes them — so the bar is the canonical read.
+        // The §5/§4.6 records land bare — the manifests attest wrappers;
+        // nothing wrappers them — so the bar is the canonical read.
         let manifest: RunManifest =
-            read_canonical(&std::fs::read(run_dir.join("manifest.json")).unwrap()).unwrap();
+            read_strict_canonical(&std::fs::read(run_dir.join("manifest.json")).unwrap()).unwrap();
         let replay: ReplayManifest =
-            read_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap();
+            read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap();
 
         // §5 plan linkage: the plan rebuilt from the experiment registry
         // hashes to the recorded value.
@@ -794,8 +794,8 @@ mod report {
             .unwrap();
         let plan = RunPlan {
             experiment_id: exp.id.clone(),
-            fixture_groups: exp
-                .fixture_groups
+            test_source_groups: exp
+                .test_source_groups
                 .iter()
                 .map(|g| g.group_id.clone())
                 .collect(),
@@ -812,7 +812,7 @@ mod report {
         assert!(manifest.git_commit.bytes().all(|b| b.is_ascii_hexdigit()));
 
         // Raw-byte hashes of the repo files in force (§4.4 `_hash` rule),
-        // the environment profile, and the verify stage's live identity.
+        // the environment profile, and the verify processing_stage's live identity.
         let file_hash = |rel: &str| ckc_core::hash_bytes(&std::fs::read(root.join(rel)).unwrap());
         assert_eq!(
             manifest.toolchain_manifest_hash,
@@ -837,7 +837,7 @@ mod report {
         assert_eq!(manifest.solver_identity, report.payload.solver_identity);
         assert_eq!(manifest.output_hashes, output_hashes);
 
-        // §4.6 replay record: the re-execution argv, the three fixture
+        // §4.6 replay record: the re-execution argv, the three test_source
         // raw-byte input hashes, every shared fact mirrored from the §5
         // record, and the output expectation verbatim.
         assert_eq!(

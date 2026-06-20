@@ -156,7 +156,7 @@ impl std::error::Error for ManifestError {}
 
 #[cfg(test)]
 mod tests {
-    use ckc_core::{canonical_payload_bytes, read_canonical};
+    use ckc_core::{canonical_payload_bytes, read_strict_canonical};
 
     use super::*;
 
@@ -174,7 +174,7 @@ mod tests {
         ManifestInputs {
             plan: RunPlan {
                 experiment_id: id("exp.m1_spine"),
-                fixture_groups: vec![id("group.m1_conflict"), id("group.m1_null")],
+                test_source_groups: vec![id("group.m1_conflict"), id("group.m1_no_conflict")],
                 pipelines: vec![id("pipe.layered_ckcir_to_smt")],
                 seed: 42,
                 budget: vec![(id("solver_ms_per_query"), 10_000)],
@@ -253,12 +253,12 @@ mod tests {
         let (manifest, replay) = assemble_manifests(&inputs()).unwrap();
         let manifest_bytes = canonical_payload_bytes(&manifest).unwrap();
         assert_eq!(
-            read_canonical::<RunManifest>(&manifest_bytes).unwrap(),
+            read_strict_canonical::<RunManifest>(&manifest_bytes).unwrap(),
             manifest
         );
         let replay_bytes = canonical_payload_bytes(&replay).unwrap();
         assert_eq!(
-            read_canonical::<ReplayManifest>(&replay_bytes).unwrap(),
+            read_strict_canonical::<ReplayManifest>(&replay_bytes).unwrap(),
             replay
         );
     }

@@ -1,5 +1,5 @@
-//! SPEC §5 `VerifierResult` — the verify stage's durable per-query payload:
-//! §6 category, raw solver verdict kept distinct, witness model or canonical
+//! SPEC §5 `VerifierResult` — the verify processing_stage's durable per-query payload:
+//! §6 category, raw solver verdict kept distinct, satisfying_example model or canonical
 //! unsat core, solver identity, diagnostics.
 //!
 //! The §6 mapping from raw solver outcomes to categories is the verify
@@ -21,9 +21,9 @@ fieldless_enum! {
     /// [`VerifierResult`] carries, kept distinct from the raw
     /// [`SolverVerdict`] token.
     VerifierCategory {
-        /// An input artifact failed schema or canonical admission.
+        /// An input artifact failed schema or canonical acceptance.
         SchemaFailure => "schema_failure",
-        /// The compile stage failed to produce the query.
+        /// The compile processing_stage failed to produce the query.
         CompilerFailure => "compiler_failure",
         /// The solver rejected the query text (parse error).
         TargetSyntaxFailure => "target_syntax_failure",
@@ -31,7 +31,7 @@ fieldless_enum! {
         SolverExecutionFailure => "solver_execution_failure",
         /// The query completed without witnessing a contradiction.
         SemanticNoConflict => "semantic_no_conflict",
-        /// The query's unsat verdict witnesses a contradiction; the unsat
+        /// The query's unsat verdict satisfying_examples a contradiction; the unsat
         /// core names the contributing assertions.
         SemanticContradiction => "semantic_contradiction",
         /// The solver returned unknown or hit its per-query budget (the
@@ -61,7 +61,7 @@ fieldless_enum! {
 /// units.
 ///
 /// Optional fields omit canonically when absent (§4.3): a failure category
-/// carries no verdict, a sat verdict may carry a witness `model` (§6 "where
+/// carries no verdict, a sat verdict may carry a satisfying_example `model` (§6 "where
 /// relevant"), an unsat verdict may carry `unsat_core` — assertion names
 /// normalized to a canonical Id set sorted by canonical_sort_key. `model`
 /// rides byte-exact as the solver printed it.
@@ -202,12 +202,12 @@ impl CanonRead for VerifierResult {
     }
 }
 
-/// SPEC §8.3 verify-stage durable artifact: one fixture group's results in
+/// SPEC §8.3 verify-processing_stage durable artifact: one test_source group's results in
 /// plan order — pair k's `context_overlap`, then its `deontic_consistency`
 /// when Q1 answered sat — the payload of the run layout's
 /// `groups/<gid>/verifier_results.json`. Order is producer-owned:
 /// [`verify`](crate::verify) yields it by construction, and the compiled
-/// artifact's plan stays the order authority.
+/// artifact's plan stays the order evidence_status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifierResults {
     pub results: Vec<VerifierResult>,
@@ -242,11 +242,11 @@ impl CanonRead for VerifierResults {
 /// ([`VerifierResult::validate`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifierError {
-    /// A witness model rides on a verdict other than `sat`.
+    /// A satisfying_example model rides on a verdict other than `sat`.
     ModelWithoutSat,
     /// An unsat core rides on a verdict other than `unsat`.
     CoreWithoutUnsat,
-    /// The witness model text is empty.
+    /// The satisfying_example model text is empty.
     EmptyModel,
     /// The unsat core set is empty.
     EmptyCore,
@@ -267,7 +267,7 @@ impl std::fmt::Display for VerifierError {
         match self {
             VerifierError::ModelWithoutSat => write!(f, "model without a sat verdict"),
             VerifierError::CoreWithoutUnsat => write!(f, "unsat core without an unsat verdict"),
-            VerifierError::EmptyModel => write!(f, "empty witness model"),
+            VerifierError::EmptyModel => write!(f, "empty satisfying_example model"),
             VerifierError::EmptyCore => write!(f, "empty unsat core"),
             VerifierError::Duplicate { pool, id } => write!(f, "duplicate {pool} id {id}"),
             VerifierError::Unsorted { pool, id } => {
@@ -285,7 +285,7 @@ impl std::error::Error for VerifierError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::{DiagnosticCode, Outcome, canonical_payload_bytes, read_canonical};
+    use ckc_core::{DiagnosticCode, Outcome, canonical_payload_bytes, read_strict_canonical};
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
     fn canon<T: Canonical>(value: &T) -> String {
@@ -295,7 +295,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -310,7 +310,7 @@ mod tests {
         }
     }
 
-    /// §8.6 Q1: context overlap sat, witness model recorded.
+    /// §8.6 Q1: context overlap sat, satisfying_example model recorded.
     fn q1_sat() -> VerifierResult {
         VerifierResult {
             query_id: id("q.m1_conflict.pair1.overlap"),
@@ -331,8 +331,8 @@ mod tests {
             verdict: Some(SolverVerdict::Unsat),
             model: None,
             unsat_core: Some(vec![
-                id("a.fixture.m1_guideline_a.rule.0"),
-                id("a.fixture.m1_guideline_b.rule.0"),
+                id("a.test_source.m1_guideline_a.rule.0"),
+                id("a.test_source.m1_guideline_b.rule.0"),
             ]),
             solver_identity: z3(),
             diagnostics: vec![],
@@ -378,8 +378,8 @@ mod tests {
                 r#"{"category":"semantic_contradiction","diagnostics":[],"#,
                 r#""query_id":"q.m1_conflict.pair1.deontic","#,
                 r#""solver_identity":{"solver_id":"z3","version":"4.13.4"},"#,
-                r#""unsat_core":["a.fixture.m1_guideline_a.rule.0","#,
-                r#""a.fixture.m1_guideline_b.rule.0"],"verdict":"unsat"}"#
+                r#""unsat_core":["a.test_source.m1_guideline_a.rule.0","#,
+                r#""a.test_source.m1_guideline_b.rule.0"],"verdict":"unsat"}"#
             )
         );
     }
@@ -422,7 +422,7 @@ mod tests {
         // Core on sat.
         let mut core_sat = q1_sat();
         core_sat.model = None;
-        core_sat.unsat_core = Some(vec![id("a.fixture.m1_guideline_a.rule.0")]);
+        core_sat.unsat_core = Some(vec![id("a.test_source.m1_guideline_a.rule.0")]);
         assert_eq!(core_sat.validate(), Err(VerifierError::CoreWithoutUnsat));
         // Empty model / empty core.
         let mut empty_model = q1_sat();
@@ -434,26 +434,26 @@ mod tests {
         // Core stored unsorted / with duplicates.
         let mut unsorted = q2_unsat();
         unsorted.unsat_core = Some(vec![
-            id("a.fixture.m1_guideline_b.rule.0"),
-            id("a.fixture.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
         ]);
         assert_eq!(
             unsorted.validate(),
             Err(VerifierError::Unsorted {
                 pool: "unsat_core",
-                id: id("a.fixture.m1_guideline_a.rule.0"),
+                id: id("a.test_source.m1_guideline_a.rule.0"),
             })
         );
         let mut dup = q2_unsat();
         dup.unsat_core = Some(vec![
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
         ]);
         assert_eq!(
             dup.validate(),
             Err(VerifierError::Duplicate {
                 pool: "unsat_core",
-                id: id("a.fixture.m1_guideline_a.rule.0"),
+                id: id("a.test_source.m1_guideline_a.rule.0"),
             })
         );
     }

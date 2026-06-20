@@ -1,12 +1,12 @@
-//! Envelope content and policy hashes (SPEC §4.3, §4.4).
+//! Wrapper content and policy hashes (SPEC §4.3, §4.4).
 //!
 //! SPEC §4.3 fixes `content_hash = sha256(canonical_payload_bytes(payload))`.
-//! [`content_hash`] is that single authority, wrapping the digest as the [`Hash`]
+//! [`content_hash`] is that single evidence_status, wrapping the digest as the [`Hash`]
 //! value type; [`hash_bytes`] exposes the underlying sha256-over-raw-bytes step
 //! for the §4.4 `_hash` fields that declare raw-byte hashing. The descriptor
 //! [`CanonicalizationPolicy`] names the canonical-bytes policy, and
 //! [`canonicalization_policy_hash`] is its content hash — the value an artifact
-//! envelope records to pin the policy version that sealed it.
+//! wrapper records to pin the policy version that sealed it.
 
 use sha2::{Digest, Sha256};
 
@@ -17,7 +17,7 @@ use crate::id::Hash;
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
 /// SPEC §4.3 `content_hash = sha256(canonical_payload_bytes(payload))`, wrapped as
-/// the [`struct@Hash`] value type. The one authority for an artifact's content hash;
+/// the [`struct@Hash`] value type. The one evidence_status for an artifact's content hash;
 /// fails only when `value` cannot be canonicalized.
 pub fn content_hash<T: Canonical>(value: &T) -> Result<Hash, CanonError> {
     Ok(hash_bytes(&canonical_payload_bytes(value)?))
@@ -46,7 +46,7 @@ pub fn canonicalization_policy_hash() -> Hash {
 }
 
 /// Stable identity of the SPEC §4.3 canonical-JSON byte policy: an `id` naming the
-/// policy family and a `version` frozen per milestone. It is itself a
+/// policy family and a `version` locked per milestone. It is itself a
 /// [`Canonical`] value, so [`canonicalization_policy_hash`] is an ordinary
 /// [`content_hash`] over it; bumping `version` when §4.3 changes re-keys every
 /// downstream policy hash.

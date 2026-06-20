@@ -1,9 +1,9 @@
-//! Normalize stage (SPEC §8.3 normalize row): lexicon loading, mention
-//! binding, statement building, and the enveloped stage entry;
-//! [`NormRule`](ckc_core::NormRule) derivation lives in [`crate::rules`].
+//! Normalize processing_stage (SPEC §8.3 normalize row): lexicon loading, mention
+//! binding, statement building, and the wrapped processing_stage entry;
+//! [`NormativeRule`](ckc_core::NormativeRule) derivation lives in [`crate::rules`].
 //!
 //! [`load_lexicon`] strict-deserializes `corpus/lexicon/ja_core.yaml` — the
-//! §5 M1 terminology and modality authority (system `ckc.lex`) — and
+//! §5 M1 terminology and modality evidence_status (system `ckc.lex`) — and
 //! validates it into the typed [`Lexicon`], content-hash versioned over its
 //! raw file bytes (§4.4 raw-byte hashing) for every run manifest. Every
 //! surface form is stored normalized under [`StringPolicy::SemanticJa`]
@@ -38,13 +38,13 @@
 //! segment; a concept-free exception or one with no preceding statement
 //! records a Residual and drops the clause, bindings emitting either way.
 //!
-//! [`normalize`] (`stage-normalize.2b`) is the stage entry: [`clinical_ir`]
-//! plus [`crate::rules::derive_norm_ir`] under one §4.4 envelope —
+//! [`normalize`] (`stage-normalize.2b`) is the processing_stage entry: [`clinical_ir`]
+//! plus [`crate::rules::derive_norm_ir`] under one §4.4 wrapper —
 //! `schema.normalization`, artifact id `<document_id>.normalization`,
-//! `deterministic_compiler` origin under `mechanical_authority`, the
-//! consumed source-graph and segments envelopes' content hashes as the
+//! `deterministic_compiler` origin under `mechanical_evidence_status`, the
+//! consumed source-graph and segments wrappers' content hashes as the
 //! input hashes in that order, the statement pass's diagnostics in the
-//! envelope, payload hashes computed here.
+//! wrapper, payload hashes computed here.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -52,10 +52,10 @@ use std::fmt;
 use serde::Deserialize;
 
 use ckc_core::{
-    Action, ArtifactEnvelope, Authority, BindingStatus, CanonError, Certainty, ClinicalIr,
+    Action, ArtifactWrapper, EvidenceStatus, BindingStatus, CanonError, Certainty, ClinicalIr,
     ClinicalSegment, ClinicalStatement, ContextAtom, DiagnosticCode, DiagnosticRecord, Direction,
     ExceptionClause, Hash, Id, Normalization, Origin, Outcome, Producer, QuantityInterval,
-    SegmentIr, SegmentKind, SourceGraph, SourceRegion, SourceSpan, Strength, StringPolicy,
+    SegmentIr, SegmentKind, SourceDocumentGraph, EvidenceRegion, SourceTextSpan, Strength, StringPolicy,
     TerminologyBinding, canonicalization_policy_hash, content_hash, hash_bytes,
 };
 
@@ -358,7 +358,7 @@ fn check_interval(owner: &Id, q: &QuantityInterval) -> Result<(), LexiconError> 
 ///
 /// Each segment's regions resolve to their spans, scanned in reading order
 /// (a span named by several regions scans once, every naming region
-/// grounding its matches); each span's `search_text` is scanned greedy
+/// source_linkage its matches); each span's `search_text` is scanned greedy
 /// left-to-right longest-match against the concept surfaces, a match
 /// consuming its bytes. The candidate set is every concept sharing the
 /// matched surface: a singleton binds its concept — `exact` when the
@@ -371,7 +371,7 @@ fn check_interval(owner: &Id, q: &QuantityInterval) -> Result<(), LexiconError> 
 /// statement builder's (`stage-normalize.1d`). Dangling region or span refs
 /// are the bundle validator's domain (§5 invariants) and skip silently.
 pub fn bind_segments(
-    graph: &SourceGraph,
+    graph: &SourceDocumentGraph,
     segments: &SegmentIr,
     lexicon: &Lexicon,
 ) -> (Vec<TerminologyBinding>, Vec<DiagnosticRecord>) {
@@ -395,15 +395,15 @@ pub fn bind_segments(
     (bindings, diagnostics)
 }
 
-/// One-pass id indexes over a [`SourceGraph`]: the span and region lookups
+/// One-pass id indexes over a [`SourceDocumentGraph`]: the span and region lookups
 /// behind [`GraphIndex::segment_spans`], built once per binding run.
 struct GraphIndex<'a> {
-    spans: HashMap<&'a Id, &'a SourceSpan>,
-    regions: HashMap<&'a Id, &'a SourceRegion>,
+    spans: HashMap<&'a Id, &'a SourceTextSpan>,
+    regions: HashMap<&'a Id, &'a EvidenceRegion>,
 }
 
 impl<'a> GraphIndex<'a> {
-    fn new(graph: &'a SourceGraph) -> GraphIndex<'a> {
+    fn new(graph: &'a SourceDocumentGraph) -> GraphIndex<'a> {
         GraphIndex {
             spans: graph.spans.iter().map(|s| (&s.span_id, s)).collect(),
             regions: graph.regions.iter().map(|r| (&r.region_id, r)).collect(),
@@ -414,8 +414,8 @@ impl<'a> GraphIndex<'a> {
     /// named by several regions appears once — each paired with the region
     /// ids naming it (raw accumulation; consumers sort and dedupe what
     /// they keep). Dangling region and span refs skip silently per the
-    /// [`bind_segments`] contract.
-    fn segment_spans(&self, segment: &ClinicalSegment) -> Vec<(&'a SourceSpan, Vec<&'a Id>)> {
+    /// [`bind_segments`] requirements.
+    fn segment_spans(&self, segment: &ClinicalSegment) -> Vec<(&'a SourceTextSpan, Vec<&'a Id>)> {
         let mut span_regions: HashMap<&'a Id, Vec<&'a Id>> = HashMap::new();
         for region_id in &segment.region_ids {
             let Some(&region) = self.regions.get(region_id) else {
@@ -428,7 +428,7 @@ impl<'a> GraphIndex<'a> {
                     .push(&region.region_id);
             }
         }
-        let mut spans: Vec<(&'a SourceSpan, Vec<&'a Id>)> = span_regions
+        let mut spans: Vec<(&'a SourceTextSpan, Vec<&'a Id>)> = span_regions
             .into_iter()
             .filter_map(|(span_id, regions)| self.spans.get(span_id).map(|&span| (span, regions)))
             .collect();
@@ -522,7 +522,7 @@ fn dedup_keep_first<T: PartialEq>(items: &mut Vec<T>) {
 /// order under ids `bind.<next + local index>`, plus one ambiguity record
 /// per ambiguous binding.
 fn bind_segment(
-    spans: &[(&SourceSpan, Vec<&Id>)],
+    spans: &[(&SourceTextSpan, Vec<&Id>)],
     table: &ConceptTable<'_>,
     system: &Id,
     next: usize,
@@ -668,7 +668,7 @@ fn ambiguity(surface: &str, alternatives: &[Id], region_ids: &[Id]) -> Diagnosti
 /// target, modality/strength from the single reading, and
 /// `source_segment_ids = {segment}`.
 pub fn clinical_ir(
-    graph: &SourceGraph,
+    graph: &SourceDocumentGraph,
     segments: &SegmentIr,
     lexicon: &Lexicon,
 ) -> (ClinicalIr, Vec<DiagnosticRecord>) {
@@ -762,7 +762,7 @@ impl<'a> StatementTables<'a> {
 /// `stmt.<next>` when every required slot reads single.
 fn build_statement(
     segment: &ClinicalSegment,
-    spans: &[(&SourceSpan, Vec<&Id>)],
+    spans: &[(&SourceTextSpan, Vec<&Id>)],
     bindings: &[TerminologyBinding],
     tables: &StatementTables<'_>,
     next: usize,
@@ -1040,11 +1040,11 @@ impl From<CanonError> for NormalizeError {
 /// (module doc): the §5 statement layer beside the rule layer derived
 /// from it, `schema.normalization`.
 pub fn normalize(
-    source: &ArtifactEnvelope<SourceGraph>,
-    segments: &ArtifactEnvelope<SegmentIr>,
+    source: &ArtifactWrapper<SourceDocumentGraph>,
+    segments: &ArtifactWrapper<SegmentIr>,
     lexicon: &Lexicon,
     producer: &Producer,
-) -> Result<ArtifactEnvelope<Normalization>, NormalizeError> {
+) -> Result<ArtifactWrapper<Normalization>, NormalizeError> {
     let (clinical, diagnostics) = clinical_ir(&source.payload, &segments.payload, lexicon);
     let document_id = &source.payload.document.document_id;
     let norm = crate::rules::derive_norm_ir(document_id, &clinical, &segments.payload, lexicon);
@@ -1052,7 +1052,7 @@ pub fn normalize(
 
     let artifact_id = Id::new(format!("{document_id}.normalization"))
         .expect("a valid document id keeps the Id grammar under a suffix");
-    Ok(ArtifactEnvelope {
+    Ok(ArtifactWrapper {
         schema_id: static_id("schema.normalization"),
         artifact_id,
         artifact_kind: static_id("normalization"),
@@ -1061,8 +1061,8 @@ pub fn normalize(
         content_hash: content_hash(&payload)?,
         canonicalization_policy_hash: canonicalization_policy_hash(),
         origin: Origin::DeterministicCompiler,
-        authority: Authority::MechanicalAuthority,
-        accepted_effects: vec![],
+        evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+        external_effects: vec![],
         trace_refs: vec![],
         diagnostics,
         runtime_metadata: vec![],
@@ -1376,22 +1376,22 @@ mod tests {
     use crate::extract::{ExtractConfig, extract};
     use crate::segment::segment;
     use ckc_core::{
-        ArtifactEnvelope, ClinicalSegment, DataClass, Producer, Provenance,
-        canonical_payload_bytes, read_canonical,
+        ArtifactWrapper, ClinicalSegment, DataClass, Producer, Provenance,
+        canonical_payload_bytes, read_strict_canonical,
     };
 
     fn producer() -> Producer {
         Producer {
-            candidate_id: id("cand.m1"),
-            component_id: id("stage.normalize"),
+            pipeline_id: id("cand.m1"),
+            pipeline_step_id: id("processing_stage.normalize"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
     }
 
-    fn extracted(html: &[u8]) -> ArtifactEnvelope<SourceGraph> {
+    fn extracted(html: &[u8]) -> ArtifactWrapper<SourceDocumentGraph> {
         let config = ExtractConfig {
             document_id: id("doc.test"),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: producer(),
@@ -1399,8 +1399,8 @@ mod tests {
         extract(html, &config).unwrap()
     }
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+    fn test_source(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/test_sources/");
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
@@ -1428,14 +1428,14 @@ mod tests {
         }
     }
 
-    // The committed fixtures bind their recommendation and exception
-    // mentions against the committed lexicon — all exact (every fixture
+    // The committed test_sources bind their recommendation and exception
+    // mentions against the committed lexicon — all exact (every test_source
     // mention is a representative surface), diagnostic-free, ids
     // document-wide across segments. Unscanned kinds prove the segment
     // filter: a's CQ heading and definition rows and every metadata
     // heading mention concepts yet mint nothing.
     #[test]
-    fn committed_fixtures_bind_exact() {
+    fn committed_test_sources_bind_exact() {
         let lexicon = load_lexicon(&committed()).unwrap();
         let cases: [(&str, Vec<TerminologyBinding>); 3] = [
             (
@@ -1478,7 +1478,7 @@ mod tests {
             ),
         ];
         for (name, want) in cases {
-            let (bindings, diagnostics) = bound(&fixture(name), &lexicon);
+            let (bindings, diagnostics) = bound(&test_source(name), &lexicon);
             assert!(
                 diagnostics.is_empty(),
                 "{name} binds diagnostic-free, got {diagnostics:?}"
@@ -1653,7 +1653,7 @@ mod tests {
     }
 
     // The statement builder's binding core reproduces bind_segments
-    // byte-for-byte on every committed fixture: same bindings, same
+    // byte-for-byte on every committed test_source: same bindings, same
     // (empty) diagnostics.
     #[test]
     fn clinical_ir_bindings_equal_bind_segments() {
@@ -1663,7 +1663,7 @@ mod tests {
             "m1_guideline_b.html",
             "m1_control.html",
         ] {
-            let source = extracted(&fixture(name));
+            let source = extracted(&test_source(name));
             let segments = segment(&source, &producer()).unwrap();
             let (bindings, diagnostics) =
                 bind_segments(&source.payload, &segments.payload, &lexicon);
@@ -1673,13 +1673,13 @@ mod tests {
         }
     }
 
-    // The two single-recommendation fixtures build their statements,
+    // The two single-recommendation test_sources build their statements,
     // pinned from observed output: in guideline_b the verb 投与 matches
     // inside 投与しないこと and the two contraindicate phrases dedupe to
     // one (contraindicate, strong) reading; in control no verb matches
     // and the kind arrives via 禁忌's implies_action.
     #[test]
-    fn committed_fixtures_build_statements() {
+    fn committed_test_sources_build_statements() {
         let lexicon = load_lexicon(&committed()).unwrap();
         let statement = |population: &str, condition: &[&str]| ClinicalStatement {
             statement_id: id("stmt.0"),
@@ -1703,7 +1703,7 @@ mod tests {
             ("m1_control.html", statement("pop.child", &["cond.sepsis"])),
         ];
         for (name, want) in cases {
-            let (ir, diagnostics) = derived(&fixture(name), &lexicon);
+            let (ir, diagnostics) = derived(&test_source(name), &lexicon);
             assert!(
                 diagnostics.is_empty(),
                 "{name} derives diagnostic-free, got {diagnostics:?}"
@@ -1932,7 +1932,7 @@ mod tests {
     #[test]
     fn committed_guideline_a_attaches_exception() {
         let lexicon = load_lexicon(&committed()).unwrap();
-        let (ir, diagnostics) = derived(&fixture("m1_guideline_a.html"), &lexicon);
+        let (ir, diagnostics) = derived(&test_source("m1_guideline_a.html"), &lexicon);
         assert!(
             diagnostics.is_empty(),
             "derives diagnostic-free, got {diagnostics:?}"
@@ -2150,17 +2150,17 @@ mod tests {
         );
     }
 
-    // Double derivation over the exception-bearing fixture is
+    // Double derivation over the exception-bearing test_source is
     // byte-identical, and the bytes strict-read back to the derived value.
     #[test]
     fn clinical_ir_derivation_is_deterministic() {
         let lexicon = load_lexicon(&committed()).unwrap();
-        let html = fixture("m1_guideline_a.html");
+        let html = test_source("m1_guideline_a.html");
         let (first, _) = derived(&html, &lexicon);
         let (second, _) = derived(&html, &lexicon);
         let bytes = canonical_payload_bytes(&first).unwrap();
         assert_eq!(bytes, canonical_payload_bytes(&second).unwrap());
-        let read: ClinicalIr = read_canonical(&bytes).unwrap();
+        let read: ClinicalIr = read_strict_canonical(&bytes).unwrap();
         assert_eq!(read, first);
     }
 }

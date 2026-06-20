@@ -1,21 +1,21 @@
-//! SPEC §8.3 verify stage, interpretation half — completes `verify` over
-//! the adapter: parse solver replies into verdicts, witnesses, and §6
+//! SPEC §8.3 verify processing_stage, interpretation half — completes `verify` over
+//! the adapter: parse solver replies into verdicts, satisfying_examples, and §6
 //! categories, assemble validated [`VerifierResult`]s, and drive one
 //! compiled group's two-query plan.
 //!
-//! §6 verifier-adapter contract: parse the verdict token and result
+//! §6 verifier-adapter requirements: parse the verdict token and result
 //! s-expressions, normalize core tokens (strip `|…|`) to Ids, and record
 //! cores as canonical sets sorted by canonical_sort_key — on that
-//! normalized form, set-based comparison is plain equality. The witness
+//! normalized form, set-based comparison is plain equality. The satisfying_example
 //! model on a sat Q1 rides byte-exact as the solver printed it.
 //!
 //! Observed z3 shape (4.13, live-probed): the §8.6 query texts end in a
-//! static retrieval command, so on the verdicts that make its witness
+//! static retrieval command, so on the verdicts that make its satisfying_example
 //! unavailable — Q1 unsat (`get-model`), Q2 sat (`get-unsat-core`) — z3
 //! prints the true verdict, then `(error "... is not available")`, and
 //! exits 1. The leading verdict token therefore outranks the exit fate
-//! wherever it parses, and the [`QueryRole`] decides which witness the
-//! reply owes; the benign retrieval error on a witness-free path is
+//! wherever it parses, and the [`QueryRole`] decides which satisfying_example the
+//! reply owes; the benign retrieval error on a satisfying_example-free path is
 //! expected output, never a diagnostic. z3 also prints core symbols bare
 //! when they lex as simple symbols (dots qualify), so pipe-stripping is
 //! conditional per token.
@@ -34,10 +34,10 @@ use crate::{
 const STREAM_HEAD_CHARS: usize = 160;
 
 /// SPEC §6 role of one planned query inside its contradiction-query pair —
-/// the role decides the category mapping and the witness the reply owes.
+/// the role decides the category mapping and the satisfying_example the reply owes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryRole {
-    /// Q1 `context_overlap`: sat records the overlap witness model; unsat
+    /// Q1 `context_overlap`: sat records the overlap satisfying_example model; unsat
     /// closes the pair as the documented null result (§6).
     ContextOverlap,
     /// Q2 `deontic_consistency`: unsat is the semantic contradiction, its
@@ -45,7 +45,7 @@ pub enum QueryRole {
     DeonticConsistency,
 }
 
-/// SPEC §8.3 verify-stage core over one compiled group: invoke the adapter
+/// SPEC §8.3 verify-processing_stage core over one compiled group: invoke the adapter
 /// per planned query, each under `budget` wall-clock time, and assemble
 /// results in plan order — pair k's `context_overlap` first, its
 /// `deontic_consistency` only when Q1 answered sat (§6: Q2 runs for pairs
@@ -61,12 +61,12 @@ pub fn verify(
 ) -> Vec<VerifierResult> {
     assert_eq!(
         artifact.query_bodies.len(),
-        2 * artifact.query_plan.len(),
+        2 * artifact.solver_query_plan.len(),
         "validated artifacts carry exactly two bodies per planned pair"
     );
     let identity = adapter.identity();
     let mut results = Vec::new();
-    for (k, pair) in artifact.query_plan.iter().enumerate() {
+    for (k, pair) in artifact.solver_query_plan.iter().enumerate() {
         let q1 = &artifact.query_bodies[2 * k];
         let q2 = &artifact.query_bodies[2 * k + 1];
         assert_eq!(
@@ -99,14 +99,14 @@ pub fn verify(
 ///
 /// §6 category mapping, role-aware: Q2 unsat → `semantic_contradiction`
 /// with the normalized core; Q2 sat → `semantic_no_conflict`; Q1 sat →
-/// `semantic_no_conflict` with the witness model recorded; Q1 unsat →
+/// `semantic_no_conflict` with the satisfying_example model recorded; Q1 unsat →
 /// `semantic_no_conflict`, the documented-null path; unknown stays
 /// `unknown` — raw `sat`/`unsat`/`unknown`/`timeout` tokens preserved
 /// distinctly in `verdict`. Runs with no verdict token map to the failure
 /// categories: a solver `(error …)` reply is `target_syntax_failure`,
 /// anything else `solver_execution_failure`; a budget expiry is `unknown`
 /// under the budget-minted `timeout` token. Every failure, unknown, or
-/// missing-witness path mints one §7.4 diagnostic; an expected benign
+/// missing-satisfying_example path mints one §7.4 diagnostic; an expected benign
 /// retrieval error mints none.
 pub fn assemble_result(
     query_id: &Id,
@@ -193,7 +193,7 @@ pub fn assemble_result(
                         DiagnosticCode::SolverExecutionFailure,
                         Outcome::Invalid,
                         query_id,
-                        "sat reply carries no parseable witness model",
+                        "sat reply carries no parseable satisfying_example model",
                     )),
                 }
             }
@@ -267,7 +267,7 @@ fn head(text: &str) -> String {
         .collect()
 }
 
-/// One §7.4 verify-stage diagnostic: `code` under `outcome`, detail
+/// One §7.4 verify-processing_stage diagnostic: `code` under `outcome`, detail
 /// normalized by the diagnostic-text policy, payload naming the query.
 fn diagnostic(
     code: DiagnosticCode,
@@ -307,7 +307,7 @@ enum Lex {
 
 /// Byte span (start, end-exclusive) of the first balanced s-expression in
 /// `text`, anything before its `(` skipped; `None` when no expression
-/// opens or the text ends unbalanced. The span is the byte-exact witness
+/// opens or the text ends unbalanced. The span is the byte-exact satisfying_example
 /// slice a sat Q1 records as its model (§6).
 fn sexpr_span(text: &str) -> Option<(usize, usize)> {
     let start = text.find('(')?;
@@ -384,7 +384,7 @@ fn flat_list_tokens(text: &str) -> Option<Vec<&str>> {
 /// token pipe-stripped when quoted, to a canonical Id set sorted by
 /// canonical_sort_key (Id byte order) and duplicate-free. `None` when no
 /// flat list parses or a token is no Id; an empty list comes back
-/// `Some(empty)` and the caller treats it as a missing witness — an unsat
+/// `Some(empty)` and the caller treats it as a missing satisfying_example — an unsat
 /// over named assertions always cores at least one name.
 fn parse_core(reply: &str) -> Option<Vec<Id>> {
     let tokens = flat_list_tokens(reply)?;
@@ -406,7 +406,7 @@ mod tests {
     use super::*;
     use crate::compile;
     use ckc_core::{
-        Action, ContextAtom, ContextConjunct, ContextExpr, Direction, FormalIr, NormIr, NormRule,
+        Action, ContextAtom, ContextConjunct, ContextExpr, Direction, FormalIr, NormIr, NormativeRule,
         QuantityInterval, Strength,
     };
 
@@ -434,7 +434,7 @@ mod tests {
     }
 
     /// A run that exited 1 with `stdout` — the live-probed fate of a §8.6
-    /// static retrieval command whose witness the verdict made unavailable.
+    /// static retrieval command whose satisfying_example the verdict made unavailable.
     fn exit1(stdout: &str) -> SolverRun {
         SolverRun {
             outcome: RunOutcome::ExitFailure { code: Some(1) },
@@ -485,15 +485,15 @@ mod tests {
     #[test]
     fn core_normalization_pins_worked_set() {
         let want = vec![
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_b.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0"),
         ];
         assert_eq!(
-            parse_core("\n(a.fixture.m1_guideline_b.rule.0 a.fixture.m1_guideline_a.rule.0)\n"),
+            parse_core("\n(a.test_source.m1_guideline_b.rule.0 a.test_source.m1_guideline_a.rule.0)\n"),
             Some(want.clone())
         );
         assert_eq!(
-            parse_core("(|a.fixture.m1_guideline_a.rule.0| |a.fixture.m1_guideline_b.rule.0|)"),
+            parse_core("(|a.test_source.m1_guideline_a.rule.0| |a.test_source.m1_guideline_b.rule.0|)"),
             Some(want)
         );
         assert_eq!(parse_core("(a.r1 a.r1)"), Some(vec![id("a.r1")]));
@@ -502,11 +502,11 @@ mod tests {
         assert_eq!(parse_core("no list"), None);
     }
 
-    // Q1 sat records the witness model byte-exact: the balanced
+    // Q1 sat records the satisfying_example model byte-exact: the balanced
     // s-expression span, multi-line indentation and all, trailing newline
     // outside.
     #[test]
-    fn q1_sat_records_witness_model() {
+    fn q1_sat_records_satisfying_example_model() {
         let stdout = concat!(
             "sat\n",
             "(\n",
@@ -539,7 +539,7 @@ mod tests {
     // `(error "... model is not available")`) is expected output, never a
     // diagnostic.
     #[test]
-    fn q1_unsat_closes_documented_null() {
+    fn q1_unsat_closes_documented_no_conflict() {
         let result = assemble(
             QueryRole::ContextOverlap,
             &exit1("unsat\n(error \"line 7 column 10: model is not available\")\n"),
@@ -551,7 +551,7 @@ mod tests {
         assert_eq!(result.diagnostics, vec![]);
     }
 
-    // Q2 sat documents no conflict; its role owes no witness, so the
+    // Q2 sat documents no conflict; its role owes no satisfying_example, so the
     // benign `unsat core is not available` error (exit 1) mints nothing.
     #[test]
     fn q2_sat_documents_no_conflict() {
@@ -571,12 +571,12 @@ mod tests {
     #[test]
     fn q2_unsat_records_canonical_core() {
         let want = [
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_b.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0"),
         ];
         for stdout in [
-            "unsat\n(a.fixture.m1_guideline_a.rule.0 a.fixture.m1_guideline_b.rule.0)\n",
-            "unsat\n(|a.fixture.m1_guideline_b.rule.0| |a.fixture.m1_guideline_a.rule.0|)\n",
+            "unsat\n(a.test_source.m1_guideline_a.rule.0 a.test_source.m1_guideline_b.rule.0)\n",
+            "unsat\n(|a.test_source.m1_guideline_b.rule.0| |a.test_source.m1_guideline_a.rule.0|)\n",
         ] {
             let result = assemble(QueryRole::DeonticConsistency, &completed(stdout));
             assert_eq!(result.category, VerifierCategory::SemanticContradiction);
@@ -678,11 +678,11 @@ mod tests {
         );
     }
 
-    // A verdict whose owed witness is missing or garbled keeps its §6
+    // A verdict whose owed satisfying_example is missing or garbled keeps its §6
     // category — the verdict is the solver's answer — and mints one
     // invalid-outcome diagnostic for the broken evidence chain.
     #[test]
-    fn degraded_witness_paths_diagnosed() {
+    fn degraded_satisfying_example_paths_diagnosed() {
         let no_model = assemble(QueryRole::ContextOverlap, &completed("sat\n"));
         assert_eq!(no_model.category, VerifierCategory::SemanticNoConflict);
         assert_eq!(no_model.model, None);
@@ -721,9 +721,9 @@ mod tests {
         })
     }
 
-    /// A §8.6-shaped NormRule over the shared administer-abx_a action.
-    fn nr(rule_id: &str, direction: Direction, context: ContextExpr, regions: &[&str]) -> NormRule {
-        NormRule {
+    /// A §8.6-shaped NormativeRule over the shared administer-abx_a action.
+    fn nr(rule_id: &str, direction: Direction, context: ContextExpr, regions: &[&str]) -> NormativeRule {
+        NormativeRule {
             rule_id: id(rule_id),
             context,
             direction,
@@ -737,16 +737,16 @@ mod tests {
 
     /// One document's layer pair for [`compile`]: NormIR from `rules`,
     /// FormalIR derived per §5.
-    fn layers(rules: Vec<NormRule>) -> (FormalIr, NormIr) {
+    fn layers(rules: Vec<NormativeRule>) -> (FormalIr, NormIr) {
         let norm = NormIr { rules };
         (FormalIr::derive(&norm), norm)
     }
 
     /// docA rule.0 (§8.6): for administer abx_a under
     /// sepsis ∧ ¬renal_severe ∧ age ≥ 18.
-    fn rule_a() -> NormRule {
+    fn rule_a() -> NormativeRule {
         nr(
-            "fixture.m1_guideline_a.rule.0",
+            "test_source.m1_guideline_a.rule.0",
             Direction::For,
             dnf1(vec![
                 concept("cond.sepsis"),
@@ -759,9 +759,9 @@ mod tests {
 
     /// docB rule.0 (§8.6): contraindicate the same action under
     /// pregnancy ∧ sepsis ∧ age ≥ 18.
-    fn rule_b() -> NormRule {
+    fn rule_b() -> NormativeRule {
         nr(
-            "fixture.m1_guideline_b.rule.0",
+            "test_source.m1_guideline_b.rule.0",
             Direction::Contraindicate,
             dnf1(vec![
                 concept("cond.pregnancy"),
@@ -774,9 +774,9 @@ mod tests {
 
     /// Control rule.0 (§8.2): contraindicate the same action under
     /// sepsis ∧ age < 18 — interval disjoint with docA's.
-    fn rule_control() -> NormRule {
+    fn rule_control() -> NormativeRule {
         nr(
-            "fixture.m1_control.rule.0",
+            "test_source.m1_control.rule.0",
             Direction::Contraindicate,
             dnf1(vec![concept("cond.sepsis"), age(false)]),
             &["r.2"],
@@ -785,7 +785,7 @@ mod tests {
 
     // §8.6 worked thread end-to-end on live z3: plan + emit through
     // compile, verify over the conflict group — Q1 sat with the overlap
-    // witness model recorded, Q2 unsat with the expected cross-document
+    // satisfying_example model recorded, Q2 unsat with the expected cross-document
     // core as the canonical set, both stamped with the probed identity.
     #[test]
     fn live_worked_pair_full_verify() {
@@ -803,7 +803,7 @@ mod tests {
         let model = q1
             .model
             .as_deref()
-            .expect("Q1 sat records the witness model");
+            .expect("Q1 sat records the satisfying_example model");
         assert!(model.contains("define-fun"), "model {model:?}");
         assert!(model.contains("q.age_years"), "model {model:?}");
         assert_eq!(q1.unsat_core, None);
@@ -819,8 +819,8 @@ mod tests {
             q2.unsat_core.as_deref(),
             Some(
                 &[
-                    id("a.fixture.m1_guideline_a.rule.0"),
-                    id("a.fixture.m1_guideline_b.rule.0"),
+                    id("a.test_source.m1_guideline_a.rule.0"),
+                    id("a.test_source.m1_guideline_b.rule.0"),
                 ][..]
             )
         );
@@ -834,16 +834,16 @@ mod tests {
     // unsat, closing the pair as the documented null result — one clean
     // semantic_no_conflict, no Q2 result.
     #[test]
-    fn live_control_pair_closes_null() {
+    fn live_control_pair_closes_no_conflict() {
         let (fa, na) = layers(vec![rule_a()]);
         let (fc, nc) = layers(vec![rule_control()]);
-        let artifact = compile(&id("group.m1_null"), [(&fa, &na), (&fc, &nc)]);
+        let artifact = compile(&id("group.m1_no_conflict"), [(&fa, &na), (&fc, &nc)]);
         let adapter = Z3Adapter::new().unwrap();
         let results = verify(&adapter, &artifact, Duration::from_secs(30));
 
         assert_eq!(results.len(), 1, "unsat Q1 closes the pair without Q2");
         let q1 = &results[0];
-        assert_eq!(q1.query_id, id("q.m1_null.pair1.overlap"));
+        assert_eq!(q1.query_id, id("q.m1_no_conflict.pair1.overlap"));
         assert_eq!(q1.category, VerifierCategory::SemanticNoConflict);
         assert_eq!(q1.verdict, Some(SolverVerdict::Unsat));
         assert_eq!(q1.model, None);

@@ -1,6 +1,6 @@
-# SPEC §5 M1 terminology and modality authority (system ckc.lex), consumed by
-# the normalize stage and content-hash versioned into every run manifest.
-# Shape contract (typed loader lands with stage-normalize.1):
+# SPEC §5 M1 terminology and modality evidence_status (system ckc.lex), consumed by
+# the normalize processing_stage and content-hash versioned into every run manifest.
+# Shape requirements (typed loader lands with stage-normalize.1):
 #   concepts[]: id + surface forms; optional interval semantics over a
 #     quantity variable (成人 → age >= 18) with i64 bounds ge/gt/le/lt
 #     mirroring §5 QuantityInterval.

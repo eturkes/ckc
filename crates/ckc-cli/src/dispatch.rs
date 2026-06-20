@@ -352,7 +352,7 @@ fn finish_exit(op: Id, shell: Shell, command_output: Option<Vec<u8>>) -> CliExit
         },
         Err(err) => {
             // Last-resort path: the invariant layer itself failed (logs I/O,
-            // canonical emission). Keep the exactly-one-result contract with
+            // canonical emission). Keep the exactly-one-result requirements with
             // a bare invalid result; the cause goes straight to stderr since
             // no event stream could be built.
             eprintln!("ckc: {op}: {err}");
@@ -451,7 +451,7 @@ mod tests {
             read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].run_id, static_id("m1"));
-        assert_eq!(events[0].stage, static_id(OP_RUN));
+        assert_eq!(events[0].processing_stage, static_id(OP_RUN));
         let diagnostics: Vec<DiagnosticRecord> =
             read_jsonl(&std::fs::read(out.join("logs/diagnostics.jsonl")).unwrap()).unwrap();
         assert_eq!(diagnostics.len(), 3);

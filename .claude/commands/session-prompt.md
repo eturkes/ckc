@@ -7,7 +7,7 @@ file named below.
 ## Load context
 
 Read `.agent/memory.md` and `.agent/roadmap.md` in full, then SPEC §1–§2
-(Operating contract, Build plan; find headers with `grep -n '^#' SPEC.md`). Load
+(Operating requirements, Build plan; find headers with `grep -n '^#' SPEC.md`). Load
 further SPEC sections only as the chosen session directs; whole-spec loading is
 reserved for spec-maintenance sessions.
 

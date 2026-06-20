@@ -1,8 +1,8 @@
-//! SPEC §6/§8.6 deterministic SMT-LIB emission and §8.3 compile-stage
+//! SPEC §6/§8.6 deterministic SMT-LIB emission and §8.3 compile-processing_stage
 //! assembly — [`emit_overlap_query`] / [`emit_deontic_query`] render the two
 //! §6 contradiction queries of one planned pair
 //! ([`plan_queries`](crate::plan_queries) mints the pair and its query ids),
-//! and [`compile`] assembles one fixture group's
+//! and [`compile`] assembles one test_source group's
 //! [`CompiledArtifact`](crate::CompiledArtifact) from them: planned pairs
 //! gated by the §6 M1 atom profile, bodies in plan order, the §8.5-item-4
 //! assertion map bound through NormIR rules, target metadata.
@@ -23,15 +23,15 @@ use std::collections::{BTreeMap, HashMap};
 
 use ckc_core::{
     ContextAtom, ContextConjunct, ContextExpr, ContradictionQueryPair, DiagnosticCode,
-    DiagnosticRecord, Direction, FormalConstraint, FormalIr, Id, NormIr, NormRule, Outcome,
+    DiagnosticRecord, Direction, FormalConstraint, FormalIr, Id, NormIr, NormativeRule, Outcome,
     StringPolicy,
 };
 
 use crate::{AssertionRecord, CompiledArtifact, QueryBody, SmtLogic, plan_queries};
 
-/// SPEC §6 Q1 context_overlap (QF_LRA): both guarded contexts as
+/// SPEC §6 Q1 context_overlap (QF_LRA): both conditioned contexts as
 /// `ctx.<rule_id>` named assertions; sat yields the recorded overlap
-/// witness, unsat closes the pair as the documented null result. `a`/`b`
+/// satisfying_example, unsat closes the pair as the documented null result. `a`/`b`
 /// are the pair's constraints in slot order.
 pub fn emit_overlap_query(
     pair: &ContradictionQueryPair,
@@ -97,7 +97,7 @@ pub fn emit_deontic_query(
     }
 }
 
-/// SPEC §8.3 compile-stage core — the [`CompiledArtifact`] of one fixture
+/// SPEC §8.3 compile-processing_stage core — the [`CompiledArtifact`] of one test_source
 /// group. [`plan_queries`] plans over the documents' FormalIRs, each
 /// surviving pair emits its two §6 bodies in plan order, and the §6
 /// assertion map binds every `ctx.<rule_id>` and `a.<rule_id>` name to its
@@ -109,7 +109,7 @@ pub fn emit_deontic_query(
 /// concept/concept_negated/interval set expressible in QF_LRA — drops its
 /// pair from the plan with an `unsupported_ir_fragment` diagnostic (no plan
 /// slot, bodies, or assertion entries; later pairs keep their minted
-/// ordinals) while the artifact still validates.
+/// sequence_numbers) while the artifact still validates.
 ///
 /// Documents arrive as the (FormalIR, NormIR) layer pairs of one IrBundle
 /// each, validated per §5 before compilation; a planned rule the layers
@@ -125,7 +125,7 @@ pub fn compile<'a>(
 
 /// SPEC §6 M1 declared profile over context atoms: concept and negated-
 /// concept Bool constants plus QF_LRA quantity intervals — every atom kind
-/// the M1 type admits, exhaustively matched so an M3 variant (slot
+/// the M1 type accepts, exhaustively matched so an M3 variant (slot
 /// equality, temporal interval) forces a profile decision here.
 fn in_m1_profile(atom: &ContextAtom) -> bool {
     match atom {
@@ -135,7 +135,7 @@ fn in_m1_profile(atom: &ContextAtom) -> bool {
 
 /// [`compile`] over an explicit atom profile — the seam §6 names "declared
 /// target profiles gate anything richer", and the test path for the drop
-/// machinery (the M1 profile admits every constructible atom).
+/// machinery (the M1 profile accepts every constructible atom).
 fn compile_with<'a>(
     group_id: &Id,
     docs: impl IntoIterator<Item = (&'a FormalIr, &'a NormIr)>,
@@ -147,14 +147,14 @@ fn compile_with<'a>(
         .flat_map(|&(formal, _)| &formal.constraints)
         .map(|c| (c.constraint_id.as_str(), c))
         .collect();
-    let rules: HashMap<&str, &NormRule> = docs
+    let rules: HashMap<&str, &NormativeRule> = docs
         .iter()
         .flat_map(|&(_, norm)| &norm.rules)
         .map(|r| (r.rule_id.as_str(), r))
         .collect();
-    let mut query_plan = Vec::new();
+    let mut solver_query_plan = Vec::new();
     let mut query_bodies = Vec::new();
-    let mut assertion_map: BTreeMap<Id, AssertionRecord> = BTreeMap::new();
+    let mut assertion_to_source_map: BTreeMap<Id, AssertionRecord> = BTreeMap::new();
     let mut diagnostics = Vec::new();
     for pair in plan_queries(group_id, docs.iter().map(|&(formal, _)| formal)) {
         let constraint = |id: &Id| {
@@ -170,13 +170,13 @@ fn compile_with<'a>(
             .into_iter()
             .find(|c| atoms(&c.context).any(|atom| !in_profile(atom)))
         {
-            diagnostics.push(dropped_pair(&pair, norm_rule(&rules, &offender.rule_id)));
+            diagnostics.push(dropped_pair(&pair, normative_rule(&rules, &offender.rule_id)));
             continue;
         }
         query_bodies.push(emit_overlap_query(&pair, a, b));
         query_bodies.push(emit_deontic_query(&pair, a, b));
         for constraint in [a, b] {
-            let rule = norm_rule(&rules, &constraint.rule_id);
+            let rule = normative_rule(&rules, &constraint.rule_id);
             let record = AssertionRecord {
                 rule_ids: vec![rule.rule_id.clone()],
                 region_ids: region_set(&rule.source_region_ids),
@@ -184,16 +184,16 @@ fn compile_with<'a>(
             for prefix in ["ctx.", "a."] {
                 let name = Id::new(format!("{prefix}{}", rule.rule_id))
                     .expect("a §6 assertion prefix before a valid id forms a valid id");
-                assertion_map.insert(name, record.clone());
+                assertion_to_source_map.insert(name, record.clone());
             }
         }
-        query_plan.push(pair);
+        solver_query_plan.push(pair);
     }
     CompiledArtifact {
         target_id: static_id("target.smtlib2"),
-        query_plan,
+        solver_query_plan,
         query_bodies,
-        assertion_map: assertion_map.into_iter().collect(),
+        assertion_to_source_map: assertion_to_source_map.into_iter().collect(),
         target_metadata: vec![
             (static_id("profile"), "m1".to_owned()),
             (static_id("smtlib_version"), "2.6".to_owned()),
@@ -209,7 +209,7 @@ fn atoms(context: &ContextExpr) -> impl Iterator<Item = &ContextAtom> {
 
 /// Resolve a planned constraint's rule through the group's NormIRs (§5:
 /// bundles validate layer coherence before compilation).
-fn norm_rule<'r>(rules: &HashMap<&str, &'r NormRule>, rule_id: &Id) -> &'r NormRule {
+fn normative_rule<'r>(rules: &HashMap<&str, &'r NormativeRule>, rule_id: &Id) -> &'r NormativeRule {
     rules
         .get(rule_id.as_str())
         .unwrap_or_else(|| panic!("rule {rule_id} absent from NormIR"))
@@ -228,7 +228,7 @@ fn region_set(ordered: &[Id]) -> Vec<Id> {
 /// The §7.4 record of one dropped pair: `unsupported_ir_fragment` under
 /// outcome `unsupported`, grounded in the offending rule's regions, naming
 /// the pair whose plan slot it cost.
-fn dropped_pair(pair: &ContradictionQueryPair, rule: &NormRule) -> DiagnosticRecord {
+fn dropped_pair(pair: &ContradictionQueryPair, rule: &NormativeRule) -> DiagnosticRecord {
     let detail = StringPolicy::DiagnosticText
         .normalize(&format!(
             "pair {} dropped: rule {} context atom outside the target profile",
@@ -252,7 +252,7 @@ fn static_id(s: &str) -> Id {
     Id::new(s).expect("static ids are valid")
 }
 
-/// The slot contract both emitters lean on: `a`/`b` arrive in pair order
+/// The slot requirements both emitters lean on: `a`/`b` arrive in pair order
 /// (`constraint_a_id`, `constraint_b_id`). A mismatch is a caller bug,
 /// never data.
 fn check_slots(pair: &ContradictionQueryPair, a: &FormalConstraint, b: &FormalConstraint) {
@@ -410,7 +410,7 @@ mod tests {
         plan.remove(0)
     }
 
-    /// A NormRule behind an [`fc`]-shaped constraint: the §5 fields the
+    /// A NormativeRule behind an [`fc`]-shaped constraint: the §5 fields the
     /// projection copies plus regions and exception refs.
     fn nr(
         rule_id: &str,
@@ -419,8 +419,8 @@ mod tests {
         context: ContextExpr,
         regions: &[&str],
         exceptions: &[&str],
-    ) -> NormRule {
-        NormRule {
+    ) -> NormativeRule {
+        NormativeRule {
             rule_id: id(rule_id),
             context,
             direction,
@@ -434,17 +434,17 @@ mod tests {
 
     /// One document's layer pair for [`compile`]: NormIR from `rules`,
     /// FormalIR derived per §5.
-    fn layers(rules: Vec<NormRule>) -> (FormalIr, NormIr) {
+    fn layers(rules: Vec<NormativeRule>) -> (FormalIr, NormIr) {
         let norm = NormIr { rules };
         (FormalIr::derive(&norm), norm)
     }
 
-    /// docA rule.0 (§8.6 NormRule listing): for administer abx_a under
+    /// docA rule.0 (§8.6 NormativeRule listing): for administer abx_a under
     /// sepsis ∧ ¬renal_severe ∧ age ≥ 18 (atoms in canonical stored order),
     /// grounded in r.2 + r.3 with exc.0 folded in.
-    fn rule_a() -> NormRule {
+    fn rule_a() -> NormativeRule {
         nr(
-            "fixture.m1_guideline_a.rule.0",
+            "test_source.m1_guideline_a.rule.0",
             Direction::For,
             "drug.abx_a",
             dnf1(vec![
@@ -460,9 +460,9 @@ mod tests {
     /// docB rule.0 (§8.6): contraindicate the same action under
     /// pregnancy ∧ sepsis ∧ age ≥ 18 (canonical stored order), grounded in
     /// r.2.
-    fn rule_b() -> NormRule {
+    fn rule_b() -> NormativeRule {
         nr(
-            "fixture.m1_guideline_b.rule.0",
+            "test_source.m1_guideline_b.rule.0",
             Direction::Contraindicate,
             "drug.abx_a",
             dnf1(vec![
@@ -477,9 +477,9 @@ mod tests {
 
     /// Control rule.0 (§8.2): contraindicate the same action under
     /// sepsis ∧ age < 18 — interval disjoint with docA's — grounded in r.2.
-    fn rule_control() -> NormRule {
+    fn rule_control() -> NormativeRule {
         nr(
-            "fixture.m1_control.rule.0",
+            "test_source.m1_control.rule.0",
             Direction::Contraindicate,
             "drug.abx_a",
             dnf1(vec![
@@ -524,8 +524,8 @@ mod tests {
                 "(declare-const |cond.renal_severe| Bool)\n",
                 "(declare-const |cond.sepsis| Bool)\n",
                 "(declare-const |q.age_years| Real)\n",
-                "(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.fixture.m1_guideline_a.rule.0|))\n",
-                "(assert (! (and |cond.pregnancy| |cond.sepsis| (>= |q.age_years| 18)) :named |ctx.fixture.m1_guideline_b.rule.0|))\n",
+                "(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.test_source.m1_guideline_a.rule.0|))\n",
+                "(assert (! (and |cond.pregnancy| |cond.sepsis| (>= |q.age_years| 18)) :named |ctx.test_source.m1_guideline_b.rule.0|))\n",
                 "(check-sat)\n",
                 "(get-model)\n",
             )
@@ -547,21 +547,21 @@ mod tests {
                 "(set-option :print-success false)\n",
                 "(set-option :produce-unsat-cores true)\n",
                 "(declare-const |pos:act.administer:drug.abx_a| Bool)\n",
-                "(assert (! |pos:act.administer:drug.abx_a| :named |a.fixture.m1_guideline_a.rule.0|))\n",
-                "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.fixture.m1_guideline_b.rule.0|))\n",
+                "(assert (! |pos:act.administer:drug.abx_a| :named |a.test_source.m1_guideline_a.rule.0|))\n",
+                "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.test_source.m1_guideline_b.rule.0|))\n",
                 "(check-sat)\n",
                 "(get-unsat-core)\n",
             )
         );
     }
 
-    /// group.m1_null control pair (§8.2): the disjoint-interval Q1 the
-    /// verify stage closes as the documented null, and a Q2 whose negated
+    /// group.m1_no_conflict control pair (§8.2): the disjoint-interval Q1 the
+    /// verify processing_stage closes as the documented null, and a Q2 whose negated
     /// polarity lands in slot a (the control sorts first by id bytes).
     #[test]
     fn control_pair_pins_observed_bytes() {
         let (a, b) = (control(), doc_a());
-        let pair = plan_pair("group.m1_null", &a, &b);
+        let pair = plan_pair("group.m1_no_conflict", &a, &b);
         assert_eq!(
             emit_overlap_query(&pair, &a, &b).body,
             concat!(
@@ -571,8 +571,8 @@ mod tests {
                 "(declare-const |cond.renal_severe| Bool)\n",
                 "(declare-const |cond.sepsis| Bool)\n",
                 "(declare-const |q.age_years| Real)\n",
-                "(assert (! (and |cond.sepsis| (< |q.age_years| 18)) :named |ctx.fixture.m1_control.rule.0|))\n",
-                "(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.fixture.m1_guideline_a.rule.0|))\n",
+                "(assert (! (and |cond.sepsis| (< |q.age_years| 18)) :named |ctx.test_source.m1_control.rule.0|))\n",
+                "(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.test_source.m1_guideline_a.rule.0|))\n",
                 "(check-sat)\n",
                 "(get-model)\n",
             )
@@ -584,8 +584,8 @@ mod tests {
                 "(set-option :print-success false)\n",
                 "(set-option :produce-unsat-cores true)\n",
                 "(declare-const |pos:act.administer:drug.abx_a| Bool)\n",
-                "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.fixture.m1_control.rule.0|))\n",
-                "(assert (! |pos:act.administer:drug.abx_a| :named |a.fixture.m1_guideline_a.rule.0|))\n",
+                "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.test_source.m1_control.rule.0|))\n",
+                "(assert (! |pos:act.administer:drug.abx_a| :named |a.test_source.m1_guideline_a.rule.0|))\n",
                 "(check-sat)\n",
                 "(get-unsat-core)\n",
             )
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(context_term(&dnf1(vec![])), "true");
     }
 
-    /// Slot order is the caller's contract; a swap is a bug, not data.
+    /// Slot order is the caller's requirements; a swap is a bug, not data.
     #[test]
     #[should_panic(expected = "out of pair slot order")]
     fn swapped_slots_panic() {
@@ -717,8 +717,8 @@ mod tests {
         let artifact = compile(&id("group.m1_conflict"), [(&fa, &na), (&fb, &nb)]);
         assert_eq!(artifact.validate(), Ok(()));
         assert_eq!(artifact.target_id, id("target.smtlib2"));
-        assert_eq!(artifact.query_plan.len(), 1);
-        let pair = &artifact.query_plan[0];
+        assert_eq!(artifact.solver_query_plan.len(), 1);
+        let pair = &artifact.solver_query_plan[0];
         assert_eq!(pair.pair_id, id("q.m1_conflict.pair1"));
         let (a, b) = (doc_a(), doc_b());
         assert_eq!(
@@ -729,20 +729,20 @@ mod tests {
             ]
         );
         let record_a = AssertionRecord {
-            rule_ids: vec![id("fixture.m1_guideline_a.rule.0")],
+            rule_ids: vec![id("test_source.m1_guideline_a.rule.0")],
             region_ids: vec![id("r.2"), id("r.3")],
         };
         let record_b = AssertionRecord {
-            rule_ids: vec![id("fixture.m1_guideline_b.rule.0")],
+            rule_ids: vec![id("test_source.m1_guideline_b.rule.0")],
             region_ids: vec![id("r.2")],
         };
         assert_eq!(
-            artifact.assertion_map,
+            artifact.assertion_to_source_map,
             [
-                (id("a.fixture.m1_guideline_a.rule.0"), record_a.clone()),
-                (id("a.fixture.m1_guideline_b.rule.0"), record_b.clone()),
-                (id("ctx.fixture.m1_guideline_a.rule.0"), record_a),
-                (id("ctx.fixture.m1_guideline_b.rule.0"), record_b),
+                (id("a.test_source.m1_guideline_a.rule.0"), record_a.clone()),
+                (id("a.test_source.m1_guideline_b.rule.0"), record_b.clone()),
+                (id("ctx.test_source.m1_guideline_a.rule.0"), record_a),
+                (id("ctx.test_source.m1_guideline_b.rule.0"), record_b),
             ]
         );
         assert_eq!(
@@ -755,19 +755,19 @@ mod tests {
         assert_eq!(artifact.diagnostics, []);
     }
 
-    /// The §8.2 control pair (group.m1_null) compiles the same way: the
+    /// The §8.2 control pair (group.m1_no_conflict) compiles the same way: the
     /// disjoint age intervals stay in profile (Q1 decides the null at
     /// verify), the control rule in slot a by id bytes.
     #[test]
     fn compile_assembles_control_pair_artifact() {
         let (fa, na) = layers(vec![rule_a()]);
         let (fc_, nc) = layers(vec![rule_control()]);
-        let artifact = compile(&id("group.m1_null"), [(&fa, &na), (&fc_, &nc)]);
+        let artifact = compile(&id("group.m1_no_conflict"), [(&fa, &na), (&fc_, &nc)]);
         assert_eq!(artifact.validate(), Ok(()));
-        assert_eq!(artifact.query_plan.len(), 1);
-        let pair = &artifact.query_plan[0];
-        assert_eq!(pair.pair_id, id("q.m1_null.pair1"));
-        assert_eq!(pair.constraint_a_id, id("fc.fixture.m1_control.rule.0"));
+        assert_eq!(artifact.solver_query_plan.len(), 1);
+        let pair = &artifact.solver_query_plan[0];
+        assert_eq!(pair.pair_id, id("q.m1_no_conflict.pair1"));
+        assert_eq!(pair.constraint_a_id, id("fc.test_source.m1_control.rule.0"));
         let (a, b) = (control(), doc_a());
         assert_eq!(
             artifact.query_bodies,
@@ -777,20 +777,20 @@ mod tests {
             ]
         );
         let record_control = AssertionRecord {
-            rule_ids: vec![id("fixture.m1_control.rule.0")],
+            rule_ids: vec![id("test_source.m1_control.rule.0")],
             region_ids: vec![id("r.2")],
         };
         let record_a = AssertionRecord {
-            rule_ids: vec![id("fixture.m1_guideline_a.rule.0")],
+            rule_ids: vec![id("test_source.m1_guideline_a.rule.0")],
             region_ids: vec![id("r.2"), id("r.3")],
         };
         assert_eq!(
-            artifact.assertion_map,
+            artifact.assertion_to_source_map,
             [
-                (id("a.fixture.m1_control.rule.0"), record_control.clone()),
-                (id("a.fixture.m1_guideline_a.rule.0"), record_a.clone()),
-                (id("ctx.fixture.m1_control.rule.0"), record_control),
-                (id("ctx.fixture.m1_guideline_a.rule.0"), record_a),
+                (id("a.test_source.m1_control.rule.0"), record_control.clone()),
+                (id("a.test_source.m1_guideline_a.rule.0"), record_a.clone()),
+                (id("ctx.test_source.m1_control.rule.0"), record_control),
+                (id("ctx.test_source.m1_guideline_a.rule.0"), record_a),
             ]
         );
         assert_eq!(artifact.diagnostics, []);
@@ -831,7 +831,7 @@ mod tests {
         let artifact = compile(&id("group.t"), [(&f, &n)]);
         assert_eq!(artifact.validate(), Ok(()));
         let pair_ids: Vec<&str> = artifact
-            .query_plan
+            .solver_query_plan
             .iter()
             .map(|p| p.pair_id.as_str())
             .collect();
@@ -851,7 +851,7 @@ mod tests {
             ]
         );
         let keys: Vec<&str> = artifact
-            .assertion_map
+            .assertion_to_source_map
             .iter()
             .map(|(k, _)| k.as_str())
             .collect();
@@ -867,15 +867,15 @@ mod tests {
             ]
         );
         assert_eq!(
-            artifact.assertion_map[2].1.region_ids,
+            artifact.assertion_to_source_map[2].1.region_ids,
             [id("r.10"), id("r.9")]
         );
     }
 
     /// The §6 profile gate through the compile_with seam (the M1 profile
-    /// admits every constructible atom): a target without interval support
+    /// accepts every constructible atom): a target without interval support
     /// drops the interval-bearing pair — no plan slot, bodies, or assertion
-    /// entries; the survivor keeps its minted ordinal — minting the §7.4
+    /// entries; the survivor keeps its minted sequence_number — minting the §7.4
     /// unsupported_ir_fragment record grounded in the offending rule's
     /// regions, and the artifact still validates.
     #[test]
@@ -924,14 +924,14 @@ mod tests {
         let artifact = compile_with(&id("group.t"), docs, no_intervals);
         assert_eq!(artifact.validate(), Ok(()));
         let pair_ids: Vec<&str> = artifact
-            .query_plan
+            .solver_query_plan
             .iter()
             .map(|p| p.pair_id.as_str())
             .collect();
         assert_eq!(pair_ids, ["q.t.pair2"]);
         assert_eq!(artifact.query_bodies.len(), 2);
         let keys: Vec<&str> = artifact
-            .assertion_map
+            .assertion_to_source_map
             .iter()
             .map(|(k, _)| k.as_str())
             .collect();
@@ -964,7 +964,7 @@ mod tests {
         );
         // The M1 profile keeps the same group whole.
         let m1 = compile(&id("group.t"), docs);
-        assert_eq!(m1.query_plan.len(), 2);
+        assert_eq!(m1.solver_query_plan.len(), 2);
         assert_eq!(m1.diagnostics, []);
     }
 
@@ -983,9 +983,9 @@ mod tests {
         let artifact = compile(&id("group.t"), [(&f, &n)]);
         assert_eq!(artifact.validate(), Ok(()));
         assert_eq!(artifact.target_id, id("target.smtlib2"));
-        assert_eq!(artifact.query_plan, []);
+        assert_eq!(artifact.solver_query_plan, []);
         assert_eq!(artifact.query_bodies, []);
-        assert_eq!(artifact.assertion_map, []);
+        assert_eq!(artifact.assertion_to_source_map, []);
         assert_eq!(
             artifact.target_metadata,
             [
@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(artifact.diagnostics, []);
     }
 
-    /// Layer coherence is the caller's contract (§5: bundles validate
+    /// Layer coherence is the caller's requirements (§5: bundles validate
     /// before compilation); a planned rule the NormIRs cannot resolve is a
     /// bug, not data.
     #[test]

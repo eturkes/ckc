@@ -1,6 +1,6 @@
 # Plan session protocol (routed from /session-prompt)
 
-A plan session opens the next milestone. When that milestone's contract
+A plan session opens the next milestone. When that milestone's requirements
 section is still compact, elaborate it first per SPEC §1 — the spec diff
 reaches the user before any unit consumes it. Then author the milestone header
 and its full unit checklist.

@@ -2,11 +2,11 @@
 //!
 //! Every enum here is fieldless: its canonical form is the value's
 //! identifier_ascii spelling as a bare JSON string (SPEC §4.3), and reading
-//! admits exactly the spelled value set. [`Outcome`] additionally orders its
-//! variants by §4.4 severity so `max` aggregates stage outcomes.
+//! accepts exactly the spelled value set. [`Outcome`] additionally orders its
+//! variants by §4.4 severity so `max` aggregates processing_stage outcomes.
 //! [`DiagnosticRecord`] is the §7.4 diagnostic (stable code, structured
 //! payload, region/artifact refs, exactly one outcome); [`TotalOperationResult`]
-//! is the §4.4 record every stage and command returns exactly once.
+//! is the §4.4 record every processing_stage and command returns exactly once.
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
@@ -86,7 +86,7 @@ macro_rules! fieldless_enum {
     };
 }
 
-/// Crate-visible so sibling modules (envelope) define their own §4.4-style
+/// Crate-visible so sibling modules (wrapper) define their own §4.4-style
 /// value sets through the same generator.
 pub(crate) use fieldless_enum;
 
@@ -97,12 +97,12 @@ fieldless_enum! {
     /// aggregates per-item outcomes into a total one.
     #[derive(PartialOrd, Ord)]
     Outcome {
-        /// Output valid for the declared stage.
+        /// Output valid for the declared processing_stage.
         Ok => "ok",
         /// Schema-valid but incomplete: permission-limited, missing evidence,
         /// missing policy, partial extraction.
         Residual => "residual",
-        /// Multiple admissible readings, bindings, spans, or normalizations
+        /// Multiple acceptable readings, bindings, spans, or normalizations
         /// remain.
         Ambiguity => "ambiguity",
         /// Schema-valid construction outside implemented semantics.
@@ -123,27 +123,27 @@ fieldless_enum! {
         HumanAuthored => "human_authored",
         AiAssisted => "ai_assisted",
         AiGenerated => "ai_generated",
-        AdapterGenerated => "adapter_generated",
+        ExternalAdapterGenerated => "external_adapter_generated",
         DeterministicCompiler => "deterministic_compiler",
     }
 }
 
 fieldless_enum! {
-    /// SPEC §4.4 artifact authority. `compiler_authority` is reserved for
-    /// compiled artifacts and `verifier_authority` for verifier results.
-    Authority {
-        SourceAuthority => "source_authority",
-        MechanicalAuthority => "mechanical_authority",
+    /// SPEC §4.4 artifact evidence_status. `compiler_evidence_status` is reserved for
+    /// compiled artifacts and `verifier_evidence_status` for verifier results.
+    EvidenceStatus {
+        SourceEvidenceStatus => "source_evidence_status",
+        MechanicalEvidenceStatus => "mechanical_evidence_status",
         EvidenceDiscoveryOnly => "evidence_discovery_only",
-        AdmittedAuthority => "admitted_authority",
-        CompilerAuthority => "compiler_authority",
-        VerifierAuthority => "verifier_authority",
+        AcceptedEvidenceStatus => "accepted_evidence_status",
+        CompilerEvidenceStatus => "compiler_evidence_status",
+        VerifierEvidenceStatus => "verifier_evidence_status",
         ViewOnly => "view_only",
     }
 }
 
 fieldless_enum! {
-    /// SPEC §4.4 terminology binding status (SPEC §5 binding contract).
+    /// SPEC §4.4 terminology binding status (SPEC §5 binding requirements).
     BindingStatus {
         Exact => "exact",
         Synonym => "synonym",
@@ -169,7 +169,7 @@ fieldless_enum! {
     /// SPEC §4.4 claim evidence tier.
     ClaimTier {
         S0Replayable => "s0_replayable",
-        S1Admitted => "s1_admitted",
+        S1Accepted => "s1_accepted",
         S2ResearchEvidence => "s2_research_evidence",
         S3ClinicalRegulatory => "s3_clinical_regulatory",
     }
@@ -183,13 +183,13 @@ fieldless_enum! {
         Ambiguity => "ambiguity",
         Incoherence => "incoherence",
         ReplayFailure => "replay_failure",
-        DocumentedNullResult => "documented_null_result",
+        DocumentedNoConflictResult => "documented_no_conflict_result",
     }
 }
 
 fieldless_enum! {
     /// SPEC §4.4 attempt classification (first used by the M5 loop).
-    AttemptClassification {
+    AttemptOutcome {
         Improved => "improved",
         Equivalent => "equivalent",
         Dominated => "dominated",
@@ -198,7 +198,7 @@ fieldless_enum! {
         Unsupported => "unsupported",
         Timeout => "timeout",
         Crash => "crash",
-        NullResult => "null_result",
+        NoConflictResult => "no_conflict_result",
         NearMiss => "near_miss",
         Unreproducible => "unreproducible",
         Unauthorized => "unauthorized",
@@ -232,7 +232,7 @@ fieldless_enum! {
     DiagnosticCode {
         ExtractionUncertain => "extraction_uncertain",
         TableStructureUncertain => "table_structure_uncertain",
-        SpanGroundingMissing => "span_grounding_missing",
+        SpanSourceLinkageMissing => "span_source_linkage_missing",
         SegmentationBoundaryError => "segmentation_boundary_error",
         TerminologyUnmapped => "terminology_unmapped",
         TerminologyAmbiguous => "terminology_ambiguous",
@@ -295,7 +295,7 @@ pub(crate) fn read_payload(r: &mut Reader<'_>) -> Result<Vec<(Id, String)>, Cano
 
 /// SPEC §7.4 diagnostic: a stable code from the base set, a structured
 /// payload, region/artifact refs, and exactly one [`Outcome`]. The ref lists
-/// are sets in canonical form (sorted, duplicate-free); the producing stage
+/// are sets in canonical form (sorted, duplicate-free); the producing processing_stage
 /// chooses the outcome its code maps to (e.g. `terminology_ambiguous` ⇒
 /// `ambiguity`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -342,11 +342,11 @@ impl CanonRead for DiagnosticRecord {
     }
 }
 
-/// SPEC §4.4 total operation result: every stage and command returns exactly
+/// SPEC §4.4 total operation result: every processing_stage and command returns exactly
 /// one. `outcome` is the severity-aggregated total; the five buckets hold
 /// content hashes of the produced value, diagnostic, residual, ambiguity, and
 /// incoherence artifacts (sets in canonical form). Aggregation itself is wired
-/// where stages run (the CLI shell).
+/// where processing_stages run (the CLI shell).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TotalOperationResult {
     pub operation_id: Id,
@@ -402,7 +402,7 @@ impl CanonRead for TotalOperationResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canon::{canonical_payload_bytes, read_canonical};
+    use crate::canon::{canonical_payload_bytes, read_strict_canonical};
     use crate::id::ValidationError;
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
@@ -413,7 +413,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -446,19 +446,19 @@ mod tests {
                 "human_authored",
                 "ai_assisted",
                 "ai_generated",
-                "adapter_generated",
+                "external_adapter_generated",
                 "deterministic_compiler"
             ]
         );
         assert_eq!(
-            spellings(Authority::ALL, Authority::as_str),
+            spellings(EvidenceStatus::ALL, EvidenceStatus::as_str),
             [
-                "source_authority",
-                "mechanical_authority",
+                "source_evidence_status",
+                "mechanical_evidence_status",
                 "evidence_discovery_only",
-                "admitted_authority",
-                "compiler_authority",
-                "verifier_authority",
+                "accepted_evidence_status",
+                "compiler_evidence_status",
+                "verifier_evidence_status",
                 "view_only"
             ]
         );
@@ -481,7 +481,7 @@ mod tests {
             spellings(ClaimTier::ALL, ClaimTier::as_str),
             [
                 "s0_replayable",
-                "s1_admitted",
+                "s1_accepted",
                 "s2_research_evidence",
                 "s3_clinical_regulatory"
             ]
@@ -494,11 +494,11 @@ mod tests {
                 "ambiguity",
                 "incoherence",
                 "replay_failure",
-                "documented_null_result"
+                "documented_no_conflict_result"
             ]
         );
         assert_eq!(
-            spellings(AttemptClassification::ALL, AttemptClassification::as_str),
+            spellings(AttemptOutcome::ALL, AttemptOutcome::as_str),
             [
                 "improved",
                 "equivalent",
@@ -508,7 +508,7 @@ mod tests {
                 "unsupported",
                 "timeout",
                 "crash",
-                "null_result",
+                "no_conflict_result",
                 "near_miss",
                 "unreproducible",
                 "unauthorized",
@@ -534,7 +534,7 @@ mod tests {
             [
                 "extraction_uncertain",
                 "table_structure_uncertain",
-                "span_grounding_missing",
+                "span_source_linkage_missing",
                 "segmentation_boundary_error",
                 "terminology_unmapped",
                 "terminology_ambiguous",
@@ -585,7 +585,7 @@ mod tests {
         for v in Origin::ALL {
             round_trip(*v);
         }
-        for v in Authority::ALL {
+        for v in EvidenceStatus::ALL {
             round_trip(*v);
         }
         for v in BindingStatus::ALL {
@@ -600,7 +600,7 @@ mod tests {
         for v in ReviewClassification::ALL {
             round_trip(*v);
         }
-        for v in AttemptClassification::ALL {
+        for v in AttemptOutcome::ALL {
             round_trip(*v);
         }
         for v in PromotionDecision::ALL {
@@ -626,16 +626,16 @@ mod tests {
     fn enum_reading_rejects_unknown_tokens_and_non_strings() {
         // a token outside the value set (including case variants)
         assert!(matches!(
-            read_canonical::<Outcome>(br#""weird""#),
+            read_strict_canonical::<Outcome>(br#""weird""#),
             Err(CanonReadError::Policy(ValidationError::Enum(_)))
         ));
         assert!(matches!(
-            read_canonical::<Direction>(br#""FOR""#),
+            read_strict_canonical::<Direction>(br#""FOR""#),
             Err(CanonReadError::Policy(ValidationError::Enum(_)))
         ));
         // null is never canonical
         assert_eq!(
-            read_canonical::<Outcome>(b"null"),
+            read_strict_canonical::<Outcome>(b"null"),
             Err(CanonReadError::Token)
         );
     }
@@ -694,13 +694,13 @@ mod tests {
         // misordered payload keys are non-canonical on reading
         let unsorted = br#"{"artifact_hashes":[],"code":"missing_policy","outcome":"residual","payload":{"b":"1","a":"2"},"region_ids":[]}"#;
         assert_eq!(
-            read_canonical::<DiagnosticRecord>(unsorted),
+            read_strict_canonical::<DiagnosticRecord>(unsorted),
             Err(CanonReadError::Unsorted)
         );
         // a payload value that is not diagnostic_text-normalized is rejected
         let unnormalized = br#"{"artifact_hashes":[],"code":"missing_policy","outcome":"residual","payload":{"k":"a  b"},"region_ids":[]}"#;
         assert_eq!(
-            read_canonical::<DiagnosticRecord>(unnormalized),
+            read_strict_canonical::<DiagnosticRecord>(unnormalized),
             Err(CanonReadError::Unnormalized(StringPolicy::DiagnosticText))
         );
     }
@@ -733,7 +733,7 @@ mod tests {
     }
 
     // Serde (the §8.4 YAML registry surface) speaks the same identifier_ascii
-    // spelling as the canonical bytes, and admits nothing else.
+    // spelling as the canonical bytes, and accepts nothing else.
     #[test]
     fn fieldless_enum_serde_mirrors_canonical_spelling() {
         assert_eq!(serde_json::to_string(&Outcome::Ok).unwrap(), r#""ok""#);
@@ -751,7 +751,7 @@ mod tests {
         text.truncate(text.len() - 1);
         text.push_str(r#","z":"1"}"#);
         assert_eq!(
-            read_canonical::<TotalOperationResult>(text.as_bytes()),
+            read_strict_canonical::<TotalOperationResult>(text.as_bytes()),
             Err(CanonReadError::UnknownField("z".to_owned()))
         );
     }

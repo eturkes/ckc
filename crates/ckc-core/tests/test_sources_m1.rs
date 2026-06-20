@@ -1,20 +1,20 @@
-//! fixtures-m1 gate: the committed M1 data layer — corpus fixtures, lexicon,
-//! gold, registry seeds — loads through the SPEC §8.4 registry types,
-//! validates as one set with zero findings, fixture and gold paths resolve
-//! from the repository root, and fixture bytes carry the normative §8.2
-//! sentences the gold core ids and §8.6 worked thread are derived from.
+//! fixtures-m1 gate: the committed M1 data layer — corpus test_sources, lexicon,
+//! reference, registry seeds — loads through the SPEC §8.4 registry types,
+//! validates as one set with zero findings, test_source and reference paths resolve
+//! from the repository root, and test_source bytes carry the normative §8.2
+//! sentences the reference core ids and §8.6 worked thread are derived from.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use ckc_core::{
-    Candidates, Certainty, CorpusEntry, Direction, ExperimentEntry, GoldEntry, Id, Strength,
-    parse_candidates, parse_corpora, parse_experiments, parse_gold, validate_registries,
+    Candidates, Certainty, CorpusEntry, Direction, ExperimentEntry, ReferenceEntry, Id, Strength,
+    parse_candidates, parse_corpora, parse_experiments, parse_reference, validate_registries,
 };
 use serde::Deserialize;
 
-/// SPEC §8.2 normative fixture sentences, byte-exact with the spec quotes.
+/// SPEC §8.2 normative test_source sentences, byte-exact with the spec quotes.
 const A_RECOMMENDATION: &str =
     "成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)";
 const A_EXCEPTION: &str = "ただし、重度腎機能障害のある患者を除く";
@@ -41,34 +41,34 @@ fn id(s: &str) -> Id {
     Id::new(s).unwrap()
 }
 
-/// The committed registry surface loaded through the typed parsers, gold
+/// The committed registry surface loaded through the typed parsers, reference
 /// keyed exactly by the path the experiment writes.
 fn load_set() -> (
     Vec<CorpusEntry>,
     Candidates,
     Vec<ExperimentEntry>,
-    BTreeMap<String, Vec<GoldEntry>>,
+    BTreeMap<String, Vec<ReferenceEntry>>,
 ) {
     let corpora = parse_corpora(&read("registry/corpora.yaml")).unwrap();
     let candidates = parse_candidates(&read("registry/candidates.yaml")).unwrap();
     let experiments = parse_experiments(&read("registry/experiments.yaml")).unwrap();
-    let mut gold = BTreeMap::new();
+    let mut reference = BTreeMap::new();
     for experiment in &experiments {
-        gold.insert(
+        reference.insert(
             experiment.expected_outcomes.clone(),
-            parse_gold(&read(&experiment.expected_outcomes)).unwrap(),
+            parse_reference(&read(&experiment.expected_outcomes)).unwrap(),
         );
     }
-    (corpora, candidates, experiments, gold)
+    (corpora, candidates, experiments, reference)
 }
 
 // The committed set cross-resolves with zero findings, and exp.m1_spine
-// carries the §8.2 groups over the §8.3 stage chain.
+// carries the §8.2 groups over the §8.3 processing_stage chain.
 #[test]
 fn registry_set_loads_and_validates() {
-    let (corpora, candidates, experiments, gold) = load_set();
+    let (corpora, candidates, experiments, reference) = load_set();
     assert_eq!(
-        validate_registries(&corpora, &candidates, &experiments, &gold),
+        validate_registries(&corpora, &candidates, &experiments, &reference),
         vec![]
     );
 
@@ -76,9 +76,9 @@ fn registry_set_loads_and_validates() {
     assert_eq!(
         corpus_ids,
         vec![
-            &id("fixture.m1_guideline_a"),
-            &id("fixture.m1_guideline_b"),
-            &id("fixture.m1_control"),
+            &id("test_source.m1_guideline_a"),
+            &id("test_source.m1_guideline_b"),
+            &id("test_source.m1_control"),
         ]
     );
 
@@ -86,26 +86,26 @@ fn registry_set_loads_and_validates() {
     let exp = &experiments[0];
     assert_eq!(exp.id, id("exp.m1_spine"));
     assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
-    assert_eq!(exp.fixture_groups.len(), 2);
-    assert_eq!(exp.fixture_groups[0].group_id, id("group.m1_conflict"));
+    assert_eq!(exp.test_source_groups.len(), 2);
+    assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
     assert_eq!(
-        exp.fixture_groups[0].fixtures,
-        vec![id("fixture.m1_guideline_a"), id("fixture.m1_guideline_b")]
+        exp.test_source_groups[0].test_sources,
+        vec![id("test_source.m1_guideline_a"), id("test_source.m1_guideline_b")]
     );
-    assert_eq!(exp.fixture_groups[1].group_id, id("group.m1_null"));
+    assert_eq!(exp.test_source_groups[1].group_id, id("group.m1_no_conflict"));
     assert_eq!(
-        exp.fixture_groups[1].fixtures,
-        vec![id("fixture.m1_guideline_a"), id("fixture.m1_control")]
+        exp.test_source_groups[1].test_sources,
+        vec![id("test_source.m1_guideline_a"), id("test_source.m1_control")]
     );
     assert!(exp.budget.contains_key(&id("solver_ms_per_query")));
 
-    // The pipeline chains the eight §8.3 stages in execution order.
-    let stage_kind: BTreeMap<&Id, &Id> =
-        candidates.stages.iter().map(|s| (&s.id, &s.kind)).collect();
+    // The pipeline chains the eight §8.3 processing_stages in execution order.
+    let processing_stage_kind: BTreeMap<&Id, &Id> =
+        candidates.processing_stages.iter().map(|s| (&s.id, &s.kind)).collect();
     let kinds: Vec<&str> = candidates.pipelines[0]
-        .stages
+        .processing_stages
         .iter()
-        .map(|sid| stage_kind[sid].as_str())
+        .map(|sid| processing_stage_kind[sid].as_str())
         .collect();
     assert_eq!(
         kinds,
@@ -126,22 +126,22 @@ fn registry_set_loads_and_validates() {
 // the §8.2 sentences; guideline_a also exercises the layout surface (CQ
 // heading, definitions table, evidence list).
 #[test]
-fn fixture_paths_resolve_and_carry_spec_sentences() {
+fn test_source_paths_resolve_and_carry_spec_sentences() {
     let (corpora, ..) = load_set();
     let required: BTreeMap<&str, Vec<&str>> = BTreeMap::from([
         (
-            "fixture.m1_guideline_a",
+            "test_source.m1_guideline_a",
             vec![A_RECOMMENDATION, A_EXCEPTION, "CQ1", "<table>", "<ul>"],
         ),
-        ("fixture.m1_guideline_b", vec![B_CONTRAINDICATION]),
-        ("fixture.m1_control", vec![CONTROL_SENTENCE]),
+        ("test_source.m1_guideline_b", vec![B_CONTRAINDICATION]),
+        ("test_source.m1_control", vec![CONTROL_SENTENCE]),
     ]);
     assert_eq!(corpora.len(), required.len());
     for entry in &corpora {
         let body = read(&entry.path);
         assert!(
             body.contains(r#"<meta charset="utf-8">"#) && body.contains(r#"<html lang="ja">"#),
-            "{}: fixture HTML preamble missing",
+            "{}: test_source HTML preamble missing",
             entry.id
         );
         for needle in &required[entry.id.as_str()] {
@@ -150,13 +150,13 @@ fn fixture_paths_resolve_and_carry_spec_sentences() {
     }
 }
 
-// The gold file matches the §8.2 expectations entry for entry: the conflict
+// The reference file matches the §8.2 expectations entry for entry: the conflict
 // group expects the cross-document unsat core as a set, the control group a
 // documented null result.
 #[test]
-fn gold_matches_spec_expectations() {
-    let (_, _, experiments, gold) = load_set();
-    let entries = &gold[&experiments[0].expected_outcomes];
+fn reference_matches_spec_expectations() {
+    let (_, _, experiments, reference) = load_set();
+    let entries = &reference[&experiments[0].expected_outcomes];
     assert_eq!(entries.len(), 2);
 
     let conflict = &entries[0];
@@ -167,23 +167,23 @@ fn gold_matches_spec_expectations() {
         Some(id("deontic_direction_conflict"))
     );
     assert_eq!(
-        conflict.expected_core,
+        conflict.expected_unsat_core,
         BTreeSet::from([
-            id("a.fixture.m1_guideline_a.rule.0"),
-            id("a.fixture.m1_guideline_b.rule.0"),
+            id("a.test_source.m1_guideline_a.rule.0"),
+            id("a.test_source.m1_guideline_b.rule.0"),
         ])
     );
-    assert!(!conflict.expected_null_result);
+    assert!(!conflict.expected_no_conflict_result);
 
     let null = &entries[1];
-    assert_eq!(null.group_id, id("group.m1_null"));
+    assert_eq!(null.group_id, id("group.m1_no_conflict"));
     assert_eq!(null.expected_outcome, id("semantic_no_conflict"));
     assert_eq!(null.expected_conflict_kind, None);
-    assert!(null.expected_core.is_empty());
-    assert!(null.expected_null_result);
+    assert!(null.expected_unsat_core.is_empty());
+    assert!(null.expected_no_conflict_result);
 }
 
-/// Test-local mirror of the `corpus/lexicon/ja_core.yaml` shape contract
+/// Test-local mirror of the `corpus/lexicon/ja_core.yaml` shape requirements
 /// (the typed loader lands with stage-normalize.1); strict so field typos in
 /// the committed file fail here.
 #[derive(Deserialize)]
@@ -245,10 +245,10 @@ struct CertaintyEntry {
     value: Certainty,
 }
 
-// The lexicon parses through the shape contract and carries exactly the §8.6
+// The lexicon parses through the shape requirements and carries exactly the §8.6
 // concept/action vocabulary, the §5 modality and certainty tables, and the
 // adult/child age-interval semantics; every concept surface form is bound by
-// at least one fixture.
+// at least one test_source.
 #[test]
 fn lexicon_parses_and_yields_spec_ids() {
     let lexicon: Lexicon = serde_saphyr::from_str(&read("corpus/lexicon/ja_core.yaml")).unwrap();
@@ -353,15 +353,15 @@ fn lexicon_parses_and_yields_spec_ids() {
         ])
     );
 
-    // Grounding coverage: every concept surface form occurs in fixture text,
+    // SourceLinkage coverage: every concept surface form occurs in test_source text,
     // so each lexicon concept is bindable from the committed corpus.
     let (corpora, ..) = load_set();
-    let all_fixture_text: String = corpora.iter().map(|c| read(&c.path)).collect();
+    let all_test_source_text: String = corpora.iter().map(|c| read(&c.path)).collect();
     for concept in &lexicon.concepts {
         for surface in &concept.surface {
             assert!(
-                all_fixture_text.contains(surface.as_str()),
-                "{}: surface {surface:?} unbound by any fixture",
+                all_test_source_text.contains(surface.as_str()),
+                "{}: surface {surface:?} unbound by any test_source",
                 concept.id
             );
         }

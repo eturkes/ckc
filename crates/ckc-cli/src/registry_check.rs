@@ -1,7 +1,7 @@
 //! SPEC §3 `ckc registry check` (cli-runner.1.2; closes §8.5 item 2).
 //!
 //! Loads the §8.4 registry surface from the invocation root —
-//! `registry/{corpora,candidates,experiments}.yaml` plus every gold document
+//! `registry/{corpora,candidates,experiments}.yaml` plus every reference document
 //! an experiment's expected-outcome ref names — through the strict
 //! core-registry loaders, then runs [`validate_registries`] over the set as
 //! one cross-referenced whole (resolution, uniqueness, the stage-chain
@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ckc_core::{
-    DiagnosticCode, DiagnosticRecord, GoldEntry, Id, Outcome, RegistryError, parse_candidates,
-    parse_corpora, parse_experiments, parse_gold, validate_registries,
+    DiagnosticCode, DiagnosticRecord, ReferenceEntry, Id, Outcome, RegistryError, parse_candidates,
+    parse_corpora, parse_experiments, parse_reference, validate_registries,
 };
 
 use crate::shell::{Shell, static_id};
@@ -27,7 +27,7 @@ const CANDIDATES_FILE: &str = "registry/candidates.yaml";
 const EXPERIMENTS_FILE: &str = "registry/experiments.yaml";
 
 /// Run `registry check` rooted at `root` (the invocation working directory:
-/// §3 anchors `registry/` and gold paths at the repository root). Evidence
+/// §3 anchors `registry/` and reference paths at the repository root). Evidence
 /// and the outcome land entirely in the shell.
 pub(crate) fn check(root: &Path, shell: &mut Shell) {
     let corpora = load(root, CORPORA_FILE, parse_corpora, shell);
@@ -38,23 +38,23 @@ pub(crate) fn check(root: &Path, shell: &mut Shell) {
         return;
     };
 
-    // Gold documents load per unique experiment ref, keyed exactly by the
+    // Reference documents load per unique experiment ref, keyed exactly by the
     // path text the experiment writes (the resolution key validation uses).
     // Empty refs are an Empty finding below, not a read; a ref whose file
     // fails to load keeps its load diagnostic and surfaces again as
-    // GoldUnresolved — one cause, both layers reported.
-    let mut gold: BTreeMap<String, Vec<GoldEntry>> = BTreeMap::new();
+    // ReferenceUnresolved — one cause, both layers reported.
+    let mut reference: BTreeMap<String, Vec<ReferenceEntry>> = BTreeMap::new();
     for experiment in &experiments {
         let rel = &experiment.expected_outcomes;
-        if rel.is_empty() || gold.contains_key(rel) {
+        if rel.is_empty() || reference.contains_key(rel) {
             continue;
         }
-        if let Some(entries) = load(root, rel, parse_gold, shell) {
-            gold.insert(rel.clone(), entries);
+        if let Some(entries) = load(root, rel, parse_reference, shell) {
+            reference.insert(rel.clone(), entries);
         }
     }
 
-    for finding in validate_registries(&corpora, &candidates, &experiments, &gold) {
+    for finding in validate_registries(&corpora, &candidates, &experiments, &reference) {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("finding"),
             finding.to_string(),
@@ -190,13 +190,13 @@ mod tests {
             "\
 pipelines:
   - id: pipe.p
-    stages: [stage.head]
-stages:
-  - id: stage.head
+    processing_stages: [processing_stage.head]
+processing_stages:
+  - id: processing_stage.head
     kind: extract
     determinism: deterministic
     input_artifact_kinds: []
-    output_artifact_kinds: [source_graph]
+    output_artifact_kinds: [source_document_graph]
 ",
         );
         write(
@@ -205,13 +205,13 @@ stages:
             "\
 - id: exp.e
   pipeline: pipe.p
-  fixture_groups:
+  test_source_groups:
     - group_id: group.g
-      fixtures: [fixture.x]
+      test_sources: [test_source.x]
   seed: 1
   budget:
     solver_ms_per_query: 1000
-  expected_outcomes: corpus/gold/g.yaml
+  expected_outcomes: corpus/reference/g.yaml
 ",
         );
         let (result, diagnostics) = checked(root);
@@ -221,7 +221,7 @@ stages:
     }
 
     // A loadable but semantically broken set is reported whole: every
-    // finding and the gold load failure land as their own diagnostics, no
+    // finding and the reference load failure land as their own diagnostics, no
     // fail-fast.
     #[test]
     fn broken_set_reports_every_finding() {
@@ -231,67 +231,67 @@ stages:
             root,
             CORPORA_FILE,
             "\
-- id: fixture.x
-  path: corpus/fixtures/x.html
+- id: test_source.x
+  path: corpus/test_sources/x.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic
 ",
         );
-        // stage.consume's input has no producing predecessor: ChainBreak.
+        // processing_stage.consume's input has no producing predecessor: ChainBreak.
         write(
             root,
             CANDIDATES_FILE,
             "\
 pipelines:
   - id: pipe.broken
-    stages: [stage.consume]
-stages:
-  - id: stage.consume
+    processing_stages: [processing_stage.consume]
+processing_stages:
+  - id: processing_stage.consume
     kind: segment
     determinism: deterministic
-    input_artifact_kinds: [source_graph]
+    input_artifact_kinds: [source_document_graph]
     output_artifact_kinds: [segments]
 ",
         );
-        // exp.broken: dangling pipeline, dangling fixture, gold ref whose
-        // file exists but fails to parse; exp.holey: empty gold ref.
+        // exp.broken: dangling pipeline, dangling test_source, reference ref whose
+        // file exists but fails to parse; exp.holey: empty reference ref.
         write(
             root,
             EXPERIMENTS_FILE,
             "\
 - id: exp.broken
   pipeline: pipe.missing
-  fixture_groups:
+  test_source_groups:
     - group_id: group.g1
-      fixtures: [fixture.x, fixture.missing]
+      test_sources: [test_source.x, test_source.missing]
   seed: 1
   budget:
     solver_ms_per_query: 1000
-  expected_outcomes: corpus/gold/broken.yaml
+  expected_outcomes: corpus/reference/broken.yaml
 - id: exp.holey
   pipeline: pipe.broken
-  fixture_groups:
+  test_source_groups:
     - group_id: group.g2
-      fixtures: [fixture.x]
+      test_sources: [test_source.x]
   seed: 1
   budget:
     solver_ms_per_query: 1000
   expected_outcomes: \"\"
 ",
         );
-        write(root, "corpus/gold/broken.yaml", "][ not yaml");
+        write(root, "corpus/reference/broken.yaml", "][ not yaml");
 
         let (result, diagnostics) = checked(root);
         assert_eq!(result.outcome, Outcome::Invalid);
-        // gold load failure + ChainBreak + 2 danglings + GoldUnresolved +
+        // reference load failure + ChainBreak + 2 danglings + ReferenceUnresolved +
         // Empty expected_outcomes.
         assert_eq!(diagnostics.len(), 6);
-        assert_reported(&diagnostics, "corpus/gold/broken.yaml");
+        assert_reported(&diagnostics, "corpus/reference/broken.yaml");
         assert_reported(&diagnostics, "no predecessor produces");
         assert_reported(&diagnostics, "undefined pipelines pipe.missing");
-        assert_reported(&diagnostics, "undefined corpora fixture.missing");
-        assert_reported(&diagnostics, "matches no loaded gold document");
+        assert_reported(&diagnostics, "undefined corpora test_source.missing");
+        assert_reported(&diagnostics, "matches no loaded reference document");
         assert_reported(&diagnostics, "expected_outcomes is empty");
     }
 }

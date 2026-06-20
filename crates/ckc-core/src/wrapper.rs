@@ -1,8 +1,8 @@
-//! SPEC §4.4 artifact envelope and SPEC §4.6 event records, plus the JSONL
+//! SPEC §4.4 artifact wrapper and SPEC §4.6 event records, plus the JSONL
 //! stream form behind `events.jsonl` and `diagnostics.jsonl`.
 //!
-//! [`ArtifactEnvelope`] is the one canonical JSON wrapper every accepted
-//! artifact ships in; [`validate`](ArtifactEnvelope::validate) enforces the
+//! [`ArtifactWrapper`] is the one canonical JSON wrapper every accepted
+//! artifact ships in; [`validate`](ArtifactWrapper::validate) enforces the
 //! §4.4 invariants that are mechanical at this layer. [`EventRecord`] is one
 //! `events.jsonl` line of runtime evidence. [`write_jsonl`]/[`read_jsonl`]
 //! frame any canonical type as newline-delimited canonical JSON, strictly in
@@ -13,21 +13,21 @@ use std::fmt;
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
     canonical_payload_bytes, emit_raw_map, emit_set, emit_string, emit_u64, emit_u64_map,
-    read_canonical, read_raw_map, read_set, read_string, read_u64, read_u64_map,
+    read_strict_canonical, read_raw_map, read_set, read_string, read_u64, read_u64_map,
 };
-use crate::enums::{Authority, DiagnosticRecord, Origin, Outcome, fieldless_enum};
+use crate::enums::{EvidenceStatus, DiagnosticRecord, Origin, Outcome, fieldless_enum};
 use crate::hash::{canonicalization_policy_hash, content_hash};
 use crate::id::{Hash, Id, ValidationError};
 
-/// SPEC §4.4 `schema_version`: bumped on breaking schema change. The envelope
+/// SPEC §4.4 `schema_version`: bumped on breaking schema change. The wrapper
 /// emits this constant and reading requires it, so a foreign version never
 /// constructs a value.
 pub const SCHEMA_VERSION: &str = "ckc.1";
 
 fieldless_enum! {
-    /// SPEC §4.4 `accepted_effects` value: an effect channel an
+    /// SPEC §4.4 `external_effects` value: an effect channel an
     /// evidence-discovery artifact may record. Accepted semantic artifacts
-    /// carry the empty set ([`ArtifactEnvelope::validate`]).
+    /// carry the empty set ([`ArtifactWrapper::validate`]).
     Effect {
         Network => "network",
         Clock => "clock",
@@ -39,8 +39,8 @@ fieldless_enum! {
 /// SPEC §4.4 `producer`: the component execution that emitted the artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Producer {
-    pub candidate_id: Id,
-    pub component_id: Id,
+    pub pipeline_id: Id,
+    pub pipeline_step_id: Id,
     /// Hash of the toolchain manifest in force; this schema declares raw-byte
     /// hashing (§4.4 `_hash` rule) — the manifest is a file, not an accepted
     /// artifact.
@@ -50,8 +50,8 @@ pub struct Producer {
 impl Canonical for Producer {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("candidate_id", |b| self.candidate_id.emit_canonical(b))?;
-        obj.member("component_id", |b| self.component_id.emit_canonical(b))?;
+        obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
+        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
         obj.member("toolchain_manifest_hash", |b| {
             self.toolchain_manifest_hash.emit_canonical(b)
         })?;
@@ -62,24 +62,24 @@ impl Canonical for Producer {
 impl CanonRead for Producer {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let candidate_id = obj.member("candidate_id", Id::read)?;
-        let component_id = obj.member("component_id", Id::read)?;
+        let pipeline_id = obj.member("pipeline_id", Id::read)?;
+        let pipeline_step_id = obj.member("pipeline_step_id", Id::read)?;
         let toolchain_manifest_hash = obj.member("toolchain_manifest_hash", Hash::read)?;
         obj.close()?;
         Ok(Producer {
-            candidate_id,
-            component_id,
+            pipeline_id,
+            pipeline_step_id,
             toolchain_manifest_hash,
         })
     }
 }
 
-/// A SPEC §4.4 envelope invariant failed ([`ArtifactEnvelope::validate`]).
+/// A SPEC §4.4 wrapper invariant failed ([`ArtifactWrapper::validate`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EnvelopeError {
-    /// `accepted_effects` was nonempty under an authority other than
+pub enum WrapperError {
+    /// `external_effects` was nonempty under an evidence_status other than
     /// `evidence_discovery_only` (carried here).
-    EffectsForbidden(Authority),
+    EffectsForbidden(EvidenceStatus),
     /// The `content_hash` field is not the hash of the payload's canonical
     /// bytes.
     ContentHash { declared: Hash, computed: Hash },
@@ -90,41 +90,41 @@ pub enum EnvelopeError {
     Canon(CanonError),
 }
 
-impl fmt::Display for EnvelopeError {
+impl fmt::Display for WrapperError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            EnvelopeError::EffectsForbidden(authority) => write!(
+            WrapperError::EffectsForbidden(evidence_status) => write!(
                 f,
-                "accepted_effects requires evidence_discovery_only authority, found {}",
-                authority.as_str()
+                "external_effects requires evidence_discovery_only evidence_status, found {}",
+                evidence_status.as_str()
             ),
-            EnvelopeError::ContentHash { declared, computed } => write!(
+            WrapperError::ContentHash { declared, computed } => write!(
                 f,
                 "content_hash {} does not match payload bytes ({})",
                 declared.as_str(),
                 computed.as_str()
             ),
-            EnvelopeError::PolicyHash { declared, computed } => write!(
+            WrapperError::PolicyHash { declared, computed } => write!(
                 f,
                 "canonicalization_policy_hash {} is not the in-force descriptor {}",
                 declared.as_str(),
                 computed.as_str()
             ),
-            EnvelopeError::Canon(e) => write!(f, "payload emission: {e}"),
+            WrapperError::Canon(e) => write!(f, "payload emission: {e}"),
         }
     }
 }
 
-impl std::error::Error for EnvelopeError {}
+impl std::error::Error for WrapperError {}
 
-/// SPEC §4.4 envelope: the one canonical JSON wrapper every accepted artifact
+/// SPEC §4.4 wrapper: the one canonical JSON wrapper every accepted artifact
 /// ships in, generic over the typed payload `P`. Builders fill the struct,
 /// computing the two derived fields with [`content_hash`] and
 /// [`canonicalization_policy_hash`], then confirm with
 /// [`validate`](Self::validate); `schema_version` is the [`SCHEMA_VERSION`]
 /// constant, emitted and required on read rather than stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ArtifactEnvelope<P> {
+pub struct ArtifactWrapper<P> {
     /// Schema identifier, e.g. `schema.ir_bundle`.
     pub schema_id: Id,
     pub artifact_id: Id,
@@ -132,19 +132,19 @@ pub struct ArtifactEnvelope<P> {
     pub producer: Producer,
     /// Content hashes of the accepted artifacts this one consumed.
     pub input_hashes: Vec<Hash>,
-    /// Hash of the canonical payload bytes — and nothing else: envelope
+    /// Hash of the canonical payload bytes — and nothing else: wrapper
     /// metadata never shifts content identity.
     pub content_hash: Hash,
     /// Hash of the §4.3 canonicalization-policy descriptor in force.
     pub canonicalization_policy_hash: Hash,
     pub origin: Origin,
-    /// `compiler_authority` is reserved for compiled artifacts and
-    /// `verifier_authority` for verifier results; those schemas bind the
-    /// reservation where they land (M1 compile/verify stages).
-    pub authority: Authority,
+    /// `compiler_evidence_status` is reserved for compiled artifacts and
+    /// `verifier_evidence_status` for verifier results; those schemas bind the
+    /// reservation where they land (M1 compile/verify processing_stages).
+    pub evidence_status: EvidenceStatus,
     /// `[]` for accepted semantic artifacts; evidence-discovery artifacts may
     /// record the channels they used. Set semantics.
-    pub accepted_effects: Vec<Effect>,
+    pub external_effects: Vec<Effect>,
     /// Trace links (§7.1 entities). Set semantics.
     pub trace_refs: Vec<Id>,
     /// Structured §7.4 diagnostics. Set semantics.
@@ -156,24 +156,24 @@ pub struct ArtifactEnvelope<P> {
     pub payload: P,
 }
 
-impl<P: Canonical> ArtifactEnvelope<P> {
-    /// Enforce the §4.4 invariants that are mechanical at the envelope layer:
+impl<P: Canonical> ArtifactWrapper<P> {
+    /// Enforce the §4.4 invariants that are mechanical at the wrapper layer:
     /// both derived hash fields match recomputation, and a nonempty
-    /// `accepted_effects` is confined to `evidence_discovery_only` authority.
-    pub fn validate(&self) -> Result<(), EnvelopeError> {
-        if !self.accepted_effects.is_empty() && self.authority != Authority::EvidenceDiscoveryOnly {
-            return Err(EnvelopeError::EffectsForbidden(self.authority));
+    /// `external_effects` is confined to `evidence_discovery_only` evidence_status.
+    pub fn validate(&self) -> Result<(), WrapperError> {
+        if !self.external_effects.is_empty() && self.evidence_status != EvidenceStatus::EvidenceDiscoveryOnly {
+            return Err(WrapperError::EffectsForbidden(self.evidence_status));
         }
-        let computed = content_hash(&self.payload).map_err(EnvelopeError::Canon)?;
+        let computed = content_hash(&self.payload).map_err(WrapperError::Canon)?;
         if self.content_hash != computed {
-            return Err(EnvelopeError::ContentHash {
+            return Err(WrapperError::ContentHash {
                 declared: self.content_hash.clone(),
                 computed,
             });
         }
         let policy = canonicalization_policy_hash();
         if self.canonicalization_policy_hash != policy {
-            return Err(EnvelopeError::PolicyHash {
+            return Err(WrapperError::PolicyHash {
                 declared: self.canonicalization_policy_hash.clone(),
                 computed: policy,
             });
@@ -182,18 +182,18 @@ impl<P: Canonical> ArtifactEnvelope<P> {
     }
 }
 
-impl<P: Canonical> Canonical for ArtifactEnvelope<P> {
+impl<P: Canonical> Canonical for ArtifactWrapper<P> {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("accepted_effects", |b| emit_set(b, &self.accepted_effects))?;
         obj.member("artifact_id", |b| self.artifact_id.emit_canonical(b))?;
         obj.member("artifact_kind", |b| self.artifact_kind.emit_canonical(b))?;
-        obj.member("authority", |b| self.authority.emit_canonical(b))?;
         obj.member("canonicalization_policy_hash", |b| {
             self.canonicalization_policy_hash.emit_canonical(b)
         })?;
         obj.member("content_hash", |b| self.content_hash.emit_canonical(b))?;
         obj.member("diagnostics", |b| emit_set(b, &self.diagnostics))?;
+        obj.member("evidence_status", |b| self.evidence_status.emit_canonical(b))?;
+        obj.member("external_effects", |b| emit_set(b, &self.external_effects))?;
         obj.member("input_hashes", |b| emit_set(b, &self.input_hashes))?;
         obj.member("origin", |b| self.origin.emit_canonical(b))?;
         obj.member("payload", |b| self.payload.emit_canonical(b))?;
@@ -211,17 +211,17 @@ impl<P: Canonical> Canonical for ArtifactEnvelope<P> {
     }
 }
 
-impl<P: CanonRead> CanonRead for ArtifactEnvelope<P> {
+impl<P: CanonRead> CanonRead for ArtifactWrapper<P> {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let accepted_effects = obj.member("accepted_effects", read_set::<Effect>)?;
         let artifact_id = obj.member("artifact_id", Id::read)?;
         let artifact_kind = obj.member("artifact_kind", Id::read)?;
-        let authority = obj.member("authority", Authority::read)?;
         let canonicalization_policy_hash =
             obj.member("canonicalization_policy_hash", Hash::read)?;
         let content_hash = obj.member("content_hash", Hash::read)?;
         let diagnostics = obj.member("diagnostics", read_set::<DiagnosticRecord>)?;
+        let evidence_status = obj.member("evidence_status", EvidenceStatus::read)?;
+        let external_effects = obj.member("external_effects", read_set::<Effect>)?;
         let input_hashes = obj.member("input_hashes", read_set::<Hash>)?;
         let origin = obj.member("origin", Origin::read)?;
         let payload = obj.member("payload", P::read)?;
@@ -239,7 +239,7 @@ impl<P: CanonRead> CanonRead for ArtifactEnvelope<P> {
         })?;
         let trace_refs = obj.member("trace_refs", read_set::<Id>)?;
         obj.close()?;
-        Ok(ArtifactEnvelope {
+        Ok(ArtifactWrapper {
             schema_id,
             artifact_id,
             artifact_kind,
@@ -248,8 +248,8 @@ impl<P: CanonRead> CanonRead for ArtifactEnvelope<P> {
             content_hash,
             canonicalization_policy_hash,
             origin,
-            authority,
-            accepted_effects,
+            evidence_status,
+            external_effects,
             trace_refs,
             diagnostics,
             runtime_metadata,
@@ -265,14 +265,14 @@ impl<P: CanonRead> CanonRead for ArtifactEnvelope<P> {
 pub struct EventRecord {
     pub event_id: Id,
     pub run_id: Id,
-    pub candidate_id: Id,
-    pub component_id: Id,
-    /// Pipeline stage the event belongs to (e.g. `extract`).
-    pub stage: Id,
-    /// Log-level token (e.g. `info`); §4.6 leaves the value set open at M1.
-    pub level: Id,
+    pub pipeline_id: Id,
+    pub pipeline_step_id: Id,
+    /// Pipeline processing_stage the event belongs to (e.g. `extract`).
+    pub processing_stage: Id,
+    /// Log-level (log_level) token (e.g. `info`); §4.6 leaves the value set open at M1.
+    pub log_level: Id,
     /// Deterministic event ordering within a run.
-    pub logical_time: u64,
+    pub event_sequence_number: u64,
     /// Wall-clock bounds as raw runtime text (e.g. RFC 3339).
     pub started_at: String,
     pub ended_at: String,
@@ -283,17 +283,12 @@ pub struct EventRecord {
     /// §7.4 diagnostics raised during the event. Set semantics.
     pub diagnostics: Vec<DiagnosticRecord>,
     /// Counter name to consumed amount (tokens, calls, milliseconds).
-    pub budget_counters: Vec<(Id, u64)>,
+    pub resource_counters: Vec<(Id, u64)>,
 }
 
 impl Canonical for EventRecord {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("budget_counters", |b| {
-            emit_u64_map(b, &self.budget_counters)
-        })?;
-        obj.member("candidate_id", |b| self.candidate_id.emit_canonical(b))?;
-        obj.member("component_id", |b| self.component_id.emit_canonical(b))?;
         obj.member("diagnostics", |b| emit_set(b, &self.diagnostics))?;
         obj.member("duration_ms", |b| {
             emit_u64(b, self.duration_ms);
@@ -304,16 +299,21 @@ impl Canonical for EventRecord {
             Ok(())
         })?;
         obj.member("event_id", |b| self.event_id.emit_canonical(b))?;
-        obj.member("input_hashes", |b| emit_set(b, &self.input_hashes))?;
-        obj.member("level", |b| self.level.emit_canonical(b))?;
-        obj.member("logical_time", |b| {
-            emit_u64(b, self.logical_time);
+        obj.member("event_sequence_number", |b| {
+            emit_u64(b, self.event_sequence_number);
             Ok(())
         })?;
+        obj.member("input_hashes", |b| emit_set(b, &self.input_hashes))?;
+        obj.member("log_level", |b| self.log_level.emit_canonical(b))?;
         obj.member("outcome", |b| self.outcome.emit_canonical(b))?;
         obj.member("output_hashes", |b| emit_set(b, &self.output_hashes))?;
+        obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
+        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
+        obj.member("processing_stage", |b| self.processing_stage.emit_canonical(b))?;
+        obj.member("resource_counters", |b| {
+            emit_u64_map(b, &self.resource_counters)
+        })?;
         obj.member("run_id", |b| self.run_id.emit_canonical(b))?;
-        obj.member("stage", |b| self.stage.emit_canonical(b))?;
         obj.member("started_at", |b| {
             emit_string(b, &self.started_at);
             Ok(())
@@ -325,30 +325,30 @@ impl Canonical for EventRecord {
 impl CanonRead for EventRecord {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let budget_counters = obj.member("budget_counters", read_u64_map)?;
-        let candidate_id = obj.member("candidate_id", Id::read)?;
-        let component_id = obj.member("component_id", Id::read)?;
         let diagnostics = obj.member("diagnostics", read_set::<DiagnosticRecord>)?;
         let duration_ms = obj.member("duration_ms", read_u64)?;
         let ended_at = obj.member("ended_at", read_string)?;
         let event_id = obj.member("event_id", Id::read)?;
+        let event_sequence_number = obj.member("event_sequence_number", read_u64)?;
         let input_hashes = obj.member("input_hashes", read_set::<Hash>)?;
-        let level = obj.member("level", Id::read)?;
-        let logical_time = obj.member("logical_time", read_u64)?;
+        let log_level = obj.member("log_level", Id::read)?;
         let outcome = obj.member("outcome", Outcome::read)?;
         let output_hashes = obj.member("output_hashes", read_set::<Hash>)?;
+        let pipeline_id = obj.member("pipeline_id", Id::read)?;
+        let pipeline_step_id = obj.member("pipeline_step_id", Id::read)?;
+        let processing_stage = obj.member("processing_stage", Id::read)?;
+        let resource_counters = obj.member("resource_counters", read_u64_map)?;
         let run_id = obj.member("run_id", Id::read)?;
-        let stage = obj.member("stage", Id::read)?;
         let started_at = obj.member("started_at", read_string)?;
         obj.close()?;
         Ok(EventRecord {
             event_id,
             run_id,
-            candidate_id,
-            component_id,
-            stage,
-            level,
-            logical_time,
+            pipeline_id,
+            pipeline_step_id,
+            processing_stage,
+            log_level,
+            event_sequence_number,
             started_at,
             ended_at,
             duration_ms,
@@ -356,7 +356,7 @@ impl CanonRead for EventRecord {
             output_hashes,
             outcome,
             diagnostics,
-            budget_counters,
+            resource_counters,
         })
     }
 }
@@ -395,7 +395,7 @@ pub fn read_jsonl<T: CanonRead>(bytes: &[u8]) -> Result<Vec<T>, CanonReadError> 
             Err(CanonReadError::Eof)
         };
     };
-    body.split(|&b| b == b'\n').map(read_canonical).collect()
+    body.split(|&b| b == b'\n').map(read_strict_canonical).collect()
 }
 
 #[cfg(test)]
@@ -411,7 +411,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -434,23 +434,23 @@ mod tests {
         }
     }
 
-    fn sample_envelope() -> ArtifactEnvelope<Id> {
+    fn sample_wrapper() -> ArtifactWrapper<Id> {
         let payload = id("payload.v");
-        ArtifactEnvelope {
+        ArtifactWrapper {
             schema_id: id("schema.test"),
             artifact_id: id("artifact.a"),
             artifact_kind: id("test_kind"),
             producer: Producer {
-                candidate_id: id("cand.base"),
-                component_id: id("comp.unit"),
+                pipeline_id: id("cand.base"),
+                pipeline_step_id: id("comp.unit"),
                 toolchain_manifest_hash: h('b'),
             },
             input_hashes: vec![h('a')],
             content_hash: content_hash(&payload).unwrap(),
             canonicalization_policy_hash: canonicalization_policy_hash(),
             origin: Origin::DeterministicCompiler,
-            authority: Authority::MechanicalAuthority,
-            accepted_effects: vec![],
+            evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+            external_effects: vec![],
             trace_refs: vec![id("trace.t1")],
             diagnostics: vec![],
             runtime_metadata: vec![(id("run_id"), "run.1".to_owned())],
@@ -458,7 +458,7 @@ mod tests {
         }
     }
 
-    // Pins the §4.4 accepted_effects value set: spelling, round-trips, and
+    // Pins the §4.4 external_effects value set: spelling, round-trips, and
     // canonical set order (byte-lexicographic, independent of declaration).
     #[test]
     fn effect_spellings_and_set_order() {
@@ -472,19 +472,19 @@ mod tests {
         assert_eq!(out, br#"["ai","clock","network","tool"]"#);
     }
 
-    // Pins the envelope's canonical shape: every §4.4 field, byte-sorted, with
+    // Pins the wrapper's canonical shape: every §4.4 field, byte-sorted, with
     // the schema_version constant and object-form runtime_metadata.
     #[test]
-    fn envelope_canonical_bytes() {
-        let env = sample_envelope();
+    fn wrapper_canonical_bytes() {
+        let env = sample_wrapper();
         let want = format!(
             concat!(
-                r#"{{"accepted_effects":[],"artifact_id":"artifact.a","#,
-                r#""artifact_kind":"test_kind","authority":"mechanical_authority","#,
+                r#"{{"artifact_id":"artifact.a","artifact_kind":"test_kind","#,
                 r#""canonicalization_policy_hash":"{}","content_hash":"{}","#,
-                r#""diagnostics":[],"input_hashes":["{}"],"#,
+                r#""diagnostics":[],"evidence_status":"mechanical_evidence_status","#,
+                r#""external_effects":[],"input_hashes":["{}"],"#,
                 r#""origin":"deterministic_compiler","payload":"payload.v","#,
-                r#""producer":{{"candidate_id":"cand.base","component_id":"comp.unit","#,
+                r#""producer":{{"pipeline_id":"cand.base","pipeline_step_id":"comp.unit","#,
                 r#""toolchain_manifest_hash":"{}"}},"runtime_metadata":{{"run_id":"run.1"}},"#,
                 r#""schema_id":"schema.test","schema_version":"ckc.1","#,
                 r#""trace_refs":["trace.t1"]}}"#
@@ -498,60 +498,60 @@ mod tests {
     }
 
     #[test]
-    fn envelope_round_trips_fully_populated() {
-        let mut env = sample_envelope();
-        env.authority = Authority::EvidenceDiscoveryOnly;
-        env.accepted_effects = vec![Effect::Ai, Effect::Tool];
+    fn wrapper_round_trips_fully_populated() {
+        let mut env = sample_wrapper();
+        env.evidence_status = EvidenceStatus::EvidenceDiscoveryOnly;
+        env.external_effects = vec![Effect::Ai, Effect::Tool];
         env.diagnostics = vec![sample_diagnostic()];
         round_trip(env);
     }
 
     #[test]
-    fn validate_accepts_consistent_envelopes() {
-        sample_envelope().validate().unwrap();
+    fn validate_accepts_consistent_wrappers() {
+        sample_wrapper().validate().unwrap();
         // evidence-discovery artifacts may record effects
-        let mut env = sample_envelope();
-        env.authority = Authority::EvidenceDiscoveryOnly;
-        env.accepted_effects = vec![Effect::Network, Effect::Clock];
+        let mut env = sample_wrapper();
+        env.evidence_status = EvidenceStatus::EvidenceDiscoveryOnly;
+        env.external_effects = vec![Effect::Network, Effect::Clock];
         env.validate().unwrap();
     }
 
-    // §4.4: accepted_effects is [] for accepted semantic artifacts; only
+    // §4.4: external_effects is [] for accepted semantic artifacts; only
     // evidence-discovery artifacts record effects.
     #[test]
     fn validate_rejects_effects_outside_evidence_discovery() {
-        let mut env = sample_envelope();
-        env.accepted_effects = vec![Effect::Network];
+        let mut env = sample_wrapper();
+        env.external_effects = vec![Effect::Network];
         assert_eq!(
             env.validate(),
-            Err(EnvelopeError::EffectsForbidden(
-                Authority::MechanicalAuthority
+            Err(WrapperError::EffectsForbidden(
+                EvidenceStatus::MechanicalEvidenceStatus
             ))
         );
     }
 
     #[test]
     fn validate_rejects_derived_hash_drift() {
-        let mut env = sample_envelope();
+        let mut env = sample_wrapper();
         env.content_hash = h('c');
         assert!(matches!(
             env.validate(),
-            Err(EnvelopeError::ContentHash { .. })
+            Err(WrapperError::ContentHash { .. })
         ));
-        let mut env = sample_envelope();
+        let mut env = sample_wrapper();
         env.canonicalization_policy_hash = h('d');
         assert!(matches!(
             env.validate(),
-            Err(EnvelopeError::PolicyHash { .. })
+            Err(WrapperError::PolicyHash { .. })
         ));
     }
 
-    // §4.4: runtime_metadata is excluded from content_hash — the envelope
+    // §4.4: runtime_metadata is excluded from content_hash — the wrapper
     // bytes change, the content identity does not.
     #[test]
     fn runtime_metadata_never_shifts_content_hash() {
-        let a = sample_envelope();
-        let mut b = sample_envelope();
+        let a = sample_wrapper();
+        let mut b = sample_wrapper();
         b.runtime_metadata = vec![(id("host"), "other".to_owned())];
         assert_ne!(
             canonical_payload_bytes(&a).unwrap(),
@@ -563,10 +563,10 @@ mod tests {
 
     #[test]
     fn reading_rejects_foreign_schema_version() {
-        let text = canon(&sample_envelope())
+        let text = canon(&sample_wrapper())
             .replace(r#""schema_version":"ckc.1""#, r#""schema_version":"ckc.2""#);
         assert!(matches!(
-            read_canonical::<ArtifactEnvelope<Id>>(text.as_bytes()),
+            read_strict_canonical::<ArtifactWrapper<Id>>(text.as_bytes()),
             Err(CanonReadError::Policy(ValidationError::Enum(_)))
         ));
     }
@@ -575,11 +575,11 @@ mod tests {
         EventRecord {
             event_id: id("event.1"),
             run_id: id("run.20260610"),
-            candidate_id: id("cand.base"),
-            component_id: id("comp.extract"),
-            stage: id("extract"),
-            level: id("info"),
-            logical_time: 3,
+            pipeline_id: id("cand.base"),
+            pipeline_step_id: id("comp.extract"),
+            processing_stage: id("extract"),
+            log_level: id("info"),
+            event_sequence_number: 3,
             started_at: "2026-06-10T06:30:00Z".to_owned(),
             ended_at: "2026-06-10T06:30:01Z".to_owned(),
             duration_ms: 1000,
@@ -587,7 +587,7 @@ mod tests {
             output_hashes: vec![h('b')],
             outcome: Outcome::Ok,
             diagnostics: vec![],
-            budget_counters: vec![(id("tokens"), 42)],
+            resource_counters: vec![(id("tokens"), 42)],
         }
     }
 
@@ -597,12 +597,13 @@ mod tests {
     fn event_record_canonical_bytes() {
         let want = format!(
             concat!(
-                r#"{{"budget_counters":{{"tokens":"42"}},"candidate_id":"cand.base","#,
-                r#""component_id":"comp.extract","diagnostics":[],"duration_ms":"1000","#,
+                r#"{{"diagnostics":[],"duration_ms":"1000","#,
                 r#""ended_at":"2026-06-10T06:30:01Z","event_id":"event.1","#,
-                r#""input_hashes":["{}"],"level":"info","logical_time":"3","#,
-                r#""outcome":"ok","output_hashes":["{}"],"run_id":"run.20260610","#,
-                r#""stage":"extract","started_at":"2026-06-10T06:30:00Z"}}"#
+                r#""event_sequence_number":"3","input_hashes":["{}"],"log_level":"info","#,
+                r#""outcome":"ok","output_hashes":["{}"],"pipeline_id":"cand.base","#,
+                r#""pipeline_step_id":"comp.extract","processing_stage":"extract","#,
+                r#""resource_counters":{{"tokens":"42"}},"run_id":"run.20260610","#,
+                r#""started_at":"2026-06-10T06:30:00Z"}}"#
             ),
             h('a').as_str(),
             h('b').as_str(),
@@ -615,13 +616,13 @@ mod tests {
         round_trip(sample_event());
         let mut populated = sample_event();
         populated.diagnostics = vec![sample_diagnostic()];
-        populated.budget_counters = vec![(id("calls"), 1), (id("tokens"), u64::MAX)];
+        populated.resource_counters = vec![(id("calls"), 1), (id("tokens"), u64::MAX)];
         round_trip(populated);
         // negative integers are not u64 runtime counters
         let neg =
             canon(&sample_event()).replace(r#""duration_ms":"1000""#, r#""duration_ms":"-1""#);
         assert!(matches!(
-            read_canonical::<EventRecord>(neg.as_bytes()),
+            read_strict_canonical::<EventRecord>(neg.as_bytes()),
             Err(CanonReadError::Integer(_))
         ));
     }
@@ -631,7 +632,7 @@ mod tests {
     fn jsonl_round_trips_event_and_diagnostic_streams() {
         let mut second = sample_event();
         second.event_id = id("event.2");
-        second.logical_time = 4;
+        second.event_sequence_number = 4;
         let events = vec![sample_event(), second];
         let bytes = write_jsonl(&events).unwrap();
         assert_eq!(bytes.iter().filter(|&&b| b == b'\n').count(), 2);

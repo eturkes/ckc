@@ -14,8 +14,8 @@ Beyond trivial bug fixes, the review is a holistic analysis of codebase
 cohesion and overall project direction, scrutinized along: bugs and incorrect
 logic, specification non-conformance, CLAUDE.md/memory non-conformance,
 inconsistencies, token-inefficiency, obsolescence. Specification improvements
-are in scope: when the analysis exposes a better contract or design, edit
-SPEC.md in the same session (contract-affecting amendments reach the user
+are in scope: when the analysis exposes a better requirements or design, edit
+SPEC.md in the same session (requirements-affecting amendments reach the user
 first, per SPEC §1).
 
 Close the milestone in one commit, scoped `review-m<n>:` — fill the last

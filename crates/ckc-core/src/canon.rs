@@ -1,12 +1,12 @@
 //! Canonical JSON payload bytes — writer core (SPEC §4.3).
 //!
-//! [`canonical_payload_bytes`] is the single authority that turns a typed value
+//! [`canonical_payload_bytes`] is the single evidence_status that turns a typed value
 //! into the deterministic UTF-8 bytes hashed into an artifact's `content_hash`.
 //! `core-canon-writer` delivered the scalar + object writer core,
 //! `core-canon-collections` added the array, set, and map rules,
 //! `core-canon-unions` added tagged unions, and `core-canon-reader` adds the
-//! strict inverse ([`read_canonical`], [`CanonRead`], [`CanonReadError`]) that
-//! admits only these bytes, and `core-canon-hash` seals them into an artifact's
+//! strict inverse ([`read_strict_canonical`], [`CanonRead`], [`CanonReadError`]) that
+//! accepts only these bytes, and `core-canon-hash` seals them into an artifact's
 //! content hash.
 //!
 //! ```text
@@ -391,7 +391,7 @@ pub fn emit_union<V: Canonical>(out: &mut Vec<u8>, tag: &str, value: &V) -> Resu
 // ---------------------------------------------------------------------------
 
 /// Failure while strictly reading canonical bytes (SPEC §4.3). Every variant
-/// marks an encoding the writer never produces, so [`read_canonical`] admits
+/// marks an encoding the writer never produces, so [`read_strict_canonical`] accepts
 /// exactly the canonical form and nothing else.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanonReadError {
@@ -470,7 +470,7 @@ impl From<CanonError> for CanonReadError {
 }
 
 /// A cursor over canonical bytes that [`CanonRead`] implementations pull from.
-/// Callers normally go through [`read_canonical`] rather than driving it.
+/// Callers normally go through [`read_strict_canonical`] rather than driving it.
 pub struct Reader<'a> {
     input: &'a [u8],
     pos: usize,
@@ -513,7 +513,7 @@ impl<'a> Reader<'a> {
 /// Strictly read a `T` from canonical bytes, requiring the whole input to be
 /// consumed (SPEC §4.3): the inverse of [`canonical_payload_bytes`]. Any
 /// deviation from the writer's encoding is rejected with a [`CanonReadError`].
-pub fn read_canonical<T: CanonRead>(bytes: &[u8]) -> Result<T, CanonReadError> {
+pub fn read_strict_canonical<T: CanonRead>(bytes: &[u8]) -> Result<T, CanonReadError> {
     let mut r = Reader::new(bytes);
     let value = T::read(&mut r)?;
     if !r.at_end() {
@@ -553,7 +553,7 @@ fn read_hex4(r: &mut Reader<'_>) -> Result<u32, CanonReadError> {
     Ok(cp)
 }
 
-/// Read a canonical JSON string `"…"` and return its decoded text, admitting
+/// Read a canonical JSON string `"…"` and return its decoded text, accepting
 /// only the writer's minimal escaping: `\"`, `\\`, and `\u00xx` (lowercase hex)
 /// for U+0000..U+001F. Shorthand escapes (`\n`), `\u` escapes for scalars that
 /// pass through raw, uppercase hex, unescaped control bytes, and invalid UTF-8
@@ -927,7 +927,7 @@ impl CanonRead for Count {
 }
 
 /// Emit `entries` as a §4.3 map of identifier keys to `u64` counter values
-/// (event `budget_counters`, plan `budget`, report `diagnostics_summary`).
+/// (event `resource_counters`, plan `budget`, report `diagnostics_summary`).
 pub fn emit_u64_map(out: &mut Vec<u8>, entries: &[(Id, u64)]) -> Result<(), CanonError> {
     let counts: Vec<Count> = entries.iter().map(|&(_, v)| Count(v)).collect();
     emit_map(out, entries.iter().map(|(k, _)| k).zip(&counts))
@@ -1021,11 +1021,11 @@ mod tests {
     fn object_rejects_duplicate_field() {
         let mut o = ObjectEmitter::new();
         o.member("dup", |b| {
-            emit_string_policy(b, StringPolicy::ViewText, "1")
+            emit_string_policy(b, StringPolicy::RenderedText, "1")
         })
         .unwrap();
         o.member("dup", |b| {
-            emit_string_policy(b, StringPolicy::ViewText, "2")
+            emit_string_policy(b, StringPolicy::RenderedText, "2")
         })
         .unwrap();
         let mut out = Vec::new();
@@ -1259,7 +1259,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     /// Read a `T` from the whole of `bytes`, requiring full consumption: the
-    /// free-function analogue of [`read_canonical`] for the collection, union,
+    /// free-function analogue of [`read_strict_canonical`] for the collection, union,
     /// and policy-string readers that are not [`CanonRead`] impls.
     fn read_all<T>(
         bytes: &[u8],
@@ -1276,7 +1276,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -1425,16 +1425,16 @@ mod tests {
     fn rejects_trailing_bytes_null_and_bare_numbers() {
         // bytes left over after a complete value
         assert_eq!(
-            read_canonical::<Id>(br#""a"x"#),
+            read_strict_canonical::<Id>(br#""a"x"#),
             Err(CanonReadError::Trailing)
         );
         // null / booleans are never canonical
-        assert_eq!(read_canonical::<Id>(b"null"), Err(CanonReadError::Token));
+        assert_eq!(read_strict_canonical::<Id>(b"null"), Err(CanonReadError::Token));
         // a bare number where an integer string is required
-        assert_eq!(read_canonical::<BigInt>(b"42"), Err(CanonReadError::Token));
+        assert_eq!(read_strict_canonical::<BigInt>(b"42"), Err(CanonReadError::Token));
         // bare numbers inside a rational object (parts are integer strings)
         assert_eq!(
-            read_canonical::<Rational>(br#"{"den":4,"num":2}"#),
+            read_strict_canonical::<Rational>(br#"{"den":4,"num":2}"#),
             Err(CanonReadError::Token)
         );
     }
@@ -1443,27 +1443,27 @@ mod tests {
     fn rejects_non_canonical_strings() {
         // a JSON shorthand escape (canonical form uses the six-byte u-escape)
         assert!(matches!(
-            read_canonical::<Id>(&[b'"', 0x5c, b'n', b'"']),
+            read_strict_canonical::<Id>(&[b'"', 0x5c, b'n', b'"']),
             Err(CanonReadError::Str(_))
         ));
         // a u-escape for a scalar that must pass through raw (uppercase 'A')
         assert!(matches!(
-            read_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'4', b'1', b'"']),
+            read_strict_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'4', b'1', b'"']),
             Err(CanonReadError::Str(_))
         ));
         // a u-escape written with uppercase hex digits
         assert!(matches!(
-            read_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'0', b'A', b'"']),
+            read_strict_canonical::<Id>(&[b'"', 0x5c, b'u', b'0', b'0', b'0', b'A', b'"']),
             Err(CanonReadError::Str(_))
         ));
         // an unescaped control byte
         assert!(matches!(
-            read_canonical::<Id>(&[b'"', 0x01, b'"']),
+            read_strict_canonical::<Id>(&[b'"', 0x01, b'"']),
             Err(CanonReadError::Str(_))
         ));
         // invalid UTF-8
         assert!(matches!(
-            read_canonical::<Id>(&[b'"', 0xff, b'"']),
+            read_strict_canonical::<Id>(&[b'"', 0xff, b'"']),
             Err(CanonReadError::Str(_))
         ));
     }
@@ -1473,18 +1473,18 @@ mod tests {
         // leading zero, explicit +, and -0 are non-canonical decimals
         for s in [r#""007""#, r#""+1""#, r#""-0""#] {
             assert!(matches!(
-                read_canonical::<BigInt>(s.as_bytes()),
+                read_strict_canonical::<BigInt>(s.as_bytes()),
                 Err(CanonReadError::Integer(_))
             ));
         }
         // 2/4 reduces to 1/2, so its written parts are non-canonical
         assert_eq!(
-            read_canonical::<Rational>(br#"{"den":"4","num":"2"}"#),
+            read_strict_canonical::<Rational>(br#"{"den":"4","num":"2"}"#),
             Err(CanonReadError::RationalNotReduced)
         );
         // a negative denominator is non-canonical (sign rides the numerator)
         assert_eq!(
-            read_canonical::<Rational>(br#"{"den":"-2","num":"1"}"#),
+            read_strict_canonical::<Rational>(br#"{"den":"-2","num":"1"}"#),
             Err(CanonReadError::RationalNotReduced)
         );
     }
@@ -1493,12 +1493,12 @@ mod tests {
     fn rejects_object_field_violations() {
         // a field no type expects (also how dupes / mis-order surface)
         assert_eq!(
-            read_canonical::<Rec>(br#"{"count":"1","zzz":"2"}"#),
+            read_strict_canonical::<Rec>(br#"{"count":"1","zzz":"2"}"#),
             Err(CanonReadError::UnknownField("zzz".to_string()))
         );
         // a required field absent (only the optional present)
         assert_eq!(
-            read_canonical::<Rec>(br#"{"label":"x"}"#),
+            read_strict_canonical::<Rec>(br#"{"label":"x"}"#),
             Err(CanonReadError::MissingField("count"))
         );
     }

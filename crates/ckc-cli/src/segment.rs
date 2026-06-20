@@ -1,7 +1,7 @@
-//! Segment stage (SPEC §8.3): enveloped [`SourceGraph`] → enveloped
+//! Segment processing_stage (SPEC §8.3): wrapped [`SourceDocumentGraph`] → wrapped
 //! [`SegmentIr`], `segments.json`'s payload.
 //!
-//! Rule-based segmentation keyed on the §8.2 fixture structure, walking
+//! Rule-based segmentation keyed on the §8.2 test_source structure, walking
 //! the graph's spans in reading order:
 //!
 //! - section heading spans: `CQ<digit>` prefix → `cq`, anything else →
@@ -28,9 +28,9 @@ use std::collections::HashMap;
 use std::fmt;
 
 use ckc_core::{
-    ArtifactEnvelope, Authority, CanonError, ClinicalSegment, DiagnosticCode, DiagnosticRecord, Id,
-    NodeKind, Origin, Outcome, Producer, SegmentIr, SegmentKind, SourceGraph, SourceNode,
-    SourceSpan, StringPolicy, canonical_sort_key, canonicalization_policy_hash, content_hash,
+    ArtifactWrapper, EvidenceStatus, CanonError, ClinicalSegment, DiagnosticCode, DiagnosticRecord, Id,
+    NodeKind, Origin, Outcome, Producer, SegmentIr, SegmentKind, SourceDocumentGraph, SourceNode,
+    SourceTextSpan, StringPolicy, canonical_sort_key, canonicalization_policy_hash, content_hash,
 };
 
 use crate::shell::static_id;
@@ -61,7 +61,7 @@ impl From<CanonError> for SegmentError {
 
 /// The §5 modality phrases as segmentation markers: presence flags a
 /// recommendation sentence; mapping them to direction/strength is the
-/// normalize stage's job.
+/// normalize processing_stage's job.
 const RECOMMENDATION_MARKERS: [&str; 7] = [
     "推奨する",
     "推奨しない",
@@ -82,20 +82,20 @@ const DEFINITION_HEADING_MARKER: &str = "定義";
 
 /// Segment `source`'s graph and wrap the result per §4.4 —
 /// `schema.segments`, artifact id `<document_id>.segments`,
-/// `deterministic_compiler` origin under `mechanical_authority`, the
+/// `deterministic_compiler` origin under `mechanical_evidence_status`, the
 /// consumed source graph's content hash as the one input hash, misses in
-/// the envelope diagnostics, payload hashes computed here.
+/// the wrapper diagnostics, payload hashes computed here.
 pub fn segment(
-    source: &ArtifactEnvelope<SourceGraph>,
+    source: &ArtifactWrapper<SourceDocumentGraph>,
     producer: &Producer,
-) -> Result<ArtifactEnvelope<SegmentIr>, SegmentError> {
+) -> Result<ArtifactWrapper<SegmentIr>, SegmentError> {
     let (segments, diagnostics) = segment_graph(&source.payload);
     let ir = SegmentIr { segments };
 
     let document_id = &source.payload.document.document_id;
     let artifact_id = Id::new(format!("{document_id}.segments"))
         .expect("a valid document id keeps the Id grammar under a suffix");
-    Ok(ArtifactEnvelope {
+    Ok(ArtifactWrapper {
         schema_id: static_id("schema.segments"),
         artifact_id,
         artifact_kind: static_id("segments"),
@@ -104,8 +104,8 @@ pub fn segment(
         content_hash: content_hash(&ir)?,
         canonicalization_policy_hash: canonicalization_policy_hash(),
         origin: Origin::DeterministicCompiler,
-        authority: Authority::MechanicalAuthority,
-        accepted_effects: vec![],
+        evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+        external_effects: vec![],
         trace_refs: vec![],
         diagnostics,
         runtime_metadata: vec![],
@@ -118,12 +118,12 @@ pub fn segment(
 struct RowBucket<'g> {
     table_id: &'g Id,
     all_header: bool,
-    spans: Vec<&'g SourceSpan>,
+    spans: Vec<&'g SourceTextSpan>,
 }
 
 /// Classify every span into segments and miss diagnostics, both in
 /// reading order.
-fn segment_graph(graph: &SourceGraph) -> (Vec<ClinicalSegment>, Vec<DiagnosticRecord>) {
+fn segment_graph(graph: &SourceDocumentGraph) -> (Vec<ClinicalSegment>, Vec<DiagnosticRecord>) {
     let nodes: HashMap<&Id, &SourceNode> = graph.nodes.iter().map(|n| (&n.node_id, n)).collect();
     // A node's heading text is its first span's search text (a section
     // heading spans the section node itself).
@@ -131,7 +131,7 @@ fn segment_graph(graph: &SourceGraph) -> (Vec<ClinicalSegment>, Vec<DiagnosticRe
     for span in &graph.spans {
         node_text.entry(&span.node_id).or_insert(&span.search_text);
     }
-    // First region grounding each span — extract mints exactly one
+    // First region source_linkage each span — extract mints exactly one
     // {node,span} region per span.
     let mut span_region: HashMap<&Id, &Id> = HashMap::new();
     for region in &graph.regions {
@@ -139,7 +139,7 @@ fn segment_graph(graph: &SourceGraph) -> (Vec<ClinicalSegment>, Vec<DiagnosticRe
             span_region.entry(span_id).or_insert(&region.region_id);
         }
     }
-    let mut spans: Vec<&SourceSpan> = graph.spans.iter().collect();
+    let mut spans: Vec<&SourceTextSpan> = graph.spans.iter().collect();
     spans.sort_by_key(|s| s.reading_order);
 
     // Pass 1: bucket groupable cell spans by (table, row attr); pass 2
@@ -351,8 +351,8 @@ mod tests {
     use super::*;
     use crate::extract::{ExtractConfig, extract};
     use ckc_core::{
-        DataClass, Hash, Provenance, SourceDocument, SourceRegion, canonical_payload_bytes,
-        hash_bytes, read_canonical,
+        DataClass, Hash, Provenance, SourceDocument, EvidenceRegion, canonical_payload_bytes,
+        hash_bytes, read_strict_canonical,
     };
 
     fn id(s: &str) -> Id {
@@ -361,16 +361,16 @@ mod tests {
 
     fn producer() -> Producer {
         Producer {
-            candidate_id: id("cand.m1"),
-            component_id: id("stage.segment"),
+            pipeline_id: id("cand.m1"),
+            pipeline_step_id: id("processing_stage.segment"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
     }
 
-    fn extracted(html: &[u8]) -> ArtifactEnvelope<SourceGraph> {
+    fn extracted(html: &[u8]) -> ArtifactWrapper<SourceDocumentGraph> {
         let config = ExtractConfig {
             document_id: id("doc.test"),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: producer(),
@@ -378,13 +378,13 @@ mod tests {
         extract(html, &config).unwrap()
     }
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+    fn test_source(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/test_sources/");
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
-    fn shape(envelope: &ArtifactEnvelope<SegmentIr>) -> Vec<(Id, SegmentKind, Vec<Id>)> {
-        envelope
+    fn shape(wrapper: &ArtifactWrapper<SegmentIr>) -> Vec<(Id, SegmentKind, Vec<Id>)> {
+        wrapper
             .payload
             .segments
             .iter()
@@ -403,19 +403,19 @@ mod tests {
         value
     }
 
-    // The committed m1_guideline_a fixture, every span placed and no
+    // The committed m1_guideline_a test_source, every span placed and no
     // misses: title/heading metadata, the CQ heading, recommendation and
     // exception paragraphs, the th header row as table_row over the
     // definition body rows (region pairs in canonical set order — note
     // r.10 < r.9 by bytes), and the evidence list items.
     #[test]
-    fn fixture_guideline_a_segments() {
-        let source = extracted(&fixture("m1_guideline_a.html"));
-        let envelope = segment(&source, &producer()).unwrap();
+    fn test_source_guideline_a_segments() {
+        let source = extracted(&test_source("m1_guideline_a.html"));
+        let wrapper = segment(&source, &producer()).unwrap();
         assert!(
-            envelope.diagnostics.is_empty(),
-            "fixture segments residual-free, got {:?}",
-            envelope.diagnostics
+            wrapper.diagnostics.is_empty(),
+            "test_source segments residual-free, got {:?}",
+            wrapper.diagnostics
         );
         let want: Vec<(Id, SegmentKind, Vec<Id>)> = [
             ("seg.0", SegmentKind::Metadata, vec!["r.0"]),
@@ -434,23 +434,23 @@ mod tests {
         .into_iter()
         .map(|(s, kind, regions)| (id(s), kind, regions.into_iter().map(id).collect()))
         .collect();
-        assert_eq!(shape(&envelope), want);
+        assert_eq!(shape(&wrapper), want);
     }
 
-    // The two single-recommendation fixtures: 投与しないこと(禁忌) and
+    // The two single-recommendation test_sources: 投与しないこと(禁忌) and
     // 禁忌である both flag recommendation sentences under metadata
     // headings.
     #[test]
-    fn fixtures_b_and_control_segment_residual_free() {
+    fn test_sources_b_and_control_segment_residual_free() {
         for name in ["m1_guideline_b.html", "m1_control.html"] {
-            let envelope = segment(&extracted(&fixture(name)), &producer()).unwrap();
+            let wrapper = segment(&extracted(&test_source(name)), &producer()).unwrap();
             assert!(
-                envelope.diagnostics.is_empty(),
+                wrapper.diagnostics.is_empty(),
                 "{name} segments residual-free, got {:?}",
-                envelope.diagnostics
+                wrapper.diagnostics
             );
             let kinds: Vec<SegmentKind> =
-                envelope.payload.segments.iter().map(|s| s.kind).collect();
+                wrapper.payload.segments.iter().map(|s| s.kind).collect();
             assert_eq!(
                 kinds,
                 vec![
@@ -463,38 +463,38 @@ mod tests {
         }
     }
 
-    // §4.4 envelope shape: ids, deterministic_compiler origin under
-    // mechanical_authority, the consumed source graph's content hash as
+    // §4.4 wrapper shape: ids, deterministic_compiler origin under
+    // mechanical_evidence_status, the consumed source graph's content hash as
     // the one input hash, empty sets.
     #[test]
-    fn envelope_shape() {
+    fn wrapper_shape() {
         let source = extracted(
             "<!DOCTYPE html><html><body><p>成人には抗菌薬Aを推奨する。</p></body></html>"
                 .as_bytes(),
         );
-        let envelope = segment(&source, &producer()).unwrap();
-        assert_eq!(envelope.schema_id, id("schema.segments"));
-        assert_eq!(envelope.artifact_id, id("doc.test.segments"));
-        assert_eq!(envelope.artifact_kind, id("segments"));
-        assert_eq!(envelope.producer, producer());
-        assert_eq!(envelope.origin, Origin::DeterministicCompiler);
-        assert_eq!(envelope.authority, Authority::MechanicalAuthority);
-        assert_eq!(envelope.input_hashes, vec![source.content_hash.clone()]);
-        assert!(envelope.accepted_effects.is_empty());
-        assert!(envelope.trace_refs.is_empty());
-        assert!(envelope.runtime_metadata.is_empty());
-        envelope.validate().unwrap();
+        let wrapper = segment(&source, &producer()).unwrap();
+        assert_eq!(wrapper.schema_id, id("schema.segments"));
+        assert_eq!(wrapper.artifact_id, id("doc.test.segments"));
+        assert_eq!(wrapper.artifact_kind, id("segments"));
+        assert_eq!(wrapper.producer, producer());
+        assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
+        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert_eq!(wrapper.input_hashes, vec![source.content_hash.clone()]);
+        assert!(wrapper.external_effects.is_empty());
+        assert!(wrapper.trace_refs.is_empty());
+        assert!(wrapper.runtime_metadata.is_empty());
+        wrapper.validate().unwrap();
     }
 
-    // Determinism: identical input gives byte-identical envelopes, and
+    // Determinism: identical input gives byte-identical wrappers, and
     // the bytes survive a strict read → re-emit cycle.
     #[test]
     fn double_segment_byte_identical_and_strict_reads() {
-        let source = extracted(&fixture("m1_guideline_a.html"));
+        let source = extracted(&test_source("m1_guideline_a.html"));
         let first = canonical_payload_bytes(&segment(&source, &producer()).unwrap()).unwrap();
         let second = canonical_payload_bytes(&segment(&source, &producer()).unwrap()).unwrap();
         assert_eq!(first, second, "double segment is byte-identical");
-        let reread: ArtifactEnvelope<SegmentIr> = read_canonical(&first).unwrap();
+        let reread: ArtifactWrapper<SegmentIr> = read_strict_canonical(&first).unwrap();
         assert_eq!(
             canonical_payload_bytes(&reread).unwrap(),
             first,
@@ -517,9 +517,9 @@ mod tests {
             )
             .as_bytes(),
         );
-        let envelope = segment(&source, &producer()).unwrap();
-        let [diag] = envelope.diagnostics.as_slice() else {
-            panic!("one miss, got {:?}", envelope.diagnostics);
+        let wrapper = segment(&source, &producer()).unwrap();
+        let [diag] = wrapper.diagnostics.as_slice() else {
+            panic!("one miss, got {:?}", wrapper.diagnostics);
         };
         assert_eq!(detail(diag), "unclassified paragraph: 経過観察を継続した.");
         assert_eq!(diag.region_ids, vec![id("r.1")]);
@@ -527,7 +527,7 @@ mod tests {
             (id("seg.0"), SegmentKind::Metadata, vec![id("r.0")]),
             (id("seg.1"), SegmentKind::Recommendation, vec![id("r.2")]),
         ];
-        assert_eq!(shape(&envelope), want);
+        assert_eq!(shape(&wrapper), want);
     }
 
     // Outside a 定義 heading every row is table_row (header and body
@@ -545,8 +545,8 @@ mod tests {
             )
             .as_bytes(),
         );
-        let envelope = segment(&source, &producer()).unwrap();
-        assert!(envelope.diagnostics.is_empty());
+        let wrapper = segment(&source, &producer()).unwrap();
+        assert!(wrapper.diagnostics.is_empty());
         let want = vec![
             (id("seg.0"), SegmentKind::Metadata, vec![id("r.0")]),
             (id("seg.1"), SegmentKind::Metadata, vec![id("r.1")]),
@@ -561,7 +561,7 @@ mod tests {
                 vec![id("r.4"), id("r.5")],
             ),
         ];
-        assert_eq!(shape(&envelope), want);
+        assert_eq!(shape(&wrapper), want);
     }
 
     // Robustness paths extract output cannot reach, on a hand-built
@@ -569,10 +569,10 @@ mod tests {
     // each miss in reading order with no segments minted.
     #[test]
     fn ungroupable_cell_and_ungrounded_span_are_boundary_residuals() {
-        let graph = SourceGraph {
+        let graph = SourceDocumentGraph {
             document: SourceDocument {
                 document_id: id("doc.hand"),
-                source_family: id("synthetic_fixture_html"),
+                source_family: id("synthetic_test_source_html"),
                 provenance: Provenance::Synthetic,
                 raw_hash: hash_bytes(b""),
                 content_hash: hash_bytes(b""),
@@ -599,37 +599,37 @@ mod tests {
                 },
             ],
             spans: vec![
-                SourceSpan::derive(id("s.0"), id("n.1"), 0, "セル".to_owned(), 0),
-                SourceSpan::derive(id("s.1"), id("n.2"), 0, "本文。".to_owned(), 1),
+                SourceTextSpan::derive(id("s.0"), id("n.1"), 0, "セル".to_owned(), 0),
+                SourceTextSpan::derive(id("s.1"), id("n.2"), 0, "本文。".to_owned(), 1),
             ],
             anchors: vec![],
-            regions: vec![SourceRegion {
+            regions: vec![EvidenceRegion {
                 region_id: id("r.0"),
                 node_ids: vec![id("n.1")],
                 span_ids: vec![id("s.0")],
                 anchor_ids: vec![],
             }],
         };
-        let source = ArtifactEnvelope {
-            schema_id: id("schema.source_graph"),
-            artifact_id: id("doc.hand.source_graph"),
-            artifact_kind: id("source_graph"),
+        let source = ArtifactWrapper {
+            schema_id: id("schema.source_document_graph"),
+            artifact_id: id("doc.hand.source_document_graph"),
+            artifact_kind: id("source_document_graph"),
             producer: producer(),
             input_hashes: vec![],
             content_hash: content_hash(&graph).unwrap(),
             canonicalization_policy_hash: canonicalization_policy_hash(),
             origin: Origin::DeterministicCompiler,
-            authority: Authority::MechanicalAuthority,
-            accepted_effects: vec![],
+            evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+            external_effects: vec![],
             trace_refs: vec![],
             diagnostics: vec![],
             runtime_metadata: vec![],
             payload: graph,
         };
-        let envelope = segment(&source, &producer()).unwrap();
-        assert!(envelope.payload.segments.is_empty());
-        let [cell, ungrounded] = envelope.diagnostics.as_slice() else {
-            panic!("two misses, got {:?}", envelope.diagnostics);
+        let wrapper = segment(&source, &producer()).unwrap();
+        assert!(wrapper.payload.segments.is_empty());
+        let [cell, ungrounded] = wrapper.diagnostics.as_slice() else {
+            panic!("two misses, got {:?}", wrapper.diagnostics);
         };
         assert_eq!(detail(cell), "ungroupable cell n.1");
         assert_eq!(cell.region_ids, vec![id("r.0")]);

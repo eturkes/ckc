@@ -4,7 +4,7 @@
 //! full chain source spans → segments → statements → rules → named
 //! assertions → solver verdict → finding, rendered in both directions as
 //! the command's stdout body. Both artifacts cross the §8.5 item 3 bar
-//! (strict canonical read, envelope and payload re-validation) and the
+//! (strict canonical read, wrapper and payload re-validation) and the
 //! pair must agree on the finding's cross-document evidence. Every
 //! failure is one command-scope §7.4 diagnostic, outcome `invalid`:
 //! `schema_invalid` while loading an artifact, `trace_incomplete` when
@@ -13,8 +13,8 @@
 use std::path::Path;
 
 use ckc_core::{
-    ArtifactEnvelope, CanonRead, Canonical, DiagnosticCode, DiagnosticRecord, Id, Outcome,
-    read_canonical,
+    ArtifactWrapper, CanonRead, Canonical, DiagnosticCode, DiagnosticRecord, Id, Outcome,
+    read_strict_canonical,
 };
 
 use super::{
@@ -60,12 +60,12 @@ pub(crate) fn execute(run_dir: &Path, finding: &Id, shell: &mut Shell) -> Option
 }
 
 /// Load one pair artifact at the §8.5 item 3 bar: strict canonical read,
-/// §4.4 envelope re-validation, payload structural validation. Failures
+/// §4.4 wrapper re-validation, payload structural validation. Failures
 /// are `schema_invalid`.
 fn strict_payload<P: Canonical + CanonRead + Validated>(
     run_dir: &Path,
     rel: &str,
-) -> Result<ArtifactEnvelope<P>, DiagnosticRecord> {
+) -> Result<ArtifactWrapper<P>, DiagnosticRecord> {
     let fail = |reason: String| DiagnosticRecord {
         code: DiagnosticCode::SchemaInvalid,
         outcome: Outcome::Invalid,
@@ -77,16 +77,16 @@ fn strict_payload<P: Canonical + CanonRead + Validated>(
         artifact_hashes: vec![],
     };
     let bytes = std::fs::read(run_dir.join(rel)).map_err(|e| fail(e.to_string()))?;
-    let envelope: ArtifactEnvelope<P> =
-        read_canonical(&bytes).map_err(|e| fail(format!("strict read: {e:?}")))?;
-    envelope
+    let wrapper: ArtifactWrapper<P> =
+        read_strict_canonical(&bytes).map_err(|e| fail(format!("strict read: {e:?}")))?;
+    wrapper
         .validate()
-        .map_err(|e| fail(format!("envelope invariant: {e}")))?;
-    envelope
+        .map_err(|e| fail(format!("wrapper invariant: {e}")))?;
+    wrapper
         .payload
         .validate_payload()
         .map_err(|e| fail(format!("payload invariant: {e}")))?;
-    Ok(envelope)
+    Ok(wrapper)
 }
 
 /// The pair payloads' shared validation surface, so [`strict_payload`]
@@ -260,7 +260,7 @@ mod tests {
     use super::*;
     use crate::shell::{FinishedCommand, run_none};
     use ckc_core::{
-        Authority, EventRecord, Hash, Origin, Producer, canonical_payload_bytes,
+        EvidenceStatus, EventRecord, Hash, Origin, Producer, canonical_payload_bytes,
         canonicalization_policy_hash, content_hash, read_jsonl,
     };
     use ckc_smt::{SolverVerdict, VerifierCategory};
@@ -282,13 +282,13 @@ mod tests {
             TraceNode {
                 node_id: id("doc.a"),
                 kind: TraceNodeKind::Source,
-                path: "corpus/fixtures/doc.a.html".to_owned(),
+                path: "corpus/test_sources/doc.a.html".to_owned(),
                 content_hash: Some(hash('a')),
             },
             TraceNode {
                 node_id: id("doc.b"),
                 kind: TraceNodeKind::Source,
-                path: "corpus/fixtures/doc.b.html".to_owned(),
+                path: "corpus/test_sources/doc.b.html".to_owned(),
                 content_hash: Some(hash('b')),
             },
             TraceNode {
@@ -342,31 +342,31 @@ mod tests {
         }
     }
 
-    /// Envelope one payload with real content/policy hashes and write its
+    /// Wrapper one payload with real content/policy hashes and write its
     /// canonical bytes into `dir` — the run layout the command reads.
     fn write_artifact<P: Canonical>(dir: &Path, rel: &str, kind: &str, payload: P) {
-        let envelope = ArtifactEnvelope {
+        let wrapper = ArtifactWrapper {
             schema_id: id(&format!("schema.{kind}")),
             artifact_id: id(kind),
             artifact_kind: id(kind),
             producer: Producer {
-                candidate_id: id("cand.t"),
-                component_id: id("stage.t.trace"),
+                pipeline_id: id("cand.t"),
+                pipeline_step_id: id("processing_stage.t.trace"),
                 toolchain_manifest_hash: hash('f'),
             },
             input_hashes: vec![],
             content_hash: content_hash(&payload).unwrap(),
             canonicalization_policy_hash: canonicalization_policy_hash(),
             origin: Origin::DeterministicCompiler,
-            authority: Authority::MechanicalAuthority,
-            accepted_effects: vec![],
+            evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+            external_effects: vec![],
             trace_refs: vec![],
             diagnostics: vec![],
             runtime_metadata: vec![],
             payload,
         };
-        envelope.validate().unwrap();
-        let bytes = canonical_payload_bytes(&envelope).unwrap();
+        wrapper.validate().unwrap();
+        let bytes = canonical_payload_bytes(&wrapper).unwrap();
         std::fs::write(dir.join(rel), bytes).unwrap();
     }
 
@@ -403,12 +403,12 @@ mod tests {
         let expected = "\
 trace finding.group.g1.0 run run.none
 forward source spans -> segments -> statements -> rules -> named assertions -> solver verdict -> finding
-document doc.a path corpus/fixtures/doc.a.html
+document doc.a path corpus/test_sources/doc.a.html
   source spans: r.2
   segments: seg.4
   statements: doc.a.stmt.0
   rules: doc.a.rule.0
-document doc.b path corpus/fixtures/doc.b.html
+document doc.b path corpus/test_sources/doc.b.html
   source spans: r.3
   segments: seg.6
   statements: doc.b.stmt.0
@@ -420,12 +420,12 @@ reverse finding -> solver verdict -> named assertions -> rules -> statements -> 
 finding: finding.group.g1.0 report report
 solver verdict: unsat category semantic_contradiction conflict deontic_direction_conflict group group.g1 pair pair.1 query pair.1.deontic
 named assertions: a.doc.a.rule.0 a.doc.b.rule.0
-document doc.a path corpus/fixtures/doc.a.html
+document doc.a path corpus/test_sources/doc.a.html
   rules: doc.a.rule.0
   statements: doc.a.stmt.0
   segments: seg.4
   source spans: r.2
-document doc.b path corpus/fixtures/doc.b.html
+document doc.b path corpus/test_sources/doc.b.html
   rules: doc.b.rule.0
   statements: doc.b.stmt.0
   segments: seg.6

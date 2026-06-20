@@ -2,13 +2,13 @@
 //! `report.json` (§8.3) and the derivation DAG's sink. Contents at M1:
 //! findings and documented null results partitioned from the §7.1
 //! claim-evidence rows, quoted Japanese source spans resolved per member
-//! document, a code-keyed §7.4 diagnostics rollup, corpus and lexicon
+//! document, a code-keyed §7.4 diagnostics summary, corpus and lexicon
 //! hashes, solver identity, the replay-status slot, and §0-vocabulary
 //! wording. This module owns the types, their canonical bytes, structural
 //! validation, and assembly ([`assemble_report`]) over the run's validated
-//! artifacts; `ckc run` drives it from the report stage (cli-runner.4.1b.1);
+//! artifacts; `ckc run` drives it from the report processing_stage (cli-runner.4.1b.1);
 //! [`render_markdown`] is the deterministic §7.2 derived view, the
-//! `report.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
+//! `report_en.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
 //! arrive with .4.1b.2b (manifest assembly lives in `crate::manifests`).
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
@@ -21,7 +21,7 @@
 //!   documented null result, carrying neither (Q1 runs produce-models, so
 //!   even its unsat records no core).
 //! - `semantic_no_conflict` on a sat overlap probe: the pair-eligibility
-//!   witness, not an outcome — no report row.
+//!   satisfying_example, not an outcome — no report row.
 //! - Failure/unknown categories: no row; their evidence is the §7.4
 //!   records rolled up in `diagnostics_summary`.
 
@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, DiagnosticRecord, Hash, Id,
-    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceGraph, canonical_sort_key, emit_map,
+    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceDocumentGraph, canonical_sort_key, emit_map,
     emit_set, emit_string, emit_u64_map, fieldless_enum, read_map, read_set, read_string,
     read_u64_map,
 };
@@ -58,31 +58,31 @@ fieldless_enum! {
     /// SPEC §0 report vocabulary, spelled exactly as §0 prints it — the
     /// closed label set report wording draws from (§7.2: report wording
     /// stays within the §0 vocabulary). M1 rows use
-    /// [`SyntheticFixtureMeasurement`](Wording::SyntheticFixtureMeasurement)
+    /// [`SyntheticTestSourceMeasurement`](Wording::SyntheticTestSourceMeasurement)
     /// (findings) and
-    /// [`DocumentedNullResult`](Wording::DocumentedNullResult) (null
+    /// [`DocumentedNoConflictResult`](Wording::DocumentedNoConflictResult) (null
     /// results); the rest join with their milestones.
     Wording {
         Candidate => "candidate",
-        DocumentedNullResult => "documented null result",
+        DocumentedNoConflictResult => "documented null result",
         FormalizationQa => "formalization-QA",
         LockedMeasurement => "locked measurement",
         RawBenchmarkOutput => "raw benchmark output",
         Replayable => "replayable",
-        RequiresHumanAdjudication => "requires human adjudication",
+        RequiresHumanReview => "requires human review",
         ResearchHarness => "research harness",
         ReviewCandidate => "review candidate",
         SchemaValid => "schema-valid",
         SourceGrounded => "source-grounded",
-        SyntheticFixtureMeasurement => "synthetic fixture measurement",
+        SyntheticTestSourceMeasurement => "synthetic test_source measurement",
         TextQualityAnalysis => "text-quality analysis",
         VerifierChecked => "verifier-checked",
     }
 }
 
 /// One quoted source span (§7.2 "quoted spans", §8.5 item 9): a member
-/// document's region resolved through its SourceGraph to one span's raw
-/// fixture bytes. Region and span ids are document-local (§8.6), so every
+/// document's region resolved through its SourceDocumentGraph to one span's raw
+/// test_source bytes. Region and span ids are document-local (§8.6), so every
 /// row carries its `document_id`; a multi-span region yields one row per
 /// span.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,7 +90,7 @@ pub struct QuotedSpan {
     pub document_id: Id,
     pub region_id: Id,
     pub span_id: Id,
-    /// The span's `raw_text` — fixture bytes exactly as extracted.
+    /// The span's `raw_text` — test_source bytes exactly as extracted.
     pub text: String,
 }
 
@@ -131,8 +131,8 @@ impl CanonRead for QuotedSpan {
 /// the claim row (`assertion_ids` the claim-evidence set: the recorded
 /// core when one exists, else the query's named assertions), `core` is the
 /// solver-recorded unsat core itself, and `quoted_spans` ground the row in
-/// fixture bytes. At M1 every row is claim tier `s1_admitted` (§8.6: built
-/// from artifacts that passed deterministic admission) with its partition's
+/// test_source bytes. At M1 every row is claim tier `s1_accepted` (§8.6: built
+/// from artifacts that passed deterministic acceptance) with its partition's
 /// §0 wording label.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportFinding {
@@ -202,18 +202,18 @@ impl CanonRead for ReportFinding {
 
 /// SPEC §5 `Report`: the canonical `report.json` payload (§7.2 contents at
 /// M1). `corpus_hashes` maps each member document to its raw source-byte
-/// hash; `diagnostics_summary` is the code-keyed count rollup over the
-/// run's §7.4 records; `findings` and `null_results` are the two claim
+/// hash; `diagnostics_summary` is the code-keyed count summary over the
+/// run's §7.4 records; `findings` and `no_conflict_results` are the two claim
 /// partitions; `wording` is the canonical set of §0 labels the rows carry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
     pub corpus_hashes: Vec<(Id, Hash)>,
     pub diagnostics_summary: Vec<(Id, u64)>,
     pub findings: Vec<ReportFinding>,
-    /// Raw-byte hash of the §5 lexicon authority file (§4.4: the lexicon
+    /// Raw-byte hash of the §5 lexicon evidence_status file (§4.4: the lexicon
     /// is a file, not an accepted artifact).
     pub lexicon_hash: Hash,
-    pub null_results: Vec<ReportFinding>,
+    pub no_conflict_results: Vec<ReportFinding>,
     pub replay_status: ReplayStatus,
     pub solver_identity: SolverIdentity,
     pub wording: Vec<Wording>,
@@ -224,11 +224,11 @@ impl Report {
     ///
     /// 1. `corpus_hashes` and `diagnostics_summary` are §4.3 maps (keys
     ///    strictly ascending by id bytes); summary counts are positive.
-    /// 2. `findings`, `null_results`, and `wording` are canonical sets
+    /// 2. `findings`, `no_conflict_results`, and `wording` are canonical sets
     ///    (sorted by [`canonical_sort_key`], duplicate-free).
     /// 3. Rows: `conflict_kind` and `core` are present exactly on findings
     ///    (§6: a contradiction is an unsat deontic query with its recorded
-    ///    core; Q1-unsat and deontic-sat nulls carry neither); finding
+    ///    core; Q1-unsat and deontic-sat no_conflict_results carry neither); finding
     ///    verdicts are `unsat` and null verdicts `sat` or `unsat`; the
     ///    three id pools, `quoted_spans`, and `core` are non-empty
     ///    canonical sets; quoted texts are non-empty.
@@ -243,10 +243,10 @@ impl Report {
             return Err(ReportError::ZeroCount(code.clone()));
         }
         check_canonical_set("findings", &self.findings)?;
-        check_canonical_set("null_results", &self.null_results)?;
+        check_canonical_set("no_conflict_results", &self.no_conflict_results)?;
         check_canonical_set("wording", &self.wording)?;
         let mut seen: Vec<&str> = Vec::new();
-        for (rows, is_finding) in [(&self.findings, true), (&self.null_results, false)] {
+        for (rows, is_finding) in [(&self.findings, true), (&self.no_conflict_results, false)] {
             for row in rows {
                 if seen.contains(&row.finding_id.as_str()) {
                     return Err(ReportError::DuplicateFindingId(row.finding_id.clone()));
@@ -325,7 +325,7 @@ impl Canonical for Report {
         })?;
         obj.member("findings", |b| emit_set(b, &self.findings))?;
         obj.member("lexicon_hash", |b| self.lexicon_hash.emit_canonical(b))?;
-        obj.member("null_results", |b| emit_set(b, &self.null_results))?;
+        obj.member("no_conflict_results", |b| emit_set(b, &self.no_conflict_results))?;
         obj.member("replay_status", |b| self.replay_status.emit_canonical(b))?;
         obj.member("solver_identity", |b| {
             self.solver_identity.emit_canonical(b)
@@ -342,7 +342,7 @@ impl CanonRead for Report {
         let diagnostics_summary = obj.member("diagnostics_summary", read_u64_map)?;
         let findings = obj.member("findings", read_set::<ReportFinding>)?;
         let lexicon_hash = obj.member("lexicon_hash", Hash::read)?;
-        let null_results = obj.member("null_results", read_set::<ReportFinding>)?;
+        let no_conflict_results = obj.member("no_conflict_results", read_set::<ReportFinding>)?;
         let replay_status = obj.member("replay_status", ReplayStatus::read)?;
         let solver_identity = obj.member("solver_identity", SolverIdentity::read)?;
         let wording = obj.member("wording", read_set::<Wording>)?;
@@ -352,7 +352,7 @@ impl CanonRead for Report {
             diagnostics_summary,
             findings,
             lexicon_hash,
-            null_results,
+            no_conflict_results,
             replay_status,
             solver_identity,
             wording,
@@ -371,7 +371,7 @@ enum Role {
 /// Assemble the run's [`Report`] over the validated run artifact set:
 /// the strict-read §7.1 pair (claims and source nodes from `bundle`,
 /// per-document reference rows from `lineage`), each member document's
-/// SourceGraph, each group's VerifierResults, the run's lexicon hash and
+/// SourceDocumentGraph, each group's VerifierResults, the run's lexicon hash and
 /// solver identity, and every §7.4 record the run emitted.
 ///
 /// Inputs must already satisfy their own validation (the §8.5 item 3 bar);
@@ -383,7 +383,7 @@ enum Role {
 /// Rows: claims partition per the module rules; every row resolves its
 /// quoted spans per member document through the lineage rows (region and
 /// span ids are document-local), takes `core` from its verifier result's
-/// recorded unsat core, and carries the M1 constants (`s1_admitted`, the
+/// recorded unsat core, and carries the M1 constants (`s1_accepted`, the
 /// partition's §0 label). `corpus_hashes` come from the bundle's source
 /// nodes; `diagnostics_summary` counts `diagnostics` by §7.4 code;
 /// `replay_status` starts [`NotReplayed`](ReplayStatus::NotReplayed). The
@@ -392,13 +392,13 @@ enum Role {
 pub fn assemble_report(
     bundle: &TraceBundle,
     lineage: &LineageIndex,
-    graphs: &[&SourceGraph],
+    graphs: &[&SourceDocumentGraph],
     results: &[&VerifierResults],
     lexicon_hash: &Hash,
     solver_identity: &SolverIdentity,
     diagnostics: &[DiagnosticRecord],
 ) -> Result<Report, ReportError> {
-    let mut graph_index: BTreeMap<&str, &SourceGraph> = BTreeMap::new();
+    let mut graph_index: BTreeMap<&str, &SourceDocumentGraph> = BTreeMap::new();
     for &graph in graphs {
         let document_id = &graph.document.document_id;
         if graph_index.insert(document_id.as_str(), graph).is_some() {
@@ -442,7 +442,7 @@ pub fn assemble_report(
         .collect();
 
     let mut findings = Vec::new();
-    let mut null_results = Vec::new();
+    let mut no_conflict_results = Vec::new();
     for claim in &bundle.claims {
         if !matches!(
             claim.category,
@@ -538,7 +538,7 @@ pub fn assemble_report(
         }
         let row = ReportFinding {
             assertion_ids: claim.assertion_ids.clone(),
-            claim_tier: ClaimTier::S1Admitted,
+            claim_tier: ClaimTier::S1Accepted,
             conflict_kind: claim.conflict_kind,
             core: result.unsat_core.clone(),
             finding_id: claim.finding_id.clone(),
@@ -548,50 +548,50 @@ pub fn assemble_report(
             rule_ids: claim.rule_ids.clone(),
             verdict,
             wording: if is_finding {
-                Wording::SyntheticFixtureMeasurement
+                Wording::SyntheticTestSourceMeasurement
             } else {
-                Wording::DocumentedNullResult
+                Wording::DocumentedNoConflictResult
             },
         };
         if is_finding {
             findings.push(row);
         } else {
-            null_results.push(row);
+            no_conflict_results.push(row);
         }
     }
     let findings = canonical_set(findings)?;
-    let null_results = canonical_set(null_results)?;
+    let no_conflict_results = canonical_set(no_conflict_results)?;
     // §0-label bytes order the pair: "documented null result" sorts before
-    // "synthetic fixture measurement".
+    // "synthetic test_source measurement".
     let mut wording = Vec::new();
-    if !null_results.is_empty() {
-        wording.push(Wording::DocumentedNullResult);
+    if !no_conflict_results.is_empty() {
+        wording.push(Wording::DocumentedNoConflictResult);
     }
     if !findings.is_empty() {
-        wording.push(Wording::SyntheticFixtureMeasurement);
+        wording.push(Wording::SyntheticTestSourceMeasurement);
     }
     Ok(Report {
         corpus_hashes,
         diagnostics_summary,
         findings,
         lexicon_hash: lexicon_hash.clone(),
-        null_results,
+        no_conflict_results,
         replay_status: ReplayStatus::NotReplayed,
         solver_identity: solver_identity.clone(),
         wording,
     })
 }
 
-/// SPEC §7.2 `report.md` body: the deterministic markdown rendering of a
+/// SPEC §7.2 `report_en.md` body: the deterministic markdown rendering of a
 /// validated [`Report`] — a pure function of the canonical value, §7.2
 /// contents in §7.2 prose order (corpus and lexicon hashes, findings,
 /// documented null results, diagnostics summary, solver identity, replay
 /// status), headings and labels drawn from §7.2/§0 vocabulary, ids and
 /// hashes verbatim in code spans, quoted-span texts verbatim as plain
-/// text (§8.5 item 9 resolves them to fixture bytes). Empty content slots
+/// text (§8.5 item 9 resolves them to test_source bytes). Empty content slots
 /// render as `none.` so every §7.2 slot stays visible. The caller
 /// validates first (the [`assemble_report`] boundary discipline) and
-/// writes the returned body as `report.md` (cli-runner.4.1b.2b).
+/// writes the returned body as `report_en.md` (cli-runner.4.1b.2b).
 pub fn render_markdown(report: &Report) -> String {
     let mut md = String::new();
     md.push_str("# CKC report\n\n");
@@ -612,7 +612,7 @@ pub fn render_markdown(report: &Report) -> String {
     render_rows(&mut md, &report.findings);
 
     md.push_str("\n## Documented null results\n");
-    render_rows(&mut md, &report.null_results);
+    render_rows(&mut md, &report.no_conflict_results);
 
     md.push_str("\n## Diagnostics summary\n\n");
     if report.diagnostics_summary.is_empty() {
@@ -776,7 +776,7 @@ pub enum ReportError {
     DuplicateGraph(Id),
     /// Two input results claim one query.
     DuplicateResult(Id),
-    /// A lineage row's document has no input SourceGraph.
+    /// A lineage row's document has no input SourceDocumentGraph.
     MissingGraph(Id),
     /// A lineage region is absent from its document's graph.
     MissingRegion { document_id: Id, region_id: Id },
@@ -901,8 +901,8 @@ impl std::error::Error for ReportError {}
 #[cfg(test)]
 mod tests {
     use ckc_core::{
-        DataClass, DiagnosticCode, Outcome, Provenance, SourceDocument, SourceRegion, SourceSpan,
-        canonical_payload_bytes, read_canonical,
+        DataClass, DiagnosticCode, Outcome, Provenance, SourceDocument, EvidenceRegion, SourceTextSpan,
+        canonical_payload_bytes, read_strict_canonical,
     };
 
     use super::*;
@@ -930,40 +930,40 @@ mod tests {
     /// canonical order (ASCII span texts keep the byte pin stable).
     fn valid_report() -> Report {
         Report {
-            corpus_hashes: vec![(id("fixture.a"), hash('1')), (id("fixture.b"), hash('2'))],
+            corpus_hashes: vec![(id("test_source.a"), hash('1')), (id("test_source.b"), hash('2'))],
             diagnostics_summary: vec![(id("schema_invalid"), 1), (id("solver_timeout"), 2)],
             findings: vec![ReportFinding {
-                assertion_ids: vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")],
-                claim_tier: ClaimTier::S1Admitted,
+                assertion_ids: vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")],
+                claim_tier: ClaimTier::S1Accepted,
                 conflict_kind: Some(ConflictKind::DeonticDirectionConflict),
-                core: Some(vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")]),
+                core: Some(vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")]),
                 finding_id: id("finding.group.g1.1"),
                 query_id: id("q.g1.pair1.deontic"),
                 quoted_spans: vec![
-                    span("fixture.a", "r.0", "s.0", "administer drug A"),
-                    span("fixture.b", "r.0", "s.0", "withhold drug A"),
+                    span("test_source.a", "r.0", "s.0", "administer drug A"),
+                    span("test_source.b", "r.0", "s.0", "withhold drug A"),
                 ],
                 region_ids: vec![id("r.0")],
-                rule_ids: vec![id("fixture.a.rule.0"), id("fixture.b.rule.0")],
+                rule_ids: vec![id("test_source.a.rule.0"), id("test_source.b.rule.0")],
                 verdict: SolverVerdict::Unsat,
-                wording: Wording::SyntheticFixtureMeasurement,
+                wording: Wording::SyntheticTestSourceMeasurement,
             }],
             lexicon_hash: hash('f'),
-            null_results: vec![ReportFinding {
-                assertion_ids: vec![id("ctx.fixture.a.rule.1"), id("ctx.fixture.b.rule.1")],
-                claim_tier: ClaimTier::S1Admitted,
+            no_conflict_results: vec![ReportFinding {
+                assertion_ids: vec![id("ctx.test_source.a.rule.1"), id("ctx.test_source.b.rule.1")],
+                claim_tier: ClaimTier::S1Accepted,
                 conflict_kind: None,
                 core: None,
                 finding_id: id("finding.group.g2.0"),
                 query_id: id("q.g2.pair1.overlap"),
                 quoted_spans: vec![
-                    span("fixture.a", "r.1", "s.1", "adults eighteen and over"),
-                    span("fixture.b", "r.1", "s.1", "children under eighteen"),
+                    span("test_source.a", "r.1", "s.1", "adults eighteen and over"),
+                    span("test_source.b", "r.1", "s.1", "children under eighteen"),
                 ],
                 region_ids: vec![id("r.1")],
-                rule_ids: vec![id("fixture.a.rule.1"), id("fixture.b.rule.1")],
+                rule_ids: vec![id("test_source.a.rule.1"), id("test_source.b.rule.1")],
                 verdict: SolverVerdict::Unsat,
-                wording: Wording::DocumentedNullResult,
+                wording: Wording::DocumentedNoConflictResult,
             }],
             replay_status: ReplayStatus::NotReplayed,
             solver_identity: SolverIdentity {
@@ -971,8 +971,8 @@ mod tests {
                 version: "4.13.0".to_owned(),
             },
             wording: vec![
-                Wording::DocumentedNullResult,
-                Wording::SyntheticFixtureMeasurement,
+                Wording::DocumentedNoConflictResult,
+                Wording::SyntheticTestSourceMeasurement,
             ],
         }
     }
@@ -989,12 +989,12 @@ mod tests {
                 "locked measurement",
                 "raw benchmark output",
                 "replayable",
-                "requires human adjudication",
+                "requires human review",
                 "research harness",
                 "review candidate",
                 "schema-valid",
                 "source-grounded",
-                "synthetic fixture measurement",
+                "synthetic test_source measurement",
                 "text-quality analysis",
                 "verifier-checked",
             ]
@@ -1020,7 +1020,7 @@ mod tests {
         let report = valid_report();
         report.validate().unwrap();
         let bytes = canonical_payload_bytes(&report).unwrap();
-        let read: Report = read_canonical(&bytes).unwrap();
+        let read: Report = read_strict_canonical(&bytes).unwrap();
         assert_eq!(read, report);
         read.validate().unwrap();
         assert_eq!(String::from_utf8(bytes).unwrap(), PINNED_REPORT);
@@ -1029,23 +1029,23 @@ mod tests {
     /// The full canonical bytes of [`valid_report`], pinned from observed
     /// output: alphabetical members, optionals omitted on the null row,
     /// u64 counts as §4.3 string-wrapped integers.
-    const PINNED_REPORT: &str = r#"{"corpus_hashes":{"fixture.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","fixture.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"findings":[{"assertion_ids":["a.fixture.a.rule.0","a.fixture.b.rule.0"],"claim_tier":"s1_admitted","conflict_kind":"deontic_direction_conflict","core":["a.fixture.a.rule.0","a.fixture.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"fixture.a","region_id":"r.0","span_id":"s.0","text":"administer drug A"},{"document_id":"fixture.b","region_id":"r.0","span_id":"s.0","text":"withhold drug A"}],"region_ids":["r.0"],"rule_ids":["fixture.a.rule.0","fixture.b.rule.0"],"verdict":"unsat","wording":"synthetic fixture measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","null_results":[{"assertion_ids":["ctx.fixture.a.rule.1","ctx.fixture.b.rule.1"],"claim_tier":"s1_admitted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"fixture.a","region_id":"r.1","span_id":"s.1","text":"adults eighteen and over"},{"document_id":"fixture.b","region_id":"r.1","span_id":"s.1","text":"children under eighteen"}],"region_ids":["r.1"],"rule_ids":["fixture.a.rule.1","fixture.b.rule.1"],"verdict":"unsat","wording":"documented null result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented null result","synthetic fixture measurement"]}"#;
+    const PINNED_REPORT: &str = r#"{"corpus_hashes":{"test_source.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","test_source.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"findings":[{"assertion_ids":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"claim_tier":"s1_accepted","conflict_kind":"deontic_direction_conflict","core":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"test_source.a","region_id":"r.0","span_id":"s.0","text":"administer drug A"},{"document_id":"test_source.b","region_id":"r.0","span_id":"s.0","text":"withhold drug A"}],"region_ids":["r.0"],"rule_ids":["test_source.a.rule.0","test_source.b.rule.0"],"verdict":"unsat","wording":"synthetic test_source measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","no_conflict_results":[{"assertion_ids":["ctx.test_source.a.rule.1","ctx.test_source.b.rule.1"],"claim_tier":"s1_accepted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"test_source.a","region_id":"r.1","span_id":"s.1","text":"adults eighteen and over"},{"document_id":"test_source.b","region_id":"r.1","span_id":"s.1","text":"children under eighteen"}],"region_ids":["r.1"],"rule_ids":["test_source.a.rule.1","test_source.b.rule.1"],"verdict":"unsat","wording":"documented null result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented null result","synthetic test_source measurement"]}"#;
 
     #[test]
-    fn null_row_omits_conflict_kind_and_core_bytes() {
+    fn no_conflict_row_omits_conflict_kind_and_core_bytes() {
         let report = valid_report();
-        let bytes = canonical_payload_bytes(&report.null_results[0]).unwrap();
+        let bytes = canonical_payload_bytes(&report.no_conflict_results[0]).unwrap();
         let text = String::from_utf8(bytes).unwrap();
         assert!(!text.contains("conflict_kind"));
         assert!(!text.contains("core"));
-        let read: ReportFinding = read_canonical(text.as_bytes()).unwrap();
-        assert_eq!(read, report.null_results[0]);
+        let read: ReportFinding = read_strict_canonical(text.as_bytes()).unwrap();
+        assert_eq!(read, report.no_conflict_results[0]);
     }
 
     #[test]
-    fn deontic_sat_null_verdict_is_valid() {
+    fn deontic_sat_no_conflict_verdict_is_valid() {
         let mut report = valid_report();
-        report.null_results[0].verdict = SolverVerdict::Sat;
+        report.no_conflict_results[0].verdict = SolverVerdict::Sat;
         report.validate().unwrap();
     }
 
@@ -1061,7 +1061,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.corpus_hashes[1].0 = id("fixture.a");
+        report.corpus_hashes[1].0 = id("test_source.a");
         assert_eq!(
             report.validate(),
             Err(ReportError::MapOrder {
@@ -1101,12 +1101,12 @@ mod tests {
         );
 
         let mut report = valid_report();
-        let copy = report.null_results[0].clone();
-        report.null_results.push(copy);
+        let copy = report.no_conflict_results[0].clone();
+        report.no_conflict_results.push(copy);
         assert_eq!(
             report.validate(),
             Err(ReportError::SetDuplicate {
-                pool: "null_results"
+                pool: "no_conflict_results"
             })
         );
 
@@ -1121,7 +1121,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_finding_ids_across_partitions() {
         let mut report = valid_report();
-        report.null_results[0].finding_id = report.findings[0].finding_id.clone();
+        report.no_conflict_results[0].finding_id = report.findings[0].finding_id.clone();
         assert_eq!(
             report.validate(),
             Err(ReportError::DuplicateFindingId(id("finding.group.g1.1")))
@@ -1138,7 +1138,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.null_results[0].conflict_kind = Some(ConflictKind::DeonticDirectionConflict);
+        report.no_conflict_results[0].conflict_kind = Some(ConflictKind::DeonticDirectionConflict);
         assert_eq!(
             report.validate(),
             Err(ReportError::ConflictKindPresence(id("finding.group.g2.0")))
@@ -1155,7 +1155,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.null_results[0].core = Some(vec![id("a.fixture.a.rule.1")]);
+        report.no_conflict_results[0].core = Some(vec![id("a.test_source.a.rule.1")]);
         assert_eq!(
             report.validate(),
             Err(ReportError::CorePresence(id("finding.group.g2.0")))
@@ -1175,7 +1175,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.null_results[0].verdict = SolverVerdict::Timeout;
+        report.no_conflict_results[0].verdict = SolverVerdict::Timeout;
         assert_eq!(
             report.validate(),
             Err(ReportError::VerdictRule {
@@ -1234,7 +1234,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.findings[0].assertion_ids = vec![id("a.fixture.a.rule.0"), id("a.fixture.a.rule.0")];
+        report.findings[0].assertion_ids = vec![id("a.test_source.a.rule.0"), id("a.test_source.a.rule.0")];
         assert_eq!(
             report.validate(),
             Err(ReportError::SetDuplicate {
@@ -1252,7 +1252,7 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.findings[0].core = Some(vec![id("a.fixture.b.rule.0"), id("a.fixture.a.rule.0")]);
+        report.findings[0].core = Some(vec![id("a.test_source.b.rule.0"), id("a.test_source.a.rule.0")]);
         assert_eq!(
             report.validate(),
             Err(ReportError::SetOrder { pool: "core" })
@@ -1262,7 +1262,7 @@ mod tests {
     #[test]
     fn rejects_empty_quoted_text() {
         let mut report = valid_report();
-        report.null_results[0].quoted_spans[0].text = String::new();
+        report.no_conflict_results[0].quoted_spans[0].text = String::new();
         assert_eq!(
             report.validate(),
             Err(ReportError::EmptyQuotedText {
@@ -1279,14 +1279,14 @@ mod tests {
         }
     }
 
-    /// A lookup-minimal SourceGraph: the spans and regions assembly
+    /// A lookup-minimal SourceDocumentGraph: the spans and regions assembly
     /// resolves, document identity for the index key, empty node/anchor
     /// pools.
-    fn graph(doc: &str, spans: &[(&str, &str)], regions: &[(&str, &[&str])]) -> SourceGraph {
-        SourceGraph {
+    fn graph(doc: &str, spans: &[(&str, &str)], regions: &[(&str, &[&str])]) -> SourceDocumentGraph {
+        SourceDocumentGraph {
             document: SourceDocument {
                 document_id: id(doc),
-                source_family: id("family.fixture_html"),
+                source_family: id("family.test_source_html"),
                 provenance: Provenance::Synthetic,
                 raw_hash: hash('a'),
                 content_hash: hash('b'),
@@ -1297,13 +1297,13 @@ mod tests {
                 .iter()
                 .enumerate()
                 .map(|(k, (span_id, text))| {
-                    SourceSpan::derive(id(span_id), id("n.0"), 0, (*text).to_owned(), k as u64)
+                    SourceTextSpan::derive(id(span_id), id("n.0"), 0, (*text).to_owned(), k as u64)
                 })
                 .collect(),
             anchors: vec![],
             regions: regions
                 .iter()
-                .map(|(region_id, span_ids)| SourceRegion {
+                .map(|(region_id, span_ids)| EvidenceRegion {
                     region_id: id(region_id),
                     node_ids: vec![],
                     span_ids: span_ids.iter().map(|s| id(s)).collect(),
@@ -1375,13 +1375,13 @@ mod tests {
 
     /// The §8.6-shaped synthetic run: two documents whose region ids
     /// collide (document-local counters), a conflict group whose overlap
-    /// probe answered sat (ordinal 0, no report row) and whose deontic
-    /// query cored (ordinal 1, the finding), and a null group closed by an
-    /// unsat overlap probe (ordinal 0, the documented null result).
+    /// probe answered sat (sequence_number 0, no report row) and whose deontic
+    /// query cored (sequence_number 1, the finding), and a null group closed by an
+    /// unsat overlap probe (sequence_number 0, the documented null result).
     struct World {
         bundle: TraceBundle,
         lineage: LineageIndex,
-        graphs: Vec<SourceGraph>,
+        graphs: Vec<SourceDocumentGraph>,
         results: Vec<VerifierResults>,
         diagnostics: Vec<DiagnosticRecord>,
     }
@@ -1395,15 +1395,15 @@ mod tests {
                 content_hash: None,
             },
             TraceNode {
-                node_id: id("fixture.a"),
+                node_id: id("test_source.a"),
                 kind: TraceNodeKind::Source,
-                path: "corpus/fixtures/a.html".to_owned(),
+                path: "corpus/test_sources/a.html".to_owned(),
                 content_hash: Some(hash('1')),
             },
             TraceNode {
-                node_id: id("fixture.b"),
+                node_id: id("test_source.b"),
                 kind: TraceNodeKind::Source,
-                path: "corpus/fixtures/b.html".to_owned(),
+                path: "corpus/test_sources/b.html".to_owned(),
                 content_hash: Some(hash('2')),
             },
         ]);
@@ -1416,8 +1416,8 @@ mod tests {
                 VerifierCategory::SemanticNoConflict,
                 Some(SolverVerdict::Sat),
                 None,
-                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
-                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["ctx.test_source.a.rule.0", "ctx.test_source.b.rule.0"],
+                &["test_source.a.rule.0", "test_source.b.rule.0"],
                 &["r.0"],
             ),
             claim(
@@ -1428,8 +1428,8 @@ mod tests {
                 VerifierCategory::SemanticContradiction,
                 Some(SolverVerdict::Unsat),
                 Some(ConflictKind::DeonticDirectionConflict),
-                &["a.fixture.a.rule.0", "a.fixture.b.rule.0"],
-                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["a.test_source.a.rule.0", "a.test_source.b.rule.0"],
+                &["test_source.a.rule.0", "test_source.b.rule.0"],
                 &["r.0"],
             ),
             claim(
@@ -1440,8 +1440,8 @@ mod tests {
                 VerifierCategory::SemanticNoConflict,
                 Some(SolverVerdict::Unsat),
                 None,
-                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
-                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["ctx.test_source.a.rule.0", "ctx.test_source.b.rule.0"],
+                &["test_source.a.rule.0", "test_source.b.rule.0"],
                 &["r.0"],
             ),
         ]);
@@ -1454,50 +1454,50 @@ mod tests {
             rows: sorted(vec![
                 lineage_row(
                     "finding.group.g1.0",
-                    "fixture.a",
+                    "test_source.a",
                     &["r.0"],
-                    &["fixture.a.rule.0"],
+                    &["test_source.a.rule.0"],
                 ),
                 lineage_row(
                     "finding.group.g1.0",
-                    "fixture.b",
+                    "test_source.b",
                     &["r.0"],
-                    &["fixture.b.rule.0"],
+                    &["test_source.b.rule.0"],
                 ),
                 lineage_row(
                     "finding.group.g1.1",
-                    "fixture.a",
+                    "test_source.a",
                     &["r.0"],
-                    &["fixture.a.rule.0"],
+                    &["test_source.a.rule.0"],
                 ),
                 lineage_row(
                     "finding.group.g1.1",
-                    "fixture.b",
+                    "test_source.b",
                     &["r.0"],
-                    &["fixture.b.rule.0"],
+                    &["test_source.b.rule.0"],
                 ),
                 lineage_row(
                     "finding.group.g2.0",
-                    "fixture.a",
+                    "test_source.a",
                     &["r.0"],
-                    &["fixture.a.rule.0"],
+                    &["test_source.a.rule.0"],
                 ),
                 lineage_row(
                     "finding.group.g2.0",
-                    "fixture.b",
+                    "test_source.b",
                     &["r.0"],
-                    &["fixture.b.rule.0"],
+                    &["test_source.b.rule.0"],
                 ),
             ]),
         };
         let graphs = vec![
             graph(
-                "fixture.a",
+                "test_source.a",
                 &[("s.0", "投与を推奨する")],
                 &[("r.0", &["s.0"])],
             ),
             graph(
-                "fixture.b",
+                "test_source.b",
                 &[("s.0", "投与しないこと")],
                 &[("r.0", &["s.0"])],
             ),
@@ -1515,7 +1515,7 @@ mod tests {
                         "q.g1.pair1.deontic",
                         VerifierCategory::SemanticContradiction,
                         Some(SolverVerdict::Unsat),
-                        Some(&["a.fixture.a.rule.0", "a.fixture.b.rule.0"]),
+                        Some(&["a.test_source.a.rule.0", "a.test_source.b.rule.0"]),
                     ),
                 ],
             },
@@ -1568,7 +1568,7 @@ mod tests {
 
         assert_eq!(
             report.corpus_hashes,
-            vec![(id("fixture.a"), hash('1')), (id("fixture.b"), hash('2'))]
+            vec![(id("test_source.a"), hash('1')), (id("test_source.b"), hash('2'))]
         );
         assert_eq!(report.lexicon_hash, hash('f'));
         assert_eq!(
@@ -1580,14 +1580,14 @@ mod tests {
         assert_eq!(
             report.wording,
             vec![
-                Wording::DocumentedNullResult,
-                Wording::SyntheticFixtureMeasurement
+                Wording::DocumentedNoConflictResult,
+                Wording::SyntheticTestSourceMeasurement
             ]
         );
 
         // The overlap-sat precondition row reaches neither partition.
         assert_eq!(report.findings.len(), 1);
-        assert_eq!(report.null_results.len(), 1);
+        assert_eq!(report.no_conflict_results.len(), 1);
 
         let finding = &report.findings[0];
         assert_eq!(finding.finding_id, id("finding.group.g1.1"));
@@ -1597,19 +1597,19 @@ mod tests {
             Some(ConflictKind::DeonticDirectionConflict)
         );
         assert_eq!(finding.verdict, SolverVerdict::Unsat);
-        assert_eq!(finding.claim_tier, ClaimTier::S1Admitted);
-        assert_eq!(finding.wording, Wording::SyntheticFixtureMeasurement);
+        assert_eq!(finding.claim_tier, ClaimTier::S1Accepted);
+        assert_eq!(finding.wording, Wording::SyntheticTestSourceMeasurement);
         assert_eq!(
             finding.assertion_ids,
-            vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")]
+            vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")]
         );
         assert_eq!(
             finding.core,
-            Some(vec![id("a.fixture.a.rule.0"), id("a.fixture.b.rule.0")])
+            Some(vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")])
         );
         assert_eq!(
             finding.rule_ids,
-            vec![id("fixture.a.rule.0"), id("fixture.b.rule.0")]
+            vec![id("test_source.a.rule.0"), id("test_source.b.rule.0")]
         );
         assert_eq!(finding.region_ids, vec![id("r.0")]);
         // The colliding document-local region id resolves per document.
@@ -1617,13 +1617,13 @@ mod tests {
             finding.quoted_spans,
             vec![
                 QuotedSpan {
-                    document_id: id("fixture.a"),
+                    document_id: id("test_source.a"),
                     region_id: id("r.0"),
                     span_id: id("s.0"),
                     text: "投与を推奨する".to_owned(),
                 },
                 QuotedSpan {
-                    document_id: id("fixture.b"),
+                    document_id: id("test_source.b"),
                     region_id: id("r.0"),
                     span_id: id("s.0"),
                     text: "投与しないこと".to_owned(),
@@ -1631,16 +1631,16 @@ mod tests {
             ]
         );
 
-        let null = &report.null_results[0];
+        let null = &report.no_conflict_results[0];
         assert_eq!(null.finding_id, id("finding.group.g2.0"));
         assert_eq!(null.query_id, id("q.g2.pair1.overlap"));
         assert_eq!(null.conflict_kind, None);
         assert_eq!(null.core, None);
         assert_eq!(null.verdict, SolverVerdict::Unsat);
-        assert_eq!(null.wording, Wording::DocumentedNullResult);
+        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(
             null.assertion_ids,
-            vec![id("ctx.fixture.a.rule.0"), id("ctx.fixture.b.rule.0")]
+            vec![id("ctx.test_source.a.rule.0"), id("ctx.test_source.b.rule.0")]
         );
         assert_eq!(null.quoted_spans.len(), 2);
     }
@@ -1649,14 +1649,14 @@ mod tests {
     fn assembled_report_round_trips_canonically() {
         let report = assemble(&world()).unwrap();
         let bytes = canonical_payload_bytes(&report).unwrap();
-        let read: Report = read_canonical(&bytes).unwrap();
+        let read: Report = read_strict_canonical(&bytes).unwrap();
         assert_eq!(read, report);
         read.validate().unwrap();
         // Pin the §0 spellings and the code-keyed summary form.
         let text = String::from_utf8(bytes).unwrap();
         assert!(
             text.contains(
-                r#""wording":["documented null result","synthetic fixture measurement"]"#
+                r#""wording":["documented null result","synthetic test_source measurement"]"#
             )
         );
         assert!(
@@ -1666,7 +1666,7 @@ mod tests {
     }
 
     #[test]
-    fn deontic_sat_closes_as_a_null_result() {
+    fn deontic_sat_closes_as_a_no_conflict_result() {
         let mut world = world();
         // Rebuild g1: overlap sat, then a consistent (sat) deontic query.
         world.bundle.claims = sorted(vec![
@@ -1678,8 +1678,8 @@ mod tests {
                 VerifierCategory::SemanticNoConflict,
                 Some(SolverVerdict::Sat),
                 None,
-                &["ctx.fixture.a.rule.0", "ctx.fixture.b.rule.0"],
-                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["ctx.test_source.a.rule.0", "ctx.test_source.b.rule.0"],
+                &["test_source.a.rule.0", "test_source.b.rule.0"],
                 &["r.0"],
             ),
             claim(
@@ -1690,8 +1690,8 @@ mod tests {
                 VerifierCategory::SemanticNoConflict,
                 Some(SolverVerdict::Sat),
                 None,
-                &["a.fixture.a.rule.0", "a.fixture.b.rule.0"],
-                &["fixture.a.rule.0", "fixture.b.rule.0"],
+                &["a.test_source.a.rule.0", "a.test_source.b.rule.0"],
+                &["test_source.a.rule.0", "test_source.b.rule.0"],
                 &["r.0"],
             ),
         ]);
@@ -1718,12 +1718,12 @@ mod tests {
         let report = assemble(&world).unwrap();
         report.validate().unwrap();
         assert!(report.findings.is_empty());
-        assert_eq!(report.null_results.len(), 1);
-        let null = &report.null_results[0];
+        assert_eq!(report.no_conflict_results.len(), 1);
+        let null = &report.no_conflict_results[0];
         assert_eq!(null.finding_id, id("finding.group.g1.1"));
         assert_eq!(null.verdict, SolverVerdict::Sat);
-        assert_eq!(null.wording, Wording::DocumentedNullResult);
-        assert_eq!(report.wording, vec![Wording::DocumentedNullResult]);
+        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
+        assert_eq!(report.wording, vec![Wording::DocumentedNoConflictResult]);
     }
 
     #[test]
@@ -1731,10 +1731,10 @@ mod tests {
         let mut world = world();
         world
             .graphs
-            .retain(|g| g.document.document_id.as_str() != "fixture.b");
+            .retain(|g| g.document.document_id.as_str() != "test_source.b");
         assert_eq!(
             assemble(&world),
-            Err(ReportError::MissingGraph(id("fixture.b")))
+            Err(ReportError::MissingGraph(id("test_source.b")))
         );
     }
 
@@ -1745,7 +1745,7 @@ mod tests {
         assert_eq!(
             assemble(&world),
             Err(ReportError::MissingRegion {
-                document_id: id("fixture.a"),
+                document_id: id("test_source.a"),
                 region_id: id("r.0"),
             })
         );
@@ -1758,7 +1758,7 @@ mod tests {
         assert_eq!(
             assemble(&world),
             Err(ReportError::MissingSpan {
-                document_id: id("fixture.a"),
+                document_id: id("test_source.a"),
                 span_id: id("s.0"),
             })
         );
@@ -1796,7 +1796,7 @@ mod tests {
         world.graphs.push(copy);
         assert_eq!(
             assemble(&world),
-            Err(ReportError::DuplicateGraph(id("fixture.a")))
+            Err(ReportError::DuplicateGraph(id("test_source.a")))
         );
     }
 
@@ -1845,7 +1845,7 @@ mod tests {
         let mut world = world();
         for row in &mut world.lineage.rows {
             if row.finding_id.as_str() == "finding.group.g1.1"
-                && row.document_id.as_str() == "fixture.a"
+                && row.document_id.as_str() == "test_source.a"
             {
                 row.region_ids = vec![id("r.0"), id("r.9")];
             }
@@ -1869,20 +1869,20 @@ mod tests {
         );
     }
 
-    /// The full `report.md` body of [`valid_report`], pinned from
+    /// The full `report_en.md` body of [`valid_report`], pinned from
     /// observed output: §7.2 prose order, code-spanned ids and hashes,
     /// the finding-only optionals (conflict kind, core) absent on the
     /// null row, span texts plain and verbatim.
     const PINNED_MARKDOWN: &str = r#"# CKC report
 
-wording: documented null result, synthetic fixture measurement
+wording: documented null result, synthetic test_source measurement
 
 ## Corpus
 
 | document | source hash |
 | --- | --- |
-| `fixture.a` | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
-| `fixture.b` | `sha256:2222222222222222222222222222222222222222222222222222222222222222` |
+| `test_source.a` | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
+| `test_source.b` | `sha256:2222222222222222222222222222222222222222222222222222222222222222` |
 
 lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
 
@@ -1890,31 +1890,31 @@ lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 ### `finding.group.g1.1`
 
-synthetic fixture measurement; claim tier `s1_admitted`.
+synthetic test_source measurement; claim tier `s1_accepted`.
 
 - conflict kind: `deontic_direction_conflict`
 - query: `q.g1.pair1.deontic`, verdict `unsat`
-- rules: `fixture.a.rule.0`, `fixture.b.rule.0`
+- rules: `test_source.a.rule.0`, `test_source.b.rule.0`
 - regions: `r.0`
-- assertions: `a.fixture.a.rule.0`, `a.fixture.b.rule.0`
-- core: `a.fixture.a.rule.0`, `a.fixture.b.rule.0`
+- assertions: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- core: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
 - quoted spans:
-  - `fixture.a` `r.0` `s.0`: administer drug A
-  - `fixture.b` `r.0` `s.0`: withhold drug A
+  - `test_source.a` `r.0` `s.0`: administer drug A
+  - `test_source.b` `r.0` `s.0`: withhold drug A
 
 ## Documented null results
 
 ### `finding.group.g2.0`
 
-documented null result; claim tier `s1_admitted`.
+documented null result; claim tier `s1_accepted`.
 
 - query: `q.g2.pair1.overlap`, verdict `unsat`
-- rules: `fixture.a.rule.1`, `fixture.b.rule.1`
+- rules: `test_source.a.rule.1`, `test_source.b.rule.1`
 - regions: `r.1`
-- assertions: `ctx.fixture.a.rule.1`, `ctx.fixture.b.rule.1`
+- assertions: `ctx.test_source.a.rule.1`, `ctx.test_source.b.rule.1`
 - quoted spans:
-  - `fixture.a` `r.1` `s.1`: adults eighteen and over
-  - `fixture.b` `r.1` `s.1`: children under eighteen
+  - `test_source.a` `r.1` `s.1`: adults eighteen and over
+  - `test_source.b` `r.1` `s.1`: children under eighteen
 
 ## Diagnostics summary
 
@@ -1950,7 +1950,7 @@ documented null result; claim tier `s1_admitted`.
             diagnostics_summary: vec![],
             findings: vec![],
             lexicon_hash: hash('f'),
-            null_results: vec![],
+            no_conflict_results: vec![],
             replay_status: ReplayStatus::NotReplayed,
             solver_identity: SolverIdentity {
                 solver_id: id("z3"),

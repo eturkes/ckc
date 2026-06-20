@@ -26,7 +26,7 @@ use std::path::Path;
 
 use ckc_core::{
     CanonRead, DiagnosticCode, DiagnosticRecord, Hash, Id, Outcome, ReplayManifest, RunManifest,
-    read_canonical,
+    read_strict_canonical,
 };
 use ckc_smt::{AdapterError, Z3Adapter};
 
@@ -237,12 +237,12 @@ fn prepare_scratch(scratch: &Path) -> Result<(), DiagnosticRecord> {
     Ok(())
 }
 
-/// Strict-read one bare canonical record (the manifests attest envelopes;
-/// nothing envelopes them), failures as reason text for the caller's §7.4
+/// Strict-read one bare canonical record (the manifests attest wrappers;
+/// nothing wrappers them), failures as reason text for the caller's §7.4
 /// record.
 fn read_record<T: CanonRead>(path: &Path) -> Result<T, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read: {e}"))?;
-    read_canonical(&bytes).map_err(|e| format!("strict read: {e}"))
+    read_strict_canonical(&bytes).map_err(|e| format!("strict read: {e}"))
 }
 
 /// `left \ right` over §4.3 canonical-set vecs; the §4.6 symmetric
@@ -283,7 +283,7 @@ mod tests {
 
     /// Execute `exp.m1_spine` into `<tmp>/m1` — the prior run every live
     /// replay test re-executes — and require it clean.
-    pub(crate) fn fixture_run(root: &Path, tmp: &Path) -> PathBuf {
+    pub(crate) fn test_source_run(root: &Path, tmp: &Path) -> PathBuf {
         let out = tmp.join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m1"), Some(out.clone()));
@@ -316,15 +316,15 @@ mod tests {
         }
     }
 
-    // §4.6 re-run-equals-prior over a live fixture run — the §8.5 item 8
+    // §4.6 re-run-equals-prior over a live test_source run — the §8.5 item 8
     // property, asserted at the core: matching hash sets, and the §5
     // record reproduced byte-equal (runtime metadata differs across the
     // two runs; nothing hashed does).
     #[test]
-    fn replay_of_a_fixture_run_matches_all_accepted_hashes() {
+    fn replay_of_a_test_source_run_matches_all_accepted_hashes() {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
-        let run_dir = fixture_run(&root, tmp.path());
+        let run_dir = test_source_run(&root, tmp.path());
         let scratch = tmp.path().join("scratch");
 
         let check = execute(&root, &run_dir, &scratch).unwrap();
@@ -362,7 +362,7 @@ mod tests {
     fn doctored_expectation_yields_symmetric_difference() {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
-        let run_dir = fixture_run(&root, tmp.path());
+        let run_dir = test_source_run(&root, tmp.path());
 
         let path = run_dir.join(REPLAY_MANIFEST);
         let mut manifest: ReplayManifest = read_record(&path).unwrap();

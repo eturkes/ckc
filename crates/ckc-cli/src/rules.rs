@@ -1,8 +1,8 @@
-//! NormRule derivation (SPEC §8.3 normalize row, rule half): kept
-//! [`ClinicalStatement`](ckc_core::ClinicalStatement)s lowered to guarded
-//! [`NormRule`]s, `rules[k]` deriving from `statements[k]` under the §8.6
+//! NormativeRule derivation (SPEC §8.3 normalize row, rule half): kept
+//! [`ClinicalStatement`](ckc_core::ClinicalStatement)s lowered to conditioned
+//! [`NormativeRule`]s, `rules[k]` deriving from `statements[k]` under the §8.6
 //! id scheme (`rule_id = <document_id>.rule.<k>`, document ids the
-//! corpora fixture ids).
+//! corpora test_source ids).
 //!
 //! [`derive_norm_ir`] builds one DNF conjunct per statement:
 //!
@@ -29,14 +29,14 @@
 use std::collections::HashMap;
 
 use ckc_core::{
-    ClinicalIr, ContextAtom, ContextConjunct, ContextExpr, Id, NormIr, NormRule, QuantityInterval,
+    ClinicalIr, ContextAtom, ContextConjunct, ContextExpr, Id, NormIr, NormativeRule, QuantityInterval,
     SegmentIr, SegmentKind, canonical_sort_key,
 };
 
 use crate::normalize::Lexicon;
 
 /// Derive the document's [`NormIr`] from its kept statements (module
-/// doc; SPEC §5 NormRule row, §8.6 id scheme).
+/// doc; SPEC §5 NormativeRule row, §8.6 id scheme).
 pub fn derive_norm_ir(
     document_id: &Id,
     clinical: &ClinicalIr,
@@ -86,7 +86,7 @@ pub fn derive_norm_ir(
                 source_region_ids.extend_from_slice(&clause.region_ids);
             }
 
-            NormRule {
+            NormativeRule {
                 rule_id,
                 context: ContextExpr {
                     any: vec![ContextConjunct { all }],
@@ -123,9 +123,9 @@ mod tests {
     use super::*;
 
     use ckc_core::{
-        Action, ArtifactEnvelope, Authority, Certainty, ClinicalSegment, ClinicalStatement,
+        Action, ArtifactWrapper, EvidenceStatus, Certainty, ClinicalSegment, ClinicalStatement,
         DataClass, Direction, ExceptionClause, Hash, Normalization, Origin, Producer, Provenance,
-        SourceGraph, Strength, canonical_payload_bytes, content_hash, read_canonical,
+        SourceDocumentGraph, Strength, canonical_payload_bytes, content_hash, read_strict_canonical,
     };
 
     use crate::extract::{ExtractConfig, extract};
@@ -138,14 +138,14 @@ mod tests {
 
     fn producer() -> Producer {
         Producer {
-            candidate_id: id("cand.m1"),
-            component_id: id("stage.normalize"),
+            pipeline_id: id("cand.m1"),
+            pipeline_step_id: id("processing_stage.normalize"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
     }
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+    fn test_source(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/test_sources/");
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
@@ -157,20 +157,20 @@ mod tests {
         load_lexicon(&std::fs::read(path).unwrap()).unwrap()
     }
 
-    fn extracted(name: &str, document_id: &str) -> ArtifactEnvelope<SourceGraph> {
+    fn extracted(name: &str, document_id: &str) -> ArtifactWrapper<SourceDocumentGraph> {
         let config = ExtractConfig {
             document_id: id(document_id),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: producer(),
         };
-        extract(&fixture(name), &config).unwrap()
+        extract(&test_source(name), &config).unwrap()
     }
 
-    /// Extract → segment → normalize a committed fixture under its
+    /// Extract → segment → normalize a committed test_source under its
     /// corpora document id.
-    fn pipeline(name: &str, document_id: &str) -> ArtifactEnvelope<Normalization> {
+    fn pipeline(name: &str, document_id: &str) -> ArtifactWrapper<Normalization> {
         let source = extracted(name, document_id);
         let segments = segment(&source, &producer()).unwrap();
         normalize(&source, &segments, &committed(), &producer()).unwrap()
@@ -186,18 +186,18 @@ mod tests {
         }
     }
 
-    // THE oracle: the full pipeline reproduces the amended §8.6 NormRule
+    // THE oracle: the full pipeline reproduces the amended §8.6 NormativeRule
     // listing byte for byte, and the bytes strict-read back to the
     // derived value.
     #[test]
     fn pipeline_guideline_a_pins_spec86_bytes() {
-        let envelope = pipeline("m1_guideline_a.html", "fixture.m1_guideline_a");
+        let wrapper = pipeline("m1_guideline_a.html", "test_source.m1_guideline_a");
         assert!(
-            envelope.diagnostics.is_empty(),
+            wrapper.diagnostics.is_empty(),
             "derives diagnostic-free, got {:?}",
-            envelope.diagnostics
+            wrapper.diagnostics
         );
-        let rules = &envelope.payload.norm.rules;
+        let rules = &wrapper.payload.norm.rules;
         assert_eq!(rules.len(), 1, "one statement, one rule");
         let bytes = canonical_payload_bytes(&rules[0]).unwrap();
         assert_eq!(
@@ -209,12 +209,12 @@ mod tests {
                 r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
                 r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
                 r#""direction":"for","exception_refs":["exc.0"],"#,
-                r#""rule_id":"fixture.m1_guideline_a.rule.0","#,
+                r#""rule_id":"test_source.m1_guideline_a.rule.0","#,
                 r#""source_region_ids":["r.2","r.3"],"#,
                 r#""strength":"strong"}"#
             )
         );
-        let reread: NormRule = read_canonical(&bytes).unwrap();
+        let reread: NormativeRule = read_strict_canonical(&bytes).unwrap();
         assert_eq!(reread, rules[0], "strict read returns the derived value");
     }
 
@@ -224,7 +224,7 @@ mod tests {
     // region.
     #[test]
     fn pipeline_guideline_b_and_control_full_values() {
-        let rule = |rule_id: &str, all: Vec<ContextAtom>| NormRule {
+        let rule = |rule_id: &str, all: Vec<ContextAtom>| NormativeRule {
             rule_id: id(rule_id),
             context: ContextExpr {
                 any: vec![ContextConjunct { all }],
@@ -239,9 +239,9 @@ mod tests {
         let cases = [
             (
                 "m1_guideline_b.html",
-                "fixture.m1_guideline_b",
+                "test_source.m1_guideline_b",
                 rule(
-                    "fixture.m1_guideline_b.rule.0",
+                    "test_source.m1_guideline_b.rule.0",
                     vec![
                         ContextAtom::Concept(id("cond.pregnancy")),
                         ContextAtom::Concept(id("cond.sepsis")),
@@ -251,9 +251,9 @@ mod tests {
             ),
             (
                 "m1_control.html",
-                "fixture.m1_control",
+                "test_source.m1_control",
                 rule(
-                    "fixture.m1_control.rule.0",
+                    "test_source.m1_control.rule.0",
                     vec![
                         ContextAtom::Concept(id("cond.sepsis")),
                         ContextAtom::Interval(age(None, Some(18))),
@@ -262,14 +262,14 @@ mod tests {
             ),
         ];
         for (name, document_id, want) in cases {
-            let envelope = pipeline(name, document_id);
+            let wrapper = pipeline(name, document_id);
             assert!(
-                envelope.diagnostics.is_empty(),
+                wrapper.diagnostics.is_empty(),
                 "{name} derives diagnostic-free, got {:?}",
-                envelope.diagnostics
+                wrapper.diagnostics
             );
             assert_eq!(
-                envelope.payload.norm,
+                wrapper.payload.norm,
                 NormIr { rules: vec![want] },
                 "{name}"
             );
@@ -277,7 +277,7 @@ mod tests {
     }
 
     // Hand-built statements exercising the derivation rules the committed
-    // fixtures cannot: recommendation regions follow reading order (seg.b
+    // test_sources cannot: recommendation regions follow reading order (seg.b
     // before seg.a) over the set order of source_segment_ids while the
     // exception-kind source segment contributes none, clause regions
     // follow clause order behind them, certainty flows, a clause Interval
@@ -348,7 +348,7 @@ mod tests {
             norm,
             NormIr {
                 rules: vec![
-                    NormRule {
+                    NormativeRule {
                         rule_id: id("doc.hand.rule.0"),
                         context: ContextExpr {
                             any: vec![ContextConjunct {
@@ -367,7 +367,7 @@ mod tests {
                         certainty: Some(Certainty::Moderate),
                         exception_refs: vec![id("exc.0"), id("exc.1")],
                     },
-                    NormRule {
+                    NormativeRule {
                         rule_id: id("doc.hand.rule.1"),
                         context: ContextExpr {
                             any: vec![ContextConjunct {
@@ -389,45 +389,45 @@ mod tests {
         );
     }
 
-    // §4.4 envelope shape over the stage entry — ids, kind, producer,
+    // §4.4 wrapper shape over the processing_stage entry — ids, kind, producer,
     // [source, segments] input hashes in order, deterministic_compiler
-    // under mechanical_authority, empty sets, payload-hash agreement —
+    // under mechanical_evidence_status, empty sets, payload-hash agreement —
     // and determinism: double run byte-identical, the bytes surviving a
     // strict read → re-emit cycle.
     #[test]
-    fn envelope_contract_and_double_run_determinism() {
+    fn wrapper_requirements_and_double_run_determinism() {
         let lexicon = committed();
-        let source = extracted("m1_guideline_a.html", "fixture.m1_guideline_a");
+        let source = extracted("m1_guideline_a.html", "test_source.m1_guideline_a");
         let segments = segment(&source, &producer()).unwrap();
-        let envelope = normalize(&source, &segments, &lexicon, &producer()).unwrap();
-        assert_eq!(envelope.schema_id, id("schema.normalization"));
+        let wrapper = normalize(&source, &segments, &lexicon, &producer()).unwrap();
+        assert_eq!(wrapper.schema_id, id("schema.normalization"));
         assert_eq!(
-            envelope.artifact_id,
-            id("fixture.m1_guideline_a.normalization")
+            wrapper.artifact_id,
+            id("test_source.m1_guideline_a.normalization")
         );
-        assert_eq!(envelope.artifact_kind, id("normalization"));
-        assert_eq!(envelope.producer, producer());
+        assert_eq!(wrapper.artifact_kind, id("normalization"));
+        assert_eq!(wrapper.producer, producer());
         assert_eq!(
-            envelope.input_hashes,
+            wrapper.input_hashes,
             vec![source.content_hash.clone(), segments.content_hash.clone()]
         );
-        assert_eq!(envelope.origin, Origin::DeterministicCompiler);
-        assert_eq!(envelope.authority, Authority::MechanicalAuthority);
-        assert!(envelope.accepted_effects.is_empty());
-        assert!(envelope.trace_refs.is_empty());
-        assert!(envelope.runtime_metadata.is_empty());
+        assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
+        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert!(wrapper.external_effects.is_empty());
+        assert!(wrapper.trace_refs.is_empty());
+        assert!(wrapper.runtime_metadata.is_empty());
         assert_eq!(
-            envelope.content_hash,
-            content_hash(&envelope.payload).unwrap()
+            wrapper.content_hash,
+            content_hash(&wrapper.payload).unwrap()
         );
-        envelope.validate().unwrap();
+        wrapper.validate().unwrap();
 
-        let first = canonical_payload_bytes(&envelope).unwrap();
+        let first = canonical_payload_bytes(&wrapper).unwrap();
         let second =
             canonical_payload_bytes(&normalize(&source, &segments, &lexicon, &producer()).unwrap())
                 .unwrap();
         assert_eq!(first, second, "double normalize is byte-identical");
-        let reread: ArtifactEnvelope<Normalization> = read_canonical(&first).unwrap();
+        let reread: ArtifactWrapper<Normalization> = read_strict_canonical(&first).unwrap();
         assert_eq!(
             canonical_payload_bytes(&reread).unwrap(),
             first,

@@ -1,7 +1,7 @@
 //! SPEC §5 run plan and run manifest records, plus the SPEC §4.6 replay
 //! manifest.
 //!
-//! [`RunPlan`] fixes what a run executes (experiment, fixture groups,
+//! [`RunPlan`] fixes what a run executes (experiment, test_source groups,
 //! pipelines, seed, budget); its canonical bytes hash into
 //! [`RunManifest::run_plan_hash`] via [`RunPlan::plan_hash`]. [`RunManifest`]
 //! attests what a run was built from and produced. [`ReplayManifest`] is the
@@ -50,26 +50,26 @@ impl CanonRead for SolverIdentity {
     }
 }
 
-/// SPEC §5 run plan: experiment id, fixture groups, pipeline(s), seed,
+/// SPEC §5 run plan: experiment id, test_source groups, pipeline(s), seed,
 /// budget — everything that fixes what a run executes, before it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunPlan {
     /// Experiment registry entry this run executes (e.g. `exp.m1_spine`).
     pub experiment_id: Id,
-    /// Fixture groups in scope (§8.2 `group.*`). Set semantics.
-    pub fixture_groups: Vec<Id>,
+    /// TestSource groups in scope (§8.2 `group.*`). Set semantics.
+    pub test_source_groups: Vec<Id>,
     /// Pipeline candidates the run executes — a singleton at M1; M2 onward
-    /// runs several over the same fixtures. Set semantics.
+    /// runs several over the same test_sources. Set semantics.
     pub pipelines: Vec<Id>,
     /// Deterministic seed for any seeded component.
     pub seed: u64,
     /// Budget caps: counter name → limit, the counters §4.6 event
-    /// `budget_counters` consume against. Map semantics.
+    /// `resource_counters` consume against. Map semantics.
     pub budget: Vec<(Id, u64)>,
 }
 
 impl RunPlan {
-    /// The §5 contract "canonical bytes hashed into the manifest": this
+    /// The §5 requirements "canonical bytes hashed into the manifest": this
     /// plan's [`content_hash`], stored as [`RunManifest::run_plan_hash`].
     pub fn plan_hash(&self) -> Result<Hash, CanonError> {
         content_hash(self)
@@ -81,12 +81,12 @@ impl Canonical for RunPlan {
         let mut obj = ObjectEmitter::new();
         obj.member("budget", |b| emit_u64_map(b, &self.budget))?;
         obj.member("experiment_id", |b| self.experiment_id.emit_canonical(b))?;
-        obj.member("fixture_groups", |b| emit_set(b, &self.fixture_groups))?;
         obj.member("pipelines", |b| emit_set(b, &self.pipelines))?;
         obj.member("seed", |b| {
             emit_u64(b, self.seed);
             Ok(())
         })?;
+        obj.member("test_source_groups", |b| emit_set(b, &self.test_source_groups))?;
         obj.finish(out)
     }
 }
@@ -96,13 +96,13 @@ impl CanonRead for RunPlan {
         let mut obj = ObjectReader::open(r)?;
         let budget = obj.member("budget", read_u64_map)?;
         let experiment_id = obj.member("experiment_id", Id::read)?;
-        let fixture_groups = obj.member("fixture_groups", read_set::<Id>)?;
         let pipelines = obj.member("pipelines", read_set::<Id>)?;
         let seed = obj.member("seed", read_u64)?;
+        let test_source_groups = obj.member("test_source_groups", read_set::<Id>)?;
         obj.close()?;
         Ok(RunPlan {
             experiment_id,
-            fixture_groups,
+            test_source_groups,
             pipelines,
             seed,
             budget,
@@ -126,7 +126,7 @@ pub struct RunManifest {
     pub lockfile_hashes: Vec<(Id, Hash)>,
     /// Content hash versioning the corpus in force.
     pub corpus_hash: Hash,
-    /// Content hash versioning the lexicon in force (§5 lexicon contract).
+    /// Content hash versioning the lexicon in force (§5 lexicon requirements).
     pub lexicon_hash: Hash,
     /// Recorded environment facts: identifier keys to raw text. Map
     /// semantics.
@@ -282,7 +282,7 @@ impl CanonRead for ReplayManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canon::{canonical_payload_bytes, read_canonical};
+    use crate::canon::{canonical_payload_bytes, read_strict_canonical};
 
     /// Canonical bytes of `value` as a UTF-8 string, for exact-match assertions.
     fn canon<T: Canonical>(value: &T) -> String {
@@ -292,7 +292,7 @@ mod tests {
     /// Assert `value` survives a canonical write -> read round trip unchanged.
     fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -315,7 +315,7 @@ mod tests {
     fn sample_plan() -> RunPlan {
         RunPlan {
             experiment_id: id("exp.m1_spine"),
-            fixture_groups: vec![id("group.m1_conflict"), id("group.m1_null")],
+            test_source_groups: vec![id("group.m1_conflict"), id("group.m1_no_conflict")],
             pipelines: vec![id("pipe.layered_ckcir_to_smt")],
             seed: 42,
             budget: vec![(id("solver_ms_per_query"), 10_000)],
@@ -371,14 +371,14 @@ mod tests {
             concat!(
                 r#"{"budget":{"solver_ms_per_query":"10000"},"#,
                 r#""experiment_id":"exp.m1_spine","#,
-                r#""fixture_groups":["group.m1_conflict","group.m1_null"],"#,
-                r#""pipelines":["pipe.layered_ckcir_to_smt"],"seed":"42"}"#
+                r#""pipelines":["pipe.layered_ckcir_to_smt"],"seed":"42","#,
+                r#""test_source_groups":["group.m1_conflict","group.m1_no_conflict"]}"#
             )
         );
         // Empty collections keep their type-guided forms ({} map, [] sets).
         let empty = RunPlan {
             experiment_id: id("exp.m1_spine"),
-            fixture_groups: vec![],
+            test_source_groups: vec![],
             pipelines: vec![],
             seed: 0,
             budget: vec![],
@@ -387,7 +387,7 @@ mod tests {
             canon(&empty),
             concat!(
                 r#"{"budget":{},"experiment_id":"exp.m1_spine","#,
-                r#""fixture_groups":[],"pipelines":[],"seed":"0"}"#
+                r#""pipelines":[],"seed":"0","test_source_groups":[]}"#
             )
         );
     }
@@ -402,7 +402,7 @@ mod tests {
             sample_plan().plan_hash().unwrap()
         );
         let bytes = canonical_payload_bytes(&plan).unwrap();
-        let reread: RunPlan = read_canonical(&bytes).unwrap();
+        let reread: RunPlan = read_strict_canonical(&bytes).unwrap();
         assert_eq!(reread.plan_hash().unwrap(), plan.plan_hash().unwrap());
         let mut reseeded = sample_plan();
         reseeded.seed = 43;

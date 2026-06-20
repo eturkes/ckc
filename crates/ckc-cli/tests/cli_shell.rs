@@ -110,7 +110,7 @@ fn run_writes_only_under_its_out_dir() {
             "manifest.json",
             "replay_manifest.json",
             "report.json",
-            "report.md",
+            "report_en.md",
             "trace_bundle.json"
         ]
     );
@@ -119,17 +119,17 @@ fn run_writes_only_under_its_out_dir() {
         ["diagnostics.jsonl", "events.jsonl"]
     );
     assert_eq!(
-        sorted_entries(&out_dir.join("artifacts/fixture.m1_guideline_a")),
+        sorted_entries(&out_dir.join("artifacts/test_source.m1_guideline_a")),
         [
             "ir_bundle.json",
             "normalization.json",
             "segments.json",
-            "source_graph.json"
+            "source_document_graph.json"
         ]
     );
     assert_eq!(
         sorted_entries(&out_dir.join("groups")),
-        ["group.m1_conflict", "group.m1_null"]
+        ["group.m1_conflict", "group.m1_no_conflict"]
     );
     assert_eq!(
         sorted_entries(&out_dir.join("groups/group.m1_conflict")),

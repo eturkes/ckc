@@ -114,7 +114,7 @@ ls_specific_settings: {}
 ignored_paths:
   - LICENSE
   - Cargo.lock
-  - corpus/fixtures
+  - corpus/test_sources
   - .claude/marketplace
 
 # list of additional workspace folder paths for cross-package reference support (e.g. in monorepos).

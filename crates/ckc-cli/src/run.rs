@@ -1,32 +1,32 @@
 //! SPEC §3 `ckc run` (cli-runner.2a + .2b + .3a.3 + .4.1b): resolve the
 //! experiment through the §8.4 registries, drive each corpus document through
 //! extract → segment → normalize → assemble into
-//! `artifacts/<doc-id>/{source_graph,segments,normalization,ir_bundle}.json`,
-//! drive each fixture group through compile → verify into
+//! `artifacts/<doc-id>/{source_document_graph,segments,normalization,ir_bundle}.json`,
+//! drive each test_source group through compile → verify into
 //! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`,
 //! assemble the run-scoped §7.1 trace pair over every landed artifact
 //! into `trace_bundle.json` + `lineage_index.json` at the run root, then
-//! close with the §8.3 report stage: `report.json` (§7.2), its rendered
-//! `report.md` view, and the §5/§4.6 provenance pair `manifest.json` +
+//! close with the §8.3 report processing_stage: `report.json` (§7.2), its rendered
+//! `report_en.md` view, and the §5/§4.6 provenance pair `manifest.json` +
 //! `replay_manifest.json` over the run's recorded state
-//! — every envelope written as §4.3 canonical bytes and strict-read back at
+//! — every wrapper written as §4.3 canonical bytes and strict-read back at
 //! the write boundary ([`land`]), every smt file byte-identical to its
 //! [`ckc_smt::QueryBody`] body, every bare record re-read equal
-//! ([`land_record`]). Each attempted stage records exactly one
-//! §4.6 stage event carrying the artifact's envelope diagnostics (or the
+//! ([`land_record`]). Each attempted processing_stage records exactly one
+//! §4.6 processing_stage event carrying the artifact's wrapper diagnostics (or the
 //! failure diagnostic); the §4.4 total outcome is the severity fold over
 //! every event and command-scope diagnostic.
 //!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
-//! ([`Shell::diagnostic`]); a stage failure rides its stage event and skips
-//! the document's (or group's) remaining stages, leaving other documents
+//! ([`Shell::diagnostic`]); a processing_stage failure rides its processing_stage event and skips
+//! the document's (or group's) remaining processing_stages, leaving other documents
 //! and groups to proceed (§4.4 valid-remainder rule). A group whose member
-//! bundle is missing fails its compile stage rather than compiling a
+//! bundle is missing fails its compile processing_stage rather than compiling a
 //! partial group: a cross-document verdict over fewer documents than the
-//! group declares would document a null result the fixtures never earned.
+//! group declares would document a null result the test_sources never earned.
 //! Producer values are runner-owned: candidate = the experiment's pipeline,
-//! component = the registry stage component, toolchain manifest hash = the
+//! component = the registry processing_stage component, toolchain manifest hash = the
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
@@ -34,11 +34,11 @@ use std::path::Path;
 use std::time::Duration;
 
 use ckc_core::{
-    ArtifactEnvelope, Authority, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
-    DiagnosticCode, DiagnosticRecord, FixtureGroup, Hash, Id, IrBundle, Normalization, Origin,
-    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceGraph, assemble,
+    ArtifactWrapper, EvidenceStatus, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
+    DiagnosticCode, DiagnosticRecord, TestSourceGroup, Hash, Id, IrBundle, Normalization, Origin,
+    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, assemble,
     canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
-    hash_bytes, parse_candidates, parse_corpora, parse_experiments, read_canonical,
+    hash_bytes, parse_candidates, parse_corpora, parse_experiments, read_strict_canonical,
 };
 use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
 
@@ -48,10 +48,10 @@ use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
 use crate::report::{Report, assemble_report, render_markdown};
 use crate::segment::segment;
-use crate::shell::{Shell, StageClock, StageEvent, stage_clock, static_id};
+use crate::shell::{Shell, ProcessingStageClock, ProcessingStageEvent, processing_stage_clock, static_id};
 use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_trace};
 
-/// §5 lexicon authority the normalize stage consumes (module doc in
+/// §5 lexicon evidence_status the normalize processing_stage consumes (module doc in
 /// [`crate::normalize`]), read from the invocation root like the registries.
 const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
 
@@ -72,11 +72,11 @@ const LOCKFILE: &str = "Cargo.lock";
 /// invocation directory).
 const GIT_COMMIT: &str = env!("CKC_GIT_COMMIT");
 
-/// The eight §8.3 stages this module drives, in chain order, spelled as the
-/// registry `kind` tokens the pipeline's stage components declare: four
-/// per-document stages, the two per-group stages, then the run-scoped
-/// trace and report stages.
-const STAGE_KINDS: [&str; 8] = [
+/// The eight §8.3 processing_stages this module drives, in chain order, spelled as the
+/// registry `kind` tokens the pipeline's processing_stage components declare: four
+/// per-document processing_stages, the two per-group processing_stages, then the run-scoped
+/// trace and report processing_stages.
+const PROCESSING_STAGE_KINDS: [&str; 8] = [
     "extract",
     "segment",
     "normalize",
@@ -87,7 +87,7 @@ const STAGE_KINDS: [&str; 8] = [
     "report",
 ];
 
-/// [`STAGE_KINDS`] indices of the group stages and the run-scoped pair.
+/// [`PROCESSING_STAGE_KINDS`] indices of the group processing_stages and the run-scoped pair.
 const COMPILE: usize = 4;
 const VERIFY: usize = 5;
 const TRACE: usize = 6;
@@ -104,7 +104,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     let Some(resolved) = resolve(root, experiment_id, shell) else {
         return;
     };
-    // §7.2's lexicon hash rides the raw authority-file bytes (§4.4: the
+    // §7.2's lexicon hash rides the raw evidence_status-file bytes (§4.4: the
     // lexicon is a file, not an accepted artifact), taken here where the
     // run already holds them.
     let (lexicon, lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
@@ -127,7 +127,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         }
     };
     let mut docs: Vec<DocTrace> = Vec::new();
-    let mut graphs: Vec<ArtifactEnvelope<SourceGraph>> = Vec::new();
+    let mut graphs: Vec<ArtifactWrapper<SourceDocumentGraph>> = Vec::new();
     for entry in &resolved.documents {
         if let Some((doc, graph)) = document_pipeline(root, entry, &resolved, &lexicon, shell) {
             docs.push(doc);
@@ -154,12 +154,12 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     for group in &resolved.groups {
         groups.push(group_pipeline(group, &docs, &resolved, &adapter, shell));
     }
-    // Run-scoped chain: a trace-stage failure stops it before the report,
+    // Run-scoped chain: a trace-processing_stage failure stops it before the report,
     // the same first-failure rule the document chain runs under.
-    let Some((bundle, lineage)) = trace_stage(&docs, &groups, &resolved, shell) else {
+    let Some((bundle, lineage)) = trace_processing_stage(&docs, &groups, &resolved, shell) else {
         return;
     };
-    report_stage(
+    report_processing_stage(
         root,
         &docs,
         &graphs,
@@ -174,16 +174,16 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
 }
 
 /// The runner's resolved view of one experiment: the pipeline candidate,
-/// its stage component ids, the unique corpus documents across the fixture
+/// its processing_stage component ids, the unique corpus documents across the test_source
 /// groups in first-appearance order, the groups themselves in evaluation
 /// order, the per-query solver budget, the §5 plan the run executes, and
 /// the toolchain manifest hash every producer carries.
 struct Resolved {
     pipeline_id: Id,
-    /// Stage component ids parallel to [`STAGE_KINDS`].
+    /// ProcessingStage component ids parallel to [`PROCESSING_STAGE_KINDS`].
     components: [Id; 8],
     documents: Vec<CorpusEntry>,
-    groups: Vec<FixtureGroup>,
+    groups: Vec<TestSourceGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
     budget_ms: u64,
     /// §5 run plan built from the experiment entry; its content hash is
@@ -230,21 +230,21 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         return None;
     };
 
-    let mut components: Vec<Id> = Vec::with_capacity(STAGE_KINDS.len());
-    for kind in STAGE_KINDS {
-        let found = pipeline.stages.iter().find_map(|stage_id| {
+    let mut components: Vec<Id> = Vec::with_capacity(PROCESSING_STAGE_KINDS.len());
+    for kind in PROCESSING_STAGE_KINDS {
+        let found = pipeline.processing_stages.iter().find_map(|processing_stage_id| {
             candidates
-                .stages
+                .processing_stages
                 .iter()
-                .find(|s| s.id == *stage_id && s.kind == static_id(kind))
+                .find(|s| s.id == *processing_stage_id && s.kind == static_id(kind))
         });
         match found {
-            Some(stage) => components.push(stage.id.clone()),
+            Some(processing_stage) => components.push(processing_stage.id.clone()),
             None => {
                 shell.diagnostic(invalid_diagnostic(vec![(
                     static_id("reason"),
                     format!(
-                        "pipeline {} declares no {kind} stage component",
+                        "pipeline {} declares no {kind} processing_stage component",
                         pipeline.id
                     ),
                 )]));
@@ -254,7 +254,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
     }
     let components: [Id; 8] = components
         .try_into()
-        .expect("the loop pushes one component per stage kind");
+        .expect("the loop pushes one component per processing_stage kind");
 
     let Some(&budget_ms) = experiment.budget.get(&static_id(SOLVER_BUDGET_KEY)) else {
         shell.diagnostic(invalid_diagnostic(vec![(
@@ -266,18 +266,18 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
 
     let mut documents: Vec<CorpusEntry> = Vec::new();
     let mut unresolved = false;
-    for group in &experiment.fixture_groups {
-        for fixture in &group.fixtures {
-            if documents.iter().any(|d| d.id == *fixture) {
+    for group in &experiment.test_source_groups {
+        for test_source in &group.test_sources {
+            if documents.iter().any(|d| d.id == *test_source) {
                 continue;
             }
-            match corpora.iter().find(|c| c.id == *fixture) {
+            match corpora.iter().find(|c| c.id == *test_source) {
                 Some(entry) => documents.push(entry.clone()),
                 None => {
                     shell.diagnostic(invalid_diagnostic(vec![(
                         static_id("reason"),
                         format!(
-                            "group {} names fixture {fixture} undefined in registry/corpora.yaml",
+                            "group {} names test_source {test_source} undefined in registry/corpora.yaml",
                             group.group_id
                         ),
                     )]));
@@ -303,12 +303,12 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         pipeline_id: pipeline.id.clone(),
         components,
         documents,
-        groups: experiment.fixture_groups.clone(),
+        groups: experiment.test_source_groups.clone(),
         budget_ms,
         plan: RunPlan {
             experiment_id: experiment.id.clone(),
-            fixture_groups: experiment
-                .fixture_groups
+            test_source_groups: experiment
+                .test_source_groups
                 .iter()
                 .map(|g| g.group_id.clone())
                 .collect(),
@@ -324,13 +324,13 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
     })
 }
 
-/// Drive one corpus document through the four document stages. Every
-/// attempted stage lands exactly one stage event; the first failure stops
+/// Drive one corpus document through the four document processing_stages. Every
+/// attempted processing_stage lands exactly one processing_stage event; the first failure stops
 /// this document and leaves the rest of the run to proceed. Returns the
 /// document's [`DocTrace`] — every landing recorded as it happens, the
-/// bundle envelope riding whole as the group stages' input — beside its
-/// landed source-graph envelope when extract succeeded (the report stage's
-/// quoted-span authority), or `None` when the corpus file itself was
+/// bundle wrapper riding whole as the group processing_stages' input — beside its
+/// landed source-graph wrapper when extract succeeded (the report processing_stage's
+/// quoted-span evidence_status), or `None` when the corpus file itself was
 /// unreadable (command-scope diagnostic: without source bytes there is no
 /// hash to ground a trace node).
 fn document_pipeline(
@@ -339,7 +339,7 @@ fn document_pipeline(
     resolved: &Resolved,
     lexicon: &Lexicon,
     shell: &mut Shell,
-) -> Option<(DocTrace, Option<ArtifactEnvelope<SourceGraph>>)> {
+) -> Option<(DocTrace, Option<ArtifactWrapper<SourceDocumentGraph>>)> {
     let html = match std::fs::read(root.join(&entry.path)) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -352,50 +352,50 @@ fn document_pipeline(
     };
     let mut trace = DocTrace {
         document_id: entry.id.clone(),
-        fixture_path: entry.path.clone(),
+        test_source_path: entry.path.clone(),
         source_hash: hash_bytes(&html),
-        source_graph: None,
+        source_document_graph: None,
         segments: None,
         normalization: None,
         bundle: None,
     };
     let dir = format!("artifacts/{}", entry.id);
-    let mut graph: Option<ArtifactEnvelope<SourceGraph>> = None;
+    let mut graph: Option<ArtifactWrapper<SourceDocumentGraph>> = None;
 
     'chain: {
-        let clock = stage_clock();
+        let clock = processing_stage_clock();
         let config = ExtractConfig {
             document_id: entry.id.clone(),
-            source_family: static_id("synthetic_fixture_html"),
+            source_family: static_id("synthetic_test_source_html"),
             provenance: entry.provenance,
             data_class: DataClass::None,
             producer: producer(resolved, 0),
         };
         let built = extract(&html, &config)
-            .map_err(|e| stage_diagnostic(0, "document", &entry.id, e.to_string()));
-        let rel = format!("{dir}/source_graph.json");
-        let Some(source) = close_stage(shell, resolved, 0, clock, Vec::new(), &rel, built) else {
+            .map_err(|e| processing_stage_diagnostic(0, "document", &entry.id, e.to_string()));
+        let rel = format!("{dir}/source_document_graph.json");
+        let Some(source) = close_processing_stage(shell, resolved, 0, clock, Vec::new(), &rel, built) else {
             break 'chain;
         };
-        trace.source_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
+        trace.source_document_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
         graph = Some(source.clone());
 
-        let clock = stage_clock();
+        let clock = processing_stage_clock();
         let built = segment(&source, &producer(resolved, 1))
-            .map_err(|e| stage_diagnostic(1, "document", &entry.id, e.to_string()));
+            .map_err(|e| processing_stage_diagnostic(1, "document", &entry.id, e.to_string()));
         let rel = format!("{dir}/segments.json");
         let inputs = vec![source.content_hash.clone()];
-        let Some(segments) = close_stage(shell, resolved, 1, clock, inputs, &rel, built) else {
+        let Some(segments) = close_processing_stage(shell, resolved, 1, clock, inputs, &rel, built) else {
             break 'chain;
         };
         trace.segments = Some((segments.artifact_id.clone(), segments.content_hash.clone()));
 
-        let clock = stage_clock();
+        let clock = processing_stage_clock();
         let built = normalize(&source, &segments, lexicon, &producer(resolved, 2))
-            .map_err(|e| stage_diagnostic(2, "document", &entry.id, e.to_string()));
+            .map_err(|e| processing_stage_diagnostic(2, "document", &entry.id, e.to_string()));
         let rel = format!("{dir}/normalization.json");
         let inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
-        let Some(normalization) = close_stage(shell, resolved, 2, clock, inputs, &rel, built)
+        let Some(normalization) = close_processing_stage(shell, resolved, 2, clock, inputs, &rel, built)
         else {
             break 'chain;
         };
@@ -404,7 +404,7 @@ fn document_pipeline(
             normalization.content_hash.clone(),
         ));
 
-        let clock = stage_clock();
+        let clock = processing_stage_clock();
         let built = assemble_bundle(entry, resolved, &source, &segments, &normalization);
         let rel = format!("{dir}/ir_bundle.json");
         let inputs = vec![
@@ -412,24 +412,24 @@ fn document_pipeline(
             segments.content_hash.clone(),
             normalization.content_hash.clone(),
         ];
-        trace.bundle = close_stage(shell, resolved, 3, clock, inputs, &rel, built);
+        trace.bundle = close_processing_stage(shell, resolved, 3, clock, inputs, &rel, built);
     }
     Some((trace, graph))
 }
 
-/// Drive one fixture group through compile → verify. Compile loads the
+/// Drive one test_source group through compile → verify. Compile loads the
 /// members' landed bundles (all must be present — see the module doc's
 /// partial-group rule), compiles their (FormalIR, NormIR) pairs into the
-/// enveloped [`ckc_smt::CompiledArtifact`] at `groups/<gid>/compiled.json`,
+/// wrapped [`ckc_smt::CompiledArtifact`] at `groups/<gid>/compiled.json`,
 /// and materializes every planned query body byte-identical at
 /// `groups/<gid>/smt/<query-id>.smt2`; verify drives the compiled plan
 /// through the solver adapter under the experiment's per-query budget into
-/// `groups/<gid>/verifier_results.json`. One stage event each; a compile
+/// `groups/<gid>/verifier_results.json`. One processing_stage event each; a compile
 /// failure skips the group's verify and leaves other groups to proceed.
 /// Returns the group's [`GroupTrace`]: the §8.4 member set plus each group
 /// landing that happened, riding whole.
 fn group_pipeline(
-    group: &FixtureGroup,
+    group: &TestSourceGroup,
     docs: &[DocTrace],
     resolved: &Resolved,
     adapter: &Z3Adapter,
@@ -439,28 +439,28 @@ fn group_pipeline(
     let dir = format!("groups/{gid}");
     let mut trace = GroupTrace {
         group_id: gid.clone(),
-        fixtures: group.fixtures.clone(),
+        test_sources: group.test_sources.clone(),
         compiled: None,
         verifier_results: None,
     };
 
-    let clock = stage_clock();
-    let mut members: Vec<&ArtifactEnvelope<IrBundle>> = Vec::with_capacity(group.fixtures.len());
-    for fixture in &group.fixtures {
+    let clock = processing_stage_clock();
+    let mut members: Vec<&ArtifactWrapper<IrBundle>> = Vec::with_capacity(group.test_sources.len());
+    for test_source in &group.test_sources {
         let bundle = docs
             .iter()
-            .find(|d| d.document_id == *fixture)
+            .find(|d| d.document_id == *test_source)
             .and_then(|d| d.bundle.as_ref());
         match bundle {
             Some(bundle) => members.push(bundle),
             None => {
-                let built = Err(stage_diagnostic(
+                let built = Err(processing_stage_diagnostic(
                     COMPILE,
                     "group",
                     gid,
-                    format!("member {fixture} landed no ir_bundle artifact"),
+                    format!("member {test_source} landed no ir_bundle artifact"),
                 ));
-                finish_stage::<IrBundle>(shell, resolved, COMPILE, clock, Vec::new(), built);
+                finish_processing_stage::<IrBundle>(shell, resolved, COMPILE, clock, Vec::new(), built);
                 return trace;
             }
         }
@@ -473,21 +473,21 @@ fn group_pipeline(
     );
     let built = artifact
         .validate()
-        .map_err(|e| stage_diagnostic(COMPILE, "group", gid, format!("compiled artifact: {e}")))
+        .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, format!("compiled artifact: {e}")))
         .and_then(|()| {
             let diagnostics = canonical_diagnostic_set(&artifact.diagnostics)
-                .map_err(|e| stage_diagnostic(COMPILE, "group", gid, e.to_string()))?;
-            envelope(
+                .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, e.to_string()))?;
+            wrapper(
                 format!("{gid}.compiled"),
                 "compiled",
                 producer(resolved, COMPILE),
                 inputs.clone(),
                 Origin::DeterministicCompiler,
-                Authority::CompilerAuthority,
+                EvidenceStatus::CompilerEvidenceStatus,
                 diagnostics,
                 artifact,
             )
-            .map_err(|e| stage_diagnostic(COMPILE, "group", gid, e.to_string()))
+            .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, e.to_string()))
         });
     let landed = built
         .and_then(|env| land(shell, &format!("{dir}/compiled.json"), env))
@@ -495,11 +495,11 @@ fn group_pipeline(
             materialize_queries(shell, &dir, &env)?;
             Ok(env)
         });
-    let Some(compiled) = finish_stage(shell, resolved, COMPILE, clock, inputs, landed) else {
+    let Some(compiled) = finish_processing_stage(shell, resolved, COMPILE, clock, inputs, landed) else {
         return trace;
     };
 
-    let clock = stage_clock();
+    let clock = processing_stage_clock();
     let results = verify(
         adapter,
         &compiled.payload,
@@ -508,25 +508,25 @@ fn group_pipeline(
     let wrapped = VerifierResults { results };
     let built = wrapped
         .validate()
-        .map_err(|e| stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}")))
+        .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}")))
         .and_then(|()| {
             let diagnostics =
                 canonical_diagnostic_set(wrapped.results.iter().flat_map(|r| &r.diagnostics))
-                    .map_err(|e| stage_diagnostic(VERIFY, "group", gid, e.to_string()))?;
-            envelope(
+                    .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, e.to_string()))?;
+            wrapper(
                 format!("{gid}.verifier_results"),
                 "verifier_results",
                 producer(resolved, VERIFY),
                 vec![compiled.content_hash.clone()],
-                Origin::AdapterGenerated,
-                Authority::VerifierAuthority,
+                Origin::ExternalAdapterGenerated,
+                EvidenceStatus::VerifierEvidenceStatus,
                 diagnostics,
                 wrapped,
             )
-            .map_err(|e| stage_diagnostic(VERIFY, "group", gid, e.to_string()))
+            .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, e.to_string()))
         });
     let landed = built.and_then(|env| land(shell, &format!("{dir}/verifier_results.json"), env));
-    trace.verifier_results = finish_stage(
+    trace.verifier_results = finish_processing_stage(
         shell,
         resolved,
         VERIFY,
@@ -538,25 +538,25 @@ fn group_pipeline(
     trace
 }
 
-/// The §8.3 trace stage, run once after the group loop: assemble the §7.1
+/// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1
 /// pair over every landed artifact ([`assemble_trace`] skips absent
 /// pieces), validate both payloads, and land them at the run root as
-/// `trace_bundle.json` + `lineage_index.json`. Both envelopes carry the
+/// `trace_bundle.json` + `lineage_index.json`. Both wrappers carry the
 /// DAG's node content-hash set as input hashes (each source's raw-byte
-/// hash beside every landed envelope hash; the hashless report node
-/// contributes nothing). One stage event covers the pair: both content
+/// hash beside every landed wrapper hash; the hashless report node
+/// contributes nothing). One processing_stage event covers the pair: both content
 /// hashes as outputs, or the first failure diagnostic. Returns the landed
-/// pair — the report stage's input — or `None` on the recorded failure.
-fn trace_stage(
+/// pair — the report processing_stage's input — or `None` on the recorded failure.
+fn trace_processing_stage(
     docs: &[DocTrace],
     groups: &[GroupTrace],
     resolved: &Resolved,
     shell: &mut Shell,
 ) -> Option<(
-    ArtifactEnvelope<TraceBundle>,
-    ArtifactEnvelope<LineageIndex>,
+    ArtifactWrapper<TraceBundle>,
+    ArtifactWrapper<LineageIndex>,
 )> {
-    let clock = stage_clock();
+    let clock = processing_stage_clock();
     let (bundle, lineage) = assemble_trace(docs, groups);
     // §4.3 set semantics up front so the in-memory hashes equal every
     // durable view: distinct nodes can share bytes (two structurally
@@ -570,7 +570,7 @@ fn trace_stage(
     input_hashes.sort();
     input_hashes.dedup();
     let run_id = shell.run_id().clone();
-    let fail = |reason: String| stage_diagnostic(TRACE, "run", &run_id, reason);
+    let fail = |reason: String| processing_stage_diagnostic(TRACE, "run", &run_id, reason);
 
     let landed = bundle
         .validate()
@@ -581,24 +581,24 @@ fn trace_stage(
                 .map_err(|e| fail(format!("lineage index: {e}")))
         })
         .and_then(|()| {
-            let bundle = envelope(
+            let bundle = wrapper(
                 "trace_bundle".to_owned(),
                 "trace_bundle",
                 producer(resolved, TRACE),
                 input_hashes.clone(),
                 Origin::DeterministicCompiler,
-                Authority::MechanicalAuthority,
+                EvidenceStatus::MechanicalEvidenceStatus,
                 vec![],
                 bundle,
             )
             .map_err(|e| fail(e.to_string()))?;
-            let lineage = envelope(
+            let lineage = wrapper(
                 "lineage_index".to_owned(),
                 "lineage_index",
                 producer(resolved, TRACE),
                 input_hashes.clone(),
                 Origin::DeterministicCompiler,
-                Authority::MechanicalAuthority,
+                EvidenceStatus::MechanicalEvidenceStatus,
                 vec![],
                 lineage,
             )
@@ -613,8 +613,8 @@ fn trace_stage(
 
     let (started_at, ended_at, duration_ms) = clock.stop();
     let (outcome, diagnostics, output_hashes, pair) = match landed {
-        // Both envelopes are built with empty diagnostics (assembly raises
-        // nothing of its own), so a landed pair is a clean stage.
+        // Both wrappers are built with empty diagnostics (assembly raises
+        // nothing of its own), so a landed pair is a clean processing_stage.
         Ok((bundle, lineage)) => (
             Outcome::Ok,
             Vec::new(),
@@ -623,10 +623,10 @@ fn trace_stage(
         ),
         Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
     };
-    shell.stage_event(StageEvent {
-        candidate_id: resolved.pipeline_id.clone(),
-        component_id: resolved.components[TRACE].clone(),
-        stage: static_id(STAGE_KINDS[TRACE]),
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.components[TRACE].clone(),
+        processing_stage: static_id(PROCESSING_STAGE_KINDS[TRACE]),
         started_at,
         ended_at,
         duration_ms,
@@ -634,46 +634,46 @@ fn trace_stage(
         output_hashes,
         outcome,
         diagnostics,
-        budget_counters: Vec::new(),
+        resource_counters: Vec::new(),
     });
     pair
 }
 
-/// The §8.3 report stage, the run-scoped chain's tail: snapshot the
+/// The §8.3 report processing_stage, the run-scoped chain's tail: snapshot the
 /// shell's diagnostic ledger (every §7.4 record the run raised before this
-/// stage; the report cannot count records that do not yet exist), assemble
+/// processing_stage; the report cannot count records that do not yet exist), assemble
 /// the §7.2 [`crate::report::Report`] over the landed trace pair, the
-/// landed source-graph envelopes, the landed verifier results, the raw
+/// landed source-graph wrappers, the landed verifier results, the raw
 /// lexicon-byte hash, and the adapter's live solver identity, validate it,
 /// and land it at the run root as `report.json` — the path the DAG's
 /// hashless sink node already names. The landed payload then renders as
-/// `report.md` (read back byte-identical, the [`materialize_queries`]
+/// `report_en.md` (read back byte-identical, the [`materialize_queries`]
 /// discipline), and the §5/§4.6 provenance pair lands as `manifest.json` +
 /// `replay_manifest.json` over [`manifest_inputs`]' gathered run state.
-/// Input hashes are the §4.3 set of every consumed envelope's content
-/// hash; one stage event closes the stage with the report's content hash
+/// Input hashes are the §4.3 set of every consumed wrapper's content
+/// hash; one processing_stage event closes the processing_stage with the report's content hash
 /// (the manifests and the view attest or derive from accepted artifacts;
 /// they carry no content hash of their own) or the first failure
 /// diagnostic.
 #[allow(clippy::too_many_arguments)]
-fn report_stage(
+fn report_processing_stage(
     root: &Path,
     docs: &[DocTrace],
-    graphs: &[ArtifactEnvelope<SourceGraph>],
+    graphs: &[ArtifactWrapper<SourceDocumentGraph>],
     groups: &[GroupTrace],
-    bundle: &ArtifactEnvelope<TraceBundle>,
-    lineage: &ArtifactEnvelope<LineageIndex>,
+    bundle: &ArtifactWrapper<TraceBundle>,
+    lineage: &ArtifactWrapper<LineageIndex>,
     lexicon_hash: &Hash,
     solver_identity: &SolverIdentity,
     resolved: &Resolved,
     shell: &mut Shell,
 ) {
-    let clock = stage_clock();
+    let clock = processing_stage_clock();
     let ledger = shell.ledger().to_vec();
     let run_id = shell.run_id().clone();
-    let fail = |reason: String| stage_diagnostic(REPORT, "run", &run_id, reason);
+    let fail = |reason: String| processing_stage_diagnostic(REPORT, "run", &run_id, reason);
 
-    let results: Vec<&ArtifactEnvelope<VerifierResults>> = groups
+    let results: Vec<&ArtifactWrapper<VerifierResults>> = groups
         .iter()
         .filter_map(|g| g.verifier_results.as_ref())
         .collect();
@@ -697,13 +697,13 @@ fn report_stage(
         report
             .validate()
             .map_err(|e| fail(format!("report invariant: {e}")))?;
-        envelope(
+        wrapper(
             "report".to_owned(),
             "report",
             producer(resolved, REPORT),
             input_hashes.clone(),
             Origin::DeterministicCompiler,
-            Authority::MechanicalAuthority,
+            EvidenceStatus::MechanicalEvidenceStatus,
             vec![],
             report,
         )
@@ -715,13 +715,13 @@ fn report_stage(
         // truth), landed beside the canonical record.
         let body = render_markdown(&report.payload);
         let path = shell
-            .write_under("report.md", body.as_bytes())
-            .map_err(|e| fail(format!("report.md: {e}")))?;
+            .write_under("report_en.md", body.as_bytes())
+            .map_err(|e| fail(format!("report_en.md: {e}")))?;
         let read_back =
-            std::fs::read(&path).map_err(|e| fail(format!("report.md: read back: {e}")))?;
+            std::fs::read(&path).map_err(|e| fail(format!("report_en.md: read back: {e}")))?;
         if read_back != body.as_bytes() {
             return Err(fail(
-                "report.md: read back diverges from the rendering".to_owned(),
+                "report_en.md: read back diverges from the rendering".to_owned(),
             ));
         }
         Ok(report)
@@ -749,15 +749,15 @@ fn report_stage(
 
     let (started_at, ended_at, duration_ms) = clock.stop();
     let (outcome, diagnostics, output_hashes) = match landed {
-        // The envelope is built with empty diagnostics (assembly raises
-        // nothing of its own), so a landed report is a clean stage.
+        // The wrapper is built with empty diagnostics (assembly raises
+        // nothing of its own), so a landed report is a clean processing_stage.
         Ok(report) => (Outcome::Ok, Vec::new(), vec![report.content_hash]),
         Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new()),
     };
-    shell.stage_event(StageEvent {
-        candidate_id: resolved.pipeline_id.clone(),
-        component_id: resolved.components[REPORT].clone(),
-        stage: static_id(STAGE_KINDS[REPORT]),
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.components[REPORT].clone(),
+        processing_stage: static_id(PROCESSING_STAGE_KINDS[REPORT]),
         started_at,
         ended_at,
         duration_ms,
@@ -765,19 +765,19 @@ fn report_stage(
         output_hashes,
         outcome,
         diagnostics,
-        budget_counters: Vec::new(),
+        resource_counters: Vec::new(),
     });
 }
 
 /// Gather the run state the §5/§4.6 manifests attest, one value per
-/// [`ManifestInputs`] fact (failures name their reason; the report stage
+/// [`ManifestInputs`] fact (failures name their reason; the report processing_stage
 /// scopes them): the resolved §5 plan and toolchain hash; the §4.6 replay
 /// command reconstructed in semantic order from the experiment id and the
 /// shell's `--out` token; the build-baked [`GIT_COMMIT`]; raw-byte hashes
 /// of [`LOCKFILE`] and [`CORPORA_FILE`] read at the invocation root; the
 /// lexicon hash and live solver identity the run already holds; `os` +
 /// `arch` environment facts; input hashes = the corpus documents' raw
-/// source-byte hashes; output hashes = every landed envelope's content
+/// source-byte hashes; output hashes = every landed wrapper's content
 /// hash — the document layers, the group pair, the trace pair, and the
 /// report itself ([`assemble_manifests`] owns canonical ordering).
 #[allow(clippy::too_many_arguments)]
@@ -785,9 +785,9 @@ fn manifest_inputs(
     root: &Path,
     docs: &[DocTrace],
     groups: &[GroupTrace],
-    bundle: &ArtifactEnvelope<TraceBundle>,
-    lineage: &ArtifactEnvelope<LineageIndex>,
-    report: &ArtifactEnvelope<Report>,
+    bundle: &ArtifactWrapper<TraceBundle>,
+    lineage: &ArtifactWrapper<LineageIndex>,
+    report: &ArtifactWrapper<Report>,
     lexicon_hash: &Hash,
     solver_identity: &SolverIdentity,
     resolved: &Resolved,
@@ -812,7 +812,7 @@ fn manifest_inputs(
         report.content_hash.clone(),
     ];
     for doc in docs {
-        output_hashes.extend(doc.source_graph.iter().map(|(_, h)| h.clone()));
+        output_hashes.extend(doc.source_document_graph.iter().map(|(_, h)| h.clone()));
         output_hashes.extend(doc.segments.iter().map(|(_, h)| h.clone()));
         output_hashes.extend(doc.normalization.iter().map(|(_, h)| h.clone()));
         output_hashes.extend(doc.bundle.iter().map(|b| b.content_hash.clone()));
@@ -848,7 +848,7 @@ fn manifest_inputs(
 /// The manifests' write boundary: emit the bare §5/§4.6 record as
 /// canonical bytes under `rel`, strict-read the file back, and require the
 /// read-back value equal — [`land`]'s discipline for records that carry no
-/// envelope (the manifests attest envelopes; nothing envelopes them).
+/// wrapper (the manifests attest wrappers; nothing wrappers them).
 fn land_record<P: Canonical + CanonRead + PartialEq>(
     shell: &Shell,
     rel: &str,
@@ -866,7 +866,7 @@ fn land_record<P: Canonical + CanonRead + PartialEq>(
         .write_under(rel, &bytes)
         .map_err(|e| fail(e.to_string()))?;
     let read_back = std::fs::read(&path).map_err(|e| fail(format!("read back: {e}")))?;
-    let parsed: P = read_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
+    let parsed: P = read_strict_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
     if parsed != *record {
         return Err(fail("read-back value diverges from the record".to_owned()));
     }
@@ -876,11 +876,11 @@ fn land_record<P: Canonical + CanonRead + PartialEq>(
 /// Materialize the landed compiled artifact's query bodies as the §8.3
 /// `groups/<gid>/smt/<query-id>.smt2` files, each read back and checked
 /// byte-identical to its [`ckc_smt::QueryBody`] body — solver-bound text
-/// pinned at the same boundary discipline as the envelopes.
+/// pinned at the same boundary discipline as the wrappers.
 fn materialize_queries(
     shell: &Shell,
     dir: &str,
-    compiled: &ArtifactEnvelope<ckc_smt::CompiledArtifact>,
+    compiled: &ArtifactWrapper<ckc_smt::CompiledArtifact>,
 ) -> Result<(), DiagnosticRecord> {
     for body in &compiled.payload.query_bodies {
         let rel = format!("{dir}/smt/{}.smt2", body.query_id);
@@ -901,20 +901,20 @@ fn materialize_queries(
     Ok(())
 }
 
-/// The §8.3 assemble stage, the thin core-ir.4/.5 wrapper: derive the DocIR
+/// The §8.3 assemble processing_stage, the thin core-ir.4/.5 wrapper: derive the DocIR
 /// view from the source graph and its extraction diagnostics, assemble the
 /// five-layer bundle (bundle-level diagnostics = canonical-set union of the
-/// segments and normalization envelope diagnostics; extraction diagnostics
-/// stay in DocIr per the §5 bundle row; M1 fixtures inject no assumptions),
-/// validate it against the graph, and envelope it.
+/// segments and normalization wrapper diagnostics; extraction diagnostics
+/// stay in DocIr per the §5 bundle row; M1 test_sources inject no assumptions),
+/// validate it against the graph, and wrapper it.
 fn assemble_bundle(
     entry: &CorpusEntry,
     resolved: &Resolved,
-    source: &ArtifactEnvelope<SourceGraph>,
-    segments: &ArtifactEnvelope<SegmentIr>,
-    normalization: &ArtifactEnvelope<Normalization>,
-) -> Result<ArtifactEnvelope<IrBundle>, DiagnosticRecord> {
-    let fail = |reason: String| stage_diagnostic(3, "document", &entry.id, reason);
+    source: &ArtifactWrapper<SourceDocumentGraph>,
+    segments: &ArtifactWrapper<SegmentIr>,
+    normalization: &ArtifactWrapper<Normalization>,
+) -> Result<ArtifactWrapper<IrBundle>, DiagnosticRecord> {
+    let fail = |reason: String| processing_stage_diagnostic(3, "document", &entry.id, reason);
 
     let doc = ckc_core::DocIr::from_graph(&source.payload, source.diagnostics.clone())
         .map_err(|e| fail(format!("doc layer: {e}")))?;
@@ -940,7 +940,7 @@ fn assemble_bundle(
         .validate(&source.payload)
         .map_err(|e| fail(format!("bundle invariant: {e}")))?;
 
-    Ok(ArtifactEnvelope {
+    Ok(ArtifactWrapper {
         schema_id: static_id("schema.ir_bundle"),
         artifact_id: Id::new(format!("{}.ir_bundle", entry.id))
             .expect("a valid document id keeps the Id grammar under a suffix"),
@@ -954,64 +954,64 @@ fn assemble_bundle(
         content_hash: content_hash(&bundle).map_err(|e| fail(format!("content hash: {e}")))?,
         canonicalization_policy_hash: canonicalization_policy_hash(),
         origin: Origin::DeterministicCompiler,
-        authority: Authority::MechanicalAuthority,
-        accepted_effects: vec![],
+        evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+        external_effects: vec![],
         trace_refs: vec![],
         // Assembly raised nothing of its own: layer diagnostics live in the
-        // payload, stage failures never reach an envelope.
+        // payload, processing_stage failures never reach an wrapper.
         diagnostics: vec![],
         runtime_metadata: vec![],
         payload: bundle,
     })
 }
 
-/// Close one attempted stage: land the built envelope at `rel` on success,
-/// then record the stage event ([`finish_stage`]).
-fn close_stage<P: Canonical + CanonRead>(
+/// Close one attempted processing_stage: land the built wrapper at `rel` on success,
+/// then record the processing_stage event ([`finish_processing_stage`]).
+fn close_processing_stage<P: Canonical + CanonRead>(
     shell: &mut Shell,
     resolved: &Resolved,
-    stage_index: usize,
-    clock: StageClock,
+    processing_stage_index: usize,
+    clock: ProcessingStageClock,
     input_hashes: Vec<Hash>,
     rel: &str,
-    built: Result<ArtifactEnvelope<P>, DiagnosticRecord>,
-) -> Option<ArtifactEnvelope<P>> {
-    let landed = built.and_then(|envelope| land(shell, rel, envelope));
-    finish_stage(shell, resolved, stage_index, clock, input_hashes, landed)
+    built: Result<ArtifactWrapper<P>, DiagnosticRecord>,
+) -> Option<ArtifactWrapper<P>> {
+    let landed = built.and_then(|wrapper| land(shell, rel, wrapper));
+    finish_processing_stage(shell, resolved, processing_stage_index, clock, input_hashes, landed)
 }
 
-/// Record one attempted stage's §4.6 event: envelope diagnostics and
+/// Record one attempted processing_stage's §4.6 event: wrapper diagnostics and
 /// content hash on success, the failure diagnostic alone otherwise; the
-/// verify stage carries its §8.4 budget counter. Returns the landed
-/// envelope for the next consumer; `None` means the event recorded a
+/// verify processing_stage carries its §8.4 budget counter. Returns the landed
+/// wrapper for the next consumer; `None` means the event recorded a
 /// failure.
-fn finish_stage<P: Canonical + CanonRead>(
+fn finish_processing_stage<P: Canonical + CanonRead>(
     shell: &mut Shell,
     resolved: &Resolved,
-    stage_index: usize,
-    clock: StageClock,
+    processing_stage_index: usize,
+    clock: ProcessingStageClock,
     input_hashes: Vec<Hash>,
-    landed: Result<ArtifactEnvelope<P>, DiagnosticRecord>,
-) -> Option<ArtifactEnvelope<P>> {
+    landed: Result<ArtifactWrapper<P>, DiagnosticRecord>,
+) -> Option<ArtifactWrapper<P>> {
     let (started_at, ended_at, duration_ms) = clock.stop();
-    let (outcome, diagnostics, output_hashes, envelope) = match landed {
-        Ok(envelope) => (
-            severity(&envelope.diagnostics),
-            envelope.diagnostics.clone(),
-            vec![envelope.content_hash.clone()],
-            Some(envelope),
+    let (outcome, diagnostics, output_hashes, wrapper) = match landed {
+        Ok(wrapper) => (
+            severity(&wrapper.diagnostics),
+            wrapper.diagnostics.clone(),
+            vec![wrapper.content_hash.clone()],
+            Some(wrapper),
         ),
         Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
     };
-    let budget_counters = if stage_index == VERIFY {
+    let resource_counters = if processing_stage_index == VERIFY {
         vec![(static_id(SOLVER_BUDGET_KEY), resolved.budget_ms)]
     } else {
         Vec::new()
     };
-    shell.stage_event(StageEvent {
-        candidate_id: resolved.pipeline_id.clone(),
-        component_id: resolved.components[stage_index].clone(),
-        stage: static_id(STAGE_KINDS[stage_index]),
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.components[processing_stage_index].clone(),
+        processing_stage: static_id(PROCESSING_STAGE_KINDS[processing_stage_index]),
         started_at,
         ended_at,
         duration_ms,
@@ -1019,26 +1019,26 @@ fn finish_stage<P: Canonical + CanonRead>(
         output_hashes,
         outcome,
         diagnostics,
-        budget_counters,
+        resource_counters,
     });
-    envelope
+    wrapper
 }
 
-/// Envelope one group-stage payload under the runner's fixed §4.4 fields:
+/// Wrapper one group-processing_stage payload under the runner's fixed §4.4 fields:
 /// `schema.<kind>` schema id, `<artifact-id>` minted by the caller, content
 /// and policy hashes computed here.
 #[allow(clippy::too_many_arguments)]
-fn envelope<P: Canonical>(
+fn wrapper<P: Canonical>(
     artifact_id: String,
     kind: &str,
     producer: Producer,
     input_hashes: Vec<Hash>,
     origin: Origin,
-    authority: Authority,
+    evidence_status: EvidenceStatus,
     diagnostics: Vec<DiagnosticRecord>,
     payload: P,
-) -> Result<ArtifactEnvelope<P>, CanonError> {
-    Ok(ArtifactEnvelope {
+) -> Result<ArtifactWrapper<P>, CanonError> {
+    Ok(ArtifactWrapper {
         schema_id: Id::new(format!("schema.{kind}")).expect("schema.<kind> stays in the grammar"),
         artifact_id: Id::new(artifact_id)
             .expect("the runner mints artifact ids inside the Id grammar"),
@@ -1048,8 +1048,8 @@ fn envelope<P: Canonical>(
         content_hash: content_hash(&payload)?,
         canonicalization_policy_hash: canonicalization_policy_hash(),
         origin,
-        authority,
-        accepted_effects: vec![],
+        evidence_status,
+        external_effects: vec![],
         trace_refs: vec![],
         diagnostics,
         runtime_metadata: vec![],
@@ -1057,8 +1057,8 @@ fn envelope<P: Canonical>(
     })
 }
 
-/// §4.3 canonical-set view of stage diagnostics: sorted by canonical bytes,
-/// byte-identical duplicates collapsed — the envelope `diagnostics` field's
+/// §4.3 canonical-set view of processing_stage diagnostics: sorted by canonical bytes,
+/// byte-identical duplicates collapsed — the wrapper `diagnostics` field's
 /// storage order.
 fn canonical_diagnostic_set<'a>(
     diagnostics: impl IntoIterator<Item = &'a DiagnosticRecord>,
@@ -1072,44 +1072,44 @@ fn canonical_diagnostic_set<'a>(
     Ok(keyed.into_iter().map(|(_, d)| d).collect())
 }
 
-/// The write boundary: validate the produced envelope, write its canonical
+/// The write boundary: validate the produced wrapper, write its canonical
 /// bytes under `rel`, strict-read the file back, re-validate, and return
 /// the read-back value — §8.5 item 3's per-artifact property enforced at
-/// production time. Downstream stages chain the read-back value, never the
+/// production time. Downstream processing_stages chain the read-back value, never the
 /// in-memory precursor: the §4.4 accepted artifact is the canonical bytes
 /// on disk, and §4.3 set emission sorts what some producers store in
-/// creation order (e.g. SourceGraph regions), so only disk truth keeps
+/// creation order (e.g. SourceDocumentGraph regions), so only disk truth keeps
 /// every consumer — here, cli-runner.2b/.2c, replay — seeing one value.
-/// Failures come back as the stage's diagnostic.
+/// Failures come back as the processing_stage's diagnostic.
 fn land<P: Canonical + CanonRead>(
     shell: &Shell,
     rel: &str,
-    envelope: ArtifactEnvelope<P>,
-) -> Result<ArtifactEnvelope<P>, DiagnosticRecord> {
+    wrapper: ArtifactWrapper<P>,
+) -> Result<ArtifactWrapper<P>, DiagnosticRecord> {
     let fail = |reason: String| {
         invalid_diagnostic(vec![
             (static_id("artifact"), rel.to_owned()),
             (static_id("reason"), reason),
         ])
     };
-    envelope
+    wrapper
         .validate()
-        .map_err(|e| fail(format!("envelope invariant: {e}")))?;
+        .map_err(|e| fail(format!("wrapper invariant: {e}")))?;
     let bytes =
-        canonical_payload_bytes(&envelope).map_err(|e| fail(format!("canonical emission: {e}")))?;
+        canonical_payload_bytes(&wrapper).map_err(|e| fail(format!("canonical emission: {e}")))?;
     let path = shell
         .write_under(rel, &bytes)
         .map_err(|e| fail(e.to_string()))?;
     let read_back = std::fs::read(&path).map_err(|e| fail(format!("read back: {e}")))?;
-    let parsed: ArtifactEnvelope<P> =
-        read_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
+    let parsed: ArtifactWrapper<P> =
+        read_strict_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
     parsed
         .validate()
         .map_err(|e| fail(format!("read-back invariant: {e}")))?;
     Ok(parsed)
 }
 
-/// §4.4 stage outcome: severity max over the artifact's diagnostics.
+/// §4.4 processing_stage outcome: severity max over the artifact's diagnostics.
 fn severity(diagnostics: &[DiagnosticRecord]) -> Outcome {
     diagnostics
         .iter()
@@ -1117,11 +1117,11 @@ fn severity(diagnostics: &[DiagnosticRecord]) -> Outcome {
         .fold(Outcome::Ok, Outcome::max)
 }
 
-/// Stage-failure diagnostic: `schema_invalid`/`invalid` naming the §8.3
-/// stage and its subject — `document` for the per-document stages, `group`
-/// for the group stages (§4.4 "schema, hash, canonicalization … fails").
-fn stage_diagnostic(
-    stage_index: usize,
+/// ProcessingStage-failure diagnostic: `schema_invalid`/`invalid` naming the §8.3
+/// processing_stage and its subject — `document` for the per-document processing_stages, `group`
+/// for the group processing_stages (§4.4 "schema, hash, canonicalization … fails").
+fn processing_stage_diagnostic(
+    processing_stage_index: usize,
     subject_key: &str,
     subject: &Id,
     reason: String,
@@ -1129,16 +1129,16 @@ fn stage_diagnostic(
     invalid_diagnostic(vec![
         (static_id(subject_key), subject.to_string()),
         (static_id("reason"), reason),
-        (static_id("stage"), STAGE_KINDS[stage_index].to_owned()),
+        (static_id("processing_stage"), PROCESSING_STAGE_KINDS[processing_stage_index].to_owned()),
     ])
 }
 
-/// §4.4 producer for one stage execution; the toolchain manifest hash is
+/// §4.4 producer for one processing_stage execution; the toolchain manifest hash is
 /// the [`TOOLCHAIN_FILE`] raw-byte hash resolution recorded.
-fn producer(resolved: &Resolved, stage_index: usize) -> Producer {
+fn producer(resolved: &Resolved, processing_stage_index: usize) -> Producer {
     Producer {
-        candidate_id: resolved.pipeline_id.clone(),
-        component_id: resolved.components[stage_index].clone(),
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.components[processing_stage_index].clone(),
         toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
     }
 }
@@ -1187,12 +1187,12 @@ mod tests {
     }
 
     const DOC_IDS: [&str; 3] = [
-        "fixture.m1_guideline_a",
-        "fixture.m1_guideline_b",
-        "fixture.m1_control",
+        "test_source.m1_guideline_a",
+        "test_source.m1_guideline_b",
+        "test_source.m1_control",
     ];
 
-    /// §4.3 set emission canonically sorts envelope input hashes, so the
+    /// §4.3 set emission canonically sorts wrapper input hashes, so the
     /// chain expectations compare as sorted sets (ASCII `sha256:` text
     /// orders identically under derived `Ord` and the canonical byte key).
     fn sorted(hashes: &[Hash]) -> Vec<Hash> {
@@ -1201,28 +1201,28 @@ mod tests {
         hashes
     }
 
-    /// Strict-read one landed artifact envelope at `rel` under the run
+    /// Strict-read one landed artifact wrapper at `rel` under the run
     /// directory and re-check its mechanical invariants; the §8.5 item 3
     /// per-artifact property, asserted from the consumer side.
-    fn strict_at<P: Canonical + CanonRead>(out: &Path, rel: &str) -> ArtifactEnvelope<P> {
+    fn strict_at<P: Canonical + CanonRead>(out: &Path, rel: &str) -> ArtifactWrapper<P> {
         let path = out.join(rel);
-        let envelope: ArtifactEnvelope<P> = read_canonical(&std::fs::read(&path).unwrap())
+        let wrapper: ArtifactWrapper<P> = read_strict_canonical(&std::fs::read(&path).unwrap())
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        envelope.validate().unwrap();
-        envelope
+        wrapper.validate().unwrap();
+        wrapper
     }
 
     /// [`strict_at`] over the document-artifact layout slot.
-    fn strict<P: Canonical + CanonRead>(out: &Path, doc: &str, name: &str) -> ArtifactEnvelope<P> {
+    fn strict<P: Canonical + CanonRead>(out: &Path, doc: &str, name: &str) -> ArtifactWrapper<P> {
         strict_at(out, &format!("artifacts/{doc}/{name}.json"))
     }
 
-    // The unit gate: the document stages over the three fixtures land the
+    // The unit gate: the document processing_stages over the three test_sources land the
     // twelve §8.3 document artifacts, every one strict-read clean with its
-    // input hashes chaining the §8.4 stage order, and the event stream
-    // carries one clean stage event per execution before the command event.
+    // input hashes chaining the §8.4 processing_stage order, and the event stream
+    // carries one clean processing_stage event per execution before the command event.
     #[test]
-    fn document_stages_land_strict_artifacts_over_the_fixtures() {
+    fn document_processing_stages_land_strict_artifacts_over_the_test_sources() {
         let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
 
         // The full §8.3 chain through verify completes clean.
@@ -1231,14 +1231,14 @@ mod tests {
         assert!(diagnostics.is_empty());
 
         for doc in DOC_IDS {
-            let source: ArtifactEnvelope<SourceGraph> = strict(&out, doc, "source_graph");
-            let segments: ArtifactEnvelope<SegmentIr> = strict(&out, doc, "segments");
-            let normalization: ArtifactEnvelope<Normalization> = strict(&out, doc, "normalization");
-            let bundle: ArtifactEnvelope<IrBundle> = strict(&out, doc, "ir_bundle");
+            let source: ArtifactWrapper<SourceDocumentGraph> = strict(&out, doc, "source_document_graph");
+            let segments: ArtifactWrapper<SegmentIr> = strict(&out, doc, "segments");
+            let normalization: ArtifactWrapper<Normalization> = strict(&out, doc, "normalization");
+            let bundle: ArtifactWrapper<IrBundle> = strict(&out, doc, "ir_bundle");
 
             assert_eq!(
                 source.artifact_id,
-                format!("{doc}.source_graph").parse().unwrap()
+                format!("{doc}.source_document_graph").parse().unwrap()
             );
             assert_eq!(source.input_hashes, Vec::new());
             assert_eq!(segments.input_hashes, vec![source.content_hash.clone()]);
@@ -1255,13 +1255,13 @@ mod tests {
                 ])
             );
             assert_eq!(
-                bundle.producer.candidate_id,
+                bundle.producer.pipeline_id,
                 static_id("pipe.layered_ckcir_to_smt")
             );
-            assert_eq!(bundle.producer.component_id, static_id("stage.m1.assemble"));
+            assert_eq!(bundle.producer.pipeline_step_id, static_id("processing_stage.m1.assemble"));
 
             // The bundle re-validates against its graph and carries the §8.6
-            // rule the gold core expects from each fixture.
+            // rule the reference core expects from each test_source.
             bundle.payload.validate(&source.payload).unwrap();
             assert_eq!(bundle.payload.norm.rules.len(), 1);
             assert_eq!(
@@ -1270,23 +1270,23 @@ mod tests {
             );
         }
 
-        // 4 stage events per document, compile+verify per group, the
-        // run-scoped trace and report stages, then the closing command
+        // 4 processing_stage events per document, compile+verify per group, the
+        // run-scoped trace and report processing_stages, then the closing command
         // event.
         assert_eq!(events.len(), 19);
         for (n, event) in events.iter().enumerate() {
             assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
-            assert_eq!(event.logical_time, n as u64);
+            assert_eq!(event.event_sequence_number, n as u64);
             assert_eq!(event.run_id, static_id("m1"));
         }
         for (d, doc) in DOC_IDS.iter().enumerate() {
-            for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
+            for (s, kind) in PROCESSING_STAGE_KINDS[..4].iter().enumerate() {
                 let event = &events[d * 4 + s];
-                assert_eq!(event.stage, static_id(kind), "{doc}");
-                assert_eq!(event.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
+                assert_eq!(event.processing_stage, static_id(kind), "{doc}");
+                assert_eq!(event.pipeline_id, static_id("pipe.layered_ckcir_to_smt"));
                 assert_eq!(
-                    event.component_id,
-                    format!("stage.m1.{kind}").parse().unwrap()
+                    event.pipeline_step_id,
+                    format!("processing_stage.m1.{kind}").parse().unwrap()
                 );
                 assert_eq!(event.outcome, Outcome::Ok);
                 assert_eq!(event.input_hashes.len(), s);
@@ -1298,92 +1298,92 @@ mod tests {
         // then verify; only verify carries the §8.4 budget counter.
         for (g, base) in [12, 14].iter().enumerate() {
             let compile = &events[*base];
-            assert_eq!(compile.stage, static_id("compile"), "group {g}");
-            assert_eq!(compile.component_id, static_id("stage.m1.compile"));
+            assert_eq!(compile.processing_stage, static_id("compile"), "group {g}");
+            assert_eq!(compile.pipeline_step_id, static_id("processing_stage.m1.compile"));
             assert_eq!(compile.outcome, Outcome::Ok);
             assert_eq!(compile.input_hashes.len(), 2);
             assert_eq!(compile.output_hashes.len(), 1);
             assert!(compile.diagnostics.is_empty());
-            assert!(compile.budget_counters.is_empty());
+            assert!(compile.resource_counters.is_empty());
             let verify = &events[*base + 1];
-            assert_eq!(verify.stage, static_id("verify"), "group {g}");
-            assert_eq!(verify.component_id, static_id("stage.m1.verify"));
+            assert_eq!(verify.processing_stage, static_id("verify"), "group {g}");
+            assert_eq!(verify.pipeline_step_id, static_id("processing_stage.m1.verify"));
             assert_eq!(verify.outcome, Outcome::Ok);
             assert_eq!(verify.input_hashes, compile.output_hashes);
             assert_eq!(verify.output_hashes.len(), 1);
             assert!(verify.diagnostics.is_empty());
             assert_eq!(
-                verify.budget_counters,
+                verify.resource_counters,
                 vec![(static_id("solver_ms_per_query"), 10_000)]
             );
         }
-        // The trace stage: the DAG node content-hash set as input — 19
+        // The trace processing_stage: the DAG node content-hash set as input — 19
         // hashed nodes (3 sources + 12 document artifacts + 4 group
         // artifacts; the report node is hashless) collapsing to 18 because
         // control's and guideline_b's segments artifacts are byte-identical
         // — and the landed pair as outputs.
         let trace = &events[16];
-        assert_eq!(trace.stage, static_id("trace"));
-        assert_eq!(trace.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
-        assert_eq!(trace.component_id, static_id("stage.m1.trace"));
+        assert_eq!(trace.processing_stage, static_id("trace"));
+        assert_eq!(trace.pipeline_id, static_id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(trace.pipeline_step_id, static_id("processing_stage.m1.trace"));
         assert_eq!(trace.outcome, Outcome::Ok);
         assert_eq!(trace.input_hashes.len(), 18);
         assert_eq!(trace.output_hashes.len(), 2);
         assert!(trace.diagnostics.is_empty());
-        assert!(trace.budget_counters.is_empty());
-        // The report stage: every consumed envelope's content hash as
+        assert!(trace.resource_counters.is_empty());
+        // The report processing_stage: every consumed wrapper's content hash as
         // input — the trace pair, three source graphs, two verifier
         // results — and the landed report as output.
         let report = &events[17];
-        assert_eq!(report.stage, static_id("report"));
-        assert_eq!(report.candidate_id, static_id("pipe.layered_ckcir_to_smt"));
-        assert_eq!(report.component_id, static_id("stage.m1.report"));
+        assert_eq!(report.processing_stage, static_id("report"));
+        assert_eq!(report.pipeline_id, static_id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(report.pipeline_step_id, static_id("processing_stage.m1.report"));
         assert_eq!(report.outcome, Outcome::Ok);
         assert_eq!(report.input_hashes.len(), 7);
         assert!(report.input_hashes.contains(&trace.output_hashes[0]));
         assert!(report.input_hashes.contains(&trace.output_hashes[1]));
         assert_eq!(report.output_hashes.len(), 1);
         assert!(report.diagnostics.is_empty());
-        assert!(report.budget_counters.is_empty());
+        assert!(report.resource_counters.is_empty());
         assert!(out.join("report.json").exists());
         let command = &events[18];
-        assert_eq!(command.stage, static_id("run"));
+        assert_eq!(command.processing_stage, static_id("run"));
         assert_eq!(command.outcome, Outcome::Ok);
     }
 
-    // The group stages over exp.m1_spine: compiled artifacts and verifier
+    // The group processing_stages over exp.m1_spine: compiled artifacts and verifier
     // results land strict-read clean with hashes chaining bundles →
     // compiled → results and every query body materialized byte-identical
     // under smt/; the §8.6 thread yields the cross-document contradiction
     // in the conflict group and the disjoint-interval documented null in
     // the null group.
     #[test]
-    fn group_stages_compile_and_verify_the_fixture_groups() {
+    fn group_processing_stages_compile_and_verify_the_test_source_groups() {
         use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory};
 
         let (_result, _events, _diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
-        let a: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_guideline_a", "ir_bundle");
-        let b: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_guideline_b", "ir_bundle");
-        let control: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.m1_control", "ir_bundle");
+        let a: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_a", "ir_bundle");
+        let b: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_b", "ir_bundle");
+        let control: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_control", "ir_bundle");
 
-        // Per group: envelope identity/chaining pins, plan and assertion
+        // Per group: wrapper identity/chaining pins, plan and assertion
         // map shape, and byte-identical smt materialization.
         for (gid, members, rules) in [
             (
                 "group.m1_conflict",
                 [&a, &b],
-                ["a", "b"].map(|d| format!("fixture.m1_guideline_{d}.rule.0")),
+                ["a", "b"].map(|d| format!("test_source.m1_guideline_{d}.rule.0")),
             ),
             (
-                "group.m1_null",
+                "group.m1_no_conflict",
                 [&a, &control],
                 [
-                    "fixture.m1_control.rule.0".to_owned(),
-                    "fixture.m1_guideline_a.rule.0".to_owned(),
+                    "test_source.m1_control.rule.0".to_owned(),
+                    "test_source.m1_guideline_a.rule.0".to_owned(),
                 ],
             ),
         ] {
-            let compiled: ArtifactEnvelope<CompiledArtifact> =
+            let compiled: ArtifactWrapper<CompiledArtifact> =
                 strict_at(&out, &format!("groups/{gid}/compiled.json"));
             assert_eq!(compiled.schema_id, static_id("schema.compiled"), "{gid}");
             assert_eq!(
@@ -1392,11 +1392,11 @@ mod tests {
             );
             assert_eq!(compiled.artifact_kind, static_id("compiled"));
             assert_eq!(
-                compiled.producer.component_id,
-                static_id("stage.m1.compile")
+                compiled.producer.pipeline_step_id,
+                static_id("processing_stage.m1.compile")
             );
             assert_eq!(compiled.origin, Origin::DeterministicCompiler);
-            assert_eq!(compiled.authority, Authority::CompilerAuthority);
+            assert_eq!(compiled.evidence_status, EvidenceStatus::CompilerEvidenceStatus);
             assert_eq!(
                 compiled.input_hashes,
                 sorted(&members.map(|m| m.content_hash.clone()))
@@ -1405,9 +1405,9 @@ mod tests {
             assert!(compiled.payload.diagnostics.is_empty());
 
             let gsuf = gid.strip_prefix("group.").unwrap();
-            assert_eq!(compiled.payload.query_plan.len(), 1);
+            assert_eq!(compiled.payload.solver_query_plan.len(), 1);
             assert_eq!(
-                compiled.payload.query_plan[0].pair_id,
+                compiled.payload.solver_query_plan[0].pair_id,
                 format!("q.{gsuf}.pair1").parse().unwrap()
             );
             assert_eq!(compiled.payload.query_bodies.len(), 2);
@@ -1420,7 +1420,7 @@ mod tests {
             expected_names.sort();
             let names: Vec<Id> = compiled
                 .payload
-                .assertion_map
+                .assertion_to_source_map
                 .iter()
                 .map(|(name, _)| name.clone())
                 .collect();
@@ -1444,7 +1444,7 @@ mod tests {
                 assert_eq!(bytes, body.body.as_bytes(), "{}", body.query_id);
             }
 
-            let results: ArtifactEnvelope<ckc_smt::VerifierResults> =
+            let results: ArtifactWrapper<ckc_smt::VerifierResults> =
                 strict_at(&out, &format!("groups/{gid}/verifier_results.json"));
             assert_eq!(results.schema_id, static_id("schema.verifier_results"));
             assert_eq!(
@@ -1452,9 +1452,9 @@ mod tests {
                 format!("{gid}.verifier_results").parse().unwrap()
             );
             assert_eq!(results.artifact_kind, static_id("verifier_results"));
-            assert_eq!(results.producer.component_id, static_id("stage.m1.verify"));
-            assert_eq!(results.origin, Origin::AdapterGenerated);
-            assert_eq!(results.authority, Authority::VerifierAuthority);
+            assert_eq!(results.producer.pipeline_step_id, static_id("processing_stage.m1.verify"));
+            assert_eq!(results.origin, Origin::ExternalAdapterGenerated);
+            assert_eq!(results.evidence_status, EvidenceStatus::VerifierEvidenceStatus);
             assert_eq!(results.input_hashes, vec![compiled.content_hash.clone()]);
             assert!(results.diagnostics.is_empty());
             results.payload.validate().unwrap();
@@ -1464,9 +1464,9 @@ mod tests {
             }
         }
 
-        // Conflict group: Q1 sat with the overlap witness, Q2 unsat with
+        // Conflict group: Q1 sat with the overlap satisfying_example, Q2 unsat with
         // the cross-document core — the §8.6 finding.
-        let conflict: ArtifactEnvelope<ckc_smt::VerifierResults> =
+        let conflict: ArtifactWrapper<ckc_smt::VerifierResults> =
             strict_at(&out, "groups/group.m1_conflict/verifier_results.json");
         let rs = &conflict.payload.results;
         assert_eq!(rs.len(), 2);
@@ -1488,18 +1488,18 @@ mod tests {
         assert_eq!(
             rs[1].unsat_core,
             Some(vec![
-                "a.fixture.m1_guideline_a.rule.0".parse().unwrap(),
-                "a.fixture.m1_guideline_b.rule.0".parse().unwrap(),
+                "a.test_source.m1_guideline_a.rule.0".parse().unwrap(),
+                "a.test_source.m1_guideline_b.rule.0".parse().unwrap(),
             ])
         );
 
         // Null group: the disjoint-interval Q1 answers unsat, closing the
-        // pair as the documented null result — no Q2 run, no witness.
-        let null: ArtifactEnvelope<ckc_smt::VerifierResults> =
-            strict_at(&out, "groups/group.m1_null/verifier_results.json");
+        // pair as the documented null result — no Q2 run, no satisfying_example.
+        let null: ArtifactWrapper<ckc_smt::VerifierResults> =
+            strict_at(&out, "groups/group.m1_no_conflict/verifier_results.json");
         let rs = &null.payload.results;
         assert_eq!(rs.len(), 1);
-        assert_eq!(rs[0].query_id, "q.m1_null.pair1.overlap".parse().unwrap());
+        assert_eq!(rs[0].query_id, "q.m1_no_conflict.pair1.overlap".parse().unwrap());
         assert_eq!(rs[0].category, VerifierCategory::SemanticNoConflict);
         assert_eq!(rs[0].verdict, Some(SolverVerdict::Unsat));
         assert_eq!(rs[0].model, None);
@@ -1532,9 +1532,9 @@ mod tests {
         );
     }
 
-    /// Write a minimal two-fixture registry trio under `root`: `fixture.gone`
-    /// points at a missing file, `fixture.tiny` at a minimal HTML document;
-    /// the pipeline declares one component per [`STAGE_KINDS`] entry.
+    /// Write a minimal two-test_source registry trio under `root`: `test_source.gone`
+    /// points at a missing file, `test_source.tiny` at a minimal HTML document;
+    /// the pipeline declares one component per [`PROCESSING_STAGE_KINDS`] entry.
     fn write_tiny_root(root: &Path) {
         let write = |rel: &str, text: &str| {
             let path = root.join(rel);
@@ -1544,15 +1544,15 @@ mod tests {
         write(
             "registry/corpora.yaml",
             "\
-- id: fixture.gone
-  path: corpus/fixtures/gone.html
+- id: test_source.gone
+  path: corpus/test_sources/gone.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic
-- id: fixture.tiny
-  path: corpus/fixtures/tiny.html
+- id: test_source.tiny
+  path: corpus/test_sources/tiny.html
   origin: ai_generated
-  authority: source_authority
+  evidence_status: source_evidence_status
   provenance: synthetic
 ",
         );
@@ -1561,51 +1561,51 @@ mod tests {
             "\
 pipelines:
   - id: pipe.tiny
-    stages:
-      [stage.t.extract, stage.t.segment, stage.t.normalize, stage.t.assemble,
-       stage.t.compile, stage.t.verify, stage.t.trace, stage.t.report]
-stages:
-  - id: stage.t.extract
+    processing_stages:
+      [processing_stage.t.extract, processing_stage.t.segment, processing_stage.t.normalize, processing_stage.t.assemble,
+       processing_stage.t.compile, processing_stage.t.verify, processing_stage.t.trace, processing_stage.t.report]
+processing_stages:
+  - id: processing_stage.t.extract
     kind: extract
     determinism: deterministic
     input_artifact_kinds: []
-    output_artifact_kinds: [source_graph]
-  - id: stage.t.segment
+    output_artifact_kinds: [source_document_graph]
+  - id: processing_stage.t.segment
     kind: segment
     determinism: deterministic
-    input_artifact_kinds: [source_graph]
+    input_artifact_kinds: [source_document_graph]
     output_artifact_kinds: [segments]
-  - id: stage.t.normalize
+  - id: processing_stage.t.normalize
     kind: normalize
     determinism: deterministic
-    input_artifact_kinds: [source_graph, segments]
+    input_artifact_kinds: [source_document_graph, segments]
     output_artifact_kinds: [normalization]
-  - id: stage.t.assemble
+  - id: processing_stage.t.assemble
     kind: assemble
     determinism: deterministic
-    input_artifact_kinds: [source_graph, segments, normalization]
+    input_artifact_kinds: [source_document_graph, segments, normalization]
     output_artifact_kinds: [ir_bundle]
-  - id: stage.t.compile
+  - id: processing_stage.t.compile
     kind: compile
     determinism: deterministic
     input_artifact_kinds: [ir_bundle]
     output_artifact_kinds: [compiled, smt_query]
-  - id: stage.t.verify
+  - id: processing_stage.t.verify
     kind: verify
     determinism: deterministic
     input_artifact_kinds: [compiled, smt_query]
     output_artifact_kinds: [verifier_results]
-  - id: stage.t.trace
+  - id: processing_stage.t.trace
     kind: trace
     determinism: deterministic
     input_artifact_kinds:
-      [source_graph, segments, normalization, ir_bundle, compiled, verifier_results]
+      [source_document_graph, segments, normalization, ir_bundle, compiled, verifier_results]
     output_artifact_kinds: [trace_bundle, lineage_index]
-  - id: stage.t.report
+  - id: processing_stage.t.report
     kind: report
     determinism: deterministic
     input_artifact_kinds:
-      [source_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
+      [source_document_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
     output_artifact_kinds: [report, run_manifest, replay_manifest]
 ",
         );
@@ -1614,20 +1614,20 @@ stages:
             "\
 - id: exp.tiny
   pipeline: pipe.tiny
-  fixture_groups:
+  test_source_groups:
     - group_id: group.t
-      fixtures: [fixture.gone, fixture.tiny]
+      test_sources: [test_source.gone, test_source.tiny]
   seed: 1
   budget:
     solver_ms_per_query: 1000
-  expected_outcomes: corpus/gold/t.yaml
+  expected_outcomes: corpus/reference/t.yaml
 ",
         );
         write(
-            "corpus/fixtures/tiny.html",
+            "corpus/test_sources/tiny.html",
             "<html><body><p>本文。</p></body></html>",
         );
-        // Provenance files the resolved producer and the report stage's
+        // Provenance files the resolved producer and the report processing_stage's
         // manifests hash (raw bytes; never parsed).
         write(TOOLCHAIN_FILE, "[toolchain]\nchannel = \"test\"\n");
         write(LOCKFILE, "# staged lockfile\n");
@@ -1635,12 +1635,12 @@ stages:
 
     // §4.4 valid remainder: a document whose corpus file is missing takes a
     // command-scope diagnostic while the other document still runs all four
-    // stages and lands its artifacts; the group misses a member bundle, so
-    // its compile stage fails rather than compiling a partial group, and
-    // verify never runs. The trace stage still assembles and lands the pair
+    // processing_stages and lands its artifacts; the group misses a member bundle, so
+    // its compile processing_stage fails rather than compiling a partial group, and
+    // verify never runs. The trace processing_stage still assembles and lands the pair
     // over what landed — the surviving document's chain, no group artifacts
-    // — and the report stage closes the chain over it: no claims, so both
-    // partitions are empty, while the corpus row and the ledger rollup
+    // — and the report processing_stage closes the chain over it: no claims, so both
+    // partitions are empty, while the corpus row and the ledger summary
     // still document the degraded run.
     #[test]
     fn missing_corpus_file_keeps_other_documents() {
@@ -1653,8 +1653,8 @@ stages:
         let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
         assert_eq!(result.outcome, Outcome::Invalid);
         // Ledger: the command-scope read failure first, then the tiny
-        // document's stage residuals (extract parse error, unclassified
-        // paragraph) riding their stage events, then the group's compile
+        // document's processing_stage residuals (extract parse error, unclassified
+        // paragraph) riding their processing_stage events, then the group's compile
         // failure naming the bundle-less member.
         assert_eq!(diagnostics.len(), 4);
         assert!(
@@ -1668,16 +1668,16 @@ stages:
             diagnostics[3]
                 .payload
                 .iter()
-                .any(|(_, v)| v.contains("fixture.gone")),
+                .any(|(_, v)| v.contains("test_source.gone")),
             "{diagnostics:?}"
         );
 
         assert_eq!(events.len(), 8);
-        for (s, kind) in STAGE_KINDS[..4].iter().enumerate() {
-            assert_eq!(events[s].stage, static_id(kind));
+        for (s, kind) in PROCESSING_STAGE_KINDS[..4].iter().enumerate() {
+            assert_eq!(events[s].processing_stage, static_id(kind));
             assert_eq!(
-                events[s].component_id,
-                format!("stage.t.{kind}").parse().unwrap()
+                events[s].pipeline_step_id,
+                format!("processing_stage.t.{kind}").parse().unwrap()
             );
             assert_eq!(
                 events[s].output_hashes.len(),
@@ -1686,41 +1686,41 @@ stages:
             );
         }
         let compile_event = &events[4];
-        assert_eq!(compile_event.stage, static_id("compile"));
-        assert_eq!(compile_event.component_id, static_id("stage.t.compile"));
+        assert_eq!(compile_event.processing_stage, static_id("compile"));
+        assert_eq!(compile_event.pipeline_step_id, static_id("processing_stage.t.compile"));
         assert_eq!(compile_event.outcome, Outcome::Invalid);
         assert_eq!(compile_event.diagnostics.len(), 1);
         assert!(compile_event.output_hashes.is_empty());
         let trace_event = &events[5];
-        assert_eq!(trace_event.stage, static_id("trace"));
-        assert_eq!(trace_event.component_id, static_id("stage.t.trace"));
+        assert_eq!(trace_event.processing_stage, static_id("trace"));
+        assert_eq!(trace_event.pipeline_step_id, static_id("processing_stage.t.trace"));
         assert_eq!(trace_event.outcome, Outcome::Ok);
-        // fixture.tiny's source + its four landed artifacts; the
+        // test_source.tiny's source + its four landed artifacts; the
         // bundle-less group contributes no nodes.
         assert_eq!(trace_event.input_hashes.len(), 5);
         assert_eq!(trace_event.output_hashes.len(), 2);
-        // The report stage consumes the trace pair and the surviving
+        // The report processing_stage consumes the trace pair and the surviving
         // document's graph (the verdict-less group contributes nothing);
-        // its rollup counts the whole four-record ledger.
+        // its summary counts the whole four-record ledger.
         let report_event = &events[6];
-        assert_eq!(report_event.stage, static_id("report"));
-        assert_eq!(report_event.component_id, static_id("stage.t.report"));
+        assert_eq!(report_event.processing_stage, static_id("report"));
+        assert_eq!(report_event.pipeline_step_id, static_id("processing_stage.t.report"));
         assert_eq!(report_event.outcome, Outcome::Ok);
         assert_eq!(report_event.input_hashes.len(), 3);
         assert_eq!(report_event.output_hashes.len(), 1);
         assert!(out.join("trace_bundle.json").exists());
         assert!(out.join("lineage_index.json").exists());
-        assert!(!out.join("artifacts/fixture.gone").exists());
+        assert!(!out.join("artifacts/test_source.gone").exists());
         assert!(!out.join("groups").exists());
-        let bundle: ArtifactEnvelope<IrBundle> = strict(&out, "fixture.tiny", "ir_bundle");
-        let source: ArtifactEnvelope<SourceGraph> = strict(&out, "fixture.tiny", "source_graph");
+        let bundle: ArtifactWrapper<IrBundle> = strict(&out, "test_source.tiny", "ir_bundle");
+        let source: ArtifactWrapper<SourceDocumentGraph> = strict(&out, "test_source.tiny", "source_document_graph");
         bundle.payload.validate(&source.payload).unwrap();
-        let report: ArtifactEnvelope<crate::report::Report> = strict_at(&out, "report.json");
+        let report: ArtifactWrapper<crate::report::Report> = strict_at(&out, "report.json");
         assert!(report.payload.findings.is_empty());
-        assert!(report.payload.null_results.is_empty());
+        assert!(report.payload.no_conflict_results.is_empty());
         assert!(report.payload.wording.is_empty());
         assert_eq!(report.payload.corpus_hashes.len(), 1);
-        assert_eq!(report.payload.corpus_hashes[0].0, static_id("fixture.tiny"));
+        assert_eq!(report.payload.corpus_hashes[0].0, static_id("test_source.tiny"));
         assert_eq!(
             report
                 .payload
@@ -1733,7 +1733,7 @@ stages:
     }
 
     // Budget resolution: an experiment without the §8.4 per-query solver
-    // budget key is one command-scope diagnostic and no stage runs.
+    // budget key is one command-scope diagnostic and no processing_stage runs.
     #[test]
     fn missing_solver_budget_stops_resolution() {
         let root = tempfile::tempdir().unwrap();
@@ -1743,12 +1743,12 @@ stages:
             "\
 - id: exp.tiny
   pipeline: pipe.tiny
-  fixture_groups:
+  test_source_groups:
     - group_id: group.t
-      fixtures: [fixture.tiny]
+      test_sources: [test_source.tiny]
   seed: 1
   budget: {}
-  expected_outcomes: corpus/gold/t.yaml
+  expected_outcomes: corpus/reference/t.yaml
 ",
         )
         .unwrap();

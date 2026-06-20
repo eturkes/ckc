@@ -1,7 +1,7 @@
 //! Command shell: the SPEC §3 CLI invariants wired once.
 //!
 //! Every `ckc` command runs inside one [`Shell`]. It owns the §3 boundary
-//! invariants — every disk write goes through the containment-guarded
+//! invariants — every disk write goes through the containment-conditioned
 //! [`Shell::write_under`]; §4.6 events and §7.4 diagnostics leave as
 //! canonical JSONL (`logs/{events,diagnostics}.jsonl` under the output
 //! directory per the §8.3 run layout, or an events stream for stderr when
@@ -77,7 +77,7 @@ pub(crate) struct FinishedCommand {
 }
 
 /// One command's invariant context. Open it after validation, record
-/// outcomes, diagnostics, and stage events while the command body runs,
+/// outcomes, diagnostics, and processing_stage events while the command body runs,
 /// then [`finish`].
 ///
 /// [`finish`]: Shell::finish
@@ -89,53 +89,53 @@ pub(crate) struct Shell {
     started: Instant,
     outcome: Outcome,
     /// Command-scope diagnostics ([`Shell::diagnostic`]): they ride the
-    /// closing command event. Stage-scope diagnostics ride their stage
+    /// closing command event. ProcessingStage-scope diagnostics ride their processing_stage
     /// event instead.
     diagnostics: Vec<DiagnosticRecord>,
     /// Every diagnostic raised during the command, append-ordered: the
     /// `logs/diagnostics.jsonl` stream and the result's
     /// `diagnostic_hashes` draw from here.
     ledger: Vec<DiagnosticRecord>,
-    /// §4.6 stage events in execution order ([`Shell::stage_event`]);
+    /// §4.6 processing_stage events in execution order ([`Shell::processing_stage_event`]);
     /// [`Shell::finish`] appends the command event after them.
     events: Vec<EventRecord>,
 }
 
-/// One §4.6 stage execution, ready for the shell to number: the shell
-/// assigns `event_id`/`logical_time` (execution order), `run_id`, and
-/// `level`; everything else is the stage's to report.
-pub(crate) struct StageEvent {
-    pub candidate_id: Id,
-    pub component_id: Id,
-    pub stage: Id,
+/// One §4.6 processing_stage execution, ready for the shell to number: the shell
+/// assigns `event_id`/`event_sequence_number` (execution order), `run_id`, and
+/// `log_level`; everything else is the processing_stage's to report.
+pub(crate) struct ProcessingStageEvent {
+    pub pipeline_id: Id,
+    pub pipeline_step_id: Id,
+    pub processing_stage: Id,
     pub started_at: String,
     pub ended_at: String,
     pub duration_ms: u64,
     pub input_hashes: Vec<Hash>,
     pub output_hashes: Vec<Hash>,
     pub outcome: Outcome,
-    /// Diagnostics the stage raised (§4.3 set: pass canonical order —
-    /// envelope fields already hold it). They extend the ledger here.
+    /// Diagnostics the processing_stage raised (§4.3 set: pass canonical order —
+    /// wrapper fields already hold it). They extend the ledger here.
     pub diagnostics: Vec<DiagnosticRecord>,
-    pub budget_counters: Vec<(Id, u64)>,
+    pub resource_counters: Vec<(Id, u64)>,
 }
 
-/// Wall-clock + monotonic capture opened at a stage's start, closed into
+/// Wall-clock + monotonic capture opened at a processing_stage's start, closed into
 /// the §4.6 event bounds.
-pub(crate) struct StageClock {
+pub(crate) struct ProcessingStageClock {
     started_at: String,
     started: Instant,
 }
 
-pub(crate) fn stage_clock() -> StageClock {
-    StageClock {
+pub(crate) fn processing_stage_clock() -> ProcessingStageClock {
+    ProcessingStageClock {
         started_at: rfc3339_utc(SystemTime::now()),
         started: Instant::now(),
     }
 }
 
-impl StageClock {
-    /// `(started_at, ended_at, duration_ms)` at stage end.
+impl ProcessingStageClock {
+    /// `(started_at, ended_at, duration_ms)` at processing_stage end.
     pub(crate) fn stop(self) -> (String, String, u64) {
         let ended_at = rfc3339_utc(SystemTime::now());
         let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -167,20 +167,20 @@ impl Shell {
         self.outcome = self.outcome.max(outcome);
     }
 
-    /// The run id this shell stamps on every event — run-scoped stage
+    /// The run id this shell stamps on every event — run-scoped processing_stage
     /// diagnostics cite it as their subject.
     pub(crate) fn run_id(&self) -> &Id {
         &self.run_id
     }
 
     /// The output directory as the dispatcher received it — the report
-    /// stage's `--out` token when reconstructing the §4.6 replay command.
+    /// processing_stage's `--out` token when reconstructing the §4.6 replay command.
     pub(crate) fn out_dir(&self) -> Option<&Path> {
         self.out_dir.as_deref()
     }
 
     /// Every §7.4 record raised so far, append-ordered — the report
-    /// stage's diagnostics-summary source.
+    /// processing_stage's diagnostics-summary source.
     pub(crate) fn ledger(&self) -> &[DiagnosticRecord] {
         &self.ledger
     }
@@ -194,29 +194,29 @@ impl Shell {
         self.diagnostics.push(diagnostic);
     }
 
-    /// Record one §4.6 stage event: the outcome folds into the total, the
-    /// stage's diagnostics extend the ledger, and the event takes the next
-    /// `event_id`/`logical_time` slot ahead of the closing command event.
-    pub(crate) fn stage_event(&mut self, stage: StageEvent) {
-        self.merge(stage.outcome);
-        self.ledger.extend(stage.diagnostics.iter().cloned());
+    /// Record one §4.6 processing_stage event: the outcome folds into the total, the
+    /// processing_stage's diagnostics extend the ledger, and the event takes the next
+    /// `event_id`/`event_sequence_number` slot ahead of the closing command event.
+    pub(crate) fn processing_stage_event(&mut self, processing_stage: ProcessingStageEvent) {
+        self.merge(processing_stage.outcome);
+        self.ledger.extend(processing_stage.diagnostics.iter().cloned());
         let slot = self.events.len();
         self.events.push(EventRecord {
             event_id: event_id(slot),
             run_id: self.run_id.clone(),
-            candidate_id: stage.candidate_id,
-            component_id: stage.component_id,
-            stage: stage.stage,
-            level: level_for(stage.outcome),
-            logical_time: slot as u64,
-            started_at: stage.started_at,
-            ended_at: stage.ended_at,
-            duration_ms: stage.duration_ms,
-            input_hashes: stage.input_hashes,
-            output_hashes: stage.output_hashes,
-            outcome: stage.outcome,
-            diagnostics: stage.diagnostics,
-            budget_counters: stage.budget_counters,
+            pipeline_id: processing_stage.pipeline_id,
+            pipeline_step_id: processing_stage.pipeline_step_id,
+            processing_stage: processing_stage.processing_stage,
+            log_level: log_level_for(processing_stage.outcome),
+            event_sequence_number: slot as u64,
+            started_at: processing_stage.started_at,
+            ended_at: processing_stage.ended_at,
+            duration_ms: processing_stage.duration_ms,
+            input_hashes: processing_stage.input_hashes,
+            output_hashes: processing_stage.output_hashes,
+            outcome: processing_stage.outcome,
+            diagnostics: processing_stage.diagnostics,
+            resource_counters: processing_stage.resource_counters,
         });
     }
 
@@ -249,7 +249,7 @@ impl Shell {
     }
 
     /// Close the command: build the §4.6 command event (the last event,
-    /// numbered after the stage events; command-scope diagnostics ride it),
+    /// numbered after the processing_stage events; command-scope diagnostics ride it),
     /// land both JSONL streams, and return exactly one §4.4 total operation
     /// result.
     pub(crate) fn finish(self) -> Result<FinishedCommand, ShellError> {
@@ -280,13 +280,13 @@ impl Shell {
         let event = EventRecord {
             event_id: event_id(slot),
             run_id: self.run_id.clone(),
-            candidate_id: static_id("cli"),
-            component_id: format!("cli.{}", self.operation_id)
+            pipeline_id: static_id("cli"),
+            pipeline_step_id: format!("cli.{}", self.operation_id)
                 .parse()
                 .expect("cli.<operation-id> matches the Id grammar"),
-            stage: self.operation_id.clone(),
-            level: level_for(self.outcome),
-            logical_time: slot as u64,
+            processing_stage: self.operation_id.clone(),
+            log_level: log_level_for(self.outcome),
+            event_sequence_number: slot as u64,
             started_at: self.started_at.clone(),
             ended_at,
             duration_ms,
@@ -294,7 +294,7 @@ impl Shell {
             output_hashes: Vec::new(),
             outcome: self.outcome,
             diagnostics: keyed_diags.into_iter().map(|(_, d)| d).collect(),
-            budget_counters: Vec::new(),
+            resource_counters: Vec::new(),
         };
         let events_bytes = write_jsonl(self.events.iter().chain([&event]))?;
 
@@ -326,15 +326,15 @@ impl Shell {
 }
 
 /// §4.6 event id for execution slot `n`: `event.<n>`, matching
-/// `logical_time` so id order is event order.
+/// `event_sequence_number` so id order is event order.
 fn event_id(slot: usize) -> Id {
     format!("event.{slot}")
         .parse()
         .expect("event.<decimal> matches the Id grammar")
 }
 
-/// §4.6 `level` token from the total outcome's severity band.
-fn level_for(outcome: Outcome) -> Id {
+/// §4.6 `log_level` token from the total outcome's severity band.
+fn log_level_for(outcome: Outcome) -> Id {
     let token = match outcome {
         Outcome::Ok => "info",
         Outcome::Residual | Outcome::Ambiguity => "warn",
@@ -440,11 +440,11 @@ mod tests {
         let event = &events[0];
         assert_eq!(event.event_id, static_id("event.0"));
         assert_eq!(event.run_id, static_id("m1"));
-        assert_eq!(event.candidate_id, static_id("cli"));
-        assert_eq!(event.component_id, static_id("cli.run"));
-        assert_eq!(event.stage, static_id("run"));
-        assert_eq!(event.level, static_id("error"));
-        assert_eq!(event.logical_time, 0);
+        assert_eq!(event.pipeline_id, static_id("cli"));
+        assert_eq!(event.pipeline_step_id, static_id("cli.run"));
+        assert_eq!(event.processing_stage, static_id("run"));
+        assert_eq!(event.log_level, static_id("error"));
+        assert_eq!(event.event_sequence_number, 0);
         assert_eq!(event.outcome, Outcome::Invalid);
         assert_eq!(event.diagnostics, vec![d.clone()]);
 
@@ -471,40 +471,40 @@ mod tests {
             read_jsonl(finished.streamed_events.as_deref().unwrap()).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].run_id, run_none());
-        assert_eq!(events[0].component_id, static_id("cli.registry.check"));
-        assert_eq!(events[0].level, static_id("info"));
+        assert_eq!(events[0].pipeline_step_id, static_id("cli.registry.check"));
+        assert_eq!(events[0].log_level, static_id("info"));
         assert_eq!(events[0].outcome, Outcome::Ok);
         assert_eq!(finished.result.outcome, Outcome::Ok);
         assert!(finished.result.diagnostic_hashes.is_empty());
     }
 
-    // Stage events take slots 0..n in execution order; the command event
+    // ProcessingStage events take slots 0..n in execution order; the command event
     // closes the file at slot n carrying only command-scope diagnostics,
     // while the result's hashes and the diagnostics stream cover the whole
-    // ledger (stage diagnostics included).
+    // ledger (processing_stage diagnostics included).
     #[test]
-    fn stage_events_precede_the_command_event() {
+    fn processing_stage_events_precede_the_command_event() {
         let root = tempfile::tempdir().unwrap();
         let mut shell = Shell::open(
             static_id("run"),
             static_id("m1"),
             Some(root.path().to_path_buf()),
         );
-        let stage_diag = diag(DiagnosticCode::SolverTimeout, Outcome::Residual, "slow");
+        let processing_stage_diag = diag(DiagnosticCode::SolverTimeout, Outcome::Residual, "slow");
         let command_diag = diag(DiagnosticCode::SchemaInvalid, Outcome::Invalid, "late");
-        let (started_at, ended_at, duration_ms) = stage_clock().stop();
-        shell.stage_event(StageEvent {
-            candidate_id: static_id("pipe.p"),
-            component_id: static_id("stage.s"),
-            stage: static_id("extract"),
+        let (started_at, ended_at, duration_ms) = processing_stage_clock().stop();
+        shell.processing_stage_event(ProcessingStageEvent {
+            pipeline_id: static_id("pipe.p"),
+            pipeline_step_id: static_id("processing_stage.s"),
+            processing_stage: static_id("extract"),
             started_at,
             ended_at,
             duration_ms,
             input_hashes: Vec::new(),
             output_hashes: Vec::new(),
             outcome: Outcome::Residual,
-            diagnostics: vec![stage_diag.clone()],
-            budget_counters: Vec::new(),
+            diagnostics: vec![processing_stage_diag.clone()],
+            resource_counters: Vec::new(),
         });
         shell.diagnostic(command_diag.clone());
         let finished = shell.finish().unwrap();
@@ -513,27 +513,27 @@ mod tests {
             read_jsonl(&std::fs::read(root.path().join("logs/events.jsonl")).unwrap()).unwrap();
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].event_id, static_id("event.0"));
-        assert_eq!(events[0].logical_time, 0);
-        assert_eq!(events[0].candidate_id, static_id("pipe.p"));
-        assert_eq!(events[0].component_id, static_id("stage.s"));
-        assert_eq!(events[0].stage, static_id("extract"));
-        assert_eq!(events[0].level, static_id("warn"));
+        assert_eq!(events[0].event_sequence_number, 0);
+        assert_eq!(events[0].pipeline_id, static_id("pipe.p"));
+        assert_eq!(events[0].pipeline_step_id, static_id("processing_stage.s"));
+        assert_eq!(events[0].processing_stage, static_id("extract"));
+        assert_eq!(events[0].log_level, static_id("warn"));
         assert_eq!(events[0].outcome, Outcome::Residual);
-        assert_eq!(events[0].diagnostics, vec![stage_diag.clone()]);
+        assert_eq!(events[0].diagnostics, vec![processing_stage_diag.clone()]);
         assert_eq!(events[1].event_id, static_id("event.1"));
-        assert_eq!(events[1].logical_time, 1);
-        assert_eq!(events[1].stage, static_id("run"));
+        assert_eq!(events[1].event_sequence_number, 1);
+        assert_eq!(events[1].processing_stage, static_id("run"));
         assert_eq!(events[1].outcome, Outcome::Invalid);
         assert_eq!(events[1].diagnostics, vec![command_diag.clone()]);
 
         let stream: Vec<DiagnosticRecord> =
             read_jsonl(&std::fs::read(root.path().join("logs/diagnostics.jsonl")).unwrap())
                 .unwrap();
-        assert_eq!(stream, vec![stage_diag.clone(), command_diag.clone()]);
+        assert_eq!(stream, vec![processing_stage_diag.clone(), command_diag.clone()]);
 
         assert_eq!(finished.result.outcome, Outcome::Invalid);
         let mut expected = vec![
-            content_hash(&stage_diag).unwrap(),
+            content_hash(&processing_stage_diag).unwrap(),
             content_hash(&command_diag).unwrap(),
         ];
         expected.sort_by_key(|h| canonical_sort_key(h).unwrap());

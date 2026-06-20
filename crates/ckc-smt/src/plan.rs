@@ -1,18 +1,18 @@
-//! SPEC §8.3 compile-stage planning — the eligibility scan and
-//! contradiction-query plan over a fixture group's per-document FormalIRs.
+//! SPEC §8.3 compile-processing_stage planning — the eligibility scan and
+//! contradiction-query plan over a test_source group's per-document FormalIRs.
 //!
 //! [`plan_queries`] returns [`ContradictionQueryPair`]s only: query text
 //! derives from the paired constraints in
 //! [`emit_overlap_query`](crate::emit_overlap_query) /
 //! [`emit_deontic_query`](crate::emit_deontic_query), the pairs ride
-//! [`CompiledArtifact::query_plan`](crate::CompiledArtifact), and each
+//! [`CompiledArtifact::solver_query_plan`](crate::CompiledArtifact), and each
 //! document's `FormalIr::plan` slot stays empty (pairs may cross documents,
 //! so `FormalIr::derive` leaves planning here).
 
 use ckc_core::{ContradictionQueryPair, FormalConstraint, FormalIr, Id, directions_opposed};
 
 /// SPEC §6 eligibility scan and §8.6 id minting over the per-document
-/// FormalIRs of fixture group `group_id`.
+/// FormalIRs of test_source group `group_id`.
 ///
 /// A constraint pair — unordered, same- or cross-document — is
 /// conflict-eligible when the two Action normalized keys are equal (§5
@@ -137,7 +137,7 @@ mod tests {
     /// sepsis ∧ ¬renal_severe ∧ age ≥ 18.
     fn doc_a() -> FormalIr {
         doc(vec![fc(
-            "fixture.m1_guideline_a.rule.0",
+            "test_source.m1_guideline_a.rule.0",
             Direction::For,
             "drug.abx_a",
             dnf1(vec![
@@ -152,7 +152,7 @@ mod tests {
     /// sepsis ∧ age ≥ 18 ∧ pregnancy.
     fn doc_b() -> FormalIr {
         doc(vec![fc(
-            "fixture.m1_guideline_b.rule.0",
+            "test_source.m1_guideline_b.rule.0",
             Direction::Contraindicate,
             "drug.abx_a",
             dnf1(vec![
@@ -167,7 +167,7 @@ mod tests {
     /// sepsis ∧ age < 18 — interval disjoint with docA's.
     fn control() -> FormalIr {
         doc(vec![fc(
-            "fixture.m1_control.rule.0",
+            "test_source.m1_control.rule.0",
             Direction::Contraindicate,
             "drug.abx_a",
             dnf1(vec![concept("cond.sepsis"), age(false)]),
@@ -182,8 +182,8 @@ mod tests {
         let want = ContradictionQueryPair {
             pair_id: id("q.m1_conflict.pair1"),
             action_key: id("act.administer:drug.abx_a"),
-            constraint_a_id: id("fc.fixture.m1_guideline_a.rule.0"),
-            constraint_b_id: id("fc.fixture.m1_guideline_b.rule.0"),
+            constraint_a_id: id("fc.test_source.m1_guideline_a.rule.0"),
+            constraint_b_id: id("fc.test_source.m1_guideline_b.rule.0"),
             context_overlap_query_id: id("q.m1_conflict.pair1.overlap"),
             deontic_consistency_query_id: id("q.m1_conflict.pair1.deontic"),
         };
@@ -192,21 +192,21 @@ mod tests {
         assert_eq!(plan_queries(&group, [&b, &a]), [want]);
     }
 
-    /// group.m1_null: disjoint age intervals leave eligibility untouched —
+    /// group.m1_no_conflict: disjoint age intervals leave eligibility untouched —
     /// the pair plans, and Q1 later decides the null (§6 documented-null
     /// path). Normalization puts the control constraint first by id bytes.
     #[test]
     fn disjoint_interval_control_pair_stays_eligible() {
-        let plan = plan_queries(&id("group.m1_null"), [&doc_a(), &control()]);
+        let plan = plan_queries(&id("group.m1_no_conflict"), [&doc_a(), &control()]);
         assert_eq!(
             plan,
             [ContradictionQueryPair {
-                pair_id: id("q.m1_null.pair1"),
+                pair_id: id("q.m1_no_conflict.pair1"),
                 action_key: id("act.administer:drug.abx_a"),
-                constraint_a_id: id("fc.fixture.m1_control.rule.0"),
-                constraint_b_id: id("fc.fixture.m1_guideline_a.rule.0"),
-                context_overlap_query_id: id("q.m1_null.pair1.overlap"),
-                deontic_consistency_query_id: id("q.m1_null.pair1.deontic"),
+                constraint_a_id: id("fc.test_source.m1_control.rule.0"),
+                constraint_b_id: id("fc.test_source.m1_guideline_a.rule.0"),
+                context_overlap_query_id: id("q.m1_no_conflict.pair1.overlap"),
+                deontic_consistency_query_id: id("q.m1_no_conflict.pair1.deontic"),
             }]
         );
     }
@@ -216,13 +216,13 @@ mod tests {
     #[test]
     fn same_direction_pair_excluded() {
         let x = doc(vec![fc(
-            "fixture.m1_guideline_a.rule.0",
+            "test_source.m1_guideline_a.rule.0",
             Direction::For,
             "drug.abx_a",
             dnf1(vec![concept("cond.sepsis")]),
         )]);
         let y = doc(vec![fc(
-            "fixture.m1_guideline_b.rule.0",
+            "test_source.m1_guideline_b.rule.0",
             Direction::For,
             "drug.abx_a",
             dnf1(vec![concept("cond.pregnancy")]),
@@ -235,13 +235,13 @@ mod tests {
     #[test]
     fn different_action_pair_excluded() {
         let x = doc(vec![fc(
-            "fixture.m1_guideline_a.rule.0",
+            "test_source.m1_guideline_a.rule.0",
             Direction::For,
             "drug.abx_a",
             dnf1(vec![concept("cond.sepsis")]),
         )]);
         let z = doc(vec![fc(
-            "fixture.m1_guideline_b.rule.0",
+            "test_source.m1_guideline_b.rule.0",
             Direction::Contraindicate,
             "drug.abx_b",
             dnf1(vec![concept("cond.sepsis")]),
@@ -249,25 +249,25 @@ mod tests {
         assert_eq!(plan_queries(&id("group.m1_conflict"), [&x, &z]), []);
     }
 
-    /// Same-document pairs are in scope, and ordinals count from 1 in
+    /// Same-document pairs are in scope, and sequence_numbers count from 1 in
     /// `(a, b)` id-byte order.
     #[test]
-    fn ordinals_follow_id_byte_order_within_one_document() {
+    fn sequence_numbers_follow_id_byte_order_within_one_document() {
         let d = doc(vec![
             fc(
-                "fixture.m1_guideline_a.rule.0",
+                "test_source.m1_guideline_a.rule.0",
                 Direction::For,
                 "drug.abx_a",
                 dnf1(vec![concept("cond.sepsis")]),
             ),
             fc(
-                "fixture.m1_guideline_a.rule.1",
+                "test_source.m1_guideline_a.rule.1",
                 Direction::Permit,
                 "drug.abx_a",
                 dnf1(vec![concept("cond.pregnancy")]),
             ),
             fc(
-                "fixture.m1_guideline_a.rule.2",
+                "test_source.m1_guideline_a.rule.2",
                 Direction::Against,
                 "drug.abx_a",
                 dnf1(vec![concept("cond.renal_severe")]),
@@ -289,13 +289,13 @@ mod tests {
             [
                 (
                     "q.m1_conflict.pair1",
-                    "fc.fixture.m1_guideline_a.rule.0",
-                    "fc.fixture.m1_guideline_a.rule.2",
+                    "fc.test_source.m1_guideline_a.rule.0",
+                    "fc.test_source.m1_guideline_a.rule.2",
                 ),
                 (
                     "q.m1_conflict.pair2",
-                    "fc.fixture.m1_guideline_a.rule.1",
-                    "fc.fixture.m1_guideline_a.rule.2",
+                    "fc.test_source.m1_guideline_a.rule.1",
+                    "fc.test_source.m1_guideline_a.rule.2",
                 ),
             ]
         );

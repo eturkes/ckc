@@ -1,5 +1,5 @@
-//! Extract stage core (SPEC §8.3): fixture HTML → grounded
-//! [`SourceGraph`] in its §4.4 envelope, `source_graph.json`'s payload.
+//! Extract processing_stage core (SPEC §8.3): test_source HTML → grounded
+//! [`SourceDocumentGraph`] in its §4.4 wrapper, `source_document_graph.json`'s payload.
 //!
 //! `stage-extract.1` lands the flow walker. html5ever parses the bytes
 //! (guaranteeing the html/head/body skeleton); the body walk mints
@@ -8,7 +8,7 @@
 //! list with li children as paragraphs. Every nonempty trimmed textual
 //! unit gets one span at offset 0 with strictly increasing reading order
 //! plus one {node,span} region; whitespace-only units mint nothing;
-//! anchors stay empty (§4.5 subspan anchors belong to later stages).
+//! anchors stay empty (§4.5 subspan anchors belong to later processing_stages).
 //! Parse errors and unknown flow content become `extraction_uncertain`
 //! residuals.
 //!
@@ -18,7 +18,7 @@
 //! wraps bare tr in tbody); rows flatten in document order. Each
 //! nonempty cell parents directly to the table node with attrs `row`
 //! and `col` as 0-based decimal strings plus `header` `"true"` on th,
-//! absent on td — exactly the `DocIr::from_graph` cell contract; an
+//! absent on td — exactly the `DocIr::from_graph` cell requirements; an
 //! empty cell mints no node yet still occupies its column index. Any
 //! rowspan or colspan other than `"1"`, nested table, second caption,
 //! stray non-whitespace text, or unknown child element rejects the
@@ -30,9 +30,9 @@ use std::collections::HashMap;
 use std::fmt;
 
 use ckc_core::{
-    ArtifactEnvelope, Authority, CanonError, DataClass, DiagnosticCode, DiagnosticRecord,
-    GroundingError, Id, NodeKind, Origin, Outcome, Producer, Provenance, SourceDocument,
-    SourceGraph, SourceNode, SourceRegion, SourceSpan, StringPolicy, canonicalization_policy_hash,
+    ArtifactWrapper, EvidenceStatus, CanonError, DataClass, DiagnosticCode, DiagnosticRecord,
+    SourceLinkageError, Id, NodeKind, Origin, Outcome, Producer, Provenance, SourceDocument,
+    SourceDocumentGraph, SourceNode, EvidenceRegion, SourceTextSpan, StringPolicy, canonicalization_policy_hash,
     content_hash, hash_bytes,
 };
 use ego_tree::NodeRef;
@@ -42,28 +42,28 @@ use scraper::node::Node;
 use crate::shell::static_id;
 
 /// Extractor-fixed identity for one document: everything the §4.5
-/// [`SourceDocument`] and the §4.4 envelope need beyond the input bytes.
+/// [`SourceDocument`] and the §4.4 wrapper need beyond the input bytes.
 #[derive(Debug, Clone)]
 pub struct ExtractConfig {
     pub document_id: Id,
-    /// Open vocabulary, e.g. `synthetic_fixture_html` (§4.5).
+    /// Open vocabulary, e.g. `synthetic_test_source_html` (§4.5).
     pub source_family: Id,
     pub provenance: Provenance,
     pub data_class: DataClass,
-    /// Rides the envelope verbatim; the runner owns its values.
+    /// Rides the wrapper verbatim; the runner owns its values.
     pub producer: Producer,
 }
 
-/// Extraction failed before an envelope could form. Parse trouble is
+/// Extraction failed before an wrapper could form. Parse trouble is
 /// never an error — html5ever recovers and the walker emits
 /// `extraction_uncertain` residuals — so the variants are the §4.4/§4.5
 /// mechanical invariants plus input decoding.
 #[derive(Debug)]
 pub enum ExtractError {
-    /// Input bytes are not UTF-8 (M1 fixtures carry no charset layer).
+    /// Input bytes are not UTF-8 (M1 test_sources carry no charset layer).
     Utf8(std::str::Utf8Error),
     /// The built graph violates a §4.5 invariant (extractor bug).
-    Grounding(GroundingError),
+    SourceLinkage(SourceLinkageError),
     /// Canonical emission failed while hashing the payload.
     Canon(CanonError),
 }
@@ -72,7 +72,7 @@ impl fmt::Display for ExtractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ExtractError::Utf8(e) => write!(f, "input is not UTF-8: {e}"),
-            ExtractError::Grounding(e) => write!(f, "grounding invariant: {e}"),
+            ExtractError::SourceLinkage(e) => write!(f, "source_linkage invariant: {e}"),
             ExtractError::Canon(e) => write!(f, "canonical emission: {e}"),
         }
     }
@@ -80,9 +80,9 @@ impl fmt::Display for ExtractError {
 
 impl std::error::Error for ExtractError {}
 
-impl From<GroundingError> for ExtractError {
-    fn from(e: GroundingError) -> Self {
-        ExtractError::Grounding(e)
+impl From<SourceLinkageError> for ExtractError {
+    fn from(e: SourceLinkageError) -> Self {
+        ExtractError::SourceLinkage(e)
     }
 }
 
@@ -92,15 +92,15 @@ impl From<CanonError> for ExtractError {
     }
 }
 
-/// Parse `html` and build the enveloped source graph: walk the body,
+/// Parse `html` and build the wrapped source graph: walk the body,
 /// validate the graph (residual-licensed), and wrap it per §4.4 —
-/// `schema.source_graph`, artifact id `<document_id>.source_graph`,
-/// `deterministic_compiler` origin under `mechanical_authority`, empty
+/// `schema.source_document_graph`, artifact id `<document_id>.source_document_graph`,
+/// `deterministic_compiler` origin under `mechanical_evidence_status`, empty
 /// input/effect/trace/runtime sets, payload hashes computed here.
 pub fn extract(
     html: &[u8],
     config: &ExtractConfig,
-) -> Result<ArtifactEnvelope<SourceGraph>, ExtractError> {
+) -> Result<ArtifactWrapper<SourceDocumentGraph>, ExtractError> {
     let text = std::str::from_utf8(html).map_err(ExtractError::Utf8)?;
     let parsed = Html::parse_document(text);
 
@@ -115,12 +115,12 @@ pub fn extract(
     }
     walker.walk_body(find_body(&parsed), &doc_node);
 
-    let graph = SourceGraph {
+    let graph = SourceDocumentGraph {
         document: SourceDocument {
             document_id: config.document_id.clone(),
             source_family: config.source_family.clone(),
             provenance: config.provenance,
-            // No transport or charset decoding applies to fixture bytes,
+            // No transport or charset decoding applies to test_source bytes,
             // so acquired and consumed bytes coincide (§4.5).
             raw_hash: hash_bytes(html),
             content_hash: hash_bytes(html),
@@ -133,19 +133,19 @@ pub fn extract(
     };
     graph.validate(&walker.residual_nodes)?;
 
-    let artifact_id = Id::new(format!("{}.source_graph", config.document_id))
+    let artifact_id = Id::new(format!("{}.source_document_graph", config.document_id))
         .expect("a valid document id keeps the Id grammar under a suffix");
-    Ok(ArtifactEnvelope {
-        schema_id: static_id("schema.source_graph"),
+    Ok(ArtifactWrapper {
+        schema_id: static_id("schema.source_document_graph"),
         artifact_id,
-        artifact_kind: static_id("source_graph"),
+        artifact_kind: static_id("source_document_graph"),
         producer: config.producer.clone(),
         input_hashes: vec![],
         content_hash: content_hash(&graph)?,
         canonicalization_policy_hash: canonicalization_policy_hash(),
         origin: Origin::DeterministicCompiler,
-        authority: Authority::MechanicalAuthority,
-        accepted_effects: vec![],
+        evidence_status: EvidenceStatus::MechanicalEvidenceStatus,
+        external_effects: vec![],
         trace_refs: vec![],
         diagnostics: walker.diagnostics,
         runtime_metadata: vec![],
@@ -196,13 +196,13 @@ fn collect_text(node: NodeRef<'_, Node>) -> String {
 }
 
 /// Walk state: the four §4.5 pools under construction plus the residual
-/// bookkeeping `extract` feeds to [`SourceGraph::validate`]. Counter ids
+/// bookkeeping `extract` feeds to [`SourceDocumentGraph::validate`]. Counter ids
 /// derive from pool lengths, so mint order is id order.
 #[derive(Default)]
 struct Walker {
     nodes: Vec<SourceNode>,
-    spans: Vec<SourceSpan>,
-    regions: Vec<SourceRegion>,
+    spans: Vec<SourceTextSpan>,
+    regions: Vec<EvidenceRegion>,
     diagnostics: Vec<DiagnosticRecord>,
     /// Memoized node-only regions: one region per node grounds every
     /// residual naming that node.
@@ -237,7 +237,7 @@ impl Walker {
     fn mint_span(&mut self, node_id: &Id, raw_text: String) {
         let k = self.spans.len();
         let span_id = counter_id("s", k);
-        self.spans.push(SourceSpan::derive(
+        self.spans.push(SourceTextSpan::derive(
             span_id.clone(),
             node_id.clone(),
             0,
@@ -245,7 +245,7 @@ impl Walker {
             k as u64,
         ));
         let region_id = counter_id("r", self.regions.len());
-        self.regions.push(SourceRegion {
+        self.regions.push(EvidenceRegion {
             region_id,
             node_ids: vec![node_id.clone()],
             span_ids: vec![span_id],
@@ -259,7 +259,7 @@ impl Walker {
             return region_id.clone();
         }
         let region_id = counter_id("r", self.regions.len());
-        self.regions.push(SourceRegion {
+        self.regions.push(EvidenceRegion {
             region_id: region_id.clone(),
             node_ids: vec![node_id.clone()],
             span_ids: vec![],
@@ -554,7 +554,7 @@ fn reject_stray_text(text: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ckc_core::{Hash, canonical_payload_bytes, read_canonical};
+    use ckc_core::{Hash, canonical_payload_bytes, read_strict_canonical};
 
     fn id(s: &str) -> Id {
         Id::new(s).unwrap()
@@ -563,32 +563,32 @@ mod tests {
     fn config() -> ExtractConfig {
         ExtractConfig {
             document_id: id("doc.test"),
-            source_family: id("synthetic_fixture_html"),
+            source_family: id("synthetic_test_source_html"),
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: Producer {
-                candidate_id: id("cand.m1"),
-                component_id: id("stage.extract"),
+                pipeline_id: id("cand.m1"),
+                pipeline_step_id: id("processing_stage.extract"),
                 toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
             },
         }
     }
 
-    /// Extract `html`, returning the payload graph and the envelope
+    /// Extract `html`, returning the payload graph and the wrapper
     /// diagnostics.
-    fn graph(html: &str) -> (SourceGraph, Vec<DiagnosticRecord>) {
-        let envelope = extract(html.as_bytes(), &config()).unwrap();
-        (envelope.payload, envelope.diagnostics)
+    fn graph(html: &str) -> (SourceDocumentGraph, Vec<DiagnosticRecord>) {
+        let wrapper = extract(html.as_bytes(), &config()).unwrap();
+        (wrapper.payload, wrapper.diagnostics)
     }
 
-    fn node_shape(g: &SourceGraph) -> Vec<(Id, NodeKind, Option<Id>)> {
+    fn node_shape(g: &SourceDocumentGraph) -> Vec<(Id, NodeKind, Option<Id>)> {
         g.nodes
             .iter()
             .map(|n| (n.node_id.clone(), n.kind, n.parent_id.clone()))
             .collect()
     }
 
-    fn span_shape(g: &SourceGraph) -> Vec<(Id, Id, String, u64)> {
+    fn span_shape(g: &SourceDocumentGraph) -> Vec<(Id, Id, String, u64)> {
         g.spans
             .iter()
             .map(|s| {
@@ -602,7 +602,7 @@ mod tests {
             .collect()
     }
 
-    fn region_shape(g: &SourceGraph) -> Vec<(Id, Vec<Id>, Vec<Id>)> {
+    fn region_shape(g: &SourceDocumentGraph) -> Vec<(Id, Vec<Id>, Vec<Id>)> {
         g.regions
             .iter()
             .map(|r| (r.region_id.clone(), r.node_ids.clone(), r.span_ids.clone()))
@@ -642,7 +642,7 @@ mod tests {
         ));
         assert!(
             diags.is_empty(),
-            "clean fixture HTML extracts residual-free"
+            "clean test_source HTML extracts residual-free"
         );
         assert_eq!(
             node_shape(&g),
@@ -789,27 +789,27 @@ mod tests {
         );
     }
 
-    // §4.4 envelope shape: ids, deterministic_compiler origin under
-    // mechanical_authority, empty sets, both derived hashes valid, and
+    // §4.4 wrapper shape: ids, deterministic_compiler origin under
+    // mechanical_evidence_status, empty sets, both derived hashes valid, and
     // the §4.5 document identity hashing the input bytes raw.
     #[test]
-    fn envelope_shape() {
+    fn wrapper_shape() {
         let html = "<!DOCTYPE html><html><body><p>本文。</p></body></html>";
-        let envelope = extract(html.as_bytes(), &config()).unwrap();
-        assert_eq!(envelope.schema_id, id("schema.source_graph"));
-        assert_eq!(envelope.artifact_id, id("doc.test.source_graph"));
-        assert_eq!(envelope.artifact_kind, id("source_graph"));
-        assert_eq!(envelope.producer, config().producer);
-        assert_eq!(envelope.origin, Origin::DeterministicCompiler);
-        assert_eq!(envelope.authority, Authority::MechanicalAuthority);
-        assert!(envelope.input_hashes.is_empty());
-        assert!(envelope.accepted_effects.is_empty());
-        assert!(envelope.trace_refs.is_empty());
-        assert!(envelope.runtime_metadata.is_empty());
-        envelope.validate().unwrap();
-        let document = &envelope.payload.document;
+        let wrapper = extract(html.as_bytes(), &config()).unwrap();
+        assert_eq!(wrapper.schema_id, id("schema.source_document_graph"));
+        assert_eq!(wrapper.artifact_id, id("doc.test.source_document_graph"));
+        assert_eq!(wrapper.artifact_kind, id("source_document_graph"));
+        assert_eq!(wrapper.producer, config().producer);
+        assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
+        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert!(wrapper.input_hashes.is_empty());
+        assert!(wrapper.external_effects.is_empty());
+        assert!(wrapper.trace_refs.is_empty());
+        assert!(wrapper.runtime_metadata.is_empty());
+        wrapper.validate().unwrap();
+        let document = &wrapper.payload.document;
         assert_eq!(document.document_id, id("doc.test"));
-        assert_eq!(document.source_family, id("synthetic_fixture_html"));
+        assert_eq!(document.source_family, id("synthetic_test_source_html"));
         assert_eq!(document.provenance, Provenance::Synthetic);
         assert_eq!(document.data_class, DataClass::None);
         assert_eq!(document.raw_hash, hash_bytes(html.as_bytes()));
@@ -817,7 +817,7 @@ mod tests {
     }
 
     // §4.5 determinism: identical bytes and config give byte-identical
-    // envelopes, and the bytes survive a strict read → re-emit cycle.
+    // wrappers, and the bytes survive a strict read → re-emit cycle.
     #[test]
     fn double_extract_byte_identical_and_strict_reads() {
         let html = concat!(
@@ -832,7 +832,7 @@ mod tests {
         let second =
             canonical_payload_bytes(&extract(html.as_bytes(), &config()).unwrap()).unwrap();
         assert_eq!(first, second, "double extract is byte-identical");
-        let reread: ArtifactEnvelope<SourceGraph> = read_canonical(&first).unwrap();
+        let reread: ArtifactWrapper<SourceDocumentGraph> = read_strict_canonical(&first).unwrap();
         assert_eq!(
             canonical_payload_bytes(&reread).unwrap(),
             first,
@@ -846,8 +846,8 @@ mod tests {
         assert!(matches!(err, ExtractError::Utf8(_)), "got {err}");
     }
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/fixtures/");
+    fn test_source(name: &str) -> Vec<u8> {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/test_sources/");
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
@@ -863,8 +863,8 @@ mod tests {
     }
 
     /// Every region is the {node,span} pair of the same-index span —
-    /// the walker's only region shape outside residual grounding.
-    fn assert_span_regions(g: &SourceGraph) {
+    /// the walker's only region shape outside residual source_linkage.
+    fn assert_span_regions(g: &SourceDocumentGraph) {
         assert_eq!(g.regions.len(), g.spans.len());
         for (region, span) in g.regions.iter().zip(&g.spans) {
             assert_eq!(region.node_ids, vec![span.node_id.clone()]);
@@ -873,15 +873,15 @@ mod tests {
         }
     }
 
-    // The committed m1_guideline_a fixture, full shape pinned from
+    // The committed m1_guideline_a test_source, full shape pinned from
     // observed output: section tree, recommendation and exception
     // paragraphs, the 4x2 definitions table with th header row, and
     // the evidence list; DocIr::from_graph accepts the result.
     #[test]
-    fn fixture_guideline_a_full_shape_and_doc_ir() {
-        let envelope = extract(&fixture("m1_guideline_a.html"), &config()).unwrap();
-        let (g, diags) = (envelope.payload, envelope.diagnostics);
-        assert!(diags.is_empty(), "fixture extracts residual-free");
+    fn test_source_guideline_a_full_shape_and_doc_ir() {
+        let wrapper = extract(&test_source("m1_guideline_a.html"), &config()).unwrap();
+        let (g, diags) = (wrapper.payload, wrapper.diagnostics);
+        assert!(diags.is_empty(), "test_source extracts residual-free");
 
         let n = |k: usize| id(&format!("n.{k}"));
         let mut want_nodes = vec![
@@ -992,17 +992,17 @@ mod tests {
     }
 
     #[test]
-    fn committed_fixtures_extract_residual_free() {
+    fn committed_test_sources_extract_residual_free() {
         for name in [
             "m1_guideline_a.html",
             "m1_guideline_b.html",
             "m1_control.html",
         ] {
-            let envelope = extract(&fixture(name), &config()).unwrap();
+            let wrapper = extract(&test_source(name), &config()).unwrap();
             assert!(
-                envelope.diagnostics.is_empty(),
+                wrapper.diagnostics.is_empty(),
                 "{name} extracts residual-free, got {:?}",
-                envelope.diagnostics
+                wrapper.diagnostics
             );
         }
     }

@@ -74,11 +74,11 @@ fn render(check: &ReplayCheck, run_id: &Id, scratch: &Path) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::tests::{fixture_run, repo_root};
+    use crate::replay::tests::{test_source_run, repo_root};
     use crate::shell::{FinishedCommand, static_id};
     use ckc_core::{
         DiagnosticCode, DiagnosticRecord, EventRecord, Hash, Outcome, ReplayManifest,
-        canonical_payload_bytes, read_canonical, read_jsonl,
+        canonical_payload_bytes, read_strict_canonical, read_jsonl,
     };
 
     /// The dispatch-shaped shell: operation `replay`, run id from the run
@@ -101,10 +101,10 @@ mod tests {
     }
 
     fn read_manifest(run_dir: &Path) -> ReplayManifest {
-        read_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap()
+        read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap()
     }
 
-    // §8.5 item 8 at the command surface, three paths over one fixture
+    // §8.5 item 8 at the command surface, three paths over one test_source
     // run: the replay matches and renders the recorded hash set as the
     // body; the populated scratch layout then blocks a second attempt
     // (the core's empty-guard through the command's sibling layout
@@ -114,13 +114,13 @@ mod tests {
     fn live_replay_matches_then_guards_then_mismatches() {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
-        let run_dir = fixture_run(&root, tmp.path());
+        let run_dir = test_source_run(&root, tmp.path());
 
         let mut sh = shell();
         let body = execute(&root, &run_dir, &mut sh).unwrap();
         let scratch = tmp.path().join("m1.replay");
         assert!(scratch.join("manifest.json").is_file());
-        assert!(scratch.join("report.md").is_file());
+        assert!(scratch.join("report_en.md").is_file());
         let manifest = read_manifest(&run_dir);
         let mut expected = format!(
             "replay run m1 matched\nrerun outcome: ok\nrerun layout: {}\naccepted artifacts: {}\n",

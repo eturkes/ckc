@@ -1,13 +1,13 @@
 //! SPEC §5 IR layers: DocIR ([`DocIr`]) — the layout-preserving text/table
-//! view over [`SourceGraph`] refs with extraction diagnostics — SegmentIR
+//! view over [`SourceDocumentGraph`] refs with extraction diagnostics — SegmentIR
 //! ([`SegmentIr`]) — the document's [`ClinicalSegment`]s — ClinicalIR
 //! ([`ClinicalIr`]) — [`ClinicalStatement`]s plus [`TerminologyBinding`]s —
-//! NormIR ([`NormIr`]) — [`NormRule`]s over [`ContextExpr`] guards — and
+//! NormIR ([`NormIr`]) — [`NormativeRule`]s over [`ContextExpr`] guards — and
 //! FormalIR ([`FormalIr`]) — target-independent [`FormalConstraint`]s plus
 //! the [`ContradictionQueryPair`] contradiction-query plan.
-//! Layers hold references into the graph; the graph stays the byte authority.
+//! Layers hold references into the graph; the graph stays the byte evidence_status.
 //! [`Normalization`] pairs the ClinicalIR and NormIR layers as the §8.3
-//! normalize-stage envelope payload (`normalization.json`).
+//! normalize-processing_stage wrapper payload (`normalization.json`).
 //!
 //! The module also defines the §4.3 structural-hash machinery the later
 //! layers (core-ir.2/.3) reuse: a component's *structural bytes* are its
@@ -47,7 +47,7 @@ use crate::canon::{
 use crate::enums::{
     BindingStatus, DiagnosticCode, DiagnosticRecord, Direction, emit_payload, fieldless_enum,
 };
-use crate::grounding::{NodeKind, RefKind, SourceGraph, SourceNode};
+use crate::source_linkage::{NodeKind, RefKind, SourceDocumentGraph, SourceNode};
 use crate::hash::hash_bytes;
 use crate::id::{Hash, Id, ValidationError};
 
@@ -87,7 +87,7 @@ pub fn structural_hash<T: Structural>(value: &T) -> Result<Hash, CanonError> {
 
 /// Emit reference ids as a §4.3 set localized in the enclosing scope:
 /// members localize in byte order of their semantic ids (for [`Id`] the raw
-/// bytes are the canonical order — the grammar admits no escapes), and the
+/// bytes are the canonical order — the grammar accepts no escapes), and the
 /// localized set sorts by localized bytes. Fresh contiguous indices keep the
 /// result rename-stable while the set is its scope's only use of its id pool,
 /// which M1 component shapes satisfy.
@@ -103,7 +103,7 @@ pub fn emit_structural_ref_set(
 }
 
 /// Emit reference ids as an ordered array localized in the enclosing scope,
-/// for refs whose order is semantic ([`NormRule::source_region_ids`]).
+/// for refs whose order is semantic ([`NormativeRule::source_region_ids`]).
 /// Localization follows array order, so the structural bytes see the
 /// co-reference pattern and count; the order of refs first occurring here is
 /// itself erased (always `i0, i1, …`), like every first-occurrence index.
@@ -363,7 +363,7 @@ impl Structural for TableView {
     }
 }
 
-/// SPEC §5 DocIR: the layout-preserving text/table view over [`SourceGraph`]
+/// SPEC §5 DocIR: the layout-preserving text/table view over [`SourceDocumentGraph`]
 /// refs, one component per document. [`from_graph`](Self::from_graph) derives
 /// it deterministically; DocIR holds references, never copied text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -382,12 +382,12 @@ pub struct DocIr {
 
 impl DocIr {
     /// Derive the view from a graph its producer already validated
-    /// ([`SourceGraph::validate`]) plus the extraction diagnostics raised for
+    /// ([`SourceDocumentGraph::validate`]) plus the extraction diagnostics raised for
     /// this document. Fails when a diagnostic's region ref dangles or a
     /// non-residual table's cells carry missing, malformed, or colliding
     /// `row`/`col`/`header` attrs.
     pub fn from_graph(
-        graph: &SourceGraph,
+        graph: &SourceDocumentGraph,
         diagnostics: Vec<DiagnosticRecord>,
     ) -> Result<DocIr, IrError> {
         let kinds: HashMap<&Id, NodeKind> =
@@ -673,7 +673,7 @@ pub struct Action {
     /// Normalized target key `kind:target` (M1; M3 joins discriminating
     /// slots). [`new`](Self::new) derives it; bundle validation
     /// (`IrBundle::validate`) re-checks a stored key against its derivation,
-    /// the [`SourceSpan`](crate::grounding::SourceSpan) precedent for
+    /// the [`SourceTextSpan`](crate::source_linkage::SourceTextSpan) precedent for
     /// derived fields.
     pub key: Id,
 }
@@ -907,16 +907,16 @@ impl Structural for TerminologyBinding {
 }
 
 /// One exception clause of a [`ClinicalStatement`]: the exception's own
-/// (positive) condition atoms plus its grounding. stage-normalize.2 compiles
+/// (positive) condition atoms plus its source_linkage. stage-normalize.2 compiles
 /// each clause into negated conjuncts of the rule context, the clause regions
-/// joining `source_region_ids` (§5); [`NormRule::exception_refs`] cite
+/// joining `source_region_ids` (§5); [`NormativeRule::exception_refs`] cite
 /// `exception_id`s for trace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExceptionClause {
     pub exception_id: Id,
     /// §4.3 set; atoms are lexicon vocabulary (verbatim in structural bytes).
     pub atoms: Vec<ContextAtom>,
-    /// §4.3 set grounding the exception text.
+    /// §4.3 set source_linkage the exception text.
     pub region_ids: Vec<Id>,
 }
 
@@ -1100,10 +1100,10 @@ impl Structural for ClinicalIr {
     }
 }
 
-/// SPEC §5 norm rule: one guarded deontic constraint. The §8.6 worked rule
+/// SPEC §5 norm rule: one conditioned deontic constraint. The §8.6 worked rule
 /// pins the canonical bytes. An independently hashable component.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NormRule {
+pub struct NormativeRule {
     pub rule_id: Id,
     pub context: ContextExpr,
     pub direction: Direction,
@@ -1121,7 +1121,7 @@ pub struct NormRule {
     pub exception_refs: Vec<Id>,
 }
 
-impl Canonical for NormRule {
+impl Canonical for NormativeRule {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("action", |b| self.action.emit_canonical(b))?;
@@ -1142,7 +1142,7 @@ impl Canonical for NormRule {
     }
 }
 
-impl CanonRead for NormRule {
+impl CanonRead for NormativeRule {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
         let action = obj.member("action", Action::read)?;
@@ -1158,7 +1158,7 @@ impl CanonRead for NormRule {
         let source_region_ids = obj.member("source_region_ids", read_array::<Id>)?;
         let strength = obj.member("strength", Strength::read)?;
         obj.close()?;
-        Ok(NormRule {
+        Ok(NormativeRule {
             rule_id,
             context,
             direction,
@@ -1171,7 +1171,7 @@ impl CanonRead for NormRule {
     }
 }
 
-impl Structural for NormRule {
+impl Structural for NormativeRule {
     fn emit_structural(&self, out: &mut Vec<u8>, ids: &mut RefLocalizer) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("action", |b| self.action.emit_canonical(b))?;
@@ -1192,11 +1192,11 @@ impl Structural for NormRule {
     }
 }
 
-/// SPEC §5 NormIR: the document's [`NormRule`]s in derivation order, each an
+/// SPEC §5 NormIR: the document's [`NormativeRule`]s in derivation order, each an
 /// independently hashable component.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormIr {
-    pub rules: Vec<NormRule>,
+    pub rules: Vec<NormativeRule>,
 }
 
 impl Canonical for NormIr {
@@ -1210,7 +1210,7 @@ impl Canonical for NormIr {
 impl CanonRead for NormIr {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let rules = obj.member("rules", read_array::<NormRule>)?;
+        let rules = obj.member("rules", read_array::<NormativeRule>)?;
         obj.close()?;
         Ok(NormIr { rules })
     }
@@ -1228,8 +1228,8 @@ impl Structural for NormIr {
     }
 }
 
-/// SPEC §8.3 normalize-stage payload (`normalization.json`): the document's
-/// [`ClinicalIr`] and [`NormIr`] under one envelope, the statement layer
+/// SPEC §8.3 normalize-processing_stage payload (`normalization.json`): the document's
+/// [`ClinicalIr`] and [`NormIr`] under one wrapper, the statement layer
 /// beside the rule layer derived from it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Normalization {
@@ -1274,7 +1274,7 @@ pub fn directions_opposed(a: Direction, b: Direction) -> bool {
 }
 
 /// SPEC §5 FormalIR constraint: the target-independent projection of one
-/// [`NormRule`] — self-contained [`Action`], folded [`ContextExpr`] guard,
+/// [`NormativeRule`] — self-contained [`Action`], folded [`ContextExpr`] guard,
 /// direction, and the proof-visible strength/certainty annotations (§5:
 /// conflict logic consumes direction and normalized action/context). Source
 /// regions stay reachable through `rule_id`. An independently hashable
@@ -1296,9 +1296,9 @@ pub struct FormalConstraint {
 
 impl FormalConstraint {
     /// Project a rule into its constraint: `constraint_id = fc.<rule_id>`,
-    /// every other field a straight copy — [`NormRule::context`] already
+    /// every other field a straight copy — [`NormativeRule::context`] already
     /// folds exceptions into negated conjuncts (§5).
-    pub fn from_rule(rule: &NormRule) -> FormalConstraint {
+    pub fn from_rule(rule: &NormativeRule) -> FormalConstraint {
         let constraint_id = Id::new(format!("fc.{}", rule.rule_id))
             .expect("'fc.' before a valid id forms a valid id");
         FormalConstraint {
@@ -1464,7 +1464,7 @@ pub struct FormalIr {
 impl FormalIr {
     /// Derive the layer from NormIR: one constraint per rule, in rule order;
     /// the plan slot stays empty (group-level pairs ride ckc-smt's
-    /// CompiledArtifact::query_plan, minted by `plan_queries`).
+    /// CompiledArtifact::solver_query_plan, minted by `plan_queries`).
     pub fn derive(norm: &NormIr) -> FormalIr {
         FormalIr {
             constraints: norm.rules.iter().map(FormalConstraint::from_rule).collect(),
@@ -1503,7 +1503,7 @@ impl Structural for FormalIr {
     }
 }
 
-/// A DocIR derivation input broke its contract ([`DocIr::from_graph`]).
+/// A DocIR derivation input broke its requirements ([`DocIr::from_graph`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrError {
     /// A carried diagnostic references a region the graph does not define, or
@@ -1534,14 +1534,14 @@ impl fmt::Display for IrError {
 
 impl std::error::Error for IrError {}
 
-/// Test fixtures shared with sibling modules (bundle): the §8.6 worked-rule
+/// Test test_sources shared with sibling modules (bundle): the §8.6 worked-rule
 /// family under a rename prefix, atom/DNF builders, and byte-pin helpers.
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::canon::{canonical_payload_bytes, read_canonical};
+    use crate::canon::{canonical_payload_bytes, read_strict_canonical};
     use crate::enums::Outcome;
-    use crate::grounding::{DataClass, Provenance, SourceDocument, SourceRegion, SourceSpan};
+    use crate::source_linkage::{DataClass, Provenance, SourceDocument, EvidenceRegion, SourceTextSpan};
     use crate::hash::content_hash;
 
     pub(crate) fn canon<T: Canonical>(value: &T) -> String {
@@ -1558,7 +1558,7 @@ pub(crate) mod tests {
 
     pub(crate) fn round_trip<T: Canonical + CanonRead + std::fmt::Debug + PartialEq>(value: T) {
         let bytes = canonical_payload_bytes(&value).unwrap();
-        let got: T = read_canonical(&bytes).unwrap();
+        let got: T = read_strict_canonical(&bytes).unwrap();
         assert_eq!(got, value, "round trip changed the value");
     }
 
@@ -1595,7 +1595,7 @@ pub(crate) mod tests {
     /// A definitions-table graph in the §8.2 shape: a CQ heading, a
     /// recommendation paragraph, and a 2×2 table (header row 用語/定義,
     /// body row 成人/18歳以上).
-    fn sample_graph() -> SourceGraph {
+    fn sample_graph() -> SourceDocumentGraph {
         let texts: [(&str, &str, &str); 6] = [
             ("s.cq1", "n.cq1", "ＣＱ１：高血圧の治療"),
             ("s.p1", "n.p1", "成人には１０ｍｇを投与する。"),
@@ -1604,10 +1604,10 @@ pub(crate) mod tests {
             ("s.c21", "n.c21", "成人"),
             ("s.c22", "n.c22", "18歳以上"),
         ];
-        SourceGraph {
+        SourceDocumentGraph {
             document: SourceDocument {
                 document_id: id("doc.a"),
-                source_family: id("synthetic_fixture_html"),
+                source_family: id("synthetic_test_source_html"),
                 provenance: Provenance::Synthetic,
                 raw_hash: h('a'),
                 content_hash: h('a'),
@@ -1627,18 +1627,18 @@ pub(crate) mod tests {
                 .iter()
                 .enumerate()
                 .map(|(i, (sid, nid, raw))| {
-                    SourceSpan::derive(id(sid), id(nid), 0, (*raw).to_owned(), i as u64 + 1)
+                    SourceTextSpan::derive(id(sid), id(nid), 0, (*raw).to_owned(), i as u64 + 1)
                 })
                 .collect(),
             anchors: vec![],
             regions: vec![
-                SourceRegion {
+                EvidenceRegion {
                     region_id: id("r.cq1"),
                     node_ids: vec![id("n.cq1")],
                     span_ids: vec![id("s.cq1")],
                     anchor_ids: vec![],
                 },
-                SourceRegion {
+                EvidenceRegion {
                     region_id: id("r.t1"),
                     node_ids: vec![id("n.t1")],
                     span_ids: vec![],
@@ -2024,8 +2024,8 @@ pub(crate) mod tests {
     }
 
     /// The §8.6 worked rule `rule.a.cq1.r1`, local ids under prefix `p`.
-    pub(crate) fn rule_p(p: &str) -> NormRule {
-        NormRule {
+    pub(crate) fn rule_p(p: &str) -> NormativeRule {
+        NormativeRule {
             rule_id: id(&format!("{p}rule.a.cq1.r1")),
             context: dnf1(vec![
                 atom_c("cond.sepsis"),
@@ -2129,7 +2129,7 @@ pub(crate) mod tests {
         round_trip(atom_c("cond.sepsis"));
         round_trip(atom_nc("cond.renal_severe"));
         assert!(matches!(
-            read_canonical::<ContextAtom>(br#"{"tag":"slot_eq","value":"x"}"#),
+            read_strict_canonical::<ContextAtom>(br#"{"tag":"slot_eq","value":"x"}"#),
             Err(CanonReadError::Policy(_))
         ));
     }
@@ -2169,13 +2169,13 @@ pub(crate) mod tests {
         assert!(bytes.find("cond.a").unwrap() < bytes.find("cond.b").unwrap());
     }
 
-    // THE unit pin: the §8.6 NormRule canonical payload, byte for byte —
+    // THE unit pin: the §8.6 NormativeRule canonical payload, byte for byte —
     // spec-scheme ids (rule_id = <document_id>.rule.<k>; every other id a
     // document-local counter), exception_refs populated.
     #[test]
-    fn norm_rule_spec86_bytes() {
-        let rule = NormRule {
-            rule_id: id("fixture.m1_guideline_a.rule.0"),
+    fn normative_rule_spec86_bytes() {
+        let rule = NormativeRule {
+            rule_id: id("test_source.m1_guideline_a.rule.0"),
             context: dnf1(vec![
                 atom_c("cond.sepsis"),
                 atom_nc("cond.renal_severe"),
@@ -2197,7 +2197,7 @@ pub(crate) mod tests {
                 r#"{"tag":"concept_negated","value":"cond.renal_severe"},"#,
                 r#"{"tag":"interval","value":{"ge":"18","var":"q.age_years"}}]}]},"#,
                 r#""direction":"for","exception_refs":["exc.0"],"#,
-                r#""rule_id":"fixture.m1_guideline_a.rule.0","#,
+                r#""rule_id":"test_source.m1_guideline_a.rule.0","#,
                 r#""source_region_ids":["r.2","r.3"],"#,
                 r#""strength":"strong"}"#
             )
@@ -2209,7 +2209,7 @@ pub(crate) mod tests {
     // (§5: optional at M1); a present-but-empty exception_refs is not writer
     // output and is rejected.
     #[test]
-    fn norm_rule_optionals() {
+    fn normative_rule_optionals() {
         let mut rule = rule_p("");
         rule.certainty = Some(Certainty::Low);
         rule.exception_refs = vec![id("exc.a.cq1.e1")];
@@ -2220,7 +2220,7 @@ pub(crate) mod tests {
         let doctored =
             canon(&rule_p("")).replace(r#""rule_id""#, r#""exception_refs":[],"rule_id""#);
         assert!(matches!(
-            read_canonical::<NormRule>(doctored.as_bytes()),
+            read_strict_canonical::<NormativeRule>(doctored.as_bytes()),
             Err(CanonReadError::UnknownField(f)) if f == "exception_refs"
         ));
     }
@@ -2286,7 +2286,7 @@ pub(crate) mod tests {
         round_trip(norm);
     }
 
-    // The §8.3 normalize-stage payload pairs the two layers under sorted
+    // The §8.3 normalize-processing_stage payload pairs the two layers under sorted
     // members; the empty payload pins the bytes.
     #[test]
     fn normalization_empty_bytes() {

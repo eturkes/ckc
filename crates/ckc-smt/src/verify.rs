@@ -1,4 +1,4 @@
-//! SPEC §8.3 verify stage, adapter half: invoke Z3 per query as a
+//! SPEC §8.3 verify processing_stage, adapter half: invoke Z3 per query as a
 //! subprocess under a per-query wall-clock budget and capture the process
 //! truth — raw stdout/stderr, exit fate, and the leading verdict token.
 //!
