@@ -174,7 +174,7 @@ git history.
   peak); chunk larger rewrites at section boundaries and processing stage outputs for main-session
   assembly. Per-agent transcripts:
   `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
-  `.message.usage`; rejected requests log no usage). compaction.sh reads the same flag and
+  `.message.usage`; rejected requests log no usage). `~/.local/bin/context` reads the same flag and
   gauges the main loop only.
 
 - Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).

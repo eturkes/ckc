@@ -41,7 +41,7 @@ its usage annotation and a fresh `_` slot.
 - Sessions run at 200K, except Review at 1M (to hold the milestone whole). The cap
   is launch-set and process-wide: subagents inherit the session window, so the
   `[1m]` slug lifts nothing (memory.md Lessons).
-- Completed items record `NN% NNNK/200K <hash>` (usage from `.agent/compaction.sh`,
+- Completed items record `NN% NNNK/200K <hash>` (usage from `~/.local/bin/context`,
   run right before staging; `>=90% compacted/200K` when compaction hit). Milestone
   headers record `plan <hash>` and `review <hash>`, bounding the milestone's commit
   range; plan and review stamps carry hashes only. Hashes land lazily: a session
