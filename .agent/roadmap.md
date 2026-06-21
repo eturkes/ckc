@@ -7,7 +7,7 @@ ordered unit checklist; unchecked lines carry the full unit spec; checked items 
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
-## M1 spine — plan 89c4cba — accept m1 — review _
+## M1 scaffold — plan 89c4cba — accept m1 — review _
 
 - [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 4b46cac
 - [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 0d823e0
@@ -59,7 +59,7 @@ bare headers; git history retains all removed text.
   read-back landings + processing stage events. >=90% compacted/200K fd11d54
 - [x] cli-runner.2b: group processing stages + total outcome completing ckc run: per-group compile/verify
   landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K aeae33d
-- [x] cli-runner.2c: workspace run oracle — exp.m1_spine sweep + reference assert. 47% 93K/200K c767c4d
+- [x] cli-runner.2c: workspace run oracle — exp.m1_scaffold sweep + reference assert. 47% 93K/200K c767c4d
 - [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
   71% 142K/200K 1e2babd
 - [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.

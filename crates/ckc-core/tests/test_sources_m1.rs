@@ -62,7 +62,7 @@ fn load_set() -> (
     (corpora, candidates, experiments, reference)
 }
 
-// The committed set cross-resolves with zero findings, and exp.m1_spine
+// The committed set cross-resolves with zero findings, and exp.m1_scaffold
 // carries the §8.2 groups over the §8.3 processing_stage chain.
 #[test]
 fn registry_set_loads_and_validates() {
@@ -84,7 +84,7 @@ fn registry_set_loads_and_validates() {
 
     assert_eq!(experiments.len(), 1);
     let exp = &experiments[0];
-    assert_eq!(exp.id, id("exp.m1_spine"));
+    assert_eq!(exp.id, id("exp.m1_scaffold"));
     assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
     assert_eq!(exp.test_source_groups.len(), 2);
     assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));

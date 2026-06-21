@@ -1,8 +1,8 @@
-# SPEC §8.4 experiments: exp.m1_spine resolves pipe.layered_ckcir_to_smt over
+# SPEC §8.4 experiments: exp.m1_scaffold resolves pipe.layered_ckcir_to_smt over
 # the §8.2 test_source groups; expected_outcomes references the typed reference file
 # asserted by acceptance tests. Budget counters are §4.6 resource_counters
 # vocabulary (per-query solver cap, milliseconds).
-- id: exp.m1_spine
+- id: exp.m1_scaffold
   pipeline: pipe.layered_ckcir_to_smt
   test_source_groups:
     - group_id: group.m1_conflict

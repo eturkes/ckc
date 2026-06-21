@@ -281,13 +281,13 @@ mod tests {
             .to_path_buf()
     }
 
-    /// Execute `exp.m1_spine` into `<tmp>/m1` — the prior run every live
+    /// Execute `exp.m1_scaffold` into `<tmp>/m1` — the prior run every live
     /// replay test re-executes — and require it clean.
     pub(crate) fn test_source_run(root: &Path, tmp: &Path) -> PathBuf {
         let out = tmp.join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m1"), Some(out.clone()));
-        crate::run::execute(root, &static_id("exp.m1_spine"), &mut shell);
+        crate::run::execute(root, &static_id("exp.m1_scaffold"), &mut shell);
         let finished = shell.finish().unwrap();
         assert_eq!(finished.result.outcome, Outcome::Ok);
         out
@@ -422,9 +422,9 @@ mod tests {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
         for command in [
-            &["ckc", "trace", "--experiment", "exp.m1_spine", "--out", "x"][..],
+            &["ckc", "trace", "--experiment", "exp.m1_scaffold", "--out", "x"][..],
             &["ckc", "run", "--experiment", "exp m1", "--out", "x"][..],
-            &["ckc", "run", "--experiment", "exp.m1_spine"][..],
+            &["ckc", "run", "--experiment", "exp.m1_scaffold"][..],
         ] {
             let manifest = synthetic_manifest(command);
             std::fs::write(
@@ -449,7 +449,7 @@ mod tests {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
         let manifest =
-            synthetic_manifest(&["ckc", "run", "--experiment", "exp.m1_spine", "--out", "x"]);
+            synthetic_manifest(&["ckc", "run", "--experiment", "exp.m1_scaffold", "--out", "x"]);
         std::fs::write(
             tmp.path().join(REPLAY_MANIFEST),
             canonical_payload_bytes(&manifest).unwrap(),

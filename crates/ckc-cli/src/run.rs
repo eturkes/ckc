@@ -1223,7 +1223,7 @@ mod tests {
     // carries one clean processing_stage event per execution before the command event.
     #[test]
     fn document_processing_stages_land_strict_artifacts_over_the_test_sources() {
-        let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
+        let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_scaffold");
 
         // The full §8.3 chain through verify completes clean.
         assert_eq!(result.outcome, Outcome::Ok);
@@ -1351,7 +1351,7 @@ mod tests {
         assert_eq!(command.outcome, Outcome::Ok);
     }
 
-    // The group processing_stages over exp.m1_spine: compiled artifacts and verifier
+    // The group processing_stages over exp.m1_scaffold: compiled artifacts and verifier
     // results land strict-read clean with hashes chaining bundles →
     // compiled → results and every query body materialized byte-identical
     // under smt/; the §8.6 thread yields the cross-document contradiction
@@ -1361,7 +1361,7 @@ mod tests {
     fn group_processing_stages_compile_and_verify_the_test_source_groups() {
         use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory};
 
-        let (_result, _events, _diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_spine");
+        let (_result, _events, _diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_scaffold");
         let a: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_a", "ir_bundle");
         let b: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_b", "ir_bundle");
         let control: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_control", "ir_bundle");
@@ -1512,7 +1512,7 @@ mod tests {
     #[test]
     fn resolution_failures_diagnose() {
         let bare = tempfile::tempdir().unwrap();
-        let (result, events, diagnostics, out, _tmp) = executed(bare.path(), "exp.m1_spine");
+        let (result, events, diagnostics, out, _tmp) = executed(bare.path(), "exp.m1_scaffold");
         assert_eq!(result.outcome, Outcome::Invalid);
         assert_eq!(diagnostics.len(), 3);
         assert_eq!(events.len(), 1);

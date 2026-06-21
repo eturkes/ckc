@@ -173,7 +173,7 @@ mod tests {
     fn inputs() -> ManifestInputs {
         ManifestInputs {
             plan: RunPlan {
-                experiment_id: id("exp.m1_spine"),
+                experiment_id: id("exp.m1_scaffold"),
                 test_source_groups: vec![id("group.m1_conflict"), id("group.m1_no_conflict")],
                 pipelines: vec![id("pipe.layered_ckcir_to_smt")],
                 seed: 42,
@@ -183,7 +183,7 @@ mod tests {
                 "ckc",
                 "run",
                 "--experiment",
-                "exp.m1_spine",
+                "exp.m1_scaffold",
                 "--out",
                 "runs/m1",
             ]

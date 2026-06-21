@@ -439,7 +439,7 @@ mod tests {
         let exit = run_cli(&args(&[
             "run",
             "--experiment",
-            "exp.m1_spine",
+            "exp.m1_scaffold",
             "--out",
             out.to_str().unwrap(),
         ]));
@@ -467,7 +467,7 @@ mod tests {
         let exit = run_cli(&args(&[
             "run",
             "--experiment",
-            "exp.m1_spine",
+            "exp.m1_scaffold",
             "--out",
             out.to_str().unwrap(),
         ]));

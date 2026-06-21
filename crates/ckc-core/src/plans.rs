@@ -54,7 +54,7 @@ impl CanonRead for SolverIdentity {
 /// budget — everything that fixes what a run executes, before it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunPlan {
-    /// Experiment registry entry this run executes (e.g. `exp.m1_spine`).
+    /// Experiment registry entry this run executes (e.g. `exp.m1_scaffold`).
     pub experiment_id: Id,
     /// TestSource groups in scope (§8.2 `group.*`). Set semantics.
     pub test_source_groups: Vec<Id>,
@@ -314,7 +314,7 @@ mod tests {
 
     fn sample_plan() -> RunPlan {
         RunPlan {
-            experiment_id: id("exp.m1_spine"),
+            experiment_id: id("exp.m1_scaffold"),
             test_source_groups: vec![id("group.m1_conflict"), id("group.m1_no_conflict")],
             pipelines: vec![id("pipe.layered_ckcir_to_smt")],
             seed: 42,
@@ -345,7 +345,7 @@ mod tests {
                 "ckc",
                 "run",
                 "--experiment",
-                "exp.m1_spine",
+                "exp.m1_scaffold",
                 "--out",
                 "runs/m1",
             ]
@@ -370,14 +370,14 @@ mod tests {
             canon(&sample_plan()),
             concat!(
                 r#"{"budget":{"solver_ms_per_query":"10000"},"#,
-                r#""experiment_id":"exp.m1_spine","#,
+                r#""experiment_id":"exp.m1_scaffold","#,
                 r#""pipelines":["pipe.layered_ckcir_to_smt"],"seed":"42","#,
                 r#""test_source_groups":["group.m1_conflict","group.m1_no_conflict"]}"#
             )
         );
         // Empty collections keep their type-guided forms ({} map, [] sets).
         let empty = RunPlan {
-            experiment_id: id("exp.m1_spine"),
+            experiment_id: id("exp.m1_scaffold"),
             test_source_groups: vec![],
             pipelines: vec![],
             seed: 0,
@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(
             canon(&empty),
             concat!(
-                r#"{"budget":{},"experiment_id":"exp.m1_spine","#,
+                r#"{"budget":{},"experiment_id":"exp.m1_scaffold","#,
                 r#""pipelines":[],"seed":"0","test_source_groups":[]}"#
             )
         );
@@ -439,7 +439,7 @@ mod tests {
     fn replay_manifest_canonical_bytes() {
         let want = format!(
             concat!(
-                r#"{{"command":["ckc","run","--experiment","exp.m1_spine","--out","runs/m1"],"#,
+                r#"{{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"#,
                 r#""corpus_hash":"{c}","environment_profile":{{"os":"linux"}},"#,
                 r#""expected_output_hashes":["{e}"],"input_hashes":["{f}"],"#,
                 r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,

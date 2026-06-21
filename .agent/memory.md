@@ -59,7 +59,7 @@ git history.
   .4.1a.1/.4.1a.2 and the sweep pre-split .4.1b and .4.2 into core/wiring pairs); a live-pin
   battery over the run binary is a unit on its own — pairing it with assembly (7th overrun)
   or with processing stage wiring overruns (9th overrun, cli-runner.4.1b.1: the 8th-overrun
-  core/wiring pre-split still left run.rs threading + the exp.m1_spine report pins on one
+  core/wiring pre-split still left run.rs threading + the exp.m1_scaffold report pins on one
   line; compacted at the workspace-suite rerun with work otherwise done, landed
   user-accepted; anchors: trace wiring solo 75%, trace live-pins solo 71%); a recovery split
   is itself plan work — audit its replacement lines against every standing rule and the

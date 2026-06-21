@@ -96,7 +96,7 @@ pub struct ProcessingStageEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentEntry {
-    /// Experiment id (e.g. `exp.m1_spine`).
+    /// Experiment id (e.g. `exp.m1_scaffold`).
     pub id: Id,
     /// Pipeline candidate this experiment executes.
     pub pipeline: Id,
@@ -500,7 +500,7 @@ processing_stages:
 ";
 
     const EXPERIMENTS: &str = "\
-- id: exp.m1_spine
+- id: exp.m1_scaffold
   pipeline: pipe.layered_ckcir_to_smt
   test_source_groups:
     - group_id: group.m1_conflict
@@ -569,7 +569,7 @@ processing_stages:
         let experiments = parse_experiments(EXPERIMENTS).unwrap();
         assert_eq!(experiments.len(), 1);
         let exp = &experiments[0];
-        assert_eq!(exp.id, id("exp.m1_spine"));
+        assert_eq!(exp.id, id("exp.m1_scaffold"));
         assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
         assert_eq!(exp.test_source_groups.len(), 2);
         assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
@@ -709,7 +709,7 @@ processing_stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::Dangling {
-                from: id("exp.m1_spine"),
+                from: id("exp.m1_scaffold"),
                 pool: "pipelines",
                 id: id("pipe.missing"),
             }]
@@ -778,7 +778,7 @@ processing_stages:
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::Duplicate {
                 pool: "experiments",
-                id: id("exp.m1_spine"),
+                id: id("exp.m1_scaffold"),
             }]
         );
 
@@ -788,7 +788,7 @@ processing_stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::DuplicateGroup {
-                experiment: id("exp.m1_spine"),
+                experiment: id("exp.m1_scaffold"),
                 group_id: id("group.m1_conflict"),
             }]
         );
@@ -836,15 +836,15 @@ processing_stages:
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![
                 RegistryFinding::Empty {
-                    entry: id("exp.m1_spine"),
+                    entry: id("exp.m1_scaffold"),
                     field: "test_source_groups",
                 },
                 RegistryFinding::ReferenceGroupUnknown {
-                    experiment: id("exp.m1_spine"),
+                    experiment: id("exp.m1_scaffold"),
                     group_id: id("group.m1_conflict"),
                 },
                 RegistryFinding::ReferenceGroupUnknown {
-                    experiment: id("exp.m1_spine"),
+                    experiment: id("exp.m1_scaffold"),
                     group_id: id("group.m1_no_conflict"),
                 },
             ]
@@ -865,7 +865,7 @@ processing_stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::Empty {
-                entry: id("exp.m1_spine"),
+                entry: id("exp.m1_scaffold"),
                 field: "expected_outcomes",
             }]
         );
@@ -879,7 +879,7 @@ processing_stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &BTreeMap::new()),
             vec![RegistryFinding::ReferenceUnresolved {
-                experiment: id("exp.m1_spine"),
+                experiment: id("exp.m1_scaffold"),
                 path: REFERENCE_PATH.to_string(),
             }]
         );
@@ -889,7 +889,7 @@ processing_stages:
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::ReferenceGroupUnknown {
-                experiment: id("exp.m1_spine"),
+                experiment: id("exp.m1_scaffold"),
                 group_id: id("group.m1_extra"),
             }]
         );

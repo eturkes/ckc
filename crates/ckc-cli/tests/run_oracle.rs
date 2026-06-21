@@ -1,4 +1,4 @@
-//! SPEC §8.5 item 3 workspace oracle: execute `exp.m1_spine` into a temp
+//! SPEC §8.5 item 3 workspace oracle: execute `exp.m1_scaffold` into a temp
 //! dir, sweep the run directory (exact §8.3 file set — a later-processing_stage
 //! artifact entering the layout must join the sweep), strict-read every
 //! accepted artifact with §4.4 re-validation, and assert the experiment's
@@ -157,7 +157,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
         .args([
             "run",
             "--experiment",
-            "exp.m1_spine",
+            "exp.m1_scaffold",
             "--out",
             run_dir.to_str().unwrap(),
         ])
@@ -182,7 +182,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
     .unwrap();
     let exp = experiments
         .iter()
-        .find(|e| e.id == id("exp.m1_spine"))
+        .find(|e| e.id == id("exp.m1_scaffold"))
         .unwrap();
     let reference: Vec<ReferenceEntry> =
         parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap()).unwrap();
@@ -510,7 +510,7 @@ mod report {
             .args([
                 "run",
                 "--experiment",
-                "exp.m1_spine",
+                "exp.m1_scaffold",
                 "--out",
                 run_dir.to_str().unwrap(),
             ])
@@ -702,7 +702,7 @@ mod report {
             .args([
                 "run",
                 "--experiment",
-                "exp.m1_spine",
+                "exp.m1_scaffold",
                 "--out",
                 run_dir.to_str().unwrap(),
             ])
@@ -790,7 +790,7 @@ mod report {
         .unwrap();
         let exp = experiments
             .iter()
-            .find(|e| e.id == id("exp.m1_spine"))
+            .find(|e| e.id == id("exp.m1_scaffold"))
             .unwrap();
         let plan = RunPlan {
             experiment_id: exp.id.clone(),
@@ -846,7 +846,7 @@ mod report {
                 "ckc",
                 "run",
                 "--experiment",
-                "exp.m1_spine",
+                "exp.m1_scaffold",
                 "--out",
                 run_dir.to_str().unwrap(),
             ]

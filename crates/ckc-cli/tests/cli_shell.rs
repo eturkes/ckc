@@ -88,7 +88,7 @@ fn run_writes_only_under_its_out_dir() {
         .args([
             "run",
             "--experiment",
-            "exp.m1_spine",
+            "exp.m1_scaffold",
             "--out",
             out_dir.to_str().unwrap(),
         ])

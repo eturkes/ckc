@@ -1,4 +1,4 @@
-# SPEC §8.2 expected outcomes for exp.m1_spine, asserted by acceptance tests.
+# SPEC §8.2 expected outcomes for exp.m1_scaffold, asserted by acceptance tests.
 - group_id: group.m1_conflict
   expected_outcome: semantic_contradiction
   expected_conflict_kind: deontic_direction_conflict

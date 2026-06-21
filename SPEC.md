@@ -137,7 +137,7 @@ assembling the full harness before the first end-to-end result.
 
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
-| M1 spine | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_spine` + §8 checklist |
+| M1 scaffold | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 test sources via `route.direct_smt` versus one IR-mediated route; scored on validity/acceptance/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
 | M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment (experiment 1 across the route axis; experiment 2 via the coverage experiment and compactness front; layered-versus-direct as architecture ablation). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
 | M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-constrained concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the fixed evaluator (experiment 1, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
@@ -600,17 +600,17 @@ M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
 (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
 is defined in its milestone section at elaboration time.
 
-## §8 M1 — Spine
+## §8 M1 — Scaffold
 
 Intent: the smallest complete instance of the thesis machinery — one layered pipeline, real
 Japanese text shapes, a real solver, full trace, deterministic replay. Everything later is
-measured against this spine, so its requirements are exact.
+measured against this scaffold, so its requirements are exact.
 
 ### §8.1 Scope
 
 Pipeline `pipe.layered_ckcir_to_smt` over synthetic test sources; deterministic throughout
-(`runtime_ai: false` is the M1 spine condition; recorded model artifacts first appear under §9
-requirements at M2). Experiment `exp.m1_spine`.
+(`runtime_ai: false` is the M1 scaffold condition; recorded model artifacts first appear under §9
+requirements at M2). Experiment `exp.m1_scaffold`.
 
 ### §8.2 Test sources
 
@@ -625,7 +625,7 @@ acceptance-over-proposer evidence status.
 | `test_source.m1_guideline_b` | Synthetic companion document: 「成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)」. | Overlap + contraindication → expected contradiction with A. |
 | `test_source.m1_control` | Synthetic document: 「小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である」. | Age intervals disjoint with A → expected no-conflict result. |
 
-Test source groups in `exp.m1_spine`: `group.m1_conflict = [a, b]` expecting one
+Test source groups in `exp.m1_scaffold`: `group.m1_conflict = [a, b]` expecting one
 `deontic_direction_conflict` finding; `group.m1_no_conflict = [a, control]` expecting
 `semantic_no_conflict` + `documented_no_conflict_result`. Expected outcomes live in
 `corpus/reference/m1_expected.yaml`, asserted by the acceptance tests, one entry per test source group:
@@ -668,7 +668,7 @@ runs/<run-id>/
 
 `registry/corpora.yaml` (test sources above), `registry/candidates.yaml` (the pipeline and its processing stage
 components with ids, kinds, determinism, input/output artifact kinds), `registry/experiments.yaml`
-(`exp.m1_spine`: test source groups, pipeline, seed, budget, expected-outcome ref). `ckc registry
+(`exp.m1_scaffold`: test source groups, pipeline, seed, budget, expected-outcome ref). `ckc registry
 check` validates all three and verifies each pipeline's processing stage components chain: every processing stage's
 declared input artifact kinds are produced by its predecessors.
 
@@ -677,7 +677,7 @@ declared input artifact kinds are produced by its predecessors.
 1. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and
    `cargo test --workspace` pass.
 2. `ckc registry check` passes.
-3. `ckc run --experiment exp.m1_spine --out runs/m1` completes with outcome `ok`, emitting the
+3. `ckc run --experiment exp.m1_scaffold --out runs/m1` completes with outcome `ok`, emitting the
    §8.3 artifact set with every accepted artifact passing strict canonical read (enforced by a
    workspace test over the run directory).
 4. Every named assertion in each `compiled.json` maps to IR rule ids and source region ids.
@@ -762,7 +762,7 @@ the core and back.
 Intent: experiment 1's minimal pair on this laptop. Establish as a locked measurement that a
 weak local model translating clinical Japanese directly into a machine-evaluable formal target
 is unreliable, and that one IR-mediated route measurably improves reliability on the same
-inputs; publish the result as a bilingual research report. The M1 spine is the instrument:
+inputs; publish the result as a bilingual research report. The M1 scaffold is the instrument:
 its deterministic pipeline supplies the reference verdicts and the calibrated compile → verify back
 end that scores both routes, so route failures attribute to translation, not to the instrument.
 
@@ -961,7 +961,7 @@ stays unscored; at least one locally promoted attempt replays; ledger summaries 
 
 ## §13 Stage II and beyond — sources (M6), auditor product (M7), CDS-backend requirements
 
-Intent: the spine, comparison, and accepted translation routes run end-to-end on real public
+Intent: the scaffold, comparison, and accepted translation routes run end-to-end on real public
 Japanese guideline material with permission-aware caching and richer extraction, followed by
 registry-guided expansion where every candidate enters behind benchmark evidence and applicable
 gates. M7 turns the audited corpus into the reviewer-facing auditor product; §13.4 keeps the
