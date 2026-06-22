@@ -1,6 +1,5 @@
 Run a non-interactive Codex review of this session and hold yourself accountable
-to it; Codex runs with full autonomy, the latest model, and the highest reasoning
-effort.
+to it.
 
 Build the prompt: focus below non-empty ⇒ review exactly that; empty ⇒
 adversarially review this session's work — correctness and logic, soundness of
@@ -29,7 +28,6 @@ Codex also writes the full session to a rollout JSONL under
 assistant message of the newest rollout.
 
 Relay the findings, say which you accept or reject and why, and fix the accepted
-ones, landing them in one `codex:`-scoped commit per CLAUDE.md; a clean review
-records that it found nothing and makes no commit.
+ones before closing.
 
 Review focus (may be empty): $ARGUMENTS

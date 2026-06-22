@@ -1,7 +1,7 @@
 # CKC — Clinical Knowledge Compiler
 
 Design authority for this repository. Sole implementers and readers: Claude
-sessions operating under CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
+sessions operating under AGENTS.md/CLAUDE.md, `.claude/commands/session-prompt.md`, and `.agent/`.
 The document is optimized for machine reading: stable `§` anchors, tables over prose, one fact in
 one place, sections sized for selective loading.
 
@@ -88,7 +88,7 @@ Claim tiers:
 Intent: every session behaves the same way, learns from prior sessions, and leaves the repository
 in a state the next session can trust.
 
-Sources of truth, in order: user instructions > CLAUDE.md > this spec > `.agent/roadmap.md`
+Sources of truth, in order: user instructions > AGENTS.md/CLAUDE.md > this spec > `.agent/roadmap.md`
 (build plan) > `.agent/memory.md` (lessons). Sessions load §1–§2 plus the reading slice their
 roadmap unit names; wider loading is reserved for spec-maintenance sessions.
 
@@ -113,8 +113,8 @@ Working style:
   their output, and state verified results plainly.
 
 Session shapes — context sizing, plan-session workflows, subagent policy — live in the session
-command and the `.agent/protocol-*.md` files it routes to; commit, compaction, and memory
-discipline live in CLAUDE.md and `.agent/memory.md`.
+command; commit, compaction, and memory
+discipline live in AGENTS.md/CLAUDE.md and `.agent/memory.md`.
 
 Spec evolution: the spec grows in place. When a milestone closes (its closing review lands), the
 plan session that opens the next milestone is an elaboration session while that milestone's
@@ -204,7 +204,7 @@ Repository layout (target state; built up by the M1 units):
 
 ```text
 .
-├── SPEC.md  CLAUDE.md  LICENSE  .gitignore
+├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore
 ├── Cargo.toml  Cargo.lock
 ├── crates/{ckc-core,ckc-smt,ckc-cli}/
 ├── corpus/{test_sources,lexicon,reference}/        # committed, license-clean
@@ -212,7 +212,7 @@ Repository layout (target state; built up by the M1 units):
 │                                          # grows per milestone (§14)
 ├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
-├── .agent/{memory.md,roadmap.md,protocol-plan.md,protocol-review.md}
+├── .agent/{context.sh,memory.md,roadmap.md}
 └── .claude/
 ```
 
