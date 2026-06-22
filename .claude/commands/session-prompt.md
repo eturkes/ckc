@@ -1,6 +1,6 @@
 Continue this project (fresh session). Non-empty task below ⇒ it is your sole task: do exactly it, leaving `.agent/roadmap.md` untouched unless it directs otherwise. Empty ⇒ run the MODE selected from the roadmap's active milestone (first one not DONE/REVIEWED).
 
-Load `.agent/roadmap.md` (milestone ledger + active-milestone detail), then `.agent/memory.md` (lessons + decisions); CLAUDE.md (it imports `AGENTS.md`) is auto-injected. Read only what the step implicates — subsystem notes under `.claude/tech/*.md` (filenames index them). Navigate via LSP where available, else grep.
+Load `.agent/roadmap.md` (milestone ledger + active-milestone detail), then `.agent/memory.md` (lessons + decisions); CLAUDE.md (it imports `AGENTS.md`) is auto-injected. Read only what the step implicates. Navigate via LSP where available, else grep.
 
 MODE ← active-milestone status (each mode advances it, then closes on a scoped commit; convention at the end):
 - UNPLANNED (incl. a not-yet-split future milestone) → PLANNING
@@ -9,10 +9,10 @@ MODE ← active-milestone status (each mode advances it, then closes on a scoped
 
 After each mode's commit I compact and run `/codex-review`; you fix accepted findings in a follow-up commit. MILESTONE-REVIEW is the exception — its `/codex-review` runs without compacting. Record context-usage in WORK-UNIT only.
 
-PLANNING — split the outline into milestones if not yet split, then plan only the next milestone.
-- Read the prior milestone's commit range, especially its recorded context-usage (it right-sizes units); for the first planned milestone, the outline-seed commit(s) the roadmap names.
+PLANNING — split the scope into milestones if not yet split, then plan only the next milestone.
+- Read the prior milestone's commit range, especially its recorded context-usage (it right-sizes units); for the first planned milestone, the scope-seed commit(s) the roadmap names.
 - Gate first: a milestone gated on an unmet precondition stops here — record the standing block. Confirm the precondition functionally (resolve it through the project's pipeline/tooling); deny-listed inputs stay off-limits.
-- Plan (once unblocked): always a dynamic workflow (session routing is your standing opt-in — call `Workflow` directly, no confirmation) + web search; keep finders read-only (`Explore`) and `git status`-reconcile after, since they still hold Bash. Break the milestone into units each completable within a 200K window; sequence gate-independent prep first; flag any still-gated unit BLOCKED (planned, not yet runnable).
+- Plan (once unblocked): always a dynamic workflow (standing opt-in) + web search; finders read-only (`Explore`), then `git status`-reconcile. Break the milestone into units each completable within a 200K window; sequence gate-independent prep first; flag any still-gated unit BLOCKED (planned, not yet runnable).
 - Close: set the milestone IN-PROGRESS (units enumerated), commit `roadmap (M<m> plan): …`.
 
 WORK-UNIT.
@@ -20,9 +20,9 @@ WORK-UNIT.
 - Do: (1) restate the unit + its acceptance in one line; (2) implement, reusing modules, matching surrounding style; (3) GATE — a gated unit needs its precondition met; confirm functionally (resolve through the pipeline/tooling), deny-listed inputs off-limits; unmet ⇒ stop and report, so every result traces to real inputs; (4) VERIFY the project's quality gates pass (lint, format, type-check, tests as the roadmap defines them); touched scripts exit clean; (5) record durable lessons/decisions in `.agent/memory.md`.
 - Close: record the unit's context-usage (`.agent/context.sh`, full `pct used/window`) into the roadmap; set the unit DONE — and the milestone IMPLEMENTED if no OPEN unit remains; commit `<scope> (M<m>.<u>): …`.
 
-MILESTONE-REVIEW — I launch this with 1M context (ideally the only 1M session): hold the milestone's whole range in your own context rather than fragmenting across subagents.
+MILESTONE-REVIEW — I launch this with 1M context (ideally the only 1M session): hold it all in-context, not split across subagents.
 - Read every commit of the milestone, planning commits included.
-- Adversarially review the milestone's whole body — correctness, claim-vs-guarantee gaps, cross-unit consistency, conformance to spec/AGENTS.md/memory, token-efficiency, obsolescence — and fix what you find; amend SPEC.md when the analysis exposes a better design (requirements changes reach me first, per §1).
+- Adversarially review the milestone's whole body — correctness, claim-vs-guarantee gaps, cross-unit consistency, conformance to scope/AGENTS.md/memory, token-efficiency, obsolescence — and fix what you find; revise the scope source on a better design (requirements changes reach me first).
 - Close: set the milestone REVIEWED, commit `<scope> (M<m> review): …`. The next session plans the next milestone.
 
 Commit convention — scoped (`<scope>: …`), trace key in parens: unit `(M<m>.<u>)`, plan `(M<m> plan)`, review `(M<m> review)`. Codex-review follow-ups keep the key and add a `Codex-Review: <accepted findings>` trailer. Grep a milestone's history: `git log --grep "(M<m>[. ]"`.
