@@ -881,10 +881,10 @@ invented form beats the §10 field — is a first-class outcome.
 Committed direction:
 
 - DSL program: candidate DSLs authored at development time (§0 posture — anything proposes,
-  acceptance decides): compact concrete syntax under a grammar mask, deterministic
+  acceptance decides): compact concrete syntax under grammar constraints, deterministic
   parse → IR bridge → §6 compile; schemas, grammars, parsers, and prompt templates registered
-  per candidate (§14). `route.ckc_dsl` — model emits a compact project-born DSL under a grammar
-  mask; deterministic parse → IR → compile — is the first entry.
+  per candidate (§14). `route.ckc_dsl` — model emits a compact project-born DSL under grammar
+  constraints; deterministic parse → IR → compile — is the first entry.
 - Configurations: each candidate runs singular and layered — stacked and hop-chain compositions
   over invented and existing dialects — extending the §10 route axis under the same
   locked-measurement identity (`exp.m4_dsl`).
@@ -991,7 +991,7 @@ Stage III CDS-backend target visible behind gates.
   UCUM-compatible conversion tables; raw Japanese unit strings preserved; threshold conflicts
   compare unit-normalized values only); reference segment/statement labels for at least one real
   test source; extractor promotion claims trigger `G-EXTRACTOR-ADAPTER`.
-- Terminology: MEDIS standard masters (病名/HOT) as the first external systems behind the
+- Terminology: MEDIS standard code tables (病名/HOT) as the first external systems behind the
   TerminologyBinding requirements; version-pinned snapshots; JLAC10/11 laboratory codes registered
   next; license-encumbered vocabularies (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until
   licensing evidence exists.
@@ -1044,7 +1044,7 @@ Committed direction:
   §0-calibrated — `warrants review` by default, contradiction vocabulary only for proven
   inconsistency within supported semantics.
 - `HumanReviewRecord`: append-only reviewer-role-typed records (clinician, formalist,
-  terminology, human reviewer) attached to findings by hash, never mutating them; agreement
+  terminology, final reviewer) attached to findings by hash, never mutating them; agreement
   statistics in reports; human-reviewed-corpus claims trigger `G-REFERENCE-CORPUS`.
 - `report.html`: one self-contained deterministic bilingual review artifact per run — embedded
   canonical report/trace data plus committed content-hashed viewer assets; Japanese spans
@@ -1100,18 +1100,18 @@ stand on their own.
 | `G-SOURCE-PERMISSION` | New source family, redistribution mode, or export class. | `SourcePermissionProfile` |
 | `G-REFERENCE-CORPUS` | Human-reviewed/released corpus-quality claims. | `ReferenceCorpusEvidence` |
 | `G-EXTRACTOR-ADAPTER` | Extractor promotion or generalized extraction-quality claims. | `ExtractorAdapterRecord` |
-| `G-RET-QUALITY` | Retrieval-quality claims. | `RetrievalParityReport` |
+| `G-RET-QUALITY` | Retrieval-quality claims. | `RetrievalQualityReport` |
 | `G-PORTFOLIO` | Multi-verifier agreement/robustness claims. | `VerifierPortfolioReport` |
-| `G-ABSTRACT-DOMAIN-LOGIC-FULL` | Richer abstract-domain logic affecting accepted outputs. | `AIRDomainRecord` |
+| `G-ABSTRACT-DOMAIN-LOGIC-FULL` | Richer abstract-domain logic affecting accepted outputs. | `AbstractDomainLogicRecord` |
 | `G-REBIND` | Proof/trace transport across source or terminology editions. | `RebindingEvidence` |
-| `G-BENCHMARK-RELEASE` | Released benchmarks, corpus-scale or calibrated performance claims. | `BenchmarkRelease`, `EMinReport` |
+| `G-BENCHMARK-RELEASE` | Released benchmarks, corpus-scale or calibrated performance claims. | `BenchmarkRelease`, `BenchmarkCalibrationReport` |
 | `G-EVALUATOR-MIGRATION` | Changes to test sources/reference/schemas/metrics/evaluator code for future scoring. | `EvaluatorMigrationEvidence` |
 | `G-MDL` | Calibrated compression/Pareto/model-selection claims. | `MDLEvidence` |
-| `G-RUNTIME-REFERENCE` | Runtime-model-call or IR-processing stage oracle fidelity claims. | `RuntimeOracleReport` |
+| `G-RUNTIME-REFERENCE` | Runtime-model-call or IR-processing stage reference-fidelity claims. | `RuntimeReferenceReport` |
 | `G-AUTO-PROMOTE` | Automated registry/status promotion of accepted generators, prompts, policies, compilers, verifier adapters, metric/report code. | `AutoPromotionEvidence` |
-| `G-PROB-REASONING` | Probabilistic semantics affecting accepted outputs. | `ProbabilisticProfileRecord` |
+| `G-PROB-REASONING` | Probability-based reasoning changes accepted outputs. | `ProbabilisticProfileRecord` |
 | `G-WORLD-MODEL` | Latent-state/multimodal observations affecting outputs. | `WorldModelProfileRecord` |
-| `G-RULE-EVAL` | Patient-context rule-evaluation semantics in any shipped output. | `ExecEvalProfileRecord` |
+| `G-RULE-EVAL` | Patient-context rule-evaluation semantics in any shipped output. | `RuleEvalProfileRecord` |
 | `G-LIVE-PATIENT` | Any patient-derived data entering CKC. | `GovernedPatientDataProfile` |
 | `G-CLINICAL-REGULATORY` | Clinical/regulatory/deployment evidence status claims. | `S3AssuranceEvidence` |
 
