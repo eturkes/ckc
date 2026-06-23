@@ -34,6 +34,12 @@ project_name: "ckc"
 languages:
 - rust
 - bash
+- json
+- yaml
+- toml
+- markdown
+- html
+- lean4
 
 # the encoding used by text files in the project
 # For a list of possible encodings, see https://docs.python.org/3.11/library/codecs.html#standard-encodings
@@ -115,7 +121,6 @@ ignored_paths:
   - LICENSE
   - Cargo.lock
   - corpus/test_sources
-  - .claude/marketplace
 
 # list of additional workspace folder paths for cross-package reference support (e.g. in monorepos).
 # Paths can be absolute or relative to the project root.

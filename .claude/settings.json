@@ -10,29 +10,8 @@
       "Read(./corpus/test_sources/**)",
       "Read(./.serena/cache/**)",
       "Read(./.serena/memories/**)",
-      "Read(./.serena/project.local.yml)",
-      "Read(./.claude/marketplace/**)"
+      "Read(./.serena/project.local.yml)"
     ]
-  },
-  "enabledPlugins": {
-    "json-lsp@ckc-lsps": true,
-    "yaml-lsp@ckc-lsps": true,
-    "markdown-lsp@ckc-lsps": true,
-    "toml-lsp@ckc-lsps": true,
-    "html-lsp@ckc-lsps": true,
-    "xml-lsp@ckc-lsps": true,
-    "lean4-lsp@ckc-lsps": true,
-    "alloy-lsp@ckc-lsps": true,
-    "dolmen-lsp@ckc-lsps": true,
-    "egglog-lsp@ckc-lsps": true
-  },
-  "extraKnownMarketplaces": {
-    "ckc-lsps": {
-      "source": {
-        "source": "directory",
-        "path": ".claude/marketplace"
-      }
-    }
   },
   "hooks": {
     "PreToolUse": [

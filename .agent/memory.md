@@ -17,15 +17,20 @@ git history.
   Checked roadmap items collapse to one-line stubs (full unit text in git history).
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- LSP coverage criterion: ckc-lsps plugins and Serena languages track formats
-  whose concrete syntax gets hand-authored or byte-pinned in-repo (active:
-  rust, bash, json, yaml, toml, markdown, html, xml, smt2 via dolmen; §13-named targets:
-  lean4, alloy, egglog) — compendium-catalogued families whose registry presence is YAML
-  data carry no plugin. TLA+, ASP/Clingo, and categorical-CQL have no standalone LSP server
-  (audited); Isabelle's LSP and any Python LSP land
-  only with their adoption decisions (§13 additional-targets row; §13.1 adapter boundary).
-  dolmen-lsp deploys as a standalone copied binary with the opam tree removed — rebuild
-  recipe in its plugin README.
+- LSP coverage map (wiring is global per ~/.claude: Serena primary via per-project
+  `.serena/project.yml` `languages:`, the global `global` marketplace for solidlsp gaps —
+  no project marketplace). ckc's hand-authored/byte-pinned formats and their provider:
+  rust, bash, json, yaml, toml, markdown (Marksman, Serena-bundled), html, lean4 sit in
+  Serena `languages:`; xml, smt2 (dolmen), alloy, egglog are global plugins. Delivery
+  differs: Serena formats surface only via an explicit get_diagnostics_for_file call;
+  global-plugin formats also push passively through the harness new-diagnostics channel.
+  Add a format = list it in `languages:` if solidlsp does it (restart Claude Code to load),
+  else lean on / add a global gap plugin. §13 formal targets: alloy, egglog covered (global
+  plugins); lean4 sits in `languages:` but the Lean server starts only once .lean files
+  exist. No standalone LSP (audited): TLA+, ASP/Clingo, categorical-CQL; Isabelle lacks
+  solidlsp (global gap plugin at adoption), Python is solidlsp-covered (add to `languages:`
+  at adoption) — §13 additional-targets, §13.1 adapter boundary. Compendium families present
+  only as registry YAML data carry no LSP.
 
 ## Lessons
 
@@ -115,7 +120,7 @@ git history.
   single-`-m` ASCII commits are safe.
 - Serena symbolic tools erroring `Active languages: [...]`: add the language
   to `.serena/project.yml` `languages:` (first entry = fallback LS), then ask the user to
-  /mcp-reconnect serena (config is read only at startup); verify with a symbol call (the
+  restart Claude Code (config is read only at startup); verify with a symbol call (the
   first may lag on indexing). rustup keeps rust-analyzer current. Serena startup
   regenerates project.yml to its full annotated template whenever keys are missing — track
   the file exactly as Serena writes it; stripping it re-dirties the tree every session.
@@ -126,19 +131,23 @@ git history.
   edits roadmap.md.
 - Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
   parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
-  code spans). Serena get_diagnostics_for_file routes non-code files to the fallback LS and
-  is useless there; Marksman diagnostics reach the session only via the harness
-  new-diagnostics channel. Marksman's index honors `.ignore`/`.gitignore`/`.hgignore`
-  (Folder.fs ignoreFiles); an ignored markdown target turns valid links into "non-existent
-  document" warnings — hence docs/ sweep-exclusion lives in `.rgignore` (rg-only,
-  Marksman-invisible) and link diagnostics are trustworthy. Ignore files are read at folder
-  scan, not watched: such fixes clear at the next LSP start. Marksman is settled (kept
-  deliberately 2026-06): all three warning shapes are real quick fixes — phantom reflink:
-  backtick the notation; non-existent document: repair the link; "Ambiguous link": target
-  doc has >1 H1 (title_from_heading registers every H1 as a title; keep one, demote the
-  rest) — apply and move on, reporting only the fix. Diagnostics are unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
-  links the same code 2/Warning, so any filter kills the signal too); the off-switch is
-  markdown-lsp@ckc-lsps in settings.json enabledPlugins.
+  code spans). Marksman is Serena's markdown server (solidlsp bundles it), active because
+  `markdown` is in `.serena/project.yml` `languages:`; its diagnostics surface only via an
+  explicit get_diagnostics_for_file call (verified: source "Marksman", code 2/Warning), not
+  the harness new-diagnostics channel — that passive push was the removed standalone
+  markdown-lsp plugin's path (Serena is MCP, not a Claude Code LSP plugin), so query markdown
+  diagnostics; they no longer auto-appear on edit. Off-switch: drop `markdown` from
+  `languages:` (restart Claude Code to apply). Marksman's index honors
+  `.ignore`/`.gitignore`/`.hgignore` (Folder.fs ignoreFiles); an ignored markdown target
+  turns valid links into "non-existent document" warnings — hence docs/ sweep-exclusion
+  lives in `.rgignore` (rg-only, Marksman-invisible) and link diagnostics are trustworthy.
+  Ignore files are read at folder scan, not watched: such fixes clear at the next LSP start.
+  Marksman is settled (kept deliberately 2026-06): all three warning shapes are real quick
+  fixes — phantom reflink: backtick the notation; non-existent document: repair the link;
+  "Ambiguous link": target doc has >1 H1 (title_from_heading registers every H1 as a title;
+  keep one, demote the rest) — apply and move on, reporting only the fix. Diagnostics are
+  unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
+  links the same code 2/Warning, so any filter kills the signal too).
 - Serena replace_symbol_body spans the preceding doc comment AND outer
   `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
   way). Include the leading `///` lines and every attribute, or edit inner regions with
