@@ -83,7 +83,7 @@ Claim tiers:
 | `s2_research_evidence` | s1 plus valid benchmark/gate evidence for a stated research claim. |
 | `s3_clinical_regulatory` | s2 plus clinical/regulatory/deployment assurance evidence. |
 
-## §1 Operating contract
+## §1 Operating requirements
 
 Intent: every session behaves the same way, learns from prior sessions, and leaves the repository
 in a state the next session can trust.
@@ -107,7 +107,7 @@ Unit discipline:
 
 Working style:
 
-- When you have enough information to act, act; bring contract-changing decisions, destructive
+- When you have enough information to act, act; bring operation-changing decisions, destructive
   actions, and genuine scope changes to the user, and proceed on everything else.
 - Audit every progress claim against a tool result from the current session; report failures with
   their output, and state verified results plainly.
