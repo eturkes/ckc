@@ -1382,8 +1382,8 @@ mod tests {
 
     fn producer() -> Producer {
         Producer {
-            pipeline_id: id("cand.m1"),
-            pipeline_step_id: id("processing_stage.normalize"),
+            pipeline_id: id("pipe.test"),
+            pipeline_step_id: id("processing_stage.test.normalize"),
             toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
         }
     }

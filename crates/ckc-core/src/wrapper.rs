@@ -453,8 +453,8 @@ mod tests {
             artifact_id: id("artifact.a"),
             artifact_kind: id("test_kind"),
             producer: Producer {
-                pipeline_id: id("cand.base"),
-                pipeline_step_id: id("comp.unit"),
+                pipeline_id: id("pipe.base"),
+                pipeline_step_id: id("processing_stage.base.unit"),
                 toolchain_manifest_hash: h('b'),
             },
             input_hashes: vec![h('a')],
@@ -496,7 +496,7 @@ mod tests {
                 r#""diagnostics":[],"evidence_status":"mechanical_evidence_status","#,
                 r#""external_effects":[],"input_hashes":["{}"],"#,
                 r#""origin":"deterministic_compiler","payload":"payload.v","#,
-                r#""producer":{{"pipeline_id":"cand.base","pipeline_step_id":"comp.unit","#,
+                r#""producer":{{"pipeline_id":"pipe.base","pipeline_step_id":"processing_stage.base.unit","#,
                 r#""toolchain_manifest_hash":"{}"}},"runtime_metadata":{{"run_id":"run.1"}},"#,
                 r#""schema_id":"schema.test","schema_version":"ckc.1","#,
                 r#""trace_refs":["trace.t1"]}}"#
@@ -587,8 +587,8 @@ mod tests {
         EventRecord {
             event_id: id("event.1"),
             run_id: id("run.20260610"),
-            pipeline_id: id("cand.base"),
-            pipeline_step_id: id("comp.extract"),
+            pipeline_id: id("pipe.base"),
+            pipeline_step_id: id("processing_stage.base.extract"),
             processing_stage: id("extract"),
             log_level: id("info"),
             event_sequence_number: 3,
@@ -612,8 +612,8 @@ mod tests {
                 r#"{{"diagnostics":[],"duration_ms":"1000","#,
                 r#""ended_at":"2026-06-10T06:30:01Z","event_id":"event.1","#,
                 r#""event_sequence_number":"3","input_hashes":["{}"],"log_level":"info","#,
-                r#""outcome":"ok","output_hashes":["{}"],"pipeline_id":"cand.base","#,
-                r#""pipeline_step_id":"comp.extract","processing_stage":"extract","#,
+                r#""outcome":"ok","output_hashes":["{}"],"pipeline_id":"pipe.base","#,
+                r#""pipeline_step_id":"processing_stage.base.extract","processing_stage":"extract","#,
                 r#""resource_counters":{{"tokens":"42"}},"run_id":"run.20260610","#,
                 r#""started_at":"2026-06-10T06:30:00Z"}}"#
             ),

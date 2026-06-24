@@ -567,8 +567,8 @@ mod tests {
             provenance: Provenance::Synthetic,
             data_class: DataClass::None,
             producer: Producer {
-                pipeline_id: id("cand.m1"),
-                pipeline_step_id: id("processing_stage.extract"),
+                pipeline_id: id("pipe.test"),
+                pipeline_step_id: id("processing_stage.test.extract"),
                 toolchain_manifest_hash: Hash::new(format!("sha256:{}", "0".repeat(64))).unwrap(),
             },
         }

@@ -350,7 +350,7 @@ mod tests {
             artifact_id: id(kind),
             artifact_kind: id(kind),
             producer: Producer {
-                pipeline_id: id("cand.t"),
+                pipeline_id: id("pipe.t"),
                 pipeline_step_id: id("processing_stage.t.trace"),
                 toolchain_manifest_hash: hash('f'),
             },

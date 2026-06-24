@@ -1640,8 +1640,8 @@ mod tests {
             artifact_id: id(artifact_id),
             artifact_kind: id(kind),
             producer: Producer {
-                pipeline_id: id("cand.test"),
-                pipeline_step_id: id("comp.test"),
+                pipeline_id: id("pipe.test"),
+                pipeline_step_id: id("processing_stage.test"),
                 toolchain_manifest_hash: hash('f'),
             },
             input_hashes: vec![],
@@ -2047,8 +2047,8 @@ mod tests {
     /// Inert processing_stage producer (real producer values are run.rs's concern).
     fn live_producer() -> Producer {
         Producer {
-            pipeline_id: id("cand.m1"),
-            pipeline_step_id: id("processing_stage.trace"),
+            pipeline_id: id("pipe.test"),
+            pipeline_step_id: id("processing_stage.test.trace"),
             toolchain_manifest_hash: hash('f'),
         }
     }
