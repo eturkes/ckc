@@ -1641,7 +1641,7 @@ mod tests {
             artifact_kind: id(kind),
             producer: Producer {
                 pipeline_id: id("pipe.test"),
-                pipeline_step_id: id("processing_stage.test"),
+                pipeline_step_id: id(&format!("processing_stage.test.{kind}")),
                 toolchain_manifest_hash: hash('f'),
             },
             input_hashes: vec![],
