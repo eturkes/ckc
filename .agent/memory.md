@@ -1,9 +1,10 @@
 # Agent Memory
 
 Entries must add value beyond the spec, AGENTS.md/CLAUDE.md, codebase, git history, and runtime
-environment. Exception: high-value reminders that are derivable but easily forgotten under
-token pressure. Entries are consolidated aggressively; full pre-consolidation text lives in
-git history.
+environment — project-independent tooling pitfalls (RTK, Headroom, Serena, Claude Code, web
+access) live in the global `~/.claude/CLAUDE.md`, not here. Exception: high-value reminders that
+are derivable but easily forgotten under token pressure. Entries are consolidated aggressively;
+full pre-consolidation text lives in git history.
 
 ## Policy
 
@@ -71,38 +72,11 @@ git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
-- Web search default: WebFetch on `https://lite.duckduckgo.com/lite/?q=<query>` (sandbox
-  curl gets a bot wall). Targeted channels: crates.io via curl with a `-A` user-agent
-  header (403 without) — detail /api/v1/crates/NAME, search /crates?q=; GitHub
-  /search/repositories?q=; Wikipedia opensearch. The WebSearch tool 400s on this model
-  line (the API rejects its forced tool_choice; the error arrives INLINE in an ok-looking
-  result) — a PreToolUse hook (`.claude/hooks/deny-websearch.sh`, wired in settings.json)
-  denies it with this redirect; Workflow agent() `schema` verified unaffected. Re-test on
-  Claude Code update or model-line change (last 2026-06-12: still broken): drop the
-  settings.json hooks entry, ToolSearch-load WebSearch, one query, read the body; healed →
-  delete hook script + entry and collapse this entry to its working-channels half.
-  Meta-rule: the session that FIRST hits an environment/tool failure records it in that
-  same session.
-- Turn-halting `API Error: <ConnectionTerminated error_code:0 ...>` = the
-  upstream HTTP/2 connection rotated mid-stream (GOAWAY surfacing through the Headroom
-  proxy); mid-stream POSTs are SDK-unretryable, so the turn halts. Transient and
-  content-independent. Recovery: session context survives — `git status` to confirm tree
-  state, then continue the interrupted action.
-- RTK mangles `git commit` carrying multiple `-m` values with non-ASCII (§,
-  em-dash): args drop/split, the commit silently never lands while RTK prints ok (the add
-  staged). Commit such messages from a file — `git commit -F <path>`, then rm it. Plain
-  single-`-m` ASCII commits are safe.
-- Serena symbolic tools erroring `Active languages: [...]`: add the language
-  to `.serena/project.yml` `languages:` (first entry = fallback LS), then ask the user to
-  restart Claude Code (config is read only at startup); verify with a symbol call (the
-  first may lag on indexing). rustup keeps rust-analyzer current. Serena startup
-  regenerates project.yml to its full annotated template whenever keys are missing — track
-  the file exactly as Serena writes it; stripping it re-dirties the tree every session.
-- Headroom-compressed Reads re-wrap long prose lines (roadmap.md, Rust
-  doc-comment blocks), so an Edit old_string assembled from such a Read can miss the file's
-  real wrap points. Print the target lines raw (`sed -n`/grep) and anchor on those bytes;
-  the Edit error's `\uXXXX` hint points the wrong way. Recurs in every closing commit that
-  edits roadmap.md.
+- WebSearch is denied here by a PreToolUse hook (`.claude/hooks/deny-websearch.sh`, wired in
+  `settings.json`) because the tool 400s on this model line — the global `~/.claude/CLAUDE.md`
+  carries the why and the web-access channels to use instead. Re-test/heal: drop the
+  `settings.json` hooks entry, ToolSearch-load WebSearch, run one query; healed → delete the
+  hook script + entry and this note.
 - Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
   parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
   code spans). Marksman is Serena's markdown server (solidlsp bundles it), active because
@@ -122,44 +96,6 @@ git history.
   keep one, demote the rest) — apply and move on, reporting only the fix. Diagnostics are
   unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
   links the same code 2/Warning, so any filter kills the signal too).
-- Serena replace_symbol_body spans the preceding doc comment AND outer
-  `#[...]` attributes — a replacement body omitting them deletes them (lost a derive this
-  way). Include the leading `///` lines and every attribute, or edit inner regions with
-  replace_content instead. Recurs with derive-heavy enums.
-- RTK rewriting can falsify output, both directions: `diff`
-  printed "identical" for differing files; standalone `grep` becomes rg (write rg-syntax
-  patterns) while piped/compound grep falls through to real grep (plain `grep -E`; rg-only
-  flags fail); a bare `rg` call can become real grep; combined grep short flags reparse as
-  rg flags (`grep -rln` ran as rg `-r ln` = --replace ln: zero output, no error); `git log`
-  piped output silently truncates at 50 entries with no marker — full listings and
-  counts via `rtk proxy git log` or `git rev-list --count`. Treat
-  unexpected empty/odd search output as rewrite-suspect and re-run under `rtk proxy rg`;
-  prove byte-equality with `cmp`/`sha256sum` only; real diffs via `git diff --no-index` or
-  `rtk proxy diff`. Critical wherever byte-compatibility is the acceptance bar.
-- Editing-tool string parameters decode `\uXXXX` escapes — and only those
-  (`\n`, `\xNN` pass through) — so source that must contain a literal backslash-u gets
-  silently corrupted and often still compiles. Express such bytes without that substring
-  (byte-array literal with `0x5c` for the backslash) and read the region back after
-  writing. Recurs in escape-syntax tests (wire parsers).
-- Subagent window = session window; the launch flag decides both. The user
-  toggles 200K/1M solely by prefixing `claude` with `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
-  (terminal-only; settings carry only model slugs); the flag gates the 1M beta header
-  process-wide (v2.1.170 short-circuits both 1M paths: `[1m]` suffix parse and the
-  always-1M model allowlist). Flag on — every non-review session — leaves the global
-  `CLAUDE_CODE_SUBAGENT_MODEL=<model>[1m]` slug silently inert: every subagent caps
-  at 200K. Flag off (review sessions): subagents get 1M via both paths. The slug keeps
-  `[1m]` by user choice; a subagent env block echoing it verifies model selection only,
-  never the effective window. Overflow = hard mid-task death (subagents never compact):
-  the API rejects the next request, the Agent result carries an INLINE `Prompt is too
-  long` (tool_uses > 0, subagent_tokens 0, no exception, no result); pinned by a probe of
-  ~19K-token reads dying at read 10, the 200K boundary. Sizing: in 200K sessions budget
-  every subagent at 200K with margin — a read+rewrite agent handles ~40KB text (~100K
-  peak); chunk larger rewrites at section boundaries and processing stage outputs for main-session
-  assembly. Per-agent transcripts:
-  `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl` (assistant
-  `.message.usage`; rejected requests log no usage). `.agent/context.sh` reads the same flag and
-  gauges the main loop only.
-
 - Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - "Oracle" has two senses; the `terms:`/`codex:` cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim one — `runtime-oracle` → `runtime reference` across IDs/types/prose (results are locked measurements, not an authority on real-world truth). Scope: SPEC.md + Rust + registry/corpus/reference data + IDs + config; `docs/` excluded. The commits cite a replacement map whose contents aren't recoverable from git — so "the map omitted generic `oracle`" is inference; what's verifiable is that only runtime-oracle terms were swapped. The TEST-ORACLE sense (authority deciding a test's pass/fail vs. the reference) persists in `run_oracle.rs` (file + `run_oracle_*` fn) and `rules.rs` (`// THE oracle`); those files passed through the sweep commits unrenamed — survival, not a documented approval — and the phrasing recurs in out-of-scope `docs/` ("test oracle"/"SAT oracle"/"perfect oracle") as ordinary technical usage (corroboration, not proof). SPEC.md has zero "oracle"; no instruction mandates global removal (nearest pull: the general "plain operational words over research jargon" line above). Decision: NARROW — leave the test-sense as-is. A global test-sense retirement (`run_oracle.rs`→`run_reference_check.rs`) stays an OPEN user/style call.
