@@ -53,7 +53,7 @@ use crate::shell::{
 };
 use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_trace};
 
-/// §5 lexicon evidence_status the normalize processing_stage consumes (module doc in
+/// §5 lexicon reference file the normalize processing_stage consumes (module doc in
 /// [`crate::normalize`]), read from the invocation root like the registries.
 const LEXICON_FILE: &str = "corpus/lexicon/ja_core.yaml";
 
@@ -106,7 +106,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     let Some(resolved) = resolve(root, experiment_id, shell) else {
         return;
     };
-    // §7.2's lexicon hash rides the raw evidence_status-file bytes (§4.4: the
+    // §7.2's lexicon hash rides the raw reference-file bytes (§4.4: the
     // lexicon is a file, not an accepted artifact), taken here where the
     // run already holds them.
     let (lexicon, lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
@@ -335,7 +335,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
 /// document's [`DocTrace`] — every landing recorded as it happens, the
 /// bundle wrapper riding whole as the group processing_stages' input — beside its
 /// landed source-graph wrapper when extract succeeded (the report processing_stage's
-/// quoted-span evidence_status), or `None` when the corpus file itself was
+/// quoted-span source), or `None` when the corpus file itself was
 /// unreadable (command-scope diagnostic: without source bytes there is no
 /// hash to ground a trace node).
 fn document_pipeline(

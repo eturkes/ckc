@@ -1,7 +1,7 @@
 //! Wrapper content and policy hashes (SPEC §4.3, §4.4).
 //!
 //! SPEC §4.3 fixes `content_hash = sha256(canonical_payload_bytes(payload))`.
-//! [`content_hash`] is that single evidence_status, wrapping the digest as the [`Hash`]
+//! [`content_hash`] is that single function, wrapping the digest as the [`Hash`]
 //! value type; [`hash_bytes`] exposes the underlying sha256-over-raw-bytes step
 //! for the §4.4 `_hash` fields that declare raw-byte hashing. The descriptor
 //! [`CanonicalizationPolicy`] names the canonical-bytes policy, and
@@ -17,7 +17,7 @@ use crate::id::Hash;
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
 /// SPEC §4.3 `content_hash = sha256(canonical_payload_bytes(payload))`, wrapped as
-/// the [`struct@Hash`] value type. The one evidence_status for an artifact's content hash;
+/// the [`struct@Hash`] value type. The one mechanism for an artifact's content hash;
 /// fails only when `value` cannot be canonicalized.
 pub fn content_hash<T: Canonical>(value: &T) -> Result<Hash, CanonError> {
     Ok(hash_bytes(&canonical_payload_bytes(value)?))

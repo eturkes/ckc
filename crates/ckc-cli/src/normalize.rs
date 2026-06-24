@@ -3,7 +3,7 @@
 //! [`NormativeRule`](ckc_core::NormativeRule) derivation lives in [`crate::rules`].
 //!
 //! [`load_lexicon`] strict-deserializes `corpus/lexicon/ja_core.yaml` — the
-//! §5 M1 terminology and modality evidence_status (system `ckc.lex`) — and
+//! §5 M1 terminology and modality reference (system `ckc.lex`) — and
 //! validates it into the typed [`Lexicon`], content-hash versioned over its
 //! raw file bytes (§4.4 raw-byte hashing) for every run manifest. Every
 //! surface form is stored normalized under [`StringPolicy::SemanticJa`]

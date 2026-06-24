@@ -1,6 +1,6 @@
 //! Canonical JSON payload bytes — writer core (SPEC §4.3).
 //!
-//! [`canonical_payload_bytes`] is the single evidence_status that turns a typed value
+//! [`canonical_payload_bytes`] is the single function that turns a typed value
 //! into the deterministic UTF-8 bytes hashed into an artifact's `content_hash`.
 //! `core-canon-writer` delivered the scalar + object writer core,
 //! `core-canon-collections` added the array, set, and map rules,

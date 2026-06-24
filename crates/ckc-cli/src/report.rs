@@ -210,7 +210,7 @@ pub struct Report {
     pub corpus_hashes: Vec<(Id, Hash)>,
     pub diagnostics_summary: Vec<(Id, u64)>,
     pub findings: Vec<ReportFinding>,
-    /// Raw-byte hash of the §5 lexicon evidence_status file (§4.4: the lexicon
+    /// Raw-byte hash of the §5 lexicon reference file (§4.4: the lexicon
     /// is a file, not an accepted artifact).
     pub lexicon_hash: Hash,
     pub no_conflict_results: Vec<ReportFinding>,

@@ -207,7 +207,7 @@ impl CanonRead for VerifierResult {
 /// when Q1 answered sat — the payload of the run layout's
 /// `groups/<gid>/verifier_results.json`. Order is producer-owned:
 /// [`verify`](crate::verify) yields it by construction, and the compiled
-/// artifact's plan stays the order evidence_status.
+/// artifact's plan stays the order source of truth.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifierResults {
     pub results: Vec<VerifierResult>,

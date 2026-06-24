@@ -19,7 +19,7 @@
 //! - [`segment`] — the graph's spans classified in reading order into §5
 //!   ClinicalSegments (cq, recommendation, exception, definition, table-row,
 //!   evidence, metadata), misses as `segmentation_boundary_error` residuals.
-//! - [`normalize`] — the §5 lexicon evidence_status `corpus/lexicon/ja_core.yaml`
+//! - [`normalize`] — the §5 lexicon reference file `corpus/lexicon/ja_core.yaml`
 //!   strict-loaded into the typed [`normalize::Lexicon`] (semantic_ja
 //!   surfaces, `surfaces[0]` representative, §5-coherent intervals, raw-byte
 //!   content hash for manifests); mention binding

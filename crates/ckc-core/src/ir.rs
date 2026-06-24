@@ -5,7 +5,7 @@
 //! NormIR ([`NormIr`]) — [`NormativeRule`]s over [`ContextExpr`] guards — and
 //! FormalIR ([`FormalIr`]) — target-independent [`FormalConstraint`]s plus
 //! the [`ContradictionQueryPair`] contradiction-query plan.
-//! Layers hold references into the graph; the graph stays the byte evidence_status.
+//! Layers hold references into the graph; the graph stays the byte source of truth.
 //! [`Normalization`] pairs the ClinicalIR and NormIR layers as the §8.3
 //! normalize-processing_stage wrapper payload (`normalization.json`).
 //!

@@ -36,7 +36,7 @@ fieldless_enum! {
 }
 
 /// One `registry/corpora.yaml` entry: a corpus document accepted with the
-/// §8.2 fields — a working example of acceptance-over-proposer evidence_status
+/// §8.2 fields — a working example of acceptance-over-proposer precedence
 /// (`ai_generated` origin under `source_evidence_status`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -2035,7 +2035,7 @@ mod tests {
         std::fs::read(format!("{dir}{name}")).unwrap()
     }
 
-    /// The committed §5 lexicon evidence_status, loaded.
+    /// The committed §5 lexicon reference file, loaded.
     fn committed_lexicon() -> Lexicon {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
