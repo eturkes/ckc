@@ -17,7 +17,7 @@
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -40,6 +40,15 @@ const POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// bound is a pipe held open by an orphaned grandchild, and the runner
 /// snapshots partial output and detaches rather than wait it out.
 const DRAIN_GRACE: Duration = Duration::from_secs(1);
+
+/// ETXTBSY grace for spawning. A freshly written stub or just-linked binary
+/// can briefly carry a write fd inherited by a sibling fork in a
+/// multithreaded spawn, so `execve` races to `ExecutableFileBusy`; the
+/// window clears in microseconds, so the spawn is retried under this bound.
+/// A missing or unexecutable binary fails with a different kind and returns
+/// at once, and a busy state outliving the grace surfaces as the failure it
+/// is.
+const SPAWN_BUSY_GRACE: Duration = Duration::from_millis(250);
 
 /// SPEC §6/§8.3 Z3 adapter: one solver binary plus the [`SolverIdentity`]
 /// parsed live from its `--version` reply at construction. Queries run via
@@ -230,6 +239,31 @@ fn drain<R: Read + Send + 'static>(pipe: R) -> (JoinHandle<()>, Arc<Mutex<Vec<u8
     (handle, buf)
 }
 
+/// Spawn `program args` with all three stdio streams piped, retrying only
+/// on `ExecutableFileBusy` (ETXTBSY) within [`SPAWN_BUSY_GRACE`]. Every
+/// other error returns at once, preserving the caller's spawn-failure
+/// mapping.
+fn spawn_piped(program: &Path, args: &[&str]) -> std::io::Result<Child> {
+    let deadline = Instant::now() + SPAWN_BUSY_GRACE;
+    loop {
+        match Command::new(program)
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy
+                    && Instant::now() < deadline =>
+            {
+                thread::sleep(POLL_INTERVAL);
+            }
+            settled => return settled,
+        }
+    }
+}
+
 /// Spawn `program args`, feed `stdin_bytes`, and wait at most `budget`
 /// wall-clock time, polling every [`POLL_INTERVAL`] and killing on expiry.
 /// Stdin is written from its own thread (a write error means the child
@@ -241,13 +275,7 @@ fn drain<R: Read + Send + 'static>(pipe: R) -> (JoinHandle<()>, Arc<Mutex<Vec<u8
 /// while pipes held open past the kill (an orphaned grandchild) cannot
 /// stall the runner.
 fn run_process(program: &Path, args: &[&str], stdin_bytes: &[u8], budget: Duration) -> SolverRun {
-    let mut child = match Command::new(program)
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
+    let mut child = match spawn_piped(program, args) {
         Ok(child) => child,
         Err(error) => {
             return SolverRun {
@@ -543,6 +571,74 @@ mod tests {
             }
             other => panic!("expected probe failure, got {other:?}"),
         }
+    }
+
+    // ETXTBSY recover: an open write fd makes `execve` race to
+    // `ExecutableFileBusy`, so spawn_piped's first attempt fails and it must
+    // retry; releasing the fd well inside the grace lets a later attempt
+    // win. A deterministic stand-in for the parallel fork/exec race the
+    // retry exists to absorb. Recovery (`Ok`) is reachable only by retrying
+    // after the release, so it alone proves the loop.
+    #[test]
+    fn spawn_piped_retries_through_etxtbsy() {
+        let path = stub("etxtbsy_recover", "exit 0");
+        let writer = fs::OpenOptions::new().write(true).open(&path).unwrap();
+        let probe_path = path.clone();
+        let attempt = thread::spawn(move || spawn_piped(&probe_path, &[]));
+
+        // Hold the fd long enough that the attempt thread has surely spun,
+        // yet far short of the grace, then release.
+        thread::sleep(Duration::from_millis(60));
+        drop(writer);
+
+        attempt
+            .join()
+            .unwrap()
+            .expect("spawn must recover once the write fd closes")
+            .wait()
+            .unwrap();
+        fs::remove_file(&path).unwrap();
+    }
+
+    // ETXTBSY surface: a write fd held for the whole grace keeps every
+    // attempt busy, so spawn_piped stays bounded — it returns the
+    // `ExecutableFileBusy` error after the grace rather than spinning on.
+    #[test]
+    fn spawn_piped_surfaces_persistent_etxtbsy() {
+        let path = stub("etxtbsy_surface", "exit 0");
+        let writer = fs::OpenOptions::new().write(true).open(&path).unwrap();
+
+        let start = Instant::now();
+        let result = spawn_piped(&path, &[]);
+        let elapsed = start.elapsed();
+
+        let error = result.expect_err("a persistently busy binary must not spawn");
+        assert_eq!(error.kind(), std::io::ErrorKind::ExecutableFileBusy);
+        assert!(
+            elapsed >= SPAWN_BUSY_GRACE,
+            "must retry up to the grace, gave up after {elapsed:?}"
+        );
+        drop(writer);
+        fs::remove_file(&path).unwrap();
+    }
+
+    // Only ETXTBSY is retried: a missing binary surfaces its error at once,
+    // well inside the busy grace, so unrelated spawn failures are not
+    // delayed.
+    #[test]
+    fn spawn_piped_does_not_retry_other_errors() {
+        let missing =
+            std::env::temp_dir().join(format!("ckc-verify-absent-{}", std::process::id()));
+        let start = Instant::now();
+        let result = spawn_piped(&missing, &[]);
+        let elapsed = start.elapsed();
+
+        let error = result.expect_err("a missing binary must fail to spawn");
+        assert_ne!(error.kind(), std::io::ErrorKind::ExecutableFileBusy);
+        assert!(
+            elapsed < SPAWN_BUSY_GRACE,
+            "non-busy errors must not retry, took {elapsed:?}"
+        );
     }
 
     // A program answering `--version` with no version token fails
