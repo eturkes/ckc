@@ -66,7 +66,7 @@ fieldless_enum! {
 /// (`action`/`concept`), whose canonical bytes are their structural bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentRecord {
-    pub pipeline_step_id: Id,
+    pub ir_component_id: Id,
     pub kind: ComponentKind,
     pub structural_hash: Hash,
     pub use_sites: Vec<Id>,
@@ -75,8 +75,8 @@ pub struct ComponentRecord {
 impl Canonical for ComponentRecord {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
+        obj.member("ir_component_id", |b| self.ir_component_id.emit_canonical(b))?;
         obj.member("kind", |b| self.kind.emit_canonical(b))?;
-        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
         obj.member("structural_hash", |b| {
             self.structural_hash.emit_canonical(b)
         })?;
@@ -88,13 +88,13 @@ impl Canonical for ComponentRecord {
 impl CanonRead for ComponentRecord {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
+        let ir_component_id = obj.member("ir_component_id", Id::read)?;
         let kind = obj.member("kind", ComponentKind::read)?;
-        let pipeline_step_id = obj.member("pipeline_step_id", Id::read)?;
         let structural_hash = obj.member("structural_hash", Hash::read)?;
         let use_sites = obj.member("use_sites", read_set::<Id>)?;
         obj.close()?;
         Ok(ComponentRecord {
-            pipeline_step_id,
+            ir_component_id,
             kind,
             structural_hash,
             use_sites,
@@ -463,7 +463,7 @@ pub fn derive_components(
 
 /// Build a record with use sites sorted by id bytes and deduped.
 fn record(
-    pipeline_step_id: Id,
+    ir_component_id: Id,
     kind: ComponentKind,
     structural_hash: Hash,
     mut use_sites: Vec<Id>,
@@ -471,7 +471,7 @@ fn record(
     use_sites.sort_by(|a, b| a.as_str().cmp(b.as_str()));
     use_sites.dedup();
     ComponentRecord {
-        pipeline_step_id,
+        ir_component_id,
         kind,
         structural_hash,
         use_sites,
@@ -1073,7 +1073,7 @@ mod tests {
             .iter()
             .map(|r| {
                 (
-                    r.pipeline_step_id.as_str(),
+                    r.ir_component_id.as_str(),
                     r.kind.as_str(),
                     r.use_sites.iter().map(Id::as_str).collect(),
                 )
@@ -1115,7 +1115,7 @@ mod tests {
             bundle
                 .components
                 .iter()
-                .find(|r| r.pipeline_step_id.as_str() == want)
+                .find(|r| r.ir_component_id.as_str() == want)
                 .unwrap()
         };
         assert_eq!(
@@ -1179,7 +1179,7 @@ mod tests {
         let by_id = |want: &str| {
             records
                 .iter()
-                .find(|r| r.pipeline_step_id.as_str() == want)
+                .find(|r| r.ir_component_id.as_str() == want)
                 .unwrap()
         };
         // both constraints cite the worked pair
