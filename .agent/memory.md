@@ -14,7 +14,6 @@ git history.
   the main window. Root `.rgignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
   rg`) out of `docs/`; Bash `grep -r` still enters it — scope Bash greps by path; deliberate
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
-  Checked roadmap items collapse to one-line stubs (full unit text in git history).
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
 - LSP coverage map (wiring is global per ~/.claude: Serena primary via per-project
@@ -35,7 +34,7 @@ git history.
 ## Lessons
 
 - Unit sizing rules (consolidated from roadmap `NN%` annotations and observed 200K overruns;
-  per-incident case studies live in git history — `git log --grep "after 200K"`). Target: one
+  per-incident case studies live in git history — `git show 6e413f0^:.agent/memory.md`). Target: one
   conceptual deliverable plus one gate, finishable AND committable in one window with margin;
   prefer more, smaller units. Plan-time obligations (a violation is a planning bug): resolve
   semantic requirements decisions INTO the roadmap line (more than ~2 left open = re-scope);
