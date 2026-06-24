@@ -221,7 +221,10 @@ impl CompiledArtifact {
                 return Err(ArtifactError::EmptyBody(body.query_id.clone()));
             }
         }
-        check_set("assertion_to_source_map", self.assertion_to_source_map.iter().map(|(k, _)| k))?;
+        check_set(
+            "assertion_to_source_map",
+            self.assertion_to_source_map.iter().map(|(k, _)| k),
+        )?;
         for (assertion_id, record) in &self.assertion_to_source_map {
             if record.rule_ids.is_empty() || record.region_ids.is_empty() {
                 return Err(ArtifactError::EmptyAssertionRefs(assertion_id.clone()));
@@ -253,7 +256,9 @@ impl Canonical for CompiledArtifact {
         })?;
         obj.member("diagnostics", |b| emit_array(b, &self.diagnostics))?;
         obj.member("query_bodies", |b| emit_array(b, &self.query_bodies))?;
-        obj.member("solver_query_plan", |b| emit_array(b, &self.solver_query_plan))?;
+        obj.member("solver_query_plan", |b| {
+            emit_array(b, &self.solver_query_plan)
+        })?;
         obj.member("target_id", |b| self.target_id.emit_canonical(b))?;
         obj.member("target_metadata", |b| {
             let texts: Vec<RawValue> = self
@@ -270,10 +275,12 @@ impl Canonical for CompiledArtifact {
 impl CanonRead for CompiledArtifact {
     fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
         let mut obj = ObjectReader::open(r)?;
-        let assertion_to_source_map = obj.member("assertion_to_source_map", read_map::<Id, AssertionRecord>)?;
+        let assertion_to_source_map =
+            obj.member("assertion_to_source_map", read_map::<Id, AssertionRecord>)?;
         let diagnostics = obj.member("diagnostics", read_array::<DiagnosticRecord>)?;
         let query_bodies = obj.member("query_bodies", read_array::<QueryBody>)?;
-        let solver_query_plan = obj.member("solver_query_plan", read_array::<ContradictionQueryPair>)?;
+        let solver_query_plan =
+            obj.member("solver_query_plan", read_array::<ContradictionQueryPair>)?;
         let target_id = obj.member("target_id", Id::read)?;
         let target_metadata = obj.member("target_metadata", |r| {
             Ok(read_map::<Id, RawValue>(r)?
@@ -692,7 +699,8 @@ mod tests {
         );
         // Suffix rule absent from rule_ids.
         let mut unbound = sample_artifact();
-        unbound.assertion_to_source_map[0].1.rule_ids = vec![id("test_source.m1_guideline_b.rule.0")];
+        unbound.assertion_to_source_map[0].1.rule_ids =
+            vec![id("test_source.m1_guideline_b.rule.0")];
         assert_eq!(
             unbound.validate(),
             Err(ArtifactError::AssertionForm(id(

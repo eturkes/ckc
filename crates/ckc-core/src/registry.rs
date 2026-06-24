@@ -21,8 +21,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::enums::{EvidenceStatus, Origin, fieldless_enum};
-use crate::source_linkage::Provenance;
 use crate::id::Id;
+use crate::source_linkage::Provenance;
 
 fieldless_enum! {
     /// SPEC §8.4 stage-component determinism class. Every M1 component is
@@ -218,7 +218,11 @@ pub enum RegistryFinding {
     },
     /// §8.4 chain rule: the processing_stage consumes an artifact kind no predecessor
     /// in the pipeline produces.
-    ChainBreak { pipeline: Id, processing_stage: Id, kind: Id },
+    ChainBreak {
+        pipeline: Id,
+        processing_stage: Id,
+        kind: Id,
+    },
     /// An experiment's expected-outcome ref matches no loaded reference document.
     ReferenceUnresolved { experiment: Id, path: String },
     /// A reference entry asserts a group the referencing experiment does not
@@ -332,8 +336,11 @@ pub fn validate_registries(
         "pipelines",
         &mut findings,
     );
-    let processing_stages_by_id: BTreeMap<&Id, &ProcessingStageEntry> =
-        candidates.processing_stages.iter().map(|s| (&s.id, s)).collect();
+    let processing_stages_by_id: BTreeMap<&Id, &ProcessingStageEntry> = candidates
+        .processing_stages
+        .iter()
+        .map(|s| (&s.id, s))
+        .collect();
     for pipeline in &candidates.pipelines {
         if pipeline.processing_stages.is_empty() {
             findings.push(RegistryFinding::Empty {
@@ -549,13 +556,19 @@ processing_stages:
         assert_eq!(pipe.id, id("pipe.layered_ckcir_to_smt"));
         assert_eq!(
             pipe.processing_stages,
-            vec![id("processing_stage.m1.extract"), id("processing_stage.m1.segment")]
+            vec![
+                id("processing_stage.m1.extract"),
+                id("processing_stage.m1.segment")
+            ]
         );
         let extract = &candidates.processing_stages[0];
         assert_eq!(extract.kind, id("extract"));
         assert_eq!(extract.determinism, Determinism::Deterministic);
         assert!(extract.input_artifact_kinds.is_empty());
-        assert_eq!(extract.output_artifact_kinds, vec![id("source_document_graph")]);
+        assert_eq!(
+            extract.output_artifact_kinds,
+            vec![id("source_document_graph")]
+        );
         assert_eq!(
             candidates.processing_stages[1].input_artifact_kinds,
             vec![id("source_document_graph")]
@@ -575,7 +588,10 @@ processing_stages:
         assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
         assert_eq!(
             exp.test_source_groups[1].test_sources,
-            vec![id("test_source.m1_guideline_a"), id("test_source.m1_control")]
+            vec![
+                id("test_source.m1_guideline_a"),
+                id("test_source.m1_control")
+            ]
         );
         assert_eq!(exp.seed, 42);
         assert_eq!(exp.budget[&id("solver_ms_per_query")], 10_000);
@@ -652,7 +668,10 @@ processing_stages:
             parse_corpora(CORPORA).unwrap(),
             parse_candidates(CANDIDATES).unwrap(),
             parse_experiments(EXPERIMENTS).unwrap(),
-            BTreeMap::from([(REFERENCE_PATH.to_string(), parse_reference(REFERENCE).unwrap())]),
+            BTreeMap::from([(
+                REFERENCE_PATH.to_string(),
+                parse_reference(REFERENCE).unwrap(),
+            )]),
         )
     }
 
@@ -689,7 +708,9 @@ processing_stages:
             input_artifact_kinds: vec![id("ir_bundle")],
             output_artifact_kinds: vec![id("compiled")],
         });
-        candidates.pipelines[0].processing_stages.push(id("processing_stage.m1.compile"));
+        candidates.pipelines[0]
+            .processing_stages
+            .push(id("processing_stage.m1.compile"));
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::ChainBreak {

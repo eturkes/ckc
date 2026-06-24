@@ -47,9 +47,9 @@ use crate::canon::{
 use crate::enums::{
     BindingStatus, DiagnosticCode, DiagnosticRecord, Direction, emit_payload, fieldless_enum,
 };
-use crate::source_linkage::{NodeKind, RefKind, SourceDocumentGraph, SourceNode};
 use crate::hash::hash_bytes;
 use crate::id::{Hash, Id, ValidationError};
+use crate::source_linkage::{NodeKind, RefKind, SourceDocumentGraph, SourceNode};
 
 /// Maps semantic ids to local index ids (`i0`, `i1`, …) by first occurrence.
 /// One localizer is one structural scope (module doc).
@@ -1541,8 +1541,10 @@ pub(crate) mod tests {
     use super::*;
     use crate::canon::{canonical_payload_bytes, read_strict_canonical};
     use crate::enums::Outcome;
-    use crate::source_linkage::{DataClass, Provenance, SourceDocument, EvidenceRegion, SourceTextSpan};
     use crate::hash::content_hash;
+    use crate::source_linkage::{
+        DataClass, EvidenceRegion, Provenance, SourceDocument, SourceTextSpan,
+    };
 
     pub(crate) fn canon<T: Canonical>(value: &T) -> String {
         String::from_utf8(canonical_payload_bytes(value).unwrap()).unwrap()

@@ -260,7 +260,7 @@ mod tests {
     use super::*;
     use crate::shell::{FinishedCommand, run_none};
     use ckc_core::{
-        EvidenceStatus, EventRecord, Hash, Origin, Producer, canonical_payload_bytes,
+        EventRecord, EvidenceStatus, Hash, Origin, Producer, canonical_payload_bytes,
         canonicalization_policy_hash, content_hash, read_jsonl,
     };
     use ckc_smt::{SolverVerdict, VerifierCategory};

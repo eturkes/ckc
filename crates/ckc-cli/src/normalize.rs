@@ -52,11 +52,11 @@ use std::fmt;
 use serde::Deserialize;
 
 use ckc_core::{
-    Action, ArtifactWrapper, EvidenceStatus, BindingStatus, CanonError, Certainty, ClinicalIr,
-    ClinicalSegment, ClinicalStatement, ContextAtom, DiagnosticCode, DiagnosticRecord, Direction,
-    ExceptionClause, Hash, Id, Normalization, Origin, Outcome, Producer, QuantityInterval,
-    SegmentIr, SegmentKind, SourceDocumentGraph, EvidenceRegion, SourceTextSpan, Strength, StringPolicy,
-    TerminologyBinding, canonicalization_policy_hash, content_hash, hash_bytes,
+    Action, ArtifactWrapper, BindingStatus, CanonError, Certainty, ClinicalIr, ClinicalSegment,
+    ClinicalStatement, ContextAtom, DiagnosticCode, DiagnosticRecord, Direction, EvidenceRegion,
+    EvidenceStatus, ExceptionClause, Hash, Id, Normalization, Origin, Outcome, Producer,
+    QuantityInterval, SegmentIr, SegmentKind, SourceDocumentGraph, SourceTextSpan, Strength,
+    StringPolicy, TerminologyBinding, canonicalization_policy_hash, content_hash, hash_bytes,
 };
 
 use crate::shell::static_id;
@@ -1376,8 +1376,8 @@ mod tests {
     use crate::extract::{ExtractConfig, extract};
     use crate::segment::segment;
     use ckc_core::{
-        ArtifactWrapper, ClinicalSegment, DataClass, Producer, Provenance,
-        canonical_payload_bytes, read_strict_canonical,
+        ArtifactWrapper, ClinicalSegment, DataClass, Producer, Provenance, canonical_payload_bytes,
+        read_strict_canonical,
     };
 
     fn producer() -> Producer {

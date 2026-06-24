@@ -422,7 +422,14 @@ mod tests {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
         for command in [
-            &["ckc", "trace", "--experiment", "exp.m1_scaffold", "--out", "x"][..],
+            &[
+                "ckc",
+                "trace",
+                "--experiment",
+                "exp.m1_scaffold",
+                "--out",
+                "x",
+            ][..],
             &["ckc", "run", "--experiment", "exp m1", "--out", "x"][..],
             &["ckc", "run", "--experiment", "exp.m1_scaffold"][..],
         ] {
@@ -448,8 +455,14 @@ mod tests {
     fn stale_scratch_is_rejected() {
         let root = repo_root();
         let tmp = tempfile::tempdir().unwrap();
-        let manifest =
-            synthetic_manifest(&["ckc", "run", "--experiment", "exp.m1_scaffold", "--out", "x"]);
+        let manifest = synthetic_manifest(&[
+            "ckc",
+            "run",
+            "--experiment",
+            "exp.m1_scaffold",
+            "--out",
+            "x",
+        ]);
         std::fs::write(
             tmp.path().join(REPLAY_MANIFEST),
             canonical_payload_bytes(&manifest).unwrap(),

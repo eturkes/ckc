@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ckc_core::{
-    Candidates, Certainty, CorpusEntry, Direction, ExperimentEntry, ReferenceEntry, Id, Strength,
+    Candidates, Certainty, CorpusEntry, Direction, ExperimentEntry, Id, ReferenceEntry, Strength,
     parse_candidates, parse_corpora, parse_experiments, parse_reference, validate_registries,
 };
 use serde::Deserialize;
@@ -90,18 +90,30 @@ fn registry_set_loads_and_validates() {
     assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
     assert_eq!(
         exp.test_source_groups[0].test_sources,
-        vec![id("test_source.m1_guideline_a"), id("test_source.m1_guideline_b")]
+        vec![
+            id("test_source.m1_guideline_a"),
+            id("test_source.m1_guideline_b")
+        ]
     );
-    assert_eq!(exp.test_source_groups[1].group_id, id("group.m1_no_conflict"));
+    assert_eq!(
+        exp.test_source_groups[1].group_id,
+        id("group.m1_no_conflict")
+    );
     assert_eq!(
         exp.test_source_groups[1].test_sources,
-        vec![id("test_source.m1_guideline_a"), id("test_source.m1_control")]
+        vec![
+            id("test_source.m1_guideline_a"),
+            id("test_source.m1_control")
+        ]
     );
     assert!(exp.budget.contains_key(&id("solver_ms_per_query")));
 
     // The pipeline chains the eight §8.3 processing_stages in execution order.
-    let processing_stage_kind: BTreeMap<&Id, &Id> =
-        candidates.processing_stages.iter().map(|s| (&s.id, &s.kind)).collect();
+    let processing_stage_kind: BTreeMap<&Id, &Id> = candidates
+        .processing_stages
+        .iter()
+        .map(|s| (&s.id, &s.kind))
+        .collect();
     let kinds: Vec<&str> = candidates.pipelines[0]
         .processing_stages
         .iter()

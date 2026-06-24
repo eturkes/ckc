@@ -406,8 +406,8 @@ mod tests {
     use super::*;
     use crate::compile;
     use ckc_core::{
-        Action, ContextAtom, ContextConjunct, ContextExpr, Direction, FormalIr, NormIr, NormativeRule,
-        QuantityInterval, Strength,
+        Action, ContextAtom, ContextConjunct, ContextExpr, Direction, FormalIr, NormIr,
+        NormativeRule, QuantityInterval, Strength,
     };
 
     fn id(s: &str) -> Id {
@@ -489,11 +489,15 @@ mod tests {
             id("a.test_source.m1_guideline_b.rule.0"),
         ];
         assert_eq!(
-            parse_core("\n(a.test_source.m1_guideline_b.rule.0 a.test_source.m1_guideline_a.rule.0)\n"),
+            parse_core(
+                "\n(a.test_source.m1_guideline_b.rule.0 a.test_source.m1_guideline_a.rule.0)\n"
+            ),
             Some(want.clone())
         );
         assert_eq!(
-            parse_core("(|a.test_source.m1_guideline_a.rule.0| |a.test_source.m1_guideline_b.rule.0|)"),
+            parse_core(
+                "(|a.test_source.m1_guideline_a.rule.0| |a.test_source.m1_guideline_b.rule.0|)"
+            ),
             Some(want)
         );
         assert_eq!(parse_core("(a.r1 a.r1)"), Some(vec![id("a.r1")]));
@@ -722,7 +726,12 @@ mod tests {
     }
 
     /// A §8.6-shaped NormativeRule over the shared administer-abx_a action.
-    fn nr(rule_id: &str, direction: Direction, context: ContextExpr, regions: &[&str]) -> NormativeRule {
+    fn nr(
+        rule_id: &str,
+        direction: Direction,
+        context: ContextExpr,
+        regions: &[&str],
+    ) -> NormativeRule {
         NormativeRule {
             rule_id: id(rule_id),
             context,

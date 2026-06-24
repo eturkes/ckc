@@ -170,7 +170,10 @@ fn compile_with<'a>(
             .into_iter()
             .find(|c| atoms(&c.context).any(|atom| !in_profile(atom)))
         {
-            diagnostics.push(dropped_pair(&pair, normative_rule(&rules, &offender.rule_id)));
+            diagnostics.push(dropped_pair(
+                &pair,
+                normative_rule(&rules, &offender.rule_id),
+            ));
             continue;
         }
         query_bodies.push(emit_overlap_query(&pair, a, b));
@@ -787,7 +790,10 @@ mod tests {
         assert_eq!(
             artifact.assertion_to_source_map,
             [
-                (id("a.test_source.m1_control.rule.0"), record_control.clone()),
+                (
+                    id("a.test_source.m1_control.rule.0"),
+                    record_control.clone()
+                ),
                 (id("a.test_source.m1_guideline_a.rule.0"), record_a.clone()),
                 (id("ctx.test_source.m1_control.rule.0"), record_control),
                 (id("ctx.test_source.m1_guideline_a.rule.0"), record_a),

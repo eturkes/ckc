@@ -36,14 +36,14 @@ use crate::canon::{
     canonical_sort_key, emit_set, read_set,
 };
 use crate::enums::{DiagnosticCode, DiagnosticRecord, emit_payload, fieldless_enum, read_payload};
-use crate::source_linkage::{SourceLinkageError, SourceDocumentGraph};
 use crate::hash::{content_hash, hash_bytes};
 use crate::id::{Hash, Id};
 use crate::ir::{
     Action, ClinicalIr, ContextAtom, ContextExpr, DocIr, FormalConstraint, FormalIr, IrError,
-    NormIr, NormativeRule, QuantityInterval, RefLocalizer, SegmentIr, Structural, directions_opposed,
-    emit_structural_record_set, emit_structural_ref_set, structural_hash,
+    NormIr, NormativeRule, QuantityInterval, RefLocalizer, SegmentIr, Structural,
+    directions_opposed, emit_structural_record_set, emit_structural_ref_set, structural_hash,
 };
+use crate::source_linkage::{SourceDocumentGraph, SourceLinkageError};
 
 fieldless_enum! {
     /// SPEC §5 reusable-component kind. Population and condition reduce to
@@ -75,7 +75,9 @@ pub struct ComponentRecord {
 impl Canonical for ComponentRecord {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
-        obj.member("ir_component_id", |b| self.ir_component_id.emit_canonical(b))?;
+        obj.member("ir_component_id", |b| {
+            self.ir_component_id.emit_canonical(b)
+        })?;
         obj.member("kind", |b| self.kind.emit_canonical(b))?;
         obj.member("structural_hash", |b| {
             self.structural_hash.emit_canonical(b)
@@ -614,7 +616,9 @@ impl IrBundle {
             .filter_map(|region_id| regions.get(region_id))
             .flat_map(|nodes| nodes.iter().cloned())
             .collect();
-        graph.validate(&residuals).map_err(BundleError::SourceLinkage)?;
+        graph
+            .validate(&residuals)
+            .map_err(BundleError::SourceLinkage)?;
 
         // (3) Id uniqueness per pool.
         unique(
@@ -888,15 +892,15 @@ mod tests {
     use super::*;
     use crate::canon::read_strict_canonical;
     use crate::enums::Direction;
-    use crate::source_linkage::{
-        DataClass, NodeKind, Provenance, SourceDocument, SourceNode, EvidenceRegion, SourceTextSpan,
-    };
     use crate::ir::tests::{
         atom_c, atom_ge, atom_nc, binding_p, canon, diag, dnf1, id, pair_p, round_trip, rule_p,
         statement_p, structural,
     };
     use crate::ir::{
         ClinicalSegment, ContextConjunct, ContradictionQueryPair, SegmentKind, Strength,
+    };
+    use crate::source_linkage::{
+        DataClass, EvidenceRegion, NodeKind, Provenance, SourceDocument, SourceNode, SourceTextSpan,
     };
 
     fn pid(p: &str, tail: &str) -> Id {

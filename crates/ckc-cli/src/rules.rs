@@ -29,8 +29,8 @@
 use std::collections::HashMap;
 
 use ckc_core::{
-    ClinicalIr, ContextAtom, ContextConjunct, ContextExpr, Id, NormIr, NormativeRule, QuantityInterval,
-    SegmentIr, SegmentKind, canonical_sort_key,
+    ClinicalIr, ContextAtom, ContextConjunct, ContextExpr, Id, NormIr, NormativeRule,
+    QuantityInterval, SegmentIr, SegmentKind, canonical_sort_key,
 };
 
 use crate::normalize::Lexicon;
@@ -123,9 +123,10 @@ mod tests {
     use super::*;
 
     use ckc_core::{
-        Action, ArtifactWrapper, EvidenceStatus, Certainty, ClinicalSegment, ClinicalStatement,
-        DataClass, Direction, ExceptionClause, Hash, Normalization, Origin, Producer, Provenance,
-        SourceDocumentGraph, Strength, canonical_payload_bytes, content_hash, read_strict_canonical,
+        Action, ArtifactWrapper, Certainty, ClinicalSegment, ClinicalStatement, DataClass,
+        Direction, EvidenceStatus, ExceptionClause, Hash, Normalization, Origin, Producer,
+        Provenance, SourceDocumentGraph, Strength, canonical_payload_bytes, content_hash,
+        read_strict_canonical,
     };
 
     use crate::extract::{ExtractConfig, extract};
@@ -268,11 +269,7 @@ mod tests {
                 "{name} derives diagnostic-free, got {:?}",
                 wrapper.diagnostics
             );
-            assert_eq!(
-                wrapper.payload.norm,
-                NormIr { rules: vec![want] },
-                "{name}"
-            );
+            assert_eq!(wrapper.payload.norm, NormIr { rules: vec![want] }, "{name}");
         }
     }
 
@@ -412,7 +409,10 @@ mod tests {
             vec![source.content_hash.clone(), segments.content_hash.clone()]
         );
         assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
-        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert_eq!(
+            wrapper.evidence_status,
+            EvidenceStatus::MechanicalEvidenceStatus
+        );
         assert!(wrapper.external_effects.is_empty());
         assert!(wrapper.trace_refs.is_empty());
         assert!(wrapper.runtime_metadata.is_empty());

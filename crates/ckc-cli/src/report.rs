@@ -30,8 +30,8 @@ use std::collections::BTreeMap;
 
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, DiagnosticRecord, Hash, Id,
-    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceDocumentGraph, canonical_sort_key, emit_map,
-    emit_set, emit_string, emit_u64_map, fieldless_enum, read_map, read_set, read_string,
+    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceDocumentGraph, canonical_sort_key,
+    emit_map, emit_set, emit_string, emit_u64_map, fieldless_enum, read_map, read_set, read_string,
     read_u64_map,
 };
 use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult, VerifierResults};
@@ -325,7 +325,9 @@ impl Canonical for Report {
         })?;
         obj.member("findings", |b| emit_set(b, &self.findings))?;
         obj.member("lexicon_hash", |b| self.lexicon_hash.emit_canonical(b))?;
-        obj.member("no_conflict_results", |b| emit_set(b, &self.no_conflict_results))?;
+        obj.member("no_conflict_results", |b| {
+            emit_set(b, &self.no_conflict_results)
+        })?;
         obj.member("replay_status", |b| self.replay_status.emit_canonical(b))?;
         obj.member("solver_identity", |b| {
             self.solver_identity.emit_canonical(b)
@@ -901,8 +903,8 @@ impl std::error::Error for ReportError {}
 #[cfg(test)]
 mod tests {
     use ckc_core::{
-        DataClass, DiagnosticCode, Outcome, Provenance, SourceDocument, EvidenceRegion, SourceTextSpan,
-        canonical_payload_bytes, read_strict_canonical,
+        DataClass, DiagnosticCode, EvidenceRegion, Outcome, Provenance, SourceDocument,
+        SourceTextSpan, canonical_payload_bytes, read_strict_canonical,
     };
 
     use super::*;
@@ -930,13 +932,19 @@ mod tests {
     /// canonical order (ASCII span texts keep the byte pin stable).
     fn valid_report() -> Report {
         Report {
-            corpus_hashes: vec![(id("test_source.a"), hash('1')), (id("test_source.b"), hash('2'))],
+            corpus_hashes: vec![
+                (id("test_source.a"), hash('1')),
+                (id("test_source.b"), hash('2')),
+            ],
             diagnostics_summary: vec![(id("schema_invalid"), 1), (id("solver_timeout"), 2)],
             findings: vec![ReportFinding {
                 assertion_ids: vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")],
                 claim_tier: ClaimTier::S1Accepted,
                 conflict_kind: Some(ConflictKind::DeonticDirectionConflict),
-                core: Some(vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")]),
+                core: Some(vec![
+                    id("a.test_source.a.rule.0"),
+                    id("a.test_source.b.rule.0"),
+                ]),
                 finding_id: id("finding.group.g1.1"),
                 query_id: id("q.g1.pair1.deontic"),
                 quoted_spans: vec![
@@ -950,7 +958,10 @@ mod tests {
             }],
             lexicon_hash: hash('f'),
             no_conflict_results: vec![ReportFinding {
-                assertion_ids: vec![id("ctx.test_source.a.rule.1"), id("ctx.test_source.b.rule.1")],
+                assertion_ids: vec![
+                    id("ctx.test_source.a.rule.1"),
+                    id("ctx.test_source.b.rule.1"),
+                ],
                 claim_tier: ClaimTier::S1Accepted,
                 conflict_kind: None,
                 core: None,
@@ -1234,7 +1245,8 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.findings[0].assertion_ids = vec![id("a.test_source.a.rule.0"), id("a.test_source.a.rule.0")];
+        report.findings[0].assertion_ids =
+            vec![id("a.test_source.a.rule.0"), id("a.test_source.a.rule.0")];
         assert_eq!(
             report.validate(),
             Err(ReportError::SetDuplicate {
@@ -1252,7 +1264,10 @@ mod tests {
         );
 
         let mut report = valid_report();
-        report.findings[0].core = Some(vec![id("a.test_source.b.rule.0"), id("a.test_source.a.rule.0")]);
+        report.findings[0].core = Some(vec![
+            id("a.test_source.b.rule.0"),
+            id("a.test_source.a.rule.0"),
+        ]);
         assert_eq!(
             report.validate(),
             Err(ReportError::SetOrder { pool: "core" })
@@ -1282,7 +1297,11 @@ mod tests {
     /// A lookup-minimal SourceDocumentGraph: the spans and regions assembly
     /// resolves, document identity for the index key, empty node/anchor
     /// pools.
-    fn graph(doc: &str, spans: &[(&str, &str)], regions: &[(&str, &[&str])]) -> SourceDocumentGraph {
+    fn graph(
+        doc: &str,
+        spans: &[(&str, &str)],
+        regions: &[(&str, &[&str])],
+    ) -> SourceDocumentGraph {
         SourceDocumentGraph {
             document: SourceDocument {
                 document_id: id(doc),
@@ -1568,7 +1587,10 @@ mod tests {
 
         assert_eq!(
             report.corpus_hashes,
-            vec![(id("test_source.a"), hash('1')), (id("test_source.b"), hash('2'))]
+            vec![
+                (id("test_source.a"), hash('1')),
+                (id("test_source.b"), hash('2'))
+            ]
         );
         assert_eq!(report.lexicon_hash, hash('f'));
         assert_eq!(
@@ -1605,7 +1627,10 @@ mod tests {
         );
         assert_eq!(
             finding.core,
-            Some(vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")])
+            Some(vec![
+                id("a.test_source.a.rule.0"),
+                id("a.test_source.b.rule.0")
+            ])
         );
         assert_eq!(
             finding.rule_ids,
@@ -1640,7 +1665,10 @@ mod tests {
         assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(
             null.assertion_ids,
-            vec![id("ctx.test_source.a.rule.0"), id("ctx.test_source.b.rule.0")]
+            vec![
+                id("ctx.test_source.a.rule.0"),
+                id("ctx.test_source.b.rule.0")
+            ]
         );
         assert_eq!(null.quoted_spans.len(), 2);
     }
@@ -1654,11 +1682,9 @@ mod tests {
         read.validate().unwrap();
         // Pin the §0 spellings and the code-keyed summary form.
         let text = String::from_utf8(bytes).unwrap();
-        assert!(
-            text.contains(
-                r#""wording":["documented no-conflict result","synthetic test source measurement"]"#
-            )
-        );
+        assert!(text.contains(
+            r#""wording":["documented no-conflict result","synthetic test source measurement"]"#
+        ));
         assert!(
             text.contains(r#""diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"}"#)
         );

@@ -15,9 +15,9 @@ use std::process::Command;
 
 use ckc_cli::trace::{ConflictKind, LineageIndex, TraceBundle, TraceNodeKind};
 use ckc_core::{
-    ArtifactWrapper, CanonRead, Canonical, DiagnosticRecord, EventRecord, ReferenceEntry, Hash, Id,
-    IrBundle, Normalization, Outcome, SegmentIr, SourceDocumentGraph, TotalOperationResult,
-    parse_experiments, parse_reference, read_strict_canonical, read_jsonl,
+    ArtifactWrapper, CanonRead, Canonical, DiagnosticRecord, EventRecord, Hash, Id, IrBundle,
+    Normalization, Outcome, ReferenceEntry, SegmentIr, SourceDocumentGraph, TotalOperationResult,
+    parse_experiments, parse_reference, read_jsonl, read_strict_canonical,
 };
 use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory, VerifierResults};
 
@@ -39,8 +39,8 @@ fn id(text: &str) -> Id {
 /// from the payload).
 fn strict_read<P: Canonical + CanonRead>(path: &Path) -> ArtifactWrapper<P> {
     let bytes = std::fs::read(path).unwrap();
-    let wrapper: ArtifactWrapper<P> =
-        read_strict_canonical(&bytes).unwrap_or_else(|e| panic!("{}: strict read: {e:?}", path.display()));
+    let wrapper: ArtifactWrapper<P> = read_strict_canonical(&bytes)
+        .unwrap_or_else(|e| panic!("{}: strict read: {e:?}", path.display()));
     wrapper
         .validate()
         .unwrap_or_else(|e| panic!("{}: wrapper invariant: {e:?}", path.display()));
@@ -101,7 +101,10 @@ fn assert_group_matches_reference(
             .expect("an unsat verdict carries its core")
             .into_iter()
             .collect();
-        assert_eq!(core, entry.expected_unsat_core, "{gid}: unsat core as a set");
+        assert_eq!(
+            core, entry.expected_unsat_core,
+            "{gid}: unsat core as a set"
+        );
     } else if entry.expected_outcome == id("semantic_no_conflict") {
         // §8.5 item 6 oracle: every query closed without a contradiction;
         // the documented null is a §6 Q1-unsat closure — the overlap query
@@ -185,7 +188,8 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
         .find(|e| e.id == id("exp.m1_scaffold"))
         .unwrap();
     let reference: Vec<ReferenceEntry> =
-        parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap()).unwrap();
+        parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap())
+            .unwrap();
     assert_eq!(
         reference.len(),
         exp.test_source_groups.len(),
@@ -278,12 +282,18 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
     assert_eq!(trace.schema_id, id("schema.trace_bundle"));
     assert_eq!(trace.artifact_id, id("trace_bundle"));
     assert_eq!(trace.artifact_kind, id("trace_bundle"));
-    assert_eq!(trace.producer.pipeline_step_id, id("processing_stage.m1.trace"));
+    assert_eq!(
+        trace.producer.pipeline_step_id,
+        id("processing_stage.m1.trace")
+    );
     assert_eq!(trace.input_hashes, node_hashes);
     assert_eq!(lineage.schema_id, id("schema.lineage_index"));
     assert_eq!(lineage.artifact_id, id("lineage_index"));
     assert_eq!(lineage.artifact_kind, id("lineage_index"));
-    assert_eq!(lineage.producer.pipeline_step_id, id("processing_stage.m1.trace"));
+    assert_eq!(
+        lineage.producer.pipeline_step_id,
+        id("processing_stage.m1.trace")
+    );
     assert_eq!(lineage.input_hashes, node_hashes);
 
     // The DAG sink: exactly one report node, the only hashless one.
@@ -424,7 +434,8 @@ document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
          group group.m1_no_conflict pair q.m1_no_conflict.pair1 query q.m1_no_conflict.pair1.overlap\n"
     ));
     assert!(
-        no_conflict_stdout.contains("document test_source.m1_control path corpus/test_sources/m1_control.html\n")
+        no_conflict_stdout
+            .contains("document test_source.m1_control path corpus/test_sources/m1_control.html\n")
     );
 
     // Logs parse as their §4.6 record types; an ok total is a pure severity
@@ -552,7 +563,10 @@ mod report {
         assert_eq!(report.schema_id, id("schema.report"));
         assert_eq!(report.artifact_id, id("report"));
         assert_eq!(report.artifact_kind, id("report"));
-        assert_eq!(report.producer.pipeline_step_id, id("processing_stage.m1.report"));
+        assert_eq!(
+            report.producer.pipeline_step_id,
+            id("processing_stage.m1.report")
+        );
         assert!(report.diagnostics.is_empty());
 
         // Input set: the trace pair, the three source document graphs, the two
@@ -585,7 +599,12 @@ mod report {
         let payload = &report.payload;
         let expected_corpus: Vec<(Id, Hash)> = docs
             .iter()
-            .map(|doc| (id(doc), ckc_core::hash_bytes(test_sources[&id(doc)].as_bytes())))
+            .map(|doc| {
+                (
+                    id(doc),
+                    ckc_core::hash_bytes(test_sources[&id(doc)].as_bytes()),
+                )
+            })
             .collect();
         assert_eq!(payload.corpus_hashes, expected_corpus);
         assert_eq!(
@@ -749,7 +768,8 @@ mod report {
         for doc in docs {
             let dir = run_dir.join("artifacts").join(doc);
             output_hashes.extend([
-                strict_read::<SourceDocumentGraph>(&dir.join("source_document_graph.json")).content_hash,
+                strict_read::<SourceDocumentGraph>(&dir.join("source_document_graph.json"))
+                    .content_hash,
                 strict_read::<SegmentIr>(&dir.join("segments.json")).content_hash,
                 strict_read::<Normalization>(&dir.join("normalization.json")).content_hash,
                 strict_read::<IrBundle>(&dir.join("ir_bundle.json")).content_hash,
@@ -780,7 +800,8 @@ mod report {
         let manifest: RunManifest =
             read_strict_canonical(&std::fs::read(run_dir.join("manifest.json")).unwrap()).unwrap();
         let replay: ReplayManifest =
-            read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap();
+            read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap())
+                .unwrap();
 
         // §5 plan linkage: the plan rebuilt from the experiment registry
         // hashes to the recorded value.

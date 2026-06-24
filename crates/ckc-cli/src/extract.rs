@@ -30,10 +30,10 @@ use std::collections::HashMap;
 use std::fmt;
 
 use ckc_core::{
-    ArtifactWrapper, EvidenceStatus, CanonError, DataClass, DiagnosticCode, DiagnosticRecord,
-    SourceLinkageError, Id, NodeKind, Origin, Outcome, Producer, Provenance, SourceDocument,
-    SourceDocumentGraph, SourceNode, EvidenceRegion, SourceTextSpan, StringPolicy, canonicalization_policy_hash,
-    content_hash, hash_bytes,
+    ArtifactWrapper, CanonError, DataClass, DiagnosticCode, DiagnosticRecord, EvidenceRegion,
+    EvidenceStatus, Id, NodeKind, Origin, Outcome, Producer, Provenance, SourceDocument,
+    SourceDocumentGraph, SourceLinkageError, SourceNode, SourceTextSpan, StringPolicy,
+    canonicalization_policy_hash, content_hash, hash_bytes,
 };
 use ego_tree::NodeRef;
 use scraper::Html;
@@ -801,7 +801,10 @@ mod tests {
         assert_eq!(wrapper.artifact_kind, id("source_document_graph"));
         assert_eq!(wrapper.producer, config().producer);
         assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
-        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert_eq!(
+            wrapper.evidence_status,
+            EvidenceStatus::MechanicalEvidenceStatus
+        );
         assert!(wrapper.input_hashes.is_empty());
         assert!(wrapper.external_effects.is_empty());
         assert!(wrapper.trace_refs.is_empty());

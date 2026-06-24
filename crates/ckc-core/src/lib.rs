@@ -44,14 +44,14 @@
 mod bundle;
 mod canon;
 mod enums;
-mod wrapper;
-mod source_linkage;
 mod hash;
 mod id;
 mod ir;
 mod plans;
 mod registry;
+mod source_linkage;
 mod strings;
+mod wrapper;
 
 pub use bundle::{
     Assumption, BundleError, ComponentKind, ComponentRecord, IrBundle, LayerHashes, assemble,
@@ -60,35 +60,35 @@ pub use bundle::{
 pub use canon::{
     CanonError, CanonRead, CanonReadError, Canonical, MapKey, ObjectEmitter, ObjectReader, Reader,
     canonical_payload_bytes, canonical_sort_key, emit_array, emit_int, emit_map, emit_set,
-    emit_string, emit_string_policy, emit_u64_map, emit_union, read_array, read_strict_canonical,
-    read_int, read_map, read_set, read_string, read_string_policy, read_u64_map, read_union,
+    emit_string, emit_string_policy, emit_u64_map, emit_union, read_array, read_int, read_map,
+    read_set, read_strict_canonical, read_string, read_string_policy, read_u64_map, read_union,
 };
 pub use enums::{
-    AttemptOutcome, EvidenceStatus, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord,
-    Direction, Origin, Outcome, PromotionDecision, PromotionScope, ReviewClassification,
+    AttemptOutcome, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord, Direction,
+    EvidenceStatus, Origin, Outcome, PromotionDecision, PromotionScope, ReviewClassification,
     TotalOperationResult,
-};
-pub use wrapper::{
-    ArtifactWrapper, Effect, WrapperError, EventRecord, Producer, SCHEMA_VERSION, jsonl_line,
-    read_jsonl, write_jsonl,
-};
-pub use source_linkage::{
-    AnchorKind, DataClass, SourceLinkageError, NodeKind, Provenance, RefKind, SourceAnchor,
-    SourceDocument, SourceDocumentGraph, SourceNode, EvidenceRegion, SourceTextSpan,
 };
 pub use hash::{CanonicalizationPolicy, canonicalization_policy_hash, content_hash, hash_bytes};
 pub use id::{Hash, Id, Rational, RationalRepr, ValidationError};
 pub use ir::{
     Action, CellRole, Certainty, ClinicalIr, ClinicalSegment, ClinicalStatement, ContextAtom,
     ContextConjunct, ContextExpr, ContradictionQueryPair, DocIr, ExceptionClause, FormalConstraint,
-    FormalIr, IrError, NormIr, NormativeRule, Normalization, QuantityInterval, RefLocalizer, SegmentIr,
-    SegmentKind, Strength, Structural, TableCell, TableView, TerminologyBinding, TextBlock,
-    directions_opposed, emit_structural_ref_set, structural_hash,
+    FormalIr, IrError, NormIr, Normalization, NormativeRule, QuantityInterval, RefLocalizer,
+    SegmentIr, SegmentKind, Strength, Structural, TableCell, TableView, TerminologyBinding,
+    TextBlock, directions_opposed, emit_structural_ref_set, structural_hash,
 };
 pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use registry::{
-    Candidates, CorpusEntry, Determinism, ExperimentEntry, TestSourceGroup, ReferenceEntry, PipelineEntry,
-    RegistryError, RegistryFinding, ProcessingStageEntry, parse_candidates, parse_corpora, parse_experiments,
-    parse_reference, to_yaml, validate_registries,
+    Candidates, CorpusEntry, Determinism, ExperimentEntry, PipelineEntry, ProcessingStageEntry,
+    ReferenceEntry, RegistryError, RegistryFinding, TestSourceGroup, parse_candidates,
+    parse_corpora, parse_experiments, parse_reference, to_yaml, validate_registries,
+};
+pub use source_linkage::{
+    AnchorKind, DataClass, EvidenceRegion, NodeKind, Provenance, RefKind, SourceAnchor,
+    SourceDocument, SourceDocumentGraph, SourceLinkageError, SourceNode, SourceTextSpan,
 };
 pub use strings::StringPolicy;
+pub use wrapper::{
+    ArtifactWrapper, Effect, EventRecord, Producer, SCHEMA_VERSION, WrapperError, jsonl_line,
+    read_jsonl, write_jsonl,
+};

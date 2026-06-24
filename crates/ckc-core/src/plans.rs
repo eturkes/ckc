@@ -86,7 +86,9 @@ impl Canonical for RunPlan {
             emit_u64(b, self.seed);
             Ok(())
         })?;
-        obj.member("test_source_groups", |b| emit_set(b, &self.test_source_groups))?;
+        obj.member("test_source_groups", |b| {
+            emit_set(b, &self.test_source_groups)
+        })?;
         obj.finish(out)
     }
 }

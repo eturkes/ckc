@@ -13,9 +13,9 @@ use std::fmt;
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
     canonical_payload_bytes, emit_raw_map, emit_set, emit_string, emit_u64, emit_u64_map,
-    read_strict_canonical, read_raw_map, read_set, read_string, read_u64, read_u64_map,
+    read_raw_map, read_set, read_strict_canonical, read_string, read_u64, read_u64_map,
 };
-use crate::enums::{EvidenceStatus, DiagnosticRecord, Origin, Outcome, fieldless_enum};
+use crate::enums::{DiagnosticRecord, EvidenceStatus, Origin, Outcome, fieldless_enum};
 use crate::hash::{canonicalization_policy_hash, content_hash};
 use crate::id::{Hash, Id, ValidationError};
 
@@ -51,7 +51,9 @@ impl Canonical for Producer {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
         obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
-        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
+        obj.member("pipeline_step_id", |b| {
+            self.pipeline_step_id.emit_canonical(b)
+        })?;
         obj.member("toolchain_manifest_hash", |b| {
             self.toolchain_manifest_hash.emit_canonical(b)
         })?;
@@ -161,7 +163,9 @@ impl<P: Canonical> ArtifactWrapper<P> {
     /// both derived hash fields match recomputation, and a nonempty
     /// `external_effects` is confined to `evidence_discovery_only` evidence_status.
     pub fn validate(&self) -> Result<(), WrapperError> {
-        if !self.external_effects.is_empty() && self.evidence_status != EvidenceStatus::EvidenceDiscoveryOnly {
+        if !self.external_effects.is_empty()
+            && self.evidence_status != EvidenceStatus::EvidenceDiscoveryOnly
+        {
             return Err(WrapperError::EffectsForbidden(self.evidence_status));
         }
         let computed = content_hash(&self.payload).map_err(WrapperError::Canon)?;
@@ -192,7 +196,9 @@ impl<P: Canonical> Canonical for ArtifactWrapper<P> {
         })?;
         obj.member("content_hash", |b| self.content_hash.emit_canonical(b))?;
         obj.member("diagnostics", |b| emit_set(b, &self.diagnostics))?;
-        obj.member("evidence_status", |b| self.evidence_status.emit_canonical(b))?;
+        obj.member("evidence_status", |b| {
+            self.evidence_status.emit_canonical(b)
+        })?;
         obj.member("external_effects", |b| emit_set(b, &self.external_effects))?;
         obj.member("input_hashes", |b| emit_set(b, &self.input_hashes))?;
         obj.member("origin", |b| self.origin.emit_canonical(b))?;
@@ -308,8 +314,12 @@ impl Canonical for EventRecord {
         obj.member("outcome", |b| self.outcome.emit_canonical(b))?;
         obj.member("output_hashes", |b| emit_set(b, &self.output_hashes))?;
         obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
-        obj.member("pipeline_step_id", |b| self.pipeline_step_id.emit_canonical(b))?;
-        obj.member("processing_stage", |b| self.processing_stage.emit_canonical(b))?;
+        obj.member("pipeline_step_id", |b| {
+            self.pipeline_step_id.emit_canonical(b)
+        })?;
+        obj.member("processing_stage", |b| {
+            self.processing_stage.emit_canonical(b)
+        })?;
         obj.member("resource_counters", |b| {
             emit_u64_map(b, &self.resource_counters)
         })?;
@@ -395,7 +405,9 @@ pub fn read_jsonl<T: CanonRead>(bytes: &[u8]) -> Result<Vec<T>, CanonReadError> 
             Err(CanonReadError::Eof)
         };
     };
-    body.split(|&b| b == b'\n').map(read_strict_canonical).collect()
+    body.split(|&b| b == b'\n')
+        .map(read_strict_canonical)
+        .collect()
 }
 
 #[cfg(test)]

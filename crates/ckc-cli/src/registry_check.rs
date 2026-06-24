@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ckc_core::{
-    DiagnosticCode, DiagnosticRecord, ReferenceEntry, Id, Outcome, RegistryError, parse_candidates,
+    DiagnosticCode, DiagnosticRecord, Id, Outcome, ReferenceEntry, RegistryError, parse_candidates,
     parse_corpora, parse_experiments, parse_reference, validate_registries,
 };
 

@@ -74,11 +74,11 @@ fn render(check: &ReplayCheck, run_id: &Id, scratch: &Path) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::tests::{test_source_run, repo_root};
+    use crate::replay::tests::{repo_root, test_source_run};
     use crate::shell::{FinishedCommand, static_id};
     use ckc_core::{
         DiagnosticCode, DiagnosticRecord, EventRecord, Hash, Outcome, ReplayManifest,
-        canonical_payload_bytes, read_strict_canonical, read_jsonl,
+        canonical_payload_bytes, read_jsonl, read_strict_canonical,
     };
 
     /// The dispatch-shaped shell: operation `replay`, run id from the run
@@ -101,7 +101,8 @@ mod tests {
     }
 
     fn read_manifest(run_dir: &Path) -> ReplayManifest {
-        read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap()).unwrap()
+        read_strict_canonical(&std::fs::read(run_dir.join("replay_manifest.json")).unwrap())
+            .unwrap()
     }
 
     // §8.5 item 8 at the command surface, three paths over one test_source

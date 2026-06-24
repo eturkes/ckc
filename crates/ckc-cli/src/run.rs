@@ -34,9 +34,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use ckc_core::{
-    ArtifactWrapper, EvidenceStatus, CanonError, CanonRead, Canonical, CorpusEntry, DataClass,
-    DiagnosticCode, DiagnosticRecord, TestSourceGroup, Hash, Id, IrBundle, Normalization, Origin,
-    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, assemble,
+    ArtifactWrapper, CanonError, CanonRead, Canonical, CorpusEntry, DataClass, DiagnosticCode,
+    DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization, Origin, Outcome, Producer,
+    RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
     canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
     hash_bytes, parse_candidates, parse_corpora, parse_experiments, read_strict_canonical,
 };
@@ -48,7 +48,9 @@ use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
 use crate::report::{Report, assemble_report, render_markdown};
 use crate::segment::segment;
-use crate::shell::{Shell, ProcessingStageClock, ProcessingStageEvent, processing_stage_clock, static_id};
+use crate::shell::{
+    ProcessingStageClock, ProcessingStageEvent, Shell, processing_stage_clock, static_id,
+};
 use crate::trace::{DocTrace, GroupTrace, LineageIndex, TraceBundle, assemble_trace};
 
 /// §5 lexicon evidence_status the normalize processing_stage consumes (module doc in
@@ -232,12 +234,15 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
 
     let mut components: Vec<Id> = Vec::with_capacity(PROCESSING_STAGE_KINDS.len());
     for kind in PROCESSING_STAGE_KINDS {
-        let found = pipeline.processing_stages.iter().find_map(|processing_stage_id| {
-            candidates
-                .processing_stages
-                .iter()
-                .find(|s| s.id == *processing_stage_id && s.kind == static_id(kind))
-        });
+        let found = pipeline
+            .processing_stages
+            .iter()
+            .find_map(|processing_stage_id| {
+                candidates
+                    .processing_stages
+                    .iter()
+                    .find(|s| s.id == *processing_stage_id && s.kind == static_id(kind))
+            });
         match found {
             Some(processing_stage) => components.push(processing_stage.id.clone()),
             None => {
@@ -374,10 +379,13 @@ fn document_pipeline(
         let built = extract(&html, &config)
             .map_err(|e| processing_stage_diagnostic(0, "document", &entry.id, e.to_string()));
         let rel = format!("{dir}/source_document_graph.json");
-        let Some(source) = close_processing_stage(shell, resolved, 0, clock, Vec::new(), &rel, built) else {
+        let Some(source) =
+            close_processing_stage(shell, resolved, 0, clock, Vec::new(), &rel, built)
+        else {
             break 'chain;
         };
-        trace.source_document_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
+        trace.source_document_graph =
+            Some((source.artifact_id.clone(), source.content_hash.clone()));
         graph = Some(source.clone());
 
         let clock = processing_stage_clock();
@@ -385,7 +393,8 @@ fn document_pipeline(
             .map_err(|e| processing_stage_diagnostic(1, "document", &entry.id, e.to_string()));
         let rel = format!("{dir}/segments.json");
         let inputs = vec![source.content_hash.clone()];
-        let Some(segments) = close_processing_stage(shell, resolved, 1, clock, inputs, &rel, built) else {
+        let Some(segments) = close_processing_stage(shell, resolved, 1, clock, inputs, &rel, built)
+        else {
             break 'chain;
         };
         trace.segments = Some((segments.artifact_id.clone(), segments.content_hash.clone()));
@@ -395,7 +404,8 @@ fn document_pipeline(
             .map_err(|e| processing_stage_diagnostic(2, "document", &entry.id, e.to_string()));
         let rel = format!("{dir}/normalization.json");
         let inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
-        let Some(normalization) = close_processing_stage(shell, resolved, 2, clock, inputs, &rel, built)
+        let Some(normalization) =
+            close_processing_stage(shell, resolved, 2, clock, inputs, &rel, built)
         else {
             break 'chain;
         };
@@ -460,7 +470,14 @@ fn group_pipeline(
                     gid,
                     format!("member {test_source} landed no ir_bundle artifact"),
                 ));
-                finish_processing_stage::<IrBundle>(shell, resolved, COMPILE, clock, Vec::new(), built);
+                finish_processing_stage::<IrBundle>(
+                    shell,
+                    resolved,
+                    COMPILE,
+                    clock,
+                    Vec::new(),
+                    built,
+                );
                 return trace;
             }
         }
@@ -473,7 +490,9 @@ fn group_pipeline(
     );
     let built = artifact
         .validate()
-        .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, format!("compiled artifact: {e}")))
+        .map_err(|e| {
+            processing_stage_diagnostic(COMPILE, "group", gid, format!("compiled artifact: {e}"))
+        })
         .and_then(|()| {
             let diagnostics = canonical_diagnostic_set(&artifact.diagnostics)
                 .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, e.to_string()))?;
@@ -495,7 +514,8 @@ fn group_pipeline(
             materialize_queries(shell, &dir, &env)?;
             Ok(env)
         });
-    let Some(compiled) = finish_processing_stage(shell, resolved, COMPILE, clock, inputs, landed) else {
+    let Some(compiled) = finish_processing_stage(shell, resolved, COMPILE, clock, inputs, landed)
+    else {
         return trace;
     };
 
@@ -508,11 +528,15 @@ fn group_pipeline(
     let wrapped = VerifierResults { results };
     let built = wrapped
         .validate()
-        .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}")))
+        .map_err(|e| {
+            processing_stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}"))
+        })
         .and_then(|()| {
             let diagnostics =
                 canonical_diagnostic_set(wrapped.results.iter().flat_map(|r| &r.diagnostics))
-                    .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, e.to_string()))?;
+                    .map_err(|e| {
+                        processing_stage_diagnostic(VERIFY, "group", gid, e.to_string())
+                    })?;
             wrapper(
                 format!("{gid}.verifier_results"),
                 "verifier_results",
@@ -552,10 +576,7 @@ fn trace_processing_stage(
     groups: &[GroupTrace],
     resolved: &Resolved,
     shell: &mut Shell,
-) -> Option<(
-    ArtifactWrapper<TraceBundle>,
-    ArtifactWrapper<LineageIndex>,
-)> {
+) -> Option<(ArtifactWrapper<TraceBundle>, ArtifactWrapper<LineageIndex>)> {
     let clock = processing_stage_clock();
     let (bundle, lineage) = assemble_trace(docs, groups);
     // §4.3 set semantics up front so the in-memory hashes equal every
@@ -866,7 +887,8 @@ fn land_record<P: Canonical + CanonRead + PartialEq>(
         .write_under(rel, &bytes)
         .map_err(|e| fail(e.to_string()))?;
     let read_back = std::fs::read(&path).map_err(|e| fail(format!("read back: {e}")))?;
-    let parsed: P = read_strict_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
+    let parsed: P =
+        read_strict_canonical(&read_back).map_err(|e| fail(format!("strict read: {e}")))?;
     if parsed != *record {
         return Err(fail("read-back value diverges from the record".to_owned()));
     }
@@ -977,7 +999,14 @@ fn close_processing_stage<P: Canonical + CanonRead>(
     built: Result<ArtifactWrapper<P>, DiagnosticRecord>,
 ) -> Option<ArtifactWrapper<P>> {
     let landed = built.and_then(|wrapper| land(shell, rel, wrapper));
-    finish_processing_stage(shell, resolved, processing_stage_index, clock, input_hashes, landed)
+    finish_processing_stage(
+        shell,
+        resolved,
+        processing_stage_index,
+        clock,
+        input_hashes,
+        landed,
+    )
 }
 
 /// Record one attempted processing_stage's §4.6 event: wrapper diagnostics and
@@ -1129,7 +1158,10 @@ fn processing_stage_diagnostic(
     invalid_diagnostic(vec![
         (static_id(subject_key), subject.to_string()),
         (static_id("reason"), reason),
-        (static_id("processing_stage"), PROCESSING_STAGE_KINDS[processing_stage_index].to_owned()),
+        (
+            static_id("processing_stage"),
+            PROCESSING_STAGE_KINDS[processing_stage_index].to_owned(),
+        ),
     ])
 }
 
@@ -1231,7 +1263,8 @@ mod tests {
         assert!(diagnostics.is_empty());
 
         for doc in DOC_IDS {
-            let source: ArtifactWrapper<SourceDocumentGraph> = strict(&out, doc, "source_document_graph");
+            let source: ArtifactWrapper<SourceDocumentGraph> =
+                strict(&out, doc, "source_document_graph");
             let segments: ArtifactWrapper<SegmentIr> = strict(&out, doc, "segments");
             let normalization: ArtifactWrapper<Normalization> = strict(&out, doc, "normalization");
             let bundle: ArtifactWrapper<IrBundle> = strict(&out, doc, "ir_bundle");
@@ -1258,7 +1291,10 @@ mod tests {
                 bundle.producer.pipeline_id,
                 static_id("pipe.layered_ckcir_to_smt")
             );
-            assert_eq!(bundle.producer.pipeline_step_id, static_id("processing_stage.m1.assemble"));
+            assert_eq!(
+                bundle.producer.pipeline_step_id,
+                static_id("processing_stage.m1.assemble")
+            );
 
             // The bundle re-validates against its graph and carries the §8.6
             // rule the reference core expects from each test_source.
@@ -1299,7 +1335,10 @@ mod tests {
         for (g, base) in [12, 14].iter().enumerate() {
             let compile = &events[*base];
             assert_eq!(compile.processing_stage, static_id("compile"), "group {g}");
-            assert_eq!(compile.pipeline_step_id, static_id("processing_stage.m1.compile"));
+            assert_eq!(
+                compile.pipeline_step_id,
+                static_id("processing_stage.m1.compile")
+            );
             assert_eq!(compile.outcome, Outcome::Ok);
             assert_eq!(compile.input_hashes.len(), 2);
             assert_eq!(compile.output_hashes.len(), 1);
@@ -1307,7 +1346,10 @@ mod tests {
             assert!(compile.resource_counters.is_empty());
             let verify = &events[*base + 1];
             assert_eq!(verify.processing_stage, static_id("verify"), "group {g}");
-            assert_eq!(verify.pipeline_step_id, static_id("processing_stage.m1.verify"));
+            assert_eq!(
+                verify.pipeline_step_id,
+                static_id("processing_stage.m1.verify")
+            );
             assert_eq!(verify.outcome, Outcome::Ok);
             assert_eq!(verify.input_hashes, compile.output_hashes);
             assert_eq!(verify.output_hashes.len(), 1);
@@ -1325,7 +1367,10 @@ mod tests {
         let trace = &events[16];
         assert_eq!(trace.processing_stage, static_id("trace"));
         assert_eq!(trace.pipeline_id, static_id("pipe.layered_ckcir_to_smt"));
-        assert_eq!(trace.pipeline_step_id, static_id("processing_stage.m1.trace"));
+        assert_eq!(
+            trace.pipeline_step_id,
+            static_id("processing_stage.m1.trace")
+        );
         assert_eq!(trace.outcome, Outcome::Ok);
         assert_eq!(trace.input_hashes.len(), 18);
         assert_eq!(trace.output_hashes.len(), 2);
@@ -1337,7 +1382,10 @@ mod tests {
         let report = &events[17];
         assert_eq!(report.processing_stage, static_id("report"));
         assert_eq!(report.pipeline_id, static_id("pipe.layered_ckcir_to_smt"));
-        assert_eq!(report.pipeline_step_id, static_id("processing_stage.m1.report"));
+        assert_eq!(
+            report.pipeline_step_id,
+            static_id("processing_stage.m1.report")
+        );
         assert_eq!(report.outcome, Outcome::Ok);
         assert_eq!(report.input_hashes.len(), 7);
         assert!(report.input_hashes.contains(&trace.output_hashes[0]));
@@ -1364,7 +1412,8 @@ mod tests {
         let (_result, _events, _diagnostics, out, _tmp) = executed(&repo_root(), "exp.m1_scaffold");
         let a: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_a", "ir_bundle");
         let b: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_guideline_b", "ir_bundle");
-        let control: ArtifactWrapper<IrBundle> = strict(&out, "test_source.m1_control", "ir_bundle");
+        let control: ArtifactWrapper<IrBundle> =
+            strict(&out, "test_source.m1_control", "ir_bundle");
 
         // Per group: wrapper identity/chaining pins, plan and assertion
         // map shape, and byte-identical smt materialization.
@@ -1396,7 +1445,10 @@ mod tests {
                 static_id("processing_stage.m1.compile")
             );
             assert_eq!(compiled.origin, Origin::DeterministicCompiler);
-            assert_eq!(compiled.evidence_status, EvidenceStatus::CompilerEvidenceStatus);
+            assert_eq!(
+                compiled.evidence_status,
+                EvidenceStatus::CompilerEvidenceStatus
+            );
             assert_eq!(
                 compiled.input_hashes,
                 sorted(&members.map(|m| m.content_hash.clone()))
@@ -1452,9 +1504,15 @@ mod tests {
                 format!("{gid}.verifier_results").parse().unwrap()
             );
             assert_eq!(results.artifact_kind, static_id("verifier_results"));
-            assert_eq!(results.producer.pipeline_step_id, static_id("processing_stage.m1.verify"));
+            assert_eq!(
+                results.producer.pipeline_step_id,
+                static_id("processing_stage.m1.verify")
+            );
             assert_eq!(results.origin, Origin::ExternalAdapterGenerated);
-            assert_eq!(results.evidence_status, EvidenceStatus::VerifierEvidenceStatus);
+            assert_eq!(
+                results.evidence_status,
+                EvidenceStatus::VerifierEvidenceStatus
+            );
             assert_eq!(results.input_hashes, vec![compiled.content_hash.clone()]);
             assert!(results.diagnostics.is_empty());
             results.payload.validate().unwrap();
@@ -1499,7 +1557,10 @@ mod tests {
             strict_at(&out, "groups/group.m1_no_conflict/verifier_results.json");
         let rs = &null.payload.results;
         assert_eq!(rs.len(), 1);
-        assert_eq!(rs[0].query_id, "q.m1_no_conflict.pair1.overlap".parse().unwrap());
+        assert_eq!(
+            rs[0].query_id,
+            "q.m1_no_conflict.pair1.overlap".parse().unwrap()
+        );
         assert_eq!(rs[0].category, VerifierCategory::SemanticNoConflict);
         assert_eq!(rs[0].verdict, Some(SolverVerdict::Unsat));
         assert_eq!(rs[0].model, None);
@@ -1687,13 +1748,19 @@ processing_stages:
         }
         let compile_event = &events[4];
         assert_eq!(compile_event.processing_stage, static_id("compile"));
-        assert_eq!(compile_event.pipeline_step_id, static_id("processing_stage.t.compile"));
+        assert_eq!(
+            compile_event.pipeline_step_id,
+            static_id("processing_stage.t.compile")
+        );
         assert_eq!(compile_event.outcome, Outcome::Invalid);
         assert_eq!(compile_event.diagnostics.len(), 1);
         assert!(compile_event.output_hashes.is_empty());
         let trace_event = &events[5];
         assert_eq!(trace_event.processing_stage, static_id("trace"));
-        assert_eq!(trace_event.pipeline_step_id, static_id("processing_stage.t.trace"));
+        assert_eq!(
+            trace_event.pipeline_step_id,
+            static_id("processing_stage.t.trace")
+        );
         assert_eq!(trace_event.outcome, Outcome::Ok);
         // test_source.tiny's source + its four landed artifacts; the
         // bundle-less group contributes no nodes.
@@ -1704,7 +1771,10 @@ processing_stages:
         // its summary counts the whole four-record ledger.
         let report_event = &events[6];
         assert_eq!(report_event.processing_stage, static_id("report"));
-        assert_eq!(report_event.pipeline_step_id, static_id("processing_stage.t.report"));
+        assert_eq!(
+            report_event.pipeline_step_id,
+            static_id("processing_stage.t.report")
+        );
         assert_eq!(report_event.outcome, Outcome::Ok);
         assert_eq!(report_event.input_hashes.len(), 3);
         assert_eq!(report_event.output_hashes.len(), 1);
@@ -1713,14 +1783,18 @@ processing_stages:
         assert!(!out.join("artifacts/test_source.gone").exists());
         assert!(!out.join("groups").exists());
         let bundle: ArtifactWrapper<IrBundle> = strict(&out, "test_source.tiny", "ir_bundle");
-        let source: ArtifactWrapper<SourceDocumentGraph> = strict(&out, "test_source.tiny", "source_document_graph");
+        let source: ArtifactWrapper<SourceDocumentGraph> =
+            strict(&out, "test_source.tiny", "source_document_graph");
         bundle.payload.validate(&source.payload).unwrap();
         let report: ArtifactWrapper<crate::report::Report> = strict_at(&out, "report.json");
         assert!(report.payload.findings.is_empty());
         assert!(report.payload.no_conflict_results.is_empty());
         assert!(report.payload.wording.is_empty());
         assert_eq!(report.payload.corpus_hashes.len(), 1);
-        assert_eq!(report.payload.corpus_hashes[0].0, static_id("test_source.tiny"));
+        assert_eq!(
+            report.payload.corpus_hashes[0].0,
+            static_id("test_source.tiny")
+        );
         assert_eq!(
             report
                 .payload

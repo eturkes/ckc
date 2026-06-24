@@ -1429,9 +1429,15 @@ mod tests {
             Err(CanonReadError::Trailing)
         );
         // null / booleans are never canonical
-        assert_eq!(read_strict_canonical::<Id>(b"null"), Err(CanonReadError::Token));
+        assert_eq!(
+            read_strict_canonical::<Id>(b"null"),
+            Err(CanonReadError::Token)
+        );
         // a bare number where an integer string is required
-        assert_eq!(read_strict_canonical::<BigInt>(b"42"), Err(CanonReadError::Token));
+        assert_eq!(
+            read_strict_canonical::<BigInt>(b"42"),
+            Err(CanonReadError::Token)
+        );
         // bare numbers inside a rational object (parts are integer strings)
         assert_eq!(
             read_strict_canonical::<Rational>(br#"{"den":4,"num":2}"#),

@@ -28,9 +28,10 @@ use std::collections::HashMap;
 use std::fmt;
 
 use ckc_core::{
-    ArtifactWrapper, EvidenceStatus, CanonError, ClinicalSegment, DiagnosticCode, DiagnosticRecord, Id,
-    NodeKind, Origin, Outcome, Producer, SegmentIr, SegmentKind, SourceDocumentGraph, SourceNode,
-    SourceTextSpan, StringPolicy, canonical_sort_key, canonicalization_policy_hash, content_hash,
+    ArtifactWrapper, CanonError, ClinicalSegment, DiagnosticCode, DiagnosticRecord, EvidenceStatus,
+    Id, NodeKind, Origin, Outcome, Producer, SegmentIr, SegmentKind, SourceDocumentGraph,
+    SourceNode, SourceTextSpan, StringPolicy, canonical_sort_key, canonicalization_policy_hash,
+    content_hash,
 };
 
 use crate::shell::static_id;
@@ -351,7 +352,7 @@ mod tests {
     use super::*;
     use crate::extract::{ExtractConfig, extract};
     use ckc_core::{
-        DataClass, Hash, Provenance, SourceDocument, EvidenceRegion, canonical_payload_bytes,
+        DataClass, EvidenceRegion, Hash, Provenance, SourceDocument, canonical_payload_bytes,
         hash_bytes, read_strict_canonical,
     };
 
@@ -449,8 +450,7 @@ mod tests {
                 "{name} segments residual-free, got {:?}",
                 wrapper.diagnostics
             );
-            let kinds: Vec<SegmentKind> =
-                wrapper.payload.segments.iter().map(|s| s.kind).collect();
+            let kinds: Vec<SegmentKind> = wrapper.payload.segments.iter().map(|s| s.kind).collect();
             assert_eq!(
                 kinds,
                 vec![
@@ -478,7 +478,10 @@ mod tests {
         assert_eq!(wrapper.artifact_kind, id("segments"));
         assert_eq!(wrapper.producer, producer());
         assert_eq!(wrapper.origin, Origin::DeterministicCompiler);
-        assert_eq!(wrapper.evidence_status, EvidenceStatus::MechanicalEvidenceStatus);
+        assert_eq!(
+            wrapper.evidence_status,
+            EvidenceStatus::MechanicalEvidenceStatus
+        );
         assert_eq!(wrapper.input_hashes, vec![source.content_hash.clone()]);
         assert!(wrapper.external_effects.is_empty());
         assert!(wrapper.trace_refs.is_empty());

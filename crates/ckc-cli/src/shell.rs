@@ -199,7 +199,8 @@ impl Shell {
     /// `event_id`/`event_sequence_number` slot ahead of the closing command event.
     pub(crate) fn processing_stage_event(&mut self, processing_stage: ProcessingStageEvent) {
         self.merge(processing_stage.outcome);
-        self.ledger.extend(processing_stage.diagnostics.iter().cloned());
+        self.ledger
+            .extend(processing_stage.diagnostics.iter().cloned());
         let slot = self.events.len();
         self.events.push(EventRecord {
             event_id: event_id(slot),
@@ -529,7 +530,10 @@ mod tests {
         let stream: Vec<DiagnosticRecord> =
             read_jsonl(&std::fs::read(root.path().join("logs/diagnostics.jsonl")).unwrap())
                 .unwrap();
-        assert_eq!(stream, vec![processing_stage_diag.clone(), command_diag.clone()]);
+        assert_eq!(
+            stream,
+            vec![processing_stage_diag.clone(), command_diag.clone()]
+        );
 
         assert_eq!(finished.result.outcome, Outcome::Invalid);
         let mut expected = vec![

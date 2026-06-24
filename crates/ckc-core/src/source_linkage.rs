@@ -514,7 +514,9 @@ impl fmt::Display for SourceLinkageError {
         match self {
             SourceLinkageError::Root(rule) => write!(f, "node tree: {rule}"),
             SourceLinkageError::ExtraDocumentNode(id) => write!(f, "second document node {id}"),
-            SourceLinkageError::MissingParent(id) => write!(f, "non-root node {id} carries no parent"),
+            SourceLinkageError::MissingParent(id) => {
+                write!(f, "non-root node {id} carries no parent")
+            }
             SourceLinkageError::Duplicate { kind, id } => {
                 write!(f, "duplicate {} id {id}", kind.as_str())
             }
@@ -588,10 +590,14 @@ impl SourceDocumentGraph {
             None => return Err(SourceLinkageError::Root("nodes is empty")),
             Some(root) => {
                 if root.kind != NodeKind::Document {
-                    return Err(SourceLinkageError::Root("first node must be the document node"));
+                    return Err(SourceLinkageError::Root(
+                        "first node must be the document node",
+                    ));
                 }
                 if root.parent_id.is_some() {
-                    return Err(SourceLinkageError::Root("the document node carries a parent"));
+                    return Err(SourceLinkageError::Root(
+                        "the document node carries a parent",
+                    ));
                 }
             }
         }
@@ -714,7 +720,9 @@ impl SourceDocumentGraph {
                 && !spanned_nodes.contains(&node.node_id)
                 && !residuals.contains(&node.node_id)
             {
-                return Err(SourceLinkageError::UnspannedTextualNode(node.node_id.clone()));
+                return Err(SourceLinkageError::UnspannedTextualNode(
+                    node.node_id.clone(),
+                ));
             }
         }
         Ok(())
@@ -1060,14 +1068,18 @@ mod tests {
         graph.nodes[0].kind = NodeKind::Section;
         assert_eq!(
             graph.validate(&[]),
-            Err(SourceLinkageError::Root("first node must be the document node"))
+            Err(SourceLinkageError::Root(
+                "first node must be the document node"
+            ))
         );
 
         let mut graph = sample_graph();
         graph.nodes[0].parent_id = Some(id("n.sec"));
         assert_eq!(
             graph.validate(&[]),
-            Err(SourceLinkageError::Root("the document node carries a parent"))
+            Err(SourceLinkageError::Root(
+                "the document node carries a parent"
+            ))
         );
 
         let mut graph = sample_graph();
@@ -1233,7 +1245,9 @@ mod tests {
                 &(|s: &mut SourceTextSpan| s.nfkc_text = s.raw_text.clone())
                     as &dyn Fn(&mut SourceTextSpan),
             ),
-            ("search_text", &|s: &mut SourceTextSpan| s.search_text.push('!')),
+            ("search_text", &|s: &mut SourceTextSpan| {
+                s.search_text.push('!')
+            }),
             ("text_hash", &|s: &mut SourceTextSpan| s.text_hash = h('b')),
         ] {
             let mut span = sample_graph().spans[1].clone();

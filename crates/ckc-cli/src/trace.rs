@@ -335,7 +335,9 @@ impl TraceBundle {
         check_canonical_set("claims", &self.claims)?;
         let mut sequence_numbers: BTreeMap<&str, Vec<u64>> = BTreeMap::new();
         for claim in &self.claims {
-            let Some(sequence_number) = parse_finding_sequence_number(&claim.finding_id, &claim.group_id) else {
+            let Some(sequence_number) =
+                parse_finding_sequence_number(&claim.finding_id, &claim.group_id)
+            else {
                 return Err(TraceError::FindingIdForm(claim.finding_id.clone()));
             };
             sequence_numbers
@@ -1009,7 +1011,10 @@ impl std::fmt::Display for TraceError {
                 "finding id {id} is not finding.<group_id>.<sequence_number> over its group"
             ),
             TraceError::FindingSequenceNumbers(group) => {
-                write!(f, "group {group} finding sequence_numbers are not dense from 0")
+                write!(
+                    f,
+                    "group {group} finding sequence_numbers are not dense from 0"
+                )
             }
             TraceError::QueryOutsidePair { query_id, pair_id } => {
                 write!(f, "query {query_id} is not under pair {pair_id}")
@@ -1045,7 +1050,7 @@ impl std::error::Error for TraceError {}
 mod tests {
     use super::*;
     use ckc_core::{
-        EvidenceStatus, ContradictionQueryPair, Origin, Producer, SolverIdentity,
+        ContradictionQueryPair, EvidenceStatus, Origin, Producer, SolverIdentity,
         canonical_payload_bytes, read_strict_canonical,
     };
     use ckc_smt::{AssertionRecord, VerifierResult};
@@ -1203,7 +1208,10 @@ mod tests {
             .map(|k| k.operation().unwrap())
             .collect();
         assert_eq!(produced, TraceOperation::ALL.to_vec());
-        assert_eq!(canon(&TraceNodeKind::SourceDocumentGraph), "\"source_document_graph\"");
+        assert_eq!(
+            canon(&TraceNodeKind::SourceDocumentGraph),
+            "\"source_document_graph\""
+        );
         assert_eq!(canon(&TraceOperation::Extract), "\"extract\"");
         assert_eq!(
             canon(&ConflictKind::DeonticDirectionConflict),
@@ -1325,7 +1333,9 @@ mod tests {
         dup_id.nodes[1].node_id = id("test_source.m1_guideline_a");
         assert_eq!(
             dup_id.validate(),
-            Err(TraceError::DuplicateNodeId(id("test_source.m1_guideline_a")))
+            Err(TraceError::DuplicateNodeId(id(
+                "test_source.m1_guideline_a"
+            )))
         );
         // Non-empty paths.
         let mut empty_path = sample_bundle();
@@ -2046,11 +2056,7 @@ mod tests {
     /// The generic live wrap: real content/policy hashes over the payload,
     /// every effect/trace/diagnostic/metadata slot empty — assembly reads
     /// `artifact_id`, `content_hash`, and `payload` only.
-    fn live_wrapper<P: Canonical>(
-        artifact_id: &str,
-        kind: &str,
-        payload: P,
-    ) -> ArtifactWrapper<P> {
+    fn live_wrapper<P: Canonical>(artifact_id: &str, kind: &str, payload: P) -> ArtifactWrapper<P> {
         ArtifactWrapper {
             schema_id: id(&format!("schema.{kind}")),
             artifact_id: id(artifact_id),
@@ -2333,8 +2339,14 @@ mod tests {
         let no_conflict_row = claim(&bundle, "finding.group.m1_no_conflict.0");
         assert_eq!(no_conflict_row.group_id, id("group.m1_no_conflict"));
         assert_eq!(no_conflict_row.pair_id, id("q.m1_no_conflict.pair1"));
-        assert_eq!(no_conflict_row.query_id, id("q.m1_no_conflict.pair1.overlap"));
-        assert_eq!(no_conflict_row.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(
+            no_conflict_row.query_id,
+            id("q.m1_no_conflict.pair1.overlap")
+        );
+        assert_eq!(
+            no_conflict_row.category,
+            VerifierCategory::SemanticNoConflict
+        );
         assert_eq!(no_conflict_row.verdict, Some(SolverVerdict::Unsat));
         assert_eq!(no_conflict_row.conflict_kind, None);
         assert_eq!(
