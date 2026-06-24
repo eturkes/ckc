@@ -71,7 +71,7 @@
 //!   directions as the command's stdout body.
 //! - [`report`] — §7.2 report payload (`cli-runner.4.1a.1`–`.4.1b.1`):
 //!   [`report::Report`], the canonical `report.json` shape (corpus/lexicon
-//!   hashes, finding and documented-null partitions as
+//!   hashes, finding and documented no-conflict result partitions as
 //!   [`report::ReportFinding`] rows with quoted spans, code-keyed
 //!   diagnostics summary, solver identity, replay status, §0 wording) with
 //!   structural validation via [`report::ReportError`] and assembly via

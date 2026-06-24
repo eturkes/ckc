@@ -559,8 +559,9 @@ mod tests {
     }
 
     /// group.m1_no_conflict control pair (§8.2): the disjoint-interval Q1 the
-    /// verify processing_stage closes as the documented null, and a Q2 whose negated
-    /// polarity lands in slot a (the control sorts first by id bytes).
+    /// verify processing_stage closes as the documented no-conflict result, and a
+    /// Q2 whose negated polarity lands in slot a (the control sorts first by id
+    /// bytes).
     #[test]
     fn control_pair_pins_observed_bytes() {
         let (a, b) = (control(), doc_a());
@@ -759,7 +760,7 @@ mod tests {
     }
 
     /// The §8.2 control pair (group.m1_no_conflict) compiles the same way: the
-    /// disjoint age intervals stay in profile (Q1 decides the null at
+    /// disjoint age intervals stay in profile (Q1 decides the no-conflict result at
     /// verify), the control rule in slot a by id bytes.
     #[test]
     fn compile_assembles_control_pair_artifact() {

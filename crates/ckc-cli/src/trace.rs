@@ -2190,9 +2190,9 @@ mod tests {
         let control = live_doc("m1_control", &lexicon);
         let adapter = Z3Adapter::new().unwrap();
         let conflict = live_group("group.m1_conflict", &[&a, &b], &adapter);
-        let null = live_group("group.m1_no_conflict", &[&a, &control], &adapter);
+        let no_conflict = live_group("group.m1_no_conflict", &[&a, &control], &adapter);
 
-        let (bundle, index) = assemble_trace(&[a, b, control], &[conflict, null]);
+        let (bundle, index) = assemble_trace(&[a, b, control], &[conflict, no_conflict]);
         assert_eq!(bundle.validate(), Ok(()));
         assert_eq!(index.validate(), Ok(()));
 
@@ -2238,7 +2238,7 @@ mod tests {
         assert_eq!(node(&bundle, "report"), &report_node());
 
         // Edge spot checks: docA's full chain, both conflict compile
-        // fan-ins, the null group's control fan-in, verify, report.
+        // fan-ins, the no-conflict group's control fan-in, verify, report.
         for (from, operation, to) in [
             (
                 "test_source.m1_guideline_a",
@@ -2334,7 +2334,7 @@ mod tests {
             assert_eq!(row.region_ids, vec![id("r.2"), id("r.3")]);
             assert_eq!(row.report_ref, id("report"));
         }
-        // The documented-null overlap row: disjoint intervals answer
+        // The documented no-conflict result overlap row: disjoint intervals answer
         // unsat, no core recorded, ctx fallback over the pair.
         let no_conflict_row = claim(&bundle, "finding.group.m1_no_conflict.0");
         assert_eq!(no_conflict_row.group_id, id("group.m1_no_conflict"));

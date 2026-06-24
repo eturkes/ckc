@@ -612,11 +612,11 @@ processing_stages:
             Some(id("deontic_direction_conflict"))
         );
         assert!(!conflict.expected_no_conflict_result);
-        let null = &reference[1];
-        assert_eq!(null.expected_outcome, id("semantic_no_conflict"));
-        assert!(null.expected_no_conflict_result);
-        assert_eq!(null.expected_conflict_kind, None);
-        assert!(null.expected_unsat_core.is_empty());
+        let no_conflict = &reference[1];
+        assert_eq!(no_conflict.expected_outcome, id("semantic_no_conflict"));
+        assert!(no_conflict.expected_no_conflict_result);
+        assert_eq!(no_conflict.expected_conflict_kind, None);
+        assert!(no_conflict.expected_unsat_core.is_empty());
 
         let reordered = REFERENCE.replace(
             "[a.test_source.m1_guideline_a.rule.0, a.test_source.m1_guideline_b.rule.0]",

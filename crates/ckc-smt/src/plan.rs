@@ -193,8 +193,9 @@ mod tests {
     }
 
     /// group.m1_no_conflict: disjoint age intervals leave eligibility untouched —
-    /// the pair plans, and Q1 later decides the null (§6 documented-null
-    /// path). Normalization puts the control constraint first by id bytes.
+    /// the pair plans, and Q1 later decides the no-conflict result (§6
+    /// documented no-conflict result path). Normalization puts the control
+    /// constraint first by id bytes.
     #[test]
     fn disjoint_interval_control_pair_stays_eligible() {
         let plan = plan_queries(&id("group.m1_no_conflict"), [&doc_a(), &control()]);

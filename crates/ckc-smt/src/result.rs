@@ -396,11 +396,12 @@ mod tests {
         assert_eq!(q1_sat().validate(), Ok(()));
         assert_eq!(q2_unsat().validate(), Ok(()));
         assert_eq!(syntax_failure().validate(), Ok(()));
-        // A documented-null Q1 unsat (disjoint intervals): no model, no core.
-        let mut null = q1_sat();
-        null.verdict = Some(SolverVerdict::Unsat);
-        null.model = None;
-        assert_eq!(null.validate(), Ok(()));
+        // A documented no-conflict result Q1 unsat (disjoint intervals): no model,
+        // no core.
+        let mut no_conflict = q1_sat();
+        no_conflict.verdict = Some(SolverVerdict::Unsat);
+        no_conflict.model = None;
+        assert_eq!(no_conflict.validate(), Ok(()));
         // Unknown via timeout keeps the raw token distinct.
         let mut timeout = q1_sat();
         timeout.category = VerifierCategory::Unknown;

@@ -229,7 +229,7 @@ impl Report {
     /// 3. Rows: `conflict_kind` and `core` are present exactly on findings
     ///    (§6: a contradiction is an unsat deontic query with its recorded
     ///    core; Q1-unsat and deontic-sat no_conflict_results carry neither); finding
-    ///    verdicts are `unsat` and null verdicts `sat` or `unsat`; the
+    ///    verdicts are `unsat` and no-conflict verdicts `sat` or `unsat`; the
     ///    three id pools, `quoted_spans`, and `core` are non-empty
     ///    canonical sets; quoted texts are non-empty.
     /// 4. Finding ids are unique across both partitions.
@@ -1038,7 +1038,7 @@ mod tests {
     }
 
     /// The full canonical bytes of [`valid_report`], pinned from observed
-    /// output: alphabetical members, optionals omitted on the null row,
+    /// output: alphabetical members, optionals omitted on the no-conflict row,
     /// u64 counts as §4.3 string-wrapped integers.
     const PINNED_REPORT: &str = r#"{"corpus_hashes":{"test_source.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","test_source.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"findings":[{"assertion_ids":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"claim_tier":"s1_accepted","conflict_kind":"deontic_direction_conflict","core":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"test_source.a","region_id":"r.0","span_id":"s.0","text":"administer drug A"},{"document_id":"test_source.b","region_id":"r.0","span_id":"s.0","text":"withhold drug A"}],"region_ids":["r.0"],"rule_ids":["test_source.a.rule.0","test_source.b.rule.0"],"verdict":"unsat","wording":"synthetic test source measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","no_conflict_results":[{"assertion_ids":["ctx.test_source.a.rule.1","ctx.test_source.b.rule.1"],"claim_tier":"s1_accepted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"test_source.a","region_id":"r.1","span_id":"s.1","text":"adults eighteen and over"},{"document_id":"test_source.b","region_id":"r.1","span_id":"s.1","text":"children under eighteen"}],"region_ids":["r.1"],"rule_ids":["test_source.a.rule.1","test_source.b.rule.1"],"verdict":"unsat","wording":"documented no-conflict result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented no-conflict result","synthetic test source measurement"]}"#;
 
@@ -1395,8 +1395,9 @@ mod tests {
     /// The §8.6-shaped synthetic run: two documents whose region ids
     /// collide (document-local counters), a conflict group whose overlap
     /// probe answered sat (sequence_number 0, no report row) and whose deontic
-    /// query cored (sequence_number 1, the finding), and a null group closed by an
-    /// unsat overlap probe (sequence_number 0, the documented no-conflict result).
+    /// query cored (sequence_number 1, the finding), and a no-conflict group
+    /// closed by an unsat overlap probe (sequence_number 0, the documented
+    /// no-conflict result).
     struct World {
         bundle: TraceBundle,
         lineage: LineageIndex,
@@ -1656,21 +1657,21 @@ mod tests {
             ]
         );
 
-        let null = &report.no_conflict_results[0];
-        assert_eq!(null.finding_id, id("finding.group.g2.0"));
-        assert_eq!(null.query_id, id("q.g2.pair1.overlap"));
-        assert_eq!(null.conflict_kind, None);
-        assert_eq!(null.core, None);
-        assert_eq!(null.verdict, SolverVerdict::Unsat);
-        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
+        let no_conflict = &report.no_conflict_results[0];
+        assert_eq!(no_conflict.finding_id, id("finding.group.g2.0"));
+        assert_eq!(no_conflict.query_id, id("q.g2.pair1.overlap"));
+        assert_eq!(no_conflict.conflict_kind, None);
+        assert_eq!(no_conflict.core, None);
+        assert_eq!(no_conflict.verdict, SolverVerdict::Unsat);
+        assert_eq!(no_conflict.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(
-            null.assertion_ids,
+            no_conflict.assertion_ids,
             vec![
                 id("ctx.test_source.a.rule.0"),
                 id("ctx.test_source.b.rule.0")
             ]
         );
-        assert_eq!(null.quoted_spans.len(), 2);
+        assert_eq!(no_conflict.quoted_spans.len(), 2);
     }
 
     #[test]
@@ -1745,10 +1746,10 @@ mod tests {
         report.validate().unwrap();
         assert!(report.findings.is_empty());
         assert_eq!(report.no_conflict_results.len(), 1);
-        let null = &report.no_conflict_results[0];
-        assert_eq!(null.finding_id, id("finding.group.g1.1"));
-        assert_eq!(null.verdict, SolverVerdict::Sat);
-        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
+        let no_conflict = &report.no_conflict_results[0];
+        assert_eq!(no_conflict.finding_id, id("finding.group.g1.1"));
+        assert_eq!(no_conflict.verdict, SolverVerdict::Sat);
+        assert_eq!(no_conflict.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(report.wording, vec![Wording::DocumentedNoConflictResult]);
     }
 
@@ -1898,7 +1899,7 @@ mod tests {
     /// The full `report_en.md` body of [`valid_report`], pinned from
     /// observed output: §7.2 prose order, code-spanned ids and hashes,
     /// the finding-only optionals (conflict kind, core) absent on the
-    /// null row, span texts plain and verbatim.
+    /// no-conflict row, span texts plain and verbatim.
     const PINNED_MARKDOWN: &str = r#"# CKC report
 
 wording: documented no-conflict result, synthetic test source measurement

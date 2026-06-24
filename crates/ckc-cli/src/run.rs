@@ -1330,7 +1330,7 @@ mod tests {
                 assert!(event.diagnostics.is_empty());
             }
         }
-        // Group events in evaluation order: conflict then null, compile
+        // Group events in evaluation order: conflict then no-conflict, compile
         // then verify; only verify carries the §8.4 budget counter.
         for (g, base) in [12, 14].iter().enumerate() {
             let compile = &events[*base];
@@ -1403,8 +1403,8 @@ mod tests {
     // results land strict-read clean with hashes chaining bundles →
     // compiled → results and every query body materialized byte-identical
     // under smt/; the §8.6 thread yields the cross-document contradiction
-    // in the conflict group and the disjoint-interval documented null in
-    // the null group.
+    // in the conflict group and the disjoint-interval documented no-conflict
+    // result in the no-conflict group.
     #[test]
     fn group_processing_stages_compile_and_verify_the_test_source_groups() {
         use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory};
@@ -1551,11 +1551,11 @@ mod tests {
             ])
         );
 
-        // Null group: the disjoint-interval Q1 answers unsat, closing the
+        // No-conflict group: the disjoint-interval Q1 answers unsat, closing the
         // pair as the documented no-conflict result — no Q2 run, no satisfying_example.
-        let null: ArtifactWrapper<ckc_smt::VerifierResults> =
+        let no_conflict: ArtifactWrapper<ckc_smt::VerifierResults> =
             strict_at(&out, "groups/group.m1_no_conflict/verifier_results.json");
-        let rs = &null.payload.results;
+        let rs = &no_conflict.payload.results;
         assert_eq!(rs.len(), 1);
         assert_eq!(
             rs[0].query_id,

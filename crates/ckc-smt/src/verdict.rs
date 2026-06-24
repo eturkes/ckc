@@ -100,7 +100,7 @@ pub fn verify(
 /// §6 category mapping, role-aware: Q2 unsat → `semantic_contradiction`
 /// with the normalized core; Q2 sat → `semantic_no_conflict`; Q1 sat →
 /// `semantic_no_conflict` with the satisfying_example model recorded; Q1 unsat →
-/// `semantic_no_conflict`, the documented-null path; unknown stays
+/// `semantic_no_conflict`, the documented no-conflict result path; unknown stays
 /// `unknown` — raw `sat`/`unsat`/`unknown`/`timeout` tokens preserved
 /// distinctly in `verdict`. Runs with no verdict token map to the failure
 /// categories: a solver `(error …)` reply is `target_syntax_failure`,
@@ -538,7 +538,7 @@ mod tests {
         assert_eq!(result.diagnostics, vec![]);
     }
 
-    // Q1 unsat closes the pair as the documented-null path of
+    // Q1 unsat closes the pair as the documented no-conflict result path of
     // semantic_no_conflict; the live-probed benign retrieval error (exit 1,
     // `(error "... model is not available")`) is expected output, never a
     // diagnostic.

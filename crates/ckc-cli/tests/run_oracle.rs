@@ -5,7 +5,7 @@
 //! reference entries over the verifier results — the code oracle behind §8.5
 //! items 5 and 6. The [`report`] module pins the landed report surface
 //! — `report.json`, its `report_en.md` rendering, and the §5/§4.6 manifest
-//! pair — over its own recorded runs: the finding/null partition, the
+//! pair — over its own recorded runs: the finding/no-conflict partition, the
 //! quoted spans resolving to test_source bytes (§8.5 item 9's code oracle),
 //! and the run's provenance facts.
 
@@ -107,8 +107,8 @@ fn assert_group_matches_reference(
         );
     } else if entry.expected_outcome == id("semantic_no_conflict") {
         // §8.5 item 6 oracle: every query closed without a contradiction;
-        // the documented null is a §6 Q1-unsat closure — the overlap query
-        // answered unsat and the pair's deontic query never ran.
+        // the documented no-conflict result is a §6 Q1-unsat closure — the
+        // overlap query answered unsat and the pair's deontic query never ran.
         assert!(contradictions.is_empty(), "{gid}: no contradiction");
         assert!(
             results
@@ -130,7 +130,7 @@ fn assert_group_matches_reference(
                 .collect();
             assert!(
                 !closed.is_empty(),
-                "{gid}: a pair closed as documented null"
+                "{gid}: a pair closed as documented no-conflict result"
             );
             for pair in &closed {
                 assert!(
@@ -413,7 +413,7 @@ document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
     assert_eq!(trace_results[0].outcome, Outcome::Ok);
     assert_eq!(trace_results[0].operation_id, id("trace"));
 
-    // The null finding resolves through the same chain: the §8.5 item 6
+    // The no-conflict result resolves through the same chain: the §8.5 item 6
     // Q1 unsat renders as a no-conflict verdict over context assertions.
     let no_conflict_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
         .args([
@@ -454,8 +454,8 @@ document test_source.m1_guideline_b path corpus/test_sources/m1_guideline_b.html
 }
 
 /// The report processing_stage's live pins (`cargo test -p ckc-cli report::`): the
-/// §7.2 partition over the recorded §8.6 world — one finding, one
-/// documented null — with every quoted span resolving through its landed
+/// §7.2 partition over the recorded §8.6 world — one finding, one documented
+/// no-conflict result — with every quoted span resolving through its landed
 /// source document graph to the raw test_source bytes (§8.5 item 9), the corpus and
 /// lexicon rows recomputed from the files in force, and the solver
 /// identity matching the recorded verifier results. The trio pin extends
@@ -664,34 +664,34 @@ mod report {
             &test_sources,
         );
 
-        // §8.5 item 6's report surface: the disjoint-interval Q1 unsat as
-        // the documented null — context assertions, no kind, no core.
+        // §8.5 item 6's report surface: the disjoint-interval Q1 unsat as the
+        // documented no-conflict result — context assertions, no kind, no core.
         assert_eq!(payload.no_conflict_results.len(), 1);
-        let null = &payload.no_conflict_results[0];
-        assert_eq!(null.finding_id, id("finding.group.m1_no_conflict.0"));
-        assert_eq!(null.query_id, id("q.m1_no_conflict.pair1.overlap"));
-        assert_eq!(null.verdict, SolverVerdict::Unsat);
-        assert_eq!(null.conflict_kind, None);
-        assert_eq!(null.core, None);
-        assert_eq!(null.claim_tier, ClaimTier::S1Accepted);
-        assert_eq!(null.wording, Wording::DocumentedNoConflictResult);
+        let no_conflict = &payload.no_conflict_results[0];
+        assert_eq!(no_conflict.finding_id, id("finding.group.m1_no_conflict.0"));
+        assert_eq!(no_conflict.query_id, id("q.m1_no_conflict.pair1.overlap"));
+        assert_eq!(no_conflict.verdict, SolverVerdict::Unsat);
+        assert_eq!(no_conflict.conflict_kind, None);
+        assert_eq!(no_conflict.core, None);
+        assert_eq!(no_conflict.claim_tier, ClaimTier::S1Accepted);
+        assert_eq!(no_conflict.wording, Wording::DocumentedNoConflictResult);
         assert_eq!(
-            null.assertion_ids,
+            no_conflict.assertion_ids,
             vec![
                 id("ctx.test_source.m1_control.rule.0"),
                 id("ctx.test_source.m1_guideline_a.rule.0")
             ]
         );
         assert_eq!(
-            null.rule_ids,
+            no_conflict.rule_ids,
             vec![
                 id("test_source.m1_control.rule.0"),
                 id("test_source.m1_guideline_a.rule.0")
             ]
         );
-        assert_eq!(null.region_ids, vec![id("r.2"), id("r.3")]);
+        assert_eq!(no_conflict.region_ids, vec![id("r.2"), id("r.3")]);
         assert_spans_ground(
-            &null.quoted_spans,
+            &no_conflict.quoted_spans,
             &[
                 ("test_source.m1_control", "r.2", "s.2"),
                 ("test_source.m1_guideline_a", "r.2", "s.2"),

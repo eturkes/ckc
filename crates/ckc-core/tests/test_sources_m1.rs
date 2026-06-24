@@ -187,12 +187,12 @@ fn reference_matches_spec_expectations() {
     );
     assert!(!conflict.expected_no_conflict_result);
 
-    let null = &entries[1];
-    assert_eq!(null.group_id, id("group.m1_no_conflict"));
-    assert_eq!(null.expected_outcome, id("semantic_no_conflict"));
-    assert_eq!(null.expected_conflict_kind, None);
-    assert!(null.expected_unsat_core.is_empty());
-    assert!(null.expected_no_conflict_result);
+    let no_conflict = &entries[1];
+    assert_eq!(no_conflict.group_id, id("group.m1_no_conflict"));
+    assert_eq!(no_conflict.expected_outcome, id("semantic_no_conflict"));
+    assert_eq!(no_conflict.expected_conflict_kind, None);
+    assert!(no_conflict.expected_unsat_core.is_empty());
+    assert!(no_conflict.expected_no_conflict_result);
 }
 
 /// Test-local mirror of the `corpus/lexicon/ja_core.yaml` shape requirements
