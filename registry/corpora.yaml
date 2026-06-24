@@ -1,5 +1,5 @@
 # SPEC §8.2/§8.4 corpus acceptances: synthetic test_sources, ai_generated origin
-# accepted under source_evidence_status (acceptance-over-proposer evidence_status).
+# accepted under source_evidence_status (acceptance-over-proposer precedence).
 - id: test_source.m1_guideline_a
   path: corpus/test_sources/m1_guideline_a.html
   origin: ai_generated

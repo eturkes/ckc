@@ -1,4 +1,4 @@
-# SPEC §5 M1 terminology and modality evidence_status (system ckc.lex), consumed by
+# SPEC §5 M1 terminology and modality reference (system ckc.lex), consumed by
 # the normalize processing_stage and content-hash versioned into every run manifest.
 # Shape requirements (typed loader lands with stage-normalize.1):
 #   concepts[]: id + surface forms; optional interval semantics over a

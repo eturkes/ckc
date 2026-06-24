@@ -617,7 +617,7 @@ requirements at M2). Experiment `exp.m1_scaffold`.
 Committed under `corpus/test_sources/` as minimal well-formed HTML (headings, paragraphs, one list,
 one small table) with `registry/corpora.yaml` entries; origin `ai_generated`, evidence status
 `source_evidence_status` on acceptance, provenance `synthetic` — a working example of
-acceptance-over-proposer evidence status.
+acceptance-over-proposer precedence.
 
 | Test source | Content | Role |
 | --- | --- | --- |
