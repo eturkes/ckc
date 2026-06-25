@@ -17,20 +17,6 @@ full pre-consolidation text lives in git history.
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- LSP coverage map (wiring is global: Serena primary via per-project
-  `.serena/project.yml` `languages:`, the global `global` marketplace for solidlsp gaps —
-  no project marketplace). ckc's hand-authored/byte-pinned formats and their provider:
-  rust, bash, json, yaml, toml, markdown (Marksman, Serena-bundled), html, lean4 sit in
-  Serena `languages:`; xml, smt2 (dolmen), alloy, egglog are global plugins. Delivery
-  differs: Serena formats surface only via an explicit get_diagnostics_for_file call;
-  global-plugin formats also push passively through the harness new-diagnostics channel.
-  Add a format = list it in `languages:` if solidlsp does it (restart Claude Code to load),
-  else lean on / add a global gap plugin. §13 formal targets: alloy, egglog covered (global
-  plugins); lean4 sits in `languages:` but the Lean server starts only once .lean files
-  exist. No standalone LSP (audited): TLA+, ASP/Clingo, categorical-CQL; Isabelle lacks
-  solidlsp (global gap plugin at adoption), Python is solidlsp-covered (add to `languages:`
-  at adoption) — §13 additional-targets, §13.1 adapter boundary. Compendium families present
-  only as registry YAML data carry no LSP.
 
 ## Lessons
 
@@ -72,25 +58,6 @@ full pre-consolidation text lives in git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
-- Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
-  parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
-  code spans). Marksman is Serena's markdown server (solidlsp bundles it), active because
-  `markdown` is in `.serena/project.yml` `languages:`; its diagnostics surface only via an
-  explicit get_diagnostics_for_file call (verified: source "Marksman", code 2/Warning), not
-  the harness new-diagnostics channel — that passive push was the removed standalone
-  markdown-lsp plugin's path (Serena is MCP, not a Claude Code LSP plugin), so query markdown
-  diagnostics; they no longer auto-appear on edit. Off-switch: drop `markdown` from
-  `languages:` (restart Claude Code to apply). Marksman's index honors
-  `.ignore`/`.gitignore`/`.hgignore` (Folder.fs ignoreFiles); an ignored markdown target
-  turns valid links into "non-existent document" warnings — hence docs/ sweep-exclusion
-  lives in `.rgignore` (rg-only, Marksman-invisible) and link diagnostics are trustworthy.
-  Ignore files are read at folder scan, not watched: such fixes clear at the next LSP start.
-  Marksman is settled (kept deliberately 2026-06): all three warning shapes are real quick
-  fixes — phantom reflink: backtick the notation; non-existent document: repair the link;
-  "Ambiguous link": target doc has >1 H1 (title_from_heading registers every H1 as a title;
-  keep one, demote the rest) — apply and move on, reporting only the fix. Diagnostics are
-  unconfigurable (none in .marksman.toml; Diag.fs gives phantom reflinks and real broken md
-  links the same code 2/Warning, so any filter kills the signal too).
 - Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
