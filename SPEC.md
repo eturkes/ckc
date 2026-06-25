@@ -372,7 +372,7 @@ quotable spans).
 Event fields (JSONL, `events.jsonl`):
 
 ```text
-event_id run_id pipeline_id pipeline_step_id processing_stage level event_sequence_number started_at ended_at duration_ms
+event_id run_id pipeline_id pipeline_step_id processing_stage log_level event_sequence_number started_at ended_at duration_ms
 input_hashes output_hashes outcome diagnostics resource_counters
 ```
 
