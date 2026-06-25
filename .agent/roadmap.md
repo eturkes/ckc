@@ -54,8 +54,8 @@ argument).
   ordered array, `ContextAtom` 3-branch `oneOf` of `{tag,value}` consts `concept`/`concept_negated`/
   `interval`, string-int `pattern` interval bounds, derived `Action.key`) over `ClinicalIr` + nested
   (`TerminologyBinding`/`ClinicalStatement`/`Action`/`ContextAtom`/`QuantityInterval`/`ExceptionClause`;
-  enums `BindingStatus`/`Direction`/`Strength`/`Certainty`) + injects lexicon `enum`s for the 6
-  controlled-vocab fields `system`/`code`/action `kind`+`target`/concept/`var` (`alternatives` free).
+  enums `BindingStatus`/`Direction`/`Strength`/`Certainty`) + injects lexicon `enum`s for the
+  controlled-vocab fields `system`/`code`+`alternatives`/action `kind`+`target`/concept/`var`.
   Schema = structural oracle (shape+vocab+pattern) for constrained decoding + structural validation;
   the canonical-only invariants it cannot express — `Action.key`=`kind:target` derivation, set-element
   canonical sort-order — stay enforced by `read_strict_canonical`/`IrBundle::validate`, NOT the schema
@@ -76,8 +76,10 @@ argument).
   silently re-blessing real drift; NEW pattern, no repo precedent). Pin `const SCHEMA_HASH`
   = `hash_bytes(emitted)` (sha256 over canonical bytes). Restore the oracle tests from the salvage:
   drift compare; hash pinned; jsonschema validates a known-good `ClinicalIr` (built from lexicon vocab
-  → serde_json `Value`); rejects each malformed case (missing `action`, non-lexicon `code`, non-lexicon
-  action `kind`, bare-number interval bound, unknown member, duplicate set element). Flow: write →
+  → serde_json `Value`); rejects each malformed case (missing `action`, non-lexicon `code`/`alternatives`,
+  non-lexicon action `kind`, bare-number interval bound, unknown member, duplicate set element; NOT an
+  out-of-`i64` magnitude bound — `INT_PATTERN` is i64-lexical not i64-bounded, `read_i64` is that backstop).
+  Flow: write →
   `CKC_BLESS=clinical_ir_schema cargo test schema::` (gen file) → `sha256sum schemas/clinical_ir.schema.json` → fill
   `SCHEMA_HASH` (prefix `sha256:`) → `cargo test` (green). Reading: the salvage (oracle tests); .1a's
   committed `schema.rs`; SPEC §9 schemas/ export. Gate: `cargo test`; validates good + rejects each

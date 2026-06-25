@@ -1,10 +1,11 @@
 //! ClinicalIR JSON-Schema export (SPEC §9 `schemas/`).
 //!
-//! [`clinical_ir_schema`] emits the committed `schemas/clinical_ir.schema.json`:
-//! a JSON-Schema (draft 2020-12, an engine-agnostic standard) that mirrors the
-//! §4.3 ClinicalIR canonical encoding (`ckc-core` `ir.rs`) member for member, so
-//! the M2 local-model runtime can constrain `route.single_ir` output to exactly
-//! the shape the deterministic tail reads back. The mirror:
+//! [`clinical_ir_schema`] emits the `schemas/clinical_ir.schema.json` bytes
+//! (committed and hashed by `schemas-export.1b`): a JSON-Schema (draft 2020-12,
+//! an engine-agnostic standard) that mirrors the §4.3 ClinicalIR canonical
+//! encoding (`ckc-core` `ir.rs`) member for member, so the M2 local-model
+//! runtime can constrain `route.single_ir` output to the shape and vocabulary
+//! the deterministic tail reads back. The mirror:
 //!
 //! - sorted-name object members (`additionalProperties:false` mirrors the
 //!   canonical reader rejecting unknown fields); optional members
@@ -18,23 +19,27 @@
 //!   not element order;
 //! - [`ContextAtom`](ckc_core::ContextAtom) is the §4.3 `{tag,value}` tagged
 //!   union → a `oneOf` of `{tag:{const},value}` branches;
-//! - interval bounds are §4.3 string-quoted integers → a `string` with the
-//!   canonical-decimal pattern, never a bare JSON number;
+//! - interval bounds are §4.3 string-quoted `i64`s → a `string` with the
+//!   canonical-decimal `pattern` (never a bare JSON number); the pattern fixes
+//!   the lexical form, the `i64` magnitude bound re-imposed downstream by the
+//!   deterministic reader (`read_i64`), like the set sort and key derivation;
 //! - the derived [`Action`](ckc_core::Action) `key` is carried as a plain id
 //!   (the `kind:target` derivation is re-checked by bundle validation, not the
 //!   schema).
 //!
 //! Controlled-vocabulary id fields take lexicon-derived `enum`s from the loaded
-//! [`Lexicon`] (`corpus/lexicon/ja_core.yaml`): `system`, `code`, the action
-//! `kind`/`target`, the context-atom concept value, and the interval `var`.
+//! [`Lexicon`] (`corpus/lexicon/ja_core.yaml`): `system`, the binding `code` and
+//! its competing `alternatives`, the action `kind`/`target`, the context-atom
+//! concept value, and the interval `var` — `code` and `alternatives` are one
+//! concept vocabulary, which `IrBundle::validate` checks alike.
 //! Generated ids (`*_id`, the derived `key`) and grounded reference ids
-//! (`alternatives`/`region_ids`/`source_segment_ids`) stay free `Id` strings —
-//! constrained by the id grammar and downstream grounding, not a vocabulary.
+//! (`region_ids`/`source_segment_ids`) stay free `Id` strings — constrained by
+//! the id grammar and downstream grounding, not a vocabulary.
 //!
 //! The bytes are deterministic (sorted-key, compact) — built on `ckc-core`'s
 //! canonical [`ObjectEmitter`]/[`emit_string`], so no runtime JSON dependency —
-//! and `hash_bytes` over them is the `schema_hash` the manifests and the
-//! registry `SchemaEntry` record.
+//! and `hash_bytes` over them is the `schema_hash` that `schemas-export.1b`
+//! pins for the manifests and the registry `SchemaEntry`.
 
 use ckc_core::{
     BindingStatus, CanonError, Certainty, Direction, ObjectEmitter, Strength, emit_string,
@@ -46,7 +51,9 @@ use crate::normalize::Lexicon;
 const DRAFT: &str = "https://json-schema.org/draft/2020-12/schema";
 /// `Id` grammar (`ckc-core` `id.rs`): a lowercase-led identifier-ascii token.
 const ID_PATTERN: &str = "^[a-z][a-z0-9_.:-]*$";
-/// §4.3 string-quoted integer: canonical decimal, no leading zero, no `-0`.
+/// §4.3 string-quoted integer lexical form: canonical decimal, no leading zero,
+/// no `-0`. Matches the `i64` bound spelling; the `i64` magnitude bound itself
+/// (`read_i64`) is re-imposed downstream, not by this pattern.
 const INT_PATTERN: &str = "^(0|-?[1-9][0-9]*)$";
 
 /// Emit the ClinicalIR JSON-Schema as deterministic canonical bytes, injecting
@@ -175,7 +182,7 @@ pub fn clinical_ir_schema(lexicon: &Lexicon) -> Vec<u8> {
                     "system",
                 ],
                 vec![
-                    ("alternatives", array_of(reference("Id"), true)),
+                    ("alternatives", array_of(reference("ConceptCode"), true)),
                     ("binding_id", reference("Id")),
                     ("code", reference("ConceptCode")),
                     ("region_ids", array_of(reference("Id"), true)),
@@ -473,6 +480,81 @@ mod tests {
                     .filter_map(|c| c.interval.as_ref().map(|i| i.var.as_str().to_owned()))
                     .collect()
             )
+        );
+
+        // The committed lexicon yields a non-empty vocab for every controlled
+        // field, so no `$def` is the unsatisfiable empty `enum`.
+        for def in [
+            "ConceptCode",
+            "ActionKind",
+            "TerminologySystem",
+            "IntervalVar",
+        ] {
+            assert!(
+                !enum_of(def).is_empty(),
+                "{def} enum is non-empty for the committed lexicon"
+            );
+        }
+    }
+
+    // Each controlled-vocab consuming field references the right `$def`: concept
+    // codes (binding `code` + `alternatives`, action `target`, atom concept
+    // value) → ConceptCode; action `kind` → ActionKind; binding `system` →
+    // TerminologySystem; the derived `key` stays a free Id. Guards the
+    // `code`/`alternatives` vocabulary parity that bundle validation enforces.
+    #[test]
+    fn consuming_fields_bind_expected_vocab() {
+        let schema = parse();
+        let defs = &schema["$defs"];
+        let ref_of = |v: &Value| v["$ref"].as_str().map(str::to_owned);
+
+        assert_eq!(
+            ref_of(&defs["Action"]["properties"]["kind"]).as_deref(),
+            Some("#/$defs/ActionKind")
+        );
+        assert_eq!(
+            ref_of(&defs["Action"]["properties"]["target"]).as_deref(),
+            Some("#/$defs/ConceptCode")
+        );
+        assert_eq!(
+            ref_of(&defs["Action"]["properties"]["key"]).as_deref(),
+            Some("#/$defs/Id")
+        );
+        assert_eq!(
+            ref_of(&defs["TerminologyBinding"]["properties"]["code"]).as_deref(),
+            Some("#/$defs/ConceptCode")
+        );
+        assert_eq!(
+            ref_of(&defs["TerminologyBinding"]["properties"]["alternatives"]["items"]).as_deref(),
+            Some("#/$defs/ConceptCode")
+        );
+        assert_eq!(
+            ref_of(&defs["TerminologyBinding"]["properties"]["system"]).as_deref(),
+            Some("#/$defs/TerminologySystem")
+        );
+        assert_eq!(
+            ref_of(&defs["TerminologyBinding"]["properties"]["status"]).as_deref(),
+            Some("#/$defs/BindingStatus")
+        );
+
+        let branches = defs["ContextAtom"]["oneOf"]
+            .as_array()
+            .expect("ContextAtom oneOf is an array");
+        let value_ref = |tag: &str| {
+            let branch = branches
+                .iter()
+                .find(|b| b["properties"]["tag"]["const"].as_str() == Some(tag))
+                .expect("branch for tag");
+            ref_of(&branch["properties"]["value"])
+        };
+        assert_eq!(value_ref("concept").as_deref(), Some("#/$defs/ConceptCode"));
+        assert_eq!(
+            value_ref("concept_negated").as_deref(),
+            Some("#/$defs/ConceptCode")
+        );
+        assert_eq!(
+            value_ref("interval").as_deref(),
+            Some("#/$defs/QuantityInterval")
         );
     }
 }
