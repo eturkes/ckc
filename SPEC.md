@@ -432,7 +432,7 @@ Assumptions and uncertainty are explicit payload fields.
 Layered pipelines expose component reuse metadata; M3 metrics consume it.
 ```
 
-Lexicon: `corpus/lexicon/ja_core.yaml` is the M1 terminology and modality evidence status
+Lexicon: `corpus/lexicon/ja_core.yaml` is the M1 terminology and modality reference file
 (system `ckc.lex`): concept entries (id, surface forms, optional interval semantics such as
 成人 → `age >= 18`), action verbs, modality phrases mapped to (direction, strength) — e.g.
 推奨する → (`for`, strong); 提案する/考慮してもよい → (`for`/`permit`, weak); 禁忌/投与しないこと →
