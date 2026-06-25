@@ -105,6 +105,7 @@ pub mod normalize;
 pub mod replay;
 pub mod report;
 pub mod rules;
+pub mod schema;
 pub mod segment;
 pub mod trace;
 

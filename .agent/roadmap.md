@@ -46,7 +46,7 @@ argument).
   `crates/ckc-core/src/plans.rs`, `enums.rs`; SPEC §9 manifest list (lines 781-795), §7.4, §4.4. Gate:
   `cargo test --workspace` green with M1 manifest pins UNCHANGED (additions omitted for M1); canonical
   round-trip + pinned bytes for `ModelIdentity` and a populated manifest; new codes serialize. 71% 142K/200K
-- [ ] schemas-export.1a: ClinicalIR JSON-Schema emitter-core (no committed file/oracle). Restore the
+- [x] schemas-export.1a: ClinicalIR JSON-Schema emitter-core (no committed file/oracle). Restore the
   VERIFIED salvage `.agent/wip-schemas-export.rs.txt` → `crates/ckc-cli/src/schema.rs` (`cp` back;
   fix compile nits) + `pub mod schema;` in `crates/ckc-cli/src/lib.rs`; add `serde_json.workspace =
   true` to ckc-cli `[dev-dependencies]`. Emitter `clinical_ir_schema(&Lexicon) -> Vec<u8>` mirrors
@@ -65,7 +65,7 @@ argument).
   `Action.required` ∋ `key`; concept/action/system/var enums == lexicon sorted vocab. Reading: the
   salvage (primary); external assumptions pre-verified against `ir.rs`/`normalize.rs` this recovery
   (re-read those only to clear a compile error); lib.rs module list. Gate: `cargo test -p ckc-cli`
-  green. [Salvage UNCOMPILED → expect only compile nits; shared w/ .1b, deleted at .1b close.]
+  green. [Salvage compiled first try (fmt-only nits); shared w/ .1b → deleted at .1b close.] 49% 97K/200K
 - [ ] schemas-export.1b: committed export + validation oracle + hash-pin. On .1a's emitter: add
   `jsonschema = "0.46"` to `[workspace.dependencies]` (draft-2020-12 validator = dev-only test oracle;
   default features OK for a self-contained schema, lean to `default-features=false` only if

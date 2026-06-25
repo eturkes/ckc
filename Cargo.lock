@@ -87,6 +87,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "tempfile",
 ]
 
