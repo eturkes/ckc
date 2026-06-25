@@ -1,8 +1,8 @@
 # Agent Memory
 
-Entries must add value beyond the spec, AGENTS.md/CLAUDE.md, codebase, git history, and runtime
+Entries must add value beyond the spec, AGENTS.md, codebase, git history, and runtime
 environment — project-independent tooling pitfalls (RTK, Headroom, Serena, Claude Code, web
-access) live in the global `~/.claude/CLAUDE.md`, not here. Exception: high-value reminders that
+access) live in each agent's own global guidance, not here. Exception: high-value reminders that
 are derivable but easily forgotten under token pressure. Entries are consolidated aggressively;
 full pre-consolidation text lives in git history.
 
@@ -17,7 +17,7 @@ full pre-consolidation text lives in git history.
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- LSP coverage map (wiring is global per ~/.claude: Serena primary via per-project
+- LSP coverage map (wiring is global: Serena primary via per-project
   `.serena/project.yml` `languages:`, the global `global` marketplace for solidlsp gaps —
   no project marketplace). ckc's hand-authored/byte-pinned formats and their provider:
   rust, bash, json, yaml, toml, markdown (Marksman, Serena-bundled), html, lean4 sit in
@@ -72,11 +72,6 @@ full pre-consolidation text lives in git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
-- WebSearch is denied here by a PreToolUse hook (`.claude/hooks/deny-websearch.sh`, wired in
-  `settings.json`) because the tool 400s on this model line — the global `~/.claude/CLAUDE.md`
-  carries the why and the web-access channels to use instead. Re-test/heal: drop the
-  `settings.json` hooks entry, ToolSearch-load WebSearch, run one query; healed → delete the
-  hook script + entry and this note.
 - Backtick-wrap regexes/grammars in markdown — bare adjacent bracket groups
   parse as reference links (phantom Marksman warnings; verify with grep for `][` outside
   code spans). Marksman is Serena's markdown server (solidlsp bundles it), active because
@@ -188,7 +183,7 @@ full pre-consolidation text lives in git history.
 
 Concrete M2 local-model runtime this container runs — machine-specific environment detail (paths +
 measurements drift; the committed deliverable stays engine-agnostic per Policy). OpenVINO GenAI on Intel
-Lunar Lake; iGPU/NPU/CPU enablement + env to source live in the gitignored `CLAUDE.local.md`. Validated
+Lunar Lake; iGPU/NPU/CPU enablement + env to source live in gitignored machine-local config. Validated
 functionally on CPU (NPU/GPU structured-output support untested — NPU static shapes may not support it).
 
 - Constrained decoding: `StructuredOutputConfig(json_schema=… | regex=… | grammar/EBNF/compound_grammar/
