@@ -61,7 +61,11 @@ full pre-consolidation text lives in git history.
   the full test battery; salvage a reverted session's compiling half as a committed
   `.agent/wip-<unit>.patch` the redo line points at (apply, verify against the line, delete in
   the closing commit) — an uncompiled draft salvages the same way flagged UNCOMPILED,
-  transcription-with-verification still beating re-derivation; pin expected shapes from
+  transcription-with-verification still beating re-derivation (recovery also verifies the draft's external assumptions —
+  referenced types/APIs/field names — against source, making the salvage a verified-sound target
+  not a blind preserve; a whole-NEW-file draft salvages as a byte-verified `.rs.txt` copy not a
+  diff, dodging RTK diff-compression + LSP indexing; a salvage shared by a multi-unit split is
+  deleted at the LAST consuming unit's close); pin expected shapes from
   observed output, never hand-computed; cite only checked roadmap lines as measured anchors.
   At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
   for readability (alignment padding, inline result comments, illustrative declaration or

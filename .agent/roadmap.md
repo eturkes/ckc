@@ -46,19 +46,38 @@ argument).
   `crates/ckc-core/src/plans.rs`, `enums.rs`; SPEC §9 manifest list (lines 781-795), §7.4, §4.4. Gate:
   `cargo test --workspace` green with M1 manifest pins UNCHANGED (additions omitted for M1); canonical
   round-trip + pinned bytes for `ModelIdentity` and a populated manifest; new codes serialize. 71% 142K/200K
-- [ ] schemas-export.1: ClinicalIR JSON-Schema emitter + committed export. Hand-write an emitter
-  mirroring the ClinicalIR canonical encoding (sorted-name members, omit-None optionals, §4.3-set
-  vs ordered-array, `ContextAtom` tagged-union `{tag,value}`, string-quoted interval ints, derived
-  `Action` key) over `ClinicalIr` + nested (`TerminologyBinding`, `ClinicalStatement`, `Action`,
-  `ContextAtom`, `QuantityInterval`, `ExceptionClause`; enums `BindingStatus`/`Direction`/
-  `Strength`/`Certainty`); inject lexicon-derived `enum` constraints for the controlled-vocab Id
-  fields (`system`/`code`/action `kind`+`target`/concept/`var`) from `ja_core.yaml`. Land committed
-  `schemas/clinical_ir.schema.json` (JSON-Schema = engine-agnostic standard) + a `schema_hash` over
-  its canonical bytes. Reading: `crates/ckc-core/src/ir.rs` ClinicalIR types + canon writer;
-  `corpus/lexicon/ja_core.yaml`; SPEC §9 schemas/ export, §4/§5. Gate: `cargo test`; emitted schema
-  validates a known-good ClinicalIR instance + rejects a malformed one; `schema_hash` stable;
-  committed bytes pinned. [Fallback: if the emitter + lexicon-enum injection outgrow one window,
-  split emitter-core (inline-literal tests) from committed-export + pin.]
+- [ ] schemas-export.1a: ClinicalIR JSON-Schema emitter-core (no committed file/oracle). Restore the
+  VERIFIED salvage `.agent/wip-schemas-export.rs.txt` → `crates/ckc-cli/src/schema.rs` (`cp` back;
+  fix compile nits) + `pub mod schema;` in `crates/ckc-cli/src/lib.rs`; add `serde_json.workspace =
+  true` to ckc-cli `[dev-dependencies]`. Emitter `clinical_ir_schema(&Lexicon) -> Vec<u8>` mirrors
+  the §4.3 ClinicalIR encoding (sorted-name members, omit-None optionals, set→`uniqueItems` vs
+  ordered array, `ContextAtom` 3-branch `oneOf` of `{tag,value}` consts `concept`/`concept_negated`/
+  `interval`, string-int `pattern` interval bounds, derived `Action.key`) over `ClinicalIr` + nested
+  (`TerminologyBinding`/`ClinicalStatement`/`Action`/`ContextAtom`/`QuantityInterval`/`ExceptionClause`;
+  enums `BindingStatus`/`Direction`/`Strength`/`Certainty`) + injects lexicon `enum`s for the 6
+  controlled-vocab fields `system`/`code`/action `kind`+`target`/concept/`var` (`alternatives` free).
+  After `cp`, KEEP the emitter + serde_json-parse tests, DROP the jsonschema/committed-file/hash tests
+  (→ .1b). Tests (serde_json parse only): bytes parse as JSON; `$defs/ContextAtom` = 3-branch oneOf
+  w/ the tag consts; `QuantityInterval` `required==["var"]` + bounds carry the string-int pattern;
+  `Action.required` ∋ `key`; concept/action/system/var enums == lexicon sorted vocab. Reading: the
+  salvage (primary); external assumptions pre-verified against `ir.rs`/`normalize.rs` this recovery
+  (re-read those only to clear a compile error); lib.rs module list. Gate: `cargo test -p ckc-cli`
+  green. [Salvage UNCOMPILED → expect only compile nits; shared w/ .1b, deleted at .1b close.]
+- [ ] schemas-export.1b: committed export + validation oracle + hash-pin. On .1a's emitter: add
+  `jsonschema = "0.46"` to `[workspace.dependencies]` (draft-2020-12 validator = dev-only test oracle;
+  default features OK for a self-contained schema, lean to `default-features=false` only if
+  `validator_for` stays available) + `jsonschema.workspace = true` to ckc-cli `[dev-dependencies]`;
+  `mkdir schemas/` (or `create_dir_all` in the writer). Generate committed
+  `schemas/clinical_ir.schema.json` (JSON-Schema = engine-agnostic standard) via a `CKC_BLESS`-gated
+  test (set→write, else→compare = drift guard; NEW pattern, no repo precedent). Pin `const SCHEMA_HASH`
+  = `hash_bytes(emitted)` (sha256 over canonical bytes). Restore the oracle tests from the salvage:
+  drift compare; hash pinned; jsonschema validates a known-good `ClinicalIr` (built from lexicon vocab
+  → serde_json `Value`); rejects each malformed case (missing `action`, non-lexicon `code`, non-lexicon
+  action `kind`, bare-number interval bound, unknown member, duplicate set element). Flow: write →
+  `CKC_BLESS=1 cargo test schema::` (gen file) → `sha256sum schemas/clinical_ir.schema.json` → fill
+  `SCHEMA_HASH` (prefix `sha256:`) → `cargo test` (green). Reading: the salvage (oracle tests); .1a's
+  committed `schema.rs`; SPEC §9 schemas/ export. Gate: `cargo test`; validates good + rejects each
+  malformed; `schema_hash` stable; committed bytes pinned. Close: delete `.agent/wip-schemas-export.rs.txt`.
 - [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral-notation
   grammar (EBNF/ABNF — engine-agnostic, no dialect name) constraining output to the `emit.rs` SMT
   surface: `(set-logic QF_LRA|QF_UF)`, `(set-option …)`, `(declare-const |sym| Bool|Real)`,
@@ -67,7 +86,9 @@ argument).
   deontic `|pos:<action_key>|`. Land committed `schemas/smt_query.grammar` + `schema_hash`. Reading:
   `crates/ckc-smt/src/emit.rs` emitted surface; SPEC §8.6 smt pins, §6, §9 schemas/. Gate:
   `cargo test`; grammar accepts the M1 emitted Q1/Q2 bodies (pinned smt2), rejects malformed;
-  `schema_hash` stable; committed bytes pinned.
+  `schema_hash` stable; committed bytes pinned. [Audited vs the .1 split: lighter (hand-authored
+  grammar, no code emitter → one unit) but shares .1b's committed-artifact+hash+oracle shape → pin
+  its accept/reject oracle (an EBNF/ABNF parser/recognizer) as a dev-dep at its turn.]
 - [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
   (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
   `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage
