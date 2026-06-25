@@ -77,7 +77,10 @@ full pre-consolidation text lives in git history.
   positional reader REQUIRES the `obj.optional` call in ascending-key position (peek next key:
   `<name`→UnknownField, `==`→consume, `>name`/absent→None) → a misplaced optional misreads. Pin
   BOTH an all-None fixture (locks old bytes) AND a fully-populated one (locks the new members'
-  slots). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
+  slots) — once per extended record type, not one exemplar for the family (a populated round-trip
+  proves read/write inverse but only a byte-pin locks canonical order/content → each record,
+  RunManifest AND ReplayManifest, needs its own populated pin; M2.1 codex follow-up caught the
+  missing replay pin). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
   gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
   extra impl).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
@@ -108,7 +111,10 @@ full pre-consolidation text lives in git history.
   manifests); match §3's engine-neutral phrasing `the M2 local-model runtime`. The CONCRETE runtime/model
   actually used is a machine-specific environment detail recorded in `## Runtime (machine-specific)` below,
   NOT in the agnostic deliverable (the contract is the artifact; the pick is config). `docs/` research
-  corpus (model-routes.md etc.) may name engines as landscape — out of scope.
+  corpus (model-routes.md etc.) may name engines as landscape — out of scope. Fixtures/test
+  values obey this too — use unmistakably-synthetic tokens (`model.baseline`/`fixture_quant`/`1.0.0`),
+  since a realistic generic quant/format token still names a real scheme (M2.1 codex follow-up: a
+  real bit-width token had slipped into a fixture whose comment asserted it named none).
 - M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):

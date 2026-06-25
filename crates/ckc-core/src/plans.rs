@@ -58,7 +58,7 @@ impl CanonRead for SolverIdentity {
 pub struct ModelIdentity {
     /// Model name as an identifier (e.g. a base instruct model id).
     pub model_id: Id,
-    /// Quantization token as reported (e.g. `int4`), raw text.
+    /// Quantization token as reported (e.g. a bit-width token), raw text.
     pub quant: String,
     /// Runtime version token as reported by the runtime, raw text.
     pub runtime_version: String,
@@ -177,10 +177,11 @@ pub struct RunManifest {
     pub solver_identity: SolverIdentity,
     /// Content hashes of the run's accepted artifacts. Set semantics.
     pub output_hashes: Vec<Hash>,
-    /// SPEC §9 M2 measurement record — model identity plus the input hashes a
-    /// model-route run locks against. Every field is omittable: `None` omits
-    /// the member, so a deterministic M1 run's manifest bytes are unchanged;
-    /// M2 runs populate them.
+    /// SPEC §9 M2 measurement record — the model identity plus the
+    /// test-source, reference, schema, prompt-template, model, and runtime
+    /// hashes a model-route run locks its outputs against. Every field is
+    /// omittable: `None` omits the member, so a deterministic M1 run's
+    /// manifest bytes are unchanged; M2 runs populate them.
     pub model_identity: Option<ModelIdentity>,
     /// Hash of the locked test sources scored in the run.
     pub test_source_hash: Option<Hash>,
@@ -501,7 +502,7 @@ mod tests {
     fn sample_model_identity() -> ModelIdentity {
         ModelIdentity {
             model_id: id("model.baseline"),
-            quant: "int4".to_owned(),
+            quant: "fixture_quant".to_owned(),
             runtime_version: "1.0.0".to_owned(),
         }
     }
@@ -548,6 +549,21 @@ mod tests {
             prompt_template_hash: None,
             model_hash: None,
             runtime_hash: None,
+        }
+    }
+
+    /// [`sample_replay`] with the full §9 M2 measurement record populated, for
+    /// the replay-side measurement pin and the round trip.
+    fn sample_replay_m2() -> ReplayManifest {
+        ReplayManifest {
+            model_identity: Some(sample_model_identity()),
+            test_source_hash: Some(h('1')),
+            reference_hash: Some(h('2')),
+            schema_hash: Some(h('3')),
+            prompt_template_hash: Some(h('4')),
+            model_hash: Some(h('5')),
+            runtime_hash: Some(h('6')),
+            ..sample_replay()
         }
     }
 
@@ -628,7 +644,7 @@ mod tests {
     fn model_identity_canonical_bytes() {
         assert_eq!(
             canon(&sample_model_identity()),
-            r#"{"model_id":"model.baseline","quant":"int4","runtime_version":"1.0.0"}"#
+            r#"{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"}"#
         );
     }
 
@@ -644,7 +660,7 @@ mod tests {
                 r#""git_commit":"0d424a397281bc8a276f4dd666c433a89d6b1228","#,
                 r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,
                 r#""model_hash":"{h5}","#,
-                r#""model_identity":{{"model_id":"model.baseline","quant":"int4","runtime_version":"1.0.0"}},"#,
+                r#""model_identity":{{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"}},"#,
                 r#""output_hashes":["{e}"],"#,
                 r#""prompt_template_hash":"{h4}","reference_hash":"{h2}","#,
                 r#""run_plan_hash":"{plan}","runtime_hash":"{h6}","schema_hash":"{h3}","#,
@@ -690,6 +706,40 @@ mod tests {
         assert_eq!(canon(&sample_replay()), want);
     }
 
+    // Pins the §9 M2 measurement record on the replay side: every omittable
+    // member populated, interleaved into the §4.6 field list in canonical
+    // order — the replay counterpart of the run-manifest measurement pin.
+    #[test]
+    fn replay_manifest_m2_measurement_record_canonical_bytes() {
+        let want = format!(
+            concat!(
+                r#"{{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"#,
+                r#""corpus_hash":"{c}","environment_profile":{{"os":"linux"}},"#,
+                r#""expected_output_hashes":["{e}"],"input_hashes":["{f}"],"#,
+                r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,
+                r#""model_hash":"{h5}","#,
+                r#""model_identity":{{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"}},"#,
+                r#""prompt_template_hash":"{h4}","reference_hash":"{h2}","#,
+                r#""runtime_hash":"{h6}","schema_hash":"{h3}","#,
+                r#""solver_identity":{{"solver_id":"z3","version":"4.13.4"}},"#,
+                r#""test_source_hash":"{h1}","toolchain_manifest_hash":"{a}"}}"#
+            ),
+            a = h('a').as_str(),
+            b = h('b').as_str(),
+            c = h('c').as_str(),
+            d = h('d').as_str(),
+            e = h('e').as_str(),
+            f = h('f').as_str(),
+            h1 = h('1').as_str(),
+            h2 = h('2').as_str(),
+            h3 = h('3').as_str(),
+            h4 = h('4').as_str(),
+            h5 = h('5').as_str(),
+            h6 = h('6').as_str(),
+        );
+        assert_eq!(canon(&sample_replay_m2()), want);
+    }
+
     #[test]
     fn plan_and_manifests_round_trip() {
         round_trip(sample_plan());
@@ -699,15 +749,6 @@ mod tests {
         round_trip(sample_model_identity());
         // Populated §9 records exercise the omittable members on the read side.
         round_trip(sample_manifest_m2());
-        round_trip(ReplayManifest {
-            model_identity: Some(sample_model_identity()),
-            test_source_hash: Some(h('1')),
-            reference_hash: Some(h('2')),
-            schema_hash: Some(h('3')),
-            prompt_template_hash: Some(h('4')),
-            model_hash: Some(h('5')),
-            runtime_hash: Some(h('6')),
-            ..sample_replay()
-        });
+        round_trip(sample_replay_m2());
     }
 }
