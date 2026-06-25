@@ -252,6 +252,54 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
             );
             expected_files.push(rel);
         }
+        // §8.6 byte-pins through the live pipeline: the conflict group's
+        // compiled Q1/Q2 bodies equal the SPEC listings exactly. The emit-unit
+        // pins (ckc-smt) prove the emitter over hand-built M1-shaped rules; this
+        // proves the full extract -> segment -> normalize -> assemble -> compile
+        // chain lands those same bytes.
+        if group.group_id.as_str() == "group.m1_conflict" {
+            let body = |qid: &str| {
+                compiled
+                    .payload
+                    .query_bodies
+                    .iter()
+                    .find(|b| b.query_id.as_str() == qid)
+                    .unwrap_or_else(|| panic!("{qid}: absent from compiled query bodies"))
+                    .body
+                    .as_str()
+            };
+            assert_eq!(
+                body("q.m1_conflict.pair1.overlap"),
+                concat!(
+                    "(set-logic QF_LRA)\n",
+                    "(set-option :print-success false)\n",
+                    "(set-option :produce-models true)\n",
+                    "(declare-const |cond.pregnancy| Bool)\n",
+                    "(declare-const |cond.renal_severe| Bool)\n",
+                    "(declare-const |cond.sepsis| Bool)\n",
+                    "(declare-const |q.age_years| Real)\n",
+                    "(assert (! (and |cond.sepsis| (not |cond.renal_severe|) (>= |q.age_years| 18)) :named |ctx.test_source.m1_guideline_a.rule.0|))\n",
+                    "(assert (! (and |cond.pregnancy| |cond.sepsis| (>= |q.age_years| 18)) :named |ctx.test_source.m1_guideline_b.rule.0|))\n",
+                    "(check-sat)\n",
+                    "(get-model)\n",
+                ),
+                "§8.6 Q1: live pipeline overlap query diverges from the SPEC listing"
+            );
+            assert_eq!(
+                body("q.m1_conflict.pair1.deontic"),
+                concat!(
+                    "(set-logic QF_UF)\n",
+                    "(set-option :print-success false)\n",
+                    "(set-option :produce-unsat-cores true)\n",
+                    "(declare-const |pos:act.administer:drug.abx_a| Bool)\n",
+                    "(assert (! |pos:act.administer:drug.abx_a| :named |a.test_source.m1_guideline_a.rule.0|))\n",
+                    "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.test_source.m1_guideline_b.rule.0|))\n",
+                    "(check-sat)\n",
+                    "(get-unsat-core)\n",
+                ),
+                "§8.6 Q2: live pipeline deontic query diverges from the SPEC listing"
+            );
+        }
         let entry = reference
             .iter()
             .find(|e| e.group_id == group.group_id)

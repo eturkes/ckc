@@ -140,7 +140,7 @@ pub fn assemble_result(
                 DiagnosticCode::SolverTimeout,
                 Outcome::Residual,
                 query_id,
-                "per-query wall-clock budget expired before a verdict",
+                "per-query wall-clock budget expired before a complete solver response",
             ));
             return result;
         }

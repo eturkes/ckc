@@ -4,8 +4,9 @@ Build plan for /session-prompt — the session protocol, bookkeeping format, and
 semantics live in that command; SPEC.md is the design authority, its §2 the milestone
 sequence. One milestone at a time: header `## <name> — plan <hash> — review <hash>` over an
 ordered unit checklist; unchecked lines carry the full unit spec; checked items collapse to
-one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
-bare headers; git history retains all removed text.
+one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; a reviewed milestone keeps its
+stubs until the next milestone is planned (that planning reads them to right-size units),
+then persists as a bare header; git history retains all removed text.
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 

@@ -46,7 +46,8 @@ fieldless_enum! {
 fieldless_enum! {
     /// SPEC §6 raw solver verdict, preserved distinctly from the category:
     /// `sat`/`unsat`/`unknown` as the solver printed it, `timeout` when the
-    /// per-query budget killed the run before a token.
+    /// per-query wall-clock budget killed the run before a complete response —
+    /// any partial output is left uninterpreted and the run is treated as Unknown.
     SolverVerdict {
         Sat => "sat",
         Unsat => "unsat",
