@@ -1,8 +1,8 @@
-# SPEC §8.4 candidate components: pipe.layered_ckcir_to_smt chains the eight
-# §8.3 processing_stage components; input/output artifact kinds (§8.3 artifact names)
+# SPEC §8.4 candidate entries: pipe.layered_ckcir_to_smt chains the eight
+# §8.3 processing_stage entries; input/output artifact kinds (§8.3 artifact names)
 # satisfy the chain rule checked by `ckc registry check`. Input lists declare
 # what each processing_stage actually reads; extract is the chain head (corpus document
-# input, no artifact kinds). All M1 components are deterministic (§8.1
+# input, no artifact kinds). All M1 processing stages are deterministic (§8.1
 # runtime_ai: false).
 pipelines:
   - id: pipe.layered_ckcir_to_smt
