@@ -119,7 +119,7 @@ argument).
   constrained decoding — pass the route's grammar/JSON-Schema (from `schemas/`), greedy, fixed seed;
   k-sample convergence draws k recorded samples via per-sample seeds (`seed_i = f(base_seed, i)`);
   collect k outputs + recorded-call count. Reading: model-adapter.1 module; `schemas/` outputs; the
-  CLAUDE.local.md runtime. Gate: `cargo test` (logic vs a recorded fixture); LIVE confirm via the env
+  M2 runtime (memory `## Runtime` note + `CLAUDE.local.md` env setup). Gate: `cargo test` (logic vs a recorded fixture); LIVE confirm via the env
   command on a real M1 source (runtime indirection) — greedy byte-stable, schema-constrained, k
   samples reproducible. [Gate MET last session; this unit re-confirms functionally.]
 - [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's

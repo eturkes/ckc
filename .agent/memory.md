@@ -118,15 +118,14 @@ full pre-consolidation text lives in git history.
   M2+ may revisit). One enhancement stays open: tests are example/byte-pin only; property-based /
   fuzzing for the canon layer (round-trip identity, reject-any-mutation) and StringPolicy
   (idempotence) is the AGENTS.md-preferred strengthening, currently unscheduled.
-- Committed tree (SPEC/code/registry/roadmap/this file) names NO specific LLM inference engine,
-  grammar dialect, or model-file format (user directive). Such names belong only in the
-  non-committed `CLAUDE.local.md`, which documents the container's actual runtime and is
-  auto-injected each session → refer to it, never copy its runtime details into committed files.
-  `docs/` research corpus (model-routes.md etc.) may name engines as landscape — out of scope. M2
-  elaboration picks the engine at build time behind the generic harness contract (greedy + fixed
-  seed, grammar/JSON-Schema constraint fed by the exported `schemas/`, recorded subprocess,
-  identity/quant/runtime-version in manifests). Match §3's existing engine-neutral phrasing `the
-  M2 local-model runtime`.
+- Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
+  name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
+  engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema
+  constraint fed by the exported `schemas/`, recorded subprocess, identity/quant/runtime-version in
+  manifests); match §3's engine-neutral phrasing `the M2 local-model runtime`. The CONCRETE runtime/model
+  actually used is a machine-specific environment detail recorded in `## Runtime (machine-specific)` below,
+  NOT in the agnostic deliverable (the contract is the artifact; the pick is config). `docs/` research
+  corpus (model-routes.md etc.) may name engines as landscape — out of scope.
 - M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):
@@ -175,7 +174,8 @@ full pre-consolidation text lives in git history.
     extracts the shared ClinicalIR→verdict tail (behavior-locked, M1 tests the gate) before the
     routes reuse it.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
-    runtime/model identity stays in `CLAUDE.local.md`): constrained decoding forces schema-VALID output
+    runtime/model identity in the `## Runtime (machine-specific)` section below): constrained decoding forces
+    schema-VALID output
     that can be semantically WRONG (observed: a greedy run emitted a wrong enum) → the M2 report scores
     BOTH acceptance-rate (schema-validity) AND verdict-accuracy, never validity alone. The baseline
     deliberately pins a weak sub-4B model whose free-form/direct-route output degenerates → exercises §9's
@@ -183,3 +183,21 @@ full pre-consolidation text lives in git history.
     Greedy output is byte-stable within + across processes on one host/device/quant but NOT across
     environments → the recorded-bytes cassette (engine-agnostic boundary above), not a live re-run, is the
     correctness mechanism; replay needs no model runtime present.
+
+## Runtime (machine-specific)
+
+Concrete M2 local-model runtime this container runs — machine-specific environment detail (paths +
+measurements drift; the committed deliverable stays engine-agnostic per Policy). OpenVINO GenAI on Intel
+Lunar Lake; iGPU/NPU/CPU enablement + env to source live in the gitignored `CLAUDE.local.md`. Validated
+functionally on CPU (NPU/GPU structured-output support untested — NPU static shapes may not support it).
+
+- Constrained decoding: `StructuredOutputConfig(json_schema=… | regex=… | grammar/EBNF/compound_grammar/
+  structural_tags)` → JSON-Schema + grammar-constrained output. `GenerationConfig`: `do_sample=False`
+  (greedy), `rng_seed`, `stop_strings`, `ignore_eos`.
+- Model: Qwen2.5-1.5B-Instruct INT4 OV-IR (HF `OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov`, fetch via
+  `huggingface-hub`) at `/var/home/eturkes/.local/app/ckc-models/qwen2.5-1.5b-int4-ov` (867M bin + ov
+  tokenizer/detokenizer). Sub-4B, JA-capable; free-form output degenerate/repetitive.
+- Determinism (CPU, measured): loads ~9s; greedy output BYTE-STABLE within a process AND across separate
+  processes on the same host/device/quant; cross-ENVIRONMENT determinism NOT guaranteed. JSON-Schema +
+  regex-grammar constraints hold deterministically. Caveat: a constraint forces schema-VALID output that
+  can be semantically WRONG (a measured greedy run picked a wrong enum value).
