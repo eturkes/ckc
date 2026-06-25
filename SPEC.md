@@ -330,15 +330,21 @@ Outcome meanings:
 | `unsupported` | Schema-valid construction outside implemented semantics. |
 | `invalid` | Schema, hash, canonicalization, registry, or command validation fails. |
 
-Every processing stage and command returns one total operation result:
+Every operation has one total operation result — an outcome plus the hash sets below. A
+processing stage's result rides its §4.6 EventRecord (the §8.3 run layout adds no per-stage
+result artifact); commands materialize the standalone record:
 
 ```json
 {"operation_id":"compile","outcome":"ok","value_hashes":["sha256:..."],"diagnostic_hashes":[],
  "residual_hashes":[],"ambiguity_hashes":[],"incoherence_hashes":[]}
 ```
 
-Partial success is expressed through typed residual/ambiguity payloads (typed placeholders)
-so downstream processing stages keep operating on the valid remainder and traces stay complete.
+`value_hashes` hash the produced value artifacts (empty when a separate manifest already
+attests them, as the run command's manifest does); `diagnostic_hashes` the §7.4 records;
+`residual_hashes`/`ambiguity_hashes`/`incoherence_hashes` the typed-placeholder payloads, empty
+until a milestone materializes such placeholders. Partial success is expressed through typed
+residual/ambiguity payloads (typed placeholders) so downstream processing stages keep operating
+on the valid remainder and traces stay complete.
 
 ### §4.5 Source linkage
 

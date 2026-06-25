@@ -106,16 +106,14 @@ full pre-consolidation text lives in git history.
   crate adopting the macro. Those serde impls go unused there (the canonical path is
   Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; don't
   "tidy" the dep away.
-- M1 review verdict (REVIEWED, zero code fixes): gates green, all nine §8.5 mechanisms + every §8.6
-  byte-pin verified live through the real pipeline, determinism/canonical guarantees hold,
-  data files conform to §8.2/§8.4/§8.6. Two items left OPEN for the user (not code defects).
-  (1) §4.4 MISMATCH — SPEC.md:333 explicitly says *every processing stage and command* returns a
-  TotalOperationResult, but M1 emits per-stage §4.6 EventRecords (outcome + in/out hashes) and only
-  one command-level total (whose `value_hashes` + typed residual/ambiguity/incoherence buckets stay
-  empty, all diagnostics → `diagnostic_hashes`). It passes §8.5 and loses no information (events +
-  run manifest cover it), but diverges from the literal §4.4 — not just "sparse". Resolve before M2:
-  implement per-stage TotalOperationResults, OR amend §4.4 to make the EventRecord the per-stage
-  result and spell out the command-total bucket partition (the genuinely under-specified part — the
-  spec gives one example, no field prose). (2) Tests are example/byte-pin only; property-based /
+- M1 reviewed (REVIEWED; gates green; zero code defects in the milestone body — all nine §8.5
+  mechanisms + every §8.6 byte-pin verified live, the Q1/Q2 smt pins via run_oracle's
+  group.m1_conflict assertion as well as the emit-unit pins). §4.4-vs-§8.3 tension RESOLVED by SPEC
+  amendment (codex-review follow-up): a processing stage's total operation result IS its §4.6
+  EventRecord — the §8.3 run layout has no per-stage total artifact — and only commands materialize
+  the standalone TotalOperationResult, whose value/residual/ambiguity/incoherence buckets stay empty
+  until a milestone materializes typed placeholders. So do NOT add per-stage TotalOperationResults:
+  inert + redundant with EventRecords until typed placeholders exist (judged technical-debt-not-gain;
+  M2+ may revisit). One enhancement stays open: tests are example/byte-pin only; property-based /
   fuzzing for the canon layer (round-trip identity, reject-any-mutation) and StringPolicy
   (idempotence) is the AGENTS.md-preferred strengthening, currently unscheduled.
