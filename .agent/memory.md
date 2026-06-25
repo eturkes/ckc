@@ -87,6 +87,24 @@ full pre-consolidation text lives in git history.
   missing replay pin). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
   gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
   extra impl).
+- Committed generated-artifact pattern (`schemas-export.1b` = first repo instance; recurs for any
+  emitter-produced committed file, e.g. the next SMT grammar export). Bless-gated round-trip test: the
+  gate is an EXACT token (`CKC_BLESS=clinical_ir_schema`), never `is_some()`/`=1`, so an ambient or CI
+  `CKC_BLESS` can't silently re-bless real drift; the bless branch `create_dir_all`s the dir then writes
+  the emitter bytes, the bare run is the drift guard (read committed → `assert_eq` vs emitter output).
+  Pin `const <X>_HASH = hash_bytes(bytes).as_str()`: `hash_bytes` is plain sha256 rendered
+  `sha256:<lowercase-hex>`, byte-identical to `sha256sum <file>`, so fill the pin from `sha256sum` + the
+  `sha256:` prefix (the equality also cross-checks committed == emitted). Flow: `CKC_BLESS=<token> cargo
+  test <mod>::` (writes) → `sha256sum` → fill hash → bare `cargo test`. The JSON-Schema validator is a
+  dev-only oracle (`jsonschema`, `default-features=false` — drops the remote-$ref resolvers + TLS a
+  self-contained schema never needs, keeps `validator_for`/`Validator::is_valid`; `pattern` enforcement
+  confirmed present without defaults, guarded by a non-canonical-bound malformed case).
+- Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
+  JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
+  union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —
+  `schema_accepts_canonical_clinical_ir` is that guard (M3 ClinicalStatement additions must extend both).
+  Non-obvious anchor: canonical integers are STRING-quoted (`emit_int`→`emit_string`), so interval bounds
+  are schema `string`+INT_PATTERN (a bare JSON number is rejected), not `number`.
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
 - "Oracle" has two senses; the `terms:`/`codex:` cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim one — `runtime-oracle` → `runtime reference` across IDs/types/prose (results are locked measurements, not an authority on real-world truth). Scope: SPEC.md + Rust + registry/corpus/reference data + IDs + config; `docs/` excluded. The commits cite a replacement map whose contents aren't recoverable from git — so "the map omitted generic `oracle`" is inference; what's verifiable is that only runtime-oracle terms were swapped. The TEST-ORACLE sense (authority deciding a test's pass/fail vs. the reference) persists in `run_oracle.rs` (file + `run_oracle_*` fn) and `rules.rs` (`// THE oracle`); those files passed through the sweep commits unrenamed — survival, not a documented approval — and the phrasing recurs in out-of-scope `docs/` ("test oracle"/"SAT oracle"/"perfect oracle") as ordinary technical usage (corroboration, not proof). SPEC.md has zero "oracle"; no instruction mandates global removal (nearest pull: the general "plain operational words over research jargon" line above). Decision: NARROW — leave the test-sense as-is. A global test-sense retirement (`run_oracle.rs`→`run_reference_check.rs`) stays an OPEN user/style call.

@@ -66,7 +66,7 @@ argument).
   salvage (primary); external assumptions pre-verified against `ir.rs`/`normalize.rs` this recovery
   (re-read those only to clear a compile error); lib.rs module list. Gate: `cargo test -p ckc-cli`
   green. [Salvage compiled first try (fmt-only nits); shared w/ .1b → deleted at .1b close.] 49% 97K/200K
-- [ ] schemas-export.1b: committed export + validation oracle + hash-pin. On .1a's emitter: add
+- [x] schemas-export.1b: committed export + validation oracle + hash-pin. On .1a's emitter: add
   `jsonschema = "0.46"` to `[workspace.dependencies]` (draft-2020-12 validator = dev-only test oracle;
   default features OK for a self-contained schema, lean to `default-features=false` only if
   `validator_for` stays available) + `jsonschema.workspace = true` to ckc-cli `[dev-dependencies]`;
@@ -84,6 +84,10 @@ argument).
   `SCHEMA_HASH` (prefix `sha256:`) → `cargo test` (green). Reading: the salvage (oracle tests); .1a's
   committed `schema.rs`; SPEC §9 schemas/ export. Gate: `cargo test`; validates good + rejects each
   malformed; `schema_hash` stable; committed bytes pinned. Close: delete `.agent/wip-schemas-export.rs.txt`.
+  [Done: `default-features=false` chosen (validator_for/is_valid present, no remote resolvers needed);
+  added two malformed cases beyond the plan list — non-lexicon `alternatives` (guards the codex
+  ConceptCode parity) + a non-canonical string bound `"1.5"` (proves INT_PATTERN `pattern` enforced,
+  not just `string` type); salvage deleted.] 55% 110K/200K
 - [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral,
   engine-agnostic grammar notation (no engine-coupled dialect; specific metasyntax SOTA-chosen at this
   unit's turn) constraining output to the `emit.rs` SMT
