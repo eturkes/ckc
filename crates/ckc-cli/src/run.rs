@@ -26,7 +26,7 @@
 //! partial group: a cross-document verdict over fewer documents than the
 //! group declares would document a no-conflict result the test_sources never earned.
 //! Producer values are runner-owned: candidate = the experiment's pipeline,
-//! component = the registry processing_stage component, toolchain manifest hash = the
+//! pipeline_step = the registry processing_stage entry, toolchain manifest hash = the
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
@@ -176,14 +176,14 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
 }
 
 /// The runner's resolved view of one experiment: the pipeline candidate,
-/// its processing_stage component ids, the unique corpus documents across the test_source
+/// its pipeline step ids, the unique corpus documents across the test_source
 /// groups in first-appearance order, the groups themselves in evaluation
 /// order, the per-query solver resource limit, the §5 plan the run executes, and
 /// the toolchain manifest hash every producer carries.
 struct Resolved {
     pipeline_id: Id,
-    /// ProcessingStage component ids parallel to [`PROCESSING_STAGE_KINDS`].
-    components: [Id; 8],
+    /// Pipeline step ids parallel to [`PROCESSING_STAGE_KINDS`].
+    pipeline_step_ids: [Id; 8],
     documents: Vec<CorpusEntry>,
     groups: Vec<TestSourceGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
@@ -232,7 +232,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         return None;
     };
 
-    let mut components: Vec<Id> = Vec::with_capacity(PROCESSING_STAGE_KINDS.len());
+    let mut pipeline_step_ids: Vec<Id> = Vec::with_capacity(PROCESSING_STAGE_KINDS.len());
     for kind in PROCESSING_STAGE_KINDS {
         let found = pipeline
             .processing_stages
@@ -244,7 +244,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
                     .find(|s| s.id == *processing_stage_id && s.kind == static_id(kind))
             });
         match found {
-            Some(processing_stage) => components.push(processing_stage.id.clone()),
+            Some(processing_stage) => pipeline_step_ids.push(processing_stage.id.clone()),
             None => {
                 shell.diagnostic(invalid_diagnostic(vec![(
                     static_id("reason"),
@@ -257,9 +257,9 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
             }
         }
     }
-    let components: [Id; 8] = components
+    let pipeline_step_ids: [Id; 8] = pipeline_step_ids
         .try_into()
-        .expect("the loop pushes one component per processing_stage kind");
+        .expect("the loop pushes one pipeline step id per processing_stage kind");
 
     let Some(&budget_ms) = experiment.budget.get(&static_id(SOLVER_BUDGET_KEY)) else {
         shell.diagnostic(invalid_diagnostic(vec![(
@@ -306,7 +306,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
     };
     Some(Resolved {
         pipeline_id: pipeline.id.clone(),
-        components,
+        pipeline_step_ids,
         documents,
         groups: experiment.test_source_groups.clone(),
         budget_ms,
@@ -646,7 +646,7 @@ fn trace_processing_stage(
     };
     shell.processing_stage_event(ProcessingStageEvent {
         pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.components[TRACE].clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[TRACE].clone(),
         processing_stage: static_id(PROCESSING_STAGE_KINDS[TRACE]),
         started_at,
         ended_at,
@@ -777,7 +777,7 @@ fn report_processing_stage(
     };
     shell.processing_stage_event(ProcessingStageEvent {
         pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.components[REPORT].clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[REPORT].clone(),
         processing_stage: static_id(PROCESSING_STAGE_KINDS[REPORT]),
         started_at,
         ended_at,
@@ -1039,7 +1039,7 @@ fn finish_processing_stage<P: Canonical + CanonRead>(
     };
     shell.processing_stage_event(ProcessingStageEvent {
         pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.components[processing_stage_index].clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[processing_stage_index].clone(),
         processing_stage: static_id(PROCESSING_STAGE_KINDS[processing_stage_index]),
         started_at,
         ended_at,
@@ -1170,7 +1170,7 @@ fn processing_stage_diagnostic(
 fn producer(resolved: &Resolved, processing_stage_index: usize) -> Producer {
     Producer {
         pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.components[processing_stage_index].clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[processing_stage_index].clone(),
         toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
     }
 }

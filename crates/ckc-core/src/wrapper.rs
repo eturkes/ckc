@@ -36,7 +36,7 @@ fieldless_enum! {
     }
 }
 
-/// SPEC §4.4 `producer`: the component execution that emitted the artifact.
+/// SPEC §4.4 `producer`: the registered pipeline step execution that emitted the artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Producer {
     pub pipeline_id: Id,
