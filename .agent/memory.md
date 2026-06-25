@@ -17,6 +17,15 @@ full pre-consolidation text lives in git history.
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
+- LSP coverage map (ckc inventory; the Serena-vs-marketplace wiring and diagnostic-delivery
+  mechanism live in each agent's own global guidance, not here). ckc's hand-authored/byte-pinned
+  formats → provider: rust, bash, json, yaml, toml, markdown (Marksman), html, lean4 are
+  Serena-served (in `.serena/project.yml` `languages:`); xml, smt2 (dolmen), alloy, egglog come
+  from the `global` LSP marketplace. §13 formal targets: alloy + egglog covered (marketplace
+  plugins); lean4 listed but its server starts only once `.lean` files exist. No standalone LSP
+  (audited): TLA+, ASP/Clingo, categorical-CQL; Isabelle lacks solidlsp (marketplace gap plugin at
+  adoption), Python is solidlsp-covered (add to `languages:` at adoption) — §13 additional-targets,
+  §13.1 adapter boundary. Compendium families present only as registry YAML data carry no LSP.
 
 ## Lessons
 
