@@ -6,77 +6,185 @@ sequence. One milestone at a time: header `## <name> — plan <hash> — review 
 ordered unit checklist; unchecked lines carry the full unit spec; checked items collapse to
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; a reviewed milestone keeps its
 stubs until the next milestone is planned (that planning reads them to right-size units),
-then persists as a bare header; git history retains all removed text.
+then persists as a bare header; git history retains all removed text. The active milestone's
+`plan <hash>` shows `PENDING` until its first unit's closing commit fills it — the planning
+commit is then known (M1's `89c4cba` was filled retroactively too).
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
-- [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 4b46cac
-- [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 0d823e0
-- [x] core-canon-writer: canonical JSON writer core + ObjectEmitter. 43% 86K/200K 1e57bb9
-- [x] core-canon-collections: arrays/sets/maps over the writer core. 41% 82K/200K a10a6a3
-- [x] core-canon-unions: tagged-union + fieldless-enum emission. 30% 61K/200K c4dcae5
-- [x] core-canon-reader: strict reader, the writer's inverse (solo). 28% 55K/200K 5a5f778
-- [x] core-canon-hash: content_hash/hash_bytes + policy descriptor. 36% 72K/200K 4e1333e
-- [x] core-enums-envelope.1: ten §4.4 enums + DiagnosticRecord + TotalOperationResult.
-  59% 118K/200K bb3152f
-- [x] core-enums-envelope.2: ArtifactWrapper + EventRecord + JSONL. 64% 128K/200K f134443
-- [x] core-grounding: SourceDocument/Graph/Span/Anchor/Region + invariants.
-  68% 135K/200K 08d634e
-- [x] core-ir.1: DocIR + SegmentIR layers, structural-hash pattern. 72% 144K/200K d5ee044
-- [x] core-ir.2: ClinicalIR + NormIR layers, §8.6 byte pin. 72% 145K/200K 385f9e4
-- [x] core-ir.3: FormalIR layer + directions_opposed + pair slots. 61% 122K/200K cb1ecf5
-- [x] core-ir.4: IrBundle assembly + components + hashes (bundle.rs). 85% 170K/200K 829aec3
-- [x] core-ir.5: ten-invariant bundle validation + rejection suite.
-  >=90% compacted/200K 0d424a3
-- [x] core-plans: RunPlan/RunManifest/ReplayManifest. 53% 106K/200K bb24b10
-- [x] core-registry.1: registry entry types + YAML loading. 56% 113K/200K 7a8fda3
-- [x] core-registry.2: registry validation + stage-chain rule. 48% 97K/200K 515b2a1
-- [x] fixtures-m1: three test source HTMLs, ja_core lexicon, reference, registry seeds.
-  65% 129K/200K 9b8414b
-- [x] cli-runner.1.1: ckc-cli crate, four-command dispatch + CLI invariants.
-  68% 137K/200K 14e0862
-- [x] cli-runner.1.2: ckc registry check end-to-end. 60% 121K/200K 844b9aa
-- [x] stage-extract.1: extract processing stage core, DOM walk + residuals. 70% 140K/200K 2d198fc
-- [x] stage-extract.2: table extraction + test source pins. 62% 124K/200K 9040c3c
-- [x] stage-segment: rule-based segmentation processing stage. 69% 138K/200K 539604c
-- [x] stage-normalize.1a: lexicon loader. 60% 119K/200K 270c34b
-- [x] stage-normalize.1b: mention binding. 69% 138K/200K befa428
-- [x] stage-normalize.1c: behavior-locked binding-core refactor. 53% 105K/200K b35963c
-- [x] stage-normalize.1d: recommendation statement builder. 68% 136K/200K 31f6070
-- [x] stage-normalize.1e: exception clause attachment completing clinical_ir.
-  51% 102K/200K 873cb02
-- [x] stage-normalize.2a: rule-id scheme + §8.6/§8.2 re-pin + Normalization payload.
-  63% 127K/200K e5878a7
-- [x] stage-normalize.2b: NormativeRule derivation + normalize() processing stage artifact wrapper.
-  74% 149K/200K 077de58
-- [x] smt-emit.1: ckc-smt crate foundation: CompiledArtifact + VerifierResult.
-  >=90% compacted/200K ebffa0c
-- [x] smt-emit.2: plan module: eligibility scan + pair/query-id minting. 60% 120K/200K f9e822a
-- [x] smt-emit.3a: §8.6 smt2 re-pin + emit-module query texts. 76% 153K/200K f4a97d4
-- [x] smt-emit.3b: CompiledArtifact assembly completing compile. 75% 151K/200K 816ed66
-- [x] smt-verify.a: Z3 adapter: live identity probe + budgeted invocation. 53% 106K/200K 6c37012
-- [x] smt-verify.b: solver-result parsing + §6 categories completing verify. 74% 147K/200K 5f16d11
-- [x] cli-runner.2a: run module document half: resolution + per-doc processing stage chain, strict
-  read-back landings + processing stage events. >=90% compacted/200K fd11d54
-- [x] cli-runner.2b: group processing stages + total outcome completing ckc run: per-group compile/verify
-  landings + byte-identical smt bodies, severity-folded total. >=90% compacted/200K aeae33d
-- [x] cli-runner.2c: workspace run oracle — exp.m1_scaffold sweep + reference assert. 47% 93K/200K c767c4d
-- [x] cli-runner.3a.1: trace module types — DAG/claim/lineage shapes + validation.
-  71% 142K/200K 1e2babd
-- [x] cli-runner.3a.2a: assemble_trace + DocTrace/GroupTrace hand-off, synthetic battery.
-  76% 153K/200K 5a280be
-- [x] cli-runner.3a.2b: live test source pins for assemble_trace. 71% 142K/200K e046926
-- [x] cli-runner.3a.3: trace processing stage wired into ckc run. 75% 150K/200K 1f99a59
-- [x] cli-runner.3b: ckc trace command, chain in both directions. 82% 164K/200K 3f630c0
-- [x] cli-runner.4.1a.1: report module types — Report/finding shapes + validation.
-  68% 136K/200K 6bbc293
-- [x] cli-runner.4.1a.2: assemble_report completing the report payload. 76% 152K/200K eaa6cbf
-- [x] cli-runner.4.1b.1: report processing stage wired into ckc run landing report.json.
-  >=90% compacted/200K 79bc570
-- [x] cli-runner.4.1b.2a: report_en.md rendering + manifest assembly cores. 65% 131K/200K ec17a36
-- [x] cli-runner.4.1b.2b.1: ckc run lands report_en.md + run/replay manifests.
-  33% 65K/200K 53d1f72
-- [x] cli-runner.4.1b.2b.2: live pins for the report_en.md + manifests trio. 50% 100K/200K 7ecc19e
-- [x] cli-runner.4.2a: replay core — re-execution + hash comparison. 75% 151K/200K 68eabd3
-- [x] cli-runner.4.2b: ckc replay command, match report stdout body. 65% 129K/200K 37d61a5
-- [x] acceptance-m1: §8.5 items 1-9 pass against recorded run m1; tag accept/m1. 38% 76K/200K b8dae7e
+## M2 multi-hop PoC — plan PENDING
+
+Scope = SPEC §9: experiment 1's minimal pair on this laptop. A weak local model translates the
+M1 test sources two ways — `route.direct_smt` (model emits SMT-LIB directly, the baseline) versus
+`route.single_ir` (model fills one grammar-constrained IR schema, then deterministic compile) —
+scored by the M1 pipeline as instrument; published as a bilingual research report. Exactly two
+routes (§10 widens the route axis). Elaboration pick: `single_ir` fills **ClinicalIR** (fully
+closed-vocab — lexicon codes / enums / ints, zero free text → tractable constrained decoding, max
+deterministic leverage). Per the "test all layer configurations" directive, the full single_ir
+layer gradient (every meaningful IR layer + the DMN-style alt) defers to M3 / §10 — recorded in
+`.agent/memory.md` as the M3 route-axis seed. Milestone gate (model runtime) MET last session
+(functionally confirmed); not a §15 gate — M2 results are locked measurements that stand on their
+own. The local-model runtime is an environment-provided command invoked Z3-style; its
+implementation lives outside git (CLAUDE.local.md), so no unit commits an engine name, dialect, or
+model format. Live units feed deny-Read sources via runtime indirection (a script opens the path;
+the path never appears in a Read/Bash argument).
+
+- [ ] model-types: ckc-core model + manifest identity types. Add `ModelIdentity` (`model_id`,
+  `quant`, `runtime_version`, `prompt_template_hash`) mirroring `SolverIdentity`; extend
+  `RunManifest`/`ReplayManifest` with the §9 minimal measurement record — `schema_hashes`,
+  `prompt_template_hashes`, `model_identity`, runtime hash beside the existing test-source /
+  reference hashes (the "evaluator identity"). Add the §7.4 model-route diagnostic codes
+  `ai_schema_violation`, `ai_hallucinated_source`, `repair_limit_exceeded` to the §4.4 family.
+  Canonical/CanonRead + `content_hash` for the new types; byte-pin their canonical forms.
+  Reading: `crates/ckc-core/src/plans.rs`, `enums.rs`; SPEC §9 manifest list, §7.4, §4.4. Gate:
+  `cargo test` ckc-core green; canonical round-trip + pinned bytes for `ModelIdentity` and the
+  extended manifests; new codes serialize.
+- [ ] schemas-export.1: ClinicalIR JSON-Schema emitter + committed export. Hand-write an emitter
+  mirroring the ClinicalIR canonical encoding (sorted-name members, omit-None optionals, §4.3-set
+  vs ordered-array, `ContextAtom` tagged-union `{tag,value}`, string-quoted interval ints, derived
+  `Action` key) over `ClinicalIr` + nested (`TerminologyBinding`, `ClinicalStatement`, `Action`,
+  `ContextAtom`, `QuantityInterval`, `ExceptionClause`; enums `BindingStatus`/`Direction`/
+  `Strength`/`Certainty`); inject lexicon-derived `enum` constraints for the controlled-vocab Id
+  fields (`system`/`code`/action `kind`+`target`/concept/`var`) from `ja_core.yaml`. Land committed
+  `schemas/clinical_ir.schema.json` (JSON-Schema = engine-agnostic standard) + a `schema_hash` over
+  its canonical bytes. Reading: `crates/ckc-core/src/ir.rs` ClinicalIR types + canon writer;
+  `corpus/lexicon/ja_core.yaml`; SPEC §9 schemas/ export, §4/§5. Gate: `cargo test`; emitted schema
+  validates a known-good ClinicalIR instance; `schema_hash` stable; committed bytes pinned.
+- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral-notation
+  grammar (EBNF/ABNF — engine-agnostic, no dialect name) constraining output to the `emit.rs` SMT
+  surface: `(set-logic QF_LRA|QF_UF)`, `(set-option …)`, `(declare-const |sym| Bool|Real)`,
+  `(assert (! <term> :named |name|))`, `(check-sat)`, `(get-model)`/`(get-unsat-core)`; term grammar
+  = `and`/`or`/`not`, `|c|`, the four interval relations over `|v|` and an int, negative `(- N)`,
+  deontic `|pos:<action_key>|`. Land committed `schemas/smt_query.grammar` + `schema_hash`. Reading:
+  `crates/ckc-smt/src/emit.rs` emitted surface; SPEC §8.6 smt pins, §6, §9 schemas/. Gate:
+  `cargo test`; grammar accepts the M1 emitted Q1/Q2 bodies (pinned smt2), rejects malformed;
+  `schema_hash` stable; committed bytes pinned.
+- [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
+  (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
+  `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage
+  (file existence, `schema_hash` match vs committed `schemas/`, id uniqueness). Seed
+  `registry/schemas.yaml` (`clinical_ir`, `smt_query`); define `PromptEntry` loading (per-route
+  prompt files authored later by the route units, which add their entry + final hash). Reading:
+  `crates/ckc-core/src/registry.rs` entry types/loaders/check, `registry/*.yaml`; SPEC §14 (M2 adds
+  prompts|schemas). Gate: `cargo test` registry; `ckc registry check` passes with the new files;
+  loader rejects a missing / hash-mismatched schema.
+- [ ] registry-m2.2: experiment multi-route binding + per-route validation. Extend `ExperimentEntry`
+  to bind both M2 routes under one experiment — add `routes` (route pipeline ids) + `baseline_route`
+  (designates `direct_smt` as the §7.3 delta baseline); keep single-`pipeline` M1 entries valid
+  (`routes` optional). `ckc registry check` validates each route pipeline's processing-stage chain
+  (input/output artifact-kind continuity) + `baseline_route` ∈ `routes`. Seed `exp.m2_multihop`
+  (`routes=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_route=pipe.m2_direct_smt`, the M1
+  groups, seed, budget incl. k-sample count + repair limit). Amend SPEC §14/§8 registry wording for
+  the route-set binding. Reading: `crates/ckc-core/src/registry.rs` `ExperimentEntry` + validation,
+  `registry/{experiments,candidates}.yaml`; SPEC §8 registry-check, §14. Gate: `cargo test`;
+  `ckc registry check` validates `exp.m2_multihop` + both route chains + rejects an unbalanced chain
+  / missing baseline; `exp.m1_scaffold` still validates. [Decision pinned: one experiment binds both
+  routes + baseline; faithful to §9 "both routes execute over identical locked inputs (`exp.m2_multihop`)".]
+- [ ] run-refactor: behavior-locked deterministic-tail extraction. Refactor `ckc-cli` `run.rs` to
+  expose the deterministic ClinicalIR→verdict tail as a reusable fn chaining `derive_norm_ir` →
+  `FormalIr::derive` → `emit::compile` → `verdict::verify`, so both the M1 pipeline and
+  `route.single_ir` call it. Zero behavior change — existing M1 tests (run oracle, §8.6 byte pins)
+  are the gate, unedited. Reading: `crates/ckc-cli/src/run.rs` execute + per-group compile/verify;
+  `rules.rs`/`normalize.rs`/`segment.rs` + ckc-smt `emit`/`verdict` signatures. Gate: `cargo test
+  --workspace` green with ZERO test edits; `exp.m1_scaffold` run oracle + §8.6 pins unchanged.
+  [Refactor-first rule: share internals before the route feature.]
+- [ ] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
+  adapter module mirroring `verify.rs` `Z3Adapter`: `ModelAdapter::with_command(<cmd from run
+  config>)` probes the environment-provided runtime command (config-declared path, env-overridable)
+  for its self-reported identity → `ModelIdentity` (no engine name in committed code — Z3 precedent);
+  `invoke(prompt, constraint, seed, budget) -> ModelRun{outcome, stdout_bytes, stderr}` with
+  `ModelOutcome` = `Completed{bytes}`/`Timeout`/`ExitFailure{code}`/`SpawnFailure{error}`; helpers
+  mirror `run_process`/`spawn_piped`. Committed CLI contract: the command takes prompt + constraint
+  (schema/grammar path) + seed (args/stdin) and writes generated bytes to stdout. Reading:
+  `crates/ckc-smt/src/verify.rs` Z3Adapter pattern; `crates/ckc-core/src/plans.rs`
+  SolverIdentity/ModelIdentity; SPEC §9 recorded-subprocess Z3 pattern. Gate: `cargo test`; probe +
+  invoke drive a committed stub-command fixture deterministically; identity parses; outcome enum
+  covers spawn/timeout/exit. [Decision pinned: env command + committed CLI contract; the wrapper impl
+  lives outside git (CLAUDE.local.md), like `intel-accel/`.]
+- [ ] model-adapter.2: constrained generation + k-sample (live). Complete `invoke` for real
+  constrained decoding — pass the route's grammar/JSON-Schema (from `schemas/`), greedy, fixed seed;
+  k-sample convergence draws k recorded samples via per-sample seeds (`seed_i = f(base_seed, i)`);
+  collect k outputs + recorded-call count. Reading: model-adapter.1 module; `schemas/` outputs;
+  CLAUDE.local.md runtime. Gate: `cargo test` (logic vs a recorded fixture); LIVE confirm via the env
+  command on a real M1 source (runtime indirection) — greedy byte-stable, schema-constrained, k
+  samples reproducible. [Gate MET last session; this unit re-confirms functionally.]
+- [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's
+  prompt + output as an `ArtifactWrapper` test-source artifact (origin `ai_generated`, evidence
+  `evidence_discovery_only`, `prompt_template_hash` in the manifest), keyed by (route, source, seed);
+  live calls gated behind an explicit experiment/`--record` flag, default replays the recordings →
+  deterministic, runtime-absent. Extend `replay.rs` hash-compare to cover model artifacts. Reading:
+  `crates/ckc-cli/src/replay.rs`, `shell.rs` artifact writes; `crates/ckc-core/src` ArtifactWrapper +
+  origin/evidence enums; SPEC §9 recorded-bytes replay, §7.1. Gate: `cargo test`; a recorded sample
+  replays byte-identical with the runtime command ABSENT; replay-manifest hashes match. [Acceptance:
+  recorded model I/O replays byte-stably.]
+- [ ] stage-model-fill: model-fill processing stage (generic over target). New stage kind
+  `model_fill`: invoke `ModelAdapter` with the route prompt + constraint, parse output → target
+  artifact (ClinicalIR JSON or SMT text), §4 acceptance-check the parse, run a repair loop (re-prompt
+  on schema-violation up to `repair_limit` from budget, counting repairs) emitting the §7.4 codes —
+  `ai_schema_violation` (parse/schema fail), `ai_hallucinated_source` (ref id absent from the
+  deterministic upstream), `repair_limit_exceeded` (loop exhausted); emit a §4.6 EventRecord carrying
+  recorded-call + repair counts. Target-generic (config selects ClinicalIR-parse vs SMT-passthrough).
+  Reading: `crates/ckc-cli/src/run.rs` stage-event pattern; the adapter + cassette modules; ckc-core
+  acceptance/validate; SPEC §7.3 repair count, §7.4. Gate: `cargo test`; stage records each code on
+  crafted fixtures (valid; schema-violation+repair; hallucinated-ref; limit-exceeded);
+  recorded-call accounting exact.
+- [ ] route-single-ir: `single_ir@ClinicalIR` route + pipeline. `pipe.m2_single_ir` = deterministic
+  extract+segment (real upstream ids/regions) → `model_fill`(target=ClinicalIR, schema=`clinical_ir`)
+  → assemble `IrBundle` (model ClinicalIR + deterministic up/downstream) → §4 bundle-validate
+  (acceptance; hallucinated `source_segment_ids`/`region_ids` → `ai_hallucinated_source`) →
+  run-refactor deterministic tail → verdict. Author the JA→ClinicalIR prompt (`registry/prompts.yaml`,
+  hashed). Reading: the refactored tail fn, stage-model-fill, schemas-export.1, segment/normalize;
+  SPEC §9 single_ir, §8. Gate: `cargo test`; route produces a scoreable verdict for an accepted
+  ClinicalIR over a recorded cassette; acceptance + §7.4 codes wire through; verdict scored vs
+  reference for accepted translations. [Decision pinned: model fills ClinicalIR over deterministic
+  upstream — the instrument supplies the grounding scaffold; hallucinated refs are measured, not fatal.]
+- [ ] route-direct-smt: `direct_smt` route + pipeline (the weak baseline). `pipe.m2_direct_smt` =
+  `model_fill`(target=SMT, grammar=`smt_query`) emitting the contradiction-query SMT (Q1 overlap + Q2
+  deontic) per conflict pair directly, no IR → syntactic-validity check (solver parse) →
+  `verdict::verify` via `Z3Adapter` + `assemble_result` → verdict. Author the JA(pair)→SMT prompt
+  (hashed). Reading: schemas-export.2, stage-model-fill, ckc-smt `verify` (Z3Adapter/assemble_result)
+  + `emit.rs` query structure; SPEC §9 direct_smt. Gate: `cargo test`; route runs a recorded SMT
+  sample through verify to a verdict; syntactic validity recorded; verdict scored vs reference.
+  [Decision pinned: per-pair Q1/Q2 emission for comparability with the M1 group verdict; packaging
+  finalized in-unit.]
+- [ ] metrics-m2.1: route-quality raw-row metrics. New metrics module → per-route raw rows over a
+  run: schema-valid rate, acceptance rate, repair count, recorded-call counts, target syntactic
+  validity (solver parse), conflict-verdict accuracy vs reference over the §8 conflict + no-conflict
+  groups (no-conflict first-class); exact-fraction values, zero-denominator → `not_applicable`,
+  unavailable omitted + diagnostic. Reading: run/report data shapes, reference loader; SPEC §7.3
+  route quality, §9 scoring. Gate: `cargo test`; metrics correct on a recorded two-route run fixture;
+  fraction / NA / omission rules hold.
+- [ ] metrics-m2.2: k-sample stability + baseline-delta. k-sample verdict stability/convergence
+  (per-route verdict agreement across k samples); baseline-delta table = per-metric (route −
+  baseline) over identical inputs (baseline = `direct_smt` per `exp.m2_multihop`), raw rows emitted
+  BEFORE the delta table. Reading: metrics-m2.1 module, the experiment baseline designation; SPEC §7.3
+  baseline delta + k-sample, §9 raw-rows-before-ranking. Gate: `cargo test`; stability + delta correct
+  on a fixture; raw-rows-before-delta ordering asserted. [Acceptance: raw rows emit before the
+  baseline-delta table.]
+- [ ] report-m2.1: report.json M2 extension. Extend `assemble_report` + the `report.json` canonical
+  shape with per-route raw rows, the baseline-delta table, findings carrying quoted Japanese source
+  spans + named assertions, a failure-taxonomy summary (§6 categories + §7.4 codes), model + solver
+  identities, replay status, metrics (M2+). Canonical/CanonRead + byte-pin. Reading:
+  `crates/ckc-cli/src/report.rs` assemble_report + Report types; the metrics modules; SPEC §7.2, §9
+  report.json contents. Gate: `cargo test`; report.json assembles from a recorded run with every M2
+  section; canonical bytes pinned; §0 vocabulary in the wording fields.
+- [ ] report-m2.2: bilingual rendering. Render `report_en.md` (extend the M1 renderer with M2
+  metrics/delta/taxonomy) + new `report_ja.md` (deterministic Japanese rendering of the same canonical
+  report.json); §0 locked-measurement wording, no clinical claims; quoted JA spans verbatim. Reading:
+  `report.rs` render_markdown + report-m2.1 payload; SPEC §7.2 (report_ja from M2), §0 vocabulary.
+  Gate: `cargo test`; both md files render deterministically (byte-stable) from one report.json; the
+  JA rendering is well-formed; §0 vocabulary asserted.
+- [ ] run-m2: `ckc run --experiment exp.m2_multihop` end-to-end. Wire both route pipelines into one
+  experiment run — per-route `model_fill` (cassette-recorded under the experiment flag) → scoring →
+  metrics → `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests, over the locked M1
+  inputs. Live-pin battery over the run binary. Reading: `run.rs` execute (route loop), the routes,
+  metrics, report, manifests; SPEC §1 command, §9. Gate: the command lands all artifacts; live pins on
+  report.json sections + manifest evaluator-identity hashes; the recorded run is committed/referenced
+  under `runs/`. LIVE: record the full cassette via the env runtime command. [Live-pin-over-run-binary
+  = its own unit.]
+- [ ] acceptance-m2: §9 acceptance. Verify the §9 themes against the recorded run — both routes
+  execute over identical locked inputs (`exp.m2_multihop`); recorded model I/O replays byte-stably
+  (runtime absent); raw rows before the baseline-delta table; expected conflict/no-conflict per
+  reference for accepted translations; the bilingual report renders deterministically from
+  report.json; §0 vocabulary holds. Tag `accept/m2`. Reading: all M2 artifacts + the §9 acceptance
+  themes. Gate: all six themes pass on the recorded run; `ckc replay` byte-matches; tag `accept/m2`.

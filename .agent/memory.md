@@ -127,3 +127,33 @@ full pre-consolidation text lives in git history.
   seed, grammar/JSON-Schema constraint fed by the exported `schemas/`, recorded subprocess,
   identity/quant/runtime-version in manifests). Match §3's existing engine-neutral phrasing `the
   M2 local-model runtime`.
+- M2 plan (minimal pair, 18 units; gate MET = model runtime, functionally confirmed last session,
+  NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
+  (which collapse at M2 review):
+  - single_ir layer pick = **ClinicalIR** — fully closed-vocab (lexicon codes / enums / ints, zero
+    free text) so constrained decoding is tractable and deterministic leverage is maximal. The
+    instrument supplies the grounding scaffold: deterministic extract+segment produce the real
+    upstream ids, the model fills ClinicalIR REFERENCING them, so hallucinated `source_segment_ids`/
+    `region_ids` surface as `ai_hallucinated_source` instead of corrupting the verdict. The §7.4
+    codes (`ai_schema_violation`/`ai_hallucinated_source`/`repair_limit_exceeded`) and §7.3 "repair
+    count" confirm the architecture (a repair loop + grounding check are intended, not bolted on).
+  - `exp.m2_multihop` binds BOTH routes in ONE experiment — `ExperimentEntry` gains `routes` +
+    `baseline_route` (baseline = `direct_smt`); one `ckc run` → one `report.json` with per-route raw
+    rows + the baseline-delta table. Faithful to §9 "both routes execute over identical locked inputs
+    (`exp.m2_multihop`)"; M3's separate `exp.*` ids are a different shape, do not back-apply here.
+  - Engine-agnostic boundary (extends the bullet above): the runtime is an environment-provided
+    COMMAND invoked Z3-style — `ModelAdapter` mirrors `Z3Adapter`; committed code carries only the CLI
+    contract (prompt + constraint + seed → recorded bytes), run config declares the command path, the
+    wrapper impl lives outside git like `intel-accel/`. Committed `schemas/` use neutral formats —
+    JSON-Schema (standard) for ClinicalIR, EBNF/ABNF grammar for the SMT surface — no GBNF / dialect
+    name; the env wrapper compiles them to the runtime's constraint format.
+  - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
+    seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9
+    minimal pair over widening §9; the gradient is the experiment §10 ("vary and layer existing IR
+    forms") was written to be.
+  - Recon mechanics that right-size the units: a processing-stage `kind` is a free-form Id (no enum)
+    → adding `model_fill` is registry data, not an enum change; the middle-layer derive fns live in
+    ckc-cli (`segment.rs`, `normalize.rs`, `rules.rs` `derive_norm_ir`), only `DocIr::from_graph` +
+    `FormalIr::derive`/`FormalConstraint::from_rule` sit on the ckc-core types → `run-refactor`
+    extracts the shared ClinicalIR→verdict tail (behavior-locked, M1 tests the gate) before the
+    routes reuse it.
