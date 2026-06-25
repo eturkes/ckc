@@ -312,7 +312,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
     let _: ArtifactWrapper<ckc_cli::report::Report> = strict_read(&run_dir.join("report.json"));
 
     // Trace artifacts: the §7.1 pair strict-read from the run root, both
-    // wrapped by the trace component over the DAG's node content-hash
+    // wrapped by the trace processing stage over the DAG's node content-hash
     // set; the §8.6 finding row and the hashless report node pin the
     // claim surface.
     let trace: ArtifactWrapper<TraceBundle> = strict_read(&run_dir.join("trace_bundle.json"));

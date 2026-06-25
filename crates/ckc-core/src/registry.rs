@@ -4,7 +4,7 @@
 //! One type family per file: `registry/corpora.yaml` is a list of
 //! [`CorpusEntry`] (acceptance fields per §8.2), `registry/candidates.yaml` is
 //! one [`Candidates`] document holding [`PipelineEntry`] and [`ProcessingStageEntry`]
-//! components, `registry/experiments.yaml` is a list of [`ExperimentEntry`]
+//! entries, `registry/experiments.yaml` is a list of [`ExperimentEntry`]
 //! (what `ckc run --experiment` resolves), and `corpus/reference/*.yaml` is a list
 //! of [`ReferenceEntry`] asserted by acceptance tests. Loading is strict: unknown
 //! fields are rejected, [`Id`] fields are grammar-checked by `Id`'s serde,
@@ -25,8 +25,8 @@ use crate::id::Id;
 use crate::source_linkage::Provenance;
 
 fieldless_enum! {
-    /// SPEC §8.4 stage-component determinism class. Every M1 component is
-    /// `deterministic`; `nondeterministic` marks components whose reruns may
+    /// SPEC §8.4 processing_stage determinism class. Every M1 processing_stage is
+    /// `deterministic`; `nondeterministic` marks processing_stages whose reruns may
     /// diverge (M2's recorded weak-model routes), which replay handles
     /// through recorded I/O rather than re-execution.
     Determinism {
@@ -52,8 +52,8 @@ pub struct CorpusEntry {
     pub provenance: Provenance,
 }
 
-/// `registry/candidates.yaml`: the §8.4 candidate components — pipelines and
-/// the processing_stage components they chain.
+/// `registry/candidates.yaml`: the §8.4 candidates — pipelines and
+/// the processing_stage entries they chain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Candidates {
@@ -69,15 +69,15 @@ pub struct Candidates {
 pub struct PipelineEntry {
     /// Pipeline id experiments reference (e.g. `pipe.layered_ckcir_to_smt`).
     pub id: Id,
-    /// ProcessingStage-component ids in execution order.
+    /// [`ProcessingStageEntry`] ids in execution order.
     pub processing_stages: Vec<Id>,
 }
 
-/// A processing_stage component candidate: one pipeline step with its §8.4 fields.
+/// A processing_stage candidate: one pipeline step with its §8.4 fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProcessingStageEntry {
-    /// ProcessingStage-component id pipelines reference.
+    /// [`ProcessingStageEntry`] id pipelines reference.
     pub id: Id,
     /// ProcessingStage role (§8.3 vocabulary: `extract`, `segment`, `normalize`,
     /// `assemble`, `compile`, `verify`, `trace`, `report`); open so later
@@ -102,7 +102,7 @@ pub struct ExperimentEntry {
     pub pipeline: Id,
     /// TestSource groups in evaluation order.
     pub test_source_groups: Vec<TestSourceGroup>,
-    /// Deterministic seed for any seeded component.
+    /// Deterministic seed for any seeded processing_stage.
     pub seed: u64,
     /// Budget caps: counter name → limit (the counters §4.6
     /// `resource_counters` consume against).
@@ -299,7 +299,7 @@ fn note_duplicates<'a>(
 /// Loading already enforces shape: required fields, [`Id`] grammar, enum
 /// spellings. This pass checks what only the whole set can — id uniqueness
 /// per pool, semantically required nonempty fields, cross-file resolution
-/// (experiment → pipeline → processing_stage components, test_source refs → corpora, each
+/// (experiment → pipeline → processing_stage entries, test_source refs → corpora, each
 /// experiment's expected-outcome ref → `reference`, whose entries must assert
 /// groups that experiment defines), and the §8.4 stage-chain rule: every
 /// processing_stage's declared input artifact kinds are produced by its predecessors
@@ -546,7 +546,7 @@ processing_stages:
         }
     }
 
-    // §8.4 candidates: the pipeline chains processing_stage components by id; processing_stages
+    // §8.4 candidates: the pipeline chains processing_stage entries by id; processing_stages
     // declare role, determinism, and input/output artifact kinds.
     #[test]
     fn candidates_load_typed() {

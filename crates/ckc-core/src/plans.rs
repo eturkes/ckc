@@ -61,7 +61,7 @@ pub struct RunPlan {
     /// Pipeline candidates the run executes — a singleton at M1; M2 onward
     /// runs several over the same test_sources. Set semantics.
     pub pipelines: Vec<Id>,
-    /// Deterministic seed for any seeded component.
+    /// Deterministic seed for any seeded processing_stage.
     pub seed: u64,
     /// Budget caps: counter name → limit, the counters §4.6 event
     /// `resource_counters` consume against. Map semantics.

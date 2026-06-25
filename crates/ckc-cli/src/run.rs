@@ -75,7 +75,7 @@ const LOCKFILE: &str = "Cargo.lock";
 const GIT_COMMIT: &str = env!("CKC_GIT_COMMIT");
 
 /// The eight §8.3 processing_stages this module drives, in chain order, spelled as the
-/// registry `kind` tokens the pipeline's processing_stage components declare: four
+/// registry `kind` tokens the pipeline's processing_stage entries declare: four
 /// per-document processing_stages, the two per-group processing_stages, then the run-scoped
 /// trace and report processing_stages.
 const PROCESSING_STAGE_KINDS: [&str; 8] = [
@@ -249,7 +249,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
                 shell.diagnostic(invalid_diagnostic(vec![(
                     static_id("reason"),
                     format!(
-                        "pipeline {} declares no {kind} processing_stage component",
+                        "pipeline {} declares no {kind} processing_stage entry",
                         pipeline.id
                     ),
                 )]));
@@ -1595,7 +1595,7 @@ mod tests {
 
     /// Write a minimal two-test_source registry trio under `root`: `test_source.gone`
     /// points at a missing file, `test_source.tiny` at a minimal HTML document;
-    /// the pipeline declares one component per [`PROCESSING_STAGE_KINDS`] entry.
+    /// the pipeline declares one processing_stage per [`PROCESSING_STAGE_KINDS`] entry.
     fn write_tiny_root(root: &Path) {
         let write = |rel: &str, text: &str| {
             let path = root.join(rel);
