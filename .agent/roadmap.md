@@ -7,7 +7,7 @@ ordered unit checklist; unchecked lines carry the full unit spec; checked items 
 one-line stubs `- [x] <id>: <gist>. NN% NNNK/200K <hash>`; closed milestones persist as
 bare headers; git history retains all removed text.
 
-## M1 scaffold — plan 89c4cba — accept m1 — review _
+## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
 - [x] core-ids: ckc-core value types Id/Hash/Rational + serde. 34% 67K/200K 4b46cac
 - [x] core-strings: seven StringPolicy normalizers. 30% 60K/200K 0d823e0
