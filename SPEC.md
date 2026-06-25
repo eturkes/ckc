@@ -673,9 +673,9 @@ runs/<run-id>/
 ### §8.4 Registries at M1
 
 `registry/corpora.yaml` (test sources above), `registry/candidates.yaml` (the pipeline and its processing stage
-components with ids, kinds, determinism, input/output artifact kinds), `registry/experiments.yaml`
+entries with ids, kinds, determinism, input/output artifact kinds), `registry/experiments.yaml`
 (`exp.m1_scaffold`: test source groups, pipeline, seed, budget, expected-outcome ref). `ckc registry
-check` validates all three and verifies each pipeline's processing stage components chain: every processing stage's
+check` validates all three and verifies each pipeline's processing-stage chain: every processing stage's
 declared input artifact kinds are produced by its predecessors.
 
 ### §8.5 Acceptance checklist
