@@ -127,26 +127,43 @@ full pre-consolidation text lives in git history.
   seed, grammar/JSON-Schema constraint fed by the exported `schemas/`, recorded subprocess,
   identity/quant/runtime-version in manifests). Match §3's existing engine-neutral phrasing `the
   M2 local-model runtime`.
-- M2 plan (minimal pair, 18 units; gate MET = model runtime, functionally confirmed last session,
+- M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):
-  - single_ir layer pick = **ClinicalIR** — fully closed-vocab (lexicon codes / enums / ints, zero
-    free text) so constrained decoding is tractable and deterministic leverage is maximal. The
+  - single_ir layer pick = **ClinicalIR** — free-text-free (closed-vocab fields = lexicon codes /
+    enums / bounded ints) → constrained decoding tractable, deterministic leverage high. NOT fully
+    closed-vocab: it carries generated IDs (`binding_id`/`statement_id`/`exception_id`) + reference
+    IDs (`source_segment_ids`/`region_ids`) constrained by the Id grammar + grounding, not a
+    vocabulary. The
     instrument supplies the grounding scaffold: deterministic extract+segment produce the real
     upstream ids, the model fills ClinicalIR REFERENCING them, so hallucinated `source_segment_ids`/
     `region_ids` surface as `ai_hallucinated_source` instead of corrupting the verdict. The §7.4
     codes (`ai_schema_violation`/`ai_hallucinated_source`/`repair_limit_exceeded`) and §7.3 "repair
-    count" confirm the architecture (a repair loop + grounding check are intended, not bolted on).
-  - `exp.m2_multihop` binds BOTH routes in ONE experiment — `ExperimentEntry` gains `routes` +
-    `baseline_route` (baseline = `direct_smt`); one `ckc run` → one `report.json` with per-route raw
+    count" IMPLY the intended repair-loop + grounding-check architecture (an elaboration inference,
+    not a §9 mandate).
+  - `exp.m2_multihop` binds BOTH routes in ONE experiment — `ExperimentEntry` generalizes singular
+    `pipeline` to `pipelines: Vec<Id>` + `baseline_pipeline` (baseline = the `direct_smt` pipeline);
+    each route is realized as one registry pipeline (`pipe.m2_*`); one `ckc run` → one `report.json`
+    with per-route raw
     rows + the baseline-delta table. Faithful to §9 "both routes execute over identical locked inputs
     (`exp.m2_multihop`)"; M3's separate `exp.*` ids are a different shape, do not back-apply here.
+  - Manifest identity (§9 vs code, finder-confirmed): §9 SEPARATES model identity from prompt hashes
+    → `ModelIdentity` = `{model_id, quant, runtime_version}` ONLY (mirrors `SolverIdentity`'s
+    identity-only shape; no prompt hash inside). `RunManifest`/`ReplayManifest` carry only
+    `corpus_hash`/`lexicon_hash` today — M2 ADDS the §9 set (test-source/reference/schema/prompt-
+    template/model/runtime hashes) as OMITTABLE fields so M1 manifest bytes + pins stay unchanged
+    (omit-None), M2 populates.
+  - Registry `check` is referential (finder-confirmed `validate_registries`): FAILS on dangling
+    experiment→pipeline / pipeline→stage refs + §8.4 ChainBreak → seed an experiment entry ONLY after
+    its pipelines + stages exist (real `exp.m2_multihop` seeds in run-m2.1, not the type-extension
+    unit, which gates on a synthetic fixture).
   - Engine-agnostic boundary (extends the bullet above): the runtime is an environment-provided
     COMMAND invoked Z3-style — `ModelAdapter` mirrors `Z3Adapter`; committed code carries only the CLI
-    contract (prompt + constraint + seed → recorded bytes), run config declares the command path, the
-    wrapper impl lives outside git like `intel-accel/`. Committed `schemas/` use neutral formats —
-    JSON-Schema (standard) for ClinicalIR, EBNF/ABNF grammar for the SMT surface — no GBNF / dialect
-    name; the env wrapper compiles them to the runtime's constraint format.
+    contract (prompt + constraint + seed → recorded bytes) + resolves a BARE command name on PATH (Z3
+    runs `z3` by bare name, no literal path / committed config), env-overridable; the wrapper binary
+    is environment-supplied outside git. Committed `schemas/` use neutral formats —
+    JSON-Schema (standard) for ClinicalIR, EBNF/ABNF grammar for the SMT surface (no engine
+    constraint-dialect name); the env wrapper compiles them to the runtime's constraint format.
   - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
     seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9
     minimal pair over widening §9; the gradient is the experiment §10 ("vary and layer existing IR
