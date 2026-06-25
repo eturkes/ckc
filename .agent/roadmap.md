@@ -56,7 +56,10 @@ argument).
   (`TerminologyBinding`/`ClinicalStatement`/`Action`/`ContextAtom`/`QuantityInterval`/`ExceptionClause`;
   enums `BindingStatus`/`Direction`/`Strength`/`Certainty`) + injects lexicon `enum`s for the 6
   controlled-vocab fields `system`/`code`/action `kind`+`target`/concept/`var` (`alternatives` free).
-  After `cp`, KEEP the emitter + serde_json-parse tests, DROP the jsonschema/committed-file/hash tests
+  Schema = structural oracle (shape+vocab+pattern) for constrained decoding + structural validation;
+  the canonical-only invariants it cannot express — `Action.key`=`kind:target` derivation, set-element
+  canonical sort-order — stay enforced by `read_strict_canonical`/`IrBundle::validate`, NOT the schema
+  (the export never claims full canonical validity). After `cp`, KEEP the emitter + serde_json-parse tests, DROP the jsonschema/committed-file/hash tests
   (→ .1b). Tests (serde_json parse only): bytes parse as JSON; `$defs/ContextAtom` = 3-branch oneOf
   w/ the tag consts; `QuantityInterval` `required==["var"]` + bounds carry the string-int pattern;
   `Action.required` ∋ `key`; concept/action/system/var enums == lexicon sorted vocab. Reading: the
@@ -68,18 +71,20 @@ argument).
   default features OK for a self-contained schema, lean to `default-features=false` only if
   `validator_for` stays available) + `jsonschema.workspace = true` to ckc-cli `[dev-dependencies]`;
   `mkdir schemas/` (or `create_dir_all` in the writer). Generate committed
-  `schemas/clinical_ir.schema.json` (JSON-Schema = engine-agnostic standard) via a `CKC_BLESS`-gated
-  test (set→write, else→compare = drift guard; NEW pattern, no repo precedent). Pin `const SCHEMA_HASH`
+  `schemas/clinical_ir.schema.json` (JSON-Schema = engine-agnostic standard) via a `CKC_BLESS=clinical_ir_schema`-gated
+  test (exact-value→write, else→compare = drift guard; the exact token stops an ambient/CI `CKC_BLESS`
+  silently re-blessing real drift; NEW pattern, no repo precedent). Pin `const SCHEMA_HASH`
   = `hash_bytes(emitted)` (sha256 over canonical bytes). Restore the oracle tests from the salvage:
   drift compare; hash pinned; jsonschema validates a known-good `ClinicalIr` (built from lexicon vocab
   → serde_json `Value`); rejects each malformed case (missing `action`, non-lexicon `code`, non-lexicon
   action `kind`, bare-number interval bound, unknown member, duplicate set element). Flow: write →
-  `CKC_BLESS=1 cargo test schema::` (gen file) → `sha256sum schemas/clinical_ir.schema.json` → fill
+  `CKC_BLESS=clinical_ir_schema cargo test schema::` (gen file) → `sha256sum schemas/clinical_ir.schema.json` → fill
   `SCHEMA_HASH` (prefix `sha256:`) → `cargo test` (green). Reading: the salvage (oracle tests); .1a's
   committed `schema.rs`; SPEC §9 schemas/ export. Gate: `cargo test`; validates good + rejects each
   malformed; `schema_hash` stable; committed bytes pinned. Close: delete `.agent/wip-schemas-export.rs.txt`.
-- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral-notation
-  grammar (EBNF/ABNF — engine-agnostic, no dialect name) constraining output to the `emit.rs` SMT
+- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral,
+  engine-agnostic grammar notation (no engine-coupled dialect; specific metasyntax SOTA-chosen at this
+  unit's turn) constraining output to the `emit.rs` SMT
   surface: `(set-logic QF_LRA|QF_UF)`, `(set-option …)`, `(declare-const |sym| Bool|Real)`,
   `(assert (! <term> :named |name|))`, `(check-sat)`, `(get-model)`/`(get-unsat-core)`; term grammar
   = `and`/`or`/`not`, `|c|`, the four interval relations over `|v|` and an int, negative `(- N)`,
@@ -88,7 +93,7 @@ argument).
   `cargo test`; grammar accepts the M1 emitted Q1/Q2 bodies (pinned smt2), rejects malformed;
   `schema_hash` stable; committed bytes pinned. [Audited vs the .1 split: lighter (hand-authored
   grammar, no code emitter → one unit) but shares .1b's committed-artifact+hash+oracle shape → pin
-  its accept/reject oracle (an EBNF/ABNF parser/recognizer) as a dev-dep at its turn.]
+  its accept/reject oracle (a grammar parser/recognizer) as a dev-dep at its turn.]
 - [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
   (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
   `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage
@@ -178,7 +183,7 @@ argument).
   deterministic up/downstream) → §4 bundle-validate (acceptance; hallucinated `source_segment_ids`/
   `region_ids` → `ai_hallucinated_source`) → run-refactor deterministic tail → verdict. Author the
   JA→ClinicalIR prompt (`registry/prompts.yaml`, hashed). Reading: the refactored tail fn,
-  stage-model-fill, schemas-export.1, segment/normalize; SPEC §9 single_ir, §8. Gate: `cargo test`;
+  stage-model-fill, schemas-export.1a/.1b, segment/normalize; SPEC §9 single_ir, §8. Gate: `cargo test`;
   `ckc registry check` validates `pipe.m2_single_ir`; the route produces a scoreable verdict for an
   accepted ClinicalIR over a recorded cassette; acceptance + §7.4 codes wire through; verdict scored
   vs reference for accepted translations. [Decision pinned: model fills ClinicalIR over deterministic
