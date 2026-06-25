@@ -25,8 +25,8 @@
 //! bundle is missing fails its compile processing_stage rather than compiling a
 //! partial group: a cross-document verdict over fewer documents than the
 //! group declares would document a no-conflict result the test_sources never earned.
-//! Producer values are runner-owned: candidate = the experiment's pipeline,
-//! pipeline_step = the registry processing_stage entry, toolchain manifest hash = the
+//! Producer values are runner-owned: pipeline_id = the experiment's pipeline,
+//! pipeline_step_id = the registry processing_stage entry, toolchain manifest hash = the
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
