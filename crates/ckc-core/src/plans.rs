@@ -50,6 +50,47 @@ impl CanonRead for SolverIdentity {
     }
 }
 
+/// SPEC §9 model identity: the local model a model-route run's outputs depend
+/// on, recorded in manifests beside [`SolverIdentity`]. Identity only — model
+/// id, quantization, runtime version — with no prompt hash inside (§9 keeps
+/// model identity separate from the prompt-template hash).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelIdentity {
+    /// Model name as an identifier (e.g. a base instruct model id).
+    pub model_id: Id,
+    /// Quantization token as reported (e.g. `int4`), raw text.
+    pub quant: String,
+    /// Runtime version token as reported by the runtime, raw text.
+    pub runtime_version: String,
+}
+
+impl Canonical for ModelIdentity {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("model_id", |b| self.model_id.emit_canonical(b))?;
+        obj.member("quant", |b| RawText(self.quant.clone()).emit_canonical(b))?;
+        obj.member("runtime_version", |b| {
+            RawText(self.runtime_version.clone()).emit_canonical(b)
+        })?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ModelIdentity {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let model_id = obj.member("model_id", Id::read)?;
+        let quant = obj.member("quant", |r| Ok(RawText::read(r)?.0))?;
+        let runtime_version = obj.member("runtime_version", |r| Ok(RawText::read(r)?.0))?;
+        obj.close()?;
+        Ok(ModelIdentity {
+            model_id,
+            quant,
+            runtime_version,
+        })
+    }
+}
+
 /// SPEC §5 run plan: experiment id, test_source groups, pipeline(s), seed,
 /// budget — everything that fixes what a run executes, before it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +177,24 @@ pub struct RunManifest {
     pub solver_identity: SolverIdentity,
     /// Content hashes of the run's accepted artifacts. Set semantics.
     pub output_hashes: Vec<Hash>,
+    /// SPEC §9 M2 measurement record — model identity plus the input hashes a
+    /// model-route run locks against. Every field is omittable: `None` omits
+    /// the member, so a deterministic M1 run's manifest bytes are unchanged;
+    /// M2 runs populate them.
+    pub model_identity: Option<ModelIdentity>,
+    /// Hash of the locked test sources scored in the run.
+    pub test_source_hash: Option<Hash>,
+    /// Content hash of the locked reference (expected outcomes).
+    pub reference_hash: Option<Hash>,
+    /// Content hash of the committed `schemas/` export in force.
+    pub schema_hash: Option<Hash>,
+    /// Content hash of the prompt-template registry in force.
+    pub prompt_template_hash: Option<Hash>,
+    /// Raw-byte hash of the model artifact (§4.4 `_hash` raw-byte rule — a
+    /// file, not an accepted artifact).
+    pub model_hash: Option<Hash>,
+    /// Raw-byte hash of the model runtime in force (§4.4 raw-byte rule).
+    pub runtime_hash: Option<Hash>,
 }
 
 impl Canonical for RunManifest {
@@ -152,11 +211,36 @@ impl Canonical for RunManifest {
         obj.member("lockfile_hashes", |b| {
             emit_map(b, self.lockfile_hashes.iter().map(|(k, v)| (k, v)))
         })?;
+        obj.optional("model_hash", self.model_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional("model_identity", self.model_identity.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
         obj.member("output_hashes", |b| emit_set(b, &self.output_hashes))?;
+        obj.optional(
+            "prompt_template_hash",
+            self.prompt_template_hash.as_ref(),
+            |b, v| v.emit_canonical(b),
+        )?;
+        obj.optional("reference_hash", self.reference_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
         obj.member("run_plan_hash", |b| self.run_plan_hash.emit_canonical(b))?;
+        obj.optional("runtime_hash", self.runtime_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional("schema_hash", self.schema_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
         obj.member("solver_identity", |b| {
             self.solver_identity.emit_canonical(b)
         })?;
+        obj.optional(
+            "test_source_hash",
+            self.test_source_hash.as_ref(),
+            |b, v| v.emit_canonical(b),
+        )?;
         obj.member("toolchain_manifest_hash", |b| {
             self.toolchain_manifest_hash.emit_canonical(b)
         })?;
@@ -172,9 +256,16 @@ impl CanonRead for RunManifest {
         let git_commit = obj.member("git_commit", |r| Ok(RawText::read(r)?.0))?;
         let lexicon_hash = obj.member("lexicon_hash", Hash::read)?;
         let lockfile_hashes = obj.member("lockfile_hashes", read_map::<Id, Hash>)?;
+        let model_hash = obj.optional("model_hash", Hash::read)?;
+        let model_identity = obj.optional("model_identity", ModelIdentity::read)?;
         let output_hashes = obj.member("output_hashes", read_set::<Hash>)?;
+        let prompt_template_hash = obj.optional("prompt_template_hash", Hash::read)?;
+        let reference_hash = obj.optional("reference_hash", Hash::read)?;
         let run_plan_hash = obj.member("run_plan_hash", Hash::read)?;
+        let runtime_hash = obj.optional("runtime_hash", Hash::read)?;
+        let schema_hash = obj.optional("schema_hash", Hash::read)?;
         let solver_identity = obj.member("solver_identity", SolverIdentity::read)?;
+        let test_source_hash = obj.optional("test_source_hash", Hash::read)?;
         let toolchain_manifest_hash = obj.member("toolchain_manifest_hash", Hash::read)?;
         obj.close()?;
         Ok(RunManifest {
@@ -187,6 +278,13 @@ impl CanonRead for RunManifest {
             environment_profile,
             solver_identity,
             output_hashes,
+            model_identity,
+            test_source_hash,
+            reference_hash,
+            schema_hash,
+            prompt_template_hash,
+            model_hash,
+            runtime_hash,
         })
     }
 }
@@ -218,6 +316,16 @@ pub struct ReplayManifest {
     pub solver_identity: SolverIdentity,
     /// Content hashes the re-execution must reproduce. Set semantics.
     pub expected_output_hashes: Vec<Hash>,
+    /// SPEC §9 M2 measurement record — see [`RunManifest`] for each field.
+    /// Every field is omittable, so a deterministic M1 replay manifest's bytes
+    /// are unchanged; M2 runs populate them.
+    pub model_identity: Option<ModelIdentity>,
+    pub test_source_hash: Option<Hash>,
+    pub reference_hash: Option<Hash>,
+    pub schema_hash: Option<Hash>,
+    pub prompt_template_hash: Option<Hash>,
+    pub model_hash: Option<Hash>,
+    pub runtime_hash: Option<Hash>,
 }
 
 impl Canonical for ReplayManifest {
@@ -239,9 +347,34 @@ impl Canonical for ReplayManifest {
         obj.member("lockfile_hashes", |b| {
             emit_map(b, self.lockfile_hashes.iter().map(|(k, v)| (k, v)))
         })?;
+        obj.optional("model_hash", self.model_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional("model_identity", self.model_identity.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional(
+            "prompt_template_hash",
+            self.prompt_template_hash.as_ref(),
+            |b, v| v.emit_canonical(b),
+        )?;
+        obj.optional("reference_hash", self.reference_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional("runtime_hash", self.runtime_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
+        obj.optional("schema_hash", self.schema_hash.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
         obj.member("solver_identity", |b| {
             self.solver_identity.emit_canonical(b)
         })?;
+        obj.optional(
+            "test_source_hash",
+            self.test_source_hash.as_ref(),
+            |b, v| v.emit_canonical(b),
+        )?;
         obj.member("toolchain_manifest_hash", |b| {
             self.toolchain_manifest_hash.emit_canonical(b)
         })?;
@@ -264,7 +397,14 @@ impl CanonRead for ReplayManifest {
         let input_hashes = obj.member("input_hashes", read_set::<Hash>)?;
         let lexicon_hash = obj.member("lexicon_hash", Hash::read)?;
         let lockfile_hashes = obj.member("lockfile_hashes", read_map::<Id, Hash>)?;
+        let model_hash = obj.optional("model_hash", Hash::read)?;
+        let model_identity = obj.optional("model_identity", ModelIdentity::read)?;
+        let prompt_template_hash = obj.optional("prompt_template_hash", Hash::read)?;
+        let reference_hash = obj.optional("reference_hash", Hash::read)?;
+        let runtime_hash = obj.optional("runtime_hash", Hash::read)?;
+        let schema_hash = obj.optional("schema_hash", Hash::read)?;
         let solver_identity = obj.member("solver_identity", SolverIdentity::read)?;
+        let test_source_hash = obj.optional("test_source_hash", Hash::read)?;
         let toolchain_manifest_hash = obj.member("toolchain_manifest_hash", Hash::read)?;
         obj.close()?;
         Ok(ReplayManifest {
@@ -277,6 +417,13 @@ impl CanonRead for ReplayManifest {
             lockfile_hashes,
             solver_identity,
             expected_output_hashes,
+            model_identity,
+            test_source_hash,
+            reference_hash,
+            schema_hash,
+            prompt_template_hash,
+            model_hash,
+            runtime_hash,
         })
     }
 }
@@ -338,6 +485,39 @@ mod tests {
             ],
             solver_identity: z3(),
             output_hashes: vec![h('e')],
+            model_identity: None,
+            test_source_hash: None,
+            reference_hash: None,
+            schema_hash: None,
+            prompt_template_hash: None,
+            model_hash: None,
+            runtime_hash: None,
+        }
+    }
+
+    /// A populated §9 model identity for the M2 measurement-record pins. Values
+    /// are synthetic placeholders — the committed deliverable names no engine,
+    /// quantization scheme, or model.
+    fn sample_model_identity() -> ModelIdentity {
+        ModelIdentity {
+            model_id: id("model.baseline"),
+            quant: "int4".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        }
+    }
+
+    /// [`sample_manifest`] with the full §9 M2 measurement record populated, so
+    /// the new omittable members pin in their canonical slots.
+    fn sample_manifest_m2() -> RunManifest {
+        RunManifest {
+            model_identity: Some(sample_model_identity()),
+            test_source_hash: Some(h('1')),
+            reference_hash: Some(h('2')),
+            schema_hash: Some(h('3')),
+            prompt_template_hash: Some(h('4')),
+            model_hash: Some(h('5')),
+            runtime_hash: Some(h('6')),
+            ..sample_manifest()
         }
     }
 
@@ -361,6 +541,13 @@ mod tests {
             lockfile_hashes: vec![(id("cargo.lock"), h('b'))],
             solver_identity: z3(),
             expected_output_hashes: vec![h('e')],
+            model_identity: None,
+            test_source_hash: None,
+            reference_hash: None,
+            schema_hash: None,
+            prompt_template_hash: None,
+            model_hash: None,
+            runtime_hash: None,
         }
     }
 
@@ -435,6 +622,51 @@ mod tests {
         assert_eq!(canon(&manifest), want);
     }
 
+    // Pins the §9 model identity canonical shape: byte-sorted members, raw-text
+    // quant and runtime version.
+    #[test]
+    fn model_identity_canonical_bytes() {
+        assert_eq!(
+            canon(&sample_model_identity()),
+            r#"{"model_id":"model.baseline","quant":"int4","runtime_version":"1.0.0"}"#
+        );
+    }
+
+    // Pins the §9 M2 measurement record: the populated model identity and the
+    // six lock hashes in their canonical slots, with the rest of the manifest
+    // unchanged from M1 — the omittable additions only appear when present.
+    #[test]
+    fn run_manifest_m2_measurement_record_canonical_bytes() {
+        let want = format!(
+            concat!(
+                r#"{{"corpus_hash":"{c}","#,
+                r#""environment_profile":{{"arch":"x86_64","os":"linux"}},"#,
+                r#""git_commit":"0d424a397281bc8a276f4dd666c433a89d6b1228","#,
+                r#""lexicon_hash":"{d}","lockfile_hashes":{{"cargo.lock":"{b}"}},"#,
+                r#""model_hash":"{h5}","#,
+                r#""model_identity":{{"model_id":"model.baseline","quant":"int4","runtime_version":"1.0.0"}},"#,
+                r#""output_hashes":["{e}"],"#,
+                r#""prompt_template_hash":"{h4}","reference_hash":"{h2}","#,
+                r#""run_plan_hash":"{plan}","runtime_hash":"{h6}","schema_hash":"{h3}","#,
+                r#""solver_identity":{{"solver_id":"z3","version":"4.13.4"}},"#,
+                r#""test_source_hash":"{h1}","toolchain_manifest_hash":"{a}"}}"#
+            ),
+            a = h('a').as_str(),
+            b = h('b').as_str(),
+            c = h('c').as_str(),
+            d = h('d').as_str(),
+            e = h('e').as_str(),
+            h1 = h('1').as_str(),
+            h2 = h('2').as_str(),
+            h3 = h('3').as_str(),
+            h4 = h('4').as_str(),
+            h5 = h('5').as_str(),
+            h6 = h('6').as_str(),
+            plan = sample_plan().plan_hash().unwrap().as_str(),
+        );
+        assert_eq!(canon(&sample_manifest_m2()), want);
+    }
+
     // Pins the §4.6 replay-manifest field list in canonical order, with the
     // command as an ordered argv array.
     #[test]
@@ -464,5 +696,18 @@ mod tests {
         round_trip(sample_manifest());
         round_trip(sample_replay());
         round_trip(z3());
+        round_trip(sample_model_identity());
+        // Populated §9 records exercise the omittable members on the read side.
+        round_trip(sample_manifest_m2());
+        round_trip(ReplayManifest {
+            model_identity: Some(sample_model_identity()),
+            test_source_hash: Some(h('1')),
+            reference_hash: Some(h('2')),
+            schema_hash: Some(h('3')),
+            prompt_template_hash: Some(h('4')),
+            model_hash: Some(h('5')),
+            runtime_hash: Some(h('6')),
+            ..sample_replay()
+        });
     }
 }

@@ -256,6 +256,10 @@ fieldless_enum! {
         FalsePositiveConflict => "false_positive_conflict",
         FalseNegativeConflict => "false_negative_conflict",
         MetamorphicInstability => "metamorphic_instability",
+        // §9 M2 model-route codes, appended to the base set at elaboration.
+        AiSchemaViolation => "ai_schema_violation",
+        AiHallucinatedSource => "ai_hallucinated_source",
+        RepairLimitExceeded => "repair_limit_exceeded",
     }
 }
 
@@ -558,7 +562,10 @@ mod tests {
                 "deferred_gate_required",
                 "false_positive_conflict",
                 "false_negative_conflict",
-                "metamorphic_instability"
+                "metamorphic_instability",
+                "ai_schema_violation",
+                "ai_hallucinated_source",
+                "repair_limit_exceeded"
             ]
         );
     }

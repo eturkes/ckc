@@ -32,7 +32,7 @@
 //!   [`IrBundle::validate`] ([`BundleError`]) enforcing the §5 source_linkage,
 //!   reference, coherence, and re-derivation invariants.
 //! - `plans` — §5/§4.6 run records [`RunPlan`] ([`RunPlan::plan_hash`]),
-//!   [`RunManifest`], [`ReplayManifest`], [`SolverIdentity`].
+//!   [`RunManifest`], [`ReplayManifest`], [`SolverIdentity`], [`ModelIdentity`].
 //! - `registry` — §8.4 registries + §8.2 reference, strict-loaded
 //!   ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
 //!   [`parse_reference`]; [`CorpusEntry`], [`Candidates`], [`PipelineEntry`],
@@ -77,7 +77,7 @@ pub use ir::{
     SegmentIr, SegmentKind, Strength, Structural, TableCell, TableView, TerminologyBinding,
     TextBlock, directions_opposed, emit_structural_ref_set, structural_hash,
 };
-pub use plans::{ReplayManifest, RunManifest, RunPlan, SolverIdentity};
+pub use plans::{ModelIdentity, ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use registry::{
     Candidates, CorpusEntry, Determinism, ExperimentEntry, PipelineEntry, ProcessingStageEntry,
     ReferenceEntry, RegistryError, RegistryFinding, TestSourceGroup, parse_candidates,

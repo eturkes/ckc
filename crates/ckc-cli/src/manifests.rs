@@ -78,6 +78,15 @@ pub fn assemble_manifests(
         environment_profile: environment_profile.clone(),
         solver_identity: inputs.solver_identity.clone(),
         output_hashes: output_hashes.clone(),
+        // §9 M2 measurement record: omitted on deterministic runs, populated
+        // by the model-route run path.
+        model_identity: None,
+        test_source_hash: None,
+        reference_hash: None,
+        schema_hash: None,
+        prompt_template_hash: None,
+        model_hash: None,
+        runtime_hash: None,
     };
     let replay = ReplayManifest {
         command: inputs.command.clone(),
@@ -89,6 +98,14 @@ pub fn assemble_manifests(
         lockfile_hashes,
         solver_identity: inputs.solver_identity.clone(),
         expected_output_hashes: output_hashes,
+        // §9 M2 measurement record: omitted on deterministic runs.
+        model_identity: None,
+        test_source_hash: None,
+        reference_hash: None,
+        schema_hash: None,
+        prompt_template_hash: None,
+        model_hash: None,
+        runtime_hash: None,
     };
     Ok((manifest, replay))
 }

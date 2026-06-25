@@ -313,6 +313,13 @@ mod tests {
                 version: "4".to_owned(),
             },
             expected_output_hashes: vec![hash('6')],
+            model_identity: None,
+            test_source_hash: None,
+            reference_hash: None,
+            schema_hash: None,
+            prompt_template_hash: None,
+            model_hash: None,
+            runtime_hash: None,
         }
     }
 

@@ -12,7 +12,7 @@ commit is then known (M1's `89c4cba` was filled retroactively too).
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
-## M2 multi-hop PoC — plan PENDING
+## M2 multi-hop PoC — plan 2a4f03d
 
 Scope = SPEC §9: experiment 1's minimal pair on this laptop. A weak local model translates the
 M1 test sources two ways — `route.direct_smt` (model emits SMT-LIB directly, the baseline) versus
@@ -34,7 +34,7 @@ so no unit commits an engine name, constraint dialect, or model format. Live uni
 sources via runtime indirection (a script opens the path; the path never appears in a Read/Bash
 argument).
 
-- [ ] model-types: ckc-core model + manifest identity types. Add `ModelIdentity` (`model_id`,
+- [x] model-types: ckc-core model + manifest identity types. Add `ModelIdentity` (`model_id`,
   `quant`, `runtime_version` — mirrors `SolverIdentity`'s identity-only shape; NO prompt hash inside,
   per §9 separating model identity from prompt hashes). Extend `RunManifest`/`ReplayManifest` with the
   §9 measurement record as OMITTABLE additions (None/empty → omit-None keeps M1 canonical bytes + pins
@@ -45,7 +45,7 @@ argument).
   `content_hash` for the new types; byte-pin a populated `ModelIdentity` + manifest fixture. Reading:
   `crates/ckc-core/src/plans.rs`, `enums.rs`; SPEC §9 manifest list (lines 781-795), §7.4, §4.4. Gate:
   `cargo test --workspace` green with M1 manifest pins UNCHANGED (additions omitted for M1); canonical
-  round-trip + pinned bytes for `ModelIdentity` and a populated manifest; new codes serialize.
+  round-trip + pinned bytes for `ModelIdentity` and a populated manifest; new codes serialize. 71% 142K/200K
 - [ ] schemas-export.1: ClinicalIR JSON-Schema emitter + committed export. Hand-write an emitter
   mirroring the ClinicalIR canonical encoding (sorted-name members, omit-None optionals, §4.3-set
   vs ordered-array, `ContextAtom` tagged-union `{tag,value}`, string-quoted interval ints, derived
