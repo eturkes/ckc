@@ -118,3 +118,12 @@ full pre-consolidation text lives in git history.
   M2+ may revisit). One enhancement stays open: tests are example/byte-pin only; property-based /
   fuzzing for the canon layer (round-trip identity, reject-any-mutation) and StringPolicy
   (idempotence) is the AGENTS.md-preferred strengthening, currently unscheduled.
+- SPEC.md names NO LLM inference engine (user directive). §9 M2 harness generalized:
+  `a llama.cpp-family local runtime`→`a local-model runtime`, `GBNF/JSON-Schema`→`a grammar or
+  JSON-Schema` (GBNF = ggml's grammar dialect ⇒ ties to llama.cpp). Keep engine names out of
+  SPEC/code/registry/roadmap; the container's real runtime = OpenVINO GPU+NPU+CPU lives ONLY in
+  `CLAUDE.local.md` (host-coupled, do-not-commit-scope memo). `docs/` research corpus
+  (model-routes.md etc.) may name engines as landscape — out of scope. M2 elaboration picks the
+  engine at build time behind the generic harness contract (greedy+fixed seed, grammar/JSON-Schema
+  constraint fed by the exported `schemas/`, recorded subprocess, identity/quant/runtime-version in
+  manifests). The §3 phrasing `the M2 local-model runtime` already models this — match it.

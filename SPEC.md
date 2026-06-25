@@ -774,9 +774,9 @@ end that scores both routes, so route failures attribute to translation, not to 
 
 Committed direction:
 
-- Model harness: a llama.cpp-family local runtime invoked as a recorded subprocess (the Z3
+- Model harness: a local-model runtime invoked as a recorded subprocess (the Z3
   pattern): greedy decoding with a fixed seed (k-sample convergence draws k recorded samples via
-  per-sample seeds), grammar-constrained output via GBNF/JSON-Schema compiled from the §4/§5
+  per-sample seeds), grammar-constrained output via a grammar or JSON-Schema compiled from the §4/§5
   type schemas — the committed `schemas/` export and `registry/{schemas,prompts}.yaml` land here
   (§14) to feed grammars and prompt templates. Model identity, quantization, and runtime version
   live in manifests; the baseline SHOULD be a small Japanese-capable instruct model (sub-4B, CPU
