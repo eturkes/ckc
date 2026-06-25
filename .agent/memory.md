@@ -174,3 +174,12 @@ full pre-consolidation text lives in git history.
     `FormalIr::derive`/`FormalConstraint::from_rule` sit on the ckc-core types → `run-refactor`
     extracts the shared ClinicalIR→verdict tail (behavior-locked, M1 tests the gate) before the
     routes reuse it.
+  - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
+    runtime/model identity stays in `CLAUDE.local.md`): constrained decoding forces schema-VALID output
+    that can be semantically WRONG (observed: a greedy run emitted a wrong enum) → the M2 report scores
+    BOTH acceptance-rate (schema-validity) AND verdict-accuracy, never validity alone. The baseline
+    deliberately pins a weak sub-4B model whose free-form/direct-route output degenerates → exercises §9's
+    "direct-route failures common" path (pin the exact model identity in the run config; alternatives ok).
+    Greedy output is byte-stable within + across processes on one host/device/quant but NOT across
+    environments → the recorded-bytes cassette (engine-agnostic boundary above), not a live re-run, is the
+    correctness mechanism; replay needs no model runtime present.
