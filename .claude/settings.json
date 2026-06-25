@@ -12,18 +12,5 @@
       "Read(./.serena/memories/**)",
       "Read(./.serena/project.local.yml)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "WebSearch",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/deny-websearch.sh"
-          }
-        ]
-      }
-    ]
   }
 }
