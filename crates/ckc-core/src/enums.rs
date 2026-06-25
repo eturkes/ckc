@@ -6,7 +6,8 @@
 //! variants by §4.4 severity so `max` aggregates processing_stage outcomes.
 //! [`DiagnosticRecord`] is the §7.4 diagnostic (stable code, structured
 //! payload, region/artifact refs, exactly one outcome); [`TotalOperationResult`]
-//! is the §4.4 record every processing_stage and command returns exactly once.
+//! is the §4.4 record commands materialize standalone (processing-stage
+//! outcomes ride their §4.6 EventRecord).
 
 use crate::canon::{
     CanonError, CanonRead, CanonReadError, Canonical, ObjectEmitter, ObjectReader, Reader,
@@ -342,8 +343,9 @@ impl CanonRead for DiagnosticRecord {
     }
 }
 
-/// SPEC §4.4 total operation result: every processing_stage and command returns exactly
-/// one. `outcome` is the severity-aggregated total; the five buckets hold
+/// SPEC §4.4 total operation result: commands materialize this standalone
+/// record. Processing-stage outcomes ride their §4.6 EventRecord.
+/// `outcome` is the severity-aggregated total; the five buckets hold
 /// content hashes of the produced value, diagnostic, residual, ambiguity, and
 /// incoherence artifacts (sets in canonical form). Aggregation itself is wired
 /// where processing_stages run (the CLI shell).
