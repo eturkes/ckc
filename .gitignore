@@ -19,3 +19,6 @@ __pycache__/
 # Generated corpus inputs and run outputs (SPEC §3); commit only when license-safe
 /corpus/raw/
 /runs/
+
+# Local, machine-scoped Claude notes (e.g. container capability memos)
+CLAUDE.local.md
