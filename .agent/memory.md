@@ -114,7 +114,15 @@ full pre-consolidation text lives in git history.
   `p.parse_input(s).next().is_some()` (full-match Earley) — `Grammar::parse_input` is DEPRECATED so
   `-D warnings` forbids it; `parse_input` binds `input: &'gram str` to the parser's grammar borrow,
   so rebuild the parser per call (or compute every input before `build_parser`) to free input
-  lifetimes — a tiny grammar makes the rebuild free.
+  lifetimes — a tiny grammar makes the rebuild free. Oracle scope = SOUND SUPERSET of the
+  emitter image, NOT its exact shape: a CFG can't bind cross-field coupling
+  (logic↔produce↔result), assertion cardinality, or declare-before-use → the §8.6 byte pins own
+  those; keep the grammar the construct-surface union (downstream grammar-constrained decoding wants
+  the union, not the 2-query image), don't tighten it to match emit. Cover every production incl. the
+  easy-to-miss empty-context→`true` collapse. Reject-case honesty: full-match is proven ONLY by a
+  trailing-garbage case (complete query + extra bytes); a missing-terminator rejects via its terminal
+  production regardless of anchoring. Byte-pinned text file → `.gitattributes eol=lf` so the sha256 +
+  the literal-LF `<nl>` survive any checkout.
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —

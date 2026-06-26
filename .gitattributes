@@ -1,0 +1,6 @@
+# Byte-pinned text artifacts: their sha256 is pinned in tests (ckc-smt
+# grammar_hash_is_pinned, ckc-cli schema_hash_is_pinned), and the grammar's
+# `<nl>` terminal is a literal LF the emitter matches. Force LF so the pin and
+# the recognizer hold on any checkout.
+schemas/smt_query.grammar text eol=lf
+schemas/clinical_ir.schema.json text eol=lf

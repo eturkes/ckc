@@ -1,9 +1,9 @@
 ; SMT-LIB 2 query grammar — CKC route.direct_smt output surface (SPEC §6 M1 profile).
 ; Backus-Naur form; ABNF-style `;` line comments. The ckc-smt emit.rs oracle recognizes
 ; every emitted Q1/Q2 body against this grammar (Earley, the `bnf` crate) and pins its
-; sha256; the registry SchemaEntry pins the same. Engine-agnostic — the canonical base of
+; sha256. Engine-agnostic — the canonical base of
 ; EBNF/GBNF, so it transforms to a grammar-constrained-decoding dialect downstream.
-; Describes the profile SURFACE (a union of valid constructs), not the per-query-kind
+; Describes the profile SURFACE (a sound superset: the union of valid constructs), not the per-query-kind
 ; logic/produce/result coupling — those exact bytes are §8.6-pinned in emit.rs. Symbols are
 ; `|`-quoted canonical Ids; numerals spell negatives the SMT way, `(- n)`. `and`/`or` carry
 ; two-plus terms (the emitter collapses a singleton to its bare term, an empty form to

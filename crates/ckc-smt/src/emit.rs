@@ -1022,7 +1022,7 @@ mod tests {
         "/../../schemas/smt_query.grammar"
     );
     const GRAMMAR_HASH: &str =
-        "sha256:fb42ee5a92d7ee445aad077095aabf0ba1016f2c56d79b1e815ff831a75d0be1";
+        "sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e";
 
     /// The exported grammar is hand-authored — the file IS the source, no
     /// emitter — so a lone hash pin is the whole drift guard: editing
@@ -1037,11 +1037,11 @@ mod tests {
     }
 
     /// The grammar recognizes every live emitted query body — the §8.6
-    /// conflict and control Q1/Q2 plus the degenerate numeral/nesting forms —
-    /// and rejects fourteen near-misses, each one mutation off a valid query
-    /// isolating a single production. The `bnf` Earley recognizer full-matches
-    /// (`parse_input(..).next().is_some()`), so a missing terminator or
-    /// trailing garbage is rejected too.
+    /// conflict and control Q1/Q2, the degenerate numeral/nesting forms, and
+    /// an empty-context `true` — and rejects fourteen near-misses, each one
+    /// mutation off a valid query isolating a single production. The `bnf`
+    /// Earley recognizer full-matches (`parse_input(..).next().is_some()`), so
+    /// trailing garbage after a complete query is rejected too.
     #[test]
     fn grammar_recognizes_emitted_and_rejects_malformed() {
         // ACCEPT: the live emitter surface across both query kinds and every
@@ -1075,12 +1075,17 @@ mod tests {
             },
         );
         let degenerate = plan_pair("group.t", &dx, &dy);
+        // An empty context collapses to the bare `true` term — the sixth term
+        // form, which the §8.6 and degenerate fixtures never reach.
+        let de = fc("t.rule.e", Direction::For, ContextExpr { any: vec![] });
+        let empty = plan_pair("group.e", &de, &dy);
         let accepted = [
             emit_overlap_query(&conflict, &ca, &cb).body,
             emit_deontic_query(&conflict, &ca, &cb).body,
             emit_overlap_query(&no_conflict, &la, &lb).body,
             emit_deontic_query(&no_conflict, &la, &lb).body,
             emit_overlap_query(&degenerate, &dx, &dy).body,
+            emit_overlap_query(&empty, &de, &dy).body,
         ];
 
         // REJECT: the base is a minimal deontic query; the numeral cases
@@ -1099,16 +1104,16 @@ mod tests {
             base.replace("QF_UF", "QF_NIA"),
             // sort outside {Bool, Real}
             base.replace("Bool", "Int"),
-            // a missing trailing newline (full-match)
+            // a result line needs its terminating newline
             base.strip_suffix('\n').unwrap().to_string(),
             // `and` needs two or more terms
             base.replace("(! |x| ", "(! (and |x|) "),
             // an unknown command
             base.replace("(check-sat)", "(push 1)\n(check-sat)"),
             // ids are lowercase
-            base.replace("|x|", "|X|"),
+            base.replacen("|x|", "|X|", 1),
             // newlines terminate lines, not spaces
-            base.replace('\n', " "),
+            base.replacen('\n', " ", 1),
             // an assertion must be `:named`
             base.replace(" :named ", " "),
             // trailing garbage after a complete query (full-match)
