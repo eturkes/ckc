@@ -10,3 +10,8 @@ license.workspace = true
 [dependencies]
 ckc-core = { path = "../ckc-core" }
 serde.workspace = true
+
+# Dev-only BNF grammar recognizer oracle pinning the exported
+# `schemas/smt_query.grammar` against the live emit.rs query surface.
+[dev-dependencies]
+bnf.workspace = true

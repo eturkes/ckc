@@ -109,7 +109,12 @@ full pre-consolidation text lives in git history.
   vs type, by the baseline accepting the canonical value). HAND-AUTHORED variant (no emitter — e.g.
   schemas-export.2's BNF grammar, route prompt files): the file IS the source + its oracle is the
   `bnf` recognizer (not jsonschema), so skip bless + the cross-check; the lone `hash_bytes(file) ==
-  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail).
+  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail). `bnf` 0.6 wiring (the working
+  form is in `emit.rs`; these two facts are not): recognize through `g.build_parser()?` +
+  `p.parse_input(s).next().is_some()` (full-match Earley) — `Grammar::parse_input` is DEPRECATED so
+  `-D warnings` forbids it; `parse_input` binds `input: &'gram str` to the parser's grammar borrow,
+  so rebuild the parser per call (or compute every input before `build_parser`) to free input
+  lifetimes — a tiny grammar makes the rebuild free.
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —

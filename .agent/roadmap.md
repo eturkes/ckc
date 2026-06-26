@@ -92,7 +92,7 @@ argument).
   memory.md); each malformed case pins its rejection reason `(instance_path, schema_path)` via
   `iter_errors()`; valid_ir enriched (concept_negated + non-empty `alternatives` + multi-element set),
   overclaiming comment corrected.] 55% 110K/200K
-- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. PRE-DERIVED (this unit's prep
+- [x] schemas-export.2: direct_smt SMT-LIB grammar + committed export. PRE-DERIVED (this unit's prep
   commit): notation + oracle SOTA-selected, grammar authored + validated + hashed → the WORK-UNIT is
   mechanical wire+gate, ZERO re-derivation; read ONLY this line, then open `emit.rs` to place two tests.
   LOCKED decisions: notation = standard BNF (engine-agnostic, the canonical base of EBNF/GBNF →
@@ -136,7 +136,7 @@ argument).
   true)\n(declare-const |x| Bool)\n(assert (! |x| :named |a.r|))\n(check-sat)\n(get-unsat-core)\n"`.
   GATE: `cargo test --workspace` (oracle + hash green, M1 §8.6 pins unchanged); `cargo fmt --check`;
   `cargo clippy --workspace --all-targets -- -D warnings`. CLOSE: `rm .agent/wip-smt_query.grammar`;
-  record context-usage; mark DONE (M2 stays IN-PROGRESS — later units remain).
+  record context-usage; mark DONE (M2 stays IN-PROGRESS — later units remain). 55% 110K/200K
 - [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
   (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
   `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage

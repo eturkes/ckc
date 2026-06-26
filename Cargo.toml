@@ -22,6 +22,11 @@ serde_json = "1"
 # TLS that the self-contained ClinicalIR schema never needs, while keeping the
 # core `validator_for`/`Validator::is_valid` surface the oracle uses.
 jsonschema = { version = "0.46", default-features = false }
+# Dev-only Earley BNF grammar recognizer oracle for the exported
+# `schemas/smt_query.grammar`. `default-features = false` drops the serde
+# grammar-(de)serialize feature the recognizer never uses, keeping `Grammar`
+# parsing + full-match `parse_input`.
+bnf = { version = "0.6", default-features = false }
 unicode-normalization = "0.1"
 sha2 = "0.11"
 tempfile = "3"

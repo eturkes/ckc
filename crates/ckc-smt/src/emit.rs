@@ -349,7 +349,7 @@ fn numeral(n: i64) -> String {
 mod tests {
     use super::*;
     use crate::plan_queries;
-    use ckc_core::{Action, FormalIr, Id, QuantityInterval, Strength};
+    use ckc_core::{Action, FormalIr, Id, QuantityInterval, Strength, hash_bytes};
 
     fn id(s: &str) -> Id {
         Id::new(s).unwrap()
@@ -1013,5 +1013,138 @@ mod tests {
         let (fb, nb) = layers(vec![rule_b()]);
         let empty = NormIr { rules: vec![] };
         compile(&id("group.m1_conflict"), [(&fa, &empty), (&fb, &nb)]);
+    }
+
+    // ---- schemas-export.2: committed `schemas/smt_query.grammar` oracle ----
+
+    const GRAMMAR_PATH: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../schemas/smt_query.grammar"
+    );
+    const GRAMMAR_HASH: &str =
+        "sha256:fb42ee5a92d7ee445aad077095aabf0ba1016f2c56d79b1e815ff831a75d0be1";
+
+    /// The exported grammar is hand-authored — the file IS the source, no
+    /// emitter — so a lone hash pin is the whole drift guard: editing
+    /// `schemas/smt_query.grammar` flips the hash and fails (mirrors
+    /// `schema.rs::schema_hash_is_pinned`).
+    #[test]
+    fn grammar_hash_is_pinned() {
+        assert_eq!(
+            hash_bytes(&std::fs::read(GRAMMAR_PATH).unwrap()).as_str(),
+            GRAMMAR_HASH
+        );
+    }
+
+    /// The grammar recognizes every live emitted query body — the §8.6
+    /// conflict and control Q1/Q2 plus the degenerate numeral/nesting forms —
+    /// and rejects fourteen near-misses, each one mutation off a valid query
+    /// isolating a single production. The `bnf` Earley recognizer full-matches
+    /// (`parse_input(..).next().is_some()`), so a missing terminator or
+    /// trailing garbage is rejected too.
+    #[test]
+    fn grammar_recognizes_emitted_and_rejects_malformed() {
+        // ACCEPT: the live emitter surface across both query kinds and every
+        // term / numeral form, reusing the §8.6 byte-pin fixtures.
+        let (ca, cb) = (doc_a(), doc_b());
+        let conflict = plan_pair("group.m1_conflict", &ca, &cb);
+        let (la, lb) = (control(), doc_a());
+        let no_conflict = plan_pair("group.m1_no_conflict", &la, &lb);
+        // The degenerate body: a two-bound atom (`(- 5)` .. `40`), a
+        // multi-disjunct `or` with a bare single-atom conjunct, and `and`.
+        let dx = fc(
+            "t.rule.x",
+            Direction::For,
+            dnf1(vec![interval("q.temp_c", Some(-5), None, None, Some(40))]),
+        );
+        let dy = fc(
+            "t.rule.y",
+            Direction::Against,
+            ContextExpr {
+                any: vec![
+                    ContextConjunct {
+                        all: vec![concept("cond.a")],
+                    },
+                    ContextConjunct {
+                        all: vec![
+                            ContextAtom::ConceptNegated(id("cond.b")),
+                            interval("q.n", None, Some(0), Some(2), None),
+                        ],
+                    },
+                ],
+            },
+        );
+        let degenerate = plan_pair("group.t", &dx, &dy);
+        let accepted = [
+            emit_overlap_query(&conflict, &ca, &cb).body,
+            emit_deontic_query(&conflict, &ca, &cb).body,
+            emit_overlap_query(&no_conflict, &la, &lb).body,
+            emit_deontic_query(&no_conflict, &la, &lb).body,
+            emit_overlap_query(&degenerate, &dx, &dy).body,
+        ];
+
+        // REJECT: the base is a minimal deontic query; the numeral cases
+        // mutate a minimal overlap query carrying `(- 5)` and a positive bound.
+        // Each entry is one mutation off its valid base, isolating one rule.
+        let base = "(set-logic QF_UF)\n(set-option :print-success false)\n(set-option :produce-unsat-cores true)\n(declare-const |x| Bool)\n(assert (! |x| :named |a.r|))\n(check-sat)\n(get-unsat-core)\n";
+        let ibase = "(set-logic QF_LRA)\n(set-option :print-success false)\n(set-option :produce-models true)\n(declare-const |q| Real)\n(assert (! (and (>= |q| (- 5)) (< |q| 40)) :named |a.r|))\n(check-sat)\n(get-model)\n";
+        let malformed = [
+            // a declared const needs `|...|` bars
+            base.replace("(declare-const |x| Bool)", "(declare-const x Bool)"),
+            // integers spell negatives `(- n)`, never bare `-n`
+            ibase.replace("(- 5)", "-5"),
+            // a nat carries no leading zero
+            ibase.replace("(< |q| 40)", "(< |q| 040)"),
+            // logic outside {QF_LRA, QF_UF}
+            base.replace("QF_UF", "QF_NIA"),
+            // sort outside {Bool, Real}
+            base.replace("Bool", "Int"),
+            // a missing trailing newline (full-match)
+            base.strip_suffix('\n').unwrap().to_string(),
+            // `and` needs two or more terms
+            base.replace("(! |x| ", "(! (and |x|) "),
+            // an unknown command
+            base.replace("(check-sat)", "(push 1)\n(check-sat)"),
+            // ids are lowercase
+            base.replace("|x|", "|X|"),
+            // newlines terminate lines, not spaces
+            base.replace('\n', " "),
+            // an assertion must be `:named`
+            base.replace(" :named ", " "),
+            // trailing garbage after a complete query (full-match)
+            format!("{base}(extra)\n"),
+            // a declaration before set-logic
+            format!("(declare-const |x| Bool)\n{base}"),
+            // a missing (check-sat)
+            base.replace("(check-sat)\n", ""),
+        ];
+
+        // Recognize each input against a parser rebuilt per call, decoupling
+        // input lifetimes from the grammar borrow `parse_input` ties them to;
+        // the grammar is tiny, so the rebuild is free.
+        let grammar: bnf::Grammar = std::fs::read_to_string(GRAMMAR_PATH)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let recognizes = |s: &str| {
+            grammar
+                .build_parser()
+                .unwrap()
+                .parse_input(s)
+                .next()
+                .is_some()
+        };
+
+        assert!(recognizes(base), "the deontic reject base is itself valid");
+        assert!(recognizes(ibase), "the overlap reject base is itself valid");
+        for body in &accepted {
+            assert!(
+                recognizes(body),
+                "grammar must accept emitted body:\n{body}"
+            );
+        }
+        for s in &malformed {
+            assert!(!recognizes(s), "grammar must reject malformed query:\n{s}");
+        }
     }
 }
