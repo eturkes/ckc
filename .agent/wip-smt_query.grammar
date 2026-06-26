@@ -1,0 +1,42 @@
+; SMT-LIB 2 query grammar — CKC route.direct_smt output surface (SPEC §6 M1 profile).
+; Backus-Naur form; ABNF-style `;` line comments. The ckc-smt emit.rs oracle recognizes
+; every emitted Q1/Q2 body against this grammar (Earley, the `bnf` crate) and pins its
+; sha256; the registry SchemaEntry pins the same. Engine-agnostic — the canonical base of
+; EBNF/GBNF, so it transforms to a grammar-constrained-decoding dialect downstream.
+; Describes the profile SURFACE (a union of valid constructs), not the per-query-kind
+; logic/produce/result coupling — those exact bytes are §8.6-pinned in emit.rs. Symbols are
+; `|`-quoted canonical Ids; numerals spell negatives the SMT way, `(- n)`. `and`/`or` carry
+; two-plus terms (the emitter collapses a singleton to its bare term, an empty form to
+; `true`). `<query>` is the start rule.
+<query> ::= <set_logic> <set_print_success> <set_produce> <declarations> <assertions> <check_sat> <result>
+<set_logic> ::= "(set-logic " <logic> ")" <nl>
+<logic> ::= "QF_LRA" | "QF_UF"
+<set_print_success> ::= "(set-option :print-success false)" <nl>
+<set_produce> ::= "(set-option :produce-models true)" <nl> | "(set-option :produce-unsat-cores true)" <nl>
+<declarations> ::= "" | <declaration> <declarations>
+<declaration> ::= "(declare-const " <symbol> " " <sort> ")" <nl>
+<sort> ::= "Bool" | "Real"
+<assertions> ::= <assertion> | <assertion> <assertions>
+<assertion> ::= "(assert (! " <term> " :named " <symbol> "))" <nl>
+<check_sat> ::= "(check-sat)" <nl>
+<result> ::= "(get-model)" <nl> | "(get-unsat-core)" <nl>
+<term> ::= <symbol> | <negation> | <conjunction> | <disjunction> | <comparison> | "true"
+<negation> ::= "(not " <term> ")"
+<conjunction> ::= "(and " <term> " " <term_rest> ")"
+<disjunction> ::= "(or " <term> " " <term_rest> ")"
+<term_rest> ::= <term> | <term> " " <term_rest>
+<comparison> ::= "(" <relation> " " <symbol> " " <numeral> ")"
+<relation> ::= ">=" | ">" | "<=" | "<"
+<numeral> ::= <nat> | "(- " <positive> ")"
+<nat> ::= "0" | <positive>
+<positive> ::= <nonzero> <digits>
+<digits> ::= "" | <digit> <digits>
+<symbol> ::= "|" <identifier> "|"
+<identifier> ::= <lower> <id_rest>
+<id_rest> ::= "" | <id_char> <id_rest>
+<id_char> ::= <lower> | <digit> | "_" | "." | ":" | "-"
+<nonzero> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<digit> ::= "0" | <nonzero>
+<lower> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+<nl> ::= "
+"

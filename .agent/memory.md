@@ -64,7 +64,13 @@ full pre-consolidation text lives in git history.
   transcription-with-verification still beating re-derivation (recovery also verifies the draft's external assumptions —
   referenced types/APIs/field names — against source, making the salvage an assumption-verified target
   not a blind preserve; a whole-NEW-file draft salvages as a byte-verified `.rs.txt` copy not a
-  diff, dodging RTK diff-compression + LSP indexing; a salvage shared by a multi-unit split is
+  diff, dodging RTK diff-compression + LSP indexing; a unit that overflows on DERIVATION not
+  implementation (SOTA notation/tool selection + empirical external-crate validation, e.g.
+  schemas-export.2's BNF + `bnf`-crate pick) salvages the same way — the redo line banks the LOCKED
+  decision, the validated + hashed artifact (any committed file → byte-exact `.agent/wip-<file>`, not
+  only `.rs`), AND the wiring APIs pre-transcribed from source (emitter fixtures, the .1b hash-pin
+  form), so the redo reads nothing but the line and runs pure wire+gate; a salvage shared by a
+  multi-unit split is
   deleted at the LAST consuming unit's close); pin expected shapes from
   observed output, never hand-computed; cite only checked roadmap lines as measured anchors.
   At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
@@ -94,7 +100,9 @@ full pre-consolidation text lives in git history.
   mask it) + an `#[ignore]`d bless that regenerates the file (`create_dir_all` + write), run manually
   (`cargo test <bless_fn> -- --ignored`). Pin `const <X>_HASH = hash_bytes(bytes).as_str()` (plain
   sha256 → `sha256:<hex>`, byte-identical to `sha256sum`; re-pin from `sha256sum` after blessing; the
-  assert_eq also cross-checks committed == emitted). Oracle = dev-only `jsonschema`,
+  assert_eq also cross-checks committed == emitted). Hand-authored committed artifacts (no emitter —
+  e.g. schemas-export.2's BNF grammar, route prompt files) skip bless: the lone `hash_bytes(file) ==
+  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail). Oracle = dev-only `jsonschema`,
   `default-features=false` (drops remote-$ref resolvers + TLS a self-contained schema never needs,
   keeps `validator_for`/`is_valid` + `pattern`). Pin the rejection REASON, not just `!is_valid`:
   assert each malformed case's `(instance_path, schema_path)` via `iter_errors()` (a failed `oneOf`
@@ -173,7 +181,7 @@ full pre-consolidation text lives in git history.
     contract (prompt + constraint + seed → recorded bytes) + resolves a BARE command name on PATH (Z3
     runs `z3` by bare name, no literal path / committed config), env-overridable; the wrapper binary
     is environment-supplied outside git. Committed `schemas/` use neutral formats —
-    JSON-Schema (standard) for ClinicalIR, EBNF/ABNF grammar for the SMT surface (no engine
+    JSON-Schema (standard) for ClinicalIR, BNF grammar (ABNF-style `;` comments) for the SMT surface (no engine
     constraint-dialect name); the env wrapper compiles them to the runtime's constraint format.
   - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
     seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9

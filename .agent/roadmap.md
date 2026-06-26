@@ -92,18 +92,51 @@ argument).
   memory.md); each malformed case pins its rejection reason `(instance_path, schema_path)` via
   `iter_errors()`; valid_ir enriched (concept_negated + non-empty `alternatives` + multi-element set),
   overclaiming comment corrected.] 55% 110K/200K
-- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral,
-  engine-agnostic grammar notation (no engine-coupled dialect; specific metasyntax SOTA-chosen at this
-  unit's turn) constraining output to the `emit.rs` SMT
-  surface: `(set-logic QF_LRA|QF_UF)`, `(set-option …)`, `(declare-const |sym| Bool|Real)`,
-  `(assert (! <term> :named |name|))`, `(check-sat)`, `(get-model)`/`(get-unsat-core)`; term grammar
-  = `and`/`or`/`not`, `|c|`, the four interval relations over `|v|` and an int, negative `(- N)`,
-  deontic `|pos:<action_key>|`. Land committed `schemas/smt_query.grammar` + `schema_hash`. Reading:
-  `crates/ckc-smt/src/emit.rs` emitted surface; SPEC §8.6 smt pins, §6, §9 schemas/. Gate:
-  `cargo test`; grammar accepts the M1 emitted Q1/Q2 bodies (pinned smt2), rejects malformed;
-  `schema_hash` stable; committed bytes pinned. [Audited vs the .1 split: lighter (hand-authored
-  grammar, no code emitter → one unit) but shares .1b's committed-artifact+hash+oracle shape → pin
-  its accept/reject oracle (a grammar parser/recognizer) as a dev-dep at its turn.]
+- [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. PRE-DERIVED (this unit's prep
+  commit): notation + oracle SOTA-selected, grammar authored + validated + hashed → the WORK-UNIT is
+  mechanical wire+gate, ZERO re-derivation; read ONLY this line, then open `emit.rs` to place two tests.
+  LOCKED decisions: notation = standard BNF (engine-agnostic, the canonical base of EBNF/GBNF →
+  transforms to a grammar-constrained-decoding dialect downstream; rejected pest/PEG = tool-coupled).
+  Oracle = `bnf` crate 0.6, dev-dep, `default-features = false` (drops the serde grammar-(de)serialize
+  feature the oracle never uses; build + run validated). Recognizer = Earley, FULL-match: `let g:
+  bnf::Grammar = txt.parse()?; let p = g.build_parser()?; let ok = |s: &str|
+  p.parse_input(s).next().is_some();`. Grammar HAND-AUTHORED (the file IS the source — no code emitter,
+  no bless/CKC_BLESS; lighter than .1b: a lone hash-pin is the whole drift guard).
+  ARTIFACT staged byte-exact at `.agent/wip-smt_query.grammar`
+  (sha256:fb42ee5a92d7ee445aad077095aabf0ba1016f2c56d79b1e815ff831a75d0be1, 2512 B; validated by a
+  scratch `bnf` harness reading the exact file bytes — parses as BNF, builds a parser, recognizes the
+  live conflict + control Q1/Q2 + the degenerate body, rejects all 14 malformed cases). Shape (review-
+  only): the profile SURFACE = a union of valid constructs, NOT per-query logic/produce/result coupling
+  (those exact bytes stay §8.6-pinned in `emit.rs`). `bnf` = pure BNF (no EBNF `{}`/`[]`) → repetition
+  is recursion + `""` base; `<nl>`'s body is a LITERAL newline byte; `;` line-comments parse (header
+  kept), `#`/`(*` do not; trailing garbage rejected (full-match).
+  STEPS: (1) `cp .agent/wip-smt_query.grammar schemas/smt_query.grammar` (byte-exact restore; `schemas/`
+  already exists from .1b) → confirm `sha256sum schemas/smt_query.grammar` == the hash above. (2) Deps:
+  root `[workspace.dependencies]` += `bnf = { version = "0.6", default-features = false }` (comment it
+  like the jsonschema entry — dev-only Earley BNF grammar oracle); ckc-smt `Cargo.toml` += a NEW
+  `[dev-dependencies]` block with `bnf.workspace = true`. (3) `emit.rs` `mod tests` += `hash_bytes` on
+  the existing `use ckc_core::{…}` line + two `#[test]`s:
+  • `grammar_hash_is_pinned` (drift guard): `const GRAMMAR_PATH: &str =
+  concat!(env!("CARGO_MANIFEST_DIR"), "/../../schemas/smt_query.grammar");` `const GRAMMAR_HASH: &str =
+  "sha256:fb42ee5a92d7ee445aad077095aabf0ba1016f2c56d79b1e815ff831a75d0be1";`
+  `assert_eq!(hash_bytes(&std::fs::read(GRAMMAR_PATH).unwrap()).as_str(), GRAMMAR_HASH);` (editing the
+  file flips the hash → fails; mirrors `schema.rs` `schema_hash_is_pinned`).
+  • `grammar_recognizes_emitted_and_rejects_malformed`: build the recognizer from
+  `std::fs::read_to_string(GRAMMAR_PATH)` per the snippet above. ACCEPT (live emitter `.body`, reusing
+  the test fixtures): conflict `emit_overlap_query`/`emit_deontic_query` over
+  `plan_pair("group.m1_conflict", &doc_a(), &doc_b())`; control over `plan_pair("group.m1_no_conflict",
+  &control(), &doc_a())`; the degenerate body — replicate `degenerate_and_numeral_forms`'s x/y build
+  (`fc`/`dnf1`/`interval(…,Some(-5),…,Some(40))`/nested `or`+`and`) + its overlap emit (covers `(- n)`,
+  nested or/and, bare single-atom disjunct). REJECT (`assert!(!ok(&s))`, mutate the minimal-valid base):
+  unquoted-symbol (`x` for `|x|`), bare-negative (`-5` not `(- 5)`), leading-zero (`018`), bad-logic
+  (`QF_NIA`), bad-sort (`Int`), missing-trailing-nl, single-arg-`(and |x|)`, unknown-command (`(push
+  1)`), uppercase-id (`|X|`), one-line-spaces (`\n`→space), missing-`:named`, trailing-garbage
+  (`(extra)\n` appended), declare-before-`set-logic`, missing-`(check-sat)`. Minimal-valid base =
+  `"(set-logic QF_UF)\n(set-option :print-success false)\n(set-option :produce-unsat-cores
+  true)\n(declare-const |x| Bool)\n(assert (! |x| :named |a.r|))\n(check-sat)\n(get-unsat-core)\n"`.
+  GATE: `cargo test --workspace` (oracle + hash green, M1 §8.6 pins unchanged); `cargo fmt --check`;
+  `cargo clippy --workspace --all-targets -- -D warnings`. CLOSE: `rm .agent/wip-smt_query.grammar`;
+  record context-usage; mark DONE (M2 stays IN-PROGRESS — later units remain).
 - [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
   (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
   `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage
