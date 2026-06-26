@@ -88,17 +88,18 @@ full pre-consolidation text lives in git history.
   gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
   extra impl).
 - Committed generated-artifact pattern (`schemas-export.1b` = first repo instance; recurs for any
-  emitter-produced committed file, e.g. the next SMT grammar export). Bless-gated round-trip test: the
-  gate is an EXACT token (`CKC_BLESS=clinical_ir_schema`), never `is_some()`/`=1`, so an ambient or CI
-  `CKC_BLESS` can't silently re-bless real drift; the bless branch `create_dir_all`s the dir then writes
-  the emitter bytes, the bare run is the drift guard (read committed → `assert_eq` vs emitter output).
-  Pin `const <X>_HASH = hash_bytes(bytes).as_str()`: `hash_bytes` is plain sha256 rendered
-  `sha256:<lowercase-hex>`, byte-identical to `sha256sum <file>`, so fill the pin from `sha256sum` + the
-  `sha256:` prefix (the equality also cross-checks committed == emitted). Flow: `CKC_BLESS=<token> cargo
-  test <mod>::` (writes) → `sha256sum` → fill hash → bare `cargo test`. The JSON-Schema validator is a
-  dev-only oracle (`jsonschema`, `default-features=false` — drops the remote-$ref resolvers + TLS a
-  self-contained schema never needs, keeps `validator_for`/`Validator::is_valid`; `pattern` enforcement
-  confirmed present without defaults, guarded by a non-canonical-bound malformed case).
+  emitter-produced committed file, e.g. the SMT grammar export). Two tests beat one env-gated test —
+  a `CKC_BLESS`-style write-in-test masks drift the moment its token leaks into CI (codex M2.3): a
+  drift guard that NEVER writes (`assert_eq!` committed bytes vs emitter output, so no env state can
+  mask it) + an `#[ignore]`d bless that regenerates the file (`create_dir_all` + write), run manually
+  (`cargo test <bless_fn> -- --ignored`). Pin `const <X>_HASH = hash_bytes(bytes).as_str()` (plain
+  sha256 → `sha256:<hex>`, byte-identical to `sha256sum`; re-pin from `sha256sum` after blessing; the
+  assert_eq also cross-checks committed == emitted). Oracle = dev-only `jsonschema`,
+  `default-features=false` (drops remote-$ref resolvers + TLS a self-contained schema never needs,
+  keeps `validator_for`/`is_valid` + `pattern`). Pin the rejection REASON, not just `!is_valid`:
+  assert each malformed case's `(instance_path, schema_path)` via `iter_errors()` (a failed `oneOf`
+  reports at the parent's `.../oneOf`, not the nested keyword → prove the nested split, e.g. pattern
+  vs type, by the baseline accepting the canonical value).
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —

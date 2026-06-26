@@ -344,8 +344,8 @@ mod tests {
     use serde_json::Value;
 
     /// Pinned `schema_hash` = `hash_bytes` over the committed canonical bytes;
-    /// update only on an intended schema change (regenerate with
-    /// `CKC_BLESS=clinical_ir_schema`).
+    /// update only on an intended schema change (re-pin from `sha256sum` after
+    /// running the ignored `bless_clinical_ir_schema`).
     const SCHEMA_HASH: &str =
         "sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0";
 
@@ -368,10 +368,11 @@ mod tests {
         Id::new(value).unwrap()
     }
 
-    /// A valid ClinicalIR over committed-lexicon vocabulary, exercising every
-    /// schema feature: both enums and free ids, all four fieldless enums, set
-    /// and ordered arrays, present/absent optional `certainty`, and both
-    /// concept and interval atom branches.
+    /// A valid ClinicalIR over committed-lexicon vocabulary, exercising the
+    /// schema's structure: lexicon-enum and free-id fields, the four fieldless
+    /// enums (one value each), multi-element sets and ordered arrays, a
+    /// non-empty `alternatives`, present/absent optional `certainty`, and all
+    /// three atom branches (concept, concept_negated, interval).
     fn valid_ir(certainty: Option<Certainty>) -> ClinicalIr {
         ClinicalIr {
             bindings: vec![TerminologyBinding {
@@ -379,13 +380,16 @@ mod tests {
                 system: id("ckc.lex"),
                 code: id("cond.sepsis"),
                 status: BindingStatus::Exact,
-                alternatives: vec![],
+                alternatives: vec![id("cond.renal_severe")],
                 region_ids: vec![id("r.1")],
             }],
             statements: vec![ClinicalStatement {
                 statement_id: id("s.1"),
                 population: vec![ContextAtom::Concept(id("pop.adult"))],
-                condition: vec![ContextAtom::Concept(id("cond.sepsis"))],
+                condition: vec![
+                    ContextAtom::Concept(id("cond.sepsis")),
+                    ContextAtom::ConceptNegated(id("cond.pregnancy")),
+                ],
                 action: Action::new(id("act.administer"), id("drug.abx_a")),
                 modality: Direction::For,
                 strength: Strength::Strong,
@@ -629,23 +633,30 @@ mod tests {
         );
     }
 
-    // The committed schema file is exactly the emitter output.
-    // `CKC_BLESS=clinical_ir_schema` regenerates it (the exact token stops an
-    // ambient `CKC_BLESS` silently re-blessing real drift); the bare run is the
-    // drift guard.
+    // Drift guard: the committed schema file is exactly the emitter output. It
+    // never writes, so no environment state can mask drift; the ignored
+    // `bless_clinical_ir_schema` regenerates the file after an intended change.
     #[test]
     fn committed_schema_matches_emitter() {
         let want = clinical_ir_schema(&committed_lexicon());
-        if std::env::var("CKC_BLESS").as_deref() == Ok("clinical_ir_schema") {
-            std::fs::create_dir_all(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schemas")).unwrap();
-            std::fs::write(SCHEMA_PATH, &want).unwrap();
-        }
         let got = std::fs::read(SCHEMA_PATH)
-            .expect("committed schema present (CKC_BLESS=clinical_ir_schema to regenerate)");
+            .expect("committed schema present (run the ignored bless_clinical_ir_schema)");
         assert_eq!(
             got, want,
-            "committed schema drifted (CKC_BLESS=clinical_ir_schema to regenerate)"
+            "committed schema drifted (run the ignored bless_clinical_ir_schema)"
         );
+    }
+
+    // (Re)generate the committed schema from the emitter. Ignored so the normal
+    // suite never writes; run manually after an intended schema change:
+    // `cargo test -p ckc-cli schema::tests::bless_clinical_ir_schema -- --ignored`,
+    // then re-pin SCHEMA_HASH from `sha256sum schemas/clinical_ir.schema.json`.
+    #[test]
+    #[ignore = "writes schemas/clinical_ir.schema.json; run manually to (re)generate"]
+    fn bless_clinical_ir_schema() {
+        let bytes = clinical_ir_schema(&committed_lexicon());
+        std::fs::create_dir_all(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schemas")).unwrap();
+        std::fs::write(SCHEMA_PATH, &bytes).unwrap();
     }
 
     // The `schema_hash` is stable; a deliberate schema change re-pins it
@@ -665,12 +676,37 @@ mod tests {
         assert!(validator.is_valid(&instance(&valid_ir(None))));
     }
 
-    // The schema rejects each malformed shape: a dropped required member, an
-    // off-lexicon concept code (in `code` and in `alternatives`, the parity
-    // bundle validation enforces), an off-lexicon action kind, a bare-number
-    // interval bound, an unknown member, and a duplicated §4.3 set element. An
-    // out-of-`i64` magnitude bound is deliberately absent — `INT_PATTERN` is
-    // i64-lexical not i64-bounded, and `read_i64` is that downstream backstop.
+    /// Assert `instance` is rejected, and specifically that some validation
+    /// error sits at `instance_loc` in the instance and `schema_loc` in the
+    /// schema — pinning the *reason* (the violated keyword/$def), not just that
+    /// validation failed.
+    fn assert_rejected_at(
+        validator: &Validator,
+        instance: &Value,
+        instance_loc: &str,
+        schema_loc: &str,
+        label: &str,
+    ) {
+        let locs: Vec<(String, String)> = validator
+            .iter_errors(instance)
+            .map(|e| (e.instance_path().to_string(), e.schema_path().to_string()))
+            .collect();
+        assert!(!locs.is_empty(), "{label}: expected rejection, got valid");
+        assert!(
+            locs.iter()
+                .any(|(i, s)| i.as_str() == instance_loc && s.as_str() == schema_loc),
+            "{label}: expected error at instance={instance_loc} schema={schema_loc}; got {locs:?}"
+        );
+    }
+
+    // The schema rejects each malformed shape, each pinned to the keyword/$def
+    // it violates (so a refactor that rejects for a different reason fails): a
+    // dropped required member, an off-lexicon concept code (in `code` and in
+    // `alternatives`, the parity bundle validation enforces), an off-lexicon
+    // action kind, a bare-number and a non-canonical interval bound, an unknown
+    // member, and a duplicated §4.3 set element. An out-of-`i64` magnitude bound
+    // is deliberately absent — `INT_PATTERN` is i64-lexical not i64-bounded, and
+    // `read_i64` is that downstream backstop.
     #[test]
     fn schema_rejects_malformed() {
         let validator = validator();
@@ -683,47 +719,75 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("action");
-        assert!(
-            !validator.is_valid(&missing_action),
-            "missing required action"
+        assert_rejected_at(
+            &validator,
+            &missing_action,
+            "/statements/0",
+            "/$defs/ClinicalStatement/required",
+            "missing required action",
         );
 
         // a controlled-vocabulary code outside the lexicon enum (still a valid id)
         let mut bad_code = good.clone();
         bad_code["bindings"][0]["code"] = Value::from("cond.not_in_lexicon");
-        assert!(!validator.is_valid(&bad_code), "non-lexicon concept code");
+        assert_rejected_at(
+            &validator,
+            &bad_code,
+            "/bindings/0/code",
+            "/$defs/ConceptCode/enum",
+            "non-lexicon concept code",
+        );
 
         // a competing alternative outside the concept vocabulary (guards the
         // codex-fixed `alternatives` → ConceptCode parity with `code`)
         let mut bad_alternative = good.clone();
         bad_alternative["bindings"][0]["alternatives"] = Value::from(vec!["cond.not_in_lexicon"]);
-        assert!(
-            !validator.is_valid(&bad_alternative),
-            "non-lexicon alternative"
+        assert_rejected_at(
+            &validator,
+            &bad_alternative,
+            "/bindings/0/alternatives/0",
+            "/$defs/ConceptCode/enum",
+            "non-lexicon alternative",
         );
 
         // an action kind outside the lexicon enum
         let mut bad_kind = good.clone();
         bad_kind["statements"][0]["action"]["kind"] = Value::from("act.bogus");
-        assert!(!validator.is_valid(&bad_kind), "non-lexicon action kind");
+        assert_rejected_at(
+            &validator,
+            &bad_kind,
+            "/statements/0/action/kind",
+            "/$defs/ActionKind/enum",
+            "non-lexicon action kind",
+        );
 
-        // an interval bound as a bare number rather than a quoted decimal
+        // an interval bound as a bare number: the atom then matches no
+        // ContextAtom branch (its interval branch needs a string bound). The
+        // baseline's quoted "18" validates, isolating the string requirement.
         let mut numeric_bound = good.clone();
         numeric_bound["statements"][0]["exceptions"][0]["atoms"][0]["value"]["ge"] =
             Value::from(18);
-        assert!(
-            !validator.is_valid(&numeric_bound),
-            "bare-number interval bound"
+        assert_rejected_at(
+            &validator,
+            &numeric_bound,
+            "/statements/0/exceptions/0/atoms/0",
+            "/$defs/ContextAtom/oneOf",
+            "bare-number interval bound",
         );
 
-        // a string interval bound that is not a canonical integer — proves the
-        // INT_PATTERN `pattern` is enforced, not just the `string` type
+        // a string interval bound that is not a canonical integer — again no
+        // branch matches. With the baseline's "18" accepted, this isolates
+        // INT_PATTERN: a plain `string` type would accept "1.5", the pattern
+        // rejects it.
         let mut noncanonical_bound = good.clone();
         noncanonical_bound["statements"][0]["exceptions"][0]["atoms"][0]["value"]["ge"] =
             Value::from("1.5");
-        assert!(
-            !validator.is_valid(&noncanonical_bound),
-            "non-canonical interval bound"
+        assert_rejected_at(
+            &validator,
+            &noncanonical_bound,
+            "/statements/0/exceptions/0/atoms/0",
+            "/$defs/ContextAtom/oneOf",
+            "non-canonical interval bound",
         );
 
         // an unknown member under additionalProperties:false
@@ -732,11 +796,23 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .insert("extra".to_owned(), Value::from("x"));
-        assert!(!validator.is_valid(&extra), "unknown member rejected");
+        assert_rejected_at(
+            &validator,
+            &extra,
+            "/bindings/0",
+            "/$defs/TerminologyBinding/additionalProperties",
+            "unknown member rejected",
+        );
 
         // a §4.3 set with a duplicate element
         let mut dup = good.clone();
         dup["statements"][0]["source_segment_ids"] = Value::from(vec!["seg.1", "seg.1"]);
-        assert!(!validator.is_valid(&dup), "duplicate set element");
+        assert_rejected_at(
+            &validator,
+            &dup,
+            "/statements/0/source_segment_ids",
+            "/$defs/ClinicalStatement/properties/source_segment_ids/uniqueItems",
+            "duplicate set element",
+        );
     }
 }

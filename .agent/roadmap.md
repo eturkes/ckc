@@ -87,7 +87,11 @@ argument).
   [Done: `default-features=false` chosen (validator_for/is_valid present, no remote resolvers needed);
   added two malformed cases beyond the plan list — non-lexicon `alternatives` (guards the codex
   ConceptCode parity) + a non-canonical string bound `"1.5"` (proves INT_PATTERN `pattern` enforced,
-  not just `string` type); salvage deleted.] 55% 110K/200K
+  not just `string` type); salvage deleted. Codex M2.3 follow-up: bless mechanism CKC_BLESS-gate →
+  drift guard (never writes) + `#[ignore]`d bless test (env-leak-proof; the durable pattern now in
+  memory.md); each malformed case pins its rejection reason `(instance_path, schema_path)` via
+  `iter_errors()`; valid_ir enriched (concept_negated + non-empty `alternatives` + multi-element set),
+  overclaiming comment corrected.] 55% 110K/200K
 - [ ] schemas-export.2: direct_smt SMT-LIB grammar + committed export. Author a neutral,
   engine-agnostic grammar notation (no engine-coupled dialect; specific metasyntax SOTA-chosen at this
   unit's turn) constraining output to the `emit.rs` SMT
