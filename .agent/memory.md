@@ -93,21 +93,23 @@ full pre-consolidation text lives in git history.
   missing replay pin). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
   gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
   extra impl).
-- Committed generated-artifact pattern (`schemas-export.1b` = first repo instance; recurs for any
-  emitter-produced committed file, e.g. the SMT grammar export). Two tests beat one env-gated test —
+- Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
+  variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
+  one env-gated test —
   a `CKC_BLESS`-style write-in-test masks drift the moment its token leaks into CI (codex M2.3): a
   drift guard that NEVER writes (`assert_eq!` committed bytes vs emitter output, so no env state can
   mask it) + an `#[ignore]`d bless that regenerates the file (`create_dir_all` + write), run manually
   (`cargo test <bless_fn> -- --ignored`). Pin `const <X>_HASH = hash_bytes(bytes).as_str()` (plain
   sha256 → `sha256:<hex>`, byte-identical to `sha256sum`; re-pin from `sha256sum` after blessing; the
-  assert_eq also cross-checks committed == emitted). Hand-authored committed artifacts (no emitter —
-  e.g. schemas-export.2's BNF grammar, route prompt files) skip bless: the lone `hash_bytes(file) ==
-  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail). Oracle = dev-only `jsonschema`,
+  assert_eq also cross-checks committed == emitted). Oracle = dev-only `jsonschema`,
   `default-features=false` (drops remote-$ref resolvers + TLS a self-contained schema never needs,
   keeps `validator_for`/`is_valid` + `pattern`). Pin the rejection REASON, not just `!is_valid`:
   assert each malformed case's `(instance_path, schema_path)` via `iter_errors()` (a failed `oneOf`
   reports at the parent's `.../oneOf`, not the nested keyword → prove the nested split, e.g. pattern
-  vs type, by the baseline accepting the canonical value).
+  vs type, by the baseline accepting the canonical value). HAND-AUTHORED variant (no emitter — e.g.
+  schemas-export.2's BNF grammar, route prompt files): the file IS the source + its oracle is the
+  `bnf` recognizer (not jsonschema), so skip bless + the cross-check; the lone `hash_bytes(file) ==
+  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail).
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —
