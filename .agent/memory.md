@@ -51,7 +51,12 @@ full pre-consolidation text lives in git history.
   assembly or processing-stage wiring); a spec-byte amendment (re-pin + reference/test mirror
   sweep) bundled with new feature code = two units — an open decision whose resolution amends
   pinned bytes is a deliverable, not a session preamble; crate foundations pair only with a
-  small type surface (one payload module per foundation unit). Measured anchors (checked
+  small type surface (one payload module per foundation unit); deterministic code paired with a SLOW or
+  exploratory live confirm over an external runtime = two units (code stub-gated + mechanical; the live
+  confirm its own unit — model-adapter.2 overflowed pairing them, ~24s/call + a one-time weak-model
+  degeneration discovery), and recovering such an overflow discharges that one-time exploration into memory
+  `## Runtime` + persists any session-scratchpad tool the live unit needs to a stable machine-local path
+  (on PATH for a bare-name command) so the redo is a checklist. Measured anchors (checked
   roadmap stubs carry the `NN%` figures): canonical JSON = five units; a five-layer recursive
   type family = three units; a lexicon-driven derivation half (loader / binding / builder) =
   three units; statement builder over a prebuilt binding core = one unit; exception
@@ -308,7 +313,15 @@ full pre-consolidation text lives in git history.
     "direct-route failures common" path (pin the exact model identity in the run config; alternatives ok).
     Greedy output is byte-stable within + across processes on one host/device/quant but NOT across
     environments → the recorded-bytes cassette (engine-agnostic boundary above), not a live re-run, is the
-    correctness mechanism; replay needs no model runtime present.
+    correctness mechanism; replay needs no model runtime present. Two M2.9-respec refinements: (a)
+    constrained output can be INCOMPLETE/INVALID (not just semantically wrong) when the constraint format
+    permits unbounded whitespace + the model is weak (greedy loops on free whitespace, truncates at the
+    token budget) → the acceptance-rate metric counts truncation/parse-incompleteness as a failure mode,
+    and the tight-grammar route (explicit newlines, no free whitespace) sidesteps it. (b) greedy is
+    SEED-INERT → the k per-sample seeds yield identical draws (convergence trivially 1.0); MEANINGFUL
+    k-sample convergence (metrics-m2.2) needs a sampling config (do_sample + temperature, the seed fixing
+    each draw) — a downstream config decision, NOT the adapter's (invoke_samples stays config-agnostic:
+    derive seeds, invoke, record).
 
 ## Runtime (machine-specific)
 
@@ -327,3 +340,26 @@ functionally on CPU (NPU/GPU structured-output support untested — NPU static s
   processes on the same host/device/quant; cross-ENVIRONMENT determinism NOT guaranteed. JSON-Schema +
   regex-grammar constraints hold deterministically. Caveat: a constraint forces schema-VALID output that
   can be semantically WRONG (a measured greedy run picked a wrong enum value).
+- Env command install (the live units depend on it): the §9 runtime command is installed persistently at
+  `/var/home/eturkes/.local/app/ckc-model-runtime/{ckc-model-runtime,wrapper.py}`, symlinked onto PATH as
+  the adapter's default bare name `ckc-model-runtime` (so `ModelAdapter::with_command` default resolves
+  it). The shell entry sources `intel-accel/env.sh` then runs the project venv
+  `/run/host/home/eturkes/Projects/ckc/.venv` (has `openvino-genai` + `jsonschema`). `--identity` ~0.1s; a
+  generation ~24s (load ~9s + ≤512 tokens), `CKC_MAX_NEW_TOKENS`-tunable. wrapper.py applies the chat
+  template manually then decodes with `apply_chat_template=False` (the generate-time flag is inert on a raw
+  string).
+- Constrained-output completeness + seed (M2.9-respec live findings): the FULL `clinical_ir.schema.json`
+  greedy-degenerates into a whitespace loop (the JSON-Schema permits free inter-token whitespace; greedy
+  loops mid-structure) → truncates at the token cap → INCOMPLETE INVALID JSON (observed 1985 B, unbalanced
+  braces) = the expected weak-baseline failure, NOT a mechanism fault (no whitespace knob in
+  StructuredOutputConfig). A SIMPLE bounded schema (enum + bool, additionalProperties:false) → COMPLETE
+  VALID terminating instance (observed `{"verdict":"unknown","actionable":true}`, 48 B, early EOS) → the
+  constraint mechanism is sound. Greedy is SEED-INERT (`do_sample=False` ignores `rng_seed`; distinct
+  seeds → byte-identical output, confirmed) → `invoke_samples`' k per-seed draws coincide + replay under
+  greedy (reproducibility trivial; sample diversity needs sampling — see the M2-plan note).
+- model-adapter.2b live checklist (all pre-proven above): `ckc-model-runtime --identity` parses; the env
+  command twice (same prompt/seed/constraint) → byte-identical; `derive_seed(42, 0/1/2)` =
+  `[12058926934050108962, 13679457532755275413, 2949826092126892291]` (greedy → all coincide). The
+  committed end-to-end test takes a `schemas/` constraint + an inline prompt and asserts byte-stability +
+  `invoke_samples` reproducibility (engine-agnostic, NOT a value); a complete-valid-instance demo uses a
+  machine-local simple enum+bool schema (not committed).
