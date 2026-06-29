@@ -24,3 +24,7 @@ __pycache__/
 # commands; .claude/settings.local.json = per-machine permission overlay)
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Machine-local runtime specifics (engine/model/paths/timings) — keeps the
+# committed deliverable engine-agnostic; agnostic conclusions stay in .agent/memory.md
+.agent/runtime.local.md

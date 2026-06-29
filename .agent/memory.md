@@ -305,7 +305,7 @@ full pre-consolidation text lives in git history.
     `compile`/`verify` per-group (1× fan-in), so they cannot be one linear fn; conflating
     granularities forced a full-session design re-derivation. Check stage granularity at plan time.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
-    runtime/model identity in the `## Runtime (machine-specific)` section below): constrained decoding forces
+    runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output
     that can be semantically WRONG (observed: a greedy run emitted a wrong enum) → the M2 report scores
     BOTH acceptance-rate (schema-validity) AND verdict-accuracy, never validity alone. The baseline
@@ -319,47 +319,27 @@ full pre-consolidation text lives in git history.
     token budget) → the acceptance-rate metric counts truncation/parse-incompleteness as a failure mode,
     and the tight-grammar route (explicit newlines, no free whitespace) sidesteps it. (b) greedy is
     SEED-INERT → the k per-sample seeds yield identical draws (convergence trivially 1.0); MEANINGFUL
-    k-sample convergence (metrics-m2.2) needs a sampling config (do_sample + temperature, the seed fixing
+    k-sample convergence (metrics-m2.2) needs a sampling config (temperature > 0, the seed fixing
     each draw) — a downstream config decision, NOT the adapter's (invoke_samples stays config-agnostic:
     derive seeds, invoke, record).
 
-## Runtime (machine-specific)
+## Runtime
 
-Concrete M2 local-model runtime this container runs — machine-specific environment detail (paths +
-measurements drift; the committed deliverable stays engine-agnostic per Policy). OpenVINO GenAI on Intel
-Lunar Lake; iGPU/NPU/CPU enablement + env to source live in gitignored machine-local config. Validated
-functionally on CPU (NPU/GPU structured-output support untested — NPU static shapes may not support it).
-
-- Constrained decoding: `StructuredOutputConfig(json_schema=… | regex=… | grammar/EBNF/compound_grammar/
-  structural_tags)` → JSON-Schema + grammar-constrained output. `GenerationConfig`: `do_sample=False`
-  (greedy), `rng_seed`, `stop_strings`, `ignore_eos`.
-- Model: Qwen2.5-1.5B-Instruct INT4 OV-IR (HF `OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov`, fetch via
-  `huggingface-hub`) at `/var/home/eturkes/.local/app/ckc-models/qwen2.5-1.5b-int4-ov` (867M bin + ov
-  tokenizer/detokenizer). Sub-4B, JA-capable; free-form output degenerate/repetitive.
-- Determinism (CPU, measured): loads ~9s; greedy output BYTE-STABLE within a process AND across separate
-  processes on the same host/device/quant; cross-ENVIRONMENT determinism NOT guaranteed. JSON-Schema +
-  regex-grammar constraints hold deterministically. Caveat: a constraint forces schema-VALID output that
-  can be semantically WRONG (a measured greedy run picked a wrong enum value).
-- Env command install (the live units depend on it): the §9 runtime command is installed persistently at
-  `/var/home/eturkes/.local/app/ckc-model-runtime/{ckc-model-runtime,wrapper.py}`, symlinked onto PATH as
-  the adapter's default bare name `ckc-model-runtime` (so `ModelAdapter::with_command` default resolves
-  it). The shell entry sources `intel-accel/env.sh` then runs the project venv
-  `/run/host/home/eturkes/Projects/ckc/.venv` (has `openvino-genai` + `jsonschema`). `--identity` ~0.1s; a
-  generation ~24s (load ~9s + ≤512 tokens), `CKC_MAX_NEW_TOKENS`-tunable. wrapper.py applies the chat
-  template manually then decodes with `apply_chat_template=False` (the generate-time flag is inert on a raw
-  string).
-- Constrained-output completeness + seed (M2.9-respec live findings): the FULL `clinical_ir.schema.json`
-  greedy-degenerates into a whitespace loop (the JSON-Schema permits free inter-token whitespace; greedy
-  loops mid-structure) → truncates at the token cap → INCOMPLETE INVALID JSON (observed 1985 B, unbalanced
-  braces) = the expected weak-baseline failure, NOT a mechanism fault (no whitespace knob in
-  StructuredOutputConfig). A SIMPLE bounded schema (enum + bool, additionalProperties:false) → COMPLETE
-  VALID terminating instance (observed `{"verdict":"unknown","actionable":true}`, 48 B, early EOS) → the
-  constraint mechanism is sound. Greedy is SEED-INERT (`do_sample=False` ignores `rng_seed`; distinct
-  seeds → byte-identical output, confirmed) → `invoke_samples`' k per-seed draws coincide + replay under
-  greedy (reproducibility trivial; sample diversity needs sampling — see the M2-plan note).
-- model-adapter.2b live checklist (all pre-proven above): `ckc-model-runtime --identity` parses; the env
-  command twice (same prompt/seed/constraint) → byte-identical; `derive_seed(42, 0/1/2)` =
-  `[12058926934050108962, 13679457532755275413, 2949826092126892291]` (greedy → all coincide). The
-  committed end-to-end test takes a `schemas/` constraint + an inline prompt and asserts byte-stability +
-  `invoke_samples` reproducibility (engine-agnostic, NOT a value); a complete-valid-instance demo uses a
-  machine-local simple enum+bool schema (not committed).
+Concrete M2 runtime specifics (engine, model id/quant, install paths, API symbols, measured timings,
+observed outputs/degeneration) are machine-specific + drift → recorded in gitignored
+`.agent/runtime.local.md`, keeping the committed deliverable engine-agnostic (Policy). Engine-agnostic
+conclusions the committed code + units rely on:
+- The §9 runtime command installs on PATH under the adapter's default bare name → `ModelAdapter::
+  with_command`'s default resolves it live (`.2b`); install/invocation specifics → `runtime.local.md`.
+- Greedy decoding = deterministic argmax → output BYTE-STABLE within + across processes on a fixed
+  host/runtime build, and SEED-INERT (argmax ignores the seed) → `invoke_samples`' k per-seed draws
+  coincide under greedy (sample diversity needs a sampling config → downstream, see M2-plan).
+  Cross-ENVIRONMENT determinism NOT guaranteed → the recorded-bytes cassette, not a live re-run, is the
+  correctness mechanism.
+- Constraint mechanism: OBSERVED to honor a bounded schema (complete + valid terminating instance) on the
+  local runtime; a permissive full schema lets a weak greedy model degenerate (whitespace loop →
+  truncated/invalid) = expected weak-baseline failure, not a mechanism fault. A LOCAL OBSERVATION, NOT an
+  engine-general guarantee → `.2b` is the proof point (asserts output parses + schema-validates against a
+  committed bounded-schema fixture).
+- `derive_seed(42, 0/1/2)` = `[12058926934050108962, 13679457532755275413, 2949826092126892291]` (pure
+  splitmix64 → engine-agnostic; `.2a` locks these as exact-value test assertions).

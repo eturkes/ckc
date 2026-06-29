@@ -244,34 +244,44 @@ argument).
   rejections; gates green (404 passed / 1 ignored, fmt + clippy `-D warnings` clean), zero edits
   elsewhere.] 76% 151K/200K
 - [ ] model-adapter.2a: constrained generation + k-sample + capture-completeness (code, no live).
-  Apply the staged VERIFIED patch — `git apply .agent/wip-model-adapter.2a.patch` (the M2.9-respec proven
-  tree; gates were green: 409 passed/1 ignored, fmt + clippy `-D warnings` clean) → completes
-  `crates/ckc-cli/src/model.rs` `invoke` for real constrained decoding (the route's grammar/JSON-Schema
-  from `schemas/` as the constraint path, greedy, fixed seed) + adds k-sample (`derive_seed(base_seed,i)`
+  Apply the staged VERIFIED patch — `git apply --3way .agent/wip-model-adapter.2a.patch` (3-way → clean
+  conflict markers if model.rs/lib.rs HEAD drifts from the staging base; the M2.9-respec proven tree, gates
+  were green: 409 passed/1 ignored, fmt + clippy `-D warnings` clean) → wires
+  `crates/ckc-cli/src/model.rs` `invoke` to the §9 CLI contract (route grammar/JSON-Schema from `schemas/`
+  passed as the constraint path + fixed seed; real constrained-decode VERIFIED live in .2b) + adds k-sample (`derive_seed(base_seed,i)`
   splitmix64 + `ModelSample{seed,run}` + `invoke_samples(prompt,constraint,base_seed,k,budget) ->
   Vec<ModelSample>`, k draws at `seed_i=derive_seed(base_seed,i)`, collects outputs + per-draw run) +
   HARDENS capture byte-completeness (`#![forbid(unsafe_code)]` rules out a process-group kill → gate
   `Completed` on stdout reaching EOF within DRAIN_GRACE, else new `ModelOutcome::CaptureIncomplete{bytes}`;
   the bytes are byte-stability-load-bearing). Stub-based tests ride the patch (capture-incomplete on a
   clean-exit-holds-stdout sentinel; derive_seed deterministic+distinct; invoke_samples k reproducible). NO
-  live call (→ .2b). Reading: THIS line + the patch (proven, zero re-derivation; if `git apply` ever
+  live call (→ .2b). Codex-review refinements (post-apply, pre-gate): tighten the `CaptureIncomplete` doc
+  — EOF-unseen-within-DRAIN_GRACE ⇒ completeness UNPROVEN / bytes may be partial (not "truncated"), and an
+  `ExitFailure`'s stdout may itself be complete; document the DRAIN_GRACE assumption (a slow/large but
+  finite drain can false-negative → state the output-size/timing bound; adaptive-drain = follow-up); add
+  exact-value asserts for the pinned `derive_seed(42,0/1/2)` (memory `## Runtime`) locking the splitmix64
+  derivation; re-gate. Reading: THIS line + the patch (proven, zero re-derivation; if `git apply` ever
   fails, re-implement from this line + model-adapter.1's module + memory `## Runtime`). Gate: `cargo test
   --workspace` + `cargo fmt --all --check` + `cargo clippy --workspace --all-targets -- -D warnings`
-  green. CLOSE: `rm .agent/wip-model-adapter.2a.patch`; record context-usage; mark DONE (M2 stays
-  IN-PROGRESS).
+  green. CLOSE: `rm .agent/wip-model-adapter.2a.patch`; prune transient respec/staging prose in memory.md;
+  record context-usage; mark DONE (M2 stays IN-PROGRESS).
 - [ ] model-adapter.2b: live end-to-end confirm through the adapter (the §9 runtime properties).
   Add a committed `#[ignore]`d live integration test driving the .2a adapter against the env command by
   its DEFAULT bare name (covers the .1-deferred live PATH resolution): probe → identity parses; `invoke`
   twice (one inline prompt + a committed `schemas/` constraint + one seed) → byte-identical (greedy
   byte-stability = the cassette-replay assumption); `invoke_samples(base_seed,k=3)` twice → byte-identical
-  `Vec` (k seeded draws replay-deterministic). Engine-agnostic asserts only (byte-stability +
-  reproducibility + identity-parse, NOT a value/validity — model-dependent). The runtime properties,
-  derived seeds, env-command install, and schema-soundness/degeneration observations are PRE-PROVEN + pinned
-  in memory `## Runtime` → this unit RUNS the real adapter codepath live to close the
-  confirmation-vs-claim gap (near-zero re-derivation). Reading: THIS line + memory `## Runtime` + the .2a
-  adapter API + SPEC §9. Gate: `cargo test --workspace` + fmt + clippy green (the ignored test compiles,
+  `Vec` (k seeded draws replay-deterministic). Engine-agnostic asserts: byte-stability + reproducibility +
+  identity-parse, PLUS constraint-CONFORMANCE — commit a simple bounded-schema fixture (enum + bool,
+  additionalProperties:false; agnostic) + assert the adapter's output PARSES + SCHEMA-VALIDATES against it
+  (proves `--constraint` is honored end-to-end → a runtime ignoring the constraint FAILS, not passes); NOT
+  a model-specific VALUE (that stays model-dependent). The runtime properties,
+  derived seeds, env-command install, and constraint observations are OBSERVED on the local runtime
+  (engine-agnostic conclusions + pinned seeds in memory `## Runtime`; machine-local specifics in
+  `.agent/runtime.local.md`) → this unit RUNS the real adapter codepath live to PROVE them, closing the
+  confirmation-vs-claim gap (near-zero re-derivation). Reading: THIS line + memory `## Runtime` +
+  `.agent/runtime.local.md` + the .2a adapter API + SPEC §9. Gate: `cargo test --workspace` + fmt + clippy green (the ignored test compiles,
   normal runs skip it); LIVE — `cargo test <fn> -- --ignored` passes against the env command; record the
-  live results in memory `## Runtime`. CLOSE: record context-usage; mark DONE (M2 stays IN-PROGRESS).
+  live results in `.agent/runtime.local.md` (machine-specific) + agnostic conclusions in memory `## Runtime`. CLOSE: record context-usage; mark DONE (M2 stays IN-PROGRESS).
 - [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's
   prompt + output as an `ArtifactWrapper` test-source artifact (tracked `corpus/test_sources/` class —
   origin `ai_generated`, evidence `evidence_discovery_only`, `prompt_template_hash` in the manifest),
