@@ -337,14 +337,18 @@ conclusions the committed code + units rely on:
 - Constraint mechanism: OBSERVED to honor a bounded schema (complete + valid terminating instance) on the
   local runtime; a permissive full schema lets a weak greedy model degenerate (whitespace loop →
   truncated/invalid) = expected weak-baseline failure, not a mechanism fault. A LOCAL OBSERVATION, NOT an
-  engine-general guarantee → PROVEN by the `.2b` `model_live` test (constrained output parses +
-  schema-validates against the committed bounded fixture).
+  engine-general guarantee → live-CHECKED by the `.2b` `model_live` test: constrained output parses +
+  schema-validates against the committed bounded fixture — conformance CONSISTENT WITH `--constraint` being
+  honored, necessary but not alone sufficient (a fixed conforming object would also pass; the bounded
+  schema makes accidental conformance unlikely for a free-running weak model).
 - `derive_seed` exact splitmix64 draws (engine-agnostic, replay-load-bearing) are pinned in the
   `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy;
   the `.2b` `model_live` test re-asserts them live through `invoke_samples`.
 - `.2b` DONE — `crates/ckc-cli/tests/model_live.rs` (`#[ignore]`d; `cargo test -p ckc-cli --test
-  model_live -- --ignored`) is the standing live proof of the §9 runtime properties (read the test, not a
-  copy: PATH-resolved `new()`, cross-process byte-stability, complete `Completed` capture, constraint-
-  conformance, seed-pinned reproducible k-sample draws, greedy seed-inert coincidence). Its bounded
-  enum+bool constraint fixture lives in `tests/fixtures/`, deliberately NOT `schemas/` (a test artifact,
+  model_live -- --ignored`) is the standing live confirmation of the §9 runtime properties (read the test,
+  not a copy: default bare-name PATH-resolved `new()` guarded on `CKC_MODEL_COMMAND` unset, cross-process
+  SAME-seed byte-stability with EOF-gated `Completed` capture asserted per run, constraint-conformance
+  consistent with `--constraint` honored, seed-pinned per-index-reproducible k-sample draws — it does NOT
+  assert cross-seed equality; greedy seed-inertness is environment-specific, kept in `runtime.local.md`).
+  Its bounded enum+bool constraint fixture lives in `tests/fixtures/`, deliberately NOT `schemas/` (a test artifact,
   not a production route constraint; the plan-line "schemas/ constraint" was shorthand — don't relocate).

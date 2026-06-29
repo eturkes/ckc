@@ -271,8 +271,9 @@ argument).
   `Vec` (k seeded draws replay-deterministic). Engine-agnostic asserts: byte-stability + reproducibility +
   identity-parse, PLUS constraint-CONFORMANCE — commit a simple bounded-schema fixture (enum + bool,
   additionalProperties:false; agnostic) + assert the adapter's output PARSES + SCHEMA-VALIDATES against it
-  (proves `--constraint` is honored end-to-end → a runtime ignoring the constraint FAILS, not passes); NOT
-  a model-specific VALUE (that stays model-dependent). The runtime properties,
+  (conformance CONSISTENT WITH `--constraint` honored end-to-end → a free-running runtime ignoring the
+  constraint emits non-conforming bytes + FAILS; necessary not alone sufficient — a fixed conforming object
+  would pass); NOT a model-specific VALUE (that stays model-dependent). The runtime properties,
   derived seeds, env-command install, and constraint observations are OBSERVED on the local runtime
   (engine-agnostic conclusions + pinned seeds in memory `## Runtime`; machine-local specifics in
   `.agent/runtime.local.md`) → this unit RUNS the real adapter codepath live to PROVE them, closing the
@@ -282,8 +283,9 @@ argument).
   live results in `.agent/runtime.local.md` (machine-specific) + agnostic conclusions in memory `## Runtime`. CLOSE: record context-usage; mark DONE (M2 stays IN-PROGRESS).
   DONE: `tests/model_live.rs` (`#[ignore]`d, `cargo test -p ckc-cli --test model_live -- --ignored`) +
   `tests/fixtures/bounded_verdict.schema.json` (bounded enum+bool; in `tests/` not `schemas/` — test
-  artifact, not a route constraint). Live pass 80.87s/8-gen (output `{"verdict":"unknown","actionable":false}`
-  byte-stable + schema-valid, k-sample seed-pinned); fmt + clippy -D + `cargo test --workspace` green. 57% 114K/200K
+  artifact, not a route constraint). Live pass: cross-process SAME-seed byte-stable + schema-valid,
+  k-sample seed-pinned per-index-reproducible (machine-local timing/output → `runtime.local.md`); fmt +
+  clippy -D + `cargo test --workspace` green. 57% 114K/200K
 - [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's
   prompt + output as an `ArtifactWrapper` test-source artifact (tracked `corpus/test_sources/` class —
   origin `ai_generated`, evidence `evidence_discovery_only`, `prompt_template_hash` in the manifest),

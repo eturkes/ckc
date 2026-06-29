@@ -8,22 +8,29 @@
 //!
 //!   cargo test -p ckc-cli --test model_live -- --ignored
 //!
-//! Every assertion is ENGINE-AGNOSTIC — byte-stability, k-sample
-//! reproducibility, identity-parse, derived-seed values, and
-//! constraint-conformance — never a model-specific output VALUE (that stays
-//! model-dependent). Conformance is proven against a committed BOUNDED
-//! schema fixture (closed enum + bool, `additionalProperties:false`): a
-//! runtime that ignored `--constraint` would emit non-conforming bytes and
-//! FAIL here. The full `schemas/clinical_ir.schema.json` is deliberately not
-//! used — its free inter-token whitespace lets a weak greedy model
-//! degenerate into a truncated, invalid instance (the expected weak-baseline
-//! failure mode, recorded machine-locally), which would mask the mechanism
-//! check.
+//! Every assertion is ENGINE-AGNOSTIC — identity-parse, cross-process
+//! byte-stability, complete (EOF-gated) capture, SAME-seed reproducibility,
+//! pinned derived-seed values, and constraint-conformance — never a
+//! model-specific output VALUE (that stays model-dependent) and never a
+//! cross-seed coincidence: whether DISTINCT seeds diverge is the runtime's
+//! decoding mode (greedy converges, sampling diverges), out of the adapter's
+//! scope, so the test asserts only that the SAME seed reproduces. Conformance
+//! is checked against a committed BOUNDED schema fixture (closed enum + bool,
+//! `additionalProperties:false`): a free-running runtime that ignored
+//! `--constraint` would almost surely emit non-conforming bytes and fail
+//! here, so a pass is CONSISTENT WITH the constraint being honored
+//! end-to-end — necessary, not alone sufficient (a runtime emitting a fixed
+//! conforming object would also pass; the bounded schema makes accidental
+//! conformance unlikely for a free-running weak model). The full
+//! `schemas/clinical_ir.schema.json` is deliberately not used — its free
+//! inter-token whitespace lets a weak greedy model degenerate into a
+//! truncated, invalid instance (the expected weak-baseline failure mode,
+//! recorded machine-locally), which would mask the conformance check.
 
 use std::path::Path;
 use std::time::Duration;
 
-use ckc_cli::model::{ModelAdapter, ModelOutcome};
+use ckc_cli::model::{ModelAdapter, ModelOutcome, ModelRun};
 use serde_json::Value;
 
 /// Committed bounded-schema constraint: a closed `verdict` enum plus a bool,
@@ -55,6 +62,27 @@ const DERIVED_SEEDS_42: [u64; 3] = [
     2_949_826_092_126_892_291,
 ];
 
+/// Assert a run is a COMPLETE capture and return its bytes. A clean exit
+/// mints [`ModelOutcome::Completed`] only once stdout reached EOF, so a
+/// timeout, an unproven-complete capture, or a failure fails here rather than
+/// slipping a partial capture through a later bytes-only comparison. The
+/// adapter guarantees the `Completed { bytes }` payload equals the raw
+/// [`ModelRun::stdout_bytes`] on a clean EOF-gated exit (the cassette records
+/// those bytes) — assert that field-invariant too.
+fn completed_bytes(run: &ModelRun) -> &[u8] {
+    let ModelOutcome::Completed { bytes } = &run.outcome else {
+        panic!(
+            "expected a complete capture, got {:?}; stderr: {}",
+            run.outcome, run.stderr
+        );
+    };
+    assert_eq!(
+        bytes, &run.stdout_bytes,
+        "Completed payload must equal the raw stdout_bytes"
+    );
+    bytes
+}
+
 /// Drive the real runtime through the full adapter codepath and assert the
 /// §9 properties live: PATH-resolved construction with a parsed identity,
 /// byte-stable greedy generation across processes, a complete EOF-gated
@@ -63,6 +91,15 @@ const DERIVED_SEEDS_42: [u64; 3] = [
 #[test]
 #[ignore = "live: drives the env-supplied model runtime; run manually with --ignored"]
 fn live_adapter_end_to_end_through_env_runtime() {
+    // `ModelAdapter::new()` honors the `CKC_MODEL_COMMAND` override, which
+    // would resolve a DIFFERENT command and silently void the default
+    // bare-name PATH-resolution this test exists to cover. Require it unset
+    // or empty so the construction below truly exercises the default name.
+    assert!(
+        std::env::var("CKC_MODEL_COMMAND").map_or(true, |v| v.is_empty()),
+        "unset CKC_MODEL_COMMAND to exercise the adapter's default bare-name PATH resolution"
+    );
+
     // Construct over the DEFAULT bare command name resolved on PATH — the
     // live PATH-resolution path `.1` could only prove for an ABSENT command.
     // Construction succeeds only if the `--identity` probe parsed a complete
@@ -76,65 +113,66 @@ fn live_adapter_end_to_end_through_env_runtime() {
     );
 
     let constraint = Path::new(FIXTURE);
-
-    // Byte-stability: the same (prompt, constraint, seed) yields a complete,
-    // byte-identical capture across two separate processes — the greedy
-    // determinism the recorded-bytes cassette replays. A complete capture
-    // mints `Completed` (stdout reached EOF); a truncation or held pipe
-    // would surface as `CaptureIncomplete` and fail here.
-    let run1 = adapter.invoke(PROMPT, constraint, 42, BUDGET);
-    let run2 = adapter.invoke(PROMPT, constraint, 42, BUDGET);
-    let ModelOutcome::Completed { bytes } = run1.outcome.clone() else {
-        panic!(
-            "expected a complete capture, got {:?}; stderr: {}",
-            run1.outcome, run1.stderr
-        );
-    };
-    assert_eq!(
-        run2.stdout_bytes, run1.stdout_bytes,
-        "greedy output must be byte-stable across processes"
-    );
-
-    // Constraint-conformance: the constrained bytes parse as JSON and
-    // validate against the very schema fed as `--constraint`. This is the
-    // engine-side proof that the runtime honored the constraint end-to-end —
-    // NOT an assertion on which verdict it picked.
     let schema: Value =
         serde_json::from_slice(&std::fs::read(constraint).expect("fixture readable"))
             .expect("fixture is valid JSON");
     let validator = jsonschema::validator_for(&schema).expect("fixture compiles as a JSON Schema");
-    let instance: Value =
-        serde_json::from_slice(&bytes).expect("constrained output parses as JSON");
-    assert!(
-        validator.is_valid(&instance),
-        "constrained output must validate against the constraint schema; got {instance}"
-    );
+    // Conformance check reused for the single run and every sample. Parses
+    // the constrained bytes and validates them against the very schema fed as
+    // `--constraint`: a pass is CONSISTENT WITH the runtime honoring the
+    // constraint (see the module doc) — NOT an assertion on which verdict it
+    // picked.
+    let conforms = |bytes: &[u8]| {
+        let instance: Value =
+            serde_json::from_slice(bytes).expect("constrained output parses as JSON");
+        assert!(
+            validator.is_valid(&instance),
+            "constrained output must validate against the constraint schema; got {instance}"
+        );
+    };
 
-    // k-sample draw: reproducible from (base_seed, k), each sample seeded by
-    // `derive_seed` and a complete capture. Under greedy decoding the seed is
-    // inert, so every draw coincides with the single greedy output above —
-    // the strongest live proof of end-to-end determinism (a sampling runtime
-    // would diverge here, signalling the cassette assumption broke).
+    // Byte-stability: the SAME (prompt, constraint, seed) yields a complete,
+    // byte-identical capture across two separate processes — the determinism
+    // the recorded-bytes cassette replays (greedy, or any runtime that is
+    // deterministic given its seed). Each run is proven `Completed`, so a
+    // truncation or held pipe surfaces as a non-`Completed` outcome and fails
+    // rather than passing a bytes-only comparison on a partial capture.
+    let run1 = adapter.invoke(PROMPT, constraint, 42, BUDGET);
+    let run2 = adapter.invoke(PROMPT, constraint, 42, BUDGET);
+    let bytes1 = completed_bytes(&run1);
+    let bytes2 = completed_bytes(&run2);
+    assert_eq!(
+        bytes2, bytes1,
+        "the same seed must yield byte-identical output across processes"
+    );
+    conforms(bytes1);
+
+    // k-sample draw: reproducible from `(base_seed, k)`, each sample seeded by
+    // `derive_seed`, a complete capture, and conformant. Two draws are
+    // compared SAMPLE-WISE on (seed, completed bytes) — not by whole-`Vec`
+    // equality, which would also pin the diagnostic `stderr` and flake on any
+    // nondeterministic runtime logging. The reproduced equality is per-seed;
+    // the test does NOT require distinct seeds to coincide (greedy seed-
+    // inertness is environment-specific, recorded machine-locally).
     let draw_a = adapter.invoke_samples(PROMPT, constraint, 42, 3, BUDGET);
     let draw_b = adapter.invoke_samples(PROMPT, constraint, 42, 3, BUDGET);
-    assert_eq!(
-        draw_a, draw_b,
-        "k-sample draw must reproduce from the same (base_seed, k)"
-    );
     assert_eq!(draw_a.len(), 3, "k == 3 yields three recorded samples");
-    for (i, sample) in draw_a.iter().enumerate() {
+    assert_eq!(draw_b.len(), 3, "k == 3 yields three recorded samples");
+    for (i, (sa, sb)) in draw_a.iter().zip(draw_b.iter()).enumerate() {
         assert_eq!(
-            sample.seed, DERIVED_SEEDS_42[i],
+            sa.seed, DERIVED_SEEDS_42[i],
             "sample {i} must carry its derive_seed(42, {i}) seed"
         );
-        assert!(
-            matches!(sample.run.outcome, ModelOutcome::Completed { .. }),
-            "sample {i} must be a complete capture, got {:?}",
-            sample.run.outcome
-        );
         assert_eq!(
-            sample.run.stdout_bytes, bytes,
-            "greedy is seed-inert: sample {i} must equal the single greedy output"
+            sb.seed, sa.seed,
+            "sample {i} seed must reproduce across draws"
         );
+        let sa_bytes = completed_bytes(&sa.run);
+        let sb_bytes = completed_bytes(&sb.run);
+        assert_eq!(
+            sb_bytes, sa_bytes,
+            "sample {i} must reproduce byte-identically from the same (base_seed, k)"
+        );
+        conforms(sa_bytes);
     }
 }
