@@ -67,8 +67,10 @@ impl CassetteStore {
         Self { root: root.into() }
     }
 
-    /// Path of the cassette for `key`, relative to the store root. Route and source
-    /// are grammatical [`Id`]s (no `/` or `..`), so the components are path-safe.
+    /// Path of the cassette for `key`, relative to the store root. Route and
+    /// source are grammatical [`Id`]s — `[a-z][a-z0-9_.:-]*` excludes `/` and is
+    /// never `.`/`..`, so each is one non-escaping path component (a `:` keeps
+    /// this Unix-only, where the store runs).
     fn relative_path(key: &CassetteKey) -> PathBuf {
         PathBuf::from("cassettes")
             .join(key.route.as_str())
@@ -92,9 +94,10 @@ impl CassetteStore {
     /// Record a live model call and write the cassette, returning the disk-read-back
     /// wrapper. Requires the runtime (via `adapter`).
     ///
-    /// `constraint_hash` seals the exact constraint bytes this recorder reads; the
-    /// committed constraint file is assumed stable across the call (a committed input,
-    /// not a concurrently-mutated path).
+    /// `constraint_hash` seals the exact constraint bytes this recorder reads; a
+    /// re-read after the call confirms the file held across it (else
+    /// [`CassetteError::ConstraintDrift`]), so the sealed hash attests the bytes the
+    /// runtime actually decoded against.
     pub fn record(
         &self,
         adapter: &ModelAdapter,
@@ -111,6 +114,13 @@ impl CassetteStore {
             ModelOutcome::Completed { bytes } => bytes,
             other => return Err(CassetteError::Incomplete(format!("{other:?}"))),
         };
+        // The runtime re-opened `constraint` by path; confirm the bytes held across
+        // the call so `constraint_hash` attests exactly what the model decoded
+        // against. Re-read rather than relocate the file — a snapshot copy would
+        // break a constraint's relative `$ref`s.
+        if std::fs::read(constraint).map_err(CassetteError::Io)? != constraint_bytes {
+            return Err(CassetteError::ConstraintDrift);
+        }
 
         let payload = CassettePayload::from_output(
             key.route.clone(),
@@ -126,6 +136,23 @@ impl CassetteStore {
         self.persist(key, wrapper)
     }
 
+    /// The cassette's derived §4.4 `artifact_id` for `key`. The (route, source,
+    /// seed) triple is the identity — realized collision-free by the on-disk path
+    /// and the payload's own fields, which `load` anchors on. This id is a derived
+    /// human label, not a uniqueness key: dotted route/source ids run together
+    /// (`a.b`+`c` and `a`+`b.c` share a label), so downstream keys on the
+    /// triple/path, never on this string.
+    fn artifact_id(key: &CassetteKey) -> Result<Id, CassetteError> {
+        format!(
+            "model_cassette.{}.{}.seed-{}",
+            key.route.as_str(),
+            key.source.as_str(),
+            key.seed
+        )
+        .parse::<Id>()
+        .map_err(|_| CassetteError::DerivedId)
+    }
+
     /// Wrap a payload as the §4.4 cassette artifact (origin `ai_generated`, evidence
     /// `evidence_discovery_only`, effect `ai`) and confirm it validates.
     fn build_wrapper(
@@ -134,14 +161,7 @@ impl CassetteStore {
         payload: CassettePayload,
         producer: Producer,
     ) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
-        let artifact_id = format!(
-            "model_cassette.{}.{}.seed-{}",
-            key.route.as_str(),
-            key.source.as_str(),
-            key.seed
-        )
-        .parse::<Id>()
-        .map_err(|_| CassetteError::DerivedId)?;
+        let artifact_id = Self::artifact_id(key)?;
         let content_hash = content_hash(&payload).map_err(CassetteError::Emit)?;
         let wrapper = ArtifactWrapper {
             schema_id: static_id("schema.model_cassette"),
@@ -179,9 +199,42 @@ impl CassetteStore {
         self.load(key)
     }
 
-    /// Read, parse, validate, key-check, and confirm the payload's `output_hex`
-    /// decodes — a committed cassette that fails any check is rejected here, not
-    /// deferred to the point of use.
+    /// Enforce the fixed §4.4 cassette metadata `build_wrapper` stamps. `validate`
+    /// covers only the two hash fields and the effect/evidence rule, so a committed
+    /// cassette that lies about its schema/kind/id/provenance would otherwise load
+    /// clean and mislead a downstream consumer — reject it here instead, naming the
+    /// off-contract field.
+    fn check_contract(
+        key: &CassetteKey,
+        wrapper: &ArtifactWrapper<CassettePayload>,
+    ) -> Result<(), CassetteError> {
+        let off = if wrapper.schema_id != static_id("schema.model_cassette") {
+            Some("schema_id")
+        } else if wrapper.artifact_kind != static_id("model_cassette") {
+            Some("artifact_kind")
+        } else if wrapper.artifact_id != Self::artifact_id(key)? {
+            Some("artifact_id")
+        } else if wrapper.origin != Origin::AiGenerated {
+            Some("origin")
+        } else if wrapper.evidence_status != EvidenceStatus::EvidenceDiscoveryOnly {
+            Some("evidence_status")
+        } else if wrapper.external_effects.len() != 1 || wrapper.external_effects[0] != Effect::Ai {
+            Some("external_effects")
+        } else if !wrapper.input_hashes.is_empty() {
+            Some("input_hashes")
+        } else {
+            None
+        };
+        match off {
+            Some(field) => Err(CassetteError::Contract(field)),
+            None => Ok(()),
+        }
+    }
+
+    /// Read, parse, validate, key-check, contract-check (the fixed §4.4 cassette
+    /// provenance fields), and confirm the payload's `output_hex` decodes — a
+    /// committed cassette that fails any check is rejected here, not deferred to
+    /// the point of use.
     fn load(&self, key: &CassetteKey) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
         let bytes = std::fs::read(self.path_for(key)).map_err(CassetteError::Io)?;
         let wrapper: ArtifactWrapper<CassettePayload> =
@@ -193,6 +246,7 @@ impl CassetteStore {
         {
             return Err(CassetteError::KeyMismatch);
         }
+        Self::check_contract(key, &wrapper)?;
         wrapper
             .payload
             .output_bytes()
@@ -214,8 +268,14 @@ pub enum CassetteError {
     Wrapper(WrapperError),
     /// The live recording did not return a clean `Completed` output.
     Incomplete(String),
+    /// The constraint file changed between the pre-read and the runtime call, so the
+    /// sealed `constraint_hash` would not attest the bytes the model read.
+    ConstraintDrift,
     /// The cassette at the keyed path records a different (route, source, seed).
     KeyMismatch,
+    /// A committed cassette violates the fixed §4.4 cassette contract; the field
+    /// names the off-contract wrapper member (`origin`, `schema_id`, …).
+    Contract(&'static str),
     /// The cassette payload's `output_hex` is not decodable lowercase hex.
     InvalidHex,
     /// The derived cassette artifact id is not a grammatical [`Id`] (defensive).
@@ -230,7 +290,11 @@ impl std::fmt::Display for CassetteError {
             CassetteError::Emit(e) => write!(f, "cassette emit: {e}"),
             CassetteError::Wrapper(e) => write!(f, "cassette wrapper invalid: {e}"),
             CassetteError::Incomplete(o) => write!(f, "recording incomplete: {o}"),
+            CassetteError::ConstraintDrift => {
+                f.write_str("constraint file changed during recording")
+            }
             CassetteError::KeyMismatch => f.write_str("cassette key mismatch at path"),
+            CassetteError::Contract(field) => write!(f, "cassette off-contract: {field}"),
             CassetteError::InvalidHex => f.write_str("cassette output_hex is not decodable hex"),
             CassetteError::DerivedId => f.write_str("derived cassette id is not grammatical"),
         }
@@ -356,6 +420,30 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, &bytes).unwrap();
         assert!(matches!(store.replay(&k), Err(CassetteError::InvalidHex)));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // A committed cassette that lies about its §4.4 provenance (here `origin`,
+    // though it stays internally consistent → `validate` passes) is rejected at
+    // load by the contract check, not trusted downstream.
+    #[test]
+    fn off_contract_rejected() {
+        let dir = temp_dir("contract");
+        let store = CassetteStore::new(&dir);
+        let k = key();
+        let mut wrapper = store
+            .build_wrapper(&k, payload_for(&k, b"x"), producer())
+            .unwrap();
+        wrapper.origin = Origin::DeterministicCompiler; // not a recording; content_hash unaffected
+        wrapper.validate().unwrap(); // still internally consistent — the gap validate misses
+        let bytes = canonical_payload_bytes(&wrapper).unwrap();
+        let path = store.path_for(&k);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(matches!(
+            store.replay(&k),
+            Err(CassetteError::Contract("origin"))
+        ));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
