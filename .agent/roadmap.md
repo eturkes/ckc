@@ -175,25 +175,45 @@ argument).
   findings via Display → no `registry_check.rs` change); `run.rs` executes the single `baseline()` + records
   `pipelines: [baseline]`, behavior-locked to M1 (run-m2.1 completes the multi-route loop); SPEC §14 ledger
   amended, §8.4 left M1-singular (no §14 byte-pin).] 66% 131K/200K
-- [ ] run-refactor: behavior-locked per-group back-end extraction (per-group scope, user-confirmed
-  — `git show` this respec commit for the rejected per-doc/full-tail alternatives + rationale).
-  Extract `ckc-cli` `run.rs` `group_pipeline`'s compile→verify body (SPEC §9 "compile→verify back
-  end") into a reusable fn keyed on the member IrBundles — contract `compile_verify_group(group_id:
-  &Id, members: &[&ArtifactWrapper<IrBundle>], resolved: &Resolved, adapter: &Z3Adapter, shell: &mut
-  Shell) -> GroupTrace` (fit the exact sig — incl. stage-clock/trace threading — to the read code;
-  the contract is the spec, not byte-exact). `group_pipeline` keeps building `members` from `docs`
-  (the DocTrace lookup + member-missing early-return) then delegates; M2 `route.single_ir` later
-  feeds its own validated bundles to the same fn. Boundary: move `inputs`(~L487) through
-  `trace.compiled = Some(compiled)`(~L563) into the new fn; setup + member-build (~L443-486) stay.
-  NO re-derivation — members already carry `formal`/`norm` (compile reads `m.payload.formal`/`.norm`
-  unchanged), identical code path → byte-identical artifacts. Per-doc derive fns
-  (`derive_norm_ir`/`assemble`/`FormalIr::derive`, already pub) are OUT of scope: route units compose
-  them directly. Reading: ONLY `run.rs` `group_pipeline` (~L443-563) + `finish_processing_stage`
-  (~L1019-1045) + `GroupTrace` def (`trace.rs`, to fix the return shape) — nothing else (per-doc fns + ckc-smt `emit`/`verdict` sigs untouched). Gate: `cargo
-  test --workspace` green, ZERO test edits; behavior-lock = `cli_shell.rs` `events.len()==19` +
-  `run_oracle.rs` §8.6 compiled-body pins (Q1/Q2) + `assert_group_matches_reference` (no
-  compile/verify event-shape pin exists → this is a pure method-move). [Refactor-first rule: share
-  internals before the route feature. Per-doc head/derive sharing deferred to the route units.]
+- [ ] run-refactor: behavior-locked per-group back-end extraction into a private `run.rs` fn
+  `compile_verify_group` (per-group scope, user-confirmed — `git show 93953c4` for the rejected
+  per-doc/full-tail alternatives + rationale). Extract `ckc-cli` `run.rs` `group_pipeline`'s
+  compile→verify body (SPEC §9 "compile→verify back end") so a later `route.single_ir` can feed its
+  own validated bundles to the same back end (route-side `Resolved`/producer wiring is THAT unit's
+  job — refactor-first: share internals now). PINNED SIGNATURE (complete — no threading left to
+  derive): `fn compile_verify_group(group_id: &Id, members: &[&ArtifactWrapper<IrBundle>], clock:
+  ProcessingStageClock, resolved: &Resolved, adapter: &Z3Adapter, shell: &mut Shell) ->
+  (Option<ArtifactWrapper<CompiledArtifact>>, Option<ArtifactWrapper<VerifierResults>>)` — a private
+  `fn` (only `group_pipeline` calls it now; a route unit widens visibility if it lands in another
+  module). BODY = the current `let inputs`(~L487) → verify-landing block verbatim, plus: (a) at the
+  helper top add `let gid = group_id; let dir = format!("groups/{gid}");` so the moved body's
+  `gid`/`dir` refs stay verbatim — `dir` then becomes unused in the caller, delete it there (~L451,
+  else clippy `-D warnings`); (b) the compile-fail early-return becomes `return (None, None);`; (c)
+  the tail returns `(Some(compiled), verifier_results)` where `verifier_results` is the VERIFY
+  `finish_processing_stage` result — drop the two `trace.* =` writes. The mid-body VERIFY
+  `let clock = processing_stage_clock();`(~L524) stays inside, shadowing the `clock` param exactly as
+  today. CALLER (`group_pipeline`) is unchanged through member-build, then: `let (compiled,
+  verifier_results) = compile_verify_group(gid, &members, clock, resolved, adapter, shell);
+  trace.compiled = compiled; trace.verifier_results = verifier_results; trace`. KEEP in the caller:
+  the `trace` build (with `test_sources`), the COMPILE `clock` creation (~L459, before member-build),
+  and the member-build loop incl. the member-missing `finish_processing_stage(COMPILE, clock, …)` +
+  `return trace`; `clock` moves into EITHER that missing-arm finish OR the helper (mutually exclusive
+  — the missing arm returns — so it compiles exactly as today). Pass the SAME compile clock (do not
+  recreate it) so the compile event's `started_at` is identical → timing-identical, not merely
+  artifact-identical. WHY PURE: same `finish_processing_stage` calls, same order, same args → same
+  events + same artifacts; NO re-derivation (`compile` reads `m.payload.formal`/`.norm` unchanged).
+  The gate PINS {`cli_shell.rs` `events.len()==19`; `run_oracle.rs` all-outcomes-Ok + §8.6
+  compiled-body pins (Q1/Q2) + `assert_group_matches_reference`; lineage/trace hashes} but NOT
+  compile/verify event FIELD shape (input_hashes/output_hashes/resource_counters) → correctness there
+  rests on the relocation staying literal (args unchanged), so make no field edits. Per-doc derive
+  fns (`derive_norm_ir`/`assemble`/`FormalIr::derive`, already pub) are OUT: route units compose them
+  directly. READING: ONLY `run.rs` `group_pipeline` (~L443-565) + `finish_processing_stage`
+  (~L1019-1045); `GroupTrace` = `{ group_id: Id, test_sources: Vec<Id>, compiled:
+  Option<ArtifactWrapper<CompiledArtifact>>, verifier_results: Option<ArtifactWrapper<VerifierResults>>
+  }` (inlined here — skip `trace.rs`); per-doc fns + ckc-smt `emit`/`verdict` sigs untouched. Gate:
+  `cargo test --workspace` + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
+  warnings` green, ZERO test edits. [Refactor-first rule: share internals before the route feature;
+  per-doc head/derive sharing deferred to the route units.]
 - [ ] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
   adapter module mirroring `verify.rs` `Z3Adapter`: `ModelAdapter::with_command(name)` resolves a
   BARE command name on PATH (Z3 precedent — `Z3Adapter` runs `z3` by bare name, no literal path / no
