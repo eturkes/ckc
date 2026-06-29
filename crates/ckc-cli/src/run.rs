@@ -448,7 +448,6 @@ fn group_pipeline(
     shell: &mut Shell,
 ) -> GroupTrace {
     let gid = &group.group_id;
-    let dir = format!("groups/{gid}");
     let mut trace = GroupTrace {
         group_id: gid.clone(),
         test_sources: group.test_sources.clone(),
@@ -484,6 +483,31 @@ fn group_pipeline(
             }
         }
     }
+    let (compiled, verifier_results) =
+        compile_verify_group(gid, &members, clock, resolved, adapter, shell);
+    trace.compiled = compiled;
+    trace.verifier_results = verifier_results;
+    trace
+}
+
+/// The compile → verify back end over a group's member [`IrBundle`]s, split
+/// from [`group_pipeline`] so a route stage can feed its own validated
+/// bundles. Reuses the caller's `clock` for the compile event (timing-identical
+/// to the inline form), opens a fresh clock for verify. Each tuple slot is
+/// `None` on that processing_stage's failure; a compile failure skips verify.
+fn compile_verify_group(
+    group_id: &Id,
+    members: &[&ArtifactWrapper<IrBundle>],
+    clock: ProcessingStageClock,
+    resolved: &Resolved,
+    adapter: &Z3Adapter,
+    shell: &mut Shell,
+) -> (
+    Option<ArtifactWrapper<ckc_smt::CompiledArtifact>>,
+    Option<ArtifactWrapper<VerifierResults>>,
+) {
+    let gid = group_id;
+    let dir = format!("groups/{gid}");
     let inputs: Vec<Hash> = members.iter().map(|m| m.content_hash.clone()).collect();
 
     let artifact = compile(
@@ -518,7 +542,7 @@ fn group_pipeline(
         });
     let Some(compiled) = finish_processing_stage(shell, resolved, COMPILE, clock, inputs, landed)
     else {
-        return trace;
+        return (None, None);
     };
 
     let clock = processing_stage_clock();
@@ -552,7 +576,7 @@ fn group_pipeline(
             .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, e.to_string()))
         });
     let landed = built.and_then(|env| land(shell, &format!("{dir}/verifier_results.json"), env));
-    trace.verifier_results = finish_processing_stage(
+    let verifier_results = finish_processing_stage(
         shell,
         resolved,
         VERIFY,
@@ -560,8 +584,7 @@ fn group_pipeline(
         vec![compiled.content_hash.clone()],
         landed,
     );
-    trace.compiled = Some(compiled);
-    trace
+    (Some(compiled), verifier_results)
 }
 
 /// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1

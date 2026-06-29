@@ -175,7 +175,7 @@ argument).
   findings via Display → no `registry_check.rs` change); `run.rs` executes the single `baseline()` + records
   `pipelines: [baseline]`, behavior-locked to M1 (run-m2.1 completes the multi-route loop); SPEC §14 ledger
   amended, §8.4 left M1-singular (no §14 byte-pin).] 66% 131K/200K
-- [ ] run-refactor: behavior-locked per-group back-end extraction into a private `run.rs` fn
+- [x] run-refactor: behavior-locked per-group back-end extraction into a private `run.rs` fn
   `compile_verify_group` (per-group scope, user-confirmed — `git show 93953c4` for the rejected
   per-doc/full-tail alternatives + rationale). Extract `ckc-cli` `run.rs` `group_pipeline`'s
   compile→verify body (SPEC §9 "compile→verify back end") so a later `route.single_ir` can feed its
@@ -214,6 +214,11 @@ argument).
   `cargo test --workspace` + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
   warnings` green, ZERO test edits. [Refactor-first rule: share internals before the route feature;
   per-doc head/derive sharing deferred to the route units.]
+  [Done: literal relocation — `compile_verify_group` private fn placed after `group_pipeline`, body
+  verbatim (git diff shows the moved block as context; only the 4 pinned boundary changes diffed:
+  removed caller `dir`, delegation call, compile-fail `return (None, None)`, tuple tail); return type
+  spells `ckc_smt::CompiledArtifact` qualified to match the file's non-test convention (no new import).
+  Behavior-lock held with zero test edits: 392 passed / 1 ignored, fmt + clippy clean.] 40% 80K/200K
 - [ ] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
   adapter module mirroring `verify.rs` `Z3Adapter`: `ModelAdapter::with_command(name)` resolves a
   BARE command name on PATH (Z3 precedent — `Z3Adapter` runs `z3` by bare name, no literal path / no
