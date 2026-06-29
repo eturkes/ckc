@@ -72,7 +72,9 @@ impl Canonical for CassettePayload {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         // Members in ascending key byte order (the reader is positional, §4.3).
         let mut obj = ObjectEmitter::new();
-        obj.member("constraint_hash", |b| self.constraint_hash.emit_canonical(b))?;
+        obj.member("constraint_hash", |b| {
+            self.constraint_hash.emit_canonical(b)
+        })?;
         obj.member("model_identity", |b| self.model_identity.emit_canonical(b))?;
         obj.member("output_hex", |b| {
             RawText(self.output_hex.clone()).emit_canonical(b)

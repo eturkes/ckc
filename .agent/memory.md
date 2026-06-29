@@ -70,7 +70,8 @@ full pre-consolidation text lives in git history.
   transcription-with-verification still beating re-derivation (recovery also verifies the draft's external assumptions —
   referenced types/APIs/field names — against source, making the salvage an assumption-verified target
   not a blind preserve; a whole-NEW-file draft salvages as a byte-verified `.rs.txt` copy not a
-  diff, dodging RTK diff-compression + LSP indexing; a unit that overflows on DERIVATION not
+  diff, dodging RTK diff-compression + LSP indexing (pre-format the salvage — rustfmt reflows an
+  unformatted draft, so a byte-exact restore fails `cargo fmt --check` otherwise); a unit that overflows on DERIVATION not
   implementation (SOTA notation/tool selection + empirical external-crate validation, e.g.
   schemas-export.2's BNF + `bnf`-crate pick) salvages the same way — the redo line banks the LOCKED
   decision, the validated + hashed artifact (any committed file → byte-exact `.agent/wip-<file>`, not

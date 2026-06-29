@@ -8,9 +8,10 @@
 //! byte-stable on a fixed runtime but not across environments, §9), so CI and other
 //! hosts replay the committed cassette rather than re-invoking the runtime.
 //!
-//! This is the store/IO layer; the §4.4 payload type lives in `ckc-core`. Cassettes are
-//! committed inputs under `corpus/test_sources/` (read via the filesystem, not the run
-//! shell, which writes only run-output artifacts).
+//! This is the store/IO layer; the §4.4 payload type lives in `ckc-core`. The cassette
+//! root is caller-selected; committed test cassettes live under
+//! `crates/ckc-cli/tests/fixtures/cassettes/<route>/<source>/seed-<seed>.json` (read via
+//! the filesystem, not the run shell, which writes only run-output artifacts).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -54,7 +55,7 @@ pub struct RecordContext {
     pub budget: Duration,
 }
 
-/// Reads and writes cassettes under a fixed root (e.g. `corpus/test_sources/`).
+/// Reads and writes cassettes under a caller-selected root (e.g. a test's `tests/fixtures`).
 #[derive(Debug, Clone)]
 pub struct CassetteStore {
     root: PathBuf,
@@ -81,12 +82,19 @@ impl CassetteStore {
     }
 
     /// Replay a committed cassette without invoking the runtime.
-    pub fn replay(&self, key: &CassetteKey) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+    pub fn replay(
+        &self,
+        key: &CassetteKey,
+    ) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
         self.load(key)
     }
 
     /// Record a live model call and write the cassette, returning the disk-read-back
     /// wrapper. Requires the runtime (via `adapter`).
+    ///
+    /// `constraint_hash` seals the exact constraint bytes this recorder reads; the
+    /// committed constraint file is assumed stable across the call (a committed input,
+    /// not a concurrently-mutated path).
     pub fn record(
         &self,
         adapter: &ModelAdapter,
@@ -171,7 +179,9 @@ impl CassetteStore {
         self.load(key)
     }
 
-    /// Read, parse, validate, and key-check the cassette for `key`.
+    /// Read, parse, validate, key-check, and confirm the payload's `output_hex`
+    /// decodes — a committed cassette that fails any check is rejected here, not
+    /// deferred to the point of use.
     fn load(&self, key: &CassetteKey) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
         let bytes = std::fs::read(self.path_for(key)).map_err(CassetteError::Io)?;
         let wrapper: ArtifactWrapper<CassettePayload> =
@@ -183,6 +193,10 @@ impl CassetteStore {
         {
             return Err(CassetteError::KeyMismatch);
         }
+        wrapper
+            .payload
+            .output_bytes()
+            .map_err(|_| CassetteError::InvalidHex)?;
         Ok(wrapper)
     }
 }
@@ -202,6 +216,8 @@ pub enum CassetteError {
     Incomplete(String),
     /// The cassette at the keyed path records a different (route, source, seed).
     KeyMismatch,
+    /// The cassette payload's `output_hex` is not decodable lowercase hex.
+    InvalidHex,
     /// The derived cassette artifact id is not a grammatical [`Id`] (defensive).
     DerivedId,
 }
@@ -215,6 +231,7 @@ impl std::fmt::Display for CassetteError {
             CassetteError::Wrapper(e) => write!(f, "cassette wrapper invalid: {e}"),
             CassetteError::Incomplete(o) => write!(f, "recording incomplete: {o}"),
             CassetteError::KeyMismatch => f.write_str("cassette key mismatch at path"),
+            CassetteError::InvalidHex => f.write_str("cassette output_hex is not decodable hex"),
             CassetteError::DerivedId => f.write_str("derived cassette id is not grammatical"),
         }
     }
@@ -279,9 +296,15 @@ mod tests {
         let replayed = store.replay(&k).unwrap();
         assert_eq!(written, replayed);
         assert_eq!(replayed.content_hash, wrapper.content_hash);
-        assert_eq!(replayed.payload.output_bytes().unwrap(), [0x00, 0xff, 0x7b, 0x0a]);
+        assert_eq!(
+            replayed.payload.output_bytes().unwrap(),
+            [0x00, 0xff, 0x7b, 0x0a]
+        );
         assert_eq!(replayed.origin, Origin::AiGenerated);
-        assert_eq!(replayed.evidence_status, EvidenceStatus::EvidenceDiscoveryOnly);
+        assert_eq!(
+            replayed.evidence_status,
+            EvidenceStatus::EvidenceDiscoveryOnly
+        );
         assert_eq!(replayed.external_effects, vec![Effect::Ai]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -310,7 +333,29 @@ mod tests {
         let path = store.path_for(&filed);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, &bytes).unwrap();
-        assert!(matches!(store.replay(&filed), Err(CassetteError::KeyMismatch)));
+        assert!(matches!(
+            store.replay(&filed),
+            Err(CassetteError::KeyMismatch)
+        ));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // A cassette whose `output_hex` is not decodable hex is rejected at load,
+    // not silently deferred to `output_bytes()` at the point of use. (Bytes are
+    // written directly so the malformed payload bypasses `persist`'s read-back.)
+    #[test]
+    fn malformed_hex_rejected() {
+        let dir = temp_dir("malformed");
+        let store = CassetteStore::new(&dir);
+        let k = key();
+        let mut payload = payload_for(&k, b"x");
+        payload.output_hex = "zz".to_owned();
+        let wrapper = store.build_wrapper(&k, payload, producer()).unwrap();
+        let bytes = canonical_payload_bytes(&wrapper).unwrap();
+        let path = store.path_for(&k);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(matches!(store.replay(&k), Err(CassetteError::InvalidHex)));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

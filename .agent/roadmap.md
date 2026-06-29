@@ -287,7 +287,7 @@ argument).
   k-sample seed-pinned per-index-reproducible (machine-local timing/output → `runtime.local.md`); fmt +
   clippy -D + `cargo test --workspace` green. 57% 114K/200K
 - [ ] model-cassette.1: §4.4/§9 cassette modules — payload + store (salvage-restore, mechanical, no
-  runtime). The two modules were authored + VERIFIED this session (compiled, 6 unit tests pass), reverted
+  runtime). The two modules were authored, VERIFIED, then codex-review-refined (compiled + 7 unit tests + fmt/clippy clean), reverted
   on overflow + salvaged byte-exact → restore: `cp .agent/wip-cassette-core.rs.txt crates/ckc-core/src/cassette.rs`
   (the §4.4 `CassettePayload` payload — Canonical/CanonRead + lowercase-hex codec) + `cp .agent/wip-cassette-cli.rs.txt
   crates/ckc-cli/src/cassette.rs` (the `CassetteStore` record/replay IO); wire `crates/ckc-core/src/lib.rs`
@@ -299,12 +299,12 @@ argument).
   bytes, never lossy-decoded — recorded bytes ARE the determinism); cassette = `ArtifactWrapper<CassettePayload>`
   origin `ai_generated`/evidence `evidence_discovery_only`/effect `ai`, keyed (route, source, seed) at
   `<root>/cassettes/<route>/<source>/seed-<seed>.json`, configurable root; `record` gated (runtime + clean
-  `Completed`), `replay` default (runtime-ABSENT); `load` validates + key-checks on read-back. Integration
+  `Completed`), `replay` default (runtime-ABSENT); `load` validates + key-checks + hex-decodes on read-back. Integration
   DEFERRED (no consumer until): stage-model-fill.1 drives record/replay, run-m2.1 the `--record` surface +
   replay.rs model-artifact coverage + §9 manifest `prompt_template_hash`. Reading: ONLY this line + the two
-  wip files. Gate: `cargo test --workspace` (6 unit tests pass runtime-absent — 3 payload round-trip/hex,
-  3 store replay/missing/key-mismatch) + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
-  warnings` (expect fmt-only nits on a `.rs.txt` restore). CLOSE: `rm .agent/wip-cassette-core.rs.txt
+  wip files. Gate: `cargo test --workspace` (7 unit tests pass runtime-absent — 3 payload round-trip/hex,
+  4 store replay/missing/key-mismatch/malformed-hex) + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
+  warnings` (salvage is fmt-clean → byte-exact restore passes fmt-check). CLOSE: `rm .agent/wip-cassette-core.rs.txt
   .agent/wip-cassette-cli.rs.txt` (both consumed here); record context-usage; mark DONE (M2 stays IN-PROGRESS).
 - [ ] model-cassette.2: committed test cassette via live bless + runtime-absent replay (the live unit,
   mirrors model-adapter.2b). Add `crates/ckc-cli/tests/model_cassette.rs` mirroring `tests/model_live.rs`:
@@ -323,7 +323,9 @@ argument).
   + the restored `cassette.rs` store API + memory `## Runtime`. Gate: `cargo test --workspace` + fmt +
   clippy green (the `#[ignore]`d bless compiles, the replay test runs runtime-absent). LIVE: `cargo test
   -p ckc-cli --test model_cassette record_cassette -- --ignored` records against the env command → commit
-  the cassette → re-pin `CASSETTE_HASH` from `sha256sum` → `cargo test` green. CLOSE: record context-usage;
+  the cassette → re-pin `CASSETTE_HASH` from the recorded wrapper's `content_hash` field (`jq -r
+  .content_hash <cassette>` — the §4.4 payload-canonical hash the test compares, NOT the file-byte
+  `sha256sum`) → `cargo test` green. CLOSE: record context-usage;
   mark DONE (M2 stays IN-PROGRESS).
 - [ ] stage-model-fill.1: model-fill processing stage — core (generic over target). New stage kind
   `model_fill`: invoke the model through `CassetteStore` (default = replay the committed cassette
@@ -408,7 +410,9 @@ argument).
   pipelines now exist, so `ckc registry check` validates the full experiment. Wire `run.rs` to execute
   both route pipelines under one experiment run → per-route `model_fill` → scoring → metrics →
   `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests (populating the
-  model/prompt/identity hash fields), over the locked M1 inputs. Tested via REPLAY of the route units'
+  model/prompt/identity hash fields), over the locked M1 inputs. Add the `ckc run --record` flag (default
+  = replay committed cassettes runtime-absent; `--record` drives `CassetteStore::record` live — run-m2.2
+  exercises that live path) + its default-replay acceptance. Tested via REPLAY of the route units'
   committed cassettes (deterministic, no live call) — model-fill replays runtime-absent, so replay.rs
   hash-compare covers the model-stage artifacts. Reading: `run.rs` execute (route loop), the
   routes, metrics, report, manifests; `registry/experiments.yaml`; SPEC §1 command, §9. Gate:
