@@ -17,8 +17,8 @@ use std::path::Path;
 
 use ckc_core::{
     DiagnosticCode, DiagnosticRecord, Id, Outcome, ReferenceEntry, RegistryError, hash_bytes,
-    parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
-    parse_schemas, validate_model_registry, validate_registries,
+    is_safe_relative_path, parse_candidates, parse_corpora, parse_experiments, parse_prompts,
+    parse_reference, parse_schemas, validate_model_registry, validate_registries,
 };
 
 use crate::shell::{Shell, static_id};
@@ -91,8 +91,8 @@ fn check_model_registry(root: &Path, shell: &mut Shell) {
     }
 
     for schema in &schemas {
-        if schema.path.is_empty() {
-            continue; // Empty path is a finding above; nothing to read.
+        if schema.path.is_empty() || !is_safe_relative_path(&schema.path) {
+            continue; // Empty / unsafe path is a finding above; never read it.
         }
         let path = root.join(&schema.path);
         match std::fs::read(&path) {
@@ -494,5 +494,92 @@ processing_stages:
         let (result, diagnostics) = model_checked(root);
         assert_eq!(result.outcome, Outcome::Invalid);
         assert_reported(&diagnostics, "duplicate schemas id schema.dup");
+    }
+
+    // An unsafe schema path (absolute or `..`-escaping) is reported as a
+    // finding and never read: exactly one diagnostic, so no read of the
+    // out-of-tree target was attempted (that would add a second).
+    #[test]
+    fn unsafe_schema_path_reported_not_read() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let good = hash_bytes(b"x\n");
+        write(
+            root,
+            SCHEMAS_FILE,
+            &format!(
+                "\
+- id: schema.escape
+  path: ../escape.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+"
+            ),
+        );
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 1);
+        assert_reported(&diagnostics, "schema.escape");
+        assert_reported(&diagnostics, "not a safe repo-relative path");
+    }
+
+    // The optional prompts file is validated too: a prompt naming both a path
+    // and inline body surfaces its PromptSource finding through the CLI.
+    #[test]
+    fn prompt_source_finding_reported() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write(
+            root,
+            PROMPTS_FILE,
+            "\
+- id: prompt.both
+  path: registry/prompts/x.txt
+  inline: \"inline body\"
+  template_hash: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  route: route.single_ir
+",
+        );
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_reported(
+            &diagnostics,
+            "prompt prompt.both: set exactly one of path or inline",
+        );
+    }
+
+    // The hash-mismatch diagnostic carries exactly the sorted-key payload
+    // [actual, expected, schema] — the row order the shell folds on.
+    #[test]
+    fn mismatch_diagnostic_payload_is_sorted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let pinned = hash_bytes(b"pinned\n");
+        write(
+            root,
+            SCHEMAS_FILE,
+            &format!(
+                "\
+- id: schema.x
+  path: schemas/x.json
+  schema_hash: {pinned}
+  target_kind: clinical_ir
+"
+            ),
+        );
+        write(root, "schemas/x.json", "actual\n");
+        let (_, diagnostics) = model_checked(root);
+        let actual = hash_bytes(b"actual\n");
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|d| d.payload.clone())
+                .collect::<Vec<_>>(),
+            vec![vec![
+                (static_id("actual"), actual.to_string()),
+                (static_id("expected"), pinned.to_string()),
+                (static_id("schema"), "schema.x".to_string()),
+            ]]
+        );
     }
 }

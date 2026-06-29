@@ -33,12 +33,15 @@
 //!   reference, coherence, and re-derivation invariants.
 //! - `plans` — §5/§4.6 run records [`RunPlan`] ([`RunPlan::plan_hash`]),
 //!   [`RunManifest`], [`ReplayManifest`], [`SolverIdentity`], [`ModelIdentity`].
-//! - `registry` — §8.4 registries + §8.2 reference, strict-loaded
-//!   ([`parse_corpora`], [`parse_candidates`], [`parse_experiments`],
-//!   [`parse_reference`]; [`CorpusEntry`], [`Candidates`], [`PipelineEntry`],
-//!   [`ProcessingStageEntry`], [`ExperimentEntry`], [`TestSourceGroup`], [`ReferenceEntry`])
-//!   and cross-validated as one set ([`validate_registries`] collecting
-//!   [`RegistryFinding`]s: uniqueness, resolution, the stage-chain rule).
+//! - `registry` — §8.4 registries + §8.2 reference + §14 model surface,
+//!   strict-loaded ([`parse_corpora`], [`parse_candidates`],
+//!   [`parse_experiments`], [`parse_reference`], [`parse_schemas`],
+//!   [`parse_prompts`]; [`CorpusEntry`], [`Candidates`], [`PipelineEntry`],
+//!   [`ProcessingStageEntry`], [`ExperimentEntry`], [`TestSourceGroup`],
+//!   [`ReferenceEntry`], [`SchemaEntry`], [`PromptEntry`]) and cross-validated
+//!   ([`validate_registries`] for §8.4, [`validate_model_registry`] for the §14
+//!   set over [`is_safe_relative_path`]) collecting [`RegistryFinding`]s:
+//!   uniqueness, resolution, the stage-chain rule, prompt source, path safety.
 #![forbid(unsafe_code)]
 
 mod bundle;
@@ -81,8 +84,8 @@ pub use plans::{ModelIdentity, ReplayManifest, RunManifest, RunPlan, SolverIdent
 pub use registry::{
     Candidates, CorpusEntry, Determinism, ExperimentEntry, PipelineEntry, ProcessingStageEntry,
     PromptEntry, ReferenceEntry, RegistryError, RegistryFinding, SchemaEntry, TestSourceGroup,
-    parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
-    parse_schemas, to_yaml, validate_model_registry, validate_registries,
+    is_safe_relative_path, parse_candidates, parse_corpora, parse_experiments, parse_prompts,
+    parse_reference, parse_schemas, to_yaml, validate_model_registry, validate_registries,
 };
 pub use source_linkage::{
     AnchorKind, DataClass, EvidenceRegion, NodeKind, Provenance, RefKind, SourceAnchor,

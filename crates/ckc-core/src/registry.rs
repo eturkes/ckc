@@ -251,10 +251,10 @@ pub fn parse_prompts(yaml: &str) -> Result<Vec<PromptEntry>, RegistryError> {
     from_yaml(yaml)
 }
 
-/// One finding from [`validate_registries`]. Validation collects every
-/// finding rather than failing fast so `ckc registry check` reports the
-/// whole set (findings map to §7.4 `schema_invalid` diagnostics at the CLI
-/// layer).
+/// One finding from [`validate_registries`] or [`validate_model_registry`].
+/// Validation collects every finding rather than failing fast so `ckc
+/// registry check` reports the whole set (findings map to §7.4
+/// `schema_invalid` diagnostics at the CLI layer).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegistryFinding {
     /// Two entries in one registry pool share an id.
@@ -286,6 +286,14 @@ pub enum RegistryFinding {
     /// A prompt entry does not name exactly one nonempty source (`path` xor
     /// `inline`).
     PromptSource { prompt: Id },
+    /// A registry file path is not a safe repo-relative path — absolute, or a
+    /// `.`/`..` component. `registry check` joins it on the repo root, so an
+    /// unsafe path could read outside the committed tree.
+    UnsafePath {
+        entry: Id,
+        field: &'static str,
+        path: String,
+    },
 }
 
 impl fmt::Display for RegistryFinding {
@@ -332,6 +340,10 @@ impl fmt::Display for RegistryFinding {
             RegistryFinding::PromptSource { prompt } => {
                 write!(f, "prompt {prompt}: set exactly one of path or inline")
             }
+            RegistryFinding::UnsafePath { entry, field, path } => write!(
+                f,
+                "{entry}: {field} {path:?} is not a safe repo-relative path"
+            ),
         }
     }
 }
@@ -514,6 +526,17 @@ pub fn validate_registries(
     findings
 }
 
+/// A registry file path is safe iff it is a nonempty repo-relative path of
+/// only normal components — no absolute root and no `.`/`..` that could read
+/// outside the committed tree when `registry check` joins it on the repo root.
+pub fn is_safe_relative_path(path: &str) -> bool {
+    use std::path::{Component, Path};
+    !path.is_empty()
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+}
+
 /// Validate the §14 model-registry surface (M2): `registry/schemas.yaml` and
 /// `registry/prompts.yaml`. A pure pass — id uniqueness per pool, a nonempty
 /// schema `path`, and each prompt naming exactly one nonempty source (`path`
@@ -535,13 +558,27 @@ pub fn validate_model_registry(
                 entry: schema.id.clone(),
                 field: "path",
             });
+        } else if !is_safe_relative_path(&schema.path) {
+            findings.push(RegistryFinding::UnsafePath {
+                entry: schema.id.clone(),
+                field: "path",
+                path: schema.path.clone(),
+            });
         }
     }
 
     note_duplicates(prompts.iter().map(|p| &p.id), "prompts", &mut findings);
     for prompt in prompts {
         match (&prompt.path, &prompt.inline) {
-            (Some(path), None) if !path.is_empty() => {}
+            (Some(path), None) if !path.is_empty() => {
+                if !is_safe_relative_path(path) {
+                    findings.push(RegistryFinding::UnsafePath {
+                        entry: prompt.id.clone(),
+                        field: "path",
+                        path: path.clone(),
+                    });
+                }
+            }
             (None, Some(inline)) if !inline.is_empty() => {}
             (Some(_), None) => findings.push(RegistryFinding::Empty {
                 entry: prompt.id.clone(),
@@ -638,16 +675,17 @@ processing_stages:
   expected_no_conflict_result: true
 ";
 
-    // §14 model surface: the committed schema entries (real `schemas/` hashes,
-    // mirroring `registry/schemas.yaml`).
+    // §14 model surface: schema entries with synthetic hashes — the loader and
+    // validator ignore hash values; the CLI committed_model_surface_checks_ok
+    // test pins the real `schemas/` bytes against `registry/schemas.yaml`.
     const SCHEMAS: &str = "\
 - id: schema.clinical_ir
   path: schemas/clinical_ir.schema.json
-  schema_hash: sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0
+  schema_hash: sha256:2222222222222222222222222222222222222222222222222222222222222222
   target_kind: clinical_ir
 - id: schema.smt_query
   path: schemas/smt_query.grammar
-  schema_hash: sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e
+  schema_hash: sha256:3333333333333333333333333333333333333333333333333333333333333333
   target_kind: smt_query
 ";
 
@@ -776,7 +814,7 @@ processing_stages:
         assert_eq!(schemas[0].target_kind, id("clinical_ir"));
         assert_eq!(
             schemas[0].schema_hash,
-            Hash::new("sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0")
+            Hash::new("sha256:2222222222222222222222222222222222222222222222222222222222222222")
                 .unwrap()
         );
         assert_eq!(schemas[1].id, id("schema.smt_query"));
@@ -827,7 +865,7 @@ processing_stages:
         let missing_field = EXPERIMENTS.replace("  seed: 42\n", "");
         assert!(parse_experiments(&missing_field).is_err());
         let bad_hash = SCHEMAS.replace(
-            "sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0",
+            "sha256:2222222222222222222222222222222222222222222222222222222222222222",
             "md5:0111",
         );
         assert!(parse_schemas(&bad_hash).is_err());
@@ -1172,5 +1210,56 @@ processing_stages:
                 field: "path",
             }]
         );
+
+        let mut empty_inline = parse_prompts(PROMPTS).unwrap();
+        empty_inline[1].inline = Some(String::new());
+        assert_eq!(
+            validate_model_registry(&[], &empty_inline),
+            vec![RegistryFinding::Empty {
+                entry: id("prompt.single_ir"),
+                field: "inline",
+            }]
+        );
+    }
+
+    // A registry path that is absolute or escapes the repo via `..` is an
+    // UnsafePath finding, for schema `path` and prompt `path` alike; a clean
+    // relative path is silent.
+    #[test]
+    fn validate_model_registry_rejects_unsafe_paths() {
+        let mut schemas = parse_schemas(SCHEMAS).unwrap();
+        schemas[0].path = "/etc/passwd".to_string();
+        schemas[1].path = "../../secret".to_string();
+        assert_eq!(
+            validate_model_registry(&schemas, &[]),
+            vec![
+                RegistryFinding::UnsafePath {
+                    entry: id("schema.clinical_ir"),
+                    field: "path",
+                    path: "/etc/passwd".to_string(),
+                },
+                RegistryFinding::UnsafePath {
+                    entry: id("schema.smt_query"),
+                    field: "path",
+                    path: "../../secret".to_string(),
+                },
+            ]
+        );
+
+        let mut prompts = parse_prompts(PROMPTS).unwrap();
+        prompts[0].path = Some("../escape.txt".to_string());
+        assert_eq!(
+            validate_model_registry(&[], &prompts),
+            vec![RegistryFinding::UnsafePath {
+                entry: id("prompt.direct_smt"),
+                field: "path",
+                path: "../escape.txt".to_string(),
+            }]
+        );
+
+        assert!(is_safe_relative_path("schemas/clinical_ir.schema.json"));
+        assert!(!is_safe_relative_path("/abs"));
+        assert!(!is_safe_relative_path("a/../b"));
+        assert!(!is_safe_relative_path(""));
     }
 }

@@ -146,7 +146,7 @@ argument).
   entry + final hash; none seeded here → no dangling ref). Reading: `crates/ckc-core/src/registry.rs`
   entry types/loaders/check, `crates/ckc-cli/src/registry_check.rs`, `registry/*.yaml`; SPEC §14 (M2
   adds prompts|schemas). Gate: `cargo test` registry; `ckc registry check` passes with the new files;
-  loader rejects a missing / hash-mismatched schema. [Done: `Hash`-typed `schema_hash`/`template_hash`
+  the check rejects a missing / hash-mismatched schema. [Done: `Hash`-typed `schema_hash`/`template_hash`
   (grammar-checked on load); pure `validate_model_registry` (id-uniqueness + nonempty path + exactly-
   one-of path|inline via `PromptSource` finding) kept SEPARATE from `validate_registries` (no call-site
   churn); file-existence + `schema_hash`-vs-`schemas/` checks live at the CLI as `schema_invalid`/`invalid`
