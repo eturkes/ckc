@@ -286,7 +286,7 @@ argument).
   artifact, not a route constraint). Live pass: cross-process SAME-seed byte-stable + schema-valid,
   k-sample seed-pinned per-index-reproducible (machine-local timing/output → `runtime.local.md`); fmt +
   clippy -D + `cargo test --workspace` green. 57% 114K/200K
-- [ ] model-cassette.1: §4.4/§9 cassette modules — payload + store (salvage-restore, mechanical, no
+- [x] model-cassette.1: §4.4/§9 cassette modules — payload + store (salvage-restore, mechanical, no
   runtime). The two modules were authored, VERIFIED, then codex-review-refined (compiled + 7 unit tests + fmt/clippy clean), reverted
   on overflow + salvaged byte-exact → restore: `cp .agent/wip-cassette-core.rs.txt crates/ckc-core/src/cassette.rs`
   (the §4.4 `CassettePayload` payload — Canonical/CanonRead + lowercase-hex codec) + `cp .agent/wip-cassette-cli.rs.txt
@@ -305,7 +305,7 @@ argument).
   wip files. Gate: `cargo test --workspace` (7 unit tests pass runtime-absent — 3 payload round-trip/hex,
   4 store replay/missing/key-mismatch/malformed-hex) + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
   warnings` (salvage is fmt-clean → byte-exact restore passes fmt-check). CLOSE: `rm .agent/wip-cassette-core.rs.txt
-  .agent/wip-cassette-cli.rs.txt` (both consumed here); record context-usage; mark DONE (M2 stays IN-PROGRESS).
+  .agent/wip-cassette-cli.rs.txt` (both consumed here); record context-usage; mark DONE (M2 stays IN-PROGRESS). DONE: restored byte-exact (sha256 parity), wired both lib.rs (core `mod`+`pub use`, cli `pub mod`, + a module doc bullet each); `RawText`/`emit_u64`/`read_u64` were already pub(crate) → no canon.rs change. Gate green: fmt clean + clippy -D 0 + `cargo test --workspace`, 7 cassette tests (3 core payload + 4 cli store, all runtime-absent). 46% 92K/200K
 - [ ] model-cassette.2: committed test cassette via live bless + runtime-absent replay (the live unit,
   mirrors model-adapter.2b). Add `crates/ckc-cli/tests/model_cassette.rs` mirroring `tests/model_live.rs`:
   (a) an `#[ignore]`d bless `record_cassette`, guarded on `CKC_MODEL_COMMAND` unset (default bare-name

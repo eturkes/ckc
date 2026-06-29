@@ -109,8 +109,16 @@
 //!   [`model::ModelAdapter::invoke_samples`]; a clean exit is
 //!   [`model::ModelOutcome::Completed`] only once stdout reached EOF, else
 //!   capture-incomplete. The forthcoming §7.4 model-fill stage drives it.
+//! - [`cassette`] — §4.4/§9 model cassette store (`model-cassette.1`):
+//!   [`cassette::CassetteStore`] records a live [`model::ModelAdapter`] call
+//!   or replays a committed [`ckc_core::CassettePayload`] wrapper keyed by
+//!   (route, source, seed) ([`cassette::CassetteKey`]), the recorded output
+//!   hex-encoded for a lossless byte round-trip — replay (default) is
+//!   runtime-absent, record ([`cassette::RecordMode`]) gated behind the
+//!   runtime. The forthcoming model-fill stage drives it.
 #![forbid(unsafe_code)]
 
+pub mod cassette;
 pub mod extract;
 pub mod manifests;
 pub mod model;

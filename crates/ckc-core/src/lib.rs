@@ -33,6 +33,10 @@
 //!   reference, coherence, and re-derivation invariants.
 //! - `plans` — §5/§4.6 run records [`RunPlan`] ([`RunPlan::plan_hash`]),
 //!   [`RunManifest`], [`ReplayManifest`], [`SolverIdentity`], [`ModelIdentity`].
+//! - `cassette` — §4.4/§9 model-call recording payload [`CassettePayload`]
+//!   (route/source/seed-keyed; model output hex-encoded for lossless byte
+//!   round-trip, [`InvalidCassetteHex`] on malformed hex); the record/replay
+//!   store lives in `ckc-cli`.
 //! - `registry` — §8.4 registries + §8.2 reference + §14 model surface,
 //!   strict-loaded ([`parse_corpora`], [`parse_candidates`],
 //!   [`parse_experiments`], [`parse_reference`], [`parse_schemas`],
@@ -46,6 +50,7 @@
 
 mod bundle;
 mod canon;
+mod cassette;
 mod enums;
 mod hash;
 mod id;
@@ -66,6 +71,7 @@ pub use canon::{
     emit_string, emit_string_policy, emit_u64_map, emit_union, read_array, read_int, read_map,
     read_set, read_strict_canonical, read_string, read_string_policy, read_u64_map, read_union,
 };
+pub use cassette::{CassettePayload, InvalidCassetteHex};
 pub use enums::{
     AttemptOutcome, BindingStatus, ClaimTier, DiagnosticCode, DiagnosticRecord, Direction,
     EvidenceStatus, Origin, Outcome, PromotionDecision, PromotionScope, ReviewClassification,
