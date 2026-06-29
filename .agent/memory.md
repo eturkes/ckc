@@ -248,8 +248,15 @@ full pre-consolidation text lives in git history.
     → adding `model_fill` is registry data, not an enum change; the middle-layer derive fns live in
     ckc-cli (`segment.rs`, `normalize.rs`, `rules.rs` `derive_norm_ir`), only `DocIr::from_graph` +
     `FormalIr::derive`/`FormalConstraint::from_rule` sit on the ckc-core types → `run-refactor`
-    extracts the shared ClinicalIR→verdict tail (behavior-locked, M1 tests the gate) before the
-    routes reuse it.
+    extracts ONLY the per-group compile→verify back end (SPEC §9; `group_pipeline`'s
+    `inputs`→`trace.compiled` body, re-keyed on the member IrBundles) — the per-doc derive fns are
+    already pub, so route units compose them directly (per-group scope user-confirmed; per-doc +
+    full ClinicalIR→verdict tail rejected). Behavior-lock = M1's `events.len()==19` + §8.6
+    compiled-body pins; no compile/verify event-shape pin exists → pure method-move. PLAN LESSON
+    (this respec recovered an overflow): a unit framed "extract a tail/chain X→Y→Z" must share ONE
+    iteration granularity — `derive_norm_ir`/`assemble` are per-document (N×), `compile`/`verify`
+    per-group (1× fan-in), so they cannot be one linear fn; conflating granularities forced a
+    full-session design re-derivation. Check stage granularity at plan time.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity in the `## Runtime (machine-specific)` section below): constrained decoding forces
     schema-VALID output

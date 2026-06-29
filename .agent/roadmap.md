@@ -175,14 +175,25 @@ argument).
   findings via Display → no `registry_check.rs` change); `run.rs` executes the single `baseline()` + records
   `pipelines: [baseline]`, behavior-locked to M1 (run-m2.1 completes the multi-route loop); SPEC §14 ledger
   amended, §8.4 left M1-singular (no §14 byte-pin).] 66% 131K/200K
-- [ ] run-refactor: behavior-locked deterministic-tail extraction. Refactor `ckc-cli` `run.rs` to
-  expose the deterministic ClinicalIR→verdict tail as a reusable fn chaining `derive_norm_ir` →
-  `FormalIr::derive` → `emit::compile` → `verdict::verify`, so both the M1 pipeline and
-  `route.single_ir` call it. Zero behavior change — existing M1 tests (run oracle, §8.6 byte pins)
-  are the gate, unedited. Reading: `crates/ckc-cli/src/run.rs` execute + per-group compile/verify;
-  `rules.rs`/`normalize.rs`/`segment.rs` + ckc-smt `emit`/`verdict` signatures. Gate: `cargo test
-  --workspace` green with ZERO test edits; `exp.m1_scaffold` run oracle + §8.6 pins unchanged.
-  [Refactor-first rule: share internals before the route feature.]
+- [ ] run-refactor: behavior-locked per-group back-end extraction (per-group scope, user-confirmed
+  — `git show` this respec commit for the rejected per-doc/full-tail alternatives + rationale).
+  Extract `ckc-cli` `run.rs` `group_pipeline`'s compile→verify body (SPEC §9 "compile→verify back
+  end") into a reusable fn keyed on the member IrBundles — contract `compile_verify_group(group_id:
+  &Id, members: &[&ArtifactWrapper<IrBundle>], resolved: &Resolved, adapter: &Z3Adapter, shell: &mut
+  Shell) -> GroupTrace` (fit the exact sig — incl. stage-clock/trace threading — to the read code;
+  the contract is the spec, not byte-exact). `group_pipeline` keeps building `members` from `docs`
+  (the DocTrace lookup + member-missing early-return) then delegates; M2 `route.single_ir` later
+  feeds its own validated bundles to the same fn. Boundary: move `inputs`(~L487) through
+  `trace.compiled = Some(compiled)`(~L563) into the new fn; setup + member-build (~L443-486) stay.
+  NO re-derivation — members already carry `formal`/`norm` (compile reads `m.payload.formal`/`.norm`
+  unchanged), identical code path → byte-identical artifacts. Per-doc derive fns
+  (`derive_norm_ir`/`assemble`/`FormalIr::derive`, already pub) are OUT of scope: route units compose
+  them directly. Reading: ONLY `run.rs` `group_pipeline` (~L443-563) + `finish_processing_stage`
+  (~L1019-1045) + `GroupTrace` def (`trace.rs`, to fix the return shape) — nothing else (per-doc fns + ckc-smt `emit`/`verdict` sigs untouched). Gate: `cargo
+  test --workspace` green, ZERO test edits; behavior-lock = `cli_shell.rs` `events.len()==19` +
+  `run_oracle.rs` §8.6 compiled-body pins (Q1/Q2) + `assert_group_matches_reference` (no
+  compile/verify event-shape pin exists → this is a pure method-move). [Refactor-first rule: share
+  internals before the route feature. Per-doc head/derive sharing deferred to the route units.]
 - [ ] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
   adapter module mirroring `verify.rs` `Z3Adapter`: `ModelAdapter::with_command(name)` resolves a
   BARE command name on PATH (Z3 precedent — `Z3Adapter` runs `z3` by bare name, no literal path / no
