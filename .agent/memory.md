@@ -341,5 +341,5 @@ conclusions the committed code + units rely on:
   truncated/invalid) = expected weak-baseline failure, not a mechanism fault. A LOCAL OBSERVATION, NOT an
   engine-general guarantee → `.2b` is the proof point (asserts output parses + schema-validates against a
   committed bounded-schema fixture).
-- `derive_seed(42, 0/1/2)` = `[12058926934050108962, 13679457532755275413, 2949826092126892291]` (pure
-  splitmix64 → engine-agnostic; `.2a` locks these as exact-value test assertions).
+- `derive_seed` exact splitmix64 draws (engine-agnostic, replay-load-bearing) are pinned in the
+  `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy.
