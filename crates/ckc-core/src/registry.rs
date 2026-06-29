@@ -144,11 +144,21 @@ impl ExperimentEntry {
         }
     }
 
-    /// The §7.3 baseline pipeline: `baseline_pipeline` for the set form, or the
-    /// single `pipeline` (its own baseline) for the legacy form. `None` only for
-    /// a malformed entry binding neither.
+    /// The §7.3 baseline pipeline this experiment runs, or `None` when the
+    /// binding is malformed — so `ckc run` rejects exactly what `registry check`
+    /// rejects. The legacy `pipeline` is its own baseline; the set form names an
+    /// in-set `baseline_pipeline`. Any other shape (neither form, both at once, a
+    /// legacy `pipeline` with a stray baseline, or an out-of-set baseline) yields
+    /// `None`. Candidate existence stays the caller's check.
     pub fn baseline(&self) -> Option<&Id> {
-        self.baseline_pipeline.as_ref().or(self.pipeline.as_ref())
+        match (&self.pipeline, self.pipelines.as_slice()) {
+            (Some(single), []) if self.baseline_pipeline.is_none() => Some(single),
+            (None, [_, ..]) => self
+                .baseline_pipeline
+                .as_ref()
+                .filter(|baseline| self.pipelines.contains(baseline)),
+            _ => None,
+        }
     }
 }
 
@@ -319,6 +329,9 @@ pub enum RegistryFinding {
     ReferenceGroupUnknown { experiment: Id, group_id: Id },
     /// An experiment's `baseline_pipeline` is not one of its `pipelines`.
     BaselineNotInSet { experiment: Id, baseline: Id },
+    /// An experiment lists the same pipeline twice in its `pipelines` set (the
+    /// set runs each route once over identical locked inputs, so dups are dead).
+    DuplicatePipeline { experiment: Id, pipeline: Id },
     /// An experiment does not bind exactly one pipeline form: neither `pipeline`
     /// nor `pipelines`, both at once, or a legacy `pipeline` carrying a stray
     /// `baseline_pipeline`.
@@ -384,10 +397,17 @@ impl fmt::Display for RegistryFinding {
                 f,
                 "experiment {experiment}: baseline_pipeline {baseline} is not one of its pipelines"
             ),
+            RegistryFinding::DuplicatePipeline {
+                experiment,
+                pipeline,
+            } => write!(
+                f,
+                "experiment {experiment}: pipeline {pipeline} is listed more than once"
+            ),
             RegistryFinding::PipelineBinding { experiment } => {
                 write!(
                     f,
-                    "experiment {experiment}: set exactly one of pipeline or pipelines"
+                    "experiment {experiment}: bind either `pipeline` alone or `pipelines` with an in-set `baseline_pipeline`"
                 )
             }
             RegistryFinding::PromptSource { prompt } => {
@@ -520,12 +540,19 @@ pub fn validate_registries(
             // Set form (M2+): every route pipeline must resolve and the §7.3
             // baseline must be one of them.
             (None, [_, ..]) => {
+                let mut seen = BTreeSet::new();
                 for pipeline in &experiment.pipelines {
                     if !pipeline_ids.contains(pipeline) {
                         findings.push(RegistryFinding::Dangling {
                             from: experiment.id.clone(),
                             pool: "pipelines",
                             id: pipeline.clone(),
+                        });
+                    }
+                    if !seen.insert(pipeline) {
+                        findings.push(RegistryFinding::DuplicatePipeline {
+                            experiment: experiment.id.clone(),
+                            pipeline: pipeline.clone(),
                         });
                     }
                 }
@@ -1142,6 +1169,9 @@ processing_stages:
                 baseline: id("pipe.not_in_set"),
             }]
         );
+        // Out-of-set baseline → `baseline()` declines it too, so `run` rejects
+        // exactly what `registry check` rejects (no silent out-of-set run).
+        assert_eq!(experiments[0].baseline(), None);
 
         // Reject: a set member no candidate defines still dangles.
         let (corpora, candidates, mut experiments, reference) = two_route_set();
@@ -1155,6 +1185,21 @@ processing_stages:
             }]
         );
 
+        // Reject: the set lists the same pipeline twice (a set runs each route
+        // once, so a duplicate is dead weight a later run would double-execute).
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].pipelines = vec![
+            id("pipe.layered_ckcir_to_smt"),
+            id("pipe.layered_ckcir_to_smt"),
+        ];
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::DuplicatePipeline {
+                experiment: id("exp.m1_scaffold"),
+                pipeline: id("pipe.layered_ckcir_to_smt"),
+            }]
+        );
+
         // Reject: both binding forms at once.
         let (corpora, candidates, mut experiments, reference) = two_route_set();
         experiments[0].pipeline = Some(id("pipe.layered_ckcir_to_smt"));
@@ -1164,6 +1209,9 @@ processing_stages:
                 experiment: id("exp.m1_scaffold"),
             }]
         );
+        // A malformed binding resolves no baseline (the old `.or()` would have
+        // run the legacy `pipeline` here); `run` now declines it.
+        assert_eq!(experiments[0].baseline(), None);
 
         // Reject: neither binding form.
         let (corpora, candidates, mut experiments, reference) = two_route_set();
@@ -1188,6 +1236,45 @@ processing_stages:
                 experiment: id("exp.m1_scaffold"),
             }]
         );
+    }
+
+    // §14: `skip_serializing_if` pins the on-disk shape so backward-compat holds
+    // — the legacy form emits only `pipeline`, the set form only `pipelines` +
+    // `baseline_pipeline`. A value round-trip would miss a regression emitting
+    // `pipeline: null` or `pipelines: []`, so assert the serialized key set.
+    #[test]
+    fn experiment_binding_serializes_to_its_form() {
+        // `pipelines:` and `baseline_pipeline:` both contain `pipeline`, so a
+        // key is present iff some line *starts* with it.
+        fn binds(yaml: &str, key: &str) -> bool {
+            yaml.lines().any(|line| line.trim_start().starts_with(key))
+        }
+
+        // Legacy single pipeline (the M1 `exp.m1_scaffold` shape).
+        let legacy = valid_set().2;
+        let yaml = to_yaml(&legacy[0]).unwrap();
+        assert!(binds(&yaml, "pipeline:"), "legacy drops pipeline:\n{yaml}");
+        assert!(
+            !binds(&yaml, "pipelines:"),
+            "legacy leaks pipelines:\n{yaml}"
+        );
+        assert!(
+            !binds(&yaml, "baseline_pipeline:"),
+            "legacy leaks baseline_pipeline:\n{yaml}"
+        );
+
+        // Set form: `pipelines` + an in-set `baseline_pipeline`, no legacy key.
+        let mut set = valid_set().2;
+        set[0].pipeline = None;
+        set[0].pipelines = vec![id("pipe.layered_ckcir_to_smt")];
+        set[0].baseline_pipeline = Some(id("pipe.layered_ckcir_to_smt"));
+        let yaml = to_yaml(&set[0]).unwrap();
+        assert!(binds(&yaml, "pipelines:"), "set drops pipelines:\n{yaml}");
+        assert!(
+            binds(&yaml, "baseline_pipeline:"),
+            "set drops baseline_pipeline:\n{yaml}"
+        );
+        assert!(!binds(&yaml, "pipeline:"), "set leaks pipeline:\n{yaml}");
     }
 
     // Id uniqueness: per pool, per experiment's groups, per reference document.

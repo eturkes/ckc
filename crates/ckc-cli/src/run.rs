@@ -222,7 +222,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
     let Some(baseline) = experiment.baseline() else {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("reason"),
-            format!("experiment {experiment_id} binds no pipeline"),
+            format!("experiment {experiment_id} has no valid pipeline binding"),
         )]));
         return None;
     };

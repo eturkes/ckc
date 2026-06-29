@@ -1082,8 +1082,8 @@ clinical deployment evidence status (`G-CLINICAL-REGULATORY`).
 Registry files are data, validated by `ckc registry check`, growing per milestone: M1
 `corpora|candidates|experiments`; M2 adds `prompts|schemas` (the schema export feeds M2's
 grammar constraints) and generalizes the `experiments` binding from a single pipeline to a
-pipeline set with a `baseline_pipeline` (the §7.3 delta baseline), so one experiment runs both
-routes over identical locked inputs while the M1 single-pipeline form stays valid; M3 adds `methods`, the method-universe catalogue seeded from the
+pipeline set with a `baseline_pipeline` (the §7.3 delta baseline), so one experiment binds both
+route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3 adds `methods`, the method-universe catalogue seeded from the
 compendium (families, aliases, candidate roles, adapter status
 `v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata);
 M4 extends `schemas|prompts` with invented-DSL entries; M5 adds `evaluators|gates` (gate

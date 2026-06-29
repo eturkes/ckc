@@ -158,11 +158,11 @@ full pre-consolidation text lives in git history.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
   forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
   Option<Id>` (the §7.3 delta baseline), all `#[serde(default, skip_serializing_if=…)]` so the M1
-  `pipeline:` key stays valid AND each form round-trips back to its own shape (omit-empty). Read the
-  binding through the accessors, never the raw field: `baseline()` (`baseline_pipeline`.or(`pipeline`))
+  `pipeline:` key stays valid AND each form round-trips back to its own shape (omit-empty); a value round-trip alone can't catch a `skip_serializing_if` regression → a test pins the serialized KEY SET per form (legacy: only `pipeline`; set: only `pipelines`+`baseline_pipeline`). Read the
+  binding through the accessors, never the raw field: `baseline()` is SHAPE-AWARE (mirrors the validator: legacy single, or in-set `baseline_pipeline`; any malformed shape → `None`, so `run` rejects EXACTLY what `registry check` does — a plain `.or()` would silently run a both-forms legacy `pipeline`, or a stray/out-of-set baseline, since `run` does targeted resolution NOT whole-set validation)
   and `resolved_pipelines()` (the set, or the single normalized to a one-element vec). `validate_registries`
   is form-aware (`match (&pipeline, pipelines.as_slice())`): legacy `(Some,[])` w/ no baseline → per-pipeline
-  Dangling; set `(None,[_,..])` → per-member Dangling + baseline must be Some (`Empty{field:"baseline_pipeline"}`)
+  Dangling; set `(None,[_,..])` → per-member Dangling + no dups (new experiment-scoped `DuplicatePipeline`; generic `note_duplicates`/`Duplicate{pool:"pipelines"}` would collide w/ the GLOBAL candidates pipelines-pool dup check, which has no experiment to scope it) + baseline must be Some (`Empty{field:"baseline_pipeline"}`)
   and ∈ set (new `BaselineNotInSet`); anything else (neither, both, or legacy + stray baseline) → new
   `PipelineBinding`. The CLI consumes findings via `to_string()`/Display (no exhaustive match) → new
   RegistryFinding variants need ZERO `registry_check.rs` change. `run.rs` deliberately executes ONLY
