@@ -137,7 +137,7 @@ argument).
   GATE: `cargo test --workspace` (oracle + hash green, M1 §8.6 pins unchanged); `cargo fmt --check`;
   `cargo clippy --workspace --all-targets -- -D warnings`. CLOSE: `rm .agent/wip-smt_query.grammar`;
   record context-usage; mark DONE (M2 stays IN-PROGRESS — later units remain). 55% 110K/200K
-- [ ] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
+- [x] registry-m2.1: `registry/{prompts,schemas}.yaml` entry types + loaders. Add `SchemaEntry`
   (`id`, `path`, `schema_hash`, `target_kind`) + `PromptEntry` (`id`, `path`/inline,
   `template_hash`, `route`) to `registry.rs`; serde loaders + `ckc registry check` coverage
   (file existence, `schema_hash` match vs committed `schemas/`, id uniqueness). Seed
@@ -146,7 +146,13 @@ argument).
   entry + final hash; none seeded here → no dangling ref). Reading: `crates/ckc-core/src/registry.rs`
   entry types/loaders/check, `crates/ckc-cli/src/registry_check.rs`, `registry/*.yaml`; SPEC §14 (M2
   adds prompts|schemas). Gate: `cargo test` registry; `ckc registry check` passes with the new files;
-  loader rejects a missing / hash-mismatched schema.
+  loader rejects a missing / hash-mismatched schema. [Done: `Hash`-typed `schema_hash`/`template_hash`
+  (grammar-checked on load); pure `validate_model_registry` (id-uniqueness + nonempty path + exactly-
+  one-of path|inline via `PromptSource` finding) kept SEPARATE from `validate_registries` (no call-site
+  churn); file-existence + `schema_hash`-vs-`schemas/` checks live at the CLI as `schema_invalid`/`invalid`
+  diagnostics (I/O out of the pure validator); `load_optional` → absent prompts.yaml/schemas.yaml is clean
+  (M1 `check` tests unchanged); `prompts.yaml` unseeded (no dangling route ref);
+  `committed_model_surface_checks_ok` guards live drift.] 82% 164K/200K
 - [ ] registry-m2.2: experiment pipeline-set binding — type + validation + §14 wording. Generalize
   `ExperimentEntry`'s singular `pipeline: Id` to a pipeline SET — add `pipelines: Vec<Id>` +
   `baseline_pipeline: Id` (the §7.3 delta baseline); keep M1's single-pipeline entries valid (accept

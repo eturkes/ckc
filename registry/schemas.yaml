@@ -1,0 +1,8 @@
+- id: schema.clinical_ir
+  path: schemas/clinical_ir.schema.json
+  schema_hash: sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0
+  target_kind: clinical_ir
+- id: schema.smt_query
+  path: schemas/smt_query.grammar
+  schema_hash: sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e
+  target_kind: smt_query

@@ -80,8 +80,9 @@ pub use ir::{
 pub use plans::{ModelIdentity, ReplayManifest, RunManifest, RunPlan, SolverIdentity};
 pub use registry::{
     Candidates, CorpusEntry, Determinism, ExperimentEntry, PipelineEntry, ProcessingStageEntry,
-    ReferenceEntry, RegistryError, RegistryFinding, TestSourceGroup, parse_candidates,
-    parse_corpora, parse_experiments, parse_reference, to_yaml, validate_registries,
+    PromptEntry, ReferenceEntry, RegistryError, RegistryFinding, SchemaEntry, TestSourceGroup,
+    parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
+    parse_schemas, to_yaml, validate_model_registry, validate_registries,
 };
 pub use source_linkage::{
     AnchorKind, DataClass, EvidenceRegion, NodeKind, Provenance, RefKind, SourceAnchor,

@@ -6,13 +6,18 @@
 //! one [`Candidates`] document holding [`PipelineEntry`] and [`ProcessingStageEntry`]
 //! entries, `registry/experiments.yaml` is a list of [`ExperimentEntry`]
 //! (what `ckc run --experiment` resolves), and `corpus/reference/*.yaml` is a list
-//! of [`ReferenceEntry`] asserted by acceptance tests. Loading is strict: unknown
+//! of [`ReferenceEntry`] asserted by acceptance tests, and the §14 M2 model
+//! surface adds `registry/schemas.yaml` ([`SchemaEntry`]) and
+//! `registry/prompts.yaml` ([`PromptEntry`]). Loading is strict: unknown
 //! fields are rejected, [`Id`] fields are grammar-checked by `Id`'s serde,
 //! and enum fields accept exactly their canonical spellings. Past loading,
 //! [`validate_registries`] checks the set semantically — pool-level id
 //! uniqueness, nonempty requirements, cross-file resolution, the §8.4
 //! stage-chain rule — collecting every [`RegistryFinding`] so §3
-//! `ckc registry check` reports the whole set.
+//! `ckc registry check` reports the whole set. [`validate_model_registry`]
+//! does the same for the model surface (id uniqueness, prompt source shape);
+//! schema-file existence and the `schema_hash` match are I/O, done by the
+//! `ckc registry check` command.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -21,7 +26,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::enums::{EvidenceStatus, Origin, fieldless_enum};
-use crate::id::Id;
+use crate::id::{Hash, Id};
 use crate::source_linkage::Provenance;
 
 fieldless_enum! {
@@ -148,6 +153,46 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// One `registry/schemas.yaml` entry (§14, M2): a committed constraint schema
+/// a model-fill route decodes against — the ClinicalIR JSON-Schema or the
+/// direct-SMT grammar under `schemas/`. `ckc registry check` reads the file at
+/// `path` and rejects it unless its raw-byte hash equals `schema_hash`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchemaEntry {
+    /// Schema id a model-fill processing_stage references (e.g. `schema.clinical_ir`).
+    pub id: Id,
+    /// Schema file path relative to the repository root (under `schemas/`).
+    pub path: String,
+    /// Pinned raw-byte hash of the committed schema file; the check fails on
+    /// drift (`hash_bytes` over the file equals this).
+    pub schema_hash: Hash,
+    /// Output layer this schema constrains (e.g. `clinical_ir`, `smt_query`);
+    /// open so later routes add layers without reshaping entries.
+    pub target_kind: Id,
+}
+
+/// One `registry/prompts.yaml` entry (§14, M2): a route's prompt template,
+/// supplied as either a file `path` (relative to the repository root) or
+/// `inline` text — exactly one, enforced by [`validate_model_registry`].
+/// `template_hash` pins the template bytes a run records.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptEntry {
+    /// Prompt id a model-fill processing_stage references (e.g. `prompt.direct_smt`).
+    pub id: Id,
+    /// Template file path, mutually exclusive with `inline`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// Inline template text, mutually exclusive with `path`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inline: Option<String>,
+    /// Pinned hash of the template bytes a run records.
+    pub template_hash: Hash,
+    /// Route this prompt serves (e.g. `route.direct_smt`, `route.single_ir`).
+    pub route: Id,
+}
+
 /// Error loading or serializing a registry document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegistryError {
@@ -196,6 +241,16 @@ pub fn parse_reference(yaml: &str) -> Result<Vec<ReferenceEntry>, RegistryError>
     from_yaml(yaml)
 }
 
+/// Load a `registry/schemas.yaml` document (§14, M2).
+pub fn parse_schemas(yaml: &str) -> Result<Vec<SchemaEntry>, RegistryError> {
+    from_yaml(yaml)
+}
+
+/// Load a `registry/prompts.yaml` document (§14, M2).
+pub fn parse_prompts(yaml: &str) -> Result<Vec<PromptEntry>, RegistryError> {
+    from_yaml(yaml)
+}
+
 /// One finding from [`validate_registries`]. Validation collects every
 /// finding rather than failing fast so `ckc registry check` reports the
 /// whole set (findings map to §7.4 `schema_invalid` diagnostics at the CLI
@@ -228,6 +283,9 @@ pub enum RegistryFinding {
     /// A reference entry asserts a group the referencing experiment does not
     /// define.
     ReferenceGroupUnknown { experiment: Id, group_id: Id },
+    /// A prompt entry does not name exactly one nonempty source (`path` xor
+    /// `inline`).
+    PromptSource { prompt: Id },
 }
 
 impl fmt::Display for RegistryFinding {
@@ -270,6 +328,9 @@ impl fmt::Display for RegistryFinding {
                     f,
                     "experiment {experiment}: reference asserts undefined group {group_id}"
                 )
+            }
+            RegistryFinding::PromptSource { prompt } => {
+                write!(f, "prompt {prompt}: set exactly one of path or inline")
             }
         }
     }
@@ -453,6 +514,52 @@ pub fn validate_registries(
     findings
 }
 
+/// Validate the §14 model-registry surface (M2): `registry/schemas.yaml` and
+/// `registry/prompts.yaml`. A pure pass — id uniqueness per pool, a nonempty
+/// schema `path`, and each prompt naming exactly one nonempty source (`path`
+/// xor `inline`). Schema-file existence and the `schema_hash` match need the
+/// committed files, so the `ckc registry check` command does them at the I/O
+/// layer; this surface carries no §8.4 cross-references yet (model-fill
+/// processing_stages bind it in later units). Findings come back in pool
+/// order, schemas then prompts; an empty vector means valid.
+pub fn validate_model_registry(
+    schemas: &[SchemaEntry],
+    prompts: &[PromptEntry],
+) -> Vec<RegistryFinding> {
+    let mut findings = Vec::new();
+
+    note_duplicates(schemas.iter().map(|s| &s.id), "schemas", &mut findings);
+    for schema in schemas {
+        if schema.path.is_empty() {
+            findings.push(RegistryFinding::Empty {
+                entry: schema.id.clone(),
+                field: "path",
+            });
+        }
+    }
+
+    note_duplicates(prompts.iter().map(|p| &p.id), "prompts", &mut findings);
+    for prompt in prompts {
+        match (&prompt.path, &prompt.inline) {
+            (Some(path), None) if !path.is_empty() => {}
+            (None, Some(inline)) if !inline.is_empty() => {}
+            (Some(_), None) => findings.push(RegistryFinding::Empty {
+                entry: prompt.id.clone(),
+                field: "path",
+            }),
+            (None, Some(_)) => findings.push(RegistryFinding::Empty {
+                entry: prompt.id.clone(),
+                field: "inline",
+            }),
+            (Some(_), Some(_)) | (None, None) => findings.push(RegistryFinding::PromptSource {
+                prompt: prompt.id.clone(),
+            }),
+        }
+    }
+
+    findings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,6 +636,32 @@ processing_stages:
 - group_id: group.m1_no_conflict
   expected_outcome: semantic_no_conflict
   expected_no_conflict_result: true
+";
+
+    // §14 model surface: the committed schema entries (real `schemas/` hashes,
+    // mirroring `registry/schemas.yaml`).
+    const SCHEMAS: &str = "\
+- id: schema.clinical_ir
+  path: schemas/clinical_ir.schema.json
+  schema_hash: sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0
+  target_kind: clinical_ir
+- id: schema.smt_query
+  path: schemas/smt_query.grammar
+  schema_hash: sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e
+  target_kind: smt_query
+";
+
+    // §14 model surface: one path-based prompt and one inline prompt (synthetic
+    // hashes; route units author the real per-route files + final hashes).
+    const PROMPTS: &str = "\
+- id: prompt.direct_smt
+  path: registry/prompts/direct_smt.txt
+  template_hash: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  route: route.direct_smt
+- id: prompt.single_ir
+  inline: \"Fill the ClinicalIR schema for the segments.\"
+  template_hash: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  route: route.single_ir
 ";
 
     // §8.2 corpora acceptance fields load typed: ai_generated origin under
@@ -632,12 +765,53 @@ processing_stages:
         );
     }
 
+    // §14 schemas load typed: id, path, pinned Hash, and the constrained
+    // output layer.
+    #[test]
+    fn schemas_load_typed() {
+        let schemas = parse_schemas(SCHEMAS).unwrap();
+        assert_eq!(schemas.len(), 2);
+        assert_eq!(schemas[0].id, id("schema.clinical_ir"));
+        assert_eq!(schemas[0].path, "schemas/clinical_ir.schema.json");
+        assert_eq!(schemas[0].target_kind, id("clinical_ir"));
+        assert_eq!(
+            schemas[0].schema_hash,
+            Hash::new("sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0")
+                .unwrap()
+        );
+        assert_eq!(schemas[1].id, id("schema.smt_query"));
+        assert_eq!(schemas[1].target_kind, id("smt_query"));
+    }
+
+    // §14 prompts load typed: a path-based entry and an inline entry, each with
+    // its route and template hash.
+    #[test]
+    fn prompts_load_typed() {
+        let prompts = parse_prompts(PROMPTS).unwrap();
+        assert_eq!(prompts.len(), 2);
+        assert_eq!(prompts[0].id, id("prompt.direct_smt"));
+        assert_eq!(
+            prompts[0].path.as_deref(),
+            Some("registry/prompts/direct_smt.txt")
+        );
+        assert_eq!(prompts[0].inline, None);
+        assert_eq!(prompts[0].route, id("route.direct_smt"));
+        assert_eq!(prompts[1].path, None);
+        assert_eq!(
+            prompts[1].inline.as_deref(),
+            Some("Fill the ClinicalIR schema for the segments.")
+        );
+        assert_eq!(prompts[1].route, id("route.single_ir"));
+    }
+
     #[test]
     fn all_documents_round_trip() {
         round_trip(&parse_corpora(CORPORA).unwrap());
         round_trip(&parse_candidates(CANDIDATES).unwrap());
         round_trip(&parse_experiments(EXPERIMENTS).unwrap());
         round_trip(&parse_reference(REFERENCE).unwrap());
+        round_trip(&parse_schemas(SCHEMAS).unwrap());
+        round_trip(&parse_prompts(PROMPTS).unwrap());
     }
 
     // Strict loading: unknown fields, Id-grammar violations, and unknown
@@ -652,6 +826,15 @@ processing_stages:
         assert!(parse_corpora(&bad_enum).is_err());
         let missing_field = EXPERIMENTS.replace("  seed: 42\n", "");
         assert!(parse_experiments(&missing_field).is_err());
+        let bad_hash = SCHEMAS.replace(
+            "sha256:0111668b2445286d22b069a8e51f6c517d4062b3b345f4d364f25dfb7970eaa0",
+            "md5:0111",
+        );
+        assert!(parse_schemas(&bad_hash).is_err());
+        let unknown_schema_field = SCHEMAS.replace("  path:", "  surprise: 1\n  path:");
+        assert!(parse_schemas(&unknown_schema_field).is_err());
+        let missing_prompt_field = PROMPTS.replace("  route: route.direct_smt\n", "");
+        assert!(parse_prompts(&missing_prompt_field).is_err());
     }
 
     const REFERENCE_PATH: &str = "corpus/reference/m1_expected.yaml";
@@ -912,6 +1095,81 @@ processing_stages:
             vec![RegistryFinding::ReferenceGroupUnknown {
                 experiment: id("exp.m1_scaffold"),
                 group_id: id("group.m1_extra"),
+            }]
+        );
+    }
+
+    // §14 model surface validates clean: unique ids, nonempty schema paths,
+    // each prompt exactly one source.
+    #[test]
+    fn validate_model_registry_accepts_good_set() {
+        let schemas = parse_schemas(SCHEMAS).unwrap();
+        let prompts = parse_prompts(PROMPTS).unwrap();
+        assert_eq!(validate_model_registry(&schemas, &prompts), vec![]);
+    }
+
+    // Duplicate ids per pool, schemas before prompts.
+    #[test]
+    fn validate_model_registry_duplicate_ids() {
+        let mut schemas = parse_schemas(SCHEMAS).unwrap();
+        schemas.push(schemas[0].clone());
+        let mut prompts = parse_prompts(PROMPTS).unwrap();
+        prompts.push(prompts[1].clone());
+        assert_eq!(
+            validate_model_registry(&schemas, &prompts),
+            vec![
+                RegistryFinding::Duplicate {
+                    pool: "schemas",
+                    id: id("schema.clinical_ir"),
+                },
+                RegistryFinding::Duplicate {
+                    pool: "prompts",
+                    id: id("prompt.single_ir"),
+                },
+            ]
+        );
+    }
+
+    // A schema needs a nonempty path; a prompt needs exactly one nonempty
+    // source — both set, neither set, and an empty named source each fail.
+    #[test]
+    fn validate_model_registry_field_findings() {
+        let mut schemas = parse_schemas(SCHEMAS).unwrap();
+        schemas[0].path.clear();
+        assert_eq!(
+            validate_model_registry(&schemas, &[]),
+            vec![RegistryFinding::Empty {
+                entry: id("schema.clinical_ir"),
+                field: "path",
+            }]
+        );
+
+        let prompts = parse_prompts(PROMPTS).unwrap();
+        let mut both = prompts.clone();
+        both[1].path = Some("registry/prompts/x.txt".to_string());
+        assert_eq!(
+            validate_model_registry(&[], &both),
+            vec![RegistryFinding::PromptSource {
+                prompt: id("prompt.single_ir"),
+            }]
+        );
+
+        let mut neither = prompts.clone();
+        neither[0].path = None;
+        assert_eq!(
+            validate_model_registry(&[], &neither),
+            vec![RegistryFinding::PromptSource {
+                prompt: id("prompt.direct_smt"),
+            }]
+        );
+
+        let mut empty = prompts;
+        empty[0].path = Some(String::new());
+        assert_eq!(
+            validate_model_registry(&[], &empty),
+            vec![RegistryFinding::Empty {
+                entry: id("prompt.direct_smt"),
+                field: "path",
             }]
         );
     }

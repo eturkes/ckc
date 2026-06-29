@@ -16,8 +16,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ckc_core::{
-    DiagnosticCode, DiagnosticRecord, Id, Outcome, ReferenceEntry, RegistryError, parse_candidates,
-    parse_corpora, parse_experiments, parse_reference, validate_registries,
+    DiagnosticCode, DiagnosticRecord, Id, Outcome, ReferenceEntry, RegistryError, hash_bytes,
+    parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
+    parse_schemas, validate_model_registry, validate_registries,
 };
 
 use crate::shell::{Shell, static_id};
@@ -25,11 +26,21 @@ use crate::shell::{Shell, static_id};
 const CORPORA_FILE: &str = "registry/corpora.yaml";
 const CANDIDATES_FILE: &str = "registry/candidates.yaml";
 const EXPERIMENTS_FILE: &str = "registry/experiments.yaml";
+const SCHEMAS_FILE: &str = "registry/schemas.yaml";
+const PROMPTS_FILE: &str = "registry/prompts.yaml";
 
 /// Run `registry check` rooted at `root` (the invocation working directory:
 /// §3 anchors `registry/` and reference paths at the repository root). Evidence
 /// and the outcome land entirely in the shell.
 pub(crate) fn check(root: &Path, shell: &mut Shell) {
+    check_core_registry(root, shell);
+    check_model_registry(root, shell);
+}
+
+/// The §8.4 core surface: corpora + candidates + experiments + reference,
+/// validated as one cross-referenced whole. A core-file load failure skips
+/// semantic validation — the load diagnostics already decide the outcome.
+fn check_core_registry(root: &Path, shell: &mut Shell) {
     let corpora = load(root, CORPORA_FILE, parse_corpora, shell);
     let candidates = load(root, CANDIDATES_FILE, parse_candidates, shell);
     let experiments = load(root, EXPERIMENTS_FILE, parse_experiments, shell);
@@ -62,6 +73,49 @@ pub(crate) fn check(root: &Path, shell: &mut Shell) {
     }
 }
 
+/// The §14 model surface (M2): `registry/schemas.yaml` + `registry/prompts.yaml`.
+/// Both are optional additions — absent until a route configures them, so a
+/// missing file is empty, not a diagnostic. Past [`validate_model_registry`]
+/// (id uniqueness, schema paths, prompt source shape), each schema file is read
+/// and its raw-byte hash compared to the entry's `schema_hash`: a missing file
+/// or a mismatch lands one diagnostic. Independent of the §8.4 set.
+fn check_model_registry(root: &Path, shell: &mut Shell) {
+    let schemas = load_optional(root, SCHEMAS_FILE, parse_schemas, shell);
+    let prompts = load_optional(root, PROMPTS_FILE, parse_prompts, shell);
+
+    for finding in validate_model_registry(&schemas, &prompts) {
+        shell.diagnostic(invalid_diagnostic(vec![(
+            static_id("finding"),
+            finding.to_string(),
+        )]));
+    }
+
+    for schema in &schemas {
+        if schema.path.is_empty() {
+            continue; // Empty path is a finding above; nothing to read.
+        }
+        let path = root.join(&schema.path);
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                let actual = hash_bytes(&bytes);
+                if actual != schema.schema_hash {
+                    shell.diagnostic(invalid_diagnostic(vec![
+                        (static_id("actual"), actual.to_string()),
+                        (static_id("expected"), schema.schema_hash.to_string()),
+                        (static_id("schema"), schema.id.to_string()),
+                    ]));
+                }
+            }
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("reason"), format!("read {}: {e}", path.display())),
+                    (static_id("schema"), schema.id.to_string()),
+                ]));
+            }
+        }
+    }
+}
+
 /// Read and strictly parse one registry document; a failure lands as one
 /// `schema_invalid` diagnostic naming the file and returns `None`. Shared
 /// with the run command's resolution step (`crate::run`).
@@ -84,6 +138,39 @@ pub(crate) fn load<T>(
                 (static_id("reason"), reason),
             ]));
             None
+        }
+    }
+}
+
+/// Like [`load`] but for an optional registry document: a file that does not
+/// exist yields the default (empty) with no diagnostic — the §14 model files
+/// are additive, absent until a route configures them. A file that exists but
+/// fails to read or parse still lands one diagnostic.
+fn load_optional<T: Default>(
+    root: &Path,
+    rel: &str,
+    parse: fn(&str) -> Result<T, RegistryError>,
+    shell: &mut Shell,
+) -> T {
+    let path = root.join(rel);
+    match std::fs::read_to_string(&path) {
+        Ok(text) => match parse(&text) {
+            Ok(value) => value,
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("file"), rel.to_owned()),
+                    (static_id("reason"), e.to_string()),
+                ]));
+                T::default()
+            }
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => T::default(),
+        Err(e) => {
+            shell.diagnostic(invalid_diagnostic(vec![
+                (static_id("file"), rel.to_owned()),
+                (static_id("reason"), format!("read {}: {e}", path.display())),
+            ]));
+            T::default()
         }
     }
 }
@@ -293,5 +380,119 @@ processing_stages:
         assert_reported(&diagnostics, "undefined corpora test_source.missing");
         assert_reported(&diagnostics, "matches no loaded reference document");
         assert_reported(&diagnostics, "expected_outcomes is empty");
+    }
+
+    /// Run only the §14 model surface against `root`; same shell harness as
+    /// [`checked`].
+    fn model_checked(root: &Path) -> (TotalOperationResult, Vec<DiagnosticRecord>) {
+        let mut shell = Shell::open(static_id("registry.check"), run_none(), None);
+        check_model_registry(root, &mut shell);
+        let finished = shell.finish().unwrap();
+        let events: Vec<EventRecord> =
+            read_jsonl(finished.streamed_events.as_deref().unwrap()).unwrap();
+        (finished.result, events[0].diagnostics.clone())
+    }
+
+    // The committed `registry/schemas.yaml` loads and its files hash-match:
+    // the model surface is clean at the repository root.
+    #[test]
+    fn committed_model_surface_checks_ok() {
+        let (result, diagnostics) = model_checked(&repo_root());
+        assert_eq!(result.outcome, Outcome::Ok);
+        assert!(diagnostics.is_empty());
+    }
+
+    // The §14 files are optional: a root without them is clean, not an error.
+    #[test]
+    fn absent_model_files_are_clean() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (result, diagnostics) = model_checked(tmp.path());
+        assert_eq!(result.outcome, Outcome::Ok);
+        assert!(diagnostics.is_empty());
+    }
+
+    // A present-but-malformed schemas file lands one load diagnostic.
+    #[test]
+    fn malformed_schemas_file_reports() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write(root, SCHEMAS_FILE, "][ not yaml");
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 1);
+        assert_reported(&diagnostics, SCHEMAS_FILE);
+    }
+
+    // The gate: a schema whose file is missing and one whose bytes drift from
+    // the pinned hash are each rejected; a matching entry stays silent.
+    #[test]
+    fn schema_file_missing_or_mismatched_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let good = hash_bytes(b"good schema bytes\n");
+        write(
+            root,
+            SCHEMAS_FILE,
+            &format!(
+                "\
+- id: schema.good
+  path: schemas/good.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+- id: schema.missing
+  path: schemas/missing.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+- id: schema.mismatch
+  path: schemas/mismatch.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+"
+            ),
+        );
+        write(root, "schemas/good.json", "good schema bytes\n");
+        write(root, "schemas/mismatch.json", "different bytes\n");
+        // schemas/missing.json is deliberately absent.
+
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 2);
+        assert_reported(&diagnostics, "schema.missing");
+        assert_reported(&diagnostics, "schema.mismatch");
+        assert!(
+            !diagnostics
+                .iter()
+                .flat_map(|d| &d.payload)
+                .any(|(_, value)| value.contains("schema.good")),
+            "the matching entry should be silent: {diagnostics:?}"
+        );
+    }
+
+    // Model-surface findings surface too: a duplicate schema id.
+    #[test]
+    fn duplicate_schema_id_reported() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let good = hash_bytes(b"x\n");
+        write(
+            root,
+            SCHEMAS_FILE,
+            &format!(
+                "\
+- id: schema.dup
+  path: schemas/a.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+- id: schema.dup
+  path: schemas/a.json
+  schema_hash: {good}
+  target_kind: clinical_ir
+"
+            ),
+        );
+        write(root, "schemas/a.json", "x\n");
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_reported(&diagnostics, "duplicate schemas id schema.dup");
     }
 }

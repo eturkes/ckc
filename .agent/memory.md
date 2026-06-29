@@ -129,6 +129,27 @@ full pre-consolidation text lives in git history.
   `schema_accepts_canonical_clinical_ir` is that guard (M3 ClinicalStatement additions must extend both).
   Non-obvious anchor: canonical integers are STRING-quoted (`emit_int`→`emit_string`), so interval bounds
   are schema `string`+INT_PATTERN (a bare JSON number is rejected), not `number`.
+- Registry model surface (§14, M2.5): `registry/schemas.yaml` (`SchemaEntry` =
+  id/path/schema_hash/target_kind) + `registry/prompts.yaml` (`PromptEntry` = id / path-xor-inline /
+  template_hash / route). Hash fields are `Hash`-typed → grammar-validated on load (Id/Hash use
+  `#[serde(try_from="String")]`; a plain derived newtype Deserialize would NOT validate). Validation is
+  SEPARATE: `validate_model_registry` (not folded into `validate_registries`) because the model surface
+  has no §8.4 cross-refs yet — model-fill stages will bind schema/prompt ids in route units; fold into
+  `validate_registries` only when a stage→schema/prompt dangling check is actually wanted (else 18
+  call sites churn for nothing). Layer split: pure findings (id uniqueness, schema path nonempty,
+  prompt path-xor-inline → `PromptSource`/`Empty`) live in core; schema FILE existence + `schema_hash`
+  match are I/O → CLI `check_model_registry` emits them as sorted-key `actual`/`expected`/`schema` (or
+  `reason`/`schema`) diagnostics mirroring `load`'s file/reason shape, NOT `RegistryFinding`s. Both
+  files are OPTIONAL via `load_optional` (absent→empty, no diagnostic — additive surface, M1 ran
+  without them; keeps existing tempdir CLI tests at their old counts); prompts.yaml is unseeded — route
+  units create it AND add prompt file/hash checks symmetric to the schema loop. Seeded: ids
+  `schema.clinical_ir`/`schema.smt_query`, `target_kind` = constrained output layer
+  `clinical_ir`/`smt_query`; prompt routes are `route.direct_smt`/`route.single_ir`. Drift guard =
+  `committed_model_surface_checks_ok` (schemas.yaml hashes must equal the real `schemas/` bytes).
+  Live smt_query grammar hash = `f14a266…` (2492 B; GRAMMAR_HASH const in `ckc-smt/emit.rs` + schemas.yaml).
+  The pre-tightening `fb42ee5a…` (2512 B) is dead — codex-review ecca074 tightened the grammar. Roadmap's
+  schemas-export.2 spec keeps `fb42ee5a…`/2512 B as faithful .2-era history (not a live value; collapses at
+  M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
 - "Oracle" has two senses; the `terms:`/`codex:` cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim one — `runtime-oracle` → `runtime reference` across IDs/types/prose (results are locked measurements, not an authority on real-world truth). Scope: SPEC.md + Rust + registry/corpus/reference data + IDs + config; `docs/` excluded. The commits cite a replacement map whose contents aren't recoverable from git — so "the map omitted generic `oracle`" is inference; what's verifiable is that only runtime-oracle terms were swapped. The TEST-ORACLE sense (authority deciding a test's pass/fail vs. the reference) persists in `run_oracle.rs` (file + `run_oracle_*` fn) and `rules.rs` (`// THE oracle`); those files passed through the sweep commits unrenamed — survival, not a documented approval — and the phrasing recurs in out-of-scope `docs/` ("test oracle"/"SAT oracle"/"perfect oracle") as ordinary technical usage (corroboration, not proof). SPEC.md has zero "oracle"; no instruction mandates global removal (nearest pull: the general "plain operational words over research jargon" line above). Decision: NARROW — leave the test-sense as-is. A global test-sense retirement (`run_oracle.rs`→`run_reference_check.rs`) stays an OPEN user/style call.
