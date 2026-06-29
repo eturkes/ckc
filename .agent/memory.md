@@ -101,6 +101,31 @@ full pre-consolidation text lives in git history.
   takes `dir: &str` so its `format!("groups/{gid}")` stays outside COMPILE timing (route.single_ir
   supplies its own dir + clock the same way). The call-boundary overhead itself is inherent + below
   ms/normalization resolution — only named setup is worth hoisting.
+- Model-runtime adapter (§9, M2.8 model-adapter.1, `ckc-cli/src/model.rs`, mirrors `ckc-smt`
+  Z3Adapter). Non-obvious decisions beyond the code/docs: (1) `pub mod model` NOT private — a
+  skeleton landed ahead of its in-crate consumer (the forthcoming model-fill stage) must be pub
+  API or clippy `--lib -D warnings` fails dead_code (test-only use doesn't count in the no-cfg-test
+  lib build); matches the exposed pipeline-mechanics modules, not the private CLI glue. (2) MIRRORS
+  not reuses the Z3 subprocess machinery (`spawn_piped`/`drain`/`run_process` + the 4 budget/grace
+  consts) — roadmap "helpers mirror" + the refactor-first rule; extracting a shared cross-crate
+  subprocess runner is a deferred future unit, don't ad-hoc-dedup. (3) `ModelOutcome::Completed{bytes}`
+  intentionally duplicates `ModelRun.stdout_bytes` on a clean exit (the Z3 raw-vs-interpreted split) —
+  only stdout_bytes carries the PARTIAL capture on Timeout/ExitFailure/SpawnFailure, so they diverge
+  there; stdout stays raw bytes (never lossy-decoded — byte-stability is the cassette determinism).
+  Documented to pre-empt a redundancy flag. (4) NO process-fate→DiagnosticCode map here: the §7.4
+  `ai_*` codes are OUTPUT-parse concerns, so process spawn/timeout/exit→diagnostic is
+  stage-model-fill's job; the adapter returns raw outcome data. (5) `set_var` is forbidden
+  (edition-2024 unsafe + crate `#![forbid(unsafe_code)]`) → env policy split into pure
+  `resolve_command(Option<String>)` tested without env mutation; default = neutral role name
+  `ckc-model-runtime`, `CKC_MODEL_COMMAND`-overridable. (6) successful bare-name PATH resolution is
+  covered LIVE in .2 (no `set_var` to inject PATH); .1 proves only that an absent bare name fails at
+  the probe spawn. The committed CLI contract (probe `--identity` → `key=value` lines
+  model_id/quant/runtime_version, parse order-independent/first-wins/all-required-non-empty/model_id a
+  grammatical Id; generation args `--constraint <path> --seed <u64>` + prompt on stdin → generated
+  bytes on stdout) lives in the module consts + docs — model-adapter.2/model-cassette/stage-model-fill
+  + the env-supplied wrapper all bind to it. Tests drive a committed in-source stub (the `COMMITTED_STUB`
+  contract emulator, materialized per-test to a unique temp exec) covering every outcome via two prompt
+  sentinels; `to_string_lossy` on the constraint path is fine for ASCII `schemas/` paths.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —

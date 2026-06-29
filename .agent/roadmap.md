@@ -219,7 +219,7 @@ argument).
   removed caller `dir`, delegation call, compile-fail `return (None, None)`, tuple tail); return type
   spells `ckc_smt::CompiledArtifact` qualified to match the file's non-test convention (no new import).
   Behavior-lock held with zero test edits: 392 passed / 1 ignored, fmt + clippy clean.] 40% 80K/200K
-- [ ] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
+- [x] model-adapter.1: generic env-command ModelAdapter — identity + invoke skeleton. New ckc-cli
   adapter module mirroring `verify.rs` `Z3Adapter`: `ModelAdapter::with_command(name)` resolves a
   BARE command name on PATH (Z3 precedent — `Z3Adapter` runs `z3` by bare name, no literal path / no
   committed config), env-var-overridable; the committed default is a neutral role name, never an
@@ -233,6 +233,16 @@ argument).
   Gate: `cargo test`; probe + invoke drive a committed stub-command fixture (on PATH) deterministically;
   identity parses; outcome enum covers spawn/timeout/exit. [Decision pinned: bare PATH command name +
   committed CLI contract; the wrapper binary is environment-supplied outside git.]
+  [Done: `pub mod model` (landed ahead of its model-fill consumer → pub dodges clippy `--lib`
+  dead_code) mirroring Z3Adapter — `with_command` (env `CKC_MODEL_COMMAND`, else neutral default
+  `ckc-model-runtime`, bare-name PATH) → `--identity` probe parses `ModelIdentity`;
+  `invoke(prompt, constraint, seed, budget)` → `ModelRun{outcome, stdout_bytes, stderr}` with
+  `ModelOutcome` Completed{bytes}/Timeout/ExitFailure/SpawnFailure; the subprocess machinery
+  (`spawn_piped`/`drain`/`run_process` + 4 budget/grace consts) MIRRORED not reused (shared-runner
+  extraction deferred). NO process-fate→DiagnosticCode (stage's job); `set_var`-free env policy via
+  pure `resolve_command`. 12 tests drive a committed in-source stub over every outcome + the parse
+  rejections; gates green (404 passed / 1 ignored, fmt + clippy `-D warnings` clean), zero edits
+  elsewhere.] 76% 151K/200K
 - [ ] model-adapter.2: constrained generation + k-sample (live). Complete `invoke` for real
   constrained decoding — pass the route's grammar/JSON-Schema (from `schemas/`), greedy, fixed seed;
   k-sample convergence draws k recorded samples via per-sample seeds (`seed_i = f(base_seed, i)`);
