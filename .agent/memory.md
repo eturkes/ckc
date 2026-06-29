@@ -137,7 +137,10 @@ full pre-consolidation text lives in git history.
   identity-probe stdout strict `from_utf8`→`IdentityUnparsed`, not lossy (recorded identity = the
   runtime's true bytes; stderr stays lossy/diagnostic). (c) REJECTED — Z3-mirrored, non-realistic, fix-both-not-one —
   `Instant::now()+budget` overflow-panic (absurd Durations) + the ETXTBSY-recover test's sub-60ms
-  vacuous-pass window; folded into the deferred shared-subprocess-runner refactor.
+  vacuous-pass window; folded into the deferred shared-subprocess-runner refactor. The post-grace
+  detached drain is unbounded-worst-case (a descendant holding stdout open + writing forever keeps the
+  thread appending to its `Vec`) — accepted for the local trusted runtime under no-unsafe + no-extra-dep
+  scope, capped or reaped in that same refactor (M2.9 r3 codex).
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —
@@ -246,7 +249,7 @@ full pre-consolidation text lives in git history.
   corpus (model-routes.md etc.) may name engines as landscape — out of scope. Fixtures/test
   values obey this too — use unmistakably-synthetic tokens (`model.baseline`/`fixture_quant`/`1.0.0`),
   since a realistic generic quant/format token still names a real scheme (M2.1 codex follow-up: a
-  real bit-width token had slipped into a fixture whose comment asserted it named none). Audit via a word-boundary grep (`git grep -niP`, the forbidden names bracketed by `\b`), not a bare substring grep — the latter false-matches a transitive dependency name in Cargo.lock.
+  real bit-width token had slipped into a fixture whose comment asserted it named none; RECURRED M2.9 r3 — `q4` slipped into a model-adapter test fixture, the dialect-only de-leak grep missed it). Audit = word-boundary `git grep -niP` (names `\b`-bracketed) over EVERY forbidden category (engines + grammar dialects + quant/model-format tokens `q4`/`gguf`/…), not just one, and not a bare substring grep (false-matches a Cargo.lock dependency name). A `q[2-8]` pattern also hits the `Q1`/`Q2` SMT query labels = skip (domain ids).
 - M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):

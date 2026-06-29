@@ -609,7 +609,7 @@ prompt=$(cat)
 case "$prompt" in
   __TIMEOUT__) sleep 30 ;;
   __EXIT_FAIL__) printf 'partial-out'; printf 'boom-err' 1>&2; exit 4 ;;
-  __CAPTURE_INCOMPLETE__) sleep 3 & printf 'partial' ;;
+  __CAPTURE_INCOMPLETE__) sleep 10 & printf 'partial' ;;
   *) printf 'constraint=%s seed=%s prompt=%s' "$2" "$4" "$prompt" ;;
 esac
 "#;
@@ -809,7 +809,7 @@ esac
 echo "model_id=model.stub"
 echo "quant=stub_quant"
 echo "runtime_version=0.0.0-stub"
-sleep 3 &
+sleep 10 &
 exit 0
 "#;
         let path = write_exec("probeincomplete", HELD_IDENTITY_STUB);
@@ -915,9 +915,10 @@ fi
     // value, ungrammatical model_id).
     #[test]
     fn parse_identity_reads_and_rejects_canned_text() {
-        let ok = parse_identity("model_id=model.x\nquant=q4\nruntime_version=1.2.3\n").unwrap();
+        let ok = parse_identity("model_id=model.x\nquant=fixture_quant\nruntime_version=1.2.3\n")
+            .unwrap();
         assert_eq!(ok.model_id.as_str(), "model.x");
-        assert_eq!(ok.quant, "q4");
+        assert_eq!(ok.quant, "fixture_quant");
         assert_eq!(ok.runtime_version, "1.2.3");
 
         let reordered =

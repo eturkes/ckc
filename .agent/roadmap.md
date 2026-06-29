@@ -248,7 +248,7 @@ argument).
   passed as the constraint path + fixed seed; real constrained-decode VERIFIED live in .2b) + adds k-sample (`derive_seed(base_seed,i)`
   splitmix64 + `ModelSample{seed,run}` + `invoke_samples(prompt,constraint,base_seed,k,budget) ->
   Vec<ModelSample>`, k draws at `seed_i=derive_seed(base_seed,i)`, collects outputs + per-draw run) +
-  HARDENS capture byte-completeness (`#![forbid(unsafe_code)]` rules out a process-group kill → gate
+  HARDENS capture byte-completeness (`#![forbid(unsafe_code)]` rules out an in-crate `libc` process-group reap (a safe one needs an added syscall-wrapper dep) → gate
   `Completed` on stdout reaching EOF within DRAIN_GRACE, else new `ModelOutcome::CaptureIncomplete{bytes}`;
   the bytes are byte-stability-load-bearing). Stub-based tests ride the patch (capture-incomplete on a
   clean-exit-holds-stdout sentinel; derive_seed deterministic+distinct; invoke_samples k reproducible). NO
