@@ -448,6 +448,7 @@ fn group_pipeline(
     shell: &mut Shell,
 ) -> GroupTrace {
     let gid = &group.group_id;
+    let dir = format!("groups/{gid}");
     let mut trace = GroupTrace {
         group_id: gid.clone(),
         test_sources: group.test_sources.clone(),
@@ -484,19 +485,21 @@ fn group_pipeline(
         }
     }
     let (compiled, verifier_results) =
-        compile_verify_group(gid, &members, clock, resolved, adapter, shell);
+        compile_verify_group(gid, &dir, &members, clock, resolved, adapter, shell);
     trace.compiled = compiled;
     trace.verifier_results = verifier_results;
     trace
 }
 
-/// The compile → verify back end over a group's member [`IrBundle`]s, split
-/// from [`group_pipeline`] so a route stage can feed its own validated
-/// bundles. Reuses the caller's `clock` for the compile event (timing-identical
-/// to the inline form), opens a fresh clock for verify. Each tuple slot is
-/// `None` on that processing_stage's failure; a compile failure skips verify.
+/// The compile → verify back end over member [`IrBundle`]s, split from
+/// [`group_pipeline`] so a route stage can feed its own validated bundles +
+/// artifact `dir`. The caller fixes `dir` and opens the COMPILE `clock` ahead
+/// of the timed body, so the compile interval spans the same work as the inline
+/// form; opens a fresh clock for verify. Each tuple slot is `None` on that
+/// processing_stage's failure; a compile failure skips verify.
 fn compile_verify_group(
     group_id: &Id,
+    dir: &str,
     members: &[&ArtifactWrapper<IrBundle>],
     clock: ProcessingStageClock,
     resolved: &Resolved,
@@ -507,7 +510,6 @@ fn compile_verify_group(
     Option<ArtifactWrapper<VerifierResults>>,
 ) {
     let gid = group_id;
-    let dir = format!("groups/{gid}");
     let inputs: Vec<Hash> = members.iter().map(|m| m.content_hash.clone()).collect();
 
     let artifact = compile(
@@ -537,7 +539,7 @@ fn compile_verify_group(
     let landed = built
         .and_then(|env| land(shell, &format!("{dir}/compiled.json"), env))
         .and_then(|env| {
-            materialize_queries(shell, &dir, &env)?;
+            materialize_queries(shell, dir, &env)?;
             Ok(env)
         });
     let Some(compiled) = finish_processing_stage(shell, resolved, COMPILE, clock, inputs, landed)

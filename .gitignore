@@ -20,5 +20,7 @@ __pycache__/
 /corpus/raw/
 /runs/
 
-# Local, machine-scoped Claude notes (e.g. container capability memos)
+# Local, machine-scoped Claude config/notes (committed: .claude/settings.json +
+# commands; .claude/settings.local.json = per-machine permission overlay)
 CLAUDE.local.md
+.claude/settings.local.json

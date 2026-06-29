@@ -93,6 +93,14 @@ full pre-consolidation text lives in git history.
   missing replay pin). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
   gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
   extra impl).
+- Behavior-locked extraction past a timed interval (M2.7 run-refactor, codex follow-up): a
+  `ProcessingStageClock` opens in the CALLER before the extracted call → pure setup (`format!`/alloc)
+  left in the callee body runs INSIDE the timed interval, falsifying a timing-identity claim that byte
+  pins CAN'T catch (`duration_ms` is normalized → tests stay green while the guarantee breaks). Audit
+  clock boundaries when extracting: hoist pre-clock setup to the caller, pass it in — `compile_verify_group`
+  takes `dir: &str` so its `format!("groups/{gid}")` stays outside COMPILE timing (route.single_ir
+  supplies its own dir + clock the same way). The call-boundary overhead itself is inherent + below
+  ms/normalization resolution — only named setup is worth hoisting.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —
