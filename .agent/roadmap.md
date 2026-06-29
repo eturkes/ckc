@@ -153,7 +153,7 @@ argument).
   diagnostics (I/O out of the pure validator); `load_optional` → absent prompts.yaml/schemas.yaml is clean
   (M1 `check` tests unchanged); `prompts.yaml` unseeded (no dangling route ref);
   `committed_model_surface_checks_ok` guards live drift.] 82% 164K/200K
-- [ ] registry-m2.2: experiment pipeline-set binding — type + validation + §14 wording. Generalize
+- [x] registry-m2.2: experiment pipeline-set binding — type + validation + §14 wording. Generalize
   `ExperimentEntry`'s singular `pipeline: Id` to a pipeline SET — add `pipelines: Vec<Id>` +
   `baseline_pipeline: Id` (the §7.3 delta baseline); keep M1's single-pipeline entries valid (accept
   `pipeline` as a one-element set / default). `validate_registries` validates `baseline_pipeline ∈
@@ -168,6 +168,13 @@ argument).
   baseline-not-in-set; `exp.m1_scaffold` still validates. [Decision pinned: experiment binds a
   pipeline set + baseline; faithful to §9 "both routes execute over identical locked inputs
   (`exp.m2_multihop`)". Real `exp.m2_multihop` seeded in run-m2.1, once both route pipelines exist.]
+  [Done: dual binding forms — legacy `pipeline: Option<Id>` + set `pipelines: Vec<Id>`/`baseline_pipeline`,
+  all skip-empty so the M1 `pipeline:` key stays valid + each form round-trips to its own shape;
+  `baseline()`/`resolved_pipelines()` accessors normalize both; form-aware `validate_registries` (match on
+  `(&pipeline, pipelines.as_slice())`) with new `BaselineNotInSet` + `PipelineBinding` findings (CLI consumes
+  findings via Display → no `registry_check.rs` change); `run.rs` executes the single `baseline()` + records
+  `pipelines: [baseline]`, behavior-locked to M1 (run-m2.1 completes the multi-route loop); SPEC §14 ledger
+  amended, §8.4 left M1-singular (no §14 byte-pin).] 66% 131K/200K
 - [ ] run-refactor: behavior-locked deterministic-tail extraction. Refactor `ckc-cli` `run.rs` to
   expose the deterministic ClinicalIR→verdict tail as a reusable fn chaining `derive_norm_ir` →
   `FormalIr::derive` → `emit::compile` → `verdict::verify`, so both the M1 pipeline and

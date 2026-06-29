@@ -155,6 +155,22 @@ full pre-consolidation text lives in git history.
   CLI read-guard (skip reading an unsafe path); don't duplicate. Core fixtures (SCHEMAS included) use
   SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents` (it replaces a
   SCHEMAS hash to forge a bad doc).
+- Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
+  forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
+  Option<Id>` (the §7.3 delta baseline), all `#[serde(default, skip_serializing_if=…)]` so the M1
+  `pipeline:` key stays valid AND each form round-trips back to its own shape (omit-empty). Read the
+  binding through the accessors, never the raw field: `baseline()` (`baseline_pipeline`.or(`pipeline`))
+  and `resolved_pipelines()` (the set, or the single normalized to a one-element vec). `validate_registries`
+  is form-aware (`match (&pipeline, pipelines.as_slice())`): legacy `(Some,[])` w/ no baseline → per-pipeline
+  Dangling; set `(None,[_,..])` → per-member Dangling + baseline must be Some (`Empty{field:"baseline_pipeline"}`)
+  and ∈ set (new `BaselineNotInSet`); anything else (neither, both, or legacy + stray baseline) → new
+  `PipelineBinding`. The CLI consumes findings via `to_string()`/Display (no exhaustive match) → new
+  RegistryFinding variants need ZERO `registry_check.rs` change. `run.rs` deliberately executes ONLY
+  `baseline()` and records `pipelines: vec![baseline]` (behavior-locked to M1) — run-m2.1 completes the
+  multi-route loop (`resolved_pipelines()` + recording the full set) AND seeds the real set-form
+  `exp.m2_multihop` (still unseeded — its route pipelines don't exist yet, would dangle `check`). SPEC: §8.4
+  stays M1-singular (faithful history); the M2 generalization went into §14's registry-evolution ledger
+  (no §14 byte-pin → free prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
 - "Oracle" has two senses; the `terms:`/`codex:` cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim one — `runtime-oracle` → `runtime reference` across IDs/types/prose (results are locked measurements, not an authority on real-world truth). Scope: SPEC.md + Rust + registry/corpus/reference data + IDs + config; `docs/` excluded. The commits cite a replacement map whose contents aren't recoverable from git — so "the map omitted generic `oracle`" is inference; what's verifiable is that only runtime-oracle terms were swapped. The TEST-ORACLE sense (authority deciding a test's pass/fail vs. the reference) persists in `run_oracle.rs` (file + `run_oracle_*` fn) and `rules.rs` (`// THE oracle`); those files passed through the sweep commits unrenamed — survival, not a documented approval — and the phrasing recurs in out-of-scope `docs/` ("test oracle"/"SAT oracle"/"perfect oracle") as ordinary technical usage (corroboration, not proof). SPEC.md has zero "oracle"; no instruction mandates global removal (nearest pull: the general "plain operational words over research jargon" line above). Decision: NARROW — leave the test-sense as-is. A global test-sense retirement (`run_oracle.rs`→`run_reference_check.rs`) stays an OPEN user/style call.

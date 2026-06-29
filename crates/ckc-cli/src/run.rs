@@ -217,17 +217,19 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         )]));
         return None;
     };
-    let Some(pipeline) = candidates
-        .pipelines
-        .iter()
-        .find(|p| p.id == experiment.pipeline)
-    else {
+    // M2 generalizes the experiment to a pipeline set + §7.3 baseline; multi-route
+    // execution lands in run-m2.1. Today the run drives the single baseline pipeline.
+    let Some(baseline) = experiment.baseline() else {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("reason"),
-            format!(
-                "experiment {experiment_id} names undefined pipeline {}",
-                experiment.pipeline
-            ),
+            format!("experiment {experiment_id} binds no pipeline"),
+        )]));
+        return None;
+    };
+    let Some(pipeline) = candidates.pipelines.iter().find(|p| p.id == *baseline) else {
+        shell.diagnostic(invalid_diagnostic(vec![(
+            static_id("reason"),
+            format!("experiment {experiment_id} names undefined pipeline {baseline}"),
         )]));
         return None;
     };
@@ -317,7 +319,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
                 .iter()
                 .map(|g| g.group_id.clone())
                 .collect(),
-            pipelines: vec![experiment.pipeline.clone()],
+            pipelines: vec![baseline.clone()],
             seed: experiment.seed,
             budget: experiment
                 .budget

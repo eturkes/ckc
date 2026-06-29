@@ -103,8 +103,21 @@ pub struct ProcessingStageEntry {
 pub struct ExperimentEntry {
     /// Experiment id (e.g. `exp.m1_scaffold`).
     pub id: Id,
-    /// Pipeline candidate this experiment executes.
-    pub pipeline: Id,
+    /// Legacy single-pipeline binding (M1 form): the pipeline this experiment
+    /// executes, and its own §7.3 baseline. Mutually exclusive with
+    /// `pipelines`; M1 `experiments.yaml` stays valid because the loader accepts
+    /// it as a one-element set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<Id>,
+    /// Pipeline set (M2+): every route the experiment runs over identical locked
+    /// inputs, each route realized as one pipeline. Paired with
+    /// `baseline_pipeline`; mutually exclusive with `pipeline`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pipelines: Vec<Id>,
+    /// §7.3 delta baseline — one of `pipelines`. Omitted for the legacy form,
+    /// where `pipeline` is its own baseline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_pipeline: Option<Id>,
     /// TestSource groups in evaluation order.
     pub test_source_groups: Vec<TestSourceGroup>,
     /// Deterministic seed for any seeded processing_stage.
@@ -116,6 +129,27 @@ pub struct ExperimentEntry {
     /// asserted against this experiment's groups, relative to the
     /// repository root.
     pub expected_outcomes: String,
+}
+
+impl ExperimentEntry {
+    /// The pipelines this experiment executes, in declared order. The legacy
+    /// single `pipeline` normalizes to a one-element vector; the `pipelines`
+    /// set returns as declared. Empty only for a malformed entry binding
+    /// neither (a [`RegistryFinding::PipelineBinding`] the validator raises).
+    pub fn resolved_pipelines(&self) -> Vec<Id> {
+        if self.pipelines.is_empty() {
+            self.pipeline.iter().cloned().collect()
+        } else {
+            self.pipelines.clone()
+        }
+    }
+
+    /// The §7.3 baseline pipeline: `baseline_pipeline` for the set form, or the
+    /// single `pipeline` (its own baseline) for the legacy form. `None` only for
+    /// a malformed entry binding neither.
+    pub fn baseline(&self) -> Option<&Id> {
+        self.baseline_pipeline.as_ref().or(self.pipeline.as_ref())
+    }
 }
 
 /// A §8.2 test_source group: the corpus documents one verdict is computed over.
@@ -283,6 +317,12 @@ pub enum RegistryFinding {
     /// A reference entry asserts a group the referencing experiment does not
     /// define.
     ReferenceGroupUnknown { experiment: Id, group_id: Id },
+    /// An experiment's `baseline_pipeline` is not one of its `pipelines`.
+    BaselineNotInSet { experiment: Id, baseline: Id },
+    /// An experiment does not bind exactly one pipeline form: neither `pipeline`
+    /// nor `pipelines`, both at once, or a legacy `pipeline` carrying a stray
+    /// `baseline_pipeline`.
+    PipelineBinding { experiment: Id },
     /// A prompt entry does not name exactly one nonempty source (`path` xor
     /// `inline`).
     PromptSource { prompt: Id },
@@ -335,6 +375,19 @@ impl fmt::Display for RegistryFinding {
                 write!(
                     f,
                     "experiment {experiment}: reference asserts undefined group {group_id}"
+                )
+            }
+            RegistryFinding::BaselineNotInSet {
+                experiment,
+                baseline,
+            } => write!(
+                f,
+                "experiment {experiment}: baseline_pipeline {baseline} is not one of its pipelines"
+            ),
+            RegistryFinding::PipelineBinding { experiment } => {
+                write!(
+                    f,
+                    "experiment {experiment}: set exactly one of pipeline or pipelines"
                 )
             }
             RegistryFinding::PromptSource { prompt } => {
@@ -452,12 +505,49 @@ pub fn validate_registries(
         &mut findings,
     );
     for experiment in experiments {
-        if !pipeline_ids.contains(&experiment.pipeline) {
-            findings.push(RegistryFinding::Dangling {
-                from: experiment.id.clone(),
-                pool: "pipelines",
-                id: experiment.pipeline.clone(),
-            });
+        match (&experiment.pipeline, experiment.pipelines.as_slice()) {
+            // Legacy single-pipeline form (M1): the pipeline is its own §7.3
+            // baseline; baseline_pipeline pairs with the set form only.
+            (Some(single), []) if experiment.baseline_pipeline.is_none() => {
+                if !pipeline_ids.contains(single) {
+                    findings.push(RegistryFinding::Dangling {
+                        from: experiment.id.clone(),
+                        pool: "pipelines",
+                        id: single.clone(),
+                    });
+                }
+            }
+            // Set form (M2+): every route pipeline must resolve and the §7.3
+            // baseline must be one of them.
+            (None, [_, ..]) => {
+                for pipeline in &experiment.pipelines {
+                    if !pipeline_ids.contains(pipeline) {
+                        findings.push(RegistryFinding::Dangling {
+                            from: experiment.id.clone(),
+                            pool: "pipelines",
+                            id: pipeline.clone(),
+                        });
+                    }
+                }
+                match &experiment.baseline_pipeline {
+                    None => findings.push(RegistryFinding::Empty {
+                        entry: experiment.id.clone(),
+                        field: "baseline_pipeline",
+                    }),
+                    Some(baseline) if !experiment.pipelines.contains(baseline) => {
+                        findings.push(RegistryFinding::BaselineNotInSet {
+                            experiment: experiment.id.clone(),
+                            baseline: baseline.clone(),
+                        })
+                    }
+                    Some(_) => {}
+                }
+            }
+            // Neither form, both forms, or a legacy pipeline carrying a stray
+            // baseline_pipeline → not exactly one valid binding.
+            _ => findings.push(RegistryFinding::PipelineBinding {
+                experiment: experiment.id.clone(),
+            }),
         }
         if experiment.test_source_groups.is_empty() {
             findings.push(RegistryFinding::Empty {
@@ -754,7 +844,16 @@ processing_stages:
         assert_eq!(experiments.len(), 1);
         let exp = &experiments[0];
         assert_eq!(exp.id, id("exp.m1_scaffold"));
-        assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(exp.pipeline, Some(id("pipe.layered_ckcir_to_smt")));
+        // The legacy single pipeline normalizes to a one-element set and is its
+        // own §7.3 baseline.
+        assert_eq!(exp.pipelines, Vec::<Id>::new());
+        assert_eq!(exp.baseline_pipeline, None);
+        assert_eq!(
+            exp.resolved_pipelines(),
+            vec![id("pipe.layered_ckcir_to_smt")]
+        );
+        assert_eq!(exp.baseline(), Some(&id("pipe.layered_ckcir_to_smt")));
         assert_eq!(exp.test_source_groups.len(), 2);
         assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
         assert_eq!(
@@ -947,7 +1046,7 @@ processing_stages:
     #[test]
     fn dangling_references_are_findings() {
         let (corpora, candidates, mut experiments, reference) = valid_set();
-        experiments[0].pipeline = id("pipe.missing");
+        experiments[0].pipeline = Some(id("pipe.missing"));
         assert_eq!(
             validate_registries(&corpora, &candidates, &experiments, &reference),
             vec![RegistryFinding::Dangling {
@@ -976,6 +1075,117 @@ processing_stages:
                 from: id("group.m1_no_conflict"),
                 pool: "corpora",
                 id: id("test_source.m1_missing"),
+            }]
+        );
+    }
+
+    // §14 (M2): an experiment may bind a pipeline SET with a §7.3 baseline. A
+    // well-formed two-route set validates clean and the accessors normalize it;
+    // a missing baseline, a baseline outside the set, a dangling set member,
+    // both binding forms at once, neither form, and a legacy pipeline carrying a
+    // stray baseline each reject. (The legacy single `pipeline` form stays valid
+    // — `validate_accepts_the_m1_set`.)
+    #[test]
+    fn experiment_pipeline_set_validates() {
+        // Two routes over identical inputs: clone the M1 chain under a second id
+        // and bind both, baseline first.
+        fn two_route_set() -> (
+            Vec<CorpusEntry>,
+            Candidates,
+            Vec<ExperimentEntry>,
+            BTreeMap<String, Vec<ReferenceEntry>>,
+        ) {
+            let (corpora, mut candidates, mut experiments, reference) = valid_set();
+            let mut route_b = candidates.pipelines[0].clone();
+            route_b.id = id("pipe.route_b");
+            candidates.pipelines.push(route_b);
+            experiments[0].pipeline = None;
+            experiments[0].pipelines = vec![id("pipe.layered_ckcir_to_smt"), id("pipe.route_b")];
+            experiments[0].baseline_pipeline = Some(id("pipe.layered_ckcir_to_smt"));
+            (corpora, candidates, experiments, reference)
+        }
+
+        // Accept: an in-set baseline; accessors return the set and the baseline.
+        let (corpora, candidates, experiments, reference) = two_route_set();
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![]
+        );
+        round_trip(&experiments[0]);
+        assert_eq!(
+            experiments[0].resolved_pipelines(),
+            vec![id("pipe.layered_ckcir_to_smt"), id("pipe.route_b")]
+        );
+        assert_eq!(
+            experiments[0].baseline(),
+            Some(&id("pipe.layered_ckcir_to_smt"))
+        );
+
+        // Reject: the §7.3 baseline omitted.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].baseline_pipeline = None;
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::Empty {
+                entry: id("exp.m1_scaffold"),
+                field: "baseline_pipeline",
+            }]
+        );
+
+        // Reject: the baseline names a pipeline outside the set.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].baseline_pipeline = Some(id("pipe.not_in_set"));
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::BaselineNotInSet {
+                experiment: id("exp.m1_scaffold"),
+                baseline: id("pipe.not_in_set"),
+            }]
+        );
+
+        // Reject: a set member no candidate defines still dangles.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].pipelines = vec![id("pipe.layered_ckcir_to_smt"), id("pipe.missing")];
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::Dangling {
+                from: id("exp.m1_scaffold"),
+                pool: "pipelines",
+                id: id("pipe.missing"),
+            }]
+        );
+
+        // Reject: both binding forms at once.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].pipeline = Some(id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::PipelineBinding {
+                experiment: id("exp.m1_scaffold"),
+            }]
+        );
+
+        // Reject: neither binding form.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].pipeline = None;
+        experiments[0].pipelines = vec![];
+        experiments[0].baseline_pipeline = None;
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::PipelineBinding {
+                experiment: id("exp.m1_scaffold"),
+            }]
+        );
+
+        // Reject: a legacy single pipeline carrying a stray baseline_pipeline.
+        let (corpora, candidates, mut experiments, reference) = two_route_set();
+        experiments[0].pipeline = Some(id("pipe.layered_ckcir_to_smt"));
+        experiments[0].pipelines = vec![];
+        experiments[0].baseline_pipeline = Some(id("pipe.layered_ckcir_to_smt"));
+        assert_eq!(
+            validate_registries(&corpora, &candidates, &experiments, &reference),
+            vec![RegistryFinding::PipelineBinding {
+                experiment: id("exp.m1_scaffold"),
             }]
         );
     }

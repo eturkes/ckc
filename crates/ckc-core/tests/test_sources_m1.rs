@@ -85,7 +85,8 @@ fn registry_set_loads_and_validates() {
     assert_eq!(experiments.len(), 1);
     let exp = &experiments[0];
     assert_eq!(exp.id, id("exp.m1_scaffold"));
-    assert_eq!(exp.pipeline, id("pipe.layered_ckcir_to_smt"));
+    assert_eq!(exp.pipeline, Some(id("pipe.layered_ckcir_to_smt")));
+    assert_eq!(exp.baseline(), Some(&id("pipe.layered_ckcir_to_smt")));
     assert_eq!(exp.test_source_groups.len(), 2);
     assert_eq!(exp.test_source_groups[0].group_id, id("group.m1_conflict"));
     assert_eq!(

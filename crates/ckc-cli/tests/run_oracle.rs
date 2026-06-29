@@ -868,7 +868,7 @@ mod report {
                 .iter()
                 .map(|g| g.group_id.clone())
                 .collect(),
-            pipelines: vec![exp.pipeline.clone()],
+            pipelines: vec![exp.baseline().unwrap().clone()],
             seed: exp.seed,
             budget: exp.budget.iter().map(|(k, v)| (k.clone(), *v)).collect(),
         };
