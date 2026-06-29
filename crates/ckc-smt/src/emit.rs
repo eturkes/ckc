@@ -1022,7 +1022,7 @@ mod tests {
         "/../../schemas/smt_query.grammar"
     );
     const GRAMMAR_HASH: &str =
-        "sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e";
+        "sha256:d26bbd5b9067a597acdb10855099707677cbfb363229f2bc13242637de0f97f2";
 
     /// The exported grammar is hand-authored — the file IS the source, no
     /// emitter — so a lone hash pin is the whole drift guard: editing

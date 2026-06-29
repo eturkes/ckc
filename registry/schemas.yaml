@@ -4,5 +4,5 @@
   target_kind: clinical_ir
 - id: schema.smt_query
   path: schemas/smt_query.grammar
-  schema_hash: sha256:f14a26688f7540f745d2e00a2b4b3e3a8627ee6ee8819b90d0c04547a011ab6e
+  schema_hash: sha256:d26bbd5b9067a597acdb10855099707677cbfb363229f2bc13242637de0f97f2
   target_kind: smt_query

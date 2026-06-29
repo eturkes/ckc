@@ -191,7 +191,6 @@ full pre-consolidation text lives in git history.
   `schema.clinical_ir`/`schema.smt_query`, `target_kind` = constrained output layer
   `clinical_ir`/`smt_query`; prompt routes are `route.direct_smt`/`route.single_ir`. Drift guard =
   `committed_model_surface_checks_ok` (schemas.yaml hashes must equal the real `schemas/` bytes).
-  Live smt_query grammar hash = `f14a266…` (2492 B; GRAMMAR_HASH const in `ckc-smt/emit.rs` + schemas.yaml).
   The pre-tightening `fb42ee5a…` (2512 B) is dead — codex-review ecca074 tightened the grammar. Roadmap's
   schemas-export.2 spec keeps `fb42ee5a…`/2512 B as faithful .2-era history (not a live value; collapses at
   M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
@@ -247,7 +246,7 @@ full pre-consolidation text lives in git history.
   corpus (model-routes.md etc.) may name engines as landscape — out of scope. Fixtures/test
   values obey this too — use unmistakably-synthetic tokens (`model.baseline`/`fixture_quant`/`1.0.0`),
   since a realistic generic quant/format token still names a real scheme (M2.1 codex follow-up: a
-  real bit-width token had slipped into a fixture whose comment asserted it named none).
+  real bit-width token had slipped into a fixture whose comment asserted it named none). Audit via a word-boundary grep (`git grep -niP`, the forbidden names bracketed by `\b`), not a bare substring grep — the latter false-matches a transitive dependency name in Cargo.lock.
 - M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):
