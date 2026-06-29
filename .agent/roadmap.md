@@ -286,18 +286,50 @@ argument).
   artifact, not a route constraint). Live pass: cross-process SAME-seed byte-stable + schema-valid,
   k-sample seed-pinned per-index-reproducible (machine-local timing/output → `runtime.local.md`); fmt +
   clippy -D + `cargo test --workspace` green. 57% 114K/200K
-- [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's
-  prompt + output as an `ArtifactWrapper` test-source artifact (tracked `corpus/test_sources/` class —
-  origin `ai_generated`, evidence `evidence_discovery_only`, `prompt_template_hash` in the manifest),
-  keyed by (route, source, seed); live calls gated behind an explicit experiment/`--record` flag,
-  default replays the recordings → deterministic, runtime-absent. Extend `replay.rs` hash-compare to
-  cover model artifacts. Reading: `crates/ckc-cli/src/replay.rs`, `shell.rs` artifact writes;
-  `crates/ckc-core/src` ArtifactWrapper + origin/evidence enums; SPEC §9 recorded-bytes replay, §7.1.
-  Gate: `cargo test`; a recorded sample replays byte-identical with the runtime command ABSENT;
-  replay-manifest hashes match. [Acceptance: recorded model I/O replays byte-stably.]
+- [ ] model-cassette.1: §4.4/§9 cassette modules — payload + store (salvage-restore, mechanical, no
+  runtime). The two modules were authored + VERIFIED this session (compiled, 6 unit tests pass), reverted
+  on overflow + salvaged byte-exact → restore: `cp .agent/wip-cassette-core.rs.txt crates/ckc-core/src/cassette.rs`
+  (the §4.4 `CassettePayload` payload — Canonical/CanonRead + lowercase-hex codec) + `cp .agent/wip-cassette-cli.rs.txt
+  crates/ckc-cli/src/cassette.rs` (the `CassetteStore` record/replay IO); wire `crates/ckc-core/src/lib.rs`
+  (`mod cassette;` + `pub use cassette::{CassettePayload, InvalidCassetteHex};`, canon-adjacent slots) +
+  `crates/ckc-cli/src/lib.rs` (`pub mod cassette;` — pub dodges clippy `--lib` dead_code ahead of its
+  stage-model-fill consumer, model.rs precedent). LOCKED (zero re-derivation): payload in ckc-core (needs
+  pub(crate) `RawText`/`emit_u64`/`read_u64`), store in ckc-cli (drives `ModelAdapter`) — mirrors
+  ModelIdentity(data)/ModelAdapter(runtime); output bytes → lowercase-hex in canonical JSON (lossless any
+  bytes, never lossy-decoded — recorded bytes ARE the determinism); cassette = `ArtifactWrapper<CassettePayload>`
+  origin `ai_generated`/evidence `evidence_discovery_only`/effect `ai`, keyed (route, source, seed) at
+  `<root>/cassettes/<route>/<source>/seed-<seed>.json`, configurable root; `record` gated (runtime + clean
+  `Completed`), `replay` default (runtime-ABSENT); `load` validates + key-checks on read-back. Integration
+  DEFERRED (no consumer until): stage-model-fill.1 drives record/replay, run-m2.1 the `--record` surface +
+  replay.rs model-artifact coverage + §9 manifest `prompt_template_hash`. Reading: ONLY this line + the two
+  wip files. Gate: `cargo test --workspace` (6 unit tests pass runtime-absent — 3 payload round-trip/hex,
+  3 store replay/missing/key-mismatch) + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
+  warnings` (expect fmt-only nits on a `.rs.txt` restore). CLOSE: `rm .agent/wip-cassette-core.rs.txt
+  .agent/wip-cassette-cli.rs.txt` (both consumed here); record context-usage; mark DONE (M2 stays IN-PROGRESS).
+- [ ] model-cassette.2: committed test cassette via live bless + runtime-absent replay (the live unit,
+  mirrors model-adapter.2b). Add `crates/ckc-cli/tests/model_cassette.rs` mirroring `tests/model_live.rs`:
+  (a) an `#[ignore]`d bless `record_cassette`, guarded on `CKC_MODEL_COMMAND` unset (default bare-name
+  `ModelAdapter::new()`) — `CassetteStore::new(<repo>/crates/ckc-cli/tests/fixtures)`, `RecordContext` {
+  synthetic `Producer`, `prompt_template_hash = hash_bytes(<synthetic template>)`, budget 120s }, key {
+  `route.fixture`, `test_source.fixture`, seed 42 }, inline prompt + committed `tests/fixtures/bounded_verdict.schema.json`
+  constraint, `store.record(&adapter, &key, prompt, constraint, &ctx)` → writes the cassette; (b) a NORMAL
+  `#[test] replay_committed_cassette` (runtime-ABSENT): `store.replay(&key)` → assert `content_hash ==
+  CASSETTE_HASH` (pinned), `payload.output_bytes()` parses as JSON + schema-validates against the bounded
+  fixture (jsonschema dev-dep), provenance (origin AiGenerated / evidence EvidenceDiscoveryOnly / effects
+  [`Ai`]). LOCKED: committed cassette → `crates/ckc-cli/tests/fixtures/cassettes/route.fixture/test_source.fixture/seed-42.json`
+  (.2b precedent — test artifact, not `corpus/test_sources/` (route units own those) nor `schemas/`);
+  eol-irrelevant (canonical JSON is newline-free); schema-conformance is CONSISTENT WITH `--constraint`
+  honored (necessary not sufficient, the .2b framing). Reading: THIS line + `tests/model_live.rs` (mirror)
+  + the restored `cassette.rs` store API + memory `## Runtime`. Gate: `cargo test --workspace` + fmt +
+  clippy green (the `#[ignore]`d bless compiles, the replay test runs runtime-absent). LIVE: `cargo test
+  -p ckc-cli --test model_cassette record_cassette -- --ignored` records against the env command → commit
+  the cassette → re-pin `CASSETTE_HASH` from `sha256sum` → `cargo test` green. CLOSE: record context-usage;
+  mark DONE (M2 stays IN-PROGRESS).
 - [ ] stage-model-fill.1: model-fill processing stage — core (generic over target). New stage kind
-  `model_fill`: invoke `ModelAdapter` with the route prompt + constraint, parse output → target
-  artifact (ClinicalIR JSON or SMT text; target-generic, config-selected), §4 acceptance-check the
+  `model_fill`: invoke the model through `CassetteStore` (default = replay the committed cassette
+  runtime-absent; `--record` invokes `ModelAdapter` live) with the route prompt + constraint, parse
+  output → target artifact (ClinicalIR JSON or SMT text; target-generic, config-selected), §4
+  acceptance-check the
   parse, emit `ai_schema_violation` on parse/schema fail, emit a §4.6 EventRecord carrying the
   recorded-call count. Seed the `model_fill` `ProcessingStageEntry` (`candidates.yaml`: `kind` =
   `model_fill`, input/output artifact kinds) so route pipelines can reference it. No repair loop /
@@ -377,7 +409,8 @@ argument).
   both route pipelines under one experiment run → per-route `model_fill` → scoring → metrics →
   `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests (populating the
   model/prompt/identity hash fields), over the locked M1 inputs. Tested via REPLAY of the route units'
-  committed cassettes (deterministic, no live call). Reading: `run.rs` execute (route loop), the
+  committed cassettes (deterministic, no live call) — model-fill replays runtime-absent, so replay.rs
+  hash-compare covers the model-stage artifacts. Reading: `run.rs` execute (route loop), the
   routes, metrics, report, manifests; `registry/experiments.yaml`; SPEC §1 command, §9. Gate:
   `cargo test`; `ckc registry check` validates `exp.m2_multihop`; a replay-driven run lands all
   artifacts deterministically; manifests carry the populated identity/hash fields.

@@ -1,0 +1,316 @@
+//! SPEC §9 model cassette store — record/replay of model I/O as committed test
+//! source artifacts, keyed by (route, source, seed).
+//!
+//! Replay (default) reads a committed [`CassettePayload`] wrapper from disk and never
+//! touches the model runtime → deterministic and runtime-absent. Record (gated behind
+//! an explicit `--record`/experiment flag by the caller) invokes [`ModelAdapter`] once
+//! and writes the recording. The recorded bytes ARE the determinism (greedy decode is
+//! byte-stable on a fixed runtime but not across environments, §9), so CI and other
+//! hosts replay the committed cassette rather than re-invoking the runtime.
+//!
+//! This is the store/IO layer; the §4.4 payload type lives in `ckc-core`. Cassettes are
+//! committed inputs under `corpus/test_sources/` (read via the filesystem, not the run
+//! shell, which writes only run-output artifacts).
+
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use ckc_core::{
+    ArtifactWrapper, CanonError, CassettePayload, Effect, EvidenceStatus, Hash, Id, Origin,
+    Producer, WrapperError, canonical_payload_bytes, canonicalization_policy_hash, content_hash,
+    hash_bytes, read_strict_canonical,
+};
+
+use crate::model::{ModelAdapter, ModelOutcome};
+use crate::shell::static_id;
+
+/// Whether the store records live or replays committed cassettes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordMode {
+    /// Invoke the runtime live and write the recording (gated; runtime required).
+    Record,
+    /// Read the committed recording; never invoke the runtime (default).
+    Replay,
+}
+
+/// Identifies one recorded model call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CassetteKey {
+    /// Route whose prompt template + constraint produced the call.
+    pub route: Id,
+    /// Test source the prompt was grounded on.
+    pub source: Id,
+    /// Decoding seed for the sample.
+    pub seed: u64,
+}
+
+/// Provenance + budget for a live recording.
+pub struct RecordContext {
+    /// Producer stamped into the cassette wrapper.
+    pub producer: Producer,
+    /// Raw-byte hash of the route prompt template the prompt was rendered from.
+    pub prompt_template_hash: Hash,
+    /// Wall-clock budget for the model invocation.
+    pub budget: Duration,
+}
+
+/// Reads and writes cassettes under a fixed root (e.g. `corpus/test_sources/`).
+#[derive(Debug, Clone)]
+pub struct CassetteStore {
+    root: PathBuf,
+}
+
+impl CassetteStore {
+    /// A store rooted at `root` (cassettes live under `root/cassettes/...`).
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    /// Path of the cassette for `key`, relative to the store root. Route and source
+    /// are grammatical [`Id`]s (no `/` or `..`), so the components are path-safe.
+    fn relative_path(key: &CassetteKey) -> PathBuf {
+        PathBuf::from("cassettes")
+            .join(key.route.as_str())
+            .join(key.source.as_str())
+            .join(format!("seed-{}.json", key.seed))
+    }
+
+    /// Absolute path of the cassette for `key`.
+    pub fn path_for(&self, key: &CassetteKey) -> PathBuf {
+        self.root.join(Self::relative_path(key))
+    }
+
+    /// Replay a committed cassette without invoking the runtime.
+    pub fn replay(&self, key: &CassetteKey) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+        self.load(key)
+    }
+
+    /// Record a live model call and write the cassette, returning the disk-read-back
+    /// wrapper. Requires the runtime (via `adapter`).
+    pub fn record(
+        &self,
+        adapter: &ModelAdapter,
+        key: &CassetteKey,
+        prompt: &str,
+        constraint: &Path,
+        ctx: &RecordContext,
+    ) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+        let constraint_bytes = std::fs::read(constraint).map_err(CassetteError::Io)?;
+        let constraint_hash = hash_bytes(&constraint_bytes);
+
+        let run = adapter.invoke(prompt, constraint, key.seed, ctx.budget);
+        let output = match run.outcome {
+            ModelOutcome::Completed { bytes } => bytes,
+            other => return Err(CassetteError::Incomplete(format!("{other:?}"))),
+        };
+
+        let payload = CassettePayload::from_output(
+            key.route.clone(),
+            key.source.clone(),
+            key.seed,
+            prompt.to_owned(),
+            constraint_hash,
+            ctx.prompt_template_hash.clone(),
+            adapter.identity().clone(),
+            &output,
+        );
+        let wrapper = self.build_wrapper(key, payload, ctx.producer.clone())?;
+        self.persist(key, wrapper)
+    }
+
+    /// Wrap a payload as the §4.4 cassette artifact (origin `ai_generated`, evidence
+    /// `evidence_discovery_only`, effect `ai`) and confirm it validates.
+    fn build_wrapper(
+        &self,
+        key: &CassetteKey,
+        payload: CassettePayload,
+        producer: Producer,
+    ) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+        let artifact_id = format!(
+            "model_cassette.{}.{}.seed-{}",
+            key.route.as_str(),
+            key.source.as_str(),
+            key.seed
+        )
+        .parse::<Id>()
+        .map_err(|_| CassetteError::DerivedId)?;
+        let content_hash = content_hash(&payload).map_err(CassetteError::Emit)?;
+        let wrapper = ArtifactWrapper {
+            schema_id: static_id("schema.model_cassette"),
+            artifact_id,
+            artifact_kind: static_id("model_cassette"),
+            producer,
+            input_hashes: vec![],
+            content_hash,
+            canonicalization_policy_hash: canonicalization_policy_hash(),
+            origin: Origin::AiGenerated,
+            evidence_status: EvidenceStatus::EvidenceDiscoveryOnly,
+            external_effects: vec![Effect::Ai],
+            trace_refs: vec![],
+            diagnostics: vec![],
+            runtime_metadata: vec![],
+            payload,
+        };
+        wrapper.validate().map_err(CassetteError::Wrapper)?;
+        Ok(wrapper)
+    }
+
+    /// Write the wrapper, then return the disk-read-back value (disk truth, mirroring
+    /// the run-shell `land` discipline).
+    fn persist(
+        &self,
+        key: &CassetteKey,
+        wrapper: ArtifactWrapper<CassettePayload>,
+    ) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+        let bytes = canonical_payload_bytes(&wrapper).map_err(CassetteError::Emit)?;
+        let path = self.path_for(key);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(CassetteError::Io)?;
+        }
+        std::fs::write(&path, &bytes).map_err(CassetteError::Io)?;
+        self.load(key)
+    }
+
+    /// Read, parse, validate, and key-check the cassette for `key`.
+    fn load(&self, key: &CassetteKey) -> Result<ArtifactWrapper<CassettePayload>, CassetteError> {
+        let bytes = std::fs::read(self.path_for(key)).map_err(CassetteError::Io)?;
+        let wrapper: ArtifactWrapper<CassettePayload> =
+            read_strict_canonical(&bytes).map_err(|e| CassetteError::Canon(format!("{e}")))?;
+        wrapper.validate().map_err(CassetteError::Wrapper)?;
+        if wrapper.payload.route != key.route
+            || wrapper.payload.source != key.source
+            || wrapper.payload.seed != key.seed
+        {
+            return Err(CassetteError::KeyMismatch);
+        }
+        Ok(wrapper)
+    }
+}
+
+/// Failure recording or replaying a cassette.
+#[derive(Debug)]
+pub enum CassetteError {
+    /// Filesystem read/write failed (a missing cassette surfaces here on replay).
+    Io(std::io::Error),
+    /// Committed cassette bytes are not strict canonical JSON for the wrapper.
+    Canon(String),
+    /// Canonical emission of the wrapper failed.
+    Emit(CanonError),
+    /// The wrapper failed §4.4 validation.
+    Wrapper(WrapperError),
+    /// The live recording did not return a clean `Completed` output.
+    Incomplete(String),
+    /// The cassette at the keyed path records a different (route, source, seed).
+    KeyMismatch,
+    /// The derived cassette artifact id is not a grammatical [`Id`] (defensive).
+    DerivedId,
+}
+
+impl std::fmt::Display for CassetteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CassetteError::Io(e) => write!(f, "cassette io: {e}"),
+            CassetteError::Canon(e) => write!(f, "cassette parse: {e}"),
+            CassetteError::Emit(e) => write!(f, "cassette emit: {e}"),
+            CassetteError::Wrapper(e) => write!(f, "cassette wrapper invalid: {e}"),
+            CassetteError::Incomplete(o) => write!(f, "recording incomplete: {o}"),
+            CassetteError::KeyMismatch => f.write_str("cassette key mismatch at path"),
+            CassetteError::DerivedId => f.write_str("derived cassette id is not grammatical"),
+        }
+    }
+}
+
+impl std::error::Error for CassetteError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ckc_core::ModelIdentity;
+
+    fn producer() -> Producer {
+        Producer {
+            pipeline_id: static_id("pipe.test"),
+            pipeline_step_id: static_id("processing_stage.test.model_fill"),
+            toolchain_manifest_hash: hash_bytes(b"toolchain"),
+        }
+    }
+
+    fn key() -> CassetteKey {
+        CassetteKey {
+            route: "route.fixture".parse().unwrap(),
+            source: "test_source.fixture".parse().unwrap(),
+            seed: 42,
+        }
+    }
+
+    fn payload_for(k: &CassetteKey, output: &[u8]) -> CassettePayload {
+        CassettePayload::from_output(
+            k.route.clone(),
+            k.source.clone(),
+            k.seed,
+            "prompt body".to_owned(),
+            hash_bytes(b"constraint"),
+            hash_bytes(b"prompt template"),
+            ModelIdentity {
+                model_id: "model.fixture".parse().unwrap(),
+                quant: "fixture_quant".to_owned(),
+                runtime_version: "1.0.0".to_owned(),
+            },
+            output,
+        )
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("ckc-cassette-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    // Runtime-absent: persist a synthetic cassette, then replay it byte-stably.
+    #[test]
+    fn replay_round_trips_without_runtime() {
+        let dir = temp_dir("rt");
+        let store = CassetteStore::new(&dir);
+        let k = key();
+        let wrapper = store
+            .build_wrapper(&k, payload_for(&k, &[0x00, 0xff, 0x7b, 0x0a]), producer())
+            .unwrap();
+        let written = store.persist(&k, wrapper.clone()).unwrap();
+        let replayed = store.replay(&k).unwrap();
+        assert_eq!(written, replayed);
+        assert_eq!(replayed.content_hash, wrapper.content_hash);
+        assert_eq!(replayed.payload.output_bytes().unwrap(), [0x00, 0xff, 0x7b, 0x0a]);
+        assert_eq!(replayed.origin, Origin::AiGenerated);
+        assert_eq!(replayed.evidence_status, EvidenceStatus::EvidenceDiscoveryOnly);
+        assert_eq!(replayed.external_effects, vec![Effect::Ai]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn missing_cassette_is_io_error() {
+        let store = CassetteStore::new(temp_dir("missing"));
+        assert!(matches!(store.replay(&key()), Err(CassetteError::Io(_))));
+    }
+
+    // A cassette filed at the wrong key path is rejected. (`persist` itself
+    // key-checks on read-back, so the bytes are written directly to bypass it.)
+    #[test]
+    fn key_mismatch_rejected() {
+        let dir = temp_dir("mismatch");
+        let store = CassetteStore::new(&dir);
+        let filed = key();
+        let other = CassetteKey {
+            source: "test_source.other".parse().unwrap(),
+            ..filed.clone()
+        };
+        let wrapper = store
+            .build_wrapper(&other, payload_for(&other, b"x"), producer())
+            .unwrap();
+        let bytes = canonical_payload_bytes(&wrapper).unwrap();
+        let path = store.path_for(&filed);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(matches!(store.replay(&filed), Err(CassetteError::KeyMismatch)));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}

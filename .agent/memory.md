@@ -53,8 +53,9 @@ full pre-consolidation text lives in git history.
   pinned bytes is a deliverable, not a session preamble; crate foundations pair only with a
   small type surface (one payload module per foundation unit); deterministic code paired with a SLOW or
   exploratory live confirm over an external runtime = two units (code stub-gated + mechanical; the live
-  confirm its own unit — model-adapter.2 overflowed pairing them, ~24s/call + a one-time weak-model
-  degeneration discovery), and recovering such an overflow discharges that one-time exploration into memory
+  confirm its own unit — model-adapter.2 (~24s/call + a one-time weak-model degeneration
+  discovery) then model-cassette (modules + a live bless) both overflowed pairing them → apply to
+  EVERY live-runtime-gated unit at plan time, not only the obviously-slow), and recovering such an overflow discharges that one-time exploration into memory
   `## Runtime` + persists any session-scratchpad tool the live unit needs to a stable machine-local path
   (on PATH for a bare-name command) so the redo is a checklist. Measured anchors (checked
   roadmap stubs carry the `NN%` figures): canonical JSON = five units; a five-layer recursive
@@ -141,6 +142,20 @@ full pre-consolidation text lives in git history.
   detached drain is unbounded-worst-case (a descendant holding stdout open + writing forever keeps the
   thread appending to its `Vec`) — accepted for the local trusted runtime under no-unsafe + no-extra-dep
   scope, capped or reaped in that same refactor (M2.9 r3 codex).
+- Model cassette (§4.4/§9, model-cassette.1 modules + .2 live bless). Crate split mirrors
+  ModelIdentity(data, ckc-core)/ModelAdapter(runtime, ckc-cli): `CassettePayload` in ckc-core (needs
+  pub(crate) `RawText`/`emit_u64`/`read_u64`), `CassetteStore` record/replay IO in ckc-cli (drives
+  `ModelAdapter`). Recorded bytes → lowercase-hex in canonical JSON: lossless for any bytes incl. non-UTF-8,
+  and NEVER lossy-decoded — the recorded bytes ARE the determinism (greedy is byte-stable on a fixed host
+  but not cross-environment, §9 → replay the committed cassette, never re-invoke). Cassette =
+  `ArtifactWrapper<CassettePayload>` origin `ai_generated`/evidence `evidence_discovery_only`/effect `ai`,
+  keyed (route, source, seed) at `<root>/cassettes/<route>/<source>/seed-<seed>.json`; `replay` (default)
+  runtime-ABSENT, `record` (gated) needs the runtime + a clean `Completed`. Committed TEST cassette →
+  `crates/ckc-cli/tests/fixtures/cassettes/...` (.2b precedent — test artifact, NOT `corpus/test_sources/`
+  (route units own those) NOR `schemas/`), blessed via an `#[ignore]`d `CKC_MODEL_COMMAND`-unset-guarded
+  test mirroring `tests/model_live.rs`, content-hash-pinned. DEFERRED (module-now/integrate-later, user
+  decision — no in-pipeline consumer yet): stage-model-fill.1 drives record/replay, run-m2.1 owns the
+  `--record` surface + replay.rs model-artifact coverage + §9 manifest `prompt_template_hash`.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —
