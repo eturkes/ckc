@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bounded verdict (model-adapter.2b live-conformance fixture)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "actionable"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["conflict", "no_conflict", "unknown"] },
+    "actionable": { "type": "boolean" }
+  }
+}

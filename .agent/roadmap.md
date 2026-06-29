@@ -263,7 +263,7 @@ argument).
   by the gate. Gates green: 409 passed / 1 ignored, fmt + clippy `-D warnings` clean. Patch deleted; memory
   derive_seed values pruned (now test-pinned).] 46% 92K/200K
 - [x] model-adapter.2a-codexfix: round-2 /codex-review fixes on committed .2a (9ae5773), two commits. C1 (1b2e09d): #1 High — run_process loads stdout_eof BEFORE the stdout snapshot (race → no Completed over stale truncated bytes); #2-4 ModelRun/DRAIN_GRACE doc honesty (Timeout typically-prefix, ExitFailure completeness UNPROVEN, residual drain-thread/stdin-writer accepted under forbid(unsafe)); #5 derive_seed doc; #7 probe_holding_stdout_open_fails_construction test; #9 memory staleness pruned. C2: #8 engine-name de-leak — grammar comment scrub + roadmap 98/99/110 + memory live-hash line dropped, grammar sha256 re-pinned (d26bbd5b, 2489 B) at emit.rs + schemas.yaml; durable word-boundary audit-grep note (substring grep false-matches a Cargo.lock dep). Gates 410 passed/1 ignored, fmt + clippy -D clean. 62% 123K/200K
-- [ ] model-adapter.2b: live end-to-end confirm through the adapter (the §9 runtime properties).
+- [x] model-adapter.2b: live end-to-end confirm through the adapter (the §9 runtime properties).
   Add a committed `#[ignore]`d live integration test driving the .2a adapter against the env command by
   its DEFAULT bare name (covers the .1-deferred live PATH resolution): probe → identity parses; `invoke`
   twice (one inline prompt + a committed `schemas/` constraint + one seed) → byte-identical (greedy
@@ -280,6 +280,10 @@ argument).
   `.agent/runtime.local.md` + the .2a adapter API + SPEC §9. Gate: `cargo test --workspace` + fmt + clippy green (the ignored test compiles,
   normal runs skip it); LIVE — `cargo test <fn> -- --ignored` passes against the env command; record the
   live results in `.agent/runtime.local.md` (machine-specific) + agnostic conclusions in memory `## Runtime`. CLOSE: record context-usage; mark DONE (M2 stays IN-PROGRESS).
+  DONE: `tests/model_live.rs` (`#[ignore]`d, `cargo test -p ckc-cli --test model_live -- --ignored`) +
+  `tests/fixtures/bounded_verdict.schema.json` (bounded enum+bool; in `tests/` not `schemas/` — test
+  artifact, not a route constraint). Live pass 80.87s/8-gen (output `{"verdict":"unknown","actionable":false}`
+  byte-stable + schema-valid, k-sample seed-pinned); fmt + clippy -D + `cargo test --workspace` green. 57% 114K/200K
 - [ ] model-cassette: recorded model I/O as test-source artifacts + replay. Record each model call's
   prompt + output as an `ArtifactWrapper` test-source artifact (tracked `corpus/test_sources/` class —
   origin `ai_generated`, evidence `evidence_discovery_only`, `prompt_template_hash` in the manifest),

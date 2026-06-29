@@ -327,7 +327,8 @@ observed outputs/degeneration) are machine-specific + drift → recorded in giti
 `.agent/runtime.local.md`, keeping the committed deliverable engine-agnostic (Policy). Engine-agnostic
 conclusions the committed code + units rely on:
 - The §9 runtime command installs on PATH under the adapter's default bare name → `ModelAdapter::
-  with_command`'s default resolves it live (`.2b`); install/invocation specifics → `runtime.local.md`.
+  new()` resolves it live — CONFIRMED end-to-end (`.2b` `model_live` test); install/invocation specifics
+  → `runtime.local.md`.
 - Greedy decoding = deterministic argmax → output BYTE-STABLE within + across processes on a fixed
   host/runtime build, and SEED-INERT (argmax ignores the seed) → `invoke_samples`' k per-seed draws
   coincide under greedy (sample diversity needs a sampling config → downstream, see M2-plan).
@@ -336,7 +337,14 @@ conclusions the committed code + units rely on:
 - Constraint mechanism: OBSERVED to honor a bounded schema (complete + valid terminating instance) on the
   local runtime; a permissive full schema lets a weak greedy model degenerate (whitespace loop →
   truncated/invalid) = expected weak-baseline failure, not a mechanism fault. A LOCAL OBSERVATION, NOT an
-  engine-general guarantee → `.2b` is the proof point (asserts output parses + schema-validates against a
-  committed bounded-schema fixture).
+  engine-general guarantee → PROVEN by the `.2b` `model_live` test (constrained output parses +
+  schema-validates against the committed bounded fixture).
 - `derive_seed` exact splitmix64 draws (engine-agnostic, replay-load-bearing) are pinned in the
-  `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy.
+  `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy;
+  the `.2b` `model_live` test re-asserts them live through `invoke_samples`.
+- `.2b` DONE — `crates/ckc-cli/tests/model_live.rs` (`#[ignore]`d; `cargo test -p ckc-cli --test
+  model_live -- --ignored`) is the standing live proof of the §9 runtime properties (read the test, not a
+  copy: PATH-resolved `new()`, cross-process byte-stability, complete `Completed` capture, constraint-
+  conformance, seed-pinned reproducible k-sample draws, greedy seed-inert coincidence). Its bounded
+  enum+bool constraint fixture lives in `tests/fixtures/`, deliberately NOT `schemas/` (a test artifact,
+  not a production route constraint; the plan-line "schemas/ constraint" was shorthand — don't relocate).
