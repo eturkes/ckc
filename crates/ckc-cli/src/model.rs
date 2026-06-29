@@ -68,9 +68,14 @@ const IDENTITY_PROBE_BUDGET: Duration = Duration::from_secs(10);
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 /// Post-fate bound on draining the I/O threads. A dead process with no
-/// orphans reaches EOF in microseconds; anything still unfinished at the
-/// bound is a pipe held open by an orphaned grandchild, and the runner
-/// snapshots partial output and detaches rather than wait it out.
+/// orphans clears a pipe-sized output in microseconds; output still
+/// unfinished at the bound is a slow or very large (yet finite) drain, or a
+/// pipe an orphaned grandchild holds open. Either way the runner snapshots
+/// what drained and detaches rather than wait it out — so a detached drain
+/// thread (and, for a large prompt a descendant never reads, a blocked stdin
+/// writer) can outlive the call until the descendant closes the pipe, a
+/// per-call residual the `forbid(unsafe)` no-process-group-kill stance
+/// accepts.
 const DRAIN_GRACE: Duration = Duration::from_secs(1);
 
 /// ETXTBSY grace for spawning. A freshly written wrapper or just-linked
@@ -216,14 +221,16 @@ impl ModelAdapter {
 /// kept as bytes (never lossy-decoded) because the generated output is
 /// recorded byte-for-byte for the cassette and its determinism is
 /// byte-stability. It is the full output exactly when the outcome is
-/// [`ModelOutcome::Completed`] (stdout reached EOF). A `Timeout` leaves a
-/// prefix (the process was killed at its budget); a
-/// [`ModelOutcome::CaptureIncomplete`] leaves a capture of UNPROVEN
+/// [`ModelOutcome::Completed`] (stdout reached EOF). Every other outcome
+/// carries whatever the post-fate snapshot drained, completeness unproven: a
+/// `Timeout` is typically a prefix of the killed process's output, though a
+/// descendant surviving the budget kill can add bytes past it; a
+/// [`ModelOutcome::CaptureIncomplete`] is a clean-exit capture of UNPROVEN
 /// completeness (EOF unseen within the grace — possibly the whole output,
-/// possibly a prefix); an `ExitFailure` usually leaves the whole output (a
-/// nonzero exit still closes its own pipes, so stdout reaches EOF) unless a
-/// descendant held the pipe open. `stderr` is the diagnostic stream, lossily
-/// decoded.
+/// possibly a prefix); an `ExitFailure` is not EOF-gated, so usually the
+/// whole output (a nonzero exit closes its own pipes) but short when a
+/// descendant holds the pipe open or a slow or very large drain has not
+/// finished at the grace. `stderr` is the diagnostic stream, lossily decoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelRun {
     pub outcome: ModelOutcome,
@@ -326,10 +333,12 @@ fn resolve_command(env_override: Option<String>) -> String {
 /// Per-sample seed for a k-sample draw: `seed_i = f(base_seed, i)`. A
 /// splitmix64 finalizer over `base_seed + i·φ` (the 64-bit golden-ratio odd
 /// constant). Deterministic and reproducible — the cassette re-derives the
-/// same seed for `(base_seed, i)` — while decorrelating sequential `i`, so a
-/// runtime seeding its PRNG from the value draws independent samples rather
-/// than near-duplicates off adjacent seeds. Pure (no env, no `unsafe`),
-/// hence directly unit-tested.
+/// same seed for `(base_seed, i)` — while decorrelating sequential `i`, so
+/// adjacent samples seed a runtime's PRNG from unrelated values rather than
+/// the near-duplicates raw adjacent seeds would feed it; whether that turns
+/// into diverse draws is the runtime's decoding mode, out of scope here (see
+/// [`invoke_samples`](ModelAdapter::invoke_samples)). Pure (no env, no
+/// `unsafe`), hence directly unit-tested.
 fn derive_seed(base_seed: u64, i: u32) -> u64 {
     let mut z = base_seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -532,9 +541,16 @@ fn run_process(program: &Path, args: &[&OsStr], stdin_bytes: &[u8], budget: Dura
             .expect("drain readers never panic holding the lock")
             .clone()
     };
+    // Load the EOF flag BEFORE snapshotting stdout. The drain thread sets eof
+    // only after appending its final chunk, so observing eof=true means the
+    // snapshot that follows holds the whole output. Snapshotting first would
+    // let a slow drain append-and-finish in the gap before the load, minting a
+    // `Completed` over stale, truncated bytes — the corruption the EOF gate
+    // exists to preclude. (eof=false is conservatively safe: it yields
+    // `CaptureIncomplete` regardless of how much the snapshot caught.)
+    let stdout_complete = stdout_eof.load(Ordering::SeqCst);
     let stdout_bytes = snapshot(&stdout_buf);
     let stderr = String::from_utf8_lossy(&snapshot(&stderr_buf)).into_owned();
-    let stdout_complete = stdout_eof.load(Ordering::SeqCst);
 
     let outcome = match fate {
         Fate::TimedOut => ModelOutcome::Timeout,
@@ -779,6 +795,31 @@ esac
             }
         );
         assert_eq!(run.stdout_bytes, b"partial");
+        fs::remove_file(&path).unwrap();
+    }
+
+    // Probe capture-incomplete: an identity probe whose stdout a backgrounded
+    // descendant holds open past the drain grace is unproven-complete, so
+    // construction rejects it (`Probe`) rather than trust a possibly-truncated
+    // identity — the EOF gate guarding the probe as it guards a recorded run.
+    // Takes ~`DRAIN_GRACE`.
+    #[test]
+    fn probe_holding_stdout_open_fails_construction() {
+        const HELD_IDENTITY_STUB: &str = r#"#!/bin/sh
+echo "model_id=model.stub"
+echo "quant=stub_quant"
+echo "runtime_version=0.0.0-stub"
+sleep 3 &
+exit 0
+"#;
+        let path = write_exec("probeincomplete", HELD_IDENTITY_STUB);
+        match ModelAdapter::with_command(&path) {
+            Err(ModelAdapterError::Probe { detail }) => assert!(
+                detail.contains("never reached EOF"),
+                "probe error should cite the EOF gate: {detail}"
+            ),
+            other => panic!("expected probe capture-incomplete failure, got {other:?}"),
+        }
         fs::remove_file(&path).unwrap();
     }
 
