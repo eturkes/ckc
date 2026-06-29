@@ -19,6 +19,7 @@
 //! land in `model-adapter.2`; diagnostic mapping of a process failure is the
 //! §7.4 model-fill stage's job, so the adapter returns raw outcome data.
 
+use std::ffi::OsStr;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -102,7 +103,12 @@ impl ModelAdapter {
     /// identity.
     pub fn with_command(command: impl Into<PathBuf>) -> Result<Self, ModelAdapterError> {
         let program = command.into();
-        let probe = run_process(&program, &[IDENTITY_PROBE_FLAG], b"", IDENTITY_PROBE_BUDGET);
+        let probe = run_process(
+            &program,
+            &[OsStr::new(IDENTITY_PROBE_FLAG)],
+            b"",
+            IDENTITY_PROBE_BUDGET,
+        );
         match &probe.outcome {
             ModelOutcome::Completed { .. } => {}
             ModelOutcome::Timeout => {
@@ -125,7 +131,12 @@ impl ModelAdapter {
                 });
             }
         }
-        let identity = parse_identity(&String::from_utf8_lossy(&probe.stdout_bytes))
+        let reply = std::str::from_utf8(&probe.stdout_bytes).map_err(|_| {
+            ModelAdapterError::IdentityUnparsed {
+                detail: "identity reply is not valid UTF-8".to_owned(),
+            }
+        })?;
+        let identity = parse_identity(reply)
             .map_err(|detail| ModelAdapterError::IdentityUnparsed { detail })?;
         Ok(ModelAdapter { program, identity })
     }
@@ -142,27 +153,30 @@ impl ModelAdapter {
     /// back on stdout. The subprocess is killed on expiry; every fate —
     /// completed bytes, timeout, exit failure, spawn failure — comes back as
     /// data in the [`ModelRun`], with whatever stdout/stderr drained before
-    /// the end. This skeleton passes the constraint path verbatim;
+    /// the end. This skeleton passes the constraint path verbatim — argv
+    /// carries it as `OsStr`, lossless even for a non-UTF-8 path — so
     /// compiling it to the runtime's constraint format is the wrapper's job
     /// (and the live constrained decoding wiring is `model-adapter.2`).
     pub fn invoke(&self, prompt: &str, constraint: &Path, seed: u64, budget: Duration) -> ModelRun {
-        let constraint = constraint.to_string_lossy();
         let seed = seed.to_string();
         let args = [
-            CONSTRAINT_FLAG,
-            constraint.as_ref(),
-            SEED_FLAG,
-            seed.as_str(),
+            OsStr::new(CONSTRAINT_FLAG),
+            constraint.as_os_str(),
+            OsStr::new(SEED_FLAG),
+            OsStr::new(&seed),
         ];
         run_process(&self.program, &args, prompt.as_bytes(), budget)
     }
 }
 
-/// One model-runtime subprocess, raw. `stdout_bytes` holds everything
-/// drained from stdout — kept as bytes (never lossy-decoded) because the
-/// generated output is recorded byte-for-byte for the cassette and its
-/// determinism is byte-stability; it is partial when a budget kill landed
-/// first. `stderr` is the diagnostic stream, lossily decoded.
+/// One model-runtime subprocess, raw. `stdout_bytes` holds the stdout
+/// drained within the run's budget plus the post-fate [`DRAIN_GRACE`] —
+/// kept as bytes (never lossy-decoded) because the generated output is
+/// recorded byte-for-byte for the cassette and its determinism is
+/// byte-stability. It is the complete output for a well-behaved runtime
+/// (one that closes stdout before exiting), but partial when a budget kill
+/// landed first or a descendant outlived the exit still holding the pipe
+/// open past the grace. `stderr` is the diagnostic stream, lossily decoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelRun {
     pub outcome: ModelOutcome,
@@ -173,12 +187,18 @@ pub struct ModelRun {
 /// Process fate of one model invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelOutcome {
-    /// Exit status zero: `bytes` is the full generated output. Mirrors
-    /// `Z3Adapter`'s success-only payload — the model adapter parses
-    /// nothing (the §7.4 schema/grounding parse is the model-fill stage's
-    /// job), so a completed run's "result" is simply its output bytes. The
-    /// same bytes are also in [`ModelRun::stdout_bytes`], which additionally
-    /// carries the partial capture on a timeout or failure.
+    /// Exit status zero. `bytes` is the stdout drained before exit closed
+    /// the pipe: the full output for a well-behaved runtime (one that closes
+    /// stdout before exiting), but only the pre-[`DRAIN_GRACE`] prefix if a
+    /// descendant outlives the exit still holding the pipe open (see
+    /// [`ModelRun::stdout_bytes`]). Mirrors `Z3Adapter`'s success-only
+    /// payload — the adapter parses nothing (the §7.4 schema/grounding parse
+    /// is the model-fill stage's job), so a completed run's "result" is
+    /// simply its output bytes, also in [`ModelRun::stdout_bytes`].
+    /// Guaranteeing completeness against a pipe-holding descendant (a
+    /// process-group kill or an EOF-gated capture outcome) lands with the
+    /// cassette recording in `model-adapter.2`/`model-cassette`, where these
+    /// bytes become byte-stability load-bearing.
     Completed { bytes: Vec<u8> },
     /// The wall-clock budget expired and the process was killed.
     Timeout,
@@ -303,7 +323,7 @@ fn drain<R: Read + Send + 'static>(pipe: R) -> (JoinHandle<()>, Arc<Mutex<Vec<u8
 /// on `ExecutableFileBusy` (ETXTBSY) within [`SPAWN_BUSY_GRACE`]. Every
 /// other error returns at once, preserving the caller's spawn-failure
 /// mapping.
-fn spawn_piped(program: &Path, args: &[&str]) -> std::io::Result<Child> {
+fn spawn_piped(program: &Path, args: &[&OsStr]) -> std::io::Result<Child> {
     let deadline = Instant::now() + SPAWN_BUSY_GRACE;
     loop {
         match Command::new(program)
@@ -336,7 +356,7 @@ fn spawn_piped(program: &Path, args: &[&str]) -> std::io::Result<Child> {
 /// stall the runner. Mirrors `ckc_smt::verify`'s `run_process`, but the
 /// stdout stays raw bytes and a clean exit yields [`ModelOutcome::Completed`]
 /// rather than a parsed verdict.
-fn run_process(program: &Path, args: &[&str], stdin_bytes: &[u8], budget: Duration) -> ModelRun {
+fn run_process(program: &Path, args: &[&OsStr], stdin_bytes: &[u8], budget: Duration) -> ModelRun {
     let mut child = match spawn_piped(program, args) {
         Ok(child) => child,
         Err(error) => {
@@ -424,6 +444,7 @@ fn run_process(program: &Path, args: &[&str], stdin_bytes: &[u8], budget: Durati
 mod tests {
     use super::*;
     use std::fs;
+    use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::PermissionsExt;
 
     /// Write an executable stub script, named uniquely per test for parallel
@@ -498,6 +519,29 @@ esac
 
         let again = adapter.invoke("hello", constraint, 7, Duration::from_secs(30));
         assert_eq!(again.stdout_bytes, run.stdout_bytes);
+        fs::remove_file(&path).unwrap();
+    }
+
+    // The constraint path reaches the runtime verbatim even when it is not
+    // valid UTF-8: argv carries it as `OsStr`, so a 0xFF byte survives
+    // rather than being lossy-rewritten (which would break a wrapper opening
+    // the path). Guards the committed verbatim contract against a
+    // `to_string_lossy` regression.
+    #[test]
+    fn invoke_passes_non_utf8_constraint_path_verbatim() {
+        let path = committed_stub("nonutf8path");
+        let adapter = ModelAdapter::with_command(&path).unwrap();
+        let constraint = Path::new(OsStr::from_bytes(b"schemas/g\xff.grammar"));
+
+        let run = adapter.invoke("p", constraint, 7, Duration::from_secs(30));
+        let expected = b"constraint=schemas/g\xff.grammar seed=7 prompt=p".to_vec();
+        assert_eq!(
+            run.outcome,
+            ModelOutcome::Completed {
+                bytes: expected.clone()
+            }
+        );
+        assert_eq!(run.stdout_bytes, expected);
         fs::remove_file(&path).unwrap();
     }
 
@@ -581,6 +625,29 @@ fi
         match ModelAdapter::with_command(&path) {
             Err(ModelAdapterError::IdentityUnparsed { detail }) => {
                 assert!(detail.contains("runtime_version"), "detail {detail:?}")
+            }
+            other => panic!("expected identity-unparsed, got {other:?}"),
+        }
+        fs::remove_file(&path).unwrap();
+    }
+
+    // A runtime whose --identity reply carries invalid UTF-8 fails
+    // construction strictly, rather than lossy-decoding the recorded
+    // identity into replacement characters.
+    #[test]
+    fn non_utf8_identity_fails_construction() {
+        let script = r#"#!/bin/sh
+if [ "$1" = "--identity" ]; then
+  printf 'model_id=model.x\nquant=q\nruntime_version='
+  printf '\377'
+  printf '\n'
+  exit 0
+fi
+"#;
+        let path = write_exec("nonutf8identity", script);
+        match ModelAdapter::with_command(&path) {
+            Err(ModelAdapterError::IdentityUnparsed { detail }) => {
+                assert!(detail.contains("UTF-8"), "detail {detail:?}")
             }
             other => panic!("expected identity-unparsed, got {other:?}"),
         }

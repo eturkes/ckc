@@ -125,7 +125,19 @@ full pre-consolidation text lives in git history.
   bytes on stdout) lives in the module consts + docs — model-adapter.2/model-cassette/stage-model-fill
   + the env-supplied wrapper all bind to it. Tests drive a committed in-source stub (the `COMMITTED_STUB`
   contract emulator, materialized per-test to a unique temp exec) covering every outcome via two prompt
-  sentinels; `to_string_lossy` on the constraint path is fine for ASCII `schemas/` paths.
+  sentinels.
+- Codex-review (M2.8) — mirror divergences from Z3Adapter + deferrals: (a) argv `&[&OsStr]` not
+  `&[&str]`: model.rs is the first to pass a PATH as an argv element, so the constraint path reaches
+  the runtime verbatim (Z3 passes only ASCII flags → its `&str` is lossless; `to_string_lossy`
+  corrupted non-UTF-8 paths → silent wrapper open-failure); 0xFF-path regression-tested. (b)
+  identity-probe stdout strict `from_utf8`→`IdentityUnparsed`, not lossy (recorded identity = the
+  runtime's true bytes; stderr stays lossy/diagnostic). (c) `Completed`/`stdout_bytes` completeness is
+  DRAIN_GRACE-bounded — a descendant outliving a clean exit while holding the stdout pipe truncates it;
+  docs now say so. True byte-completeness (process-group kill / EOF-gated capture outcome) is DEFERRED
+  to model-adapter.2/model-cassette where the bytes turn byte-stability-load-bearing (the .1 outcome
+  enum is spec-locked to 4 variants). (d) REJECTED — Z3-mirrored, non-realistic, fix-both-not-one —
+  `Instant::now()+budget` overflow-panic (absurd Durations) + the ETXTBSY-recover test's sub-60ms
+  vacuous-pass window; folded into the deferred shared-subprocess-runner refactor.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —
