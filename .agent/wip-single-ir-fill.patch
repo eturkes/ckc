@@ -1,0 +1,426 @@
+diff --git a/crates/ckc-cli/src/run.rs b/crates/ckc-cli/src/run.rs
+index 9076f4c..e891bca 100644
+--- a/crates/ckc-cli/src/run.rs
++++ b/crates/ckc-cli/src/run.rs
+@@ -44,9 +44,10 @@ use ckc_core::{
+ };
+ use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
+ 
++use crate::cassette::{CassetteKey, CassetteStore};
+ use crate::extract::{ExtractConfig, extract};
+ use crate::manifests::{ManifestInputs, assemble_manifests};
+-use crate::model_fill::FillReject;
++use crate::model_fill::{FillReject, FillSource, model_fill};
+ use crate::normalize::{Lexicon, load_lexicon, normalize};
+ use crate::registry_check::{invalid_diagnostic, load};
+ use crate::report::{Report, assemble_report, render_markdown};
+@@ -601,7 +602,7 @@ fn compile_verify_group(
+ /// outside `segments`, is a terminal [`FillReject::Grounding`] carrying the absent
+ /// ids; an empty absent set accepts and yields the parsed `ClinicalIr`. Closing
+ /// over pre-built id sets lets a route step (and its tests) classify a model
+-/// output with no live pipeline. Wired into the fill pipeline by route-single-ir.2b.
++/// output with no live pipeline. [`single_ir_fill`] wires it into the route.
+ #[allow(dead_code)]
+ fn single_ir_accept<'a>(
+     regions: &'a HashSet<&'a Id>,
+@@ -640,6 +641,200 @@ fn single_ir_accept<'a>(
+     }
+ }
+ 
++/// The single_ir route's per-document fill back end: drive a corpus document
++/// through extract → segment, replay its committed model cassette through
++/// [`model_fill`] under [`single_ir_accept`], and compile the accepted
++/// [`ClinicalIr`] over the deterministic upstream into an [`IrBundle`] — the same
++/// five-layer assembly [`assemble_bundle`] produces, but with the model's clinical
++/// layer and a norm [`derive_norm_ir`](crate::rules::derive_norm_ir)-recomputed
++/// over it in place of the deterministic normalizer's. The grounding scaffold is
++/// the deterministic head: extract + segment mint the real region and segment ids
++/// the accept closure grounds the model's references against, so a hallucinated
++/// reference surfaces as `ai_hallucinated_source` rather than corrupting the
++/// bundle. Each failure rides a shell diagnostic and yields `None`; wired into the
++/// experiment run by run-m2.1.
++#[allow(dead_code)]
++#[allow(clippy::too_many_arguments)]
++fn single_ir_fill(
++    root: &Path,
++    entry: &CorpusEntry,
++    lexicon: &Lexicon,
++    store: &CassetteStore,
++    seed: u64,
++    resolved: &Resolved,
++    repair_limit: u32,
++    shell: &mut Shell,
++) -> Option<ArtifactWrapper<IrBundle>> {
++    let html = match std::fs::read(root.join(&entry.path)) {
++        Ok(bytes) => bytes,
++        Err(e) => {
++            shell.diagnostic(invalid_diagnostic(vec![
++                (static_id("file"), entry.path.clone()),
++                (static_id("reason"), format!("read {}: {e}", entry.path)),
++            ]));
++            return None;
++        }
++    };
++    let config = ExtractConfig {
++        document_id: entry.id.clone(),
++        source_family: static_id("synthetic_test_source_html"),
++        provenance: entry.provenance,
++        data_class: DataClass::None,
++        producer: producer(resolved, 0),
++    };
++    let source = match extract(&html, &config) {
++        Ok(source) => source,
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                0,
++                "document",
++                &entry.id,
++                e.to_string(),
++            ));
++            return None;
++        }
++    };
++    let segments = match segment(&source, &producer(resolved, 1)) {
++        Ok(segments) => segments,
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                1,
++                "document",
++                &entry.id,
++                e.to_string(),
++            ));
++            return None;
++        }
++    };
++
++    // Ground the model's references against the deterministic head's real ids
++    // (§4 acceptance steps 4 + 5), then replay the committed cassette.
++    let regions: HashSet<&Id> = source
++        .payload
++        .regions
++        .iter()
++        .map(|r| &r.region_id)
++        .collect();
++    let segment_ids: HashSet<&Id> = segments
++        .payload
++        .segments
++        .iter()
++        .map(|s| &s.segment_id)
++        .collect();
++    let accept = single_ir_accept(&regions, &segment_ids);
++    let key = CassetteKey {
++        route: static_id("route.single_ir"),
++        source: entry.id.clone(),
++        seed,
++    };
++    let fill = match model_fill(store, &key, FillSource::Replay, repair_limit, accept) {
++        Ok(fill) => fill,
++        Err(e) => {
++            shell.diagnostic(invalid_diagnostic(vec![
++                (static_id("cassette"), entry.id.to_string()),
++                (static_id("reason"), e.to_string()),
++                (static_id("processing_stage"), "model_fill".to_owned()),
++            ]));
++            return None;
++        }
++    };
++    // Surface the §7.4 fill diagnostics (schema violations, terminal grounding or
++    // repair-limit), then a terminal reject (no accepted target) ends the route.
++    for diagnostic in &fill.diagnostics {
++        shell.diagnostic(diagnostic.clone());
++    }
++    let clinical = fill.target?;
++
++    // Deterministic tail mirroring [`assemble_bundle`], substituting the model's
++    // clinical layer and a norm recomputed over it; the model-fill route runs no
++    // normalizer, so the bundle diagnostics are the segments' alone — equal to M1's
++    // segments ∪ normalization set because the normalizer adds none for grounded
++    // output (route-single-ir.2b's reproduce-M1 gate proves the equality).
++    let norm = crate::rules::derive_norm_ir(
++        &source.payload.document.document_id,
++        &clinical,
++        &segments.payload,
++        lexicon,
++    );
++    let doc = match ckc_core::DocIr::from_graph(&source.payload, source.diagnostics.clone()) {
++        Ok(doc) => doc,
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                3,
++                "document",
++                &entry.id,
++                format!("doc layer: {e}"),
++            ));
++            return None;
++        }
++    };
++    let diagnostics = match canonical_diagnostic_set(segments.diagnostics.iter()) {
++        Ok(diagnostics) => diagnostics,
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                3,
++                "document",
++                &entry.id,
++                format!("diagnostic sort key: {e}"),
++            ));
++            return None;
++        }
++    };
++    let bundle = match assemble(
++        doc,
++        segments.payload.clone(),
++        clinical,
++        norm,
++        Vec::new(),
++        diagnostics,
++    ) {
++        Ok(bundle) => bundle,
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                3,
++                "document",
++                &entry.id,
++                format!("assembly: {e}"),
++            ));
++            return None;
++        }
++    };
++    if let Err(e) = bundle.validate(&source.payload) {
++        shell.diagnostic(processing_stage_diagnostic(
++            3,
++            "document",
++            &entry.id,
++            format!("bundle invariant: {e}"),
++        ));
++        return None;
++    }
++
++    // Wrap; the single_ir route has no normalization wrapper, so the bundle cites
++    // source + segments (run-m2.1 adds the replayed cassette hash for provenance).
++    // These wrapper-level fields do not reach the payload-only `content_hash`.
++    match wrapper(
++        format!("{}.ir_bundle", entry.id),
++        "ir_bundle",
++        producer(resolved, 3),
++        vec![source.content_hash.clone(), segments.content_hash.clone()],
++        Origin::DeterministicCompiler,
++        EvidenceStatus::MechanicalEvidenceStatus,
++        Vec::new(),
++        bundle,
++    ) {
++        Ok(wrapped) => Some(wrapped),
++        Err(e) => {
++            shell.diagnostic(processing_stage_diagnostic(
++                3,
++                "document",
++                &entry.id,
++                format!("content hash: {e}"),
++            ));
++            None
++        }
++    }
++}
++
+ /// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1
+ /// pair over every landed artifact ([`assemble_trace`] skips absent
+ /// pieces), validate both payloads, and land them at the run root as
+@@ -1259,10 +1454,13 @@ mod tests {
+     use std::path::PathBuf;
+ 
+     use ckc_core::{
+-        Action, BindingStatus, ClinicalStatement, Direction, EventRecord, ExceptionClause,
+-        Strength, TerminologyBinding, TotalOperationResult, read_jsonl,
++        Action, BindingStatus, CassettePayload, ClinicalStatement, Direction, EventRecord,
++        ExceptionClause, ModelIdentity, Strength, TerminologyBinding, TotalOperationResult,
++        read_jsonl,
+     };
+ 
++    use crate::normalize::clinical_ir;
++
+     /// [`single_ir_accept`] classifies a model output with no live pipeline:
+     /// malformed bytes are a repairable [`FillReject::Schema`]; an empty
+     /// [`ClinicalIr`] cites no ids and accepts; an output citing ids absent
+@@ -2020,4 +2218,183 @@ processing_stages:
+         assert_eq!(events.len(), 1);
+         assert!(!out.join("artifacts").exists());
+     }
++
++    /// The §5 lexicon the single_ir route's deterministic head consumes, loaded
++    /// from the repository root like the run does.
++    fn single_ir_lexicon() -> Lexicon {
++        load_lexicon(&std::fs::read(repo_root().join(LEXICON_FILE)).unwrap()).unwrap()
++    }
++
++    /// The three M1 corpus documents ([`DOC_IDS`]) resolved from the committed
++    /// `registry/corpora.yaml`, in [`DOC_IDS`] order.
++    fn single_ir_corpus() -> Vec<CorpusEntry> {
++        let text = std::fs::read_to_string(repo_root().join(CORPORA_FILE)).unwrap();
++        let corpora = parse_corpora(&text).unwrap();
++        DOC_IDS
++            .iter()
++            .map(|id| {
++                let id: Id = id.parse().unwrap();
++                corpora
++                    .iter()
++                    .find(|e| e.id == id)
++                    .unwrap_or_else(|| panic!("registry/corpora.yaml is missing {id}"))
++                    .clone()
++            })
++            .collect()
++    }
++
++    /// A minimal [`Resolved`] for the route fill: the bundle `content_hash` gate is
++    /// payload-only, so every field here only stamps producers — any grammatical ids
++    /// and a synthetic toolchain hash serve.
++    fn single_ir_resolved() -> Resolved {
++        Resolved {
++            pipeline_id: static_id("pipe.m2_single_ir"),
++            pipeline_step_ids: [
++                static_id("processing_stage.m2.extract"),
++                static_id("processing_stage.m2.segment"),
++                static_id("processing_stage.m2.model_fill"),
++                static_id("processing_stage.m2.assemble"),
++                static_id("processing_stage.m2.compile"),
++                static_id("processing_stage.m2.verify"),
++                static_id("processing_stage.m2.trace"),
++                static_id("processing_stage.m2.report"),
++            ],
++            documents: vec![],
++            groups: vec![],
++            budget_ms: 0,
++            plan: RunPlan {
++                experiment_id: static_id("exp.m2_multihop"),
++                test_source_groups: vec![],
++                pipelines: vec![],
++                seed: 42,
++                budget: vec![],
++            },
++            toolchain_manifest_hash: hash_bytes(b"single-ir-fixture-toolchain"),
++        }
++    }
++
++    /// Craft one golden `route.single_ir` cassette: wrap `output` (the bytes the
++    /// model "emits") under the §4.4 provenance contract
++    /// [`CassetteStore::build_wrapper`] enforces, with a synthetic model identity (the
++    /// crafted-fixture rule — no real engine, quant, or model-format token), and
++    /// persist it at the store key. Factored so route-single-ir.4 reuses it to seed
++    /// rejection cassettes at other seeds.
++    fn write_single_ir_cassette(
++        entry: &CorpusEntry,
++        resolved: &Resolved,
++        store: &CassetteStore,
++        seed: u64,
++        output: &[u8],
++    ) {
++        let key = CassetteKey {
++            route: static_id("route.single_ir"),
++            source: entry.id.clone(),
++            seed,
++        };
++        let payload = CassettePayload::from_output(
++            static_id("route.single_ir"),
++            entry.id.clone(),
++            seed,
++            "Fill the ClinicalIR schema grounded in the cited document.".to_owned(),
++            hash_bytes(b"single-ir-constraint"),
++            hash_bytes(b"single-ir-prompt-template"),
++            ModelIdentity {
++                model_id: static_id("model.baseline"),
++                quant: "fixture_quant".to_owned(),
++                runtime_version: "1.0.0".to_owned(),
++            },
++            output,
++        );
++        let wrapper = store
++            .build_wrapper(&key, payload, producer(resolved, 2))
++            .unwrap();
++        store.persist(&key, wrapper).unwrap();
++    }
++
++    /// Bless the three committed golden `route.single_ir` cassettes: for each M1
++    /// document, run the deterministic head (extract → segment → [`clinical_ir`]) and
++    /// record the canonical [`ClinicalIr`] bytes as the model output. The premise the
++    /// reproduce-M1 gate leans on — `clinical_ir` raises no diagnostics for these three
++    /// documents, so the route's segments-only bundle diagnostics equal M1's segments ∪
++    /// normalization set — is asserted here. `#[ignore]`d: run it to regenerate, then
++    /// commit the three json. Regenerate with
++    /// `cargo test -p ckc-cli bless_single_ir_cassettes -- --ignored --exact`.
++    #[test]
++    #[ignore = "regenerates the committed golden cassettes"]
++    fn bless_single_ir_cassettes() {
++        let root = repo_root();
++        let lexicon = single_ir_lexicon();
++        let resolved = single_ir_resolved();
++        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
++        for entry in single_ir_corpus() {
++            let html = std::fs::read(root.join(&entry.path)).unwrap();
++            let config = ExtractConfig {
++                document_id: entry.id.clone(),
++                source_family: static_id("synthetic_test_source_html"),
++                provenance: entry.provenance,
++                data_class: DataClass::None,
++                producer: producer(&resolved, 0),
++            };
++            let source = extract(&html, &config).unwrap();
++            let segments = segment(&source, &producer(&resolved, 1)).unwrap();
++            let (clinical, norm_diags) = clinical_ir(&source.payload, &segments.payload, &lexicon);
++            assert!(
++                norm_diags.is_empty(),
++                "{}: clinical_ir raised diagnostics, breaking the reproduce-M1 premise: {norm_diags:?}",
++                entry.id
++            );
++            let output = canonical_payload_bytes(&clinical).unwrap();
++            write_single_ir_cassette(&entry, &resolved, &store, 42, &output);
++        }
++    }
++
++    /// The reproduce-M1 gate: for each M1 document, [`single_ir_fill`] replaying the
++    /// committed golden cassette compiles a bundle byte-identical (by the payload-only
++    /// `content_hash`) to the M1 deterministic [`assemble_bundle`] bundle.
++    /// Runtime-absent — the cassette IS the recorded model output. Structural equality
++    /// is asserted too (the clearer failure should the route's deterministic tail ever
++    /// diverge).
++    #[test]
++    fn single_ir_fill_reproduces_m1_bundles() {
++        let root = repo_root();
++        let lexicon = single_ir_lexicon();
++        let resolved = single_ir_resolved();
++        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
++        for entry in single_ir_corpus() {
++            // M1 reference: the deterministic extract → segment → normalize → assemble
++            // chain (z3-free), the same `assemble_bundle` the M1 run drives.
++            let html = std::fs::read(root.join(&entry.path)).unwrap();
++            let config = ExtractConfig {
++                document_id: entry.id.clone(),
++                source_family: static_id("synthetic_test_source_html"),
++                provenance: entry.provenance,
++                data_class: DataClass::None,
++                producer: producer(&resolved, 0),
++            };
++            let source = extract(&html, &config).unwrap();
++            let segments = segment(&source, &producer(&resolved, 1)).unwrap();
++            let normalization =
++                normalize(&source, &segments, &lexicon, &producer(&resolved, 2)).unwrap();
++            let m1 =
++                assemble_bundle(&entry, &resolved, &source, &segments, &normalization).unwrap();
++
++            // The single_ir route bundle: replay the committed golden cassette and
++            // compile over the same deterministic head.
++            let tmp = tempfile::tempdir().unwrap();
++            let out = tmp.path().join("m2");
++            std::fs::create_dir_all(&out).unwrap();
++            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
++            let route = single_ir_fill(
++                &root, &entry, &lexicon, &store, 42, &resolved, 0, &mut shell,
++            )
++            .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
++
++            assert_eq!(route.payload, m1.payload, "{} payload", entry.id);
++            assert_eq!(
++                route.content_hash, m1.content_hash,
++                "{} content_hash",
++                entry.id
++            );
++        }
++    }
+ }

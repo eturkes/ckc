@@ -423,22 +423,23 @@ argument).
   binding→Grounding(≥1). Gate: ckc-cli 200 passed / 3 ignored + fmt + clippy -D clean.] 58% 116K/200K
 - [ ] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
   GOLDEN cassettes + reproduce-M1 gate test (the route's fill half; model-runtime-absent, z3 not needed).
-  HEAVY unit — its M2.16 predecessor overflowed a 200K window during READING (byte-exact shapes across 12
-  files, before writing a line). ALL exact code, confirmed signatures, the verified payload-equality facts,
-  insertion anchors, bless procedure + gate/audit commands are pre-derived in `.agent/wip-single-ir-fill.txt`
-  §B → read THAT, not the 12 files; targeted reads only where it flags `VERIFY`. Net: `single_ir_fill(
-  root, entry, lexicon, store, seed, resolved, repair_limit, shell) -> Option<ArtifactWrapper<IrBundle>>`
-  runs extract→segment→`model_fill`(Replay, `single_ir_accept`)→deterministic tail (mirror
-  `assemble_bundle`, segments-only diagnostics) → `IrBundle`; a `write_single_ir_cassette` test helper
-  (reused by .4) blesses the 3 golden cassettes to
-  `crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json` (SYNTHETIC identity →
-  engine-agnostic audit APPLIES); the gate test replays them → per-doc `IrBundle.content_hash` EQUALS the M1
-  `assemble_bundle` bundle (payload-only hash ⇒ producer-independent; the test is self-checking, so a wrong
-  tail fails loudly). New route code lives in `run.rs` (`Resolved` + `compile_verify_group` are private to
-  `mod run`, which .3 reuses). Gate: `cargo test --workspace`; engine-agnostic audit on the new cassettes;
-  fmt + clippy. On DONE, `rm .agent/wip-single-ir-fill.txt` in the same commit (consumed). [Decision pinned:
-  model fills ClinicalIR over deterministic upstream — the instrument supplies the grounding scaffold;
-  hallucinated refs are measured, not fatal.]
+  PRE-VALIDATED end-to-end (M2.17 prep): the exact run.rs change was written + proven green (`cargo test
+  --workspace`; the `single_ir_fill_reproduces_m1_bundles` gate passes — per-doc `IrBundle.content_hash`
+  EQUALS the M1 `assemble_bundle` bundle, payload-only hash ⇒ producer-independent, self-checking so a wrong
+  tail fails LOUDLY; fmt + clippy + audit clean), then REVERTED + banked as `.agent/wip-single-ir-fill.patch`.
+  Redo = apply + bless + gate + commit, ZERO re-derivation — full procedure in
+  `.agent/wip-single-ir-fill.txt`: `git apply .agent/wip-single-ir-fill.patch` → bless the 3 cassettes
+  (`cargo test -p ckc-cli bless_single_ir_cassettes -- --ignored`, writes
+  `crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json`, SYNTHETIC identity →
+  engine-agnostic audit APPLIES) → `cargo test --workspace` → audit + fmt + clippy. Net fn:
+  `single_ir_fill(root, entry, lexicon, store, seed, resolved, repair_limit, shell) ->
+  Option<ArtifactWrapper<IrBundle>>` = extract→segment→`model_fill`(Replay, `single_ir_accept`)→
+  deterministic tail (mirror `assemble_bundle`, segments-only diagnostics) → `IrBundle`. New route code lives
+  in `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`, which .3 reuses). On DONE, `rm
+  .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch` in the same commit (both consumed); record
+  .2b context-usage. [Decision pinned: model fills ClinicalIR over deterministic upstream — the instrument
+  supplies the grounding scaffold; hallucinated refs are measured, not fatal.] [M2.17 prep: this
+  validate+respec session used 87% 174K/200K; the redo is apply-and-verify only → lands well under window.]
 - [ ] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
   model-runtime-absent). Extend the route: gather .2b's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):

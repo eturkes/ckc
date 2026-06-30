@@ -1,313 +1,47 @@
-WIP IMPLEMENTATION SPEC — route-single-ir.2 (§A) + route-single-ir.2b (§B). DELETE this file when
-.2b is DONE (consumed, then obsolete). Read THIS instead of the 12 upstream files; do TARGETED reads
-ONLY where a line says "VERIFY <file>:<anchor>".
+# wip — route-single-ir.2b (single_ir_fill + 3 golden cassettes + reproduce-M1 gate)
+# STATUS: PRE-VALIDATED end-to-end (M2.17 prep), then source reverted + banked.
+# The exact validated run.rs change is in `.agent/wip-single-ir-fill.patch`.
+# Redo = apply + bless + gate + commit. ZERO re-derivation; the gate self-checks correctness.
 
-WHY THIS FILE EXISTS
-  .2 + .2b were one unit (route-single-ir.2) that overflowed a 200K window during the READING phase —
-  assembling byte-exact shapes across run.rs / ir.rs / bundle.rs / normalize.rs / extract.rs /
-  segment.rs / rules.rs / cassette.rs(core+cli) / model_fill.rs / shell.rs / lib.rs, before writing a
-  line. Splitting + pre-deriving the code here removes that sweep. The .2 session reads §A only; the
-  .2b session reads §A (recap — fill consumes accept) + §B.
+## What .2b delivers (all of it is in the patch)
+`single_ir_fill(root, entry, lexicon, store, seed, resolved, repair_limit, shell)
+  -> Option<ArtifactWrapper<IrBundle>>` in `crates/ckc-cli/src/run.rs` = the route's fill half:
+extract → segment → build region+segment id-universes → `model_fill(store, key, Replay,
+repair_limit, single_ir_accept(&regions, &segment_ids))` → deterministic tail (mirrors
+`assemble_bundle`, segments-only diagnostics) → `IrBundle`. The patch also carries the .2b-only
+imports, `single_ir_accept`'s `#[allow(dead_code)]`, a `write_single_ir_cassette` test helper
+(reused by .4), an `#[ignore]`d `bless_single_ir_cassettes`, and the
+`single_ir_fill_reproduces_m1_bundles` gate test.
 
-SELF-CHECKING SAFETY NET
-  §B's gate test asserts the route bundle's content_hash EQUALS the M1 deterministic bundle's. content_hash
-  is payload-only (producer-independent). So: every producer stamp / step-id / wrapper-level field /
-  input_hashes entry below is GATE-IRRELEVANT — get it plausibly right, do not agonize. Only the PAYLOAD
-  path is gate-critical (marked ★). If a ★ detail is subtly wrong the gate FAILS LOUDLY → fix with a
-  targeted read; it cannot silently pass wrong.
+## Banked validated state (proven THIS session before revert)
+- `git apply .agent/wip-single-ir-fill.patch` re-applies CLEAN to HEAD (verified after revert).
+- After apply + bless, `cargo test --workspace` GREEN; the gate test
+  `single_ir_fill_reproduces_m1_bundles` PASSES — each per-doc `IrBundle.content_hash` EQUALS the M1
+  `assemble_bundle` bundle (payload-only hash ⇒ producer-independent; self-checking, so a wrong tail
+  fails LOUDLY) AND `route.payload == m1.payload` structurally. (Re-confirm exact pass counts at redo;
+  the self-checking gate, not the count, is the guarantee.)
+- fmt + clippy (`-D warnings`) clean; engine-agnostic audit on the new cassettes clean.
 
-VERIFIED FACTS (trust — established in the M2.16 attempt; do NOT re-derive)
-  F1 ★ `clinical_ir(&graph, &segments, lexicon) -> (ClinicalIr, Vec<DiagnosticRecord>)` returns EMPTY
-     diagnostics for all 3 M1 docs (M1's run test asserts per-stage event.diagnostics empty for stages
-     [..4], incl. normalize = idx 2). ⇒ bless MUST `assert!(norm_diags.is_empty())`.
-  F2 ★ M1's `assemble_bundle` feeds `assemble` diagnostics = canonical_diagnostic_set(segments.diags ∪
-     normalization.diags). single_ir runs NO normalizer → segments-only diags. EQUAL because BOTH empty
-     for these docs (F1). ⇒ single_ir tail uses canonical_diagnostic_set(segments.diagnostics.iter()).
-  F3 ★ M1's normalize() computes norm = derive_norm_ir(&source.payload.document.document_id, &clinical,
-     &segments.payload, lexicon) and clinical = clinical_ir(&source.payload, &segments.payload, lexicon).0.
-     ⇒ route reproduces M1's payload iff it (a) decodes the SAME clinical the bless writer encoded (= F1's
-     clinical) and (b) recomputes norm with the SAME derive_norm_ir args. Both hold by construction below.
-  F4 The gate is content_hash (payload-only). Producer/step-ids/wrapper-diags/input_hashes do NOT affect it.
-  F5 `bundle.validate(&source.payload)` is EXPECTED-PASS for golden output (lexicon-valid by construction).
+## Procedure (run in order)
+1. `git apply .agent/wip-single-ir-fill.patch`
+2. Bless the 3 golden cassettes (writes route.single_ir/<source>/seed-42.json):
+   `cargo test -p ckc-cli bless_single_ir_cassettes -- --ignored`
+3. Gate (the reproduce-M1 test runs here):  `cargo test --workspace`
+4. Engine-agnostic audit — the new cassettes carry SYNTHETIC identity so they ARE audited (only
+   live-recorded route.fixture/ is exempt). Cassettes are still untracked here → use the filesystem
+   `rg` form (git grep sees only tracked files). Proven clean this session, expect exit 1:
+   `/usr/bin/rg --no-ignore -niP '\b(llama|vllm|ollama|exllama|exllamav2|mlc|ctranslate2?|tensorrt|sglang|lmdeploy|gpt4all|kobold(cpp)?|ggml|gguf|safetensors|awq|gptq|exl2|gbnf|lark|qwen|mistral|gemma|deepseek|vicuna|bf16|fp16|fp8|int4|int8|nf4|q[2-8]_[0-9km])\b' crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/`
+   (Canonical full-repo form + rationale: memory "Engine-agnostic DELIVERABLE".)
+5. `cargo fmt --all --check`  +  `cargo clippy --workspace --all-targets -- -D warnings`
 
-DOC SET   const DOC_IDS = ["test_source.m1_guideline_a","test_source.m1_guideline_b","test_source.m1_control"]
-SEED      golden cassettes use seed 42.
-CASSETTE PATH  crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json
+## Close-out
+- `git add` run.rs + the 3 cassettes; `rm .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch`
+  IN THE SAME COMMIT (both consumed).
+- Record .2b context-usage (`.agent/context.sh`) into the roadmap .2b line; mark .2b DONE
+  (M2 stays IN-PROGRESS — .3/.4 + run-m2.* remain).
+- Commit `route (M2.17): single_ir_fill + 3 golden cassettes + reproduce-M1 gate`.
 
-CONFIRMED SIGNATURES (from the attempt — high confidence)
-  read_strict_canonical::<T: CanonRead>(bytes: &[u8]) -> Result<T, CanonReadError>   (CanonReadError: Display → .to_string() ok)
-  canonical_payload_bytes::<T: Canonical>(&value) -> Result<Vec<u8>, CanonError>
-  content_hash::<T: Canonical>(&value) -> Result<Hash, CanonError>   (the FN; gate uses the wrapper FIELD .content_hash = bare Hash, not this fn)
-  ClinicalIr { bindings: Vec<TerminologyBinding>, statements: Vec<ClinicalStatement> }
-  TerminologyBinding { binding_id, system, code, status, alternatives, region_ids: Vec<Id> }
-  ClinicalStatement { statement_id, population, condition, action, modality, strength, certainty,
-                      exceptions: Vec<ExceptionClause>, source_segment_ids: Vec<Id> }
-  ExceptionClause { exception_id, atoms, region_ids: Vec<Id> }
-  model_fill::<T>(store: &CassetteStore, key: &CassetteKey, source: FillSource<'_>, repair_limit: u32,
-                  accept: impl Fn(&[u8]) -> Result<T, FillReject>) -> Result<ModelFill<T>, CassetteError>
-    FillReject::Schema(String) | FillReject::Grounding(Vec<Id>)
-    ModelFill<T> { target: Option<T>, diagnostics: Vec<DiagnosticRecord>, recorded_calls, repairs }
-    FillSource::Replay  (record variant unused here — runtime-absent)
-  CassetteKey { route: Id, source: Id, seed: u64 }
-  CassetteStore::new(root) ; .replay(&key) ; .build_wrapper(&key, payload, producer) ; .persist(&key, wrapper)   (persist takes wrapper BY VALUE — moves it)
-  CassettePayload::from_output(route: Id, source: Id, seed: u64, prompt: String, constraint_hash: Hash,
-                  prompt_template_hash: Hash, model_identity: ModelIdentity, output: &[u8]) -> Self  [8-arg, CONFIRMED]
-  extract(&html: &[u8], &config: &ExtractConfig) -> Result<ArtifactWrapper<SourceDocumentGraph>, ExtractError>
-    ExtractConfig { document_id: Id, source_family: Id, provenance, data_class: DataClass, producer: Producer }
-  segment(&source, &producer) -> Result<ArtifactWrapper<SegmentIr>, SegmentError>
-  normalize(&source, &segments, lexicon, producer) -> Result<ArtifactWrapper<Normalization>, NormalizeError>
-    Normalization { clinical: ClinicalIr, norm: NormIr }
-  derive_norm_ir(document_id: &Id, clinical: &ClinicalIr, segments: &SegmentIr, lexicon: &Lexicon) -> NormIr
-  DocIr::from_graph(graph: &SourceDocumentGraph, diagnostics: Vec<DiagnosticRecord>) -> Result<DocIr, IrError>
-  assemble(doc: DocIr, segment: SegmentIr, clinical: ClinicalIr, norm: NormIr,
-           assumptions: Vec<Assumption>, diagnostics: Vec<DiagnosticRecord>) -> Result<IrBundle, CanonError>
-  IrBundle::validate(&self, graph: &SourceDocumentGraph) -> Result<(), _>
-  canonical_diagnostic_set<'a>(impl IntoIterator<Item=&'a DiagnosticRecord>) -> Result<Vec<DiagnosticRecord>, CanonError>
-  load_lexicon(&bytes) -> Result<Lexicon, _>   (test pattern below)
-
-==================================================================================================
-§A — route-single-ir.2 : `single_ir_accept` + focused unit test    (commit key M2.16)
-==================================================================================================
-GOAL  A named factory fn (route reuses it; .2b's single_ir_fill + .4 both call it) that turns model
-      bytes into a grounded ClinicalIr or a §7.4 FillReject. Parameterized by the doc's region+segment
-      id-universes (pre-built sets) so the test needs NO pipeline.
-
-PLACE  run.rs, near compile_verify_group (~line 600). Add module imports (see §B IMPORTS — they serve
-       both fns; add now). #[allow(dead_code)] in .2 (only the .2 test calls it); .2b REMOVES the allow
-       (single_ir_fill, non-test, then calls it). Rationale: a fn reached only from #[cfg(test)] is dead
-       in the --lib / --all-targets clippy build (memory: clippy dead_code precedent).
-
-CODE (authoritative — copy):
-  fn single_ir_accept<'a>(
-      regions: &'a HashSet<&'a Id>,
-      segments: &'a HashSet<&'a Id>,
-  ) -> impl Fn(&[u8]) -> Result<ClinicalIr, FillReject> + 'a {
-      move |bytes| {
-          let clinical: ClinicalIr =
-              read_strict_canonical(bytes).map_err(|e| FillReject::Schema(e.to_string()))?;
-          let mut absent: Vec<Id> = Vec::new();
-          for binding in &clinical.bindings {
-              for region_id in &binding.region_ids {
-                  if !regions.contains(region_id) { absent.push(region_id.clone()); }
-              }
-          }
-          for statement in &clinical.statements {
-              for exception in &statement.exceptions {
-                  for region_id in &exception.region_ids {
-                      if !regions.contains(region_id) { absent.push(region_id.clone()); }
-                  }
-              }
-              for segment_id in &statement.source_segment_ids {
-                  if !segments.contains(segment_id) { absent.push(segment_id.clone()); }
-              }
-          }
-          if absent.is_empty() { Ok(clinical) } else { Err(FillReject::Grounding(absent)) }
-      }
-  }
-  // grounding = bundle.validate steps 4+5 (binding.region_ids + exception.region_ids + statement.source_segment_ids).
-  // Route-side non-empty `absent` assert is defense-in-depth (M2.14 codex). contains(region_id) typechecks:
-  // HashSet<&Id> + &Id value (&Id: Borrow<Id>). If lifetimes fight: try HashSet<&'a Id> exactly as written,
-  // else drop the inner 'a (let it elide). Sets outlive the closure's only use (model_fill call).
-
-TEST (run.rs mod tests):
-  #[test]
-  fn single_ir_accept_classifies() {
-      let ghost = static_id("region.ghost");
-      let regions: HashSet<&Id> = HashSet::new();          // empty universe
-      let segments: HashSet<&Id> = HashSet::new();
-      let accept = single_ir_accept(&regions, &segments);
-      // (1) malformed bytes → Schema
-      assert!(matches!(accept(b"not-canonical"), Err(FillReject::Schema(_))));
-      // (2) empty ClinicalIr → Ok (no ids to ground)
-      let empty = ClinicalIr { bindings: vec![], statements: vec![] };
-      let empty_bytes = canonical_payload_bytes(&empty).unwrap();
-      assert!(accept(&empty_bytes).is_ok());
-      // (3) one binding citing an absent region → Grounding(>=1)
-      let mut bad = ClinicalIr { bindings: vec![], statements: vec![] };
-      bad.bindings.push(/* one minimal TerminologyBinding with region_ids: vec![ghost.clone()] */);
-      let bad_bytes = canonical_payload_bytes(&bad).unwrap();
-      match accept(&bad_bytes) {
-          Err(FillReject::Grounding(ids)) => assert!(!ids.is_empty()),
-          other => panic!("expected Grounding, got {other:?}"),
-      }
-  }
-  // .2's ONLY real read: construct ONE minimal TerminologyBinding — VERIFY ir.rs for the value types of
-  // system/code/status/alternatives (region_ids = vec![ghost]). Keep alternatives empty if the type allows.
-  // (Empty-ClinicalIr Ok path + garbage-bytes Schema path need NO field construction.)
-
-.2 GATE  cargo test -p ckc-cli (the 3 closure cases) ; cargo fmt --all --check ; cargo clippy --workspace
-         --all-targets -- -D warnings.  CLOSE: record context-usage, mark .2 DONE, commit "<scope> (M2.16): …".
-
-==================================================================================================
-§B — route-single-ir.2b : `single_ir_fill` + 3 golden cassettes + reproduce-M1 gate test  (key M2.17)
-==================================================================================================
-GOAL  Per-doc fill pipeline that REPLAYS a golden cassette and deterministically compiles an IrBundle
-      byte-identical (by content_hash) to the M1 bundle. Bless the 3 golden cassettes. Prove it.
-
-IMPORTS (run.rs module level — add whichever are missing):
-  use std::collections::HashSet;
-  use std::path::Path;
-  ckc_core use-list: add  ClinicalIr   (DocIr already present? VERIFY; add if missing)
-  use crate::cassette::{CassetteError, CassetteKey, CassetteStore};
-  use crate::model_fill::{FillReject, FillSource, model_fill};
-  use crate::rules::derive_norm_ir;
-  In mod tests additionally:  CassettePayload, ModelIdentity (from ckc_core) ; use crate::normalize::clinical_ir ;
-  use crate::normalize::{Lexicon, load_lexicon} (VERIFY already imported in tests).
-
-(.2b FIRST: remove single_ir_accept's #[allow(dead_code)] — single_ir_fill now calls it from non-test code.)
-
-single_ir_fill — PLACE after single_ir_accept. #[allow(dead_code)] (called only by the gate test + later
-run-m2.1; doc-comment "wired into the real pipeline by run-m2.1"). Signature (from M2.16 plan):
-  fn single_ir_fill(
-      root: &Path,
-      entry: &CorpusEntry,
-      lexicon: &Lexicon,
-      store: &CassetteStore,
-      seed: u64,
-      resolved: &Resolved,
-      repair_limit: u32,
-      shell: &mut Shell,
-  ) -> Option<ArtifactWrapper<IrBundle>>
-BODY (★ = gate-critical payload path; errors → shell.diagnostic(processing_stage_diagnostic(...)) + return None):
-  1. let html = std::fs::read(root.join(&entry.path)) ... ;           // err → diag + None
-  2. let config = ExtractConfig {                                      // mirror run.rs ~343-388
-         document_id: entry.id.clone(),
-         source_family: static_id("synthetic_test_source_html"),
-         provenance: entry.provenance,            // VERIFY CorpusEntry has `provenance` (Copy?) — else clone
-         data_class: DataClass::None,
-         producer: producer(resolved, 0),
-     };
-     let source = extract(&html, &config) ... ;                        // err → diag + None
-  3. let segments = segment(&source, &producer(resolved, 1)) ... ;     // err → diag + None
-  4. let key = CassetteKey { route: static_id("route.single_ir"), source: entry.id.clone(), seed };
-     let regions: HashSet<&Id> = source.payload.regions.iter().map(|r| &r.region_id).collect();
-     let segment_ids: HashSet<&Id> = segments.payload.segments.iter().map(|s| &s.segment_id).collect();
-     let accept = single_ir_accept(&regions, &segment_ids);
-     let fill = match model_fill(store, &key, FillSource::Replay, repair_limit, accept) {
-         // model_fill-stage error: processing_stage_diagnostic(idx) maps idx→M1 PROCESSING_STAGE_KINDS (idx 2="normalize",
-         // no "model_fill") → inline the route kind. Gate-irrelevant (golden Replay never fails); label matters for .4 rejections.
-         Ok(f) => f, Err(e) => { shell.diagnostic(invalid_diagnostic(vec![(static_id("cassette"), entry.id.to_string()), (static_id("reason"), e.to_string()), (static_id("processing_stage"), "model_fill".to_owned())])); return None; }
-     };
-  5. for d in &fill.diagnostics { shell.diagnostic(d.clone()); }       // surface §7.4 codes
-     let clinical = fill.target?;   // ★ terminal reject (None) → None. else the SAME ClinicalIr the cassette carries.
-  6. ★ DETERMINISTIC TAIL (mirror assemble_bundle run.rs ~959-989, substituting model clinical + derived norm):
-     let norm = derive_norm_ir(&source.payload.document.document_id, &clinical, &segments.payload, lexicon);  // F3
-     let doc = DocIr::from_graph(&source.payload, source.diagnostics.clone()) ... ;     // err → diag + None
-     let diagnostics = canonical_diagnostic_set(segments.diagnostics.iter()) ... ;      // F2 segments-only
-     let bundle = assemble(doc, segments.payload.clone(), clinical, norm, Vec::new(), diagnostics) ... ;  // 6-arg order
-     if let Err(e) = bundle.validate(&source.payload) {                                 // F5 expected-pass
-         shell.diagnostic(processing_stage_diagnostic(3, "ir_bundle", &entry.id, e.to_string())); return None; // idx 3 → M1 "assemble" = single_ir's assemble stage ✓
-     }
-  7. WRAP (gate-irrelevant fields, F4) via the `wrapper()` helper (run.rs ~1087, 8 args):
-     let wrapped = wrapper(
-         format!("{}.ir_bundle", entry.id),            // VERIFY artifact_id form vs assemble_bundle
-         "ir_bundle",
-         producer(resolved, 3),
-         vec![source.content_hash, segments.content_hash],   // 2 hashes: no normalization wrapper (gate-irrelevant F4; run-m2.1: add cassette.content_hash for provenance — see roadmap)
-         Origin::DeterministicCompiler,
-         EvidenceStatus::MechanicalEvidenceStatus,
-         Vec::new(),                                   // wrapper-level diags (payload carries the real ones)
-         bundle,
-     ) ... ;   // CanonError → diag + None
-     Some(wrapped)
-
-TEST SCAFFOLDING (run.rs mod tests). Reuse existing helpers: repo_root(), static_id(), producer(),
-  processing_stage_clock, the strict()/sorted() readers, and assemble_bundle — all already in run.rs.
-  Helpers to ADD:
-  - fn single_ir_lexicon() -> Lexicon {
-        load_lexicon(&std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../corpus/lexicon/ja_core.yaml")).unwrap()).unwrap()
-    }
-  - fn single_ir_corpus() -> Vec<CorpusEntry> { parse_corpora(&std::fs::read_to_string(
-        repo_root().join("registry/corpora.yaml")).unwrap()).unwrap()  /* VERIFY parse_corpora ret shape */ }
-        // then pick the 3 DOC_IDS, or index by id.
-  - fn single_ir_resolved() -> Resolved  (gate-irrelevant per F4 — any valid Ids work):
-        Resolved {
-          pipeline_id: static_id("pipe.m2_single_ir"),
-          pipeline_step_ids: [ static_id("processing_stage.m1.extract"), static_id("processing_stage.m1.segment"),
-              static_id("processing_stage.m2.model_fill"), static_id("processing_stage.m2.assemble"),
-              static_id("processing_stage.m1.compile"), static_id("processing_stage.m1.verify"),
-              static_id("processing_stage.m1.trace"), static_id("processing_stage.m1.report") ],   // VERIFY exact strings only if you want fidelity
-          documents: vec![], groups: vec![], budget_ms: 0,
-          plan: RunPlan { /* minimal: experiment_id, test_source_groups: vec![], pipelines: vec![], seed, budget: vec![] — VERIFY RunPlan fields run.rs */ },
-          toolchain_manifest_hash: hash_bytes(b"single-ir-fixture-toolchain"),   // synthetic; gate-irrelevant
-        }
-    // (.3 will hand-build a richer Resolved; this one only stamps producers → F4 makes it free.)
-
-  CASSETTE CRAFT HELPER (factor so .4 reuses it):
-  - fn write_single_ir_cassette(root: &Path, entry: &CorpusEntry, lexicon: &Lexicon,
-        resolved: &Resolved, store: &CassetteStore, seed: u64, output: &[u8]) {
-        // output = the bytes the "model" emits. For golden: canonical_payload_bytes(&clinical).
-        let key = CassetteKey { route: static_id("route.single_ir"), source: entry.id.clone(), seed };
-        let payload = CassettePayload::from_output(
-            static_id("route.single_ir"), entry.id.clone(), seed,
-            prompt, constraint_hash, prompt_template_hash, model_identity, output);
-        let wrapper = store.build_wrapper(&key, payload, producer(resolved, 2)).unwrap();
-        store.persist(&key, wrapper).unwrap();   // persist takes wrapper by value (moves it; not used after)
-    }
-    // prompt / constraint_hash / prompt_template_hash: REUSE route-single-ir.1's derivation (M2.15 seeded the
-    //   single_ir prompt + check loop). VERIFY: grep run.rs / replay.rs for the single_ir prompt builder +
-    //   constraint/template hashing; do NOT reinvent. If .1 exposes them as helpers, call them; if inline, lift.
-    //   Fallbacks that satisfy load (if .1's are awkward to reach): prompt = the template text from
-    //   registry/prompts/single_ir.txt ; prompt_template_hash = hash_bytes(that text) ;
-    //   constraint_hash = hash_bytes(schemas/clinical_ir.schema.json bytes). VERIFY CassetteStore::load checks
-    //   these (M2.x hardening enforces a §4.4 provenance contract) — match whatever .1's pipeline produces.
-    // model_identity: SYNTHETIC ModelIdentity (model.baseline / fixture_quant / 1.0.0). VERIFY field shape via
-    //   model_fill.rs `seed_cassette` test helper (it shows a from_output call). These are CRAFTED fixtures →
-    //   engine-agnostic audit APPLIES (synthetic tokens only).
-
-  BLESS DRIVER (#[ignore]d — run once to generate, then commit the 3 json):
-  - #[test] #[ignore]
-    fn bless_single_ir_cassettes() {
-        let root = repo_root();
-        let lexicon = single_ir_lexicon();
-        let resolved = single_ir_resolved();
-        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));  // VERIFY root for the cassette path
-        for entry in single_ir_corpus().iter().filter(|e| DOC_IDS.contains(&e.id.as_str())) {  // VERIFY Id->str accessor
-            let html = std::fs::read(root.join(&entry.path)).unwrap();
-            let config = /* same ExtractConfig as single_ir_fill step 2, producer(&resolved,0) */;
-            let source = extract(&html, &config).unwrap();
-            let segments = segment(&source, &producer(&resolved, 1)).unwrap();
-            let (clinical, norm_diags) = clinical_ir(&source.payload, &segments.payload, &lexicon);
-            assert!(norm_diags.is_empty(), "{}: F1 premise", entry.id_str_or_debug);   // ★ F1
-            let output = canonical_payload_bytes(&clinical).unwrap();
-            write_single_ir_cassette(&root, entry, &lexicon, &resolved, &store, 42, &output);
-        }
-    }
-    RUN: cargo test -p ckc-cli bless_single_ir_cassettes -- --ignored --exact   (generates 3 files)
-
-  GATE TEST (normal, runtime-absent — proves the route reproduces M1):
-  - #[test]
-    fn single_ir_fill_reproduces_m1_bundles() {
-        let root = repo_root();
-        let lexicon = single_ir_lexicon();
-        let resolved = single_ir_resolved();
-        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
-        for entry in single_ir_corpus().iter().filter(|e| DOC_IDS.contains(&e.id.as_str())) {
-            // M1 reference bundle (z3-free): extract -> segment -> normalize -> assemble_bundle
-            let html = std::fs::read(root.join(&entry.path)).unwrap();
-            let config = /* same ExtractConfig, producer(&resolved,0) */;
-            let source = extract(&html, &config).unwrap();
-            let segments = segment(&source, &producer(&resolved, 1)).unwrap();
-            let normalization = normalize(&source, &segments, &lexicon, producer(&resolved, 2)).unwrap();
-            let m1 = assemble_bundle(/* VERIFY assemble_bundle sig run.rs ~959: likely (&source,&segments,&normalization,&resolved) */).unwrap();
-            // single_ir route bundle (replays the golden cassette):
-            let mut shell = Shell::open(static_id("run"), static_id("m2"), None);  // VERIFY 3rd arg None OK (no out_dir)
-            let route = single_ir_fill(&root, entry, &lexicon, &store, 42, &resolved, /*repair_limit*/ 0, &mut shell).unwrap();
-            assert_eq!(route.payload, m1.payload, "{:?} payload", entry.id);   // ★ structural equality
-            assert_eq!(route.content_hash, m1.content_hash, "{:?} content_hash", entry.id);  // ★ THE gate
-        }
-    }
-    // If a ★ assert fails: the tail mirror diverged from assemble_bundle — open run.rs ~959-989 and diff the
-    // assemble() arg construction. This is the ONLY scenario needing a broad read, and the failure pinpoints it.
-
-.2b GATE  cargo test --workspace ; cargo fmt --all --check ; cargo clippy --workspace --all-targets -- -D warnings.
-ENGINE-AGNOSTIC AUDIT (synthetic-token deliverable — run on the 3 NEW cassettes):
-  git grep -niP '<engine/dialect/model-format word-boundary pattern from memory "Engine-agnostic DELIVERABLE">' -- \
-    crates/ckc-cli/tests/fixtures/cassettes/route.single_ir
-  (expect zero hits — crafted fixtures carry synthetic model.baseline/fixture_quant/1.0.0 only.)
-COMMIT  the 3 golden json + the code; "<scope> (M2.17): …". Record context-usage. Mark .2b DONE.
-  THEN DELETE this wip file (rm .agent/wip-single-ir-fill.txt) in the same commit — it is consumed.
-
-CROSS-UNIT NOTE  .3 (verdict tail) consumes .2b's per-doc bundles; .4 (rejection paths) reuses single_ir_accept
-  (§A) + write_single_ir_cassette (§B craft helper) to seed bad cassettes at non-42 seeds.
+## If the patch fails to apply (only if run.rs changed since M2.17 prep)
+The hunks show every exact edit — re-derive against current run.rs by hand; the gate test still
+proves correctness. Design + signatures: roadmap .2b line + memory ("Model-fill stage core",
+"M2 plan" single_ir bullets).

@@ -68,7 +68,9 @@ full pre-consolidation text lives in git history.
   `.agent/wip-<unit>.patch` the redo line points at (apply, verify against the line, delete in
   the closing commit; a recovery with context to spare PROVES the salvage green before
   reverting — apply the full set, run the gate, fix what it catches, then revert — so the redo is
-  reproduction-only with the gate pre-proven + its pass counts banked in the redo line, latent bugs
+  reproduction-only with the gate pre-proven + its pass counts banked in the redo line (a SOURCE-DIFF salvage banks the whole proven change as a `git diff`
+  `.agent/wip-<unit>.patch` + a thin procedure-only `.txt`, so the redo is `git apply` → bless → gate →
+  commit, transcribing NOTHING — route-single-ir.2b M2.17), latent bugs
   caught in recovery not redo: M2.13 caught a missing `Debug` on a public result type; a codex-review
   of a salvage targets the wip as the real deliverable + folds accepted NEW TESTS into it pre-redo,
   since deferring them would re-derive in the "reproduction-only" redo → re-prove green, then re-bank
