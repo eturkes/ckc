@@ -4,6 +4,10 @@
 .serena/project.local.yml
 .serena/memories/
 
+# Headroom's tokensave code-graph: regenerable state (SQLite DB + config),
+# never committed; rebuild with `tokensave init`/`sync`.
+/.tokensave/
+
 # Rust build output (Cargo.lock is committed, not ignored)
 target/
 
