@@ -14,21 +14,30 @@
 //!   jq -r .content_hash \
 //!     crates/ckc-cli/tests/fixtures/cassettes/route.fixture/test_source.fixture/seed-42.json
 //!
-//! The replay assertions are ENGINE-AGNOSTIC: the committed cassette's
-//! payload-canonical `content_hash` is byte-pinned (drift guard), its recorded
-//! output parses as JSON and schema-validates against the committed BOUNDED
-//! fixture (closed enum + bool, `additionalProperties:false`), and its §4.4
-//! provenance is the fixed AI-recording contract. Conformance is CONSISTENT WITH
-//! `--constraint` honored end-to-end at record time — necessary, not alone
-//! sufficient (the `.2b` framing) — never a model-specific output VALUE.
+//! The replay assertions are ENGINE-AGNOSTIC. The committed cassette's
+//! payload-canonical `content_hash` is byte-pinned — the drift guard over the
+//! WHOLE payload (prompt, constraint + template hashes, model identity, output).
+//! Replay also re-binds that payload to this test's DECLARED bless inputs (prompt,
+//! prompt-template hash, constraint-file hash), so a constant edited without a
+//! re-bless fails loudly rather than silently desyncing from the artifact. The
+//! recorded output parses as JSON and schema-validates against the committed
+//! BOUNDED fixture (closed enum + bool, `additionalProperties:false`) —
+//! conformance is CONSISTENT WITH `--constraint` honored end-to-end at record
+//! time, necessary not alone sufficient (the `.2b` framing), never a
+//! model-specific output VALUE. The full §4.4 recording envelope pins too: the
+//! fixed AI-recording contract (`ai_generated` / `evidence_discovery_only` /
+//! `[ai]`), the synthetic producer, and an empty diagnostics/trace/runtime
+//! envelope — none of which `content_hash` covers.
 //!
 //! IDENTITY: the committed cassette carries the runtime's REAL `model_identity`
 //! (model/quant/engine), by deliberate decision — a recorded cassette is
 //! machine-specific MEASUREMENT data whose honest provenance records what
 //! produced it, so it is exempt from the engine-agnostic synthetic-token rule
 //! that governs hand-authored contract/fixture artifacts (and from the identity
-//! audit-grep). The replay test never asserts an identity VALUE, so the recorded
-//! model is free to drift; only the output, provenance, and content hash pin.
+//! audit-grep). The replay test never asserts an identity VALUE BY NAME — the
+//! host runtime swaps with no test-code edit — but the identity is part of the
+//! payload the pinned `content_hash` covers, so it changes only via a deliberate
+//! re-bless + re-pin (pinned transitively, not semantically asserted by name).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -157,10 +166,33 @@ fn replay_committed_cassette() {
     let output = wrapper.payload.output_bytes().expect("output_hex decodes");
     assert_conforms(&output);
 
+    // Bind the committed cassette to this test's DECLARED bless inputs: the pinned
+    // content_hash proves the payload is internally intact, but only these tie it
+    // to the constants `record_cassette` blesses from — so a constant edited
+    // without a re-bless fails here loudly instead of silently desyncing from the
+    // committed artifact.
+    assert_eq!(wrapper.payload.prompt, PROMPT);
+    assert_eq!(
+        wrapper.payload.prompt_template_hash,
+        hash_bytes(PROMPT_TEMPLATE)
+    );
+    assert_eq!(
+        wrapper.payload.constraint_hash,
+        hash_bytes(&std::fs::read(constraint_path()).unwrap())
+    );
+
+    // The full §4.4 recording envelope — none of producer/diagnostics/trace_refs/
+    // runtime_metadata is covered by `content_hash` or `check_contract`, so the pin
+    // alone would miss a tampered envelope: the fixed AI-recording contract, the
+    // synthetic producer, and no stray diagnostics/trace/runtime metadata.
     assert_eq!(wrapper.origin, Origin::AiGenerated);
     assert_eq!(
         wrapper.evidence_status,
         EvidenceStatus::EvidenceDiscoveryOnly
     );
     assert_eq!(wrapper.external_effects, vec![Effect::Ai]);
+    assert_eq!(wrapper.producer, producer());
+    assert!(wrapper.diagnostics.is_empty());
+    assert!(wrapper.trace_refs.is_empty());
+    assert!(wrapper.runtime_metadata.is_empty());
 }
