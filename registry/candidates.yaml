@@ -58,3 +58,12 @@ processing_stages:
     input_artifact_kinds:
       [source_document_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
     output_artifact_kinds: [report, run_manifest, replay_manifest]
+  # M2 §9 nondeterministic model-fill (recorded I/O). single_ir target shape
+  # (fills ClinicalIR over deterministic extract+segment upstream); the forthcoming
+  # M2 route pipelines (route-single-ir) will reference it. route.direct_smt adds
+  # its own smt_query-output entry.
+  - id: processing_stage.m2.model_fill
+    kind: model_fill
+    determinism: nondeterministic
+    input_artifact_kinds: [source_document_graph, segments]
+    output_artifact_kinds: [clinical_ir]

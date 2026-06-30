@@ -158,9 +158,26 @@ full pre-consolidation text lives in git history.
   runtime-ABSENT, `record` (gated) needs the runtime + a clean `Completed`. Committed TEST cassette →
   `crates/ckc-cli/tests/fixtures/cassettes/...` (.2b precedent — test artifact, NOT `corpus/test_sources/`
   (route units own those) NOR `schemas/`), blessed via an `#[ignore]`d `CKC_MODEL_COMMAND`-unset-guarded
-  test mirroring `tests/model_live.rs`, content-hash-pinned. DEFERRED (module-now/integrate-later, user
-  decision — no in-pipeline consumer yet): stage-model-fill.1 drives record/replay, run-m2.1 owns the
-  `--record` surface + replay.rs model-artifact coverage + §9 manifest `prompt_template_hash`.
+  test mirroring `tests/model_live.rs`, content-hash-pinned. DEFERRED (run-m2.1): the `--record`
+  surface + replay.rs model-artifact coverage + §9 manifest `prompt_template_hash` (stage-model-fill.1
+  now drives replay/record via `FillSource`, next bullet).
+- Model-fill stage core (§7.4/§9, stage-model-fill.1, `ckc-cli/src/model_fill.rs`). DECOUPLED core
+  `model_fill<T>(store, key, source: FillSource, parse) -> Result<ModelFill<T>, CassetteError>` →
+  `ModelFill<T>{target: Option<T>, diagnostics, recorded_calls}` — a plain value, NOT a §4.6
+  event/`ArtifactWrapper`. `FillSource::Replay` (default, runtime-absent) / `Record{adapter,prompt,
+  constraint,ctx}` (gated) gets the cassette via `CassetteStore`, decodes `output_bytes()`, runs the
+  route's `parse: FnOnce(&[u8])->Result<T,String>` = the §4 acceptance check (route supplies the
+  ClinicalIR/SMT parser; target + acceptance stay route-side). `Err(reason)` → a §7.4 `ai_schema_violation`
+  (`Outcome::Invalid`, reason in payload, mirrors deterministic `schema_invalid`), no target; a cassette
+  IO/contract failure stays `Err(CassetteError)`, DISTINCT (route tells a broken recording from a bad model
+  output). EVENT NOT emitted here — M1 `finish_processing_stage` is index-coupled
+  (`PROCESSING_STAGE_KINDS[index]`/`pipeline_step_ids[index]`) → run-m2.1 generalizes emission + builds the
+  §4.6 event from `recorded_calls`; `RECORDED_CALLS_COUNTER="recorded_calls"` = the resource-counter key,
+  `recorded_calls=1` per fill (stage-model-fill.2 repair loop raises it). `CassetteStore::{build_wrapper,
+  persist}` → pub(crate) so the stage (+ its tests) seed cassettes through the store's own contract-valid
+  builder. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,
+  `[source_document_graph,segments]→[clinical_ir]`), UNREFERENCED (no chain check fires until a route
+  pipeline references it); route-direct-smt adds its OWN smt_query-output entry.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
   variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
   one env-gated test —

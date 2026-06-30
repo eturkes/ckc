@@ -155,7 +155,7 @@ impl CassetteStore {
 
     /// Wrap a payload as the §4.4 cassette artifact (origin `ai_generated`, evidence
     /// `evidence_discovery_only`, effect `ai`) and confirm it validates.
-    fn build_wrapper(
+    pub(crate) fn build_wrapper(
         &self,
         key: &CassetteKey,
         payload: CassettePayload,
@@ -185,7 +185,7 @@ impl CassetteStore {
 
     /// Write the wrapper, then return the disk-read-back value (disk truth, mirroring
     /// the run-shell `land` discipline).
-    fn persist(
+    pub(crate) fn persist(
         &self,
         key: &CassetteKey,
         wrapper: ArtifactWrapper<CassettePayload>,

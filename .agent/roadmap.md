@@ -336,35 +336,16 @@ argument).
   ONLY in the cassette). Replay pins output JSON+schema-conformance + ai_generated/evidence_discovery_only/[ai]
   provenance, never an identity value. Gates green: fmt + clippy -D + `cargo test --workspace`, 419 passed /
   3 ignored (record_cassette + model_live + bless_clinical_ir_schema).] 72% 145K/200K
-- [ ] stage-model-fill.1: model-fill processing stage — core (generic over target). AUTHORED +
-  PROVEN GREEN this respec (424 passed / 3 ignored, fmt + clippy `-D warnings` clean), reverted to
-  dodge compaction → the redo is reproduction-only: read ONLY this line, restore, gate, close.
-  RESTORE: `cp .agent/wip-stage-model-fill.rs.txt crates/ckc-cli/src/model_fill.rs` (new module,
-  byte-exact + fmt-clean) + `git apply .agent/wip-stage-model-fill.edits.patch` (3 wiring edits:
-  cassette.rs `CassetteStore::{build_wrapper,persist}` → `pub(crate)`; lib.rs `pub mod model_fill;` +
-  a module doc bullet; candidates.yaml the `processing_stage.m2.model_fill` entry). Apply fails on
-  drift → 3 small hunks, apply by hand.
-  LOCKED (in the salvage, no re-derivation): a DECOUPLED core `model_fill<T>(store, key, source, parse)
-  -> Result<ModelFill<T>, CassetteError>` → `ModelFill<T>{ target: Option<T>, diagnostics, recorded_calls }`,
-  NOT an event/wrapper. Gets the cassette via `CassetteStore` (`FillSource::Replay` default
-  runtime-absent / `Record{adapter,prompt,constraint,ctx}` gated), decodes `output_bytes()`, runs the
-  route's `parse: FnOnce(&[u8]) -> Result<T,String>` = the §4 acceptance check (route supplies the
-  ClinicalIR/SMT parser); `Err(reason)` → a §7.4 `ai_schema_violation` (Outcome::Invalid, reason in
-  payload), no target; a cassette IO/contract failure → `Err(CassetteError)`, distinct. `recorded_calls
-  = 1` (.2 repair loop raises); `RECORDED_CALLS_COUNTER` = the §4.6 resource-counter key. The §4.6
-  EVENT is NOT emitted here — `finish_processing_stage` is M1-coupled (`PROCESSING_STAGE_KINDS[index]`/
-  `pipeline_step_ids[index]`), so run-m2.1 generalizes emission + builds it from `recorded_calls`.
-  Registry: ONE single_ir-shaped entry (`kind model_fill`, `nondeterministic`, in
-  `[source_document_graph, segments]` → out `[clinical_ir]`), UNREFERENCED so no chain check fires;
-  route-direct-smt adds its own smt_query-output entry. Tests (5 in the salvage): valid → target + 1
-  call; unparsable / schema-miss → `ai_schema_violation`; missing cassette → `CassetteError::Io`;
-  count keys the counter.
-  GATE (reproduction-only, proven this respec): `cargo test --workspace` (5 model_fill tests +
-  `committed_model_surface_checks_ok`) + `cargo fmt --check` + `cargo clippy --workspace --all-targets
-  -- -D warnings`. CLOSE: `rm .agent/wip-stage-model-fill.rs.txt .agent/wip-stage-model-fill.edits.patch`;
-  record context-usage; record durable cross-unit decisions in memory (decoupled core + run-m2.1
-  emits the event; single_ir registry entry + route-direct-smt's own; build_wrapper/persist
-  pub(crate)); mark DONE (M2 stays IN-PROGRESS).
+- [x] stage-model-fill.1: model-fill processing stage — core (generic over target). DECOUPLED core
+  `model_fill<T>(store, key, FillSource, parse) -> Result<ModelFill<T>, CassetteError>` (replay default /
+  record gated → decode `output_bytes()` → route `parse` = §4 acceptance → `ModelFill{target, diagnostics,
+  recorded_calls}`; `Err(reason)` → §7.4 `ai_schema_violation` (no target), a cassette IO/contract failure →
+  distinct `CassetteError`); unreferenced `processing_stage.m2.model_fill` registry entry; the §4.6 event
+  emission is deferred to run-m2.1 (builds it from `recorded_calls`). Cross-unit decisions in memory
+  (`Model-fill stage core` bullet). [Done: reproduction-only redo — restored salvage byte-exact (`cp` +
+  `git apply`; pre-image blobs matched 9b519ef/3f1fd2f/ff46c95, patch clean), gate green 424 passed /
+  3 ignored (5 model_fill tests + `committed_model_surface_checks_ok` confirmed by name) + fmt + clippy
+  `-D warnings` clean; salvage files deleted.] 51% 103K/200K
 - [ ] stage-model-fill.2: model-fill repair loop + grounding. Extend the stage with a repair loop —
   re-prompt on schema-violation up to `repair_limit` (from budget), counting repairs, emitting
   `repair_limit_exceeded` on exhaustion; a grounding check — a referenced upstream id absent from the

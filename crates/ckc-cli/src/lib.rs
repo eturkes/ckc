@@ -116,12 +116,22 @@
 //!   hex-encoded for a lossless byte round-trip — replay (default) is
 //!   runtime-absent, record ([`cassette::RecordMode`]) gated behind the
 //!   runtime. The forthcoming model-fill stage drives it.
+//! - [`model_fill`] — §7.4/§9 model-fill stage core (`stage-model-fill.1`):
+//!   [`model_fill::model_fill`] drives the [`cassette::CassetteStore`] (replay
+//!   default / record gated via [`model_fill::FillSource`]), decodes the
+//!   recorded output, and parses it into a route-supplied target
+//!   ([`model_fill::ModelFill`]); a parse/§4-acceptance failure becomes a §7.4
+//!   `ai_schema_violation` in place of a target; it returns the recorded-call
+//!   count under [`model_fill::RECORDED_CALLS_COUNTER`] for the §4.6 event the
+//!   route/run wiring emits (run-m2.1). Target-generic; the route units wire the
+//!   pipeline (no repair loop yet → .2).
 #![forbid(unsafe_code)]
 
 pub mod cassette;
 pub mod extract;
 pub mod manifests;
 pub mod model;
+pub mod model_fill;
 pub mod normalize;
 pub mod replay;
 pub mod report;
