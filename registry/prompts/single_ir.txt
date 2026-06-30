@@ -1,0 +1,24 @@
+Translate one Japanese clinical guideline document into a single ClinicalIR record.
+
+You are given, for one source document:
+- the Japanese guideline text;
+- the segment ids and region ids that the deterministic upstream produced for it;
+- the controlled lexicon: the only terminology systems, concept codes, action kinds,
+  action targets, and context variables you may name.
+
+Produce one JSON object that conforms to the supplied ClinicalIR schema. Follow these rules:
+
+- Fill every closed-vocabulary field (binding `system` and `code`, each `alternatives`
+  entry, action `kind` and `target`, statement concept, context `var`) with a value drawn
+  only from the supplied lexicon. Always stay within that vocabulary; never name a code,
+  action, or variable outside it.
+- Record each terminology binding, clinical statement, action, context atom, quantity
+  interval, and exception clause the guideline expresses.
+- Cite evidence only by the supplied ids: place segment ids in `source_segment_ids` and
+  region ids in `region_ids`, and use only ids that appear in the supplied lists. Always
+  reference an existing id; do not introduce one of your own.
+- Give each generated id (`binding_id`, `statement_id`, `exception_id`) a fresh,
+  grammar-valid identifier.
+- Write every numeric interval bound as an integer inside the schema's range.
+
+Output only the JSON object, with nothing before or after it.

@@ -1,0 +1,4 @@
+- id: prompt.single_ir
+  path: registry/prompts/single_ir.txt
+  template_hash: sha256:4678d2e7acf28edd6e0594693fc5532d887bca3c00760ef6bfe42cd5d2958021
+  route: route.single_ir

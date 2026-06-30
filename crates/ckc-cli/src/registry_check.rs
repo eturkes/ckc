@@ -76,9 +76,10 @@ fn check_core_registry(root: &Path, shell: &mut Shell) {
 /// The §14 model surface (M2): `registry/schemas.yaml` + `registry/prompts.yaml`.
 /// Both are optional additions — absent until a route configures them, so a
 /// missing file is empty, not a diagnostic. Past [`validate_model_registry`]
-/// (id uniqueness, schema paths, prompt source shape), each schema file is read
-/// and its raw-byte hash compared to the entry's `schema_hash`: a missing file
-/// or a mismatch lands one diagnostic. Independent of the §8.4 set.
+/// (id uniqueness, schema paths, prompt source shape), each schema file and each
+/// prompt body — the `path` file's bytes or the `inline` text — is hashed and
+/// compared to the entry's pinned hash (`schema_hash` / `template_hash`): a
+/// missing file or a mismatch lands one diagnostic. Independent of the §8.4 set.
 fn check_model_registry(root: &Path, shell: &mut Shell) {
     let schemas = load_optional(root, SCHEMAS_FILE, parse_schemas, shell);
     let prompts = load_optional(root, PROMPTS_FILE, parse_prompts, shell);
@@ -112,6 +113,34 @@ fn check_model_registry(root: &Path, shell: &mut Shell) {
                     (static_id("schema"), schema.id.to_string()),
                 ]));
             }
+        }
+    }
+
+    for prompt in &prompts {
+        let actual = match (&prompt.path, &prompt.inline) {
+            (Some(path), None) if !path.is_empty() && is_safe_relative_path(path) => {
+                let full = root.join(path);
+                match std::fs::read(&full) {
+                    Ok(bytes) => hash_bytes(&bytes),
+                    Err(e) => {
+                        shell.diagnostic(invalid_diagnostic(vec![
+                            (static_id("prompt"), prompt.id.to_string()),
+                            (static_id("reason"), format!("read {}: {e}", full.display())),
+                        ]));
+                        continue;
+                    }
+                }
+            }
+            (None, Some(inline)) if !inline.is_empty() => hash_bytes(inline.as_bytes()),
+            // Empty / unsafe / both-set / neither-set: a finding above covers it.
+            _ => continue,
+        };
+        if actual != prompt.template_hash {
+            shell.diagnostic(invalid_diagnostic(vec![
+                (static_id("actual"), actual.to_string()),
+                (static_id("expected"), prompt.template_hash.to_string()),
+                (static_id("prompt"), prompt.id.to_string()),
+            ]));
         }
     }
 }
@@ -579,6 +608,93 @@ processing_stages:
                 (static_id("actual"), actual.to_string()),
                 (static_id("expected"), pinned.to_string()),
                 (static_id("schema"), "schema.x".to_string()),
+            ]]
+        );
+    }
+
+    // The prompt gate mirrors the schema gate: a path prompt whose file is
+    // missing and one whose bytes drift from `template_hash` are each rejected;
+    // a matching path prompt and a matching inline prompt stay silent.
+    #[test]
+    fn prompt_file_missing_or_mismatched_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let good = hash_bytes(b"good prompt bytes\n");
+        let inline_hash = hash_bytes(b"inline body");
+        write(
+            root,
+            PROMPTS_FILE,
+            &format!(
+                "\
+- id: prompt.good
+  path: registry/prompts/good.txt
+  template_hash: {good}
+  route: route.single_ir
+- id: prompt.missing
+  path: registry/prompts/missing.txt
+  template_hash: {good}
+  route: route.single_ir
+- id: prompt.mismatch
+  path: registry/prompts/mismatch.txt
+  template_hash: {good}
+  route: route.single_ir
+- id: prompt.inline
+  inline: \"inline body\"
+  template_hash: {inline_hash}
+  route: route.single_ir
+"
+            ),
+        );
+        write(root, "registry/prompts/good.txt", "good prompt bytes\n");
+        write(root, "registry/prompts/mismatch.txt", "different bytes\n");
+        // registry/prompts/missing.txt is deliberately absent.
+
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 2);
+        assert_reported(&diagnostics, "prompt.missing");
+        assert_reported(&diagnostics, "prompt.mismatch");
+        for silent in ["prompt.good", "prompt.inline"] {
+            assert!(
+                !diagnostics
+                    .iter()
+                    .flat_map(|d| &d.payload)
+                    .any(|(_, value)| value.contains(silent)),
+                "the matching entry {silent} should be silent: {diagnostics:?}"
+            );
+        }
+    }
+
+    // The prompt hash-mismatch diagnostic carries exactly the sorted-key payload
+    // [actual, expected, prompt]; an inline body exercises the inline hash branch.
+    #[test]
+    fn prompt_mismatch_diagnostic_payload_is_sorted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let pinned = hash_bytes(b"pinned template");
+        write(
+            root,
+            PROMPTS_FILE,
+            &format!(
+                "\
+- id: prompt.x
+  inline: \"actual template\"
+  template_hash: {pinned}
+  route: route.single_ir
+"
+            ),
+        );
+        let (_, diagnostics) = model_checked(root);
+        let actual = hash_bytes(b"actual template");
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|d| d.payload.clone())
+                .collect::<Vec<_>>(),
+            vec![vec![
+                (static_id("actual"), actual.to_string()),
+                (static_id("expected"), pinned.to_string()),
+                (static_id("prompt"), "prompt.x".to_string()),
             ]]
         );
     }

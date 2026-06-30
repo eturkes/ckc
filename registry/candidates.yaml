@@ -15,6 +15,18 @@ pipelines:
       - processing_stage.m1.verify
       - processing_stage.m1.trace
       - processing_stage.m1.report
+  # M2 §9 route.single_ir: the model fills clinical_ir (processing_stage.m2.model_fill)
+  # over deterministic extract+segment, then the M1 back end assembles, compiles, and
+  # verifies it. Six stages (no normalize/trace/report) — scored through the shared
+  # compile->verify tail. route.direct_smt seeds its own pipeline later.
+  - id: pipe.m2_single_ir
+    processing_stages:
+      - processing_stage.m1.extract
+      - processing_stage.m1.segment
+      - processing_stage.m2.model_fill
+      - processing_stage.m2.assemble
+      - processing_stage.m1.compile
+      - processing_stage.m1.verify
 processing_stages:
   - id: processing_stage.m1.extract
     kind: extract
@@ -59,11 +71,17 @@ processing_stages:
       [source_document_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
     output_artifact_kinds: [report, run_manifest, replay_manifest]
   # M2 §9 nondeterministic model-fill (recorded I/O). single_ir target shape
-  # (fills ClinicalIR over deterministic extract+segment upstream); the forthcoming
-  # M2 route pipelines (route-single-ir) will reference it. route.direct_smt adds
-  # its own smt_query-output entry.
+  # (fills clinical_ir over deterministic extract+segment upstream); pipe.m2_single_ir
+  # references it. route.direct_smt adds its own smt_query-output entry later.
   - id: processing_stage.m2.model_fill
     kind: model_fill
     determinism: nondeterministic
     input_artifact_kinds: [source_document_graph, segments]
     output_artifact_kinds: [clinical_ir]
+  # M2 route.single_ir assemble: mirrors processing_stage.m1.assemble but consumes the
+  # model-filled clinical_ir in place of the deterministic normalization layer.
+  - id: processing_stage.m2.assemble
+    kind: assemble
+    determinism: deterministic
+    input_artifact_kinds: [source_document_graph, segments, clinical_ir]
+    output_artifact_kinds: [ir_bundle]

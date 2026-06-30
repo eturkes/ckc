@@ -362,7 +362,7 @@ argument).
   not a silent empty-id diagnostic; route-single-ir still enforces route-side as defense-in-depth) + softened
   two over-claimed "distinct committed cassette" docs (provably distinct across repairs; collision-negligible,
   not structurally excluded, against the base seed). +empty-grounding `should_panic` test.
-- [ ] route-single-ir.1: `single_ir` registry + prompt surface (additive, gate-independent foundation;
+- [x] route-single-ir.1: `single_ir` registry + prompt surface (additive, gate-independent foundation;
   split from the original one-shot route-single-ir — respec `git show e1c8c17`). `candidates.yaml` +=
   `processing_stage.m2.assemble` (mirror `processing_stage.m1.assemble`, swap input
   `normalization`→`clinical_ir`): `kind: assemble` / `determinism: deterministic` /
@@ -388,7 +388,15 @@ argument).
   `PromptEntry`/`validate_model_registry`/`parse_prompts`/`hash_bytes`/`is_safe_relative_path`. Gate:
   `cargo test`; `ckc registry check` validates `pipe.m2_single_ir` (chain) + the prompt file/hash, and
   rejects a missing / hash-mismatched prompt (mirror the schema-mismatch test); engine-agnostic (the prompt
-  is human JA-instruction prose, no engine/dialect/format names); fmt + clippy.
+  is human JA-instruction prose, no engine/dialect/format names); fmt + clippy. [Done: seeded
+  `pipe.m2_single_ir` (6-stage extract→segment→m2.model_fill→m2.assemble→compile→verify) +
+  `processing_stage.m2.assemble` (clinical_ir-input mirror of m1.assemble) in candidates.yaml; NEW
+  `registry/prompts.yaml` (`prompt.single_ir`→`registry/prompts/single_ir.txt`, template_hash
+  `sha256:4678d2e7…`) + first-draft JA→ClinicalIR prompt + `.gitattributes registry/prompts/*.txt
+  eol=lf`; symmetric prompt file/hash loop in `check_model_registry` (+2 tests) — mismatch payload sorted
+  `actual`/`expected`/`prompt`. `ckc registry check` ok end-to-end; engine-agnostic audit clean (every
+  forbidden category, word-boundary); gate 429 passed / 3 ignored + fmt + clippy `-D warnings` clean.]
+  70% 140K/200K
 - [ ] route-single-ir.2: per-doc model-fill → validated `IrBundle` + golden cassettes (the route's fill
   half; model-runtime-absent, z3 not needed). New route code in `run.rs` (REQUIRED there: `Resolved` +
   `compile_verify_group` are private to `mod run`, which .3 reuses). Per-doc fn (shape: `single_ir_fill(root,

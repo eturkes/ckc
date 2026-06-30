@@ -242,11 +242,16 @@ full pre-consolidation text lives in git history.
   match are I/O → CLI `check_model_registry` emits them as sorted-key `actual`/`expected`/`schema` (or
   `reason`/`schema`) diagnostics mirroring `load`'s file/reason shape, NOT `RegistryFinding`s. Both
   files are OPTIONAL via `load_optional` (absent→empty, no diagnostic — additive surface, M1 ran
-  without them; keeps existing tempdir CLI tests at their old counts); prompts.yaml is unseeded — route
-  units create it AND add prompt file/hash checks symmetric to the schema loop. Seeded: ids
+  without them; keeps existing tempdir CLI tests at their old counts). schemas.yaml seeded: ids
   `schema.clinical_ir`/`schema.smt_query`, `target_kind` = constrained output layer
-  `clinical_ir`/`smt_query`; prompt routes are `route.direct_smt`/`route.single_ir`. Drift guard =
-  `committed_model_surface_checks_ok` (schemas.yaml hashes must equal the real `schemas/` bytes).
+  `clinical_ir`/`smt_query`. prompts.yaml seeded by route-single-ir.1: `prompt.single_ir` →
+  `registry/prompts/single_ir.txt` (route `route.single_ir`, `eol=lf`-pinned) + the symmetric prompt
+  file/hash loop in `check_model_registry` (path → file bytes, inline → text bytes, vs `template_hash`;
+  mismatch payload sorted `actual`/`expected`/`prompt`; read-error sorted `prompt`/`reason`). Prompt
+  CONTENT is NOT gated (only existence + hash + path-xor-inline shape) — first-draft wording, refined at
+  run-m2.2's live recording; route.direct_smt seeds its own prompt later. Drift guard =
+  `committed_model_surface_checks_ok` (schemas.yaml + prompts.yaml pinned hashes must equal the real
+  `schemas/` + `registry/prompts/` bytes).
   The pre-tightening `fb42ee5a…` (2512 B) is dead — codex-review ecca074 tightened the grammar. Roadmap's
   schemas-export.2 spec keeps `fb42ee5a…`/2512 B as faithful .2-era history (not a live value; collapses at
   M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
