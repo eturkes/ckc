@@ -91,6 +91,23 @@ full pre-consolidation text lives in git history.
   for readability (alignment padding, inline result comments, illustrative declaration or
   conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
+- Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
+  a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
+  deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
+  byte-exact shapes — signatures, sorted-field orders, enum variants, harness helpers, the
+  `Resolved`-style stamp structs — assembled across many modules; a deterministic-REPRODUCTION
+  gate reads the WHOLE upstream type + helper set. Detect at PLAN time: count the modules a
+  unit's gate/bless scaffolding must read for exact shapes, not just its conceptual pieces. A
+  nothing-written overflow recovers FORWARD (not via a backward `.patch`/`.rs.txt` salvage):
+  (a) SPLIT the production fn from its golden-fixture + gate when separable (route-single-ir.2
+  = accept closure; .2b = fill+bless+gate); (b) pre-derive exact code + CONFIRMED signatures +
+  the verified equality-premise facts (e.g. clinical_ir diagnostics empty for the 3 docs) +
+  insertion anchors into a throwaway `.agent/wip-<unit>.txt` the impl line POINTS at — read
+  THAT not the N files, targeted reads only at flagged VERIFY points; delete it in the closing
+  commit. A self-checking gate (`content_hash == reference`) bounds transcription risk: a wrong
+  pre-derived line fails the gate loudly, never silently. Mark gate-IRRELEVANT fields (producer
+  stamps / step-ids / wrapper-level fields under a payload-only `content_hash`) explicit so the
+  session skips pinning them.
 - Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).
 - Backward-compatible canonical-record extension (proven M2.1 model-types, inverse of the rename
   break above): adding fields to a byte-pinned §4.3 record without disturbing pins = make them
@@ -254,9 +271,8 @@ full pre-consolidation text lives in git history.
   is a standing style rule, distinct from the deferred perf tuning.) Drift guard =
   `committed_model_surface_checks_ok` (schemas.yaml + prompts.yaml pinned hashes must equal the real
   `schemas/` + `registry/prompts/` bytes).
-  The pre-tightening `fb42ee5a…` (2512 B) is dead — codex-review ecca074 tightened the grammar. Roadmap's
-  schemas-export.2 spec keeps `fb42ee5a…`/2512 B as faithful .2-era history (not a live value; collapses at
-  M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
+  Roadmap's schemas-export.2 spec carries a STALE .2-era schema hash/size (codex `ecca074` tightened the
+  grammar; collapses at M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
   M2.5 codex-review: registry paths checked safe-relative via `is_safe_relative_path` (pub ckc-core) —
   ONE predicate, in the pure validator (`UnsafePath` finding, schema+prompt paths) AND reused at the
   CLI read-guard (skip reading an unsafe path); don't duplicate. LEXICAL only (rejects absolute + `.`/`..`
@@ -373,30 +389,21 @@ full pre-consolidation text lives in git history.
     → adding `model_fill` is registry data, not an enum change; the middle-layer derive fns live in
     ckc-cli (`segment.rs`, `normalize.rs`, `rules.rs` `derive_norm_ir`), only `DocIr::from_graph` +
     `FormalIr::derive`/`FormalConstraint::from_rule` sit on the ckc-core types → `run-refactor`
-    extracts ONLY the per-group compile→verify back end (per-doc derive fns already pub → route
-    units compose them directly); full spec in the roadmap unit + respec commit `93953c4`. PLAN
-    LESSON (this respec recovered an overflow): a unit framed "extract a tail/chain X→Y→Z" must
-    share ONE iteration granularity — `derive_norm_ir`/`assemble` are per-document (N×),
-    `compile`/`verify` per-group (1× fan-in), so they cannot be one linear fn; conflating
-    granularities forced a full-session design re-derivation. Check stage granularity at plan time.
-    Route→tail wiring (agent-confirmed, route-single-ir respec `git show` the split commit): a route
-    feeds the M1 `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` — that fn reads
-    only `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
-    `budget_ms`; `documents`/`groups`/`plan` are unread stubs. `resolve()` is NOT reusable (it
-    hard-requires all 8 stage KINDS + an `[Id; 8]`, returns None for the 6-stage single_ir pipeline). The
-    route fn lives in `run.rs` (`Resolved` + `compile_verify_group` are private to `mod run`). Accept
-    closure T = `ClinicalIr` (parse via `read_strict_canonical` → `Schema`; grounding pre-check mirrors
-    `bundle.validate` steps 4+5 = bindings/exceptions `region_ids` + statement `source_segment_ids` →
-    `Grounding`); `derive_norm_ir`+`assemble`+`validate` is the route's POST-acceptance deterministic tail,
-    NOT part of model-output acceptance (so no dev-only `jsonschema` runtime dep). A golden cassette stores
-    `canonical_payload_bytes(&clinical_ir(...).0)` (clinical ONLY — `clinical_ir` returns `(ClinicalIr,
-    Vec<DiagnosticRecord>)`); on replay the route reproduces the M1 bundle by `content_hash` (payload-only →
-    producer-independent) WHEN bundle-level diagnostics match — single_ir runs no normalizer so feeds `assemble`
-    segments-only diagnostics vs M1's segments∪normalization union, so equality holds where M1's normalization
-    diagnostics are empty for the test docs (asserted at bless), making verdict scoring a reuse of M1's pinned
-    result. CRAFTED fixtures (golden + bad cassettes) carry SYNTHETIC `model_identity` and ARE
-    audited (only LIVE-recorded cassettes are exempt). run-m2.1 reuses this minimal-`Resolved` pattern (or
-    generalizes `resolve()` to N stages) for the in-`execute` route loop.
+    extracted ONLY the per-group compile→verify back end (per-doc derive fns already pub → route units
+    compose them directly; full spec in respec commit `93953c4`). PLAN LESSON (this respec recovered an
+    overflow): a unit framed "extract a tail/chain X→Y→Z" must share ONE iteration granularity —
+    `derive_norm_ir`/`assemble` are per-document (N×), `compile`/`verify` per-group (1× fan-in), so they
+    cannot be one linear fn; conflating granularities forced a full-session design re-derivation. Check
+    stage granularity at plan time. Route→tail wiring (agent-confirmed): a route feeds the M1
+    `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` (that fn reads only
+    `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
+    `budget_ms`; `documents`/`groups`/`plan` are unread stubs); `resolve()` is NOT reusable (hard-requires
+    all 8 stage KINDS + `[Id; 8]`, returns None for the 6-stage single_ir pipeline); the route fn lives in
+    `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
+    accept-closure + deterministic-tail + golden-cassette wiring is pre-derived in
+    `.agent/wip-single-ir-fill.txt` (live until route-single-ir.2b) + the roadmap route-single-ir.2/.2b
+    lines; run-m2.1 reuses this minimal-`Resolved` pattern (or generalizes `resolve()` to N stages) for
+    the in-`execute` route loop.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output
@@ -441,10 +448,8 @@ conclusions the committed code + units rely on:
   `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy;
   the `.2b` `model_live` test re-asserts them live through `invoke_samples`.
 - `.2b` DONE — `crates/ckc-cli/tests/model_live.rs` (`#[ignore]`d; `cargo test -p ckc-cli --test
-  model_live -- --ignored`) is the standing live confirmation of the §9 runtime properties (read the test,
-  not a copy: default bare-name PATH-resolved `new()` guarded on `CKC_MODEL_COMMAND` unset, cross-process
-  SAME-seed byte-stability with EOF-gated `Completed` capture asserted per run, constraint-conformance
-  consistent with `--constraint` honored, seed-pinned per-index-reproducible k-sample draws — it does NOT
-  assert cross-seed equality; greedy seed-inertness is environment-specific, kept in `runtime.local.md`).
-  Its bounded enum+bool constraint fixture lives in `tests/fixtures/`, deliberately NOT `schemas/` (a test artifact,
-  not a production route constraint; the plan-line "schemas/ constraint" was shorthand — don't relocate).
+  model_live -- --ignored`) is the standing live confirmation of the §9 runtime properties — read the
+  test, not a copy. Non-obvious: it does NOT assert cross-seed equality (greedy seed-inertness is
+  environment-specific → `runtime.local.md`); its bounded enum+bool constraint fixture lives in
+  `tests/fixtures/` NOT `schemas/` (test artifact, not a production route constraint; the plan-line
+  'schemas/ constraint' was shorthand — don't relocate).

@@ -401,54 +401,37 @@ argument).
   w/ schema guard) + both-set no-read count assert → 430/3. Deferred 2 — route↔surface cross-validation
   (no route registry surface yet → route-binding unit) + `is_safe_relative_path` symlink gap (pre-existing,
   schema-shared, not remotely exploitable → own security unit; in memory).]
-- [ ] route-single-ir.2: per-doc model-fill → validated `IrBundle` + golden cassettes (the route's fill
-  half; model-runtime-absent, z3 not needed). New route code in `run.rs` (REQUIRED there: `Resolved` +
-  `compile_verify_group` are private to `mod run`, which .3 reuses). Per-doc fn (shape: `single_ir_fill(root,
-  entry: &CorpusEntry, lexicon, store: &CassetteStore, seed, resolved: &Resolved, repair_limit: u32, shell)
-  -> Option<ArtifactWrapper<IrBundle>>`; `resolved` supplies the producer stamps — .2 hand-builds it like .3
-  but with REAL `[0] = m1.extract`, `[1] = m1.segment`, `[3] = m2.assemble` (the bundle wrapper at run.rs 997
-  stamps `producer(resolved, 3)`), placeholders elsewhere; `repair_limit` lets .4 reuse this fn):
-  `extract(&html, &config)` (mirror `run.rs` 343-388: html from `root.join(&entry.path)`, `source_family =
-  static_id("synthetic_test_source_html")`, `producer(resolved, 0)`) → `segment(&source,
-  &producer(resolved, 1))` → `model_fill(store, CassetteKey{route.single_ir, entry.id, seed},
-  FillSource::Replay, repair_limit, accept)` → `ClinicalIr`. ACCEPT closure (T = `ClinicalIr`):
-  `read_strict_canonical::<ClinicalIr>(bytes).map_err(|e| FillReject::Schema(e.to_string()))?`, then a
-  grounding pre-check closed over upstream — region universe `source.payload.regions.iter().map(|r|
-  &r.region_id)`, segment universe `segments.payload.segments.iter().map(|s| &s.segment_id)`; collect
-  `absent` over `binding.region_ids` + `statement.exceptions[].region_ids` + `statement.source_segment_ids`
-  failing membership (= `bundle.validate` steps 4+5); `!absent.is_empty()` → `Err(FillReject::Grounding(
-  absent))` (route-side non-empty assert = defense-in-depth, M2.14 codex), else `Ok(clinical)`. POST-accept
-  deterministic tail (mirror `assemble_bundle` run.rs 959-989, substituting the model `clinical` +
-  `derive_norm_ir(&entry.id, &clinical, &segments.payload, lexicon)` for `normalization.payload.
-  {clinical,norm}`, with `diagnostics = canonical_diagnostic_set(segments.diagnostics.iter())`):
-  `DocIr::from_graph(&source.payload, source.diagnostics.clone())` → `assemble(doc, segments.payload, clinical,
-  norm, Vec::new(), diagnostics)` → `bundle.validate(&source.payload)` → wrap. M1's `assemble_bundle` feeds
-  `assemble` `canonical_diagnostic_set(segments.diagnostics ∪ normalization.diagnostics)`; single_ir runs NO
-  normalizer → segments-only diagnostics, so `bundle == M1` (the gate) REQUIRES M1's normalization diagnostics
-  empty for the 3 docs — asserted at bless (`norm_diags.is_empty()`). `bundle.validate` is EXPECTED-PASS for
-  accepted output: parse (→`Schema`) + grounding (→`Grounding`) cover the §7.4 classes the isolation tests
-  exercise; OTHER `ClinicalIr` invalidity `validate` catches later (vocab not in lexicon, duplicate generated
-  ids, `Action.key`≠`kind:target`, interval incoherence — bundle.rs 623/682/846) is a HARD route error, NOT a
-  §7.4 code (out of M2.15 scope; golden cassettes are lexicon-valid by construction so never trip it). GOLDEN cassettes via a bless writer — per doc (a/b/control) run the
-  deterministic upstream → `let (clinical, norm_diags) = clinical_ir(graph, segments, lexicon)`; ASSERT
-  `norm_diags.is_empty()` (single_ir carries no normalizer diagnostics → `bundle == M1` needs M1's empty here)
-  → `canonical_payload_bytes(&clinical)` →
-  `CassettePayload::from_output(route.single_ir, source, 42, prompt, constraint_hash = the `clinical_ir`
-  schema hash, prompt_template_hash = `prompt.single_ir`'s hash, model_identity = SYNTHETIC
-  `model.baseline`/`fixture_quant`/`1.0.0`, &output_bytes)` → `build_wrapper` → `persist` to
-  `crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json`. SYNTHETIC identity —
-  these are crafted deterministic fixtures, NOT live recordings, so the engine-agnostic audit APPLIES
-  (unlike run-m2.2's exempt live cassettes). Test (model-runtime-absent): per doc, `single_ir_fill` replays
-  the golden cassette → an `IrBundle` whose `content_hash` EQUALS the M1 deterministic bundle
-  (`assemble_bundle` over the same doc) — proving cassette replay + closure acceptance + assembly all
-  reproduce M1 (`content_hash` is payload-only → producer-independent). Reading: THIS line; `run.rs` 343-388
-  (extract/segment/producer) + 959-989 (assemble_bundle); `model_fill`/`FillSource`/`FillReject` + cassette
-  `build_wrapper`/`persist`/`replay` per memory `Model-fill stage core` + `Model cassette`. Gate: `cargo
-  test` (per-doc bundle == M1 bundle over committed golden cassettes); engine-agnostic audit on the new
-  cassettes; fmt + clippy. [Decision pinned: model fills ClinicalIR over deterministic upstream — the
-  instrument supplies the grounding scaffold; hallucinated refs are measured, not fatal.]
+- [ ] route-single-ir.2: `single_ir_accept` — named factory fn in `run.rs` (route + .2b + .4 reuse it).
+  `#[allow(dead_code)]` until .2b's `single_ir_fill` calls it (a fn reached only from `#[cfg(test)]` is dead
+  in the `--lib`/`--all-targets` clippy build). Closes over the doc's region + segment id-universes (pass
+  pre-built `&HashSet<&Id>` → test needs NO pipeline), returns `impl Fn(&[u8]) -> Result<ClinicalIr,
+  FillReject>`: `read_strict_canonical::<ClinicalIr>` (err → `Schema`), then grounding pre-check (=
+  `bundle.validate` steps 4+5) over `binding.region_ids` + `statement.exceptions[].region_ids` +
+  `statement.source_segment_ids` → non-empty `absent` ⇒ `Grounding(absent)` (route-side non-empty assert =
+  defense-in-depth, M2.14 codex), else `Ok`. Focused unit test (model-runtime-absent, NO cassette): garbage
+  bytes ⇒ `Schema`; empty `ClinicalIr` ⇒ `Ok`; one minimal binding citing an absent region ⇒ `Grounding`
+  (≥1 id). EXACT code + test + the one `ir.rs` read flagged in `.agent/wip-single-ir-fill.txt` §A. Gate:
+  `cargo test -p ckc-cli` (3 closure cases); fmt + clippy.
+- [ ] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
+  GOLDEN cassettes + reproduce-M1 gate test (the route's fill half; model-runtime-absent, z3 not needed).
+  HEAVY unit — its M2.16 predecessor overflowed a 200K window during READING (byte-exact shapes across 12
+  files, before writing a line). ALL exact code, confirmed signatures, the verified payload-equality facts,
+  insertion anchors, bless procedure + gate/audit commands are pre-derived in `.agent/wip-single-ir-fill.txt`
+  §B → read THAT, not the 12 files; targeted reads only where it flags `VERIFY`. Net: `single_ir_fill(
+  root, entry, lexicon, store, seed, resolved, repair_limit, shell) -> Option<ArtifactWrapper<IrBundle>>`
+  runs extract→segment→`model_fill`(Replay, `single_ir_accept`)→deterministic tail (mirror
+  `assemble_bundle`, segments-only diagnostics) → `IrBundle`; a `write_single_ir_cassette` test helper
+  (reused by .4) blesses the 3 golden cassettes to
+  `crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json` (SYNTHETIC identity →
+  engine-agnostic audit APPLIES); the gate test replays them → per-doc `IrBundle.content_hash` EQUALS the M1
+  `assemble_bundle` bundle (payload-only hash ⇒ producer-independent; the test is self-checking, so a wrong
+  tail fails loudly). New route code lives in `run.rs` (`Resolved` + `compile_verify_group` are private to
+  `mod run`, which .3 reuses). Gate: `cargo test --workspace`; engine-agnostic audit on the new cassettes;
+  fmt + clippy. On DONE, `rm .agent/wip-single-ir-fill.txt` in the same commit (consumed). [Decision pinned:
+  model fills ClinicalIR over deterministic upstream — the instrument supplies the grounding scaffold;
+  hallucinated refs are measured, not fatal.]
 - [ ] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
-  model-runtime-absent). Extend the route: gather .2's per-doc bundles for a group's test_sources, then
+  model-runtime-absent). Extend the route: gather .2b's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):
   `pipeline_id = pipe.m2_single_ir`, `pipeline_step_ids: [Id; 8]` with `[4] = processing_stage.m1.compile`
   + `[5] = processing_stage.m1.verify` (.3's tail reads only `[4]`/`[5]`; the FULL route ALSO needs .2's real
@@ -463,7 +446,7 @@ argument).
   groups, `experiments.yaml`) → verdicts vs `corpus/reference/m1_expected.yaml` via the `run_oracle.rs`
   `assert_group_matches_reference` shape (conflict: exactly one `SemanticContradiction` on the deontic query,
   `unsat_core` set-equal `a.test_source.m1_guideline_a.rule.0` + `a.test_source.m1_guideline_b.rule.0`;
-  no_conflict: all `SemanticNoConflict`). Low-risk: .2 proved the bundles == M1 bundles, so the verdicts ==
+  no_conflict: all `SemanticNoConflict`). Low-risk: .2b proved the bundles == M1 bundles, so the verdicts ==
   M1's (already pinned by `run_oracle`). Reading: THIS line; `run.rs` 460-490 (group_pipeline member-build)
   + 500-590 (`compile_verify_group`) + 1044-1085 (`finish_processing_stage`) + 1197-1203 (`producer`);
   `tests/run_oracle.rs` (`assert_group_matches_reference`, `strict_read`); `ProcessingStageClock`/`Shell`/
@@ -483,7 +466,7 @@ argument).
   pins only the (42, n) cases as worked examples, NOT (98, 1)) → `ai_schema_violation` then RECOVERY (an
   accepted bundle), AND a malformed-at-every-derived-seed variant → `repair_limit_exceeded`. SYNTHETIC
   model_identity on the bad cassettes (audit applies). Reading: THIS line; .2's committed accept closure +
-  cassette-craft helper; `model_fill` `FillReject`→code map + `derive_seed` re-prompt + `REPAIRS_COUNTER` per
+  .2b's `write_single_ir_cassette` helper; `model_fill` `FillReject`→code map + `derive_seed` re-prompt + `REPAIRS_COUNTER` per
   memory `Model-fill stage core`; the `derive_seed` test (`model.rs`). Gate: `cargo test` (hallucinated →
   `ai_hallucinated_source` with ≥1 id; malformed → `ai_schema_violation` + repair → recover / exceed);
   engine-agnostic audit on the new bad cassettes; fmt + clippy.
