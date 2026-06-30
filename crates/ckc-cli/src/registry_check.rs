@@ -571,6 +571,13 @@ processing_stages:
         );
         let (result, diagnostics) = model_checked(root);
         assert_eq!(result.outcome, Outcome::Invalid);
+        // Both-set yields only the source-shape finding — the loop's `_` arm
+        // never reads the (nonexistent) path, which would add a second.
+        assert_eq!(
+            diagnostics.len(),
+            1,
+            "both-set must not be read: {diagnostics:?}"
+        );
         assert_reported(
             &diagnostics,
             "prompt prompt.both: set exactly one of path or inline",
@@ -697,5 +704,32 @@ processing_stages:
                 (static_id("prompt"), "prompt.x".to_string()),
             ]]
         );
+    }
+
+    // The prompt loop mirrors the schema guard `unsafe_schema_path_reported_not_read`:
+    // an unsafe prompt path (absolute or `..`-escaping) is reported as a finding and
+    // never read — exactly one diagnostic, so no read of the out-of-tree target ran.
+    #[test]
+    fn unsafe_prompt_path_reported_not_read() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let good = hash_bytes(b"x\n");
+        write(
+            root,
+            PROMPTS_FILE,
+            &format!(
+                "\
+- id: prompt.escape
+  path: ../escape.txt
+  template_hash: {good}
+  route: route.single_ir
+"
+            ),
+        );
+        let (result, diagnostics) = model_checked(root);
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 1);
+        assert_reported(&diagnostics, "prompt.escape");
+        assert_reported(&diagnostics, "not a safe repo-relative path");
     }
 }

@@ -392,11 +392,15 @@ argument).
   `pipe.m2_single_ir` (6-stage extract→segment→m2.model_fill→m2.assemble→compile→verify) +
   `processing_stage.m2.assemble` (clinical_ir-input mirror of m1.assemble) in candidates.yaml; NEW
   `registry/prompts.yaml` (`prompt.single_ir`→`registry/prompts/single_ir.txt`, template_hash
-  `sha256:4678d2e7…`) + first-draft JA→ClinicalIR prompt + `.gitattributes registry/prompts/*.txt
+  `sha256:fbbea8a6…`) + first-draft JA→ClinicalIR prompt + `.gitattributes registry/prompts/*.txt
   eol=lf`; symmetric prompt file/hash loop in `check_model_registry` (+2 tests) — mismatch payload sorted
   `actual`/`expected`/`prompt`. `ckc registry check` ok end-to-end; engine-agnostic audit clean (every
   forbidden category, word-boundary); gate 429 passed / 3 ignored + fmt + clippy `-D warnings` clean.]
-  70% 140K/200K
+  70% 140K/200K [Codex-review (4 LOW, additive seed): fixed 2 — reframed prompt negatives→positives
+  (AGENTS.md pink-elephant, hash re-pinned `fbbea8a6…`) + `unsafe_prompt_path_reported_not_read` (symmetry
+  w/ schema guard) + both-set no-read count assert → 430/3. Deferred 2 — route↔surface cross-validation
+  (no route registry surface yet → route-binding unit) + `is_safe_relative_path` symlink gap (pre-existing,
+  schema-shared, not remotely exploitable → own security unit; in memory).]
 - [ ] route-single-ir.2: per-doc model-fill → validated `IrBundle` + golden cassettes (the route's fill
   half; model-runtime-absent, z3 not needed). New route code in `run.rs` (REQUIRED there: `Resolved` +
   `compile_verify_group` are private to `mod run`, which .3 reuses). Per-doc fn (shape: `single_ir_fill(root,

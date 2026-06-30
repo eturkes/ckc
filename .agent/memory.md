@@ -249,7 +249,9 @@ full pre-consolidation text lives in git history.
   file/hash loop in `check_model_registry` (path → file bytes, inline → text bytes, vs `template_hash`;
   mismatch payload sorted `actual`/`expected`/`prompt`; read-error sorted `prompt`/`reason`). Prompt
   CONTENT is NOT gated (only existence + hash + path-xor-inline shape) — first-draft wording, refined at
-  run-m2.2's live recording; route.direct_smt seeds its own prompt later. Drift guard =
+  run-m2.2's live recording; route.direct_smt seeds its own prompt later. (M2.15 codex-review: prompt
+  prose reframed negatives→positives per AGENTS.md pink-elephant rule + hash re-pinned; positive framing
+  is a standing style rule, distinct from the deferred perf tuning.) Drift guard =
   `committed_model_surface_checks_ok` (schemas.yaml + prompts.yaml pinned hashes must equal the real
   `schemas/` + `registry/prompts/` bytes).
   The pre-tightening `fb42ee5a…` (2512 B) is dead — codex-review ecca074 tightened the grammar. Roadmap's
@@ -257,7 +259,12 @@ full pre-consolidation text lives in git history.
   M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
   M2.5 codex-review: registry paths checked safe-relative via `is_safe_relative_path` (pub ckc-core) —
   ONE predicate, in the pure validator (`UnsafePath` finding, schema+prompt paths) AND reused at the
-  CLI read-guard (skip reading an unsafe path); don't duplicate. Core fixtures (SCHEMAS included) use
+  CLI read-guard (skip reading an unsafe path); don't duplicate. LEXICAL only (rejects absolute + `.`/`..`
+  components) → a committed repo-local SYMLINK pointing outside the tree still passes + the CLI
+  `std::fs::read` follows it (only the target's hash, not content, reaches a diagnostic); the pure
+  validator can't catch it (no I/O) → a real fix = an I/O-layer symlink/canonicalize guard across BOTH
+  read loops = its own scoped security unit (M2.15 codex-review deferred: low, pre-existing, local
+  repo-committed inputs only, not remotely exploitable). Core fixtures (SCHEMAS included) use
   SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents` (it replaces a
   SCHEMAS hash to forge a bad doc).
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive

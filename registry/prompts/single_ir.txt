@@ -10,13 +10,13 @@ Produce one JSON object that conforms to the supplied ClinicalIR schema. Follow 
 
 - Fill every closed-vocabulary field (binding `system` and `code`, each `alternatives`
   entry, action `kind` and `target`, statement concept, context `var`) with a value drawn
-  only from the supplied lexicon. Always stay within that vocabulary; never name a code,
-  action, or variable outside it.
+  only from the supplied lexicon. Always keep every code, action, and variable you name
+  within that supplied vocabulary.
 - Record each terminology binding, clinical statement, action, context atom, quantity
   interval, and exception clause the guideline expresses.
 - Cite evidence only by the supplied ids: place segment ids in `source_segment_ids` and
   region ids in `region_ids`, and use only ids that appear in the supplied lists. Always
-  reference an existing id; do not introduce one of your own.
+  cite an id that already appears in those lists.
 - Give each generated id (`binding_id`, `statement_id`, `exception_id`) a fresh,
   grammar-valid identifier.
 - Write every numeric interval bound as an integer inside the schema's range.
