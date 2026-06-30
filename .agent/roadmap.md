@@ -401,7 +401,7 @@ argument).
   w/ schema guard) + both-set no-read count assert → 430/3. Deferred 2 — route↔surface cross-validation
   (no route registry surface yet → route-binding unit) + `is_safe_relative_path` symlink gap (pre-existing,
   schema-shared, not remotely exploitable → own security unit; in memory).]
-- [ ] route-single-ir.2: `single_ir_accept` — named factory fn in `run.rs` (route + .2b + .4 reuse it).
+- [x] route-single-ir.2: `single_ir_accept` — named factory fn in `run.rs` (route + .2b + .4 reuse it).
   `#[allow(dead_code)]` until .2b's `single_ir_fill` calls it (a fn reached only from `#[cfg(test)]` is dead
   in the `--lib`/`--all-targets` clippy build). Closes over the doc's region + segment id-universes (pass
   pre-built `&HashSet<&Id>` → test needs NO pipeline), returns `impl Fn(&[u8]) -> Result<ClinicalIr,
@@ -411,7 +411,16 @@ argument).
   defense-in-depth, M2.14 codex), else `Ok`. Focused unit test (model-runtime-absent, NO cassette): garbage
   bytes ⇒ `Schema`; empty `ClinicalIr` ⇒ `Ok`; one minimal binding citing an absent region ⇒ `Grounding`
   (≥1 id). EXACT code + test + the one `ir.rs` read flagged in `.agent/wip-single-ir-fill.txt` §A. Gate:
-  `cargo test -p ckc-cli` (3 closure cases); fmt + clippy.
+  `cargo test -p ckc-cli` (3 closure cases); fmt + clippy. [Done: `single_ir_accept` placed after
+  `compile_verify_group` in run.rs (`#[allow(dead_code)]` until .2b's `single_ir_fill` calls it from
+  non-test) — strict-read `ClinicalIr` (err→`Schema`) then grounding pre-check over binding.region_ids +
+  exception.region_ids + statement.source_segment_ids (non-empty absent→`Grounding`, else Ok); §A code +
+  test copied verbatim, every confirmed signature/field held (one `ir.rs` read for `TerminologyBinding`
+  fields). Imports = .2's subset only (HashSet + ClinicalIr module-level, FillReject from crate::model_fill,
+  BindingStatus + TerminologyBinding test-only); §B's .2b-only imports WITHHELD (would trip clippy
+  unused_imports — `#[allow(dead_code)]` covers the dead fn, not dead imports; .2b adds them per wip §B "add
+  whichever are missing"). Test `single_ir_accept_classifies`: garbage→Schema, empty→Ok, absent-region
+  binding→Grounding(≥1). Gate: ckc-cli 200 passed / 3 ignored + fmt + clippy -D clean.] 58% 116K/200K
 - [ ] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
   GOLDEN cassettes + reproduce-M1 gate test (the route's fill half; model-runtime-absent, z3 not needed).
   HEAVY unit — its M2.16 predecessor overflowed a 200K window during READING (byte-exact shapes across 12

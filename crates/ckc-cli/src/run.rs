@@ -30,20 +30,23 @@
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
 
 use ckc_core::{
-    ArtifactWrapper, CanonError, CanonRead, Canonical, CorpusEntry, DataClass, DiagnosticCode,
-    DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization, Origin, Outcome, Producer,
-    RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
-    canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
-    hash_bytes, parse_candidates, parse_corpora, parse_experiments, read_strict_canonical,
+    ArtifactWrapper, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry, DataClass,
+    DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization, Origin,
+    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup,
+    assemble, canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash,
+    content_hash, hash_bytes, parse_candidates, parse_corpora, parse_experiments,
+    read_strict_canonical,
 };
 use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
 
 use crate::extract::{ExtractConfig, extract};
 use crate::manifests::{ManifestInputs, assemble_manifests};
+use crate::model_fill::FillReject;
 use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
 use crate::report::{Report, assemble_report, render_markdown};
@@ -587,6 +590,54 @@ fn compile_verify_group(
         landed,
     );
     (Some(compiled), verifier_results)
+}
+
+/// The `route.single_ir` §4 acceptance closure over one model output: strict-read
+/// the bytes as a [`ClinicalIr`] — a parse failure is a repairable
+/// [`FillReject::Schema`] carrying the reason — then ground every cited upstream
+/// id against the document's region and segment id-universes (the
+/// [`IrBundle::validate`] reference checks, run here before assembly). A binding
+/// or exception `region_id` outside `regions`, or a statement `source_segment_id`
+/// outside `segments`, is a terminal [`FillReject::Grounding`] carrying the absent
+/// ids; an empty absent set accepts and yields the parsed `ClinicalIr`. Closing
+/// over pre-built id sets lets a route step (and its tests) classify a model
+/// output with no live pipeline. Wired into the fill pipeline by route-single-ir.2b.
+#[allow(dead_code)]
+fn single_ir_accept<'a>(
+    regions: &'a HashSet<&'a Id>,
+    segments: &'a HashSet<&'a Id>,
+) -> impl Fn(&[u8]) -> Result<ClinicalIr, FillReject> + 'a {
+    move |bytes| {
+        let clinical: ClinicalIr =
+            read_strict_canonical(bytes).map_err(|e| FillReject::Schema(e.to_string()))?;
+        let mut absent: Vec<Id> = Vec::new();
+        for binding in &clinical.bindings {
+            for region_id in &binding.region_ids {
+                if !regions.contains(region_id) {
+                    absent.push(region_id.clone());
+                }
+            }
+        }
+        for statement in &clinical.statements {
+            for exception in &statement.exceptions {
+                for region_id in &exception.region_ids {
+                    if !regions.contains(region_id) {
+                        absent.push(region_id.clone());
+                    }
+                }
+            }
+            for segment_id in &statement.source_segment_ids {
+                if !segments.contains(segment_id) {
+                    absent.push(segment_id.clone());
+                }
+            }
+        }
+        if absent.is_empty() {
+            Ok(clinical)
+        } else {
+            Err(FillReject::Grounding(absent))
+        }
+    }
 }
 
 /// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1
@@ -1207,7 +1258,54 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    use ckc_core::{EventRecord, TotalOperationResult, read_jsonl};
+    use ckc_core::{
+        BindingStatus, EventRecord, TerminologyBinding, TotalOperationResult, read_jsonl,
+    };
+
+    /// [`single_ir_accept`] classifies a model output three ways with no live
+    /// pipeline: malformed bytes are a repairable [`FillReject::Schema`]; an empty
+    /// [`ClinicalIr`] cites no ids and accepts; a binding whose `region_id` is
+    /// absent from the (here empty) region universe is a terminal
+    /// [`FillReject::Grounding`] carrying at least that id.
+    #[test]
+    fn single_ir_accept_classifies() {
+        let ghost = static_id("region.ghost");
+        let regions: HashSet<&Id> = HashSet::new();
+        let segments: HashSet<&Id> = HashSet::new();
+        let accept = single_ir_accept(&regions, &segments);
+
+        // (1) bytes that are not canonical `ClinicalIr` → repairable schema reject.
+        assert!(matches!(
+            accept(b"not-canonical"),
+            Err(FillReject::Schema(_))
+        ));
+
+        // (2) an empty `ClinicalIr` cites no upstream ids → accepted.
+        let empty = ClinicalIr {
+            bindings: vec![],
+            statements: vec![],
+        };
+        let empty_bytes = canonical_payload_bytes(&empty).unwrap();
+        assert!(accept(&empty_bytes).is_ok());
+
+        // (3) one binding citing a region absent upstream → terminal grounding reject.
+        let bad = ClinicalIr {
+            bindings: vec![TerminologyBinding {
+                binding_id: static_id("bind.ghost"),
+                system: static_id("ckc.lex"),
+                code: static_id("cond.sepsis"),
+                status: BindingStatus::Exact,
+                alternatives: vec![],
+                region_ids: vec![ghost.clone()],
+            }],
+            statements: vec![],
+        };
+        let bad_bytes = canonical_payload_bytes(&bad).unwrap();
+        match accept(&bad_bytes) {
+            Err(FillReject::Grounding(ids)) => assert!(!ids.is_empty()),
+            other => panic!("expected Grounding, got {other:?}"),
+        }
+    }
 
     /// Repository root: two levels above the ckc-cli manifest, where the §3
     /// `registry/` and `corpus/` trees live.
