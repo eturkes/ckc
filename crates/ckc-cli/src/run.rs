@@ -2361,8 +2361,10 @@ processing_stages:
     /// at grounding. A MALFORMED output (seed 98) is not canonical `ClinicalIr`, so the
     /// parse/schema check fails. A VALID recovery output (the golden ClinicalIr) sits at
     /// the first repair seed `derive_seed(98, 1)`, so a malformed base repairs to an
-    /// accepted fill. `#[ignore]`d: run to regenerate, then commit the three json.
-    /// Regenerate with
+    /// accepted fill. A MALFORMED multi-attempt pair (base seed 97 and its first repair
+    /// seed `derive_seed(97, 1)`, both non-canonical) drives a `repair_limit = 1` fill
+    /// through the re-prompt path to a terminal `repair_limit_exceeded`. `#[ignore]`d: run
+    /// to regenerate, then commit the five json. Regenerate with
     /// `cargo test -p ckc-cli bless_single_ir_rejection_cassettes -- --ignored --exact`.
     #[test]
     #[ignore = "regenerates the committed rejection cassettes"]
@@ -2411,6 +2413,26 @@ processing_stages:
             &store,
             crate::model::derive_seed(98, 1),
             &golden_bytes,
+        );
+
+        // MULTI-ATTEMPT EXHAUSTION (base seed 97 + its first repair seed): both
+        // non-canonical, so a `repair_limit = 1` fill schema-fails at the base, re-prompts
+        // under `derive_seed(97, 1)`, schema-fails again, and exhausts → a terminal
+        // `repair_limit_exceeded` after traversing the re-prompt path (the zero-budget
+        // boundary stays `model_fill.rs`'s coverage).
+        write_single_ir_cassette(
+            &guideline_a,
+            &resolved,
+            &store,
+            97,
+            b"not a canonical ClinicalIr payload (base)",
+        );
+        write_single_ir_cassette(
+            &guideline_a,
+            &resolved,
+            &store,
+            crate::model::derive_seed(97, 1),
+            b"not a canonical ClinicalIr payload (repair 1)",
         );
     }
 
@@ -2697,6 +2719,28 @@ processing_stages:
             .map(|s| &s.segment_id)
             .collect();
 
+        // The §7.4 schema-violation shape, asserted wherever a malformed output surfaces
+        // one: the parse reason rides the payload under the `reason` key, with no resolved
+        // refs (symmetric to the hallucinated/exceeded payload pins below).
+        let assert_schema_shape = |d: &DiagnosticRecord| {
+            assert_eq!(d.code, DiagnosticCode::AiSchemaViolation);
+            assert_eq!(d.outcome, Outcome::Invalid);
+            assert!(d.region_ids.is_empty());
+            assert!(d.artifact_hashes.is_empty());
+            assert_eq!(d.payload.len(), 1);
+            assert_eq!(d.payload[0].0, static_id("reason"));
+            assert!(!d.payload[0].1.is_empty(), "the parse reason is recorded");
+        };
+
+        // guideline_a's golden ClinicalIr, decoded from its committed seed-42 cassette: the
+        // recovery cassette replays these exact bytes, so a repaired fill recovers to them.
+        let golden_bytes = store
+            .replay(&key(42))
+            .unwrap()
+            .payload
+            .output_bytes()
+            .unwrap();
+
         // (a) HALLUCINATED (seed 99): canonical output citing an absent segment → a
         // terminal `ai_hallucinated_source` naming exactly the rebound id, no target, and
         // no repair spent despite the budget (grounding does not consume repairs).
@@ -2726,7 +2770,8 @@ processing_stages:
         );
 
         // (b) MALFORMED (seed 98) with a repair budget → one `ai_schema_violation`, then
-        // the valid recovery at `derive_seed(98, 1)` is accepted.
+        // the valid recovery at `derive_seed(98, 1)` is accepted — and the recovered IR is
+        // exactly guideline_a's golden ClinicalIr, not merely some grounded fill.
         let fill = model_fill(
             &store,
             &key(98),
@@ -2735,54 +2780,87 @@ processing_stages:
             single_ir_accept(&regions, &segment_ids),
         )
         .unwrap();
-        assert!(fill.target.is_some());
         assert_eq!(fill.repairs, 1);
         assert_eq!(fill.recorded_calls, 2);
         assert_eq!(fill.diagnostics.len(), 1);
-        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
-        assert_eq!(fill.diagnostics[0].outcome, Outcome::Invalid);
+        assert_schema_shape(&fill.diagnostics[0]);
+        let recovered = fill
+            .target
+            .expect("the repair seed's valid output is accepted");
+        assert_eq!(canonical_payload_bytes(&recovered).unwrap(), golden_bytes);
 
-        // The full route threads the same malformed→repair path to an accepted bundle.
-        let tmp = tempfile::tempdir().unwrap();
-        let out = tmp.path().join("m2");
-        std::fs::create_dir_all(&out).unwrap();
-        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
-        let bundle = single_ir_fill(
-            &root,
-            &guideline_a,
-            &lexicon,
-            &store,
-            98,
-            &resolved,
-            1,
-            &mut shell,
-        );
-        assert!(
-            bundle.is_some(),
-            "the malformed base repairs to an accepted bundle"
-        );
+        // The route fn surfaces the §7.4 fill diagnostics to its shell ledger: the
+        // malformed→repair path lands one schema violation, then recovers to a bundle.
+        {
+            let tmp = tempfile::tempdir().unwrap();
+            let out = tmp.path().join("m2");
+            std::fs::create_dir_all(&out).unwrap();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+            let bundle = single_ir_fill(
+                &root,
+                &guideline_a,
+                &lexicon,
+                &store,
+                98,
+                &resolved,
+                1,
+                &mut shell,
+            );
+            assert!(
+                bundle.is_some(),
+                "the malformed base repairs to an accepted bundle"
+            );
+            assert_eq!(shell.ledger().len(), 1);
+            assert_schema_shape(&shell.ledger()[0]);
+        }
 
-        // (c) MALFORMED (seed 98) with no repair budget → `ai_schema_violation` then a
-        // terminal `repair_limit_exceeded` naming the exhausted limit.
+        // The route fn yields `None` on a terminal reject and still surfaces its
+        // diagnostic: the hallucinated cassette (seed 99) ends the route with
+        // `ai_hallucinated_source` on the ledger and no bundle.
+        {
+            let tmp = tempfile::tempdir().unwrap();
+            let out = tmp.path().join("m2");
+            std::fs::create_dir_all(&out).unwrap();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+            let bundle = single_ir_fill(
+                &root,
+                &guideline_a,
+                &lexicon,
+                &store,
+                99,
+                &resolved,
+                2,
+                &mut shell,
+            );
+            assert!(bundle.is_none(), "a hallucinated reference ends the route");
+            assert_eq!(shell.ledger().len(), 1);
+            assert_eq!(shell.ledger()[0].code, DiagnosticCode::AiHallucinatedSource);
+        }
+
+        // (c) MALFORMED at the base AND its first repair seed (97 + `derive_seed(97, 1)`)
+        // with `repair_limit = 1` → the re-prompt path is traversed: a schema violation per
+        // attempt, then a terminal `repair_limit_exceeded` naming the exhausted limit, no
+        // target. (The zero-budget boundary is `model_fill.rs`'s coverage.)
         let fill = model_fill(
             &store,
-            &key(98),
+            &key(97),
             FillSource::Replay,
-            0,
+            1,
             single_ir_accept(&regions, &segment_ids),
         )
         .unwrap();
         assert!(fill.target.is_none());
-        assert_eq!(fill.repairs, 0);
-        assert_eq!(fill.recorded_calls, 1);
-        assert_eq!(fill.diagnostics.len(), 2);
-        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
-        let last = &fill.diagnostics[1];
+        assert_eq!(fill.repairs, 1);
+        assert_eq!(fill.recorded_calls, 2);
+        assert_eq!(fill.diagnostics.len(), 3);
+        assert_schema_shape(&fill.diagnostics[0]);
+        assert_schema_shape(&fill.diagnostics[1]);
+        let last = &fill.diagnostics[2];
         assert_eq!(last.code, DiagnosticCode::RepairLimitExceeded);
         assert_eq!(last.outcome, Outcome::Invalid);
         assert_eq!(
             last.payload,
-            vec![(static_id("repair_limit"), "0".to_owned())]
+            vec![(static_id("repair_limit"), "1".to_owned())]
         );
     }
 }

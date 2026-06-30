@@ -508,7 +508,16 @@ argument).
   once for the literal accepted bundle; (c) seed 98 + `repair_limit 0` → `[AiSchemaViolation,
   RepairLimitExceeded]` (exhaust reuses the committed malformed cassette, respects the valid recovery; the
   multi-attempt loop stays `model_fill.rs`'s coverage). Gate: `cargo test --workspace` 434 passed / 5
-  ignored (was 433/4) + fmt + clippy `-D` clean + engine-agnostic audit clean.] 87% 175K/200K
+  ignored (was 433/4) + fmt + clippy `-D` clean + engine-agnostic audit clean. Codex follow-up (2 med +
+  1 low, accepted): (c) reworked from the `repair_limit=0` zero-budget boundary (short-circuits
+  model_fill's terminal branch BEFORE the re-prompt path + duplicates model_fill.rs's
+  `zero_repair_budget_exhausts_on_first_violation`) to a GENUINE multi-attempt exhaustion — non-canonical
+  pair seed 97 + `derive_seed(97,1)`=5718913436695043505, `repair_limit 1`, traversing the re-prompt path
+  → `[AiSchemaViolation×2, RepairLimitExceeded("1")]` (2 new cassettes, now 5 total); (b) recovered IR
+  pinned == guideline_a's golden seed-42 bytes (was only `target Some`) + `ai_schema_violation` payload
+  shape pinned (key `reason`, empty refs); `single_ir_fill` now asserts ROUTE-level §7.4 surfacing via
+  `shell.ledger()` on a recovery + a terminal-hallucinated path; gates still 434/5 + fmt + clippy + audit
+  clean.] 87% 175K/200K
 - [ ] route-direct-smt: `direct_smt` route + pipeline (the weak baseline). Seed `pipe.m2_direct_smt`
   `PipelineEntry` (`candidates.yaml`: `model_fill`(target=SMT, grammar=`smt_query`) →
   syntactic-validity → verify; stage chain validates). Implement: the model emits the
