@@ -416,7 +416,20 @@ full pre-consolidation text lives in git history.
     membership (drifts silently vs the registry) — codex M2.18 caught both. route-direct-smt +
     metrics/report-m2 score the same M1 groups → reuse this shape. Ceiling = smoke test (`.2b` pins
     payload-equality to M1, run_oracle pins M1 verdicts vs reference); the load-bearing route-execution
-    wiring is run-m2.1's.
+    wiring is run-m2.1's. route-single-ir.4 closed the route's §7.4 rejection coverage
+    (`single_ir_route_rejection_codes`): pin the accept-closure→§7.4-code mapping by calling
+    `model_fill(store, key, Replay, repair_limit, single_ir_accept(regions, segs))` DIRECTLY (inspect
+    `ModelFill.target`/`diagnostics`/`repairs`/`recorded_calls`) — `single_ir_fill` surfaces only shell
+    diagnostics + an `Option`, too coarse for a per-code assertion, so it serves only the end-to-end
+    "an accepted bundle" recover check. Committed bad cassettes under
+    `route.single_ir/test_source.m1_guideline_a` (synthetic-identity → audited), blessed by `#[ignore]`d
+    `bless_single_ir_rejection_cassettes`: seed 99 = the golden ClinicalIr with one `source_segment_id`
+    rebound to an absent id (canonical → parses → terminal `ai_hallucinated_source`, spends no repair);
+    seed 98 = non-canonical bytes (`ai_schema_violation`); `derive_seed(98,1)` = the golden recovery, so
+    seed 98 + `repair_limit≥1` recovers an accepted bundle and `repair_limit=0` exhausts to
+    `repair_limit_exceeded`. The multi-attempt repair LOOP stays model_fill.rs's coverage (the route test
+    exercises one repair + the limit-0 terminal). route-direct-smt's rejection unit reuses this
+    committed-bad-cassette shape.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output

@@ -2353,6 +2353,67 @@ processing_stages:
         }
     }
 
+    /// Bless the committed `route.single_ir` rejection cassettes route-single-ir.4
+    /// replays, all keyed under guideline_a (its real grounding universe) and
+    /// synthetic-identity (the crafted-fixture rule). A HALLUCINATED output (seed 99) is
+    /// the golden ClinicalIr with one statement `source_segment_id` rebound to an id
+    /// absent upstream — still canonical, so it parses and the absent reference surfaces
+    /// at grounding. A MALFORMED output (seed 98) is not canonical `ClinicalIr`, so the
+    /// parse/schema check fails. A VALID recovery output (the golden ClinicalIr) sits at
+    /// the first repair seed `derive_seed(98, 1)`, so a malformed base repairs to an
+    /// accepted fill. `#[ignore]`d: run to regenerate, then commit the three json.
+    /// Regenerate with
+    /// `cargo test -p ckc-cli bless_single_ir_rejection_cassettes -- --ignored --exact`.
+    #[test]
+    #[ignore = "regenerates the committed rejection cassettes"]
+    fn bless_single_ir_rejection_cassettes() {
+        let root = repo_root();
+        let resolved = single_ir_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let guideline_a = single_ir_corpus()
+            .into_iter()
+            .find(|e| e.id == static_id("test_source.m1_guideline_a"))
+            .expect("guideline_a in the corpus");
+
+        // The golden ClinicalIr the route reproduces for guideline_a, decoded from its
+        // committed seed-42 cassette.
+        let golden_bytes = store
+            .replay(&CassetteKey {
+                route: static_id("route.single_ir"),
+                source: guideline_a.id.clone(),
+                seed: 42,
+            })
+            .unwrap()
+            .payload
+            .output_bytes()
+            .unwrap();
+
+        // HALLUCINATED (seed 99): rebind one statement source segment to a fresh id absent
+        // from guideline_a's segment universe; canonical re-encoding keeps it parseable.
+        let mut hallucinated: ClinicalIr = read_strict_canonical(&golden_bytes).unwrap();
+        hallucinated.statements[0].source_segment_ids[0] = static_id("seg.hallucinated_absent");
+        let hallucinated_bytes = canonical_payload_bytes(&hallucinated).unwrap();
+        write_single_ir_cassette(&guideline_a, &resolved, &store, 99, &hallucinated_bytes);
+
+        // MALFORMED (seed 98): not canonical `ClinicalIr`, so the parse/schema check fails.
+        write_single_ir_cassette(
+            &guideline_a,
+            &resolved,
+            &store,
+            98,
+            b"not a canonical ClinicalIr payload",
+        );
+
+        // VALID recovery at the first repair seed: the golden ClinicalIr.
+        write_single_ir_cassette(
+            &guideline_a,
+            &resolved,
+            &store,
+            crate::model::derive_seed(98, 1),
+            &golden_bytes,
+        );
+    }
+
     /// The reproduce-M1 gate: for each M1 document, [`single_ir_fill`] replaying the
     /// committed golden cassette compiles a bundle byte-identical (by the payload-only
     /// `content_hash`) to the M1 deterministic [`assemble_bundle`] bundle.
@@ -2577,5 +2638,151 @@ processing_stages:
                 );
             }
         }
+    }
+
+    /// route-single-ir.4 — the single_ir route's §7.4 rejection codes wire through
+    /// [`model_fill`] under [`single_ir_accept`], model-runtime-absent (z3-free). Over
+    /// guideline_a's real grounding universe (the deterministic extract → segment head),
+    /// replaying the committed bad cassettes: a HALLUCINATED output — a source-segment
+    /// reference absent upstream, still canonical — is a terminal `ai_hallucinated_source`
+    /// naming exactly the absent id, with no target and no repair spent even under a repair
+    /// budget (a hallucination is not a schema defect); a MALFORMED output is a repairable
+    /// `ai_schema_violation` that, with a valid recovery cassette at the first repair seed,
+    /// recovers an accepted target — and the full route compiles it to an `IrBundle` — or,
+    /// with no repair budget, terminates in `repair_limit_exceeded`. The repair-loop
+    /// mechanics live in `model_fill.rs`; this pins the route accept closure → §7.4 code
+    /// selection end-to-end.
+    #[test]
+    fn single_ir_route_rejection_codes() {
+        use ckc_core::{DiagnosticCode, Outcome};
+
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let resolved = single_ir_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let guideline_a = single_ir_corpus()
+            .into_iter()
+            .find(|e| e.id == static_id("test_source.m1_guideline_a"))
+            .expect("guideline_a in the corpus");
+        let source_id = guideline_a.id.clone();
+        let key = |seed| CassetteKey {
+            route: static_id("route.single_ir"),
+            source: source_id.clone(),
+            seed,
+        };
+
+        // guideline_a's deterministic grounding universe: the real region and segment ids
+        // the accept closure grounds the model's references against (the head
+        // `single_ir_fill` runs internally).
+        let html = std::fs::read(root.join(&guideline_a.path)).unwrap();
+        let config = ExtractConfig {
+            document_id: guideline_a.id.clone(),
+            source_family: static_id("synthetic_test_source_html"),
+            provenance: guideline_a.provenance,
+            data_class: DataClass::None,
+            producer: producer(&resolved, 0),
+        };
+        let source = extract(&html, &config).unwrap();
+        let segments = segment(&source, &producer(&resolved, 1)).unwrap();
+        let regions: HashSet<&Id> = source
+            .payload
+            .regions
+            .iter()
+            .map(|r| &r.region_id)
+            .collect();
+        let segment_ids: HashSet<&Id> = segments
+            .payload
+            .segments
+            .iter()
+            .map(|s| &s.segment_id)
+            .collect();
+
+        // (a) HALLUCINATED (seed 99): canonical output citing an absent segment → a
+        // terminal `ai_hallucinated_source` naming exactly the rebound id, no target, and
+        // no repair spent despite the budget (grounding does not consume repairs).
+        let fill = model_fill(
+            &store,
+            &key(99),
+            FillSource::Replay,
+            2,
+            single_ir_accept(&regions, &segment_ids),
+        )
+        .unwrap();
+        assert!(fill.target.is_none());
+        assert_eq!(fill.repairs, 0);
+        assert_eq!(fill.recorded_calls, 1);
+        assert_eq!(fill.diagnostics.len(), 1);
+        let d = &fill.diagnostics[0];
+        assert_eq!(d.code, DiagnosticCode::AiHallucinatedSource);
+        assert_eq!(d.outcome, Outcome::Invalid);
+        assert!(d.region_ids.is_empty());
+        assert!(d.artifact_hashes.is_empty());
+        assert_eq!(
+            d.payload,
+            vec![(
+                static_id("absent_source_ids"),
+                "seg.hallucinated_absent".to_owned()
+            )]
+        );
+
+        // (b) MALFORMED (seed 98) with a repair budget → one `ai_schema_violation`, then
+        // the valid recovery at `derive_seed(98, 1)` is accepted.
+        let fill = model_fill(
+            &store,
+            &key(98),
+            FillSource::Replay,
+            1,
+            single_ir_accept(&regions, &segment_ids),
+        )
+        .unwrap();
+        assert!(fill.target.is_some());
+        assert_eq!(fill.repairs, 1);
+        assert_eq!(fill.recorded_calls, 2);
+        assert_eq!(fill.diagnostics.len(), 1);
+        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
+        assert_eq!(fill.diagnostics[0].outcome, Outcome::Invalid);
+
+        // The full route threads the same malformed→repair path to an accepted bundle.
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+        let bundle = single_ir_fill(
+            &root,
+            &guideline_a,
+            &lexicon,
+            &store,
+            98,
+            &resolved,
+            1,
+            &mut shell,
+        );
+        assert!(
+            bundle.is_some(),
+            "the malformed base repairs to an accepted bundle"
+        );
+
+        // (c) MALFORMED (seed 98) with no repair budget → `ai_schema_violation` then a
+        // terminal `repair_limit_exceeded` naming the exhausted limit.
+        let fill = model_fill(
+            &store,
+            &key(98),
+            FillSource::Replay,
+            0,
+            single_ir_accept(&regions, &segment_ids),
+        )
+        .unwrap();
+        assert!(fill.target.is_none());
+        assert_eq!(fill.repairs, 0);
+        assert_eq!(fill.recorded_calls, 1);
+        assert_eq!(fill.diagnostics.len(), 2);
+        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
+        let last = &fill.diagnostics[1];
+        assert_eq!(last.code, DiagnosticCode::RepairLimitExceeded);
+        assert_eq!(last.outcome, Outcome::Invalid);
+        assert_eq!(
+            last.payload,
+            vec![(static_id("repair_limit"), "0".to_owned())]
+        );
     }
 }

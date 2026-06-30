@@ -481,7 +481,7 @@ argument).
   now copies run_oracle's `expected_no_conflict_result` closure (Q1-unsat + Q2-skipped) + panics on an
   unknown outcome; groups + reference resolve from `exp.m1_scaffold` (was a hardcoded membership list);
   "8 stages" corrected to 6 real + 2 unread.] 88% 177K/200K
-- [ ] route-single-ir.4: rejection paths — §7.4 codes wire through (model-runtime-absent). Prove the route
+- [x] route-single-ir.4: rejection paths — §7.4 codes wire through (model-runtime-absent). Prove the route
   ACCEPT closure's `FillReject` → §7.4 mapping end-to-end (model_fill's repair-loop MECHANICS are already
   covered by stage-model-fill.2 — .4 adds only the route-closure coverage). Craft 2 committed bad cassettes
   keyed under `route.single_ir`/`test_source.m1_guideline_a` at distinct non-42 seeds (real upstream =
@@ -498,7 +498,17 @@ argument).
   .2b's `write_single_ir_cassette` helper; `model_fill` `FillReject`→code map + `derive_seed` re-prompt + `REPAIRS_COUNTER` per
   memory `Model-fill stage core`; the `derive_seed` test (`model.rs`). Gate: `cargo test` (hallucinated →
   `ai_hallucinated_source` with ≥1 id; malformed → `ai_schema_violation` + repair → recover / exceed);
-  engine-agnostic audit on the new bad cassettes; fmt + clippy.
+  engine-agnostic audit on the new bad cassettes; fmt + clippy. [Done: `single_ir_route_rejection_codes`
+  replay `#[test]` + `bless_single_ir_rejection_cassettes` `#[ignore]`d helper + 3 committed bad cassettes
+  (synthetic identity, audited): seed 99 HALLUCINATED (one `source_segment_id` rebound to a grammar-valid
+  absent `Id`), seed 98 MALFORMED, `derive_seed(98,1)`=17360999193197444373 = the VALID recovery. Asserts
+  call `model_fill` + `single_ir_accept` DIRECTLY (precise `ModelFill.target`/`diagnostics`) — (a) seed 99
+  → `AiHallucinatedSource`, `target None`, `repairs 0`, payload `absent_source_ids`; (b) seed 98 +
+  `repair_limit 1` → `AiSchemaViolation` then recover (`target Some`, `repairs 1`), `single_ir_fill` used
+  once for the literal accepted bundle; (c) seed 98 + `repair_limit 0` → `[AiSchemaViolation,
+  RepairLimitExceeded]` (exhaust reuses the committed malformed cassette, respects the valid recovery; the
+  multi-attempt loop stays `model_fill.rs`'s coverage). Gate: `cargo test --workspace` 434 passed / 5
+  ignored (was 433/4) + fmt + clippy `-D` clean + engine-agnostic audit clean.] 87% 175K/200K
 - [ ] route-direct-smt: `direct_smt` route + pipeline (the weak baseline). Seed `pipe.m2_direct_smt`
   `PipelineEntry` (`candidates.yaml`: `model_fill`(target=SMT, grammar=`smt_query`) →
   syntactic-validity → verify; stage chain validates). Implement: the model emits the
