@@ -1259,20 +1259,23 @@ mod tests {
     use std::path::PathBuf;
 
     use ckc_core::{
-        BindingStatus, EventRecord, TerminologyBinding, TotalOperationResult, read_jsonl,
+        Action, BindingStatus, ClinicalStatement, Direction, EventRecord, ExceptionClause,
+        Strength, TerminologyBinding, TotalOperationResult, read_jsonl,
     };
 
-    /// [`single_ir_accept`] classifies a model output three ways with no live
-    /// pipeline: malformed bytes are a repairable [`FillReject::Schema`]; an empty
-    /// [`ClinicalIr`] cites no ids and accepts; a binding whose `region_id` is
-    /// absent from the (here empty) region universe is a terminal
-    /// [`FillReject::Grounding`] carrying at least that id.
+    /// [`single_ir_accept`] classifies a model output with no live pipeline:
+    /// malformed bytes are a repairable [`FillReject::Schema`]; an empty
+    /// [`ClinicalIr`] cites no ids and accepts; an output citing ids absent
+    /// upstream is a terminal [`FillReject::Grounding`] naming exactly those ids,
+    /// and the same output accepts once the universes hold them. The cited output
+    /// exercises every grounded site together — a binding `region_id`, an
+    /// exception `region_id`, and a statement `source_segment_id` — in both
+    /// directions; the no-false-reject half is the property route-single-ir.2b's
+    /// reproduce-M1 gate leans on.
     #[test]
     fn single_ir_accept_classifies() {
-        let ghost = static_id("region.ghost");
-        let regions: HashSet<&Id> = HashSet::new();
-        let segments: HashSet<&Id> = HashSet::new();
-        let accept = single_ir_accept(&regions, &segments);
+        let none: HashSet<&Id> = HashSet::new();
+        let accept = single_ir_accept(&none, &none);
 
         // (1) bytes that are not canonical `ClinicalIr` → repairable schema reject.
         assert!(matches!(
@@ -1288,23 +1291,55 @@ mod tests {
         let empty_bytes = canonical_payload_bytes(&empty).unwrap();
         assert!(accept(&empty_bytes).is_ok());
 
-        // (3) one binding citing a region absent upstream → terminal grounding reject.
-        let bad = ClinicalIr {
+        // An output citing every grounded site: a binding region, an exception
+        // region, and a statement source segment.
+        let region_b = static_id("region.binding");
+        let region_e = static_id("region.exception");
+        let segment_s = static_id("segment.statement");
+        let cited = ClinicalIr {
             bindings: vec![TerminologyBinding {
-                binding_id: static_id("bind.ghost"),
+                binding_id: static_id("bind.0"),
                 system: static_id("ckc.lex"),
                 code: static_id("cond.sepsis"),
                 status: BindingStatus::Exact,
                 alternatives: vec![],
-                region_ids: vec![ghost.clone()],
+                region_ids: vec![region_b.clone()],
             }],
-            statements: vec![],
+            statements: vec![ClinicalStatement {
+                statement_id: static_id("stmt.0"),
+                population: vec![],
+                condition: vec![],
+                action: Action::new(static_id("act.start"), static_id("drug.x")),
+                modality: Direction::Require,
+                strength: Strength::Strong,
+                certainty: None,
+                exceptions: vec![ExceptionClause {
+                    exception_id: static_id("exc.0"),
+                    atoms: vec![],
+                    region_ids: vec![region_e.clone()],
+                }],
+                source_segment_ids: vec![segment_s.clone()],
+            }],
         };
-        let bad_bytes = canonical_payload_bytes(&bad).unwrap();
-        match accept(&bad_bytes) {
-            Err(FillReject::Grounding(ids)) => assert!(!ids.is_empty()),
-            other => panic!("expected Grounding, got {other:?}"),
+        let cited_bytes = canonical_payload_bytes(&cited).unwrap();
+
+        // (3) empty universes → terminal grounding naming exactly the three cited
+        // ids (the downstream diagnostic sorts and dedups, so compare as a set).
+        match accept(&cited_bytes) {
+            Err(FillReject::Grounding(ids)) => {
+                let mut got: Vec<&Id> = ids.iter().collect();
+                got.sort();
+                let mut want = vec![&region_b, &region_e, &segment_s];
+                want.sort();
+                assert_eq!(got, want);
+            }
+            other => panic!("expected Grounding naming all cited ids, got {other:?}"),
         }
+
+        // (4) universes holding exactly those ids → the same output accepts.
+        let regions: HashSet<&Id> = HashSet::from([&region_b, &region_e]);
+        let segments: HashSet<&Id> = HashSet::from([&segment_s]);
+        assert!(single_ir_accept(&regions, &segments)(&cited_bytes).is_ok());
     }
 
     /// Repository root: two levels above the ckc-cli manifest, where the §3
