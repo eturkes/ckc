@@ -66,7 +66,11 @@ full pre-consolidation text lives in git history.
   Reading slice to exclude files its half leaves untouched; land a compiling skeleton before
   the full test battery; salvage a reverted session's compiling half as a committed
   `.agent/wip-<unit>.patch` the redo line points at (apply, verify against the line, delete in
-  the closing commit) — an uncompiled draft salvages the same way flagged UNCOMPILED,
+  the closing commit; a recovery with context to spare PROVES the salvage green before
+  reverting — apply the full set, run the gate, fix what it catches, then revert — so the redo is
+  reproduction-only with the gate pre-proven + its pass counts banked in the redo line, latent bugs
+  caught in recovery not redo: M2.13 caught a missing `Debug` on a public result type) — an uncompiled
+  draft salvages the same way flagged UNCOMPILED,
   transcription-with-verification still beating re-derivation (recovery also verifies the draft's external assumptions —
   referenced types/APIs/field names — against source, making the salvage an assumption-verified target
   not a blind preserve; a whole-NEW-file draft salvages as a byte-verified `.rs.txt` copy not a

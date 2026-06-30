@@ -1,0 +1,64 @@
+diff --git a/crates/ckc-cli/src/cassette.rs b/crates/ckc-cli/src/cassette.rs
+index 9b519ef..faa210e 100644
+--- a/crates/ckc-cli/src/cassette.rs
++++ b/crates/ckc-cli/src/cassette.rs
+@@ -155,7 +155,7 @@ impl CassetteStore {
+ 
+     /// Wrap a payload as the §4.4 cassette artifact (origin `ai_generated`, evidence
+     /// `evidence_discovery_only`, effect `ai`) and confirm it validates.
+-    fn build_wrapper(
++    pub(crate) fn build_wrapper(
+         &self,
+         key: &CassetteKey,
+         payload: CassettePayload,
+@@ -185,7 +185,7 @@ impl CassetteStore {
+ 
+     /// Write the wrapper, then return the disk-read-back value (disk truth, mirroring
+     /// the run-shell `land` discipline).
+-    fn persist(
++    pub(crate) fn persist(
+         &self,
+         key: &CassetteKey,
+         wrapper: ArtifactWrapper<CassettePayload>,
+diff --git a/crates/ckc-cli/src/lib.rs b/crates/ckc-cli/src/lib.rs
+index 3f1fd2f..14bb8da 100644
+--- a/crates/ckc-cli/src/lib.rs
++++ b/crates/ckc-cli/src/lib.rs
+@@ -116,12 +116,21 @@
+ //!   hex-encoded for a lossless byte round-trip — replay (default) is
+ //!   runtime-absent, record ([`cassette::RecordMode`]) gated behind the
+ //!   runtime. The forthcoming model-fill stage drives it.
++//! - [`model_fill`] — §7.4/§9 model-fill stage core (`stage-model-fill.1`):
++//!   [`model_fill::model_fill`] drives the [`cassette::CassetteStore`] (replay
++//!   default / record gated via [`model_fill::FillSource`]), decodes the
++//!   recorded output, and parses it into a route-supplied target
++//!   ([`model_fill::ModelFill`]); a parse/§4-acceptance failure becomes a §7.4
++//!   `ai_schema_violation` in place of a target, and the recorded-call count
++//!   rides the stage's §4.6 event under [`model_fill::RECORDED_CALLS_COUNTER`].
++//!   Target-generic; the route units wire the pipeline (no repair loop yet → .2).
+ #![forbid(unsafe_code)]
+ 
+ pub mod cassette;
+ pub mod extract;
+ pub mod manifests;
+ pub mod model;
++pub mod model_fill;
+ pub mod normalize;
+ pub mod replay;
+ pub mod report;
+diff --git a/registry/candidates.yaml b/registry/candidates.yaml
+index ff46c95..c8f5b65 100644
+--- a/registry/candidates.yaml
++++ b/registry/candidates.yaml
+@@ -58,3 +58,11 @@ processing_stages:
+     input_artifact_kinds:
+       [source_document_graph, ir_bundle, compiled, verifier_results, trace_bundle, lineage_index]
+     output_artifact_kinds: [report, run_manifest, replay_manifest]
++  # M2 §9 nondeterministic model-fill (recorded I/O). single_ir target shape
++  # (fills ClinicalIR over deterministic extract+segment upstream); the M2 route
++  # pipelines reference it. route.direct_smt adds its own smt_query-output entry.
++  - id: processing_stage.m2.model_fill
++    kind: model_fill
++    determinism: nondeterministic
++    input_artifact_kinds: [source_document_graph, segments]
++    output_artifact_kinds: [clinical_ir]
