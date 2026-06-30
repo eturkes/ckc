@@ -407,7 +407,16 @@ full pre-consolidation text lives in git history.
     accept-closure (`single_ir_accept`) + per-doc fill (`single_ir_fill`: extract→segment→`model_fill`
     Replay→deterministic tail mirroring `assemble_bundle`) + golden-cassette wiring LANDED in `run.rs`
     (route-single-ir.2/.2b); run-m2.1 reuses this minimal-`Resolved` pattern (or generalizes `resolve()`
-    to N stages) for the in-`execute` route loop.
+    to N stages) for the in-`execute` route loop. route-single-ir.3 added the verdict-half scoring test
+    (`single_ir_route_scores_m1_groups`): a route-scoring test mirrors
+    `run_oracle.rs::assert_group_matches_reference` IN FULL (both branches, incl. the no-conflict
+    `expected_no_conflict_result` Q1-unsat/Q2-skipped closure + panic-on-unknown-outcome; a partial
+    mirror passes vacuously) and resolves groups + reference from `exp.m1_scaffold` (doc-id→bundle map,
+    iterate `test_source_groups`, assert `reference.len()==test_source_groups.len()`), never a hardcoded
+    membership (drifts silently vs the registry) — codex M2.18 caught both. route-direct-smt +
+    metrics/report-m2 score the same M1 groups → reuse this shape. Ceiling = smoke test (`.2b` pins
+    payload-equality to M1, run_oracle pins M1 verdicts vs reference); the load-bearing route-execution
+    wiring is run-m2.1's.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output

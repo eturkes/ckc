@@ -466,8 +466,9 @@ argument).
   `tests/run_oracle.rs` (`assert_group_matches_reference`, `strict_read`); `ProcessingStageClock`/`Shell`/
   `Z3Adapter` construction is pinned above. Gate: `cargo test` (conflict + no-conflict verdicts scored vs
   `m1_expected` over the golden cassettes, model-runtime-absent); fmt + clippy. [Done: extended the
-  `single_ir_resolved()` helper to the real registry step ids (`pipe.m2_single_ir`'s 8 stages,
-  `[4]`=m1.compile/`[5]`=m1.verify faithful) + `budget_ms` 10_000 (= exp.m1_scaffold
+  `single_ir_resolved()` helper to the real registry step ids (`pipe.m2_single_ir`'s 6 stages fill
+  slots `[0..5]` of the `[Id; 8]`, `[4]`=m1.compile/`[5]`=m1.verify faithful, `[6]`/`[7]` trace/report
+  unread M1-shaped placeholders) + `budget_ms` 10_000 (= exp.m1_scaffold
   `solver_ms_per_query`, the verdict tail's z3 cap; .2b's harmless 0 never ran verify); added
   `single_ir_route_scores_m1_groups` — per-doc `single_ir_fill` over the 3 golden cassettes
   (model-runtime-absent) → per-group `compile_verify_group` (real `Z3Adapter`) → verdicts scored vs
@@ -476,7 +477,10 @@ argument).
   `assert_group_matches_reference` (separate test binary → uncallable from a run.rs unit test).
   Test-only unit (no new production fn; run-m2.1 owns the execute-loop + the full head+tail single-
   `Resolved` wiring). Gate: `cargo test --workspace` 433 passed / 4 ignored + fmt + clippy `-D` clean +
-  run.rs engine-agnostic audit clean.] 88% 177K/200K
+  run.rs engine-agnostic audit clean. Codex follow-up (1 med + 2 low, accepted): no-conflict branch
+  now copies run_oracle's `expected_no_conflict_result` closure (Q1-unsat + Q2-skipped) + panics on an
+  unknown outcome; groups + reference resolve from `exp.m1_scaffold` (was a hardcoded membership list);
+  "8 stages" corrected to 6 real + 2 unread.] 88% 177K/200K
 - [ ] route-single-ir.4: rejection paths — §7.4 codes wire through (model-runtime-absent). Prove the route
   ACCEPT closure's `FillReject` → §7.4 mapping end-to-end (model_fill's repair-loop MECHANICS are already
   covered by stage-model-fill.2 — .4 adds only the route-closure coverage). Craft 2 committed bad cassettes

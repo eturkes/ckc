@@ -2243,11 +2243,13 @@ processing_stages:
             .collect()
     }
 
-    /// A minimal [`Resolved`] for the single_ir route over the M1 inputs: the step
-    /// ids are `pipe.m2_single_ir`'s real registry stages, so the route's producer
-    /// stamps (the fill head, the cassette wrapper, the verdict tail) are faithful.
-    /// `documents` / `groups` / `plan` go unread so stay empty and the toolchain hash
-    /// stays synthetic — the bundle `content_hash` gate is payload-only; `budget_ms`
+    /// A minimal [`Resolved`] for the single_ir route over the M1 inputs. `Resolved`
+    /// carries a fixed `[Id; 8]`; slots `[0]`–`[5]` are `pipe.m2_single_ir`'s six stages
+    /// (extract, segment, model_fill, assemble, compile, verify), so the route's producer
+    /// stamps (the fill head, the cassette wrapper, the verdict tail) are faithful; slots
+    /// `[6]`/`[7]` (trace, report) are unread M1-shaped placeholders the verdict tail never
+    /// reaches. `documents` / `groups` / `plan` go unread so stay empty and the toolchain
+    /// hash stays synthetic — the bundle `content_hash` gate is payload-only; `budget_ms`
     /// is exp.m1_scaffold's §8.4 `solver_ms_per_query`, the verdict tail's z3 cap.
     fn single_ir_resolved() -> Resolved {
         Resolved {
@@ -2403,18 +2405,18 @@ processing_stages:
 
     /// route-single-ir.3 — the single_ir route's verdict half over the M1 groups
     /// (z3 present, model-runtime-absent). Fill each M1 document through
-    /// [`single_ir_fill`] replaying its committed golden cassette, then drive each
-    /// group's member bundles through [`compile_verify_group`] and score the verdicts
-    /// against `corpus/reference/m1_expected.yaml` with the `run_oracle.rs`
-    /// `assert_group_matches_reference` shape. The reproduce-M1 gate proved the route
+    /// [`single_ir_fill`] replaying its committed golden cassette, resolve the groups
+    /// and reference from `exp.m1_scaffold`, then drive each group's member bundles
+    /// through [`compile_verify_group`] and score the verdicts with the `run_oracle.rs`
+    /// `assert_group_matches_reference` logic. The reproduce-M1 gate proved the route
     /// bundles equal M1's, so the model-filled clinical layer reaches M1's verdicts —
     /// the conflict pair contradicts on its deontic query (cross-document unsat core),
-    /// the no-conflict pair closes clean.
+    /// the no-conflict pair closes on a Q1-unsat overlap with its deontic query skipped.
     #[test]
     fn single_ir_route_scores_m1_groups() {
-        use std::collections::BTreeSet;
+        use std::collections::{BTreeMap, BTreeSet};
 
-        use ckc_smt::VerifierCategory;
+        use ckc_smt::{SolverVerdict, VerifierCategory};
 
         let root = repo_root();
         let lexicon = single_ir_lexicon();
@@ -2427,31 +2429,46 @@ processing_stages:
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
 
-        // Fill the three M1 documents once; the two groups share `m1_guideline_a`.
-        let corpus = single_ir_corpus();
-        let a = single_ir_fill(
-            &root, &corpus[0], &lexicon, &store, 42, &resolved, 0, &mut shell,
-        )
-        .expect("guideline_a fill");
-        let b = single_ir_fill(
-            &root, &corpus[1], &lexicon, &store, 42, &resolved, 0, &mut shell,
-        )
-        .expect("guideline_b fill");
-        let control = single_ir_fill(
-            &root, &corpus[2], &lexicon, &store, 42, &resolved, 0, &mut shell,
-        )
-        .expect("control fill");
+        // Fill every M1 document once, keyed by test_source id, so the groups and the
+        // reference resolve from `exp.m1_scaffold` (the run_oracle registry-driven
+        // shape) rather than a hardcoded membership list.
+        let mut bundles = BTreeMap::new();
+        for entry in single_ir_corpus() {
+            let bundle = single_ir_fill(
+                &root, &entry, &lexicon, &store, 42, &resolved, 0, &mut shell,
+            )
+            .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
+            bundles.insert(entry.id.clone(), bundle);
+        }
 
-        let reference = parse_reference(
-            &std::fs::read_to_string(root.join("corpus/reference/m1_expected.yaml")).unwrap(),
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
         )
         .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold");
+        let reference =
+            parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap())
+                .unwrap();
+        assert_eq!(
+            reference.len(),
+            exp.test_source_groups.len(),
+            "one reference entry per test_source group"
+        );
 
-        for (gid, members) in [
-            ("group.m1_conflict", vec![&a, &b]),
-            ("group.m1_no_conflict", vec![&a, &control]),
-        ] {
-            let gid: Id = gid.parse().unwrap();
+        for group in &exp.test_source_groups {
+            let gid = group.group_id.clone();
+            let members: Vec<_> = group
+                .test_sources
+                .iter()
+                .map(|s| {
+                    bundles
+                        .get(s)
+                        .unwrap_or_else(|| panic!("{gid}: unfilled member {s}"))
+                })
+                .collect();
             let (compiled, results) = compile_verify_group(
                 &gid,
                 &format!("groups/{gid}"),
@@ -2513,7 +2530,7 @@ processing_stages:
                     core, entry.expected_unsat_core,
                     "{gid}: unsat core as a set"
                 );
-            } else {
+            } else if entry.expected_outcome == static_id("semantic_no_conflict") {
                 assert!(contradictions.is_empty(), "{gid}: no contradiction");
                 assert!(
                     results
@@ -2522,6 +2539,41 @@ processing_stages:
                         .iter()
                         .all(|r| r.category == VerifierCategory::SemanticNoConflict),
                     "{gid}: every query closed semantic_no_conflict"
+                );
+                if entry.expected_no_conflict_result {
+                    // §6 no-conflict closure: an overlap query answered unsat and the
+                    // pair's deontic query never ran.
+                    let closed: Vec<_> = compiled
+                        .payload
+                        .solver_query_plan
+                        .iter()
+                        .filter(|p| {
+                            results.payload.results.iter().any(|r| {
+                                r.query_id == p.context_overlap_query_id
+                                    && r.verdict == Some(SolverVerdict::Unsat)
+                            })
+                        })
+                        .collect();
+                    assert!(
+                        !closed.is_empty(),
+                        "{gid}: a pair closed as documented no-conflict result"
+                    );
+                    for pair in &closed {
+                        assert!(
+                            results
+                                .payload
+                                .results
+                                .iter()
+                                .all(|r| r.query_id != pair.deontic_consistency_query_id),
+                            "{gid}: closed pair {} skipped its deontic query",
+                            pair.pair_id
+                        );
+                    }
+                }
+            } else {
+                panic!(
+                    "{gid}: unhandled expected_outcome {}",
+                    entry.expected_outcome
                 );
             }
         }
