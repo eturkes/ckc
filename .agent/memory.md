@@ -284,6 +284,12 @@ full pre-consolidation text lives in git history.
     codes (`ai_schema_violation`/`ai_hallucinated_source`/`repair_limit_exceeded`) and §7.3 "repair
     count" IMPLY the intended repair-loop + grounding-check architecture (an elaboration inference,
     not a §9 mandate).
+  - DiagnosticRecord field convention (whole codebase): schema/parse codes (`schema_invalid`,
+    `ai_schema_violation`) carry the failure reason in `payload`, leaving `region_ids` +
+    `artifact_hashes` EMPTY; `artifact_hashes` is populated ONLY by hash-identity diagnostics
+    (`replay_mismatch` = the diverging content hashes). So `ai_schema_violation` MIRRORS
+    `schema_invalid` (empty) + diagnostic→source lineage rides the §4.6 event/trace layer (run-m2.1),
+    NOT the diagnostic's own hashes — keep `ai_schema_violation` `artifact_hashes` empty.
   - `exp.m2_multihop` binds BOTH routes in ONE experiment — `ExperimentEntry` generalizes singular
     `pipeline` to `pipelines: Vec<Id>` + `baseline_pipeline` (baseline = the `direct_smt` pipeline);
     each route is realized as one registry pipeline (`pipe.m2_*`); one `ckc run` → one `report.json`
