@@ -35,9 +35,9 @@ SEED      golden cassettes use seed 42.
 CASSETTE PATH  crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/<source>/seed-42.json
 
 CONFIRMED SIGNATURES (from the attempt — high confidence)
-  read_strict_canonical::<T>(bytes: &[u8]) -> Result<T, CanonError>
+  read_strict_canonical::<T: CanonRead>(bytes: &[u8]) -> Result<T, CanonReadError>   (CanonReadError: Display → .to_string() ok)
   canonical_payload_bytes::<T: Canonical>(&value) -> Result<Vec<u8>, CanonError>
-  content_hash::<T: Canonical>(&value) -> Hash
+  content_hash::<T: Canonical>(&value) -> Result<Hash, CanonError>   (the FN; gate uses the wrapper FIELD .content_hash = bare Hash, not this fn)
   ClinicalIr { bindings: Vec<TerminologyBinding>, statements: Vec<ClinicalStatement> }
   TerminologyBinding { binding_id, system, code, status, alternatives, region_ids: Vec<Id> }
   ClinicalStatement { statement_id, population, condition, action, modality, strength, certainty,
@@ -49,7 +49,7 @@ CONFIRMED SIGNATURES (from the attempt — high confidence)
     ModelFill<T> { target: Option<T>, diagnostics: Vec<DiagnosticRecord>, recorded_calls, repairs }
     FillSource::Replay  (record variant unused here — runtime-absent)
   CassetteKey { route: Id, source: Id, seed: u64 }
-  CassetteStore::new(root) ; .replay(&key) ; .build_wrapper(&key, payload, producer) ; .persist(&key, &wrapper)
+  CassetteStore::new(root) ; .replay(&key) ; .build_wrapper(&key, payload, producer) ; .persist(&key, wrapper)   (persist takes wrapper BY VALUE — moves it)
   CassettePayload::from_output(route: Id, source: Id, seed: u64, prompt: String, constraint_hash: Hash,
                   prompt_template_hash: Hash, model_identity: ModelIdentity, output: &[u8]) -> Self  [8-arg, CONFIRMED]
   extract(&html: &[u8], &config: &ExtractConfig) -> Result<ArtifactWrapper<SourceDocumentGraph>, ExtractError>
@@ -184,7 +184,9 @@ BODY (★ = gate-critical payload path; errors → shell.diagnostic(processing_s
      let segment_ids: HashSet<&Id> = segments.payload.segments.iter().map(|s| &s.segment_id).collect();
      let accept = single_ir_accept(&regions, &segment_ids);
      let fill = match model_fill(store, &key, FillSource::Replay, repair_limit, accept) {
-         Ok(f) => f, Err(e) => { shell.diagnostic(processing_stage_diagnostic(2, "cassette", &entry.id, e.to_string())); return None; }
+         // model_fill-stage error: processing_stage_diagnostic(idx) maps idx→M1 PROCESSING_STAGE_KINDS (idx 2="normalize",
+         // no "model_fill") → inline the route kind. Gate-irrelevant (golden Replay never fails); label matters for .4 rejections.
+         Ok(f) => f, Err(e) => { shell.diagnostic(invalid_diagnostic(vec![(static_id("cassette"), entry.id.to_string()), (static_id("reason"), e.to_string()), (static_id("processing_stage"), "model_fill".to_owned())])); return None; }
      };
   5. for d in &fill.diagnostics { shell.diagnostic(d.clone()); }       // surface §7.4 codes
      let clinical = fill.target?;   // ★ terminal reject (None) → None. else the SAME ClinicalIr the cassette carries.
@@ -194,14 +196,14 @@ BODY (★ = gate-critical payload path; errors → shell.diagnostic(processing_s
      let diagnostics = canonical_diagnostic_set(segments.diagnostics.iter()) ... ;      // F2 segments-only
      let bundle = assemble(doc, segments.payload.clone(), clinical, norm, Vec::new(), diagnostics) ... ;  // 6-arg order
      if let Err(e) = bundle.validate(&source.payload) {                                 // F5 expected-pass
-         shell.diagnostic(processing_stage_diagnostic(3, "ir_bundle", &entry.id, e.to_string())); return None;
+         shell.diagnostic(processing_stage_diagnostic(3, "ir_bundle", &entry.id, e.to_string())); return None; // idx 3 → M1 "assemble" = single_ir's assemble stage ✓
      }
   7. WRAP (gate-irrelevant fields, F4) via the `wrapper()` helper (run.rs ~1087, 8 args):
      let wrapped = wrapper(
          format!("{}.ir_bundle", entry.id),            // VERIFY artifact_id form vs assemble_bundle
          "ir_bundle",
          producer(resolved, 3),
-         vec![source.content_hash, segments.content_hash],   // single_ir: no normalization artifact → 2 hashes
+         vec![source.content_hash, segments.content_hash],   // 2 hashes: no normalization wrapper (gate-irrelevant F4; run-m2.1: add cassette.content_hash for provenance — see roadmap)
          Origin::DeterministicCompiler,
          EvidenceStatus::MechanicalEvidenceStatus,
          Vec::new(),                                   // wrapper-level diags (payload carries the real ones)
@@ -241,7 +243,7 @@ TEST SCAFFOLDING (run.rs mod tests). Reuse existing helpers: repo_root(), static
             static_id("route.single_ir"), entry.id.clone(), seed,
             prompt, constraint_hash, prompt_template_hash, model_identity, output);
         let wrapper = store.build_wrapper(&key, payload, producer(resolved, 2)).unwrap();
-        store.persist(&key, &wrapper).unwrap();
+        store.persist(&key, wrapper).unwrap();   // persist takes wrapper by value (moves it; not used after)
     }
     // prompt / constraint_hash / prompt_template_hash: REUSE route-single-ir.1's derivation (M2.15 seeded the
     //   single_ir prompt + check loop). VERIFY: grep run.rs / replay.rs for the single_ir prompt builder +

@@ -522,7 +522,11 @@ argument).
   pipelines now exist, so `ckc registry check` validates the full experiment. Wire `run.rs` to execute
   both route pipelines under one experiment run → per-route `model_fill` → scoring → metrics →
   `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests (populating the
-  model/prompt/identity hash fields), over the locked M1 inputs. Add the `ckc run --record` flag (default
+  model/prompt/identity hash fields), over the locked M1 inputs. single_ir assemble-wrapper
+  input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
+  cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
+  used source+segments only, F4 payload-only, so add the cassette hash here). Add the `ckc run
+  --record` flag (default
   = replay committed cassettes runtime-absent; `--record` drives `CassetteStore::record` live — run-m2.2
   exercises that live path) + its default-replay acceptance. Tested via REPLAY of the route units'
   committed cassettes (deterministic, no live call) — model-fill replays runtime-absent, so replay.rs

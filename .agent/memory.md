@@ -104,8 +104,10 @@ full pre-consolidation text lives in git history.
   the verified equality-premise facts (e.g. clinical_ir diagnostics empty for the 3 docs) +
   insertion anchors into a throwaway `.agent/wip-<unit>.txt` the impl line POINTS at — read
   THAT not the N files, targeted reads only at flagged VERIFY points; delete it in the closing
-  commit. A self-checking gate (`content_hash == reference`) bounds transcription risk: a wrong
-  pre-derived line fails the gate loudly, never silently. Mark gate-IRRELEVANT fields (producer
+  commit. A self-checking gate (`content_hash == reference`) bounds transcription risk on the
+  PAYLOAD path ONLY: a content-hash-affecting line fails loudly; off-payload lines don't (wrong
+  signature → compile error; producer/wrapper/input_hash fields compile AND pass silently → still
+  targeted-read those). Mark gate-IRRELEVANT fields (producer
   stamps / step-ids / wrapper-level fields under a payload-only `content_hash`) explicit so the
   session skips pinning them.
 - Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).
