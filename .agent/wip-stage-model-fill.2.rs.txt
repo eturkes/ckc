@@ -82,8 +82,8 @@ pub enum FillReject {
     Grounding(Vec<Id>),
 }
 
-/// One model-fill result: the accepted target, or the diagnostics that rejected
-/// every attempt, plus exact call/repair accounting.
+/// One model-fill result: the accepted target if any, the attempt diagnostics
+/// (retained even alongside a recovered target), and exact call/repair accounting.
 #[derive(Debug)]
 pub struct ModelFill<T> {
     /// The accepted target, or `None` when no attempt passed acceptance (the
@@ -442,6 +442,50 @@ mod tests {
         assert_eq!(
             d.payload,
             vec![(static_id("absent_source_ids"), "seg.99".to_owned())]
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // Grounding can fire on a repair attempt, not just the first: attempt 0's
+    // output fails to parse (one `ai_schema_violation`, one repair), and the
+    // recovered attempt parses but names absent upstream ids — duplicated and
+    // out of order — so grounding is terminal mid-loop and the ids surface
+    // sorted + deduped. Covers the repair→grounding interleave and the multi-id
+    // canonicalization in `ai_hallucinated_source` (the terminal case above
+    // exercises only a single absent id on the first attempt).
+    #[test]
+    fn grounding_on_repair_attempt_canonicalizes_absent_ids() {
+        let (store, dir) = temp_store("groundonrepair");
+        let k = key();
+        seed_cassette(&store, &k, b"not json");
+        seed_cassette(&store, &key_at(derive_seed(42, 1)), br#"{"ok":true}"#);
+        // Parse stands in for the schema check (bad JSON → repairable Schema); a
+        // parsed output is then forced to hallucinate three absent ids
+        // (duplicated, unsorted) to exercise the canonicalization.
+        let accept = |bytes: &[u8]| -> Result<serde_json::Value, FillReject> {
+            serde_json::from_slice::<serde_json::Value>(bytes)
+                .map_err(|e| FillReject::Schema(format!("parse: {e}")))?;
+            Err(FillReject::Grounding(
+                ["seg.9", "seg.7", "seg.9"]
+                    .iter()
+                    .map(|s| s.parse().unwrap())
+                    .collect(),
+            ))
+        };
+        let fill = model_fill(&store, &k, FillSource::Replay, 2, accept).unwrap();
+        assert!(fill.target.is_none());
+        assert_eq!(fill.recorded_calls, 2);
+        assert_eq!(fill.repairs, 1);
+        assert_eq!(fill.diagnostics.len(), 2);
+        assert!(assert_schema_violation(&fill.diagnostics[0]).starts_with("parse:"));
+        let ahs = &fill.diagnostics[1];
+        assert_eq!(ahs.code, DiagnosticCode::AiHallucinatedSource);
+        assert_eq!(ahs.outcome, Outcome::Invalid);
+        assert!(ahs.region_ids.is_empty());
+        assert!(ahs.artifact_hashes.is_empty());
+        assert_eq!(
+            ahs.payload,
+            vec![(static_id("absent_source_ids"), "seg.7 seg.9".to_owned())]
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }

@@ -345,15 +345,16 @@ argument).
   (`Model-fill stage core` bullet). [Done: reproduction-only redo (salvage restored byte-exact, then deleted); gate green 423 passed /
   3 ignored (4 model_fill tests + `committed_model_surface_checks_ok` by name) + fmt + clippy
   `-D warnings` clean.] 51% 103K/200K
-- [ ] stage-model-fill.2: model-fill repair loop + grounding. AUTHORED + PROVEN GREEN at respec (gate
-  ran clean: `cargo test --workspace` 425 passed / 3 ignored, `cargo fmt --all --check`, `cargo clippy
-  --workspace --all-targets -- -D warnings`), then reverted on the design-overflow + salvaged
+- [ ] stage-model-fill.2: model-fill repair loop + grounding. AUTHORED + PROVEN GREEN at respec, then
+  HARDENED per codex-review (added a grounding-on-repair multi-id test; tightened the `ModelFill` struct
+  doc) + re-proven clean: `cargo test --workspace` 426 passed / 3 ignored, `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings`; reverted on the design-overflow + salvaged
   byte-exact → REPRODUCTION-ONLY redo: read ONLY this line + the wip, zero re-derivation. Kept UNIFIED
   (not split): the repair-loop + grounding-check interleave in one `accept()`-driven loop = one module;
   the original line left ~5 semantic decisions open (a planning-bug by the open-decision ceiling),
   RESOLVED below.
   STEPS: (1) `cp .agent/wip-stage-model-fill.2.rs.txt crates/ckc-cli/src/model_fill.rs` (sha256
-  c503bd90…, 466 lines; overwrites the .1 module whole — the .2 is a superset rewrite, nothing lost).
+  dab2be9e…, 510 lines; overwrites the .1 module whole — the .2 is a superset rewrite, nothing lost).
   (2) model.rs: `fn derive_seed` → `pub(crate) fn derive_seed` (model_fill keys each repair attempt's
   cassette by a fresh derived seed; reword its doc to two callers — k-sample draws + repair
   re-prompts). (3) `cargo fmt --all` (the salvage is already fmt-clean → a no-op guard), then the gate.
@@ -364,7 +365,7 @@ argument).
   single-draw stage but BOTH surfaced — the stage owns repair accounting, run-m2.1 builds the §4.6
   event from them + must not re-derive; §7.3's two metric families). REPAIR LOOP: attempt 0 keyed by
   `key.seed`, repair i by `derive_seed(key.seed, i)` (seed = the only varying CassetteKey dim → each
-  attempt replays a distinct crafted cassette); recorded_calls=attempt+1, repairs=attempt; a
+  attempt keys a separate crafted cassette by a distinct derived seed); recorded_calls=attempt+1, repairs=attempt; a
   schema-violation still failing at attempt==repair_limit → push `repair_limit_exceeded` (payload key
   "repair_limit") + target=None. GROUNDING = TERMINAL, does NOT consume repair budget (grounding ≠
   schema; faithful to "re-prompt on schema-violation"): a referenced upstream id absent from the
@@ -376,12 +377,14 @@ argument).
   for real spans, hallucinated ids resolve to none); `ai_schema_violation` payload key "reason"
   (unchanged from .1). `FillSource` gains `#[derive(Clone, Copy)]` (the loop re-acquires per attempt;
   Record-arm error-feedback re-prompting deferred — the seed distinguishes attempts). Event emission
-  stays DEFERRED to run-m2.1 (M1 finish_processing_stage index-coupled). TESTS (6, replay-only crafted
+  stays DEFERRED to run-m2.1 (M1 finish_processing_stage index-coupled). TESTS (7, replay-only crafted
   cassettes, all in the wip): valid_fill (target + 0 repairs); schema-then-repair-recovers;
   repair_limit_exceeded (3 cassettes → 4 diagnostics [3×asv + rle], recorded_calls=3 repairs=2);
   zero_repair_budget (repair_limit=0 → asv + rle); hallucinated_source_terminal (absent ref → ahs,
-  repairs=0); missing_cassette → `CassetteError::Io`.
-  Reading: ONLY this line + `.agent/wip-stage-model-fill.2.rs.txt`. Gate: `cargo test --workspace` (425
+  repairs=0); grounding_on_repair (schema-fail then grounds on the repair attempt → [asv, ahs],
+  recorded_calls=2 repairs=1; multi-id absent sorted+deduped → "seg.7 seg.9"); missing_cassette →
+  `CassetteError::Io`.
+  Reading: ONLY this line + `.agent/wip-stage-model-fill.2.rs.txt`. Gate: `cargo test --workspace` (426
   passed / 3 ignored expected) + `cargo fmt --all --check` + `cargo clippy --workspace --all-targets --
   -D warnings`. CLOSE: `rm .agent/wip-stage-model-fill.2.rs.txt`; record context-usage; mark DONE (M2
   stays IN-PROGRESS). [Split from .1: core fill vs the repair/grounding rejection-coverage sub-feature.]
@@ -398,6 +401,9 @@ argument).
   accepted ClinicalIR over a recorded cassette; acceptance + §7.4 codes wire through; verdict scored
   vs reference for accepted translations. [Decision pinned: model fills ClinicalIR over deterministic
   upstream — the instrument supplies the grounding scaffold; hallucinated refs are measured, not fatal.]
+  [Codex-review (M2.14): the acceptance closure must return `FillReject::Grounding` with ≥1 absent id —
+  an empty grounding vec yields a meaningless `ai_hallucinated_source` (empty `absent_source_ids`);
+  enforce non-empty at this source, since the stage trusts the closure verbatim.]
 - [ ] route-direct-smt: `direct_smt` route + pipeline (the weak baseline). Seed `pipe.m2_direct_smt`
   `PipelineEntry` (`candidates.yaml`: `model_fill`(target=SMT, grammar=`smt_query`) →
   syntactic-validity → verify; stage chain validates). Implement: the model emits the
