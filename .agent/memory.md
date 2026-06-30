@@ -175,7 +175,12 @@ full pre-consolidation text lives in git history.
   §4.6 event from `recorded_calls`; `RECORDED_CALLS_COUNTER="recorded_calls"` = the resource-counter key,
   `recorded_calls=1` per fill (stage-model-fill.2 repair loop raises it). `CassetteStore::{build_wrapper,
   persist}` → pub(crate) so the stage (+ its tests) seed cassettes through the store's own contract-valid
-  builder. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,
+  builder. Tests = replay-only: valid fill, unparsable + schema-miss (both assert the FULL §7.4
+  violation shape — one diagnostic, `Outcome::Invalid`, empty region_ids/artifact_hashes, reason under the
+  `reason` key), missing-cassette → `Io`. The `Record` arm is type-enforced thin delegation to
+  `store.record` (a mis-wired arm cannot compile; `record`'s subprocess plumbing is cassette-layer,
+  live-bless-validated), so the shared decode→parse path is covered via `Replay` — no stub-runtime test
+  duplicated here. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,
   `[source_document_graph,segments]→[clinical_ir]`), UNREFERENCED (no chain check fires until a route
   pipeline references it); route-direct-smt adds its OWN smt_query-output entry.
 - Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED

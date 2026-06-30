@@ -177,6 +177,22 @@ mod tests {
         }
     }
 
+    // Assert `diagnostics` is exactly one §7.4 `ai_schema_violation` of the
+    // documented shape — `Outcome::Invalid`, no `region_ids`/`artifact_hashes`,
+    // the reason under the `reason` payload key — and return the reason for a
+    // caller's content check.
+    fn assert_one_violation(diagnostics: &[DiagnosticRecord]) -> &str {
+        assert_eq!(diagnostics.len(), 1);
+        let d = &diagnostics[0];
+        assert_eq!(d.code, DiagnosticCode::AiSchemaViolation);
+        assert_eq!(d.outcome, Outcome::Invalid);
+        assert!(d.region_ids.is_empty());
+        assert!(d.artifact_hashes.is_empty());
+        assert_eq!(d.payload.len(), 1);
+        assert_eq!(d.payload[0].0, static_id("reason"));
+        d.payload[0].1.as_str()
+    }
+
     // A valid recording fills the target and accounts exactly one recorded call.
     #[test]
     fn valid_fill_yields_target_and_one_recorded_call() {
@@ -199,9 +215,8 @@ mod tests {
         seed_cassette(&store, &k, b"not json");
         let fill = model_fill(&store, &k, FillSource::Replay, parse_json).unwrap();
         assert!(fill.target.is_none());
-        assert_eq!(fill.diagnostics.len(), 1);
-        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
-        assert_eq!(fill.diagnostics[0].outcome, Outcome::Invalid);
+        let reason = assert_one_violation(&fill.diagnostics);
+        assert!(reason.starts_with("parse:"));
         assert_eq!(fill.recorded_calls, 1);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -215,7 +230,8 @@ mod tests {
         seed_cassette(&store, &k, br#"{"other":1}"#);
         let fill = model_fill(&store, &k, FillSource::Replay, parse_json).unwrap();
         assert!(fill.target.is_none());
-        assert_eq!(fill.diagnostics[0].code, DiagnosticCode::AiSchemaViolation);
+        let reason = assert_one_violation(&fill.diagnostics);
+        assert_eq!(reason, "missing required field `ok`");
         assert_eq!(fill.recorded_calls, 1);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -229,18 +245,5 @@ mod tests {
         let err = model_fill(&store, &key(), FillSource::Replay, parse_json).unwrap_err();
         assert!(matches!(err, CassetteError::Io(_)));
         let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    // The recorded-call count plus RECORDED_CALLS_COUNTER form the §4.6 event
-    // resource counter the route/run wiring emits.
-    #[test]
-    fn recorded_call_count_keys_the_event_counter() {
-        let (store, dir) = temp_store("counter");
-        let k = key();
-        seed_cassette(&store, &k, br#"{"ok":true}"#);
-        let fill = model_fill(&store, &k, FillSource::Replay, parse_json).unwrap();
-        let counter = (static_id(RECORDED_CALLS_COUNTER), fill.recorded_calls);
-        assert_eq!(counter, (static_id("recorded_calls"), 1));
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

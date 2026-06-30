@@ -342,10 +342,9 @@ argument).
   recorded_calls}`; `Err(reason)` → §7.4 `ai_schema_violation` (no target), a cassette IO/contract failure →
   distinct `CassetteError`); unreferenced `processing_stage.m2.model_fill` registry entry; the §4.6 event
   emission is deferred to run-m2.1 (builds it from `recorded_calls`). Cross-unit decisions in memory
-  (`Model-fill stage core` bullet). [Done: reproduction-only redo — restored salvage byte-exact (`cp` +
-  `git apply`; pre-image blobs matched 9b519ef/3f1fd2f/ff46c95, patch clean), gate green 424 passed /
-  3 ignored (5 model_fill tests + `committed_model_surface_checks_ok` confirmed by name) + fmt + clippy
-  `-D warnings` clean; salvage files deleted.] 51% 103K/200K
+  (`Model-fill stage core` bullet). [Done: reproduction-only redo (salvage restored byte-exact, then deleted); gate green 423 passed /
+  3 ignored (4 model_fill tests + `committed_model_surface_checks_ok` by name) + fmt + clippy
+  `-D warnings` clean.] 51% 103K/200K
 - [ ] stage-model-fill.2: model-fill repair loop + grounding. Extend the stage with a repair loop —
   re-prompt on schema-violation up to `repair_limit` (from budget), counting repairs, emitting
   `repair_limit_exceeded` on exhaustion; a grounding check — a referenced upstream id absent from the

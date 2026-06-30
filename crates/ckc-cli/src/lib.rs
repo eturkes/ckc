@@ -108,14 +108,14 @@
 //!   k-sample draw under per-sample seeds via
 //!   [`model::ModelAdapter::invoke_samples`]; a clean exit is
 //!   [`model::ModelOutcome::Completed`] only once stdout reached EOF, else
-//!   capture-incomplete. The forthcoming §7.4 model-fill stage drives it.
+//!   capture-incomplete. The §7.4 model-fill stage ([`model_fill`]) drives it.
 //! - [`cassette`] — §4.4/§9 model cassette store (`model-cassette.1`):
 //!   [`cassette::CassetteStore`] records a live [`model::ModelAdapter`] call
 //!   or replays a committed [`ckc_core::CassettePayload`] wrapper keyed by
 //!   (route, source, seed) ([`cassette::CassetteKey`]), the recorded output
 //!   hex-encoded for a lossless byte round-trip — replay (default) is
 //!   runtime-absent, record ([`cassette::RecordMode`]) gated behind the
-//!   runtime. The forthcoming model-fill stage drives it.
+//!   runtime. The model-fill stage ([`model_fill`]) drives it.
 //! - [`model_fill`] — §7.4/§9 model-fill stage core (`stage-model-fill.1`):
 //!   [`model_fill::model_fill`] drives the [`cassette::CassetteStore`] (replay
 //!   default / record gated via [`model_fill::FillSource`]), decodes the
