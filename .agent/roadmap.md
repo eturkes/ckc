@@ -306,7 +306,7 @@ argument).
   4 store replay/missing/key-mismatch/malformed-hex) + `cargo fmt --check` + `cargo clippy --workspace --all-targets -- -D
   warnings` (salvage is fmt-clean → byte-exact restore passes fmt-check). CLOSE: `rm .agent/wip-cassette-core.rs.txt
   .agent/wip-cassette-cli.rs.txt` (both consumed here); record context-usage; mark DONE (M2 stays IN-PROGRESS). DONE: restored byte-exact (sha256 parity), wired both lib.rs (core `mod`+`pub use`, cli `pub mod`, + a module doc bullet each); `RawText`/`emit_u64`/`read_u64` were already pub(crate) → no canon.rs change. Gate green: fmt clean + clippy -D 0 + `cargo test --workspace`, 8 cassette tests (3 core payload + 5 cli store, all runtime-absent). 46% 92K/200K Codex-review hardened the store: `load` now enforces the fixed §4.4 cassette provenance contract (schema_id/kind/artifact_id/origin/evidence/effects/input_hashes — `validate` covers only the hashes + effect/evidence rule, so a committed cassette could otherwise lie about being an AI recording + load clean) + `record` re-reads the constraint post-invoke → `ConstraintDrift` (re-read, not relocate — a snapshot would break relative `$ref`s); path-safety comment narrowed to the real grammar guarantee (no `/`/`..`; `:` ⇒ Unix-only); `artifact_id` documented as a derived label not an identity key (the (route,source,seed) triple/path is collision-free, dotted ids aren't). +`off_contract_rejected` test.
-- [ ] model-cassette.2: committed test cassette via live bless + runtime-absent replay (the live unit,
+- [x] model-cassette.2: committed test cassette via live bless + runtime-absent replay (the live unit,
   mirrors model-adapter.2b). Add `crates/ckc-cli/tests/model_cassette.rs` mirroring `tests/model_live.rs`:
   (a) an `#[ignore]`d bless `record_cassette`, guarded on `CKC_MODEL_COMMAND` unset (default bare-name
   `ModelAdapter::new()`) — `CassetteStore::new(<repo>/crates/ckc-cli/tests/fixtures)`, `RecordContext` {
@@ -326,7 +326,16 @@ argument).
   the cassette → re-pin `CASSETTE_HASH` from the recorded wrapper's `content_hash` field (`jq -r
   .content_hash <cassette>` — the §4.4 payload-canonical hash the test compares, NOT the file-byte
   `sha256sum`) → `cargo test` green. CLOSE: record context-usage;
-  mark DONE (M2 stays IN-PROGRESS).
+  mark DONE (M2 stays IN-PROGRESS). [Done: `tests/model_cassette.rs` — `#[ignore]`d `record_cassette`
+  bless + normal runtime-absent `replay_committed_cassette`; live bless recorded
+  `tests/fixtures/cassettes/route.fixture/test_source.fixture/seed-42.json` (bounded-verdict output
+  `{"verdict":"unknown","actionable":false}`), `CASSETTE_HASH` pinned to the wrapper `content_hash`
+  (`sha256:8b465db5…`). USER DECISION (asked, sets the run-m2.2 precedent): the committed cassette
+  carries the runtime's REAL `model_identity` (model/quant/engine) — recorded MEASUREMENT data, exempt
+  from the engine-agnostic synthetic-token audit (carve-out in memory; audit confirmed the tokens appear
+  ONLY in the cassette). Replay pins output JSON+schema-conformance + ai_generated/evidence_discovery_only/[ai]
+  provenance, never an identity value. Gates green: fmt + clippy -D + `cargo test --workspace`, 419 passed /
+  3 ignored (record_cassette + model_live + bless_clinical_ir_schema).] 72% 145K/200K
 - [ ] stage-model-fill.1: model-fill processing stage — core (generic over target). New stage kind
   `model_fill`: invoke the model through `CassetteStore` (default = replay the committed cassette
   runtime-absent; `--record` invokes `ModelAdapter` live) with the route prompt + constraint, parse
