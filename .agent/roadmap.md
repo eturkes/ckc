@@ -181,9 +181,11 @@ argument).
   compile→verify body (SPEC §9 "compile→verify back end") so a later `route.single_ir` can feed its
   own validated bundles to the same back end (route-side `Resolved`/producer wiring is THAT unit's
   job — refactor-first: share internals now). PINNED SIGNATURE (complete — no threading left to
-  derive): `fn compile_verify_group(group_id: &Id, members: &[&ArtifactWrapper<IrBundle>], clock:
+  derive): `fn compile_verify_group(group_id: &Id, dir: &str, members: &[&ArtifactWrapper<IrBundle>], clock:
   ProcessingStageClock, resolved: &Resolved, adapter: &Z3Adapter, shell: &mut Shell) ->
-  (Option<ArtifactWrapper<CompiledArtifact>>, Option<ArtifactWrapper<VerifierResults>>)` — a private
+  (Option<ArtifactWrapper<CompiledArtifact>>, Option<ArtifactWrapper<VerifierResults>>)` [LANDED form added
+  `dir: &str` as the 2nd param (M2.14 timing-fix; shown above) → the (a) internal-`dir`/`gid` note below is the
+  as-planned record, SUPERSEDED; `run.rs:500` authoritative] — a private
   `fn` (only `group_pipeline` calls it now; a route unit widens visibility if it lands in another
   module). BODY = the current `let inputs`(~L487) → verify-landing block verbatim, plus: (a) at the
   helper top add `let gid = group_id; let dir = format!("groups/{gid}");` so the moved body's
@@ -361,7 +363,7 @@ argument).
   two over-claimed "distinct committed cassette" docs (provably distinct across repairs; collision-negligible,
   not structurally excluded, against the base seed). +empty-grounding `should_panic` test.
 - [ ] route-single-ir.1: `single_ir` registry + prompt surface (additive, gate-independent foundation;
-  split from the original one-shot route-single-ir — respec `git show HEAD`). `candidates.yaml` +=
+  split from the original one-shot route-single-ir — respec `git show e1c8c17`). `candidates.yaml` +=
   `processing_stage.m2.assemble` (mirror `processing_stage.m1.assemble`, swap input
   `normalization`→`clinical_ir`): `kind: assemble` / `determinism: deterministic` /
   `input_artifact_kinds: [source_document_graph, segments, clinical_ir]` / `output_artifact_kinds:
@@ -390,7 +392,10 @@ argument).
 - [ ] route-single-ir.2: per-doc model-fill → validated `IrBundle` + golden cassettes (the route's fill
   half; model-runtime-absent, z3 not needed). New route code in `run.rs` (REQUIRED there: `Resolved` +
   `compile_verify_group` are private to `mod run`, which .3 reuses). Per-doc fn (shape: `single_ir_fill(root,
-  entry: &CorpusEntry, lexicon, store: &CassetteStore, seed, shell) -> Option<ArtifactWrapper<IrBundle>>`):
+  entry: &CorpusEntry, lexicon, store: &CassetteStore, seed, resolved: &Resolved, repair_limit: u32, shell)
+  -> Option<ArtifactWrapper<IrBundle>>`; `resolved` supplies the producer stamps — .2 hand-builds it like .3
+  but with REAL `[0] = m1.extract`, `[1] = m1.segment`, `[3] = m2.assemble` (the bundle wrapper at run.rs 997
+  stamps `producer(resolved, 3)`), placeholders elsewhere; `repair_limit` lets .4 reuse this fn):
   `extract(&html, &config)` (mirror `run.rs` 343-388: html from `root.join(&entry.path)`, `source_family =
   static_id("synthetic_test_source_html")`, `producer(resolved, 0)`) → `segment(&source,
   &producer(resolved, 1))` → `model_fill(store, CassetteKey{route.single_ir, entry.id, seed},
@@ -403,12 +408,19 @@ argument).
   absent))` (route-side non-empty assert = defense-in-depth, M2.14 codex), else `Ok(clinical)`. POST-accept
   deterministic tail (mirror `assemble_bundle` run.rs 959-989, substituting the model `clinical` +
   `derive_norm_ir(&entry.id, &clinical, &segments.payload, lexicon)` for `normalization.payload.
-  {clinical,norm}`): `DocIr::from_graph(&source.payload, source.diagnostics.clone())` → `assemble(doc,
-  segments.payload, clinical, norm, Vec::new(), diagnostics)` → `bundle.validate(&source.payload)` → wrap.
-  `bundle.validate` is EXPECTED-PASS for accepted output (parse + grounding cover the model-controllable
-  failures; vocab is constrained-decoded live / lexicon-valid in golden cassettes) — a failure is a hard
-  route error, NOT a §7.4 code. GOLDEN cassettes via a bless writer — per doc (a/b/control) run the
-  deterministic upstream → `canonical_payload_bytes(&clinical_ir(graph, segments, lexicon))` →
+  {clinical,norm}`, with `diagnostics = canonical_diagnostic_set(segments.diagnostics.iter())`):
+  `DocIr::from_graph(&source.payload, source.diagnostics.clone())` → `assemble(doc, segments.payload, clinical,
+  norm, Vec::new(), diagnostics)` → `bundle.validate(&source.payload)` → wrap. M1's `assemble_bundle` feeds
+  `assemble` `canonical_diagnostic_set(segments.diagnostics ∪ normalization.diagnostics)`; single_ir runs NO
+  normalizer → segments-only diagnostics, so `bundle == M1` (the gate) REQUIRES M1's normalization diagnostics
+  empty for the 3 docs — asserted at bless (`norm_diags.is_empty()`). `bundle.validate` is EXPECTED-PASS for
+  accepted output: parse (→`Schema`) + grounding (→`Grounding`) cover the §7.4 classes the isolation tests
+  exercise; OTHER `ClinicalIr` invalidity `validate` catches later (vocab not in lexicon, duplicate generated
+  ids, `Action.key`≠`kind:target`, interval incoherence — bundle.rs 623/682/846) is a HARD route error, NOT a
+  §7.4 code (out of M2.15 scope; golden cassettes are lexicon-valid by construction so never trip it). GOLDEN cassettes via a bless writer — per doc (a/b/control) run the
+  deterministic upstream → `let (clinical, norm_diags) = clinical_ir(graph, segments, lexicon)`; ASSERT
+  `norm_diags.is_empty()` (single_ir carries no normalizer diagnostics → `bundle == M1` needs M1's empty here)
+  → `canonical_payload_bytes(&clinical)` →
   `CassettePayload::from_output(route.single_ir, source, 42, prompt, constraint_hash = the `clinical_ir`
   schema hash, prompt_template_hash = `prompt.single_ir`'s hash, model_identity = SYNTHETIC
   `model.baseline`/`fixture_quant`/`1.0.0`, &output_bytes)` → `build_wrapper` → `persist` to
@@ -427,7 +439,9 @@ argument).
   model-runtime-absent). Extend the route: gather .2's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):
   `pipeline_id = pipe.m2_single_ir`, `pipeline_step_ids: [Id; 8]` with `[4] = processing_stage.m1.compile`
-  + `[5] = processing_stage.m1.verify` (the other 6 slots placeholder `Id`s), `toolchain_manifest_hash`
+  + `[5] = processing_stage.m1.verify` (.3's tail reads only `[4]`/`[5]`; the FULL route ALSO needs .2's real
+  `[0]`/`[1]`/`[3]` — when .3 wires .2's head + this tail through one `Resolved`, only `[2]`/`[6]`/`[7]` stay
+  placeholder), `toolchain_manifest_hash`
   (real), `budget_ms`; the tail never reads `documents: vec![]`, `groups: vec![]`, `plan: RunPlan{
   experiment_id, test_source_groups: vec![], pipelines: vec![], seed, budget: vec![]}`. Per group call
   `compile_verify_group(group_id, &format!("groups/{gid}"), &members, processing_stage_clock(), &resolved,
@@ -452,8 +466,9 @@ argument).
   `canonical_payload_bytes` (stays canonical → `read_strict_canonical` ACCEPTS → reaches grounding) → seed
   99; (b) MALFORMED — non-parsing bytes → `read_strict_canonical` fails → `FillReject::Schema` → seed 98.
   Tests (model-runtime-absent): hallucinated → `ModelFill.diagnostics` carries `ai_hallucinated_source` with
-  ≥1 `absent_source_ids` + `target == None`; malformed with `repair_limit ≥ 1` (+ a VALID cassette at
-  `derive_seed(98, 1)`, pinned in `model.rs`'s `derive_seed` test) → `ai_schema_violation` then RECOVERY (an
+  ≥1 `absent_source_ids` + `target == None`; malformed with `repair_limit ≥ 1` (+ a VALID recovery cassette
+  keyed at the repair seed `derive_seed(98, 1)` — COMPUTE it, `derive_seed` is deterministic; `model.rs`'s test
+  pins only the (42, n) cases as worked examples, NOT (98, 1)) → `ai_schema_violation` then RECOVERY (an
   accepted bundle), AND a malformed-at-every-derived-seed variant → `repair_limit_exceeded`. SYNTHETIC
   model_identity on the bad cassettes (audit applies). Reading: THIS line; .2's committed accept closure +
   cassette-craft helper; `model_fill` `FillReject`→code map + `derive_seed` re-prompt + `REPAIRS_COUNTER` per
