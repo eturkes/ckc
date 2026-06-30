@@ -164,25 +164,31 @@ full pre-consolidation text lives in git history.
   test mirroring `tests/model_live.rs`, content-hash-pinned. DEFERRED (run-m2.1): the `--record`
   surface + replay.rs model-artifact coverage + §9 manifest `prompt_template_hash` (stage-model-fill.1
   now drives replay/record via `FillSource`, next bullet).
-- Model-fill stage core (§7.4/§9, stage-model-fill.1, `ckc-cli/src/model_fill.rs`). DECOUPLED core
-  `model_fill<T>(store, key, source: FillSource, parse) -> Result<ModelFill<T>, CassetteError>` →
-  `ModelFill<T>{target: Option<T>, diagnostics, recorded_calls}` — a plain value, NOT a §4.6
+- Model-fill stage core (§7.4/§9, stage-model-fill.1 core + .2 repair/grounding,
+  `ckc-cli/src/model_fill.rs`). DECOUPLED core
+  `model_fill<T>(store, key, source: FillSource, repair_limit, accept) -> Result<ModelFill<T>, CassetteError>` →
+  `ModelFill<T>{target: Option<T>, diagnostics, recorded_calls, repairs}` — a plain value, NOT a §4.6
   event/`ArtifactWrapper`. `FillSource::Replay` (default, runtime-absent) / `Record{adapter,prompt,
-  constraint,ctx}` (gated) gets the cassette via `CassetteStore`, decodes `output_bytes()`, runs the
-  route's `parse: FnOnce(&[u8])->Result<T,String>` = the §4 acceptance check (route supplies the
-  ClinicalIR/SMT parser; target + acceptance stay route-side). `Err(reason)` → a §7.4 `ai_schema_violation`
-  (`Outcome::Invalid`, reason in payload, mirrors deterministic `schema_invalid`), no target; a cassette
-  IO/contract failure stays `Err(CassetteError)`, DISTINCT (route tells a broken recording from a bad model
-  output). EVENT NOT emitted here — M1 `finish_processing_stage` is index-coupled
-  (`PROCESSING_STAGE_KINDS[index]`/`pipeline_step_ids[index]`) → run-m2.1 generalizes emission + builds the
-  §4.6 event from `recorded_calls`; `RECORDED_CALLS_COUNTER="recorded_calls"` = the resource-counter key,
-  `recorded_calls=1` per fill (stage-model-fill.2 repair loop raises it). `CassetteStore::{build_wrapper,
-  persist}` → pub(crate) so the stage (+ its tests) seed cassettes through the store's own contract-valid
-  builder. Tests = replay-only: valid fill, unparsable + schema-miss (both assert the FULL §7.4
-  violation shape — one diagnostic, `Outcome::Invalid`, empty region_ids/artifact_hashes, reason under the
-  `reason` key), missing-cassette → `Io`. The `Record` arm is type-enforced thin delegation to
-  `store.record` (a mis-wired arm cannot compile; `record`'s subprocess plumbing is cassette-layer,
-  live-bless-validated), so the shared decode→parse path is covered via `Replay` — no stub-runtime test
+  constraint,ctx}` (gated) gets each attempt's cassette via `CassetteStore`, decodes `output_bytes()`, runs
+  the route's `accept: impl Fn(&[u8])->Result<T, FillReject>` = the §4 acceptance check (route supplies the
+  ClinicalIR/SMT parser+grounding; target + acceptance stay route-side). The `FillReject` variant picks the
+  §7.4 code AND repair-vs-terminal: `Schema(reason)` → `ai_schema_violation` and RE-PROMPTS under
+  `derive_seed(base, attempt)` (each attempt its own derived-seed cassette) up to `repair_limit`, then
+  terminal `repair_limit_exceeded`; `Grounding(absent)` → terminal `ai_hallucinated_source`, spends NO
+  repair. The stage trusts the closure verbatim → a route returns `Grounding` only with ≥1 absent id (empty
+  → a meaningless empty-`absent_source_ids` diagnostic; enforce route-side, route-single-ir codex note). A
+  cassette IO/contract failure stays `Err(CassetteError)`, DISTINCT (route tells a broken recording from a
+  bad model output). Two §7.3 counters both surfaced so run-m2.1 emits both without re-deriving:
+  `RECORDED_CALLS_COUNTER="recorded_calls"` (one per attempt), `REPAIRS_COUNTER="repairs"`
+  (`=recorded_calls-1` here, single draw per attempt). EVENT NOT emitted here — M1 `finish_processing_stage`
+  is index-coupled (`PROCESSING_STAGE_KINDS[index]`/`pipeline_step_ids[index]`) → run-m2.1 generalizes
+  emission + builds the §4.6 event from the counters. `derive_seed` is pub(crate) (shared: k-sample draws +
+  repair re-prompts). `CassetteStore::{build_wrapper, persist}` → pub(crate) so the stage (+ its tests) seed
+  cassettes through the store's own contract-valid builder. Tests = replay-only (7): valid (0 repairs),
+  schema→repair→recover, repair_limit_exceeded, zero-budget exhaust, hallucinated-terminal, grounding-on-
+  repair (multi-id sort+dedup), missing-cassette → `Io`. The `Record` arm is type-enforced thin delegation
+  to `store.record` (a mis-wired arm cannot compile; `record`'s subprocess plumbing is cassette-layer,
+  live-bless-validated), so the shared decode→accept path is covered via `Replay` — no stub-runtime test
   duplicated here. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,
   `[source_document_graph,segments]→[clinical_ir]`), UNREFERENCED (no chain check fires until a route
   pipeline references it); route-direct-smt adds its OWN smt_query-output entry.
@@ -315,6 +321,8 @@ full pre-consolidation text lives in git history.
     (`replay_mismatch` = the diverging content hashes). So `ai_schema_violation` MIRRORS
     `schema_invalid` (empty) + diagnostic→source lineage rides the §4.6 event/trace layer (run-m2.1),
     NOT the diagnostic's own hashes — keep `ai_schema_violation` `artifact_hashes` empty.
+    `ai_hallucinated_source` likewise leaves both EMPTY — a hallucinated id resolves to NO real §4.5
+    span, so the sorted+deduped absent ids ride `payload` (`absent_source_ids`), never `region_ids`.
   - `exp.m2_multihop` binds BOTH routes in ONE experiment — `ExperimentEntry` generalizes singular
     `pipeline` to `pipelines: Vec<Id>` + `baseline_pipeline` (baseline = the `direct_smt` pipeline);
     each route is realized as one registry pipeline (`pipe.m2_*`); one `ckc run` → one `report.json`

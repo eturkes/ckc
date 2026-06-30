@@ -116,15 +116,20 @@
 //!   hex-encoded for a lossless byte round-trip — replay (default) is
 //!   runtime-absent, record ([`cassette::RecordMode`]) gated behind the
 //!   runtime. The model-fill stage ([`model_fill`]) drives it.
-//! - [`model_fill`] — §7.4/§9 model-fill stage core (`stage-model-fill.1`):
+//! - [`model_fill`] — §7.4/§9 model-fill stage core (`stage-model-fill.1`/`.2`):
 //!   [`model_fill::model_fill`] drives the [`cassette::CassetteStore`] (replay
 //!   default / record gated via [`model_fill::FillSource`]), decodes the
-//!   recorded output, and parses it into a route-supplied target
-//!   ([`model_fill::ModelFill`]); a parse/§4-acceptance failure becomes a §7.4
-//!   `ai_schema_violation` in place of a target; it returns the recorded-call
-//!   count under [`model_fill::RECORDED_CALLS_COUNTER`] for the §4.6 event the
-//!   route/run wiring emits (run-m2.1). Target-generic; the route units wire the
-//!   pipeline (no repair loop yet → .2).
+//!   recorded output, and runs the route's §4 acceptance over it
+//!   ([`model_fill::ModelFill`]). A schema/parse rejection
+//!   ([`model_fill::FillReject::Schema`]) becomes a §7.4 `ai_schema_violation`
+//!   and re-prompts under a fresh derived seed up to `repair_limit`, then a
+//!   terminal `repair_limit_exceeded`; a grounding rejection
+//!   ([`model_fill::FillReject::Grounding`]) becomes a terminal
+//!   `ai_hallucinated_source` (a hallucination spends no repair). It accounts the
+//!   recorded-call and repair counts
+//!   ([`model_fill::RECORDED_CALLS_COUNTER`]/[`model_fill::REPAIRS_COUNTER`]) for
+//!   the §4.6 event the route/run wiring emits (run-m2.1). Target-generic; the
+//!   route units wire the pipeline.
 #![forbid(unsafe_code)]
 
 pub mod cassette;

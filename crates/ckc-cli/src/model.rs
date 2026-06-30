@@ -330,16 +330,18 @@ fn resolve_command(env_override: Option<String>) -> String {
     }
 }
 
-/// Per-sample seed for a k-sample draw: `seed_i = f(base_seed, i)`. A
-/// splitmix64 finalizer over `base_seed + i·φ` (the 64-bit golden-ratio odd
-/// constant). Deterministic and reproducible — the cassette re-derives the
-/// same seed for `(base_seed, i)` — while decorrelating sequential `i`, so
-/// adjacent samples seed a runtime's PRNG from unrelated values rather than
-/// the near-duplicates raw adjacent seeds would feed it; whether that turns
-/// into diverse draws is the runtime's decoding mode, out of scope here (see
-/// [`invoke_samples`](ModelAdapter::invoke_samples)). Pure (no env, no
-/// `unsafe`), hence directly unit-tested.
-fn derive_seed(base_seed: u64, i: u32) -> u64 {
+/// Derived seed `seed_i = f(base_seed, i)`, shared by two callers: a k-sample
+/// draw's `i`-th sample (see [`invoke_samples`](ModelAdapter::invoke_samples))
+/// and the model-fill stage's `i`-th repair re-prompt (`crate::model_fill`),
+/// each keying its cassette by the derived seed. A splitmix64 finalizer over
+/// `base_seed + i·φ` (the 64-bit golden-ratio odd constant). Deterministic and
+/// reproducible — the cassette re-derives the same seed for `(base_seed, i)` —
+/// while decorrelating sequential `i`, so adjacent draws seed a runtime's PRNG
+/// from unrelated values rather than the near-duplicates raw adjacent seeds
+/// would feed it; whether that turns into diverse draws is the runtime's
+/// decoding mode, out of scope here. Pure (no env, no `unsafe`), hence directly
+/// unit-tested.
+pub(crate) fn derive_seed(base_seed: u64, i: u32) -> u64 {
     let mut z = base_seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
