@@ -420,7 +420,7 @@ argument).
   BindingStatus + TerminologyBinding test-only); §B's .2b-only imports WITHHELD (would trip clippy
   unused_imports — `#[allow(dead_code)]` covers the dead fn, not dead imports; .2b adds them). Test `single_ir_accept_classifies`: garbage→Schema, empty→Ok, absent-region
   binding→Grounding(≥1). Gate: ckc-cli 200 passed / 3 ignored + fmt + clippy -D clean.] 58% 116K/200K
-- [ ] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
+- [x] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
   GOLDEN cassettes + reproduce-M1 gate test (the route's fill half; model-runtime-absent, z3 not needed).
   PRE-VALIDATED end-to-end (M2.17 prep): the exact run.rs change was written + proven green (`cargo test
   --workspace`; the `single_ir_fill_reproduces_m1_bundles` gate passes — per-doc `IrBundle.content_hash`
@@ -437,9 +437,13 @@ argument).
   in `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`, which .3 reuses). On DONE, `rm
   .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch` in the same commit (both consumed); record
   .2b context-usage. [Decision pinned: model fills ClinicalIR over deterministic upstream — the instrument
-  supplies the grounding scaffold; hallucinated refs are measured, not fatal.] [M2.17 prep (recovery/respec — NOT a .2b WORK-UNIT anchor; replace with the real .2b
-  usage on completion): this validate+respec session used 87% 174K/200K; the redo is apply-and-verify
-  only → lands well under window.]
+  supplies the grounding scaffold; hallucinated refs are measured, not fatal.] [Done: `git apply` of the
+  banked patch landed `single_ir_fill` (extract→segment→`model_fill` Replay under `single_ir_accept` →
+  deterministic tail mirroring `assemble_bundle`, segments-only diagnostics) + `bless_single_ir_cassettes`
+  (`#[ignore]`d) + `single_ir_fill_reproduces_m1_bundles` gate in `run.rs`; blessed 3 golden cassettes
+  (synthetic identity, audit clean); gate green — each per-doc `IrBundle.content_hash` == M1
+  `assemble_bundle` (+ structural payload eq) over all 3 docs; `cargo test --workspace` 432 passed, fmt +
+  clippy -D clean; consumed wip .patch/.txt removed.] 47% 94K/200K
 - [ ] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
   model-runtime-absent). Extend the route: gather .2b's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):

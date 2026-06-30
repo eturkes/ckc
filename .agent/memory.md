@@ -404,10 +404,10 @@ full pre-consolidation text lives in git history.
     `budget_ms`; `documents`/`groups`/`plan` are unread stubs); `resolve()` is NOT reusable (hard-requires
     all 8 stage KINDS + `[Id; 8]`, returns None for the 6-stage single_ir pipeline); the route fn lives in
     `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
-    accept-closure + deterministic-tail + golden-cassette wiring is pre-derived in
-    `.agent/wip-single-ir-fill.patch` (procedure in the sibling `.txt`; both live until route-single-ir.2b) + the roadmap route-single-ir.2/.2b
-    lines; run-m2.1 reuses this minimal-`Resolved` pattern (or generalizes `resolve()` to N stages) for
-    the in-`execute` route loop.
+    accept-closure (`single_ir_accept`) + per-doc fill (`single_ir_fill`: extract→segment→`model_fill`
+    Replay→deterministic tail mirroring `assemble_bundle`) + golden-cassette wiring LANDED in `run.rs`
+    (route-single-ir.2/.2b); run-m2.1 reuses this minimal-`Resolved` pattern (or generalizes `resolve()`
+    to N stages) for the in-`execute` route loop.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output
