@@ -1456,7 +1456,7 @@ mod tests {
     use ckc_core::{
         Action, BindingStatus, CassettePayload, ClinicalStatement, Direction, EventRecord,
         ExceptionClause, ModelIdentity, Strength, TerminologyBinding, TotalOperationResult,
-        read_jsonl,
+        parse_reference, read_jsonl,
     };
 
     use crate::normalize::clinical_ir;
@@ -2243,25 +2243,28 @@ processing_stages:
             .collect()
     }
 
-    /// A minimal [`Resolved`] for the route fill: the bundle `content_hash` gate is
-    /// payload-only, so every field here only stamps producers — any grammatical ids
-    /// and a synthetic toolchain hash serve.
+    /// A minimal [`Resolved`] for the single_ir route over the M1 inputs: the step
+    /// ids are `pipe.m2_single_ir`'s real registry stages, so the route's producer
+    /// stamps (the fill head, the cassette wrapper, the verdict tail) are faithful.
+    /// `documents` / `groups` / `plan` go unread so stay empty and the toolchain hash
+    /// stays synthetic — the bundle `content_hash` gate is payload-only; `budget_ms`
+    /// is exp.m1_scaffold's §8.4 `solver_ms_per_query`, the verdict tail's z3 cap.
     fn single_ir_resolved() -> Resolved {
         Resolved {
             pipeline_id: static_id("pipe.m2_single_ir"),
             pipeline_step_ids: [
-                static_id("processing_stage.m2.extract"),
-                static_id("processing_stage.m2.segment"),
+                static_id("processing_stage.m1.extract"),
+                static_id("processing_stage.m1.segment"),
                 static_id("processing_stage.m2.model_fill"),
                 static_id("processing_stage.m2.assemble"),
-                static_id("processing_stage.m2.compile"),
-                static_id("processing_stage.m2.verify"),
-                static_id("processing_stage.m2.trace"),
-                static_id("processing_stage.m2.report"),
+                static_id("processing_stage.m1.compile"),
+                static_id("processing_stage.m1.verify"),
+                static_id("processing_stage.m1.trace"),
+                static_id("processing_stage.m1.report"),
             ],
             documents: vec![],
             groups: vec![],
-            budget_ms: 0,
+            budget_ms: 10_000,
             plan: RunPlan {
                 experiment_id: static_id("exp.m2_multihop"),
                 test_source_groups: vec![],
@@ -2395,6 +2398,132 @@ processing_stages:
                 "{} content_hash",
                 entry.id
             );
+        }
+    }
+
+    /// route-single-ir.3 — the single_ir route's verdict half over the M1 groups
+    /// (z3 present, model-runtime-absent). Fill each M1 document through
+    /// [`single_ir_fill`] replaying its committed golden cassette, then drive each
+    /// group's member bundles through [`compile_verify_group`] and score the verdicts
+    /// against `corpus/reference/m1_expected.yaml` with the `run_oracle.rs`
+    /// `assert_group_matches_reference` shape. The reproduce-M1 gate proved the route
+    /// bundles equal M1's, so the model-filled clinical layer reaches M1's verdicts —
+    /// the conflict pair contradicts on its deontic query (cross-document unsat core),
+    /// the no-conflict pair closes clean.
+    #[test]
+    fn single_ir_route_scores_m1_groups() {
+        use std::collections::BTreeSet;
+
+        use ckc_smt::VerifierCategory;
+
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let resolved = single_ir_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let adapter = Z3Adapter::new().expect("z3 adapter on PATH");
+
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+        // Fill the three M1 documents once; the two groups share `m1_guideline_a`.
+        let corpus = single_ir_corpus();
+        let a = single_ir_fill(
+            &root, &corpus[0], &lexicon, &store, 42, &resolved, 0, &mut shell,
+        )
+        .expect("guideline_a fill");
+        let b = single_ir_fill(
+            &root, &corpus[1], &lexicon, &store, 42, &resolved, 0, &mut shell,
+        )
+        .expect("guideline_b fill");
+        let control = single_ir_fill(
+            &root, &corpus[2], &lexicon, &store, 42, &resolved, 0, &mut shell,
+        )
+        .expect("control fill");
+
+        let reference = parse_reference(
+            &std::fs::read_to_string(root.join("corpus/reference/m1_expected.yaml")).unwrap(),
+        )
+        .unwrap();
+
+        for (gid, members) in [
+            ("group.m1_conflict", vec![&a, &b]),
+            ("group.m1_no_conflict", vec![&a, &control]),
+        ] {
+            let gid: Id = gid.parse().unwrap();
+            let (compiled, results) = compile_verify_group(
+                &gid,
+                &format!("groups/{gid}"),
+                &members,
+                processing_stage_clock(),
+                &resolved,
+                &adapter,
+                &mut shell,
+            );
+            let compiled = compiled.unwrap_or_else(|| panic!("{gid}: no compiled artifact"));
+            let results = results.unwrap_or_else(|| panic!("{gid}: no verifier results"));
+
+            // The verdict tail stamps `pipe.m2_single_ir`'s real compile and verify steps.
+            assert_eq!(
+                compiled.producer.pipeline_step_id,
+                static_id("processing_stage.m1.compile"),
+                "{gid}"
+            );
+            assert_eq!(
+                results.producer.pipeline_step_id,
+                static_id("processing_stage.m1.verify"),
+                "{gid}"
+            );
+
+            // Score vs the reference (run_oracle's assert_group_matches_reference shape).
+            let entry = reference
+                .iter()
+                .find(|e| e.group_id == gid)
+                .unwrap_or_else(|| panic!("{gid}: no reference entry"));
+            let contradictions: Vec<_> = results
+                .payload
+                .results
+                .iter()
+                .filter(|r| r.category == VerifierCategory::SemanticContradiction)
+                .collect();
+            if entry.expected_outcome == static_id("semantic_contradiction") {
+                assert_eq!(contradictions.len(), 1, "{gid}: exactly one contradiction");
+                let hit = contradictions[0];
+                assert!(
+                    compiled
+                        .payload
+                        .solver_query_plan
+                        .iter()
+                        .any(|p| p.deontic_consistency_query_id == hit.query_id),
+                    "{gid}: the contradiction rides a deontic-consistency query"
+                );
+                assert_eq!(
+                    entry.expected_conflict_kind,
+                    Some(static_id("deontic_direction_conflict")),
+                    "{gid}: a deontic Q2 contradiction is the deontic_direction_conflict kind"
+                );
+                let core: BTreeSet<Id> = hit
+                    .unsat_core
+                    .clone()
+                    .expect("an unsat verdict carries its core")
+                    .into_iter()
+                    .collect();
+                assert_eq!(
+                    core, entry.expected_unsat_core,
+                    "{gid}: unsat core as a set"
+                );
+            } else {
+                assert!(contradictions.is_empty(), "{gid}: no contradiction");
+                assert!(
+                    results
+                        .payload
+                        .results
+                        .iter()
+                        .all(|r| r.category == VerifierCategory::SemanticNoConflict),
+                    "{gid}: every query closed semantic_no_conflict"
+                );
+            }
         }
     }
 }

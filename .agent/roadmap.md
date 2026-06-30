@@ -444,7 +444,7 @@ argument).
   (synthetic identity, audit clean); gate green — each per-doc `IrBundle.content_hash` == M1
   `assemble_bundle` (+ structural payload eq) over all 3 docs; `cargo test --workspace` 432 passed, fmt +
   clippy -D clean; consumed wip .patch/.txt removed.] 47% 94K/200K
-- [ ] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
+- [x] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
   model-runtime-absent). Extend the route: gather .2b's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):
   `pipeline_id = pipe.m2_single_ir`, `pipeline_step_ids: [Id; 8]` with `[4] = processing_stage.m1.compile`
@@ -465,7 +465,18 @@ argument).
   + 500-590 (`compile_verify_group`) + 1044-1085 (`finish_processing_stage`) + 1197-1203 (`producer`);
   `tests/run_oracle.rs` (`assert_group_matches_reference`, `strict_read`); `ProcessingStageClock`/`Shell`/
   `Z3Adapter` construction is pinned above. Gate: `cargo test` (conflict + no-conflict verdicts scored vs
-  `m1_expected` over the golden cassettes, model-runtime-absent); fmt + clippy.
+  `m1_expected` over the golden cassettes, model-runtime-absent); fmt + clippy. [Done: extended the
+  `single_ir_resolved()` helper to the real registry step ids (`pipe.m2_single_ir`'s 8 stages,
+  `[4]`=m1.compile/`[5]`=m1.verify faithful) + `budget_ms` 10_000 (= exp.m1_scaffold
+  `solver_ms_per_query`, the verdict tail's z3 cap; .2b's harmless 0 never ran verify); added
+  `single_ir_route_scores_m1_groups` — per-doc `single_ir_fill` over the 3 golden cassettes
+  (model-runtime-absent) → per-group `compile_verify_group` (real `Z3Adapter`) → verdicts scored vs
+  `m1_expected.yaml` (conflict: exactly one `SemanticContradiction` on a deontic-consistency query +
+  `unsat_core` set-equal; no_conflict: all `SemanticNoConflict`), replicating `run_oracle.rs`'s
+  `assert_group_matches_reference` (separate test binary → uncallable from a run.rs unit test).
+  Test-only unit (no new production fn; run-m2.1 owns the execute-loop + the full head+tail single-
+  `Resolved` wiring). Gate: `cargo test --workspace` 433 passed / 4 ignored + fmt + clippy `-D` clean +
+  run.rs engine-agnostic audit clean.] 88% 177K/200K
 - [ ] route-single-ir.4: rejection paths — §7.4 codes wire through (model-runtime-absent). Prove the route
   ACCEPT closure's `FillReject` → §7.4 mapping end-to-end (model_fill's repair-loop MECHANICS are already
   covered by stage-model-fill.2 — .4 adds only the route-closure coverage). Craft 2 committed bad cassettes
