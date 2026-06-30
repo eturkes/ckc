@@ -273,7 +273,12 @@ full pre-consolidation text lives in git history.
   (no §14 byte-pin → free prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
-- "Oracle" has two senses; the `terms:`/`codex:` cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim one — `runtime-oracle` → `runtime reference` across IDs/types/prose (results are locked measurements, not an authority on real-world truth). Scope: SPEC.md + Rust + registry/corpus/reference data + IDs + config; `docs/` excluded. The commits cite a replacement map whose contents aren't recoverable from git — so "the map omitted generic `oracle`" is inference; what's verifiable is that only runtime-oracle terms were swapped. The TEST-ORACLE sense (authority deciding a test's pass/fail vs. the reference) persists in `run_oracle.rs` (file + `run_oracle_*` fn) and `rules.rs` (`// THE oracle`); those files passed through the sweep commits unrenamed — survival, not a documented approval — and the phrasing recurs in out-of-scope `docs/` ("test oracle"/"SAT oracle"/"perfect oracle") as ordinary technical usage (corroboration, not proof). SPEC.md has zero "oracle"; no instruction mandates global removal (nearest pull: the general "plain operational words over research jargon" line above). Decision: NARROW — leave the test-sense as-is. A global test-sense retirement (`run_oracle.rs`→`run_reference_check.rs`) stays an OPEN user/style call.
+- "Oracle" cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim sense
+  (`runtime-oracle`→`runtime reference`; results are locked measurements, not a real-world-truth authority)
+  across SPEC/Rust/registry/corpus/reference/IDs/config (`docs/` excluded). The TEST-ORACLE sense (deciding
+  a test's pass/fail vs the reference) deliberately persists in `run_oracle.rs` + `rules.rs` (`// THE
+  oracle`). Decision: NARROW — leave the test-sense; a global retirement (`run_oracle.rs`→
+  `run_reference_check.rs`) is an OPEN user/style call.
 - ckc-smt's `serde` dep reads as unused (no `serde::`/`Serialize`/`Deserialize` in ckc-smt/src
   beyond the `fieldless_enum!` invocations) but is REQUIRED: that ckc-core macro expands to
   `::serde::Serialize`/`Deserialize` impls *in the caller's crate*, so every fieldless_enum! user
@@ -362,6 +367,21 @@ full pre-consolidation text lives in git history.
     share ONE iteration granularity — `derive_norm_ir`/`assemble` are per-document (N×),
     `compile`/`verify` per-group (1× fan-in), so they cannot be one linear fn; conflating
     granularities forced a full-session design re-derivation. Check stage granularity at plan time.
+    Route→tail wiring (agent-confirmed, route-single-ir respec `git show` the split commit): a route
+    feeds the M1 `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` — that fn reads
+    only `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
+    `budget_ms`; `documents`/`groups`/`plan` are unread stubs. `resolve()` is NOT reusable (it
+    hard-requires all 8 stage KINDS + an `[Id; 8]`, returns None for the 6-stage single_ir pipeline). The
+    route fn lives in `run.rs` (`Resolved` + `compile_verify_group` are private to `mod run`). Accept
+    closure T = `ClinicalIr` (parse via `read_strict_canonical` → `Schema`; grounding pre-check mirrors
+    `bundle.validate` steps 4+5 = bindings/exceptions `region_ids` + statement `source_segment_ids` →
+    `Grounding`); `derive_norm_ir`+`assemble`+`validate` is the route's POST-acceptance deterministic tail,
+    NOT part of model-output acceptance (so no dev-only `jsonschema` runtime dep). A golden cassette built
+    from `canonical_payload_bytes(&clinical_ir(...))` round-trips byte-identically, so the route's bundle ==
+    the M1 bundle by `content_hash` (payload-only → producer-independent), making verdict scoring a reuse of
+    M1's pinned result. CRAFTED fixtures (golden + bad cassettes) carry SYNTHETIC `model_identity` and ARE
+    audited (only LIVE-recorded cassettes are exempt). run-m2.1 reuses this minimal-`Resolved` pattern (or
+    generalizes `resolve()` to N stages) for the in-`execute` route loop.
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output
