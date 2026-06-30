@@ -449,7 +449,7 @@ argument).
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):
   `pipeline_id = pipe.m2_single_ir`, `pipeline_step_ids: [Id; 8]` with `[4] = processing_stage.m1.compile`
   + `[5] = processing_stage.m1.verify` (.3's tail reads only `[4]`/`[5]`; the FULL route ALSO needs .2's real
-  `[0]`/`[1]`/`[3]` — when .3 wires .2's head + this tail through one `Resolved`, only `[2]`/`[6]`/`[7]` stay
+  `[0]`/`[1]`/`[2]`/`[3]` — when run-m2.1 wires .2's head + this tail through one `Resolved`, only `[6]`/`[7]` stay
   placeholder), `toolchain_manifest_hash`
   (real), `budget_ms`; the tail never reads `documents: vec![]`, `groups: vec![]`, `plan: RunPlan{
   experiment_id, test_source_groups: vec![], pipelines: vec![], seed, budget: vec![]}`. Per group call
