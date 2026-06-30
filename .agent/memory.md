@@ -175,8 +175,9 @@ full pre-consolidation text lives in git history.
   §7.4 code AND repair-vs-terminal: `Schema(reason)` → `ai_schema_violation` and RE-PROMPTS under
   `derive_seed(base, attempt)` (each attempt its own derived-seed cassette) up to `repair_limit`, then
   terminal `repair_limit_exceeded`; `Grounding(absent)` → terminal `ai_hallucinated_source`, spends NO
-  repair. The stage trusts the closure verbatim → a route returns `Grounding` only with ≥1 absent id (empty
-  → a meaningless empty-`absent_source_ids` diagnostic; enforce route-side, route-single-ir codex note). A
+  repair. The stage ASSERTS the closure's `Grounding` carries ≥1 absent id (empty = a deterministic route
+  bug → fail-closed panic, house `expect`/`unreachable` style, not a silent empty-`absent_source_ids`
+  diagnostic); route-single-ir still enforces route-side too (defense-in-depth, M2.14 codex follow-up). A
   cassette IO/contract failure stays `Err(CassetteError)`, DISTINCT (route tells a broken recording from a
   bad model output). Two §7.3 counters both surfaced so run-m2.1 emits both without re-deriving:
   `RECORDED_CALLS_COUNTER="recorded_calls"` (one per attempt), `REPAIRS_COUNTER="repairs"`
@@ -184,9 +185,10 @@ full pre-consolidation text lives in git history.
   is index-coupled (`PROCESSING_STAGE_KINDS[index]`/`pipeline_step_ids[index]`) → run-m2.1 generalizes
   emission + builds the §4.6 event from the counters. `derive_seed` is pub(crate) (shared: k-sample draws +
   repair re-prompts). `CassetteStore::{build_wrapper, persist}` → pub(crate) so the stage (+ its tests) seed
-  cassettes through the store's own contract-valid builder. Tests = replay-only (7): valid (0 repairs),
+  cassettes through the store's own contract-valid builder. Tests = replay-only (8): valid (0 repairs),
   schema→repair→recover, repair_limit_exceeded, zero-budget exhaust, hallucinated-terminal, grounding-on-
-  repair (multi-id sort+dedup), missing-cassette → `Io`. The `Record` arm is type-enforced thin delegation
+  repair (multi-id sort+dedup), missing-cassette → `Io`, empty-grounding → panic (should_panic). The
+  `Record` arm is type-enforced thin delegation
   to `store.record` (a mis-wired arm cannot compile; `record`'s subprocess plumbing is cassette-layer,
   live-bless-validated), so the shared decode→accept path is covered via `Replay` — no stub-runtime test
   duplicated here. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,

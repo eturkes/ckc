@@ -355,7 +355,11 @@ argument).
   cross-unit + field-convention decisions in memory (`Model-fill stage core` + `DiagnosticRecord field
   convention` bullets). [Done: reproduction-only redo (salvage restored byte-exact dab2be9e…, then deleted);
   synced the lib.rs `model_fill` module doc + memory to .2; gate green 426 passed / 3 ignored + fmt + clippy
-  `-D warnings` clean.] 58% 116K/200K
+  `-D warnings` clean.] 58% 116K/200K Codex-review hardened: the stage now ASSERTS its `Grounding` carries
+  ≥1 absent id (empty = a deterministic route bug → fail-closed panic, house `expect`/`unreachable` style,
+  not a silent empty-id diagnostic; route-single-ir still enforces route-side as defense-in-depth) + softened
+  two over-claimed "distinct committed cassette" docs (provably distinct across repairs; collision-negligible,
+  not structurally excluded, against the base seed). +empty-grounding `should_panic` test.
 - [ ] route-single-ir: `single_ir@ClinicalIR` route + pipeline. Seed `pipe.m2_single_ir`
   `PipelineEntry` (`candidates.yaml`: deterministic extract+segment → `model_fill`(target=ClinicalIR,
   schema=`clinical_ir`) → assemble `IrBundle` → bundle-validate → the run-refactor tail; stage chain

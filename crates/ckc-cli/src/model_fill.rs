@@ -20,8 +20,9 @@
 //!   (a hallucination is not a schema defect, so it does not consume repairs).
 //!
 //! Each attempt is one recorded model call keyed by its own seed (attempt 0 = the
-//! base seed, repair `i` = `derive_seed(base, i)`), so a repair sequence replays
-//! as distinct committed cassettes. The stage accounts both
+//! base seed, repair `i` = `derive_seed(base, i)`), so each attempt keys its own
+//! committed cassette (distinct across repairs by construction;
+//! collision-negligible against the base seed). The stage accounts both
 //! [`recorded_calls`](ModelFill::recorded_calls) and [`repairs`](ModelFill::repairs)
 //! for the §7.3 metrics; the route/run wiring (run-m2.1) builds the §4.6 event
 //! from them ([`RECORDED_CALLS_COUNTER`]/[`REPAIRS_COUNTER`]). A cassette
@@ -126,7 +127,8 @@ pub fn model_fill<T>(
     let mut attempt: u32 = 0;
     loop {
         // Attempt 0 reads the base key directly; each repair re-prompts under a
-        // fresh derived seed, so its cassette is a distinct committed file.
+        // fresh derived seed, so it reads its own committed cassette (distinct
+        // across repairs by construction; collision-negligible against the base).
         let seed = if attempt == 0 {
             key.seed
         } else {
@@ -205,10 +207,16 @@ fn ai_schema_violation(reason: String) -> DiagnosticRecord {
 /// upstream ids absent from the deterministic upstream. Outcome `invalid`; the
 /// sorted absent ids ride the payload. They stay OUT of `region_ids` — §4.5
 /// requires those to resolve to real source spans, and a hallucinated id resolves
-/// to none.
+/// to none. Asserts ≥1 absent id: a route's `Grounding` rejection must name the
+/// hallucinated ids, so an empty set is a deterministic route bug (not a model
+/// condition) — fail-closed rather than emit a meaningless empty-id diagnostic.
 fn ai_hallucinated_source(mut absent: Vec<Id>) -> DiagnosticRecord {
     absent.sort();
     absent.dedup();
+    assert!(
+        !absent.is_empty(),
+        "route acceptance contract: a Grounding rejection names ≥1 absent id"
+    );
     let joined = absent
         .iter()
         .map(|id| id.to_string())
@@ -488,6 +496,24 @@ mod tests {
             vec![(static_id("absent_source_ids"), "seg.7 seg.9".to_owned())]
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // The route's `Grounding` rejection must name ≥1 absent id (§4.5: a
+    // hallucination resolves to no real span). An empty set is a deterministic
+    // route bug, not a model condition, so the stage fails closed (asserts)
+    // rather than emit a meaningless empty-id `ai_hallucinated_source`. The temp
+    // dir leaks on the panic; `temp_store` removes-before-create, so reruns are
+    // unaffected.
+    #[test]
+    #[should_panic(expected = "absent id")]
+    fn empty_grounding_rejection_panics() {
+        let (store, _dir) = temp_store("emptyground");
+        let k = key();
+        seed_cassette(&store, &k, br#"{"ok":true}"#);
+        let accept = |_: &[u8]| -> Result<serde_json::Value, FillReject> {
+            Err(FillReject::Grounding(Vec::new()))
+        };
+        let _ = model_fill(&store, &k, FillSource::Replay, 2, accept);
     }
 
     // A missing recording is a store error, not a schema violation — the two
