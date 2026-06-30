@@ -17,8 +17,8 @@ imports, `single_ir_accept`'s `#[allow(dead_code)]`, a `write_single_ir_cassette
 - `git apply .agent/wip-single-ir-fill.patch` re-applies CLEAN to HEAD (verified after revert).
 - After apply + bless, `cargo test --workspace` GREEN; the gate test
   `single_ir_fill_reproduces_m1_bundles` PASSES — each per-doc `IrBundle.content_hash` EQUALS the M1
-  `assemble_bundle` bundle (payload-only hash ⇒ producer-independent; self-checking, so a wrong tail
-  fails LOUDLY) AND `route.payload == m1.payload` structurally. (Re-confirm exact pass counts at redo;
+  `assemble_bundle` bundle (payload-only hash ⇒ producer-independent; self-checking over the 3 golden
+  docs, so a wrong tail fails LOUDLY on any divergence they exercise) AND `route.payload == m1.payload` structurally. (Re-confirm exact pass counts at redo;
   the self-checking gate, not the count, is the guarantee.)
 - fmt + clippy (`-D warnings`) clean; engine-agnostic audit on the new cassettes clean.
 
@@ -29,16 +29,21 @@ imports, `single_ir_accept`'s `#[allow(dead_code)]`, a `write_single_ir_cassette
 3. Gate (the reproduce-M1 test runs here):  `cargo test --workspace`
 4. Engine-agnostic audit — the new cassettes carry SYNTHETIC identity so they ARE audited (only
    live-recorded route.fixture/ is exempt). Cassettes are still untracked here → use the filesystem
-   `rg` form (git grep sees only tracked files). Proven clean this session, expect exit 1:
-   `/usr/bin/rg --no-ignore -niP '\b(llama|vllm|ollama|exllama|exllamav2|mlc|ctranslate2?|tensorrt|sglang|lmdeploy|gpt4all|kobold(cpp)?|ggml|gguf|safetensors|awq|gptq|exl2|gbnf|lark|qwen|mistral|gemma|deepseek|vicuna|bf16|fp16|fp8|int4|int8|nf4|q[2-8]_[0-9km])\b' crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/`
+   `rg` form (git grep sees only tracked files). Proven clean this session, expect exit 1 (no match).
+   Engine/dialect/format names are case-insensitive `(?i:...)`; the quant token is case-SENSITIVE
+   lowercase `\bq[2-8](_[0-9km])?\b`, so it catches bare `q4` yet skips the `Q1`/`Q2` SMT labels:
+   `/usr/bin/rg --no-ignore -nP '(?i:\b(llama|vllm|ollama|exllama|exllamav2|mlc|ctranslate2?|tensorrt|sglang|lmdeploy|gpt4all|kobold(cpp)?|ggml|gguf|safetensors|awq|gptq|exl2|gbnf|lark|qwen|mistral|gemma|deepseek|vicuna|bf16|fp16|fp8|int4|int8|nf4)\b)|\bq[2-8](_[0-9km])?\b' crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/`
    (Canonical full-repo form + rationale: memory "Engine-agnostic DELIVERABLE".)
 5. `cargo fmt --all --check`  +  `cargo clippy --workspace --all-targets -- -D warnings`
 
 ## Close-out
-- `git add` run.rs + the 3 cassettes; `rm .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch`
-  IN THE SAME COMMIT (both consumed).
-- Record .2b context-usage (`.agent/context.sh`) into the roadmap .2b line; mark .2b DONE
-  (M2 stays IN-PROGRESS — .3/.4 + run-m2.* remain).
+- Stage the work, then stage the consumed-file DELETIONS with `git rm` (a plain `rm` leaves them
+  unstaged → dirty tree after commit):
+  `git add crates/ckc-cli/src/run.rs crates/ckc-cli/tests/fixtures/cassettes/route.single_ir/`
+  `git rm .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch`
+  then `git status --short` to confirm only the intended set is staged + nothing is left dirty.
+- REPLACE the M2.17-prep context note in the roadmap .2b line with the REAL .2b usage
+  (`.agent/context.sh`); mark .2b DONE (M2 stays IN-PROGRESS — .3/.4 + run-m2.* remain).
 - Commit `route (M2.17): single_ir_fill + 3 golden cassettes + reproduce-M1 gate`.
 
 ## If the patch fails to apply (only if run.rs changed since M2.17 prep)

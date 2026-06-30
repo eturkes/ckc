@@ -418,14 +418,13 @@ argument).
   test copied verbatim, every confirmed signature/field held (one `ir.rs` read for `TerminologyBinding`
   fields). Imports = .2's subset only (HashSet + ClinicalIr module-level, FillReject from crate::model_fill,
   BindingStatus + TerminologyBinding test-only); §B's .2b-only imports WITHHELD (would trip clippy
-  unused_imports — `#[allow(dead_code)]` covers the dead fn, not dead imports; .2b adds them per wip §B "add
-  whichever are missing"). Test `single_ir_accept_classifies`: garbage→Schema, empty→Ok, absent-region
+  unused_imports — `#[allow(dead_code)]` covers the dead fn, not dead imports; .2b adds them). Test `single_ir_accept_classifies`: garbage→Schema, empty→Ok, absent-region
   binding→Grounding(≥1). Gate: ckc-cli 200 passed / 3 ignored + fmt + clippy -D clean.] 58% 116K/200K
 - [ ] route-single-ir.2b: `single_ir_fill` (per-doc fill pipeline, consumes .2's `single_ir_accept`) + 3
   GOLDEN cassettes + reproduce-M1 gate test (the route's fill half; model-runtime-absent, z3 not needed).
   PRE-VALIDATED end-to-end (M2.17 prep): the exact run.rs change was written + proven green (`cargo test
   --workspace`; the `single_ir_fill_reproduces_m1_bundles` gate passes — per-doc `IrBundle.content_hash`
-  EQUALS the M1 `assemble_bundle` bundle, payload-only hash ⇒ producer-independent, self-checking so a wrong
+  EQUALS the M1 `assemble_bundle` bundle, payload-only hash ⇒ producer-independent, self-checking over the 3 golden docs so a wrong
   tail fails LOUDLY; fmt + clippy + audit clean), then REVERTED + banked as `.agent/wip-single-ir-fill.patch`.
   Redo = apply + bless + gate + commit, ZERO re-derivation — full procedure in
   `.agent/wip-single-ir-fill.txt`: `git apply .agent/wip-single-ir-fill.patch` → bless the 3 cassettes
@@ -438,8 +437,9 @@ argument).
   in `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`, which .3 reuses). On DONE, `rm
   .agent/wip-single-ir-fill.txt .agent/wip-single-ir-fill.patch` in the same commit (both consumed); record
   .2b context-usage. [Decision pinned: model fills ClinicalIR over deterministic upstream — the instrument
-  supplies the grounding scaffold; hallucinated refs are measured, not fatal.] [M2.17 prep: this
-  validate+respec session used 87% 174K/200K; the redo is apply-and-verify only → lands well under window.]
+  supplies the grounding scaffold; hallucinated refs are measured, not fatal.] [M2.17 prep (recovery/respec — NOT a .2b WORK-UNIT anchor; replace with the real .2b
+  usage on completion): this validate+respec session used 87% 174K/200K; the redo is apply-and-verify
+  only → lands well under window.]
 - [ ] route-single-ir.3: per-group verdict tail + reference scoring (the route's verdict half; z3 present,
   model-runtime-absent). Extend the route: gather .2b's per-doc bundles for a group's test_sources, then
   hand-build a MINIMAL `Resolved` (NO refactor — `compile_verify_group` reads only 5 fields, agent-confirmed):
