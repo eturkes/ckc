@@ -42,7 +42,7 @@ use ckc_core::{
     content_hash, hash_bytes, parse_candidates, parse_corpora, parse_experiments,
     read_strict_canonical,
 };
-use ckc_smt::{VerifierResults, Z3Adapter, compile, verify};
+use ckc_smt::{QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify};
 
 use crate::cassette::{CassetteKey, CassetteStore};
 use crate::extract::{ExtractConfig, extract};
@@ -833,6 +833,171 @@ fn single_ir_fill(
             None
         }
     }
+}
+
+/// The direct_smt route's acceptance check: shallow SMT well-formedness only —
+/// valid UTF-8 with a `(set-logic ...)` head and a `(check-sat)` command — mapping
+/// any shortfall to a repairable [`FillReject::Schema`]. Unlike [`single_ir_accept`]
+/// there is no [`FillReject::Grounding`]: the direct route emits SMT over the raw
+/// guideline text and carries no source linkage, so the solver is the syntactic
+/// authority — a well-formed-but-unparseable query surfaces as `target_syntax_failure`
+/// at verify (route-direct-smt.5), never here.
+#[allow(dead_code)]
+fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
+    |bytes| {
+        let text = std::str::from_utf8(bytes)
+            .map_err(|e| FillReject::Schema(format!("not utf-8: {e}")))?;
+        if !text.trim_start().starts_with("(set-logic") {
+            return Err(FillReject::Schema(
+                "expected a (set-logic ...) head".to_owned(),
+            ));
+        }
+        if !text.contains("(check-sat)") {
+            return Err(FillReject::Schema(
+                "expected a (check-sat) command".to_owned(),
+            ));
+        }
+        Ok(text.to_owned())
+    }
+}
+
+/// The direct_smt route's per-group fill back end: extract + segment each member for
+/// provenance (references ungrounded — the direct route emits raw SMT, not an IR),
+/// then replay the group's two committed model cassettes through [`model_fill`] under
+/// [`direct_smt_accept`] — the overlap query keyed under `<gid>.overlap`, the deontic
+/// query under `<gid>.deontic`, both at the base seed. The sources are role-namespaced
+/// so a Q2 repair never aliases Q1's: [`model_fill`] reads attempt `i` under
+/// `derive_seed(base, i)` on the one source, so a shared source would collide. Each
+/// accepted body is wrapped as an `smt_query` [`ArtifactWrapper`] carrying the raw
+/// model output ([`Origin::AiGenerated`] + [`EvidenceStatus::AcceptedEvidenceStatus`],
+/// no external effects and no deterministic transform — distinct from single_ir's
+/// mechanical `ir_bundle`). Returns the pair's two wrappers (each `content_hash` is what
+/// the verdict tail cites as its `verify_smt` input) or `None` on a recorded failure;
+/// wired into the experiment run by run-m2.1.
+#[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
+fn direct_smt_fill(
+    root: &Path,
+    gid: &Id,
+    members: &[&CorpusEntry],
+    store: &CassetteStore,
+    seed: u64,
+    resolved: &Resolved,
+    repair_limit: u32,
+    shell: &mut Shell,
+) -> Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)> {
+    // Provenance inputs: extract + segment each member (the M1-chain head, references
+    // ungrounded). The wrapper cites these in member order; provenance-only, so they do
+    // not reach the payload-only `content_hash`.
+    let mut input_hashes: Vec<Hash> = Vec::new();
+    for entry in members {
+        let html = match std::fs::read(root.join(&entry.path)) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("file"), entry.path.clone()),
+                    (static_id("reason"), format!("read {}: {e}", entry.path)),
+                ]));
+                return None;
+            }
+        };
+        let config = ExtractConfig {
+            document_id: entry.id.clone(),
+            source_family: static_id("synthetic_test_source_html"),
+            provenance: entry.provenance,
+            data_class: DataClass::None,
+            producer: producer(resolved, 0),
+        };
+        let source = match extract(&html, &config) {
+            Ok(source) => source,
+            Err(e) => {
+                shell.diagnostic(processing_stage_diagnostic(
+                    0,
+                    "document",
+                    &entry.id,
+                    e.to_string(),
+                ));
+                return None;
+            }
+        };
+        let segments = match segment(&source, &producer(resolved, 1)) {
+            Ok(segments) => segments,
+            Err(e) => {
+                shell.diagnostic(processing_stage_diagnostic(
+                    1,
+                    "document",
+                    &entry.id,
+                    e.to_string(),
+                ));
+                return None;
+            }
+        };
+        input_hashes.push(source.content_hash.clone());
+        input_hashes.push(segments.content_hash.clone());
+    }
+
+    // Replay the pair's two role-namespaced cassettes at the base seed, wrapping each
+    // shallow-accepted body as the raw-AI `smt_query` the verdict tail consumes.
+    let mut pair: Vec<ArtifactWrapper<QueryBody>> = Vec::new();
+    for (role, logic) in [("overlap", SmtLogic::QfLra), ("deontic", SmtLogic::QfUf)] {
+        let source = static_id(&format!("{gid}.{role}"));
+        let key = CassetteKey {
+            route: static_id("route.direct_smt"),
+            source: source.clone(),
+            seed,
+        };
+        let fill = match model_fill(
+            store,
+            &key,
+            FillSource::Replay,
+            repair_limit,
+            direct_smt_accept(),
+        ) {
+            Ok(fill) => fill,
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("cassette"), source.to_string()),
+                    (static_id("reason"), e.to_string()),
+                    (static_id("processing_stage"), "model_fill_smt".to_owned()),
+                ]));
+                return None;
+            }
+        };
+        // Surface §7.4 fill diagnostics (schema violations, repair-limit), then a
+        // terminal reject (no accepted target) ends the route.
+        for diagnostic in &fill.diagnostics {
+            shell.diagnostic(diagnostic.clone());
+        }
+        let body = fill.target?;
+        let payload = QueryBody {
+            query_id: source,
+            logic,
+            body,
+        };
+        match wrapper(
+            format!("{gid}.{role}.smt_query"),
+            "smt_query",
+            producer(resolved, 2),
+            input_hashes.clone(),
+            Origin::AiGenerated,
+            EvidenceStatus::AcceptedEvidenceStatus,
+            Vec::new(),
+            payload,
+        ) {
+            Ok(wrapped) => pair.push(wrapped),
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("cassette"), format!("{gid}.{role}")),
+                    (static_id("reason"), format!("content hash: {e}")),
+                ]));
+                return None;
+            }
+        }
+    }
+    let mut pair = pair.into_iter();
+    let overlap = pair.next().expect("overlap query wrapped");
+    let deontic = pair.next().expect("deontic query wrapped");
+    Some((overlap, deontic))
 }
 
 /// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1
@@ -3063,6 +3228,104 @@ processing_stages:
                     wrapper.payload.output_bytes().unwrap(),
                     qbodies[i].body.as_bytes(),
                     "{gid}.{role}"
+                );
+            }
+        }
+    }
+
+    /// route-direct-smt.3b — the direct_smt route reconstructs the M1 query bodies
+    /// (model-runtime-absent). For every `exp.m1_scaffold` group, [`direct_smt_fill`]
+    /// replays the committed golden cassettes and rewraps the pair; each `QueryBody`
+    /// body matches the freshly-compiled M1 body byte-for-byte, carrying the minted
+    /// `<gid>.<role>` id, the role's logic, and the pinned raw-AI `smt_query`
+    /// provenance the verdict tail (route-direct-smt.4) cites.
+    #[test]
+    fn direct_smt_fill_reproduces_m1_query_bodies() {
+        use std::collections::BTreeMap;
+
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+
+        // The M1 reference bodies, and the corpus entries keyed by test_source id so the
+        // route's members resolve from `exp.m1_scaffold` (never a hardcoded membership).
+        let refs = m1_reference_query_bodies(&root, &lexicon);
+        let corpus: BTreeMap<Id, CorpusEntry> = single_ir_corpus()
+            .into_iter()
+            .map(|entry| (entry.id.clone(), entry))
+            .collect();
+
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold");
+
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+        for group in &exp.test_source_groups {
+            let gid = group.group_id.clone();
+            let members: Vec<&CorpusEntry> = group
+                .test_sources
+                .iter()
+                .map(|s| {
+                    corpus
+                        .get(s)
+                        .unwrap_or_else(|| panic!("{gid}: unknown member {s}"))
+                })
+                .collect();
+            let (overlap, deontic) =
+                direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell)
+                    .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+
+            let want = &refs
+                .iter()
+                .find(|(g, _)| *g == gid)
+                .unwrap_or_else(|| panic!("{gid}: no reference query bodies"))
+                .1;
+
+            assert_eq!(overlap.payload.body, want[0].body, "{gid} overlap body");
+            assert_eq!(
+                overlap.payload.query_id,
+                static_id(&format!("{gid}.overlap")),
+                "{gid} overlap id"
+            );
+            assert_eq!(
+                overlap.payload.logic,
+                SmtLogic::QfLra,
+                "{gid} overlap logic"
+            );
+            assert_eq!(deontic.payload.body, want[1].body, "{gid} deontic body");
+            assert_eq!(
+                deontic.payload.query_id,
+                static_id(&format!("{gid}.deontic")),
+                "{gid} deontic id"
+            );
+            assert_eq!(deontic.payload.logic, SmtLogic::QfUf, "{gid} deontic logic");
+
+            // The pinned raw-AI `smt_query` provenance: `validate()` enforces only the
+            // effects↔status rule, so pin origin / status / kind / producer here.
+            for w in [&overlap, &deontic] {
+                assert_eq!(w.artifact_kind, static_id("smt_query"), "{gid} kind");
+                assert_eq!(w.schema_id, static_id("schema.smt_query"), "{gid} schema");
+                assert_eq!(w.origin, Origin::AiGenerated, "{gid} origin");
+                assert_eq!(
+                    w.evidence_status,
+                    EvidenceStatus::AcceptedEvidenceStatus,
+                    "{gid} status"
+                );
+                assert!(w.external_effects.is_empty(), "{gid} effects");
+                assert_eq!(
+                    w.producer.pipeline_step_id,
+                    static_id("processing_stage.m2.model_fill_smt"),
+                    "{gid} producer"
                 );
             }
         }

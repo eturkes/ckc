@@ -606,7 +606,7 @@ argument).
   `private_intra_doc_links` errors across model.rs/cassette.rs/run.rs (public items link to private
   consts/fns) — accumulated across earlier M2 units whose test/fmt/clippy gate skips rustdoc; fix pattern =
   plain code ticks per memory doc-lint bullet.] 70% 140K/200K
-- [ ] route-direct-smt.3b: `direct_smt_accept` + `direct_smt_fill` (needs .3a — its `direct_smt_resolved` +
+- [x] route-direct-smt.3b: `direct_smt_accept` + `direct_smt_fill` (needs .3a — its `direct_smt_resolved` +
   committed cassettes). Cassette-CONSUME half. `direct_smt_accept() -> impl Fn(&[u8]) -> Result<String,
   FillReject>` = shallow well-formedness ONLY (utf8 + `(set-logic` head + `(check-sat)`) → `FillReject::Schema`,
   NO grounding (the solver is the syntactic authority, `target_syntax_failure` at verify, .5). `direct_smt_fill`
@@ -621,7 +621,21 @@ argument).
   SmtLogic` to the `use ckc_smt` import. Reading: `.agent/wip-direct-smt.txt` (blueprint — VERIFY-read only its
   flagged .3b anchors v5-v8). Gate: `cargo test` — `direct_smt_fill_reproduces_m1_query_bodies` (fill every
   group via Replay over .3a's cassettes → each `QueryBody.body` == the M1 body byte-faithful, `query_id`/`logic`
-  correct, + the pinned smt_query provenance (`Origin::AiGenerated`, `AcceptedEvidenceStatus`, empty effects, `artifact_kind`/`schema_id` = smt_query, producer step `m2.model_fill_smt`)); fmt + clippy `-D`; engine-agnostic audit clean. CLOSE: `rm .agent/wip-direct-smt.txt`.
+  correct, + the pinned smt_query provenance (`Origin::AiGenerated`, `AcceptedEvidenceStatus`, empty effects, `artifact_kind`/`schema_id` = smt_query, producer step `m2.model_fill_smt`)); fmt + clippy `-D`; engine-agnostic audit clean. CLOSE: `rm .agent/wip-direct-smt.txt`. [Done: `direct_smt_accept`
+  (shallow SMT well-formedness → `FillReject::Schema`: utf8 + `(set-logic` head + `(check-sat)`, NO
+  grounding) + `direct_smt_fill` (per-group: extract+segment each member for provenance input_hashes, two
+  `model_fill` Replay under role-namespaced sources `<gid>.overlap`/`<gid>.deontic` at base seed, each accepted
+  body wrapped as an `smt_query` `ArtifactWrapper<QueryBody>` — `Origin::AiGenerated` + `AcceptedEvidenceStatus`
+  + empty effects, the novel raw-AI provenance) landed in run.rs after `single_ir_fill` (both
+  `#[allow(dead_code)]` until run-m2.1), mirroring `single_ir_fill`'s diagnostic surfacing + Err/target-None
+  handling. `use ckc_smt` now imports `QueryBody`/`SmtLogic` (referenced in the lib build → `.3a`'s
+  fully-qualified test refs stay valid, no churn). Gate: `direct_smt_fill_reproduces_m1_query_bodies` replays
+  `.3a`'s 4 golden cassettes per exp.m1_scaffold group → each `QueryBody.body` == freshly-compiled M1 body,
+  `query_id`=`<gid>.<role>`, `logic`=QfLra/QfUf, + pinned provenance (kind/schema smt_query, `AiGenerated`,
+  `AcceptedEvidenceStatus`, empty effects, producer `m2.model_fill_smt`); `cargo test --workspace` 438 passed
+  / 6 ignored (was 437/6); fmt + clippy `-D` + engine-agnostic audit (run.rs) clean. Pre-existing rustdoc
+  `private_intra_doc_links` debt unchanged (new fns are private → the lint doesn't fire on them; deferred to
+  M2 review). wip blueprint consumed + removed.] 75% 151K/200K
 - [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3b). NEW tail fn (its own fn,
   NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
   pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3b's Q1+Q2 bodies (minted ids

@@ -479,6 +479,19 @@ full pre-consolidation text lives in git history.
     cites the UPSTREAM artifact hash (single_ir: `compiled.content_hash`), so direct wraps each fill body as an
     `smt_query` `ArtifactWrapper<QueryBody>` (Canonical+CanonRead) and `verifier_results` cite those two
     `content_hash`es — the CASSETTE hash is fill-wrapper provenance deferred to run-m2.1 (both routes).
+    LANDED (route-direct-smt.3a golden cassettes + .3b fill) in run.rs beside single_ir's: `direct_smt_accept`
+    (shallow SMT well-formedness = utf8 + `(set-logic` head + `(check-sat)`, `FillReject::Schema` only, NO
+    grounding — the solver is the syntactic authority) + per-group `direct_smt_fill` (extract+segment each
+    member for provenance input_hashes, two `model_fill` Replay under role-namespaced sources
+    `<gid>.overlap`/`<gid>.deontic` at the base seed, wrap each accepted body as an `smt_query`
+    `ArtifactWrapper<QueryBody>`). NOVEL raw-AI provenance (distinct from single_ir's ir_bundle
+    `DeterministicCompiler`/`MechanicalEvidenceStatus`): the smt_query IS the raw model body, only
+    shallow-accepted (no deterministic transform, no source linkage) → `Origin::AiGenerated` +
+    `EvidenceStatus::AcceptedEvidenceStatus` + EMPTY external effects. Why consistent: `wrapper()` forces
+    effects=`[]`, and `validate()` enforces ONLY the effects↔status rule (non-empty effects ⇒
+    `EvidenceDiscoveryOnly`), so empty-effects PERMITS an Accepted status; it does NOT check origin/status/kind
+    → the `direct_smt_fill_reproduces_m1_query_bodies` test pins origin/status/kind/schema/producer explicitly.
+    Keep this shape (do not "fix" Accepted→DiscoveryOnly or add effects).
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output
