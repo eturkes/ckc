@@ -575,34 +575,39 @@ argument).
   Q1-sat/Q2-unsat (`:named a.<id>`) → one `SemanticContradiction` carrying the cross-doc core; Q1-unsat →
   Q1 result only, no Q2. Gate: `cargo test -p ckc-smt` 60 passed + `cargo test --workspace` 436/5 + fmt +
   clippy `-D` clean.] 69% 139K/200K
-- [ ] route-direct-smt.3: `direct_smt_accept` + `direct_smt_fill` + GOLDEN cassettes + bless helper (the
-  route's fill half; model-runtime-absent, z3 not needed; needs .1). `direct_smt_accept() -> impl Fn(&[u8])
-  -> Result<String, FillReject>`: shallow well-formedness only (utf8 + query-shaped: a `(set-logic` head +
-  `(check-sat)`) → a gross violation is `FillReject::Schema` (NO grounding — the direct route has none; the
-  solver is the real syntactic authority, surfaced as `target_syntax_failure` at verify, .5). `direct_smt_fill`
-  runs PER GROUP (a conflict pair spans 2 docs): extract+segment each member (parity/context with single_ir,
-  the reused deterministic head; refs left UNgrounded), then two `model_fill(store, &key, FillSource::Replay,
-  repair_limit, accept)` (`model_fill.rs` L119) replays under ROLE-NAMESPACED sources at the base seed — Q1
-  `key = CassetteKey { route: static_id("route.direct_smt"), source: <group_id>.overlap, seed: base }`, Q2
-  `source: <group_id>.deontic, seed: base` (NOT a shared `source: <group_id>` + Q2 `seed: derive_seed(base,1)`:
-  `model_fill` reads repair attempt `i` under `derive_seed(base, i)` on the SAME source [`model_fill.rs`
-  L132-136], so a shared-source Q2 at `derive_seed(base,1)` would ALIAS Q1's first repair — .5 drives that
-  repair). Each accepted body is WRAPPED as an `smt_query` artifact (`wrapper(…, "smt_query", producer(resolved,
-  2), [source, segments] hashes, …)`, payload `ckc_smt::QueryBody` — Canonical+CanonRead, artifact.rs L52-78;
-  mirror `single_ir_fill`'s ir_bundle wrapper run.rs L820) → `direct_smt_fill` RETURNS the pair's two
-  `ArtifactWrapper<QueryBody>` (each `content_hash` is what .4 cites as the `verify_smt` input). GOLDEN cassette
-  bytes = the group's M1 emitted query bodies VERBATIM (bless from `compile()`'s `query_bodies[2k]` [overlap] /
-  `[2k+1]` [deontic], so the `:named a.<rule_id>` labels == the reference `expected_unsat_core` → .4 scores);
-  SCORED parity thus rides the golden/replay bytes (M1-faithful by construction), while live prompt-driven
-  label correctness is the baseline's own MEASURED (unguaranteed) job — no separate label-derivation guarantee
-  is built. NEW `bless_direct_smt_cassettes` (`#[ignore]`, mirror `bless_single_ir_cassettes` run.rs L2329)
-  writes `cassettes/route.direct_smt/<group_id>.overlap/seed-<base>.json` +
-  `cassettes/route.direct_smt/<group_id>.deontic/seed-<base>.json` (SYNTHETIC identity → engine-agnostic
-  audit APPLIES). NEW `direct_smt_resolved()` (mirror `single_ir_resolved` L2254; `pipeline_id:
-  pipe.m2_direct_smt`, `pipeline_step_ids[0..4]` = extract / segment / model_fill_smt / verify_smt). Gate:
-  `cargo test` — a fill test that the replayed cassettes yield the exact M1 query bodies (byte-faithful);
-  fmt + clippy + audit clean.
-- [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3). NEW tail fn (its own fn,
+- [ ] route-direct-smt.3a: GOLDEN direct_smt cassettes + produce machinery (needs .1; model-runtime-absent,
+  z3 not needed). Cassette-PRODUCE half of the old .3 (SPLIT — the .3 session overflowed a 200K window on
+  run.rs reading with ZERO code written; see memory Read-cost sizing). Deliverable: committed golden cassettes
+  at `cassettes/route.direct_smt/<gid>.{overlap,deontic}/seed-42.json` for every exp.m1_scaffold group, whose
+  recorded OUTPUT bytes = that group's M1 `compile()` query body VERBATIM (overlap=`query_bodies[0]`,
+  deontic=`[1]`, raw `.body` bytes) → the `:named a.<rule_id>` labels == the reference `expected_unsat_core` so
+  .4 scores M1-faithfully; the baseline's live prompt-driven label correctness stays its own MEASURED
+  (unguaranteed) job. NEW in run.rs test mod (all code + signatures pre-derived in the blueprint):
+  `direct_smt_resolved()` (mirror `single_ir_resolved` but 4 real + 4 INERT step-ids — `pipeline_step_ids` is a
+  fixed `[Id;8]` run.rs:190), a shared `m1_reference_query_bodies` builder (M1 bundle chain → `compile` → query
+  bodies; .3b's gate reuses it), `write_direct_smt_cassette`, `bless_direct_smt_cassettes` (`#[ignore]`,
+  SYNTHETIC identity → audit APPLIES), and a self-checking test `direct_smt_cassettes_carry_m1_query_bodies`
+  (replay each committed cassette == freshly-compiled M1 body). Reading: `.agent/wip-direct-smt.txt`
+  (transcription blueprint — read THIS, VERIFY-read only its flagged .3a anchors v1-v4). Gate: `cargo test`
+  (bless run once + committed, self-test green, existing `single_ir_fill_reproduces_m1_bundles` unaffected — no
+  refactor); fmt + clippy `-D`; engine-agnostic audit clean on touched files (run.rs + cassettes).
+- [ ] route-direct-smt.3b: `direct_smt_accept` + `direct_smt_fill` (needs .3a — its `direct_smt_resolved` +
+  committed cassettes). Cassette-CONSUME half. `direct_smt_accept() -> impl Fn(&[u8]) -> Result<String,
+  FillReject>` = shallow well-formedness ONLY (utf8 + `(set-logic` head + `(check-sat)`) → `FillReject::Schema`,
+  NO grounding (the solver is the syntactic authority, `target_syntax_failure` at verify, .5). `direct_smt_fill`
+  runs PER GROUP: extract+segment each member (provenance, refs UNgrounded), two `model_fill(…, Replay, …,
+  direct_smt_accept())` under ROLE-namespaced sources at the base seed — `source: <gid>.overlap` /
+  `<gid>.deontic` (NOT a shared source at `derive_seed(base,1)`: `model_fill` reads attempt `i` under
+  `derive_seed(base,i)` on the SAME source, so a shared-source Q2 would ALIAS Q1's first repair — memory
+  `route.direct_smt seam`). Each accepted body WRAPPED as an `smt_query` `ArtifactWrapper<QueryBody>` (PINNED
+  provenance: `Origin::AiGenerated` + `EvidenceStatus::AcceptedEvidenceStatus` + effects `[]` — the raw AI body,
+  shallow-accepted, distinct from single_ir's ir_bundle `DeterministicCompiler`/`Mechanical`; FLAG FOR CODEX).
+  RETURNS the pair's two wrappers (each `content_hash` is what .4 cites as `verify_smt` input). Add `QueryBody,
+  SmtLogic` to the `use ckc_smt` import. Reading: `.agent/wip-direct-smt.txt` (blueprint — VERIFY-read only its
+  flagged .3b anchors v5-v8). Gate: `cargo test` — `direct_smt_fill_reproduces_m1_query_bodies` (fill every
+  group via Replay over .3a's cassettes → each `QueryBody.body` == the M1 body byte-faithful, `query_id`/`logic`
+  correct); fmt + clippy `-D`; engine-agnostic audit clean. CLOSE: `rm .agent/wip-direct-smt.txt`.
+- [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3b). NEW tail fn (its own fn,
   NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
   pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3's Q1+Q2 bodies (minted ids
   `<gid>.overlap` / `.deontic`) to `verify_query_pairs` → `VerifierResults { results }` → `validate` → `wrapper(…,
@@ -622,7 +627,7 @@ argument).
   lacks, so key off the minted ids); `results.producer.pipeline_step_id == processing_stage.m2.verify_smt`.
   Reading: run.rs L504-595 + L1290-1316 + L2498-2645; .2's `verify_query_pairs`; `run_oracle.rs
   assert_group_matches_reference`. Gate: `cargo test` (both groups match reference); fmt + clippy.
-- [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3 + .4; mirror
+- [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3b + .4; mirror
   route-single-ir.4 `git show 0feb50d 9da76b9`). Codes: (a) `ai_schema_violation` — a shallow-malformed SMT
   cassette (not query-shaped) → `FillReject::Schema` → re-prompt; a second bad attempt →
   `repair_limit_exceeded` (`repair_limit 1`, Q1 `seed s` + `derive_seed(s, 1)`; mirror
