@@ -12,7 +12,9 @@ PURPOSE
     cargo fmt --check                → clean
     engine-agnostic audit on run.rs  → zero hits
   then run.rs was reverted (`git checkout`), so THIS blueprint is the only carry.
-  CLOSE: `rm .agent/wip-direct-smt-5.txt` after the unit commit.
+  CLOSE: `git rm .agent/wip-direct-smt-5.txt` STAGED INTO the .5 commit — one commit
+  holds tests + 4 cassettes + this file's deletion (no dangling tracked file, no 2nd
+  cleanup commit).
 
 WHAT = wire §7.4 rejection-path diagnostic codes for the DIRECT route, proven over
   4 committed bad cassettes, mirroring route-single-ir.4 (`git show 0feb50d 9da76b9`).
@@ -25,7 +27,8 @@ DEPENDENCY ORDER for the next session:
   2. BLESS the 4 cassettes (§3) and `git add` them  ← MUST precede the test run
   3. run the gate (§4); `direct_smt_route_rejection_codes` fails-with-missing-cassette
      if run before bless. needs z3 on PATH (Part b runs the solver).
-  4. one scoped commit (code + 4 cassettes), then CLOSE (rm this file).
+  4. ONE scoped commit = tests + 4 cassettes + `git rm .agent/wip-direct-smt-5.txt`
+     (stage the blueprint's deletion INTO this same commit; no follow-up cleanup).
 
 ================================================================================
 §1  INSERTION POINT
@@ -170,15 +173,18 @@ same panic block but is followed by `\n\n    /// route-single-ir.4 …`, not `\n
         assert_eq!(fill.repairs, 1);
         assert_eq!(fill.recorded_calls, 2);
         assert_eq!(fill.diagnostics.len(), 3);
-        let d0 = &fill.diagnostics[0];
-        assert_eq!(d0.code, DiagnosticCode::AiSchemaViolation);
-        assert_eq!(d0.outcome, Outcome::Invalid);
-        assert!(d0.region_ids.is_empty());
-        assert!(d0.artifact_hashes.is_empty());
-        assert_eq!(d0.payload.len(), 1);
-        assert_eq!(d0.payload[0].0, static_id("reason"));
-        assert!(!d0.payload[0].1.is_empty(), "the parse reason is recorded");
-        assert_eq!(fill.diagnostics[1].code, DiagnosticCode::AiSchemaViolation);
+        // Pin BOTH schema violations to the same shape (mirrors single_ir_route_rejection_codes).
+        let assert_schema_shape = |d: &DiagnosticRecord| {
+            assert_eq!(d.code, DiagnosticCode::AiSchemaViolation);
+            assert_eq!(d.outcome, Outcome::Invalid);
+            assert!(d.region_ids.is_empty());
+            assert!(d.artifact_hashes.is_empty());
+            assert_eq!(d.payload.len(), 1);
+            assert_eq!(d.payload[0].0, static_id("reason"));
+            assert!(!d.payload[0].1.is_empty(), "the parse reason is recorded");
+        };
+        assert_schema_shape(&fill.diagnostics[0]);
+        assert_schema_shape(&fill.diagnostics[1]);
         let last = &fill.diagnostics[2];
         assert_eq!(last.code, DiagnosticCode::RepairLimitExceeded);
         assert_eq!(last.outcome, Outcome::Invalid);
@@ -289,10 +295,17 @@ same panic block but is followed by `\n\n    /// route-single-ir.4 …`, not `\n
   cargo test --workspace              → EXPECT 441 passed / 7 ignored (see §7)
   cargo fmt --check
   cargo clippy --workspace --all-targets -- -D warnings
-  engine-agnostic audit on the touched file (run.rs), word-boundary git grep -niP:
-    git grep -niP '(?i:\b(llama|ollama|vllm|llamacpp|gguf|ggml|exllama|exl2|gptq|awq|safetensors|bitsandbytes|autogptq|ctransformers|xgrammar|gbnf|outlines|jsonformer|lark|mlx|tgi|marlin)\b)' -- crates/ckc-cli/src/run.rs
-    git grep -nP  '\bq[2-8](_[0-9km])?\b' -- crates/ckc-cli/src/run.rs
-  BOTH → zero hits (verified this session with the two fns in place). ALLOWED, do
+  engine-agnostic audit on the touched files — run.rs AND the committed cassettes.
+  The cassette body is `output_hex` (no forbidden token is spelled in [0-9a-f], so
+  hex is inert; the readable body is audited via its run.rs byte-literals) → the
+  cassette grep guards only the plaintext source/route/prompt/identity fields. The
+  route.direct_smt dir also re-covers the already-clean m1 cassettes (harmless).
+  Word-boundary git grep -niP (paths inlined so each line stands alone — shell vars
+  do NOT persist across separate Bash calls):
+    git grep -niP '(?i:\b(llama|ollama|vllm|llamacpp|gguf|ggml|exllama|exl2|gptq|awq|safetensors|bitsandbytes|autogptq|ctransformers|xgrammar|gbnf|outlines|jsonformer|lark|mlx|tgi|marlin)\b)' -- crates/ckc-cli/src/run.rs crates/ckc-cli/tests/fixtures/cassettes/route.direct_smt
+    git grep -nP  '\bq[2-8](_[0-9km])?\b' -- crates/ckc-cli/src/run.rs crates/ckc-cli/tests/fixtures/cassettes/route.direct_smt
+  BOTH → zero hits (run.rs verified this session with the two fns in place; cassette
+  dir validated this session over the same-structure m1 cassettes). ALLOWED, do
   NOT flag: SMT / z3 / QF_UF / QF_LRA / SMT-LIB / set-logic / check-sat / declare-const
   / unsat — they name the SOLVER, not the LLM inference engine. (`fixture_quant`
   lives only inside the pre-existing write_direct_smt_cassette, is the synthetic

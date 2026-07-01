@@ -264,7 +264,7 @@ full pre-consolidation text lives in git history.
   crate adopting the macro. Those serde impls go unused there (the canonical path is
   Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; don't
   "tidy" the dep away.
-- M1 reviewed (gates green, zero defects — git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED
+- M1 reviewed (gates green, zero code defects in the milestone body — git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED
   by SPEC amendment: a processing stage's total operation result IS its §4.6 EventRecord (§8.3 has no
   per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
   residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: do NOT
