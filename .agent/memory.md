@@ -463,7 +463,12 @@ full pre-consolidation text lives in git history.
     shallow well-formedness (utf8 + `(set-logic`/`(check-sat)`) → `Schema` only, NO grounding (the solver is
     the syntactic authority). GOLDEN cassette bytes = the group's M1 emitted `query_bodies[2k]`/`[2k+1]`
     VERBATIM → the `:named a.<rule_id>` labels == reference `expected_unsat_core` → scoring reuses
-    `single_ir_route_scores_m1_groups`'s shape. 5 units, not ≤4 (the bypass ADDS the `verify_pair` refactor
+    `single_ir_route_scores_m1_groups`'s shape. These golden cassettes = harness/determinism
+    fixtures (both routes verify identical SMT → identical verdicts BY CONSTRUCTION): they prove
+    plumbing + scoring, NOT a §9 route-quality difference. The real route contrast is measured ONLY by
+    run-m2.2's LIVE weak-model run (the weak baseline degenerates on the direct route) + the degraded
+    rejection cassettes (route-single-ir.4 + route-direct-smt.5) → report/run units attribute
+    happy-path-replay parity to the harness, never to §9 evidence (codex M2.20 .3a). 5 units, not ≤4 (the bypass ADDS the `verify_pair` refactor
     + `verify_query_pairs`; the roadmap's "likely fewer" guess assumed reusing m1.verify, which the region-id
     wall rules out). direct tail is its OWN fn (`compile_verify_group` inlines `compile()` + hardcodes
     COMPILE=4/VERIFY=5; the 4-stage direct pipeline has `verify_smt` at slot 3, no `compiled`). Two slot-3

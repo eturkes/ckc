@@ -2867,8 +2867,9 @@ processing_stages:
     /// route-direct-smt.3a — a minimal [`Resolved`] for the direct_smt route over
     /// the M1 inputs. `pipe.m2_direct_smt` is four stages (extract, segment,
     /// model_fill_smt, verify_smt), filling slots `[0]`–`[3]` of the fixed `[Id; 8]`;
-    /// only `producer(resolved, 0..=3)` is ever read, so slots `[4]`–`[7]` repeat the
-    /// verify_smt id as inert padding. `documents` / `groups` / `plan` go unread and
+    /// only `producer(resolved, 0..=3)` is ever read, so slots `[4]`–`[7]` hold an inert `processing_stage.unused`
+    /// sentinel, a non-stage id, so an accidental read surfaces obviously rather
+    /// than posing as a real verify stage. `documents` / `groups` / `plan` go unread and
     /// stay empty; `budget_ms` is exp.m1_scaffold's §8.4 `solver_ms_per_query`.
     fn direct_smt_resolved() -> Resolved {
         Resolved {
@@ -2878,10 +2879,10 @@ processing_stages:
                 static_id("processing_stage.m1.segment"),
                 static_id("processing_stage.m2.model_fill_smt"),
                 static_id("processing_stage.m2.verify_smt"),
-                static_id("processing_stage.m2.verify_smt"),
-                static_id("processing_stage.m2.verify_smt"),
-                static_id("processing_stage.m2.verify_smt"),
-                static_id("processing_stage.m2.verify_smt"),
+                static_id("processing_stage.unused"),
+                static_id("processing_stage.unused"),
+                static_id("processing_stage.unused"),
+                static_id("processing_stage.unused"),
             ],
             documents: vec![],
             groups: vec![],
@@ -2958,6 +2959,16 @@ processing_stages:
                     &gid,
                     members.iter().map(|m| (&m.payload.formal, &m.payload.norm)),
                 );
+                // Each exp.m1_scaffold group is one overlap+deontic pair, so `compile`
+                // yields exactly two query bodies ([0]=overlap, [1]=deontic). Fail loudly
+                // if a group ever yields another shape, rather than indexing past [1] or
+                // silently dropping later pairs when bless/self-check take only [0]/[1].
+                assert_eq!(
+                    compiled.query_bodies.len(),
+                    2,
+                    "{gid}: expected 2 query bodies (one overlap+deontic pair), got {}",
+                    compiled.query_bodies.len()
+                );
                 (gid, compiled.query_bodies)
             })
             .collect()
@@ -3004,7 +3015,8 @@ processing_stages:
     /// (`query_bodies[0]`) under `<gid>.overlap` and its deontic query
     /// (`query_bodies[1]`) under `<gid>.deontic`, both at seed 42, the raw SMT body
     /// bytes as recorded output. Run:
-    /// `cargo test -p ckc-cli bless_direct_smt_cassettes -- --ignored --exact`.
+    /// `cargo test -p ckc-cli bless_direct_smt_cassettes -- --ignored` (a substring
+    /// filter; `--exact` would need the full `run::tests::…` path and match nothing).
     #[test]
     #[ignore = "regenerates committed golden cassettes"]
     fn bless_direct_smt_cassettes() {
