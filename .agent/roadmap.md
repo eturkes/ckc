@@ -518,7 +518,7 @@ argument).
   shape pinned (key `reason`, empty refs); `single_ir_fill` now asserts ROUTE-level §7.4 surfacing via
   `shell.ledger()` on a recovery + a terminal-hallucinated path; gates still 434/5 + fmt + clippy + audit
   clean.] 87% 175K/200K
-- [ ] route-direct-smt.1: `direct_smt` registry + prompt surface (additive, gate-independent; split from
+- [x] route-direct-smt.1: `direct_smt` registry + prompt surface (additive, gate-independent; split from
   the one-shot route-direct-smt — M2.20 respec, seam + chain decisions in the respec commit msg + memory
   `route.direct_smt seam`). `candidates.yaml` += `pipe.m2_direct_smt` `processing_stages:` =
   `processing_stage.m1.extract`, `.m1.segment`, `.m2.model_fill_smt`, `.m2.verify_smt` (chain validates:
@@ -541,7 +541,16 @@ argument).
   L22-29 + L76-80; `prompts.yaml`; memory `Registry model surface` + `route.direct_smt seam`. Gate: `cargo
   test`; `ckc registry check` validates `pipe.m2_direct_smt` (chain) + the `prompt.direct_smt` file/hash and
   rejects a missing / hash-mismatched prompt; engine-agnostic audit clean (JA prose + grammar surface, no
-  engine/dialect/format names); fmt + clippy.
+  engine/dialect/format names); fmt + clippy. [Done: additive registry data only, ZERO Rust change —
+  `registry/prompts/direct_smt.txt` (first-draft JA-pair→SMT prompt, positive phrasing,
+  `sha256:f6bf1d59…`) + `prompt.direct_smt` in prompts.yaml + `pipe.m2_direct_smt` (4-stage
+  extract→segment→`m2.model_fill_smt`→`m2.verify_smt`, seam-B: no assemble/compile, verify consumes
+  `smt_query` directly) + `processing_stage.m2.{model_fill_smt (nondeterministic →smt_query), verify_smt
+  (deterministic, smt_query→verifier_results)}` in candidates.yaml. The generic prompt loop + committed
+  drift guards (`committed_set_checks_ok` chain / `committed_model_surface_checks_ok` hash) + the existing
+  generic reject tests absorb it. `ckc registry check` ok end-to-end (exit 0, empty diagnostics);
+  `cargo test --workspace` 434/5 unchanged; engine-agnostic audit clean; fmt + clippy `-D` clean.]
+  67% 135K/200K
 - [ ] route-direct-smt.2: `verify_pair` refactor + `verify_query_pairs` entry (ckc-smt, gate-independent
   prep; the shared calibrated back end SPEC §9 needs across both routes). Extract the per-pair Q1→Q2 gate
   from `verdict::verify` (`verdict.rs` ~L70-95: invoke the overlap query → `assemble_result(ContextOverlap)`;

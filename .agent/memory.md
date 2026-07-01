@@ -270,7 +270,11 @@ full pre-consolidation text lives in git history.
   file/hash loop in `check_model_registry` (path → file bytes, inline → text bytes, vs `template_hash`;
   mismatch payload sorted `actual`/`expected`/`prompt`; read-error sorted `prompt`/`reason`). Prompt
   CONTENT is NOT gated (only existence + hash + path-xor-inline shape) — first-draft wording, refined at
-  run-m2.2's live recording; route.direct_smt seeds its own prompt later. (M2.15 codex-review: prompt
+  run-m2.2's live recording. route-direct-smt.1 then seeded `prompt.direct_smt`
+  (`registry/prompts/direct_smt.txt`) + `pipe.m2_direct_smt` + `processing_stage.m2.{model_fill_smt,
+  verify_smt}` through that same generic loop — a 2nd prompt route + pipeline needs ZERO
+  registry_check.rs change (pure additive data; both committed drift guards absorb it, counts unchanged).
+  (M2.15 codex-review: prompt
   prose reframed negatives→positives per AGENTS.md pink-elephant rule + hash re-pinned; positive framing
   is a standing style rule, distinct from the deferred perf tuning.) Drift guard =
   `committed_model_surface_checks_ok` (schemas.yaml + prompts.yaml pinned hashes must equal the real

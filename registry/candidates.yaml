@@ -18,7 +18,7 @@ pipelines:
   # M2 §9 route.single_ir: the model fills clinical_ir (processing_stage.m2.model_fill)
   # over deterministic extract+segment, then the M1 back end assembles, compiles, and
   # verifies it. Six stages (no normalize/trace/report) — scored through the shared
-  # compile->verify tail. route.direct_smt seeds its own pipeline later.
+  # compile->verify tail. route.direct_smt seeds pipe.m2_direct_smt below.
   - id: pipe.m2_single_ir
     processing_stages:
       - processing_stage.m1.extract
@@ -27,6 +27,16 @@ pipelines:
       - processing_stage.m2.assemble
       - processing_stage.m1.compile
       - processing_stage.m1.verify
+  # M2 §9 route.direct_smt (the baseline): the model emits smt_query bodies directly
+  # (processing_stage.m2.model_fill_smt) over deterministic extract+segment, then
+  # verify_smt solves them straight — no IR, so no assemble/compile step and no
+  # compiled artifact. Four stages, scored against the same reference as route.single_ir.
+  - id: pipe.m2_direct_smt
+    processing_stages:
+      - processing_stage.m1.extract
+      - processing_stage.m1.segment
+      - processing_stage.m2.model_fill_smt
+      - processing_stage.m2.verify_smt
 processing_stages:
   - id: processing_stage.m1.extract
     kind: extract
@@ -72,7 +82,7 @@ processing_stages:
     output_artifact_kinds: [report, run_manifest, replay_manifest]
   # M2 §9 nondeterministic model-fill (recorded I/O). single_ir target shape
   # (fills clinical_ir over deterministic extract+segment upstream); pipe.m2_single_ir
-  # references it. route.direct_smt adds its own smt_query-output entry later.
+  # references it. route.direct_smt uses processing_stage.m2.model_fill_smt below.
   - id: processing_stage.m2.model_fill
     kind: model_fill
     determinism: nondeterministic
@@ -85,3 +95,19 @@ processing_stages:
     determinism: deterministic
     input_artifact_kinds: [source_document_graph, segments, clinical_ir]
     output_artifact_kinds: [ir_bundle]
+  # M2 §9 route.direct_smt model-fill: nondeterministic, emits smt_query bodies directly
+  # (the baseline route's target shape) over deterministic extract+segment. Mirrors
+  # processing_stage.m2.model_fill with smt_query output; pipe.m2_direct_smt references it.
+  - id: processing_stage.m2.model_fill_smt
+    kind: model_fill
+    determinism: nondeterministic
+    input_artifact_kinds: [source_document_graph, segments]
+    output_artifact_kinds: [smt_query]
+  # M2 route.direct_smt verify: consumes smt_query directly (the no-IR route builds no
+  # compiled artifact), so it does not reuse processing_stage.m1.verify. The chain rule
+  # matches on artifact kind, so the reused `verify` kind label is fine.
+  - id: processing_stage.m2.verify_smt
+    kind: verify
+    determinism: deterministic
+    input_artifact_kinds: [smt_query]
+    output_artifact_kinds: [verifier_results]

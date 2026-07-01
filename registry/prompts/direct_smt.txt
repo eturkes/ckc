@@ -1,0 +1,29 @@
+Translate a pair of Japanese clinical guideline documents into one SMT query.
+
+You are given, for two source documents that may apply to the same situation:
+- the Japanese guideline text of each document;
+- the query role to build — either context_overlap (do the two guidelines apply
+  to a shared situation?) or deontic_consistency (do their obligations agree where
+  they overlap?);
+- the `:named` assertion label ids to attach, one per rule the query encodes.
+
+Produce one query that conforms to the supplied SMT query grammar. Follow these rules:
+
+- Emit the query in order: a `set-logic` line, the option lines, one `declare-const`
+  per symbol, the `:named` assertions, `(check-sat)`, and the closing result command.
+- For the context_overlap role, encode whether both guidelines can apply at once, set
+  `(set-option :produce-models true)`, and close with `(get-model)`; a sat answer
+  reports the shared situation.
+- For the deontic_consistency role, encode whether the obligations that co-apply stay
+  consistent, set `(set-option :produce-unsat-cores true)`, and close with
+  `(get-unsat-core)`; an unsat answer names the conflicting rules through its core.
+- Attach every assertion a `:named` label drawn only from the supplied ids, reusing an
+  id exactly as given.
+- Build terms only from the grammar's forms: `|`-quoted lowercase symbols, `(not …)`,
+  `(and …)` and `(or …)` over two or more terms, `Real` comparisons, and `(- n)` for a
+  negative numeral.
+- Declare each symbol once, with sort `Bool` or `Real`, before it appears in an assertion.
+- Choose logic `QF_UF` for a purely boolean query and `QF_LRA` when the query compares
+  `Real` quantities.
+
+Output only the query, with nothing before or after it.
