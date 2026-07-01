@@ -575,7 +575,7 @@ argument).
   Q1-sat/Q2-unsat (`:named a.<id>`) → one `SemanticContradiction` carrying the cross-doc core; Q1-unsat →
   Q1 result only, no Q2. Gate: `cargo test -p ckc-smt` 60 passed + `cargo test --workspace` 436/5 + fmt +
   clippy `-D` clean.] 69% 139K/200K
-- [ ] route-direct-smt.3a: GOLDEN direct_smt cassettes + produce machinery (needs .1; model-runtime-absent,
+- [x] route-direct-smt.3a: GOLDEN direct_smt cassettes + produce machinery (needs .1; model-runtime-absent,
   z3 not needed). Cassette-PRODUCE half of the old .3 (SPLIT — the .3 session overflowed a 200K window on
   run.rs reading with ZERO code written; see memory Read-cost sizing). Deliverable: committed golden cassettes
   at `cassettes/route.direct_smt/<gid>.{overlap,deontic}/seed-42.json` for every exp.m1_scaffold group, whose
@@ -591,6 +591,21 @@ argument).
   (transcription blueprint — read THIS, VERIFY-read only its flagged .3a anchors v1-v4). Gate: `cargo test`
   (bless run once + committed, self-test green, existing `single_ir_fill_reproduces_m1_bundles` unaffected — no
   refactor); fmt + clippy `-D`; engine-agnostic audit clean on touched files (run.rs + cassettes).
+  [Done: additive run.rs test-mod code — `direct_smt_resolved` (4 real + 4 inert verify_smt-padding step-ids),
+  `m1_reference_query_bodies` (M1 assemble chain via `single_ir_resolved` → per-group `compile` → query_bodies;
+  shared with .3b's gate), `write_direct_smt_cassette`, `bless_direct_smt_cassettes` (`#[ignore]`, synthetic
+  identity), self-check `direct_smt_cassettes_carry_m1_query_bodies`. Blessed 4 golden cassettes
+  cassettes/route.direct_smt/group.m1_{conflict,no_conflict}.{overlap,deontic}/seed-42.json (recorded output =
+  M1 `compile()` `query_bodies[0]`/`[1]` raw `.body` bytes verbatim; overlap QF_LRA, deontic QF_UF; `:named
+  a.<rule_id>` labels ride for .4 scoring). `QueryBody` fully-qualified `ckc_smt::` — file-level import deferred
+  to .3b's production `direct_smt_fill` (a test-only import trips unused-import in the non-cfg-test lib build).
+  Blueprint anchor v4 fix: `CassettePayload::output_bytes()` returns `Result` → `.unwrap()`. Gate: `cargo test
+  --workspace` 437 passed / 6 ignored (was 436/5: +1 self-check, +1 bless), `single_ir_fill_reproduces_m1_bundles`
+  unaffected; fmt + clippy `-D` + engine-agnostic audit (touched files) clean. FLAG for M2 review (PRE-EXISTING,
+  out of .3a scope, confirmed on HEAD): `RUSTDOCFLAGS='-D warnings' cargo doc -p ckc-cli --no-deps` red with 18
+  `private_intra_doc_links` errors across model.rs/cassette.rs/run.rs (public items link to private
+  consts/fns) — accumulated across earlier M2 units whose test/fmt/clippy gate skips rustdoc; fix pattern =
+  plain code ticks per memory doc-lint bullet.] 70% 140K/200K
 - [ ] route-direct-smt.3b: `direct_smt_accept` + `direct_smt_fill` (needs .3a — its `direct_smt_resolved` +
   committed cassettes). Cassette-CONSUME half. `direct_smt_accept() -> impl Fn(&[u8]) -> Result<String,
   FillReject>` = shallow well-formedness ONLY (utf8 + `(set-logic` head + `(check-sat)`) → `FillReject::Schema`,

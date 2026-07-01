@@ -2863,4 +2863,196 @@ processing_stages:
             vec![(static_id("repair_limit"), "1".to_owned())]
         );
     }
+
+    /// route-direct-smt.3a — a minimal [`Resolved`] for the direct_smt route over
+    /// the M1 inputs. `pipe.m2_direct_smt` is four stages (extract, segment,
+    /// model_fill_smt, verify_smt), filling slots `[0]`–`[3]` of the fixed `[Id; 8]`;
+    /// only `producer(resolved, 0..=3)` is ever read, so slots `[4]`–`[7]` repeat the
+    /// verify_smt id as inert padding. `documents` / `groups` / `plan` go unread and
+    /// stay empty; `budget_ms` is exp.m1_scaffold's §8.4 `solver_ms_per_query`.
+    fn direct_smt_resolved() -> Resolved {
+        Resolved {
+            pipeline_id: static_id("pipe.m2_direct_smt"),
+            pipeline_step_ids: [
+                static_id("processing_stage.m1.extract"),
+                static_id("processing_stage.m1.segment"),
+                static_id("processing_stage.m2.model_fill_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+            ],
+            documents: vec![],
+            groups: vec![],
+            budget_ms: 10_000,
+            plan: RunPlan {
+                experiment_id: static_id("exp.m2_multihop"),
+                test_source_groups: vec![],
+                pipelines: vec![],
+                seed: 42,
+                budget: vec![],
+            },
+            toolchain_manifest_hash: hash_bytes(b"direct-smt-fixture-toolchain"),
+        }
+    }
+
+    /// The M1 reference query bodies per `exp.m1_scaffold` group: build each
+    /// member's deterministic M1 bundle (the z3-free extract → segment → normalize
+    /// → assemble chain, the same `assemble_bundle` the M1 run drives), then
+    /// [`compile`] the group's members into `query_bodies` (overlap at `[0]`,
+    /// deontic at `[1]` per planned pair). The golden `route.direct_smt` cassettes
+    /// record these exact bytes, so the route's `:named a.<rule_id>` labels match the
+    /// reference `expected_unsat_core` (route-direct-smt.4 scoring). Shared by the
+    /// bless helper and the `.3b` fill gate.
+    fn m1_reference_query_bodies(
+        root: &Path,
+        lexicon: &Lexicon,
+    ) -> Vec<(Id, Vec<ckc_smt::QueryBody>)> {
+        use std::collections::BTreeMap;
+
+        let resolved = single_ir_resolved();
+        // Build every M1 document's reference bundle once, keyed by test_source id.
+        let mut bundles = BTreeMap::new();
+        for entry in single_ir_corpus() {
+            let html = std::fs::read(root.join(&entry.path)).unwrap();
+            let config = ExtractConfig {
+                document_id: entry.id.clone(),
+                source_family: static_id("synthetic_test_source_html"),
+                provenance: entry.provenance,
+                data_class: DataClass::None,
+                producer: producer(&resolved, 0),
+            };
+            let source = extract(&html, &config).unwrap();
+            let segments = segment(&source, &producer(&resolved, 1)).unwrap();
+            let normalization =
+                normalize(&source, &segments, lexicon, &producer(&resolved, 2)).unwrap();
+            let m1 =
+                assemble_bundle(&entry, &resolved, &source, &segments, &normalization).unwrap();
+            bundles.insert(entry.id.clone(), m1);
+        }
+
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold");
+
+        exp.test_source_groups
+            .iter()
+            .map(|group| {
+                let gid = group.group_id.clone();
+                let members: Vec<_> = group
+                    .test_sources
+                    .iter()
+                    .map(|s| {
+                        bundles
+                            .get(s)
+                            .unwrap_or_else(|| panic!("{gid}: unfilled member {s}"))
+                    })
+                    .collect();
+                let compiled = compile(
+                    &gid,
+                    members.iter().map(|m| (&m.payload.formal, &m.payload.norm)),
+                );
+                (gid, compiled.query_bodies)
+            })
+            .collect()
+    }
+
+    /// Craft one golden `route.direct_smt` cassette: wrap the raw SMT `output`
+    /// bytes (the query text the model "emits") under §4.4 provenance via
+    /// [`CassetteStore::build_wrapper`], keyed by the minted `<gid>.<role>` source.
+    /// Synthetic model identity — the crafted-fixture rule.
+    fn write_direct_smt_cassette(
+        source_id: Id,
+        resolved: &Resolved,
+        store: &CassetteStore,
+        seed: u64,
+        output: &[u8],
+    ) {
+        let key = CassetteKey {
+            route: static_id("route.direct_smt"),
+            source: source_id.clone(),
+            seed,
+        };
+        let payload = CassettePayload::from_output(
+            static_id("route.direct_smt"),
+            source_id,
+            seed,
+            "Emit the SMT-LIB query for the cited guideline pair.".to_owned(),
+            hash_bytes(b"direct-smt-constraint"),
+            hash_bytes(b"direct-smt-prompt-template"),
+            ModelIdentity {
+                model_id: static_id("model.baseline"),
+                quant: "fixture_quant".to_owned(),
+                runtime_version: "1.0.0".to_owned(),
+            },
+            output,
+        );
+        let wrapper = store
+            .build_wrapper(&key, payload, producer(resolved, 2))
+            .unwrap();
+        store.persist(&key, wrapper).unwrap();
+    }
+
+    /// Regenerate the committed golden `route.direct_smt` cassettes: for each
+    /// `exp.m1_scaffold` group, record its M1 `compile()` overlap query
+    /// (`query_bodies[0]`) under `<gid>.overlap` and its deontic query
+    /// (`query_bodies[1]`) under `<gid>.deontic`, both at seed 42, the raw SMT body
+    /// bytes as recorded output. Run:
+    /// `cargo test -p ckc-cli bless_direct_smt_cassettes -- --ignored --exact`.
+    #[test]
+    #[ignore = "regenerates committed golden cassettes"]
+    fn bless_direct_smt_cassettes() {
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        for (gid, qbodies) in m1_reference_query_bodies(&root, &lexicon) {
+            write_direct_smt_cassette(
+                static_id(&format!("{gid}.overlap")),
+                &resolved,
+                &store,
+                42,
+                qbodies[0].body.as_bytes(),
+            );
+            write_direct_smt_cassette(
+                static_id(&format!("{gid}.deontic")),
+                &resolved,
+                &store,
+                42,
+                qbodies[1].body.as_bytes(),
+            );
+        }
+    }
+
+    /// route-direct-smt.3a self-check (model-runtime-absent): every committed golden
+    /// `route.direct_smt` cassette replays to its group's freshly-compiled M1 query
+    /// body — overlap under `<gid>.overlap`, deontic under `<gid>.deontic`. The `.3b`
+    /// fill gate then proves the route reconstructs these wrappers.
+    #[test]
+    fn direct_smt_cassettes_carry_m1_query_bodies() {
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        for (gid, qbodies) in m1_reference_query_bodies(&root, &lexicon) {
+            for (role, i) in [("overlap", 0), ("deontic", 1)] {
+                let key = CassetteKey {
+                    route: static_id("route.direct_smt"),
+                    source: static_id(&format!("{gid}.{role}")),
+                    seed: 42,
+                };
+                let wrapper = store.replay(&key).unwrap();
+                assert_eq!(
+                    wrapper.payload.output_bytes().unwrap(),
+                    qbodies[i].body.as_bytes(),
+                    "{gid}.{role}"
+                );
+            }
+        }
+    }
 }
