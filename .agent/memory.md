@@ -136,6 +136,11 @@ full pre-consolidation text lives in git history.
   takes `dir: &str` so its `format!("groups/{gid}")` stays outside COMPILE timing (route.single_ir
   supplies its own dir + clock the same way). The call-boundary overhead itself is inherent + below
   ms/normalization resolution — only named setup is worth hoisting.
+- Doc-lint gate (Rust): the per-unit test+fmt+clippy gate MISSES rustdoc → run `RUSTDOCFLAGS='-D
+  warnings' cargo doc -p <crate> --no-deps` whenever a unit touches doc comments. Two failure shapes:
+  a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
+  ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
+  `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Caught by codex on M2.20 .2.
 - Model-runtime adapter (§9, M2.8 model-adapter.1, `ckc-cli/src/model.rs`, mirrors `ckc-smt`
   Z3Adapter). Non-obvious decisions beyond the code/docs: (1) `pub mod model` NOT private — a
   skeleton landed ahead of its in-crate consumer (the forthcoming model-fill stage) must be pub

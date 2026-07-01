@@ -54,7 +54,7 @@ pub enum QueryRole {
 ///
 /// `artifact` must satisfy [`CompiledArtifact::validate`]; bodies out of
 /// plan order are a caller bug and panic, like emitter slot order. Each
-/// pair delegates to [`verify_pair`], the shared per-pair gate.
+/// pair delegates to `verify_pair`, the shared per-pair gate.
 pub fn verify(
     adapter: &Z3Adapter,
     artifact: &CompiledArtifact,
@@ -130,10 +130,17 @@ fn verify_pair(
 pub type MintedQueryPair = ((Id, String), (Id, String));
 
 /// SPEC §9 caller-minted verdict engine — run each `(overlap, deontic)`
-/// query pair through [`verify_pair`] with no [`CompiledArtifact`]. The
+/// query pair through `verify_pair` with no [`CompiledArtifact`]. The
 /// direct route emits its own SMT bodies and mints their query ids, so it
 /// verifies through this entry rather than [`verify`]; results assemble the
 /// same way, pair by pair in argument order, Q2 gated on a sat Q1.
+///
+/// Precondition, caller-owned (as [`verify`] leans on
+/// [`CompiledArtifact::validate`]): query ids unique across `pairs`,
+/// distinct overlap/deontic ids per pair, non-empty bodies. The direct
+/// route mints group-unique `<gid>.overlap` / `<gid>.deontic` ids and lands
+/// through [`VerifierResults`](crate::VerifierResults), so a stray duplicate
+/// surfaces fail-closed there, not here.
 pub fn verify_query_pairs(
     adapter: &Z3Adapter,
     pairs: &[MintedQueryPair],
@@ -960,9 +967,14 @@ mod tests {
         assert_eq!(q1.query_id, id("q.direct.pair1.overlap"));
         assert_eq!(q1.category, VerifierCategory::SemanticNoConflict);
         assert_eq!(q1.verdict, Some(SolverVerdict::Sat));
-        // Empty diagnostics prove the sat overlap model parsed (a missing
-        // model on a ContextOverlap sat mints one invalid diagnostic).
+        let model = q1
+            .model
+            .as_deref()
+            .expect("Q1 sat records the overlap satisfying_example model");
+        assert!(model.contains("define-fun"), "model {model:?}");
+        assert!(model.contains("cond.sepsis"), "model {model:?}");
         assert_eq!(q1.diagnostics, vec![]);
+        assert_eq!(q1.validate(), Ok(()));
         assert_eq!(&q1.solver_identity, adapter.identity());
 
         let q2 = &results[1];
