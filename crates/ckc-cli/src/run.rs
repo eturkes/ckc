@@ -3722,4 +3722,222 @@ processing_stages:
             }
         }
     }
+
+    /// Bless the committed `route.direct_smt` rejection cassettes route-direct-smt.5
+    /// replays. Both crafted groups are keyed under the minted `<gid>.<role>` sources
+    /// [`direct_smt_fill`] reads. `group.m2_direct_schema` drives §7.4 schema exhaustion:
+    /// its overlap source carries a non-SMT base (seed 91) and a non-SMT first-repair
+    /// output (`derive_seed(91, 1)`), so a `repair_limit = 1` fill schema-fails at the
+    /// base, re-prompts under the derived seed, schema-fails again, and terminates in
+    /// `repair_limit_exceeded` (its deontic source stays unwritten — the overlap query
+    /// exhausts first). `group.m2_direct_syntax` drives the direct-route-unique
+    /// `target_syntax_failure`: its overlap source (seed 90) shallow-accepts — valid
+    /// utf-8, a `(set-logic` head, a `(check-sat)` substring — yet z3 rejects the
+    /// unbalanced parens with an `(error …)` and no verdict; its deontic source (seed 90)
+    /// is a minimal valid query that never runs (Q1 fails first). Synthetic-identity
+    /// crafted-fixture cassettes, so the engine-agnostic audit applies. `#[ignore]`d: run
+    /// to regenerate, then commit the four json. Regenerate with
+    /// `cargo test -p ckc-cli bless_direct_smt_rejection_cassettes -- --ignored`.
+    #[test]
+    #[ignore = "regenerates the committed rejection cassettes"]
+    fn bless_direct_smt_rejection_cassettes() {
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(repo_root().join("crates/ckc-cli/tests/fixtures"));
+
+        // SCHEMA EXHAUSTION (group.m2_direct_schema.overlap): a non-SMT base and a
+        // non-SMT first-repair output, both failing direct_smt_accept's shallow check,
+        // drive a repair_limit = 1 fill to a terminal repair_limit_exceeded.
+        write_direct_smt_cassette(
+            static_id("group.m2_direct_schema.overlap"),
+            &resolved,
+            &store,
+            91,
+            b"not an smt query (base)\n",
+        );
+        write_direct_smt_cassette(
+            static_id("group.m2_direct_schema.overlap"),
+            &resolved,
+            &store,
+            crate::model::derive_seed(91, 1),
+            b"not an smt query (repair 1)\n",
+        );
+
+        // SYNTAX FAILURE (group.m2_direct_syntax): the overlap source shallow-accepts
+        // (utf-8, a (set-logic head, a (check-sat) substring) yet z3 rejects its
+        // unbalanced parens → target_syntax_failure at verify. The deontic source is a
+        // minimal valid query that never runs (Q1 fails first).
+        write_direct_smt_cassette(
+            static_id("group.m2_direct_syntax.overlap"),
+            &resolved,
+            &store,
+            90,
+            b"(set-logic QF_UF)\n(declare-const x Bool)\n(assert (and x\n(check-sat)\n",
+        );
+        write_direct_smt_cassette(
+            static_id("group.m2_direct_syntax.deontic"),
+            &resolved,
+            &store,
+            90,
+            b"(set-logic QF_UF)\n(check-sat)\n",
+        );
+    }
+
+    /// route-direct-smt.5 — the direct_smt route's §7.4 rejection codes wire through
+    /// [`model_fill`] under [`direct_smt_accept`] and the §4.6 verify event (z3 present,
+    /// model-runtime-absent). Replaying the committed bad cassettes: (a) a
+    /// schema-exhaustion group whose overlap base (seed 91) and first-repair
+    /// (`derive_seed(91, 1)`) outputs both fail the shallow SMT accept — a
+    /// `repair_limit = 1` fill re-prompts once and terminates in `repair_limit_exceeded`,
+    /// surfaced both at the [`model_fill`] boundary and on the route fn's shell ledger,
+    /// with no target and the deontic source never read (Q1 exhausts first); (b) a
+    /// syntax-failure group — direct-route-unique, no single_ir analogue: the overlap
+    /// body shallow-accepts (so [`direct_smt_fill`] lands the pair with an empty ledger)
+    /// yet z3 rejects its unbalanced parens with an `(error …)` and no verdict, so
+    /// [`direct_smt_verify_group`] mints a lone `target_syntax_failure` /
+    /// `target_parse_error` result and the §4.6 verify event surfaces it to the ledger.
+    /// The repair-loop mechanics live in `model_fill.rs`; this pins the direct route's
+    /// accept → §7.4 code selection end-to-end.
+    #[test]
+    fn direct_smt_route_rejection_codes() {
+        use ckc_core::{DiagnosticCode, Outcome};
+        use ckc_smt::VerifierCategory;
+
+        let root = repo_root();
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let corpus = single_ir_corpus();
+        let guideline_a = corpus
+            .iter()
+            .find(|e| e.id == static_id("test_source.m1_guideline_a"))
+            .expect("guideline_a in the corpus");
+        let guideline_b = corpus
+            .iter()
+            .find(|e| e.id == static_id("test_source.m1_guideline_b"))
+            .expect("guideline_b in the corpus");
+        let members = vec![guideline_a, guideline_b];
+        let adapter = Z3Adapter::new().expect("z3 adapter on PATH");
+
+        // The schema group's overlap source — the first cassette direct_smt_fill reads —
+        // keyed at a given seed (the golden test's key-construction shape).
+        let schema_key = |seed| CassetteKey {
+            route: static_id("route.direct_smt"),
+            source: static_id("group.m2_direct_schema.overlap"),
+            seed,
+        };
+
+        // (a) SCHEMA EXHAUSTION at the model_fill boundary: base (seed 91) and first
+        // repair (derive_seed(91, 1)) both fail direct_smt_accept's shallow check, so a
+        // repair_limit = 1 fill re-prompts once, then exhausts — no target, one repair,
+        // two recorded calls, two schema violations, then the terminal repair-limit code.
+        let fill = model_fill(
+            &store,
+            &schema_key(91),
+            FillSource::Replay,
+            1,
+            direct_smt_accept(),
+        )
+        .unwrap();
+        assert!(fill.target.is_none());
+        assert_eq!(fill.repairs, 1);
+        assert_eq!(fill.recorded_calls, 2);
+        assert_eq!(fill.diagnostics.len(), 3);
+        // Pin BOTH schema violations to the same shape (mirrors single_ir_route_rejection_codes).
+        let assert_schema_shape = |d: &DiagnosticRecord| {
+            assert_eq!(d.code, DiagnosticCode::AiSchemaViolation);
+            assert_eq!(d.outcome, Outcome::Invalid);
+            assert!(d.region_ids.is_empty());
+            assert!(d.artifact_hashes.is_empty());
+            assert_eq!(d.payload.len(), 1);
+            assert_eq!(d.payload[0].0, static_id("reason"));
+            assert!(!d.payload[0].1.is_empty(), "the parse reason is recorded");
+        };
+        assert_schema_shape(&fill.diagnostics[0]);
+        assert_schema_shape(&fill.diagnostics[1]);
+        let last = &fill.diagnostics[2];
+        assert_eq!(last.code, DiagnosticCode::RepairLimitExceeded);
+        assert_eq!(last.outcome, Outcome::Invalid);
+        assert_eq!(
+            last.payload,
+            vec![(static_id("repair_limit"), "1".to_owned())]
+        );
+
+        // The route fn surfaces the same §7.4 codes on its shell ledger, then yields None
+        // (the overlap query exhausts before the deontic source is read).
+        {
+            let tmp = tempfile::tempdir().unwrap();
+            let out = tmp.path().join("m2");
+            std::fs::create_dir_all(&out).unwrap();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+            let filled = direct_smt_fill(
+                &root,
+                &static_id("group.m2_direct_schema"),
+                &members,
+                &store,
+                91,
+                &resolved,
+                1,
+                &mut shell,
+            );
+            assert!(filled.is_none(), "schema exhaustion ends the route");
+            let codes: Vec<_> = shell.ledger().iter().map(|d| d.code).collect();
+            assert_eq!(
+                codes,
+                vec![
+                    DiagnosticCode::AiSchemaViolation,
+                    DiagnosticCode::AiSchemaViolation,
+                    DiagnosticCode::RepairLimitExceeded,
+                ]
+            );
+        }
+
+        // (b) SYNTAX FAILURE (direct-route-unique terminal, no repair): the overlap body
+        // shallow-accepts, so direct_smt_fill lands the pair with an empty ledger; z3 then
+        // rejects the unbalanced parens at verify.
+        let syntax_gid = static_id("group.m2_direct_syntax");
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+        let (overlap, deontic) = direct_smt_fill(
+            &root,
+            &syntax_gid,
+            &members,
+            &store,
+            90,
+            &resolved,
+            0,
+            &mut shell,
+        )
+        .expect("the shallow-accepting pair fills");
+        assert!(
+            shell.ledger().is_empty(),
+            "a shallow-accepting fill raises no diagnostics"
+        );
+
+        let results = direct_smt_verify_group(
+            &syntax_gid,
+            &format!("groups/{syntax_gid}"),
+            &overlap,
+            &deontic,
+            &resolved,
+            &adapter,
+            &mut shell,
+        )
+        .expect("the verify tail yields results");
+        assert_eq!(
+            results.payload.results.len(),
+            1,
+            "Q1's syntax failure closes the pair before Q2 runs"
+        );
+        let result = &results.payload.results[0];
+        assert_eq!(result.query_id, static_id("group.m2_direct_syntax.overlap"));
+        assert_eq!(result.category, VerifierCategory::TargetSyntaxFailure);
+        assert_eq!(result.diagnostics[0].code, DiagnosticCode::TargetParseError);
+        assert_eq!(result.diagnostics[0].outcome, Outcome::Invalid);
+
+        // The §4.6 verify event extended the ledger with the parse-error diagnostic.
+        let codes: Vec<_> = shell.ledger().iter().map(|d| d.code).collect();
+        assert_eq!(codes, vec![DiagnosticCode::TargetParseError]);
+    }
 }

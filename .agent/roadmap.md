@@ -671,7 +671,7 @@ argument).
   Gate: `cargo test --workspace` 440 passed / 6 ignored (was 439/6) + fmt + clippy `-D` clean + engine-agnostic
   audit (run.rs) clean; no new rustdoc debt (pre-existing model.rs/replay.rs/trace.rs `private_intra_doc_links`
   stays deferred to M2 review). M2 stays IN-PROGRESS (.5 + metrics/report/run/acceptance remain).] 77% 154K/200K
-- [ ] route-direct-smt.5: §7.4 rejection codes for the direct route over committed bad cassettes
+- [x] route-direct-smt.5: §7.4 rejection codes for the direct route over committed bad cassettes
   (needs .3b + .4; mirror route-single-ir.4 `git show 0feb50d 9da76b9`). Two codes: (a)
   `ai_schema_violation`×2 → `repair_limit_exceeded` (schema exhaustion, `repair_limit 1`, base seed +
   `derive_seed(s,1)`); (b) `target_syntax_failure`/`TargetParseError` — a shallow-accepted but
@@ -683,7 +683,21 @@ argument).
   `.agent/wip-direct-smt-5.txt` — read THIS, VERIFY-read only its flagged anchors (reconnaissance was the
   context sink last session; the blueprint removes it). Gate: `cargo test --workspace` (both codes over
   committed bad cassettes + ledger surfacing) + fmt + clippy `-D` + engine-agnostic audit (run.rs) clean.
-  CLOSE: `rm .agent/wip-direct-smt-5.txt`.
+  CLOSE: `rm .agent/wip-direct-smt-5.txt`. [Done: `bless_direct_smt_rejection_cassettes` (`#[ignore]`,
+  synthetic identity) + `direct_smt_route_rejection_codes` added to run.rs `mod tests` (near-transcribed
+  from the compile-verified blueprint, ZERO non-test code change); blessed 4 committed bad cassettes under
+  `route.direct_smt/group.m2_direct_{schema.overlap,syntax.overlap,syntax.deontic}` (no schema.deontic — the
+  overlap query exhausts first). (a) SCHEMA EXHAUSTION: seed 91 base + `derive_seed(91,1)`=
+  17894217328592812498 first-repair both non-SMT → `repair_limit 1` fill re-prompts once →
+  `[AiSchemaViolation×2, RepairLimitExceeded("1")]`, target None, surfaced on `shell.ledger()`, deontic
+  never read; (b) SYNTAX FAILURE (direct-route-unique, no repair): seed 90 overlap shallow-accepts (utf8 +
+  `(set-logic` + `(check-sat)`) yet z3 rejects the unbalanced parens with `(error …)` and no verdict → lone
+  `TargetSyntaxFailure`/`TargetParseError` from `direct_smt_verify_group` (Q2 skipped), surfaced on the §4.6
+  verify event's ledger. Gate: `cargo test --workspace` 441 passed / 7 ignored (was 440/6) + fmt + clippy
+  `-D` + engine-agnostic audit (run.rs + cassettes) clean; no new rustdoc debt (pre-existing
+  model.rs/replay.rs/trace.rs `private_intra_doc_links`, none in run.rs, deferred to M2 review). wip
+  blueprint consumed + `git rm`'d in this commit. M2 stays IN-PROGRESS (metrics/report/run/acceptance
+  remain).] 63% 126K/200K
 - [ ] metrics-m2.1: route-quality raw-row metrics. New metrics module → per-route raw rows over a
   run: schema-valid rate, acceptance rate, repair count, recorded-call counts, target syntactic
   validity (solver parse), conflict-verdict accuracy vs reference over the §8 conflict + no-conflict
