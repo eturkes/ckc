@@ -30,7 +30,7 @@ pipelines:
   # M2 §9 route.direct_smt (the baseline): the model emits smt_query bodies directly
   # (processing_stage.m2.model_fill_smt) over deterministic extract+segment, then
   # verify_smt solves them straight — no IR, so no assemble/compile step and no
-  # compiled artifact. Four stages, scored against the same reference as route.single_ir.
+  # compiled artifact. Four stages; will be scored against the same reference as route.single_ir.
   - id: pipe.m2_direct_smt
     processing_stages:
       - processing_stage.m1.extract
@@ -104,8 +104,9 @@ processing_stages:
     input_artifact_kinds: [source_document_graph, segments]
     output_artifact_kinds: [smt_query]
   # M2 route.direct_smt verify: consumes smt_query directly (the no-IR route builds no
-  # compiled artifact), so it does not reuse processing_stage.m1.verify. The chain rule
-  # matches on artifact kind, so the reused `verify` kind label is fine.
+  # compiled artifact), so it does not reuse processing_stage.m1.verify. Reusing the
+  # `verify` kind label is harmless — chain validation keys on artifact kind, and stage
+  # resolution keys on the unique stage id, never on kind alone.
   - id: processing_stage.m2.verify_smt
     kind: verify
     determinism: deterministic

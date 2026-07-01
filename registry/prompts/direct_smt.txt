@@ -9,8 +9,9 @@ You are given, for two source documents that may apply to the same situation:
 
 Produce one query that conforms to the supplied SMT query grammar. Follow these rules:
 
-- Emit the query in order: a `set-logic` line, the option lines, one `declare-const`
-  per symbol, the `:named` assertions, `(check-sat)`, and the closing result command.
+- Emit the query in order: a `set-logic` line, a `(set-option :print-success false)`
+  line, the role's produce-option line, one `declare-const` per symbol, the `:named`
+  assertions, `(check-sat)`, and the closing result command.
 - For the context_overlap role, encode whether both guidelines can apply at once, set
   `(set-option :produce-models true)`, and close with `(get-model)`; a sat answer
   reports the shared situation.
@@ -20,8 +21,9 @@ Produce one query that conforms to the supplied SMT query grammar. Follow these 
 - Attach every assertion a `:named` label drawn only from the supplied ids, reusing an
   id exactly as given.
 - Build terms only from the grammar's forms: `|`-quoted lowercase symbols, `(not …)`,
-  `(and …)` and `(or …)` over two or more terms, `Real` comparisons, and `(- n)` for a
-  negative numeral.
+  `(and …)` and `(or …)` over two or more terms, a comparison `(>= s n)`, `(> s n)`,
+  `(<= s n)`, or `(< s n)` of one `Real` symbol `s` against a numeral `n`, and `(- n)`
+  for a negative numeral.
 - Declare each symbol once, with sort `Bool` or `Real`, before it appears in an assertion.
 - Choose logic `QF_UF` for a purely boolean query and `QF_LRA` when the query compares
   `Real` quantities.

@@ -543,7 +543,7 @@ argument).
   rejects a missing / hash-mismatched prompt; engine-agnostic audit clean (JA prose + grammar surface, no
   engine/dialect/format names); fmt + clippy. [Done: additive registry data only, ZERO Rust change —
   `registry/prompts/direct_smt.txt` (first-draft JA-pair→SMT prompt, positive phrasing,
-  `sha256:f6bf1d59…`) + `prompt.direct_smt` in prompts.yaml + `pipe.m2_direct_smt` (4-stage
+  `sha256:296063f9…`) + `prompt.direct_smt` in prompts.yaml + `pipe.m2_direct_smt` (4-stage
   extract→segment→`m2.model_fill_smt`→`m2.verify_smt`, seam-B: no assemble/compile, verify consumes
   `smt_query` directly) + `processing_stage.m2.{model_fill_smt (nondeterministic →smt_query), verify_smt
   (deterministic, smt_query→verifier_results)}` in candidates.yaml. The generic prompt loop + committed

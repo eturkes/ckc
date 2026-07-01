@@ -4,5 +4,5 @@
   route: route.single_ir
 - id: prompt.direct_smt
   path: registry/prompts/direct_smt.txt
-  template_hash: sha256:f6bf1d59ca6819ae70fc17e15675ebd266a00673b0138e0de9c93293e569ee9c
+  template_hash: sha256:296063f9750b64ecdba47e07669f5a90ef938794de5803c0813cf3cdc3aae07d
   route: route.direct_smt
