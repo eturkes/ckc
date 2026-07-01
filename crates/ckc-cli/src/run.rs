@@ -835,12 +835,12 @@ fn single_ir_fill(
     }
 }
 
-/// The direct_smt route's acceptance check: shallow SMT well-formedness only —
+/// The direct_smt route's acceptance check: a shallow SMT surface-marker check only —
 /// valid UTF-8 with a `(set-logic ...)` head and a `(check-sat)` command — mapping
 /// any shortfall to a repairable [`FillReject::Schema`]. Unlike [`single_ir_accept`]
 /// there is no [`FillReject::Grounding`]: the direct route emits SMT over the raw
 /// guideline text and carries no source linkage, so the solver is the syntactic
-/// authority — a well-formed-but-unparseable query surfaces as `target_syntax_failure`
+/// authority — a marker-passing but unparseable query surfaces as `target_syntax_failure`
 /// at verify (route-direct-smt.5), never here.
 #[allow(dead_code)]
 fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
@@ -886,6 +886,21 @@ fn direct_smt_fill(
     repair_limit: u32,
     shell: &mut Shell,
 ) -> Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)> {
+    // The cassette-role design mints exactly one (overlap, deontic) pair per group — the
+    // shape of the M1 planner's single constraint-pair over a minimal pair of members.
+    // Fail closed on any other cardinality so an expanded registry cannot silently emit a
+    // two-query artifact that under-covers a 3+-member group's pairwise queries.
+    if members.len() != 2 {
+        shell.diagnostic(invalid_diagnostic(vec![
+            (static_id("group"), gid.to_string()),
+            (
+                static_id("reason"),
+                format!("expected a 2-member minimal pair, got {}", members.len()),
+            ),
+            (static_id("processing_stage"), "model_fill_smt".to_owned()),
+        ]));
+        return None;
+    }
     // Provenance inputs: extract + segment each member (the M1-chain head, references
     // ungrounded). The wrapper cites these in member order; provenance-only, so they do
     // not reach the payload-only `content_hash`.
@@ -987,8 +1002,10 @@ fn direct_smt_fill(
             Ok(wrapped) => pair.push(wrapped),
             Err(e) => {
                 shell.diagnostic(invalid_diagnostic(vec![
-                    (static_id("cassette"), format!("{gid}.{role}")),
-                    (static_id("reason"), format!("content hash: {e}")),
+                    (static_id("group"), gid.to_string()),
+                    (static_id("artifact"), format!("{gid}.{role}.smt_query")),
+                    (static_id("reason"), format!("wrap: {e}")),
+                    (static_id("processing_stage"), "model_fill_smt".to_owned()),
                 ]));
                 return None;
             }
@@ -3310,6 +3327,25 @@ processing_stages:
             );
             assert_eq!(deontic.payload.logic, SmtLogic::QfUf, "{gid} deontic logic");
 
+            // Provenance inputs: re-derive [source, segments] per member in group order —
+            // the payload-only content_hash cannot catch a wrong or missing input hash, so
+            // pin the full input_hashes independently of the body equality above.
+            let mut want_inputs: Vec<Hash> = Vec::new();
+            for m in &members {
+                let html = std::fs::read(root.join(&m.path)).unwrap();
+                let config = ExtractConfig {
+                    document_id: m.id.clone(),
+                    source_family: static_id("synthetic_test_source_html"),
+                    provenance: m.provenance,
+                    data_class: DataClass::None,
+                    producer: producer(&resolved, 0),
+                };
+                let source = extract(&html, &config).unwrap();
+                let segments = segment(&source, &producer(&resolved, 1)).unwrap();
+                want_inputs.push(source.content_hash.clone());
+                want_inputs.push(segments.content_hash.clone());
+            }
+
             // The pinned raw-AI `smt_query` provenance: `validate()` enforces only the
             // effects↔status rule, so pin origin / status / kind / producer here.
             for w in [&overlap, &deontic] {
@@ -3327,7 +3363,33 @@ processing_stages:
                     static_id("processing_stage.m2.model_fill_smt"),
                     "{gid} producer"
                 );
+                assert_eq!(w.input_hashes, want_inputs, "{gid} input_hashes");
+                w.validate()
+                    .unwrap_or_else(|e| panic!("{gid} wrapper validate: {e:?}"));
             }
+        }
+    }
+
+    /// route-direct-smt.3b fail-closed guard: the cassette-role design mints exactly one
+    /// (overlap, deontic) pair per group, so a non-pair member set must yield no artifact
+    /// rather than a two-query wrapper that silently under-covers the group. The guard
+    /// short-circuits ahead of any cassette or filesystem access, so repeating one corpus
+    /// entry to reach a given cardinality is sufficient.
+    #[test]
+    fn direct_smt_fill_rejects_non_pair_group() {
+        let root = repo_root();
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let corpus = single_ir_corpus();
+        let gid = static_id("group.malformed");
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        for members in [vec![&corpus[0]], vec![&corpus[0], &corpus[0], &corpus[0]]] {
+            let n = members.len();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
+            let got = direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell);
+            assert!(got.is_none(), "non-pair group (len {n}) must fail closed");
         }
     }
 }
