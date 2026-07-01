@@ -443,15 +443,25 @@ full pre-consolidation text lives in git history.
     `smt_query` DIRECTLY (`kind: verify`, no `compiled`), so the 3-stage "model_fill→syntactic-validity→
     verify" chain the roadmap first sketched collapses — "syntactic-validity" folds into that solver run
     (`target_syntax_failure`/`TargetParseError`, .5's direct-unique terminal, NO repair). Per-query emission
-    (grammar `<query>` = ONE query, unchanged + hash-pinned): a pair = 2 `model_fill` replays keyed
-    (route.direct_smt, GROUP_id, base) + (…, `derive_seed(base,1)`); source = GROUP id (not doc); accept =
+    (grammar `<query>` = ONE query, unchanged + hash-pinned): a pair = 2 `model_fill` replays keyed by
+    ROLE-namespaced source at the base seed — `source: <gid>.overlap` + `<gid>.deontic` (NOT a shared `<gid>`
+    source with Q2 at `derive_seed(base,1)`: `model_fill` reads repair attempt `i` under `derive_seed(base,i)`
+    on the SAME source [model_fill.rs L132], so a shared-source Q2 would ALIAS Q1's first repair — a real
+    collision, caught in codex review); accept =
     shallow well-formedness (utf8 + `(set-logic`/`(check-sat)`) → `Schema` only, NO grounding (the solver is
     the syntactic authority). GOLDEN cassette bytes = the group's M1 emitted `query_bodies[2k]`/`[2k+1]`
     VERBATIM → the `:named a.<rule_id>` labels == reference `expected_unsat_core` → scoring reuses
     `single_ir_route_scores_m1_groups`'s shape. 5 units, not ≤4 (the bypass ADDS the `verify_pair` refactor
     + `verify_query_pairs`; the roadmap's "likely fewer" guess assumed reusing m1.verify, which the region-id
     wall rules out). direct tail is its OWN fn (`compile_verify_group` inlines `compile()` + hardcodes
-    COMPILE=4/VERIFY=5; the 4-stage direct pipeline has `verify_smt` at slot 3, no `compiled`).
+    COMPILE=4/VERIFY=5; the 4-stage direct pipeline has `verify_smt` at slot 3, no `compiled`). Two slot-3
+    consequences (codex review): (1) `finish_processing_stage(idx)` derives the kind from
+    `PROCESSING_STAGE_KINDS[idx]` AND gates the solver-budget counter on `idx == VERIFY(5)` [run.rs
+    L1310-1316] → idx-3 reuse mis-stamps `"assemble"` + drops the budget (idx-5 over-runs the 4-entry
+    step-id array) → emit the verify event directly with kind `"verify"` + `SOLVER_BUDGET_KEY`; (2) verify
+    cites the UPSTREAM artifact hash (single_ir: `compiled.content_hash`), so direct wraps each fill body as an
+    `smt_query` `ArtifactWrapper<QueryBody>` (Canonical+CanonRead) and `verifier_results` cite those two
+    `content_hash`es — the CASSETTE hash is fill-wrapper provenance deferred to run-m2.1 (both routes).
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output

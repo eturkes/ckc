@@ -551,7 +551,8 @@ argument).
   (behavior-preserving — M1 verify tests + `single_ir_route_scores_m1_groups` stay byte-identical). NEW `pub
   fn verify_query_pairs(adapter: &Z3Adapter, pairs: &[((Id, String), (Id, String))], budget: Duration) ->
   Vec<VerifierResult>` (caller-minted query_ids + model bodies, no `CompiledArtifact`) looping `verify_pair`
-  — the direct route's verdict engine. Unit tests (z3 present): a hand-built Q1-sat / Q2-unsat pair (M1-shaped
+  — the direct route's verdict engine; re-export it from `lib.rs` L53 (`pub use verdict::{…,
+  verify_query_pairs}` — `verdict` is a private mod, so `.4` in ckc-cli cannot call it otherwise). Unit tests (z3 present): a hand-built Q1-sat / Q2-unsat pair (M1-shaped
   `:named a.<id>`) → one `SemanticContradiction` carrying the core; a Q1-unsat pair → Q1 result only, no Q2.
   Reading: `verdict.rs` `verify`/`assemble_result`/`QueryRole`; `verify.rs` `Z3Adapter::invoke`/`identity`.
   Gate: `cargo test -p ckc-smt` (M1 verify unchanged + 2 new); fmt + clippy.
@@ -562,13 +563,22 @@ argument).
   solver is the real syntactic authority, surfaced as `target_syntax_failure` at verify, .5). `direct_smt_fill`
   runs PER GROUP (a conflict pair spans 2 docs): extract+segment each member (parity/context with single_ir,
   the reused deterministic head; refs left UNgrounded), then two `model_fill(store, &key, FillSource::Replay,
-  repair_limit, accept)` (`model_fill.rs` L119) replays — Q1 `key = CassetteKey { route:
-  static_id("route.direct_smt"), source: <group_id>, seed: base }`, Q2 `seed: derive_seed(base, 1)`
-  (`model.rs` L344) — yielding the pair's two query bodies. GOLDEN cassette bytes = the group's M1 emitted
-  query bodies VERBATIM (bless from `compile()`'s `query_bodies[2k]`/`[2k+1]`, so the model's `:named
-  a.<rule_id>` labels == the reference `expected_unsat_core` → .4 scores). NEW `bless_direct_smt_cassettes`
-  (`#[ignore]`, mirror `bless_single_ir_cassettes` run.rs L2329) writes
-  `cassettes/route.direct_smt/<group_id>/seed-{base,derived}.json` (SYNTHETIC identity → engine-agnostic
+  repair_limit, accept)` (`model_fill.rs` L119) replays under ROLE-NAMESPACED sources at the base seed — Q1
+  `key = CassetteKey { route: static_id("route.direct_smt"), source: <group_id>.overlap, seed: base }`, Q2
+  `source: <group_id>.deontic, seed: base` (NOT a shared `source: <group_id>` + Q2 `seed: derive_seed(base,1)`:
+  `model_fill` reads repair attempt `i` under `derive_seed(base, i)` on the SAME source [`model_fill.rs`
+  L132-136], so a shared-source Q2 at `derive_seed(base,1)` would ALIAS Q1's first repair — .5 drives that
+  repair). Each accepted body is WRAPPED as an `smt_query` artifact (`wrapper(…, "smt_query", producer(resolved,
+  2), [source, segments] hashes, …)`, payload `ckc_smt::QueryBody` — Canonical+CanonRead, artifact.rs L52-78;
+  mirror `single_ir_fill`'s ir_bundle wrapper run.rs L820) → `direct_smt_fill` RETURNS the pair's two
+  `ArtifactWrapper<QueryBody>` (each `content_hash` is what .4 cites as the `verify_smt` input). GOLDEN cassette
+  bytes = the group's M1 emitted query bodies VERBATIM (bless from `compile()`'s `query_bodies[2k]` [overlap] /
+  `[2k+1]` [deontic], so the `:named a.<rule_id>` labels == the reference `expected_unsat_core` → .4 scores);
+  SCORED parity thus rides the golden/replay bytes (M1-faithful by construction), while live prompt-driven
+  label correctness is the baseline's own MEASURED (unguaranteed) job — no separate label-derivation guarantee
+  is built. NEW `bless_direct_smt_cassettes` (`#[ignore]`, mirror `bless_single_ir_cassettes` run.rs L2329)
+  writes `cassettes/route.direct_smt/<group_id>.overlap/seed-<base>.json` +
+  `cassettes/route.direct_smt/<group_id>.deontic/seed-<base>.json` (SYNTHETIC identity → engine-agnostic
   audit APPLIES). NEW `direct_smt_resolved()` (mirror `single_ir_resolved` L2254; `pipeline_id:
   pipe.m2_direct_smt`, `pipeline_step_ids[0..4]` = extract / segment / model_fill_smt / verify_smt). Gate:
   `cargo test` — a fill test that the replayed cassettes yield the exact M1 query bodies (byte-faithful);
@@ -577,16 +587,22 @@ argument).
   NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
   pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3's Q1+Q2 bodies (minted ids
   `<gid>.overlap` / `.deontic`) to `verify_query_pairs` → `VerifierResults { results }` → `validate` → `wrapper(…,
-  "verifier_results", producer(resolved, 3), <the replayed Q1+Q2 cassette content_hashes>,
-  Origin::ExternalAdapterGenerated, EvidenceStatus::VerifierEvidenceStatus, …)` → `land` →
-  `finish_processing_stage` stamping `processing_stage.m2.verify_smt` (pattern = `compile_verify_group`
-  VERIFY half, run.rs L554-595). NEW test `direct_smt_route_scores_m1_groups` (mirror
-  `single_ir_route_scores_m1_groups` L2498): fill every group, resolve groups + reference from
-  `exp.m1_scaffold`, run the tail, score — a conflict group → exactly one `SemanticContradiction` whose
-  `unsat_core` set == `entry.expected_unsat_core` and rides the Q2 (`<gid>.deontic`) id; a no-conflict group → no
-  contradiction; `results.producer.pipeline_step_id == processing_stage.m2.verify_smt`. Reading: run.rs
-  L504-595 + L2498-2620; .2's `verify_query_pairs`; `run_oracle.rs assert_group_matches_reference`. Gate:
-  `cargo test` (both groups match reference); fmt + clippy.
+  "verifier_results", producer(resolved, 3), [the two `smt_query` wrapper `content_hash`es from .3],
+  Origin::ExternalAdapterGenerated, EvidenceStatus::VerifierEvidenceStatus, …)` → `land`. Emit the verify EVENT
+  DIRECTLY (or via a NEW route-aware helper), NOT `finish_processing_stage(…, 3, …)`: that stamps the kind via
+  `PROCESSING_STAGE_KINDS[3]` = `"assemble"` and gates the solver-budget counter on `== VERIFY` (5) [run.rs
+  L1310-1316] (index 5 would over-run the 4-entry `pipeline_step_ids`) → stamp `processing_stage =
+  static_id("verify")`, `pipeline_step_id = pipeline_step_ids[3]` (= `m2.verify_smt`, which `producer(resolved,
+  3)` already yields), `resource_counters = [(SOLVER_BUDGET_KEY, budget_ms)]`. NEW test
+  `direct_smt_route_scores_m1_groups` (mirror `single_ir_route_scores_m1_groups` L2498): fill every group,
+  resolve groups + reference from `exp.m1_scaffold`, run the tail, score — a conflict group → exactly one
+  `SemanticContradiction` whose `unsat_core` set == `entry.expected_unsat_core` and rides the deontic
+  (`<gid>.deontic`) id; a no-conflict group → NO `SemanticContradiction` AND every result `SemanticNoConflict`,
+  and for an `expected_no_conflict_result` group the `<gid>.overlap` result is `Unsat` with no `<gid>.deontic`
+  result (mirror the full no-conflict branch run.rs L2616+ — it keys off `solver_query_plan`, which direct
+  lacks, so key off the minted ids); `results.producer.pipeline_step_id == processing_stage.m2.verify_smt`.
+  Reading: run.rs L504-595 + L1290-1316 + L2498-2645; .2's `verify_query_pairs`; `run_oracle.rs
+  assert_group_matches_reference`. Gate: `cargo test` (both groups match reference); fmt + clippy.
 - [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3 + .4; mirror
   route-single-ir.4 `git show 0feb50d 9da76b9`). Codes: (a) `ai_schema_violation` — a shallow-malformed SMT
   cassette (not query-shaped) → `FillReject::Schema` → re-prompt; a second bad attempt →
@@ -641,9 +657,13 @@ argument).
   input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
   cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
   used source+segments only, F4 payload-only, so add the cassette hash here). direct_smt has no assemble
-  wrapper + no `compiled`; its `verifier_results` cite the two replayed Q1/Q2 cassette `content_hash`es
-  (route-direct-smt.4 tail). Add the `ckc run
-  --record` flag (default
+  wrapper + no `compiled`: its `model_fill_smt` `smt_query` wrappers cite source+segments (.3) + the replayed
+  cassette `content_hash` added here (same model_fill provenance), and its `verifier_results` cite the two
+  `smt_query` wrapper `content_hash`es (route-direct-smt.4 — the upstream artifact, as single_ir's verify cites
+  `compiled`). Generalize `resolve()` (run.rs L208): today it selects only `experiment.baseline()` + iterates
+  all 8 `PROCESSING_STAGE_KINDS`, so make resolution route-aware over each pipeline's DECLARED stage list
+  (`pipe.m2_direct_smt` = 4, `pipe.m2_single_ir` = 6) — else `ckc run exp.m2_multihop` cannot resolve the
+  non-baseline route. Add the `ckc run --record` flag (default
   = replay committed cassettes runtime-absent; `--record` drives `CassetteStore::record` live — run-m2.2
   exercises that live path) + its default-replay acceptance. Tested via REPLAY of the route units'
   committed cassettes (deterministic, no live call) — model-fill replays runtime-absent, so replay.rs
