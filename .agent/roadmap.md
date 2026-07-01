@@ -671,17 +671,19 @@ argument).
   Gate: `cargo test --workspace` 440 passed / 6 ignored (was 439/6) + fmt + clippy `-D` clean + engine-agnostic
   audit (run.rs) clean; no new rustdoc debt (pre-existing model.rs/replay.rs/trace.rs `private_intra_doc_links`
   stays deferred to M2 review). M2 stays IN-PROGRESS (.5 + metrics/report/run/acceptance remain).] 77% 154K/200K
-- [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3b + .4; mirror
-  route-single-ir.4 `git show 0feb50d 9da76b9`). Codes: (a) `ai_schema_violation` — a shallow-malformed SMT
-  cassette (not query-shaped) → `FillReject::Schema` → re-prompt; a second bad attempt →
-  `repair_limit_exceeded` (`repair_limit 1`, Q1 `seed s` + `derive_seed(s, 1)`; mirror
-  `bless_single_ir_rejection_cassettes` L2371, the `[AiSchemaViolation×2, RepairLimitExceeded("1")]` shape);
-  (b) `target_syntax_failure` / `TargetParseError` — a well-formed-but-solver-rejected query (an `(error …)`
-  reply, no verdict token) reaching `verify_smt` → the direct-route-UNIQUE terminal path (NO repair;
-  `assemble_result` maps it, `verdict.rs`). Route-level surfacing asserted via `shell.ledger()` (as
-  `single_ir_fill` does). NEW `bless_direct_smt_rejection_cassettes` (`#[ignore]`, SYNTHETIC → audit
-  applies). Gate: `cargo test` (every code over committed bad cassettes + the ledger surfacing); fmt +
-  clippy + audit clean.
+- [ ] route-direct-smt.5: §7.4 rejection codes for the direct route over committed bad cassettes
+  (needs .3b + .4; mirror route-single-ir.4 `git show 0feb50d 9da76b9`). Two codes: (a)
+  `ai_schema_violation`×2 → `repair_limit_exceeded` (schema exhaustion, `repair_limit 1`, base seed +
+  `derive_seed(s,1)`); (b) `target_syntax_failure`/`TargetParseError` — a shallow-accepted but
+  solver-rejected query (`(error …)`, no verdict) reaching `verify_smt` → the direct-route-UNIQUE terminal
+  (NO repair; `assemble_result` maps it). Both surfaced to `shell.ledger()`. NEW
+  `bless_direct_smt_rejection_cassettes` (`#[ignore]`, SYNTHETIC → audit applies) +
+  `direct_smt_route_rejection_codes`. ALL code + signatures + validated facts (z3 stdin `(error)` shape,
+  `derive_seed(91,1)`, model_fill attempt→seed, ledger surfacing) pre-derived in
+  `.agent/wip-direct-smt-5.txt` — read THIS, VERIFY-read only its flagged anchors (reconnaissance was the
+  context sink last session; the blueprint removes it). Gate: `cargo test --workspace` (both codes over
+  committed bad cassettes + ledger surfacing) + fmt + clippy `-D` + engine-agnostic audit (run.rs) clean.
+  CLOSE: `rm .agent/wip-direct-smt-5.txt`.
 - [ ] metrics-m2.1: route-quality raw-row metrics. New metrics module → per-route raw rows over a
   run: schema-valid rate, acceptance rate, repair count, recorded-call counts, target syntactic
   validity (solver parse), conflict-verdict accuracy vs reference over the §8 conflict + no-conflict

@@ -29,70 +29,53 @@ full pre-consolidation text lives in git history.
 
 ## Lessons
 
-- Unit sizing rules (consolidated from roadmap `NN%` annotations and observed 200K overruns;
-  per-incident case studies live in git history — `git show 6e413f0^:.agent/memory.md`). Target: one
-  conceptual deliverable plus one gate, finishable AND committable in one window with margin;
-  prefer more, smaller units. Plan-time obligations (a violation is a planning bug): resolve
-  semantic requirements decisions INTO the roadmap line (more than ~2 left open = re-scope);
-  research and pin any new external dependency (exact version + features) in the line;
-  pre-split multi-deliverable stacks BEFORE scheduling — mid-session overrun recovery is
-  user-initiated (stop, bring the tree clean, report); minting a split rule re-audits every
-  remaining unchecked line against it in the same recovery commit; a recovery split is itself
-  plan work — audit its replacement lines against every standing rule and the open-decision
-  ceiling within the recovery commit. Split rules: a feature needing a refactor of existing
-  code to share internals takes the refactor as its own behavior-locked unit FIRST (existing
-  tests the gate, zero test edits); a format walker plus committed test-source integration =
-  walker-core (inline-literal tests) then format-completion + test-source integration; a
-  nontrivial algorithm plus a second authored artifact = two units; a multi-invariant
-  validator plus full rejection coverage = two units; a derivation fn with its
-  test-source-pinned battery plus an attachment sub-feature = two units; a type family plus
-  assembly plus validation = three units; an assembly fn plus its live-pipeline pin battery =
-  two units; a live-pin battery over the run binary is a unit on its own (never paired with
-  assembly or processing-stage wiring); a spec-byte amendment (re-pin + reference/test mirror
-  sweep) bundled with new feature code = two units — an open decision whose resolution amends
-  pinned bytes is a deliverable, not a session preamble; crate foundations pair only with a
-  small type surface (one payload module per foundation unit); deterministic code paired with a SLOW or
-  exploratory live confirm over an external runtime = two units (code stub-gated + mechanical; the live
-  confirm its own unit — model-adapter.2 (~24s/call + a one-time weak-model degeneration
-  discovery) then model-cassette (modules + a live bless) both overflowed pairing them → apply to
-  EVERY live-runtime-gated unit at plan time, not only the obviously-slow), and recovering such an overflow discharges that one-time exploration into memory
-  `## Runtime` + persists any session-scratchpad tool the live unit needs to a stable machine-local path
-  (on PATH for a bare-name command) so the redo is a checklist. Measured anchors (checked
-  roadmap stubs carry the `NN%` figures): canonical JSON = five units; a five-layer recursive
-  type family = three units; a lexicon-driven derivation half (loader / binding / builder) =
-  three units; statement builder over a prebuilt binding core = one unit; exception
-  attachment + determinism tests = one unit. Practices: house new type families in fresh
-  modules (extending a ~2K-line module costs a full-file read); scope each split unit's
-  Reading slice to exclude files its half leaves untouched; land a compiling skeleton before
-  the full test battery; salvage a reverted session's compiling half as a committed
-  `.agent/wip-<unit>.patch` the redo line points at (apply, verify against the line, delete in
-  the closing commit; a recovery with context to spare PROVES the salvage green before
-  reverting — apply the full set, run the gate, fix what it catches, then revert — so the redo is
-  reproduction-only with the gate pre-proven + its pass counts banked in the redo line (a SOURCE-DIFF salvage banks the whole proven change as a `git diff`
-  `.agent/wip-<unit>.patch` + a thin procedure-only `.txt`, so the redo is `git apply` → bless → gate →
-  commit, transcribing NOTHING — route-single-ir.2b M2.17), latent bugs
-  caught in recovery not redo: M2.13 caught a missing `Debug` on a public result type; a codex-review
-  of a salvage targets the wip as the real deliverable + folds accepted NEW TESTS into it pre-redo,
-  since deferring them would re-derive in the "reproduction-only" redo → re-prove green, then re-bank
-  the wip's sha AND pass counts in the redo line, e.g. M2.14 added a grounding-on-repair test 425→426)
-  — an uncompiled draft salvages the same way flagged UNCOMPILED,
-  transcription-with-verification still beating re-derivation (recovery also verifies the draft's external assumptions —
-  referenced types/APIs/field names — against source, making the salvage an assumption-verified target
-  not a blind preserve; a whole-NEW-file draft salvages as a byte-verified `.rs.txt` copy not a
-  diff, dodging RTK diff-compression + LSP indexing (pre-format the salvage — rustfmt reflows an
-  unformatted draft, so a byte-exact restore fails `cargo fmt --check` otherwise); a unit that overflows on DERIVATION not
-  implementation (SOTA notation/tool selection + empirical external-crate validation, e.g.
-  schemas-export.2's BNF + `bnf`-crate pick) salvages the same way — the redo line banks the LOCKED
-  decision, the validated + hashed artifact (any committed file → byte-exact `.agent/wip-<file>`, not
-  only `.rs`), AND the wiring APIs pre-transcribed from source (emitter fixtures, the .1b hash-pin
-  form), so the redo reads nothing but the line and runs pure wire+gate; a salvage shared by a
-  multi-unit split is
-  deleted at the LAST consuming unit's close); pin expected shapes from
-  observed output, never hand-computed; cite only checked roadmap lines as measured anchors.
-  At plan/re-scope time, audit any spec listing a unit must byte-reproduce: listings written
-  for readability (alignment padding, inline result comments, illustrative declaration or
-  conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
-  deliverable (caught pre-session for smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration rule).
+- Unit sizing rules (per-incident case studies in git — `git show 6e413f0^:.agent/memory.md`). Target:
+  one conceptual deliverable + one gate, finishable AND committable in one window with margin; prefer
+  more, smaller units. PLAN-TIME obligations (a violation is a planning bug): resolve semantic decisions
+  INTO the roadmap line (>~2 left open = re-scope); research + pin any new external dependency (exact
+  version + features) in the line; pre-split multi-deliverable stacks BEFORE scheduling (mid-session
+  overrun recovery is user-initiated — stop, clean the tree, report); minting a split rule re-audits
+  every remaining unchecked line against it in the same recovery commit; a recovery split is itself plan
+  work → audit its replacement lines against every standing rule + the open-decision ceiling within that
+  commit. SPLIT RULES: refactor-to-share-internals → the refactor is its OWN behavior-locked unit FIRST
+  (existing tests the gate, zero test edits); format walker + test-source integration = walker-core
+  (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
+  artifact = 2; multi-invariant validator + full rejection coverage = 2; derivation fn + its
+  test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
+  assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
+  (never paired with assembly or stage wiring); spec-byte amendment (re-pin + reference/test mirror sweep)
+  + new feature code = 2 (an open decision that amends pinned bytes is a deliverable, not a preamble);
+  crate foundations pair only with a small type surface (one payload module each); deterministic code + a
+  SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
+  confirm its own unit) → apply to EVERY live-runtime-gated unit at plan time, not only the obviously-slow,
+  and on recovery discharge the one-time exploration into memory `## Runtime` + persist any
+  session-scratchpad tool the live unit needs to a stable machine-local path (on PATH for a bare-name
+  command) so the redo is a checklist. MEASURED ANCHORS (checked stubs carry `NN%`): canonical JSON = 5;
+  five-layer recursive type family = 3; lexicon-driven derivation half (loader/binding/builder) = 3;
+  statement builder over a prebuilt binding core = 1; exception attachment + determinism tests = 1.
+  PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
+  read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
+  skeleton before the full test battery; pin expected shapes from observed output, never hand-computed;
+  cite only checked roadmap lines as anchors. At plan/re-scope time audit any spec a unit must
+  byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
+  declaration/conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
+  deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE (a reverted session's compiling
+  half → committed `.agent/wip-<unit>.patch` the redo line points at; apply, verify vs the line, delete at
+  the closing commit): a recovery with margin PROVES the salvage green before reverting (apply full set,
+  run gate, fix, revert) → the redo is reproduction-only, gate pre-proven + pass counts banked in the redo
+  line. A SOURCE-DIFF salvage banks the whole proven change as a `git diff` + a thin procedure-only
+  `.txt` → redo = `git apply`→bless→gate→commit, transcribing NOTHING; a codex-review of a salvage targets
+  the wip as the real deliverable + folds accepted NEW TESTS into it pre-redo (else the "reproduction-only"
+  redo re-derives them) → re-prove green, re-bank sha + pass counts. An UNCOMPILED draft salvages the same
+  way flagged UNCOMPILED — recovery verifies its external assumptions (referenced types/APIs/field names)
+  against source, an assumption-verified target not a blind preserve; a whole-NEW-file draft salvages as a
+  byte-verified `.rs.txt` copy not a diff (dodges RTK diff-compression + LSP indexing; pre-format it —
+  rustfmt reflows an unformatted draft so a byte-exact restore else fails `cargo fmt --check`). A
+  DERIVATION overflow (SOTA notation/tool selection + empirical external-crate validation) salvages the
+  same — the redo line banks the LOCKED decision, the validated + hashed artifact (any committed file →
+  byte-exact `.agent/wip-<file>`, not only `.rs`), AND the wiring APIs pre-transcribed from source, so the
+  redo reads nothing but the line. Latent bugs surface in recovery not redo (e.g. a missing `Debug` on a
+  public result type); a salvage shared by a multi-unit split is deleted at the LAST consuming unit's close.
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
@@ -141,41 +124,25 @@ full pre-consolidation text lives in git history.
   a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
   ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
   `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Caught by codex on M2.20 .2.
-- Model-runtime adapter (§9, M2.8 model-adapter.1, `ckc-cli/src/model.rs`, mirrors `ckc-smt`
-  Z3Adapter). Non-obvious decisions beyond the code/docs: (1) `pub mod model` NOT private — a
-  skeleton landed ahead of its in-crate consumer (the forthcoming model-fill stage) must be pub
-  API or clippy `--lib -D warnings` fails dead_code (test-only use doesn't count in the no-cfg-test
-  lib build); matches the exposed pipeline-mechanics modules, not the private CLI glue. (2) MIRRORS
-  not reuses the Z3 subprocess machinery (`spawn_piped`/`drain`/`run_process` + the 4 budget/grace
-  consts) — roadmap "helpers mirror" + the refactor-first rule; extracting a shared cross-crate
-  subprocess runner is a deferred future unit, don't ad-hoc-dedup. (3) `ModelOutcome::Completed{bytes}`
-  intentionally duplicates `ModelRun.stdout_bytes` on a clean exit (the Z3 raw-vs-interpreted split) —
-  only stdout_bytes carries the PARTIAL capture on Timeout/ExitFailure/SpawnFailure, so they diverge
-  there; stdout stays raw bytes (never lossy-decoded — byte-stability is the cassette determinism).
-  Documented to pre-empt a redundancy flag. (4) NO process-fate→DiagnosticCode map here: the §7.4
-  `ai_*` codes are OUTPUT-parse concerns, so process spawn/timeout/exit→diagnostic is
-  stage-model-fill's job; the adapter returns raw outcome data. (5) `set_var` is forbidden
-  (edition-2024 unsafe + crate `#![forbid(unsafe_code)]`) → env policy split into pure
-  `resolve_command(Option<String>)` tested without env mutation; default = neutral role name
-  `ckc-model-runtime`, `CKC_MODEL_COMMAND`-overridable. (6) successful bare-name PATH resolution is
-  covered LIVE in .2 (no `set_var` to inject PATH); .1 proves only that an absent bare name fails at
-  the probe spawn. The committed CLI contract (probe `--identity` → `key=value` lines
-  model_id/quant/runtime_version, parse order-independent/first-wins/all-required-non-empty/model_id a
-  grammatical Id; generation args `--constraint <path> --seed <u64>` + prompt on stdin → generated
-  bytes on stdout) lives in the module consts + docs — model-adapter.2/model-cassette/stage-model-fill
-  + the env-supplied wrapper all bind to it. Tests drive a committed in-source stub (the `COMMITTED_STUB`
-  contract emulator, materialized per-test to a unique temp exec) covering every outcome.
-- Codex-review (M2.8) — mirror divergences from Z3Adapter + deferrals: (a) argv `&[&OsStr]` not
-  `&[&str]`: model.rs is the first to pass a PATH as an argv element, so the constraint path reaches
-  the runtime verbatim (Z3 passes only ASCII flags → its `&str` is lossless; `to_string_lossy`
-  corrupted non-UTF-8 paths → silent wrapper open-failure); 0xFF-path regression-tested. (b)
-  identity-probe stdout strict `from_utf8`→`IdentityUnparsed`, not lossy (recorded identity = the
-  runtime's true bytes; stderr stays lossy/diagnostic). (c) REJECTED — Z3-mirrored, non-realistic, fix-both-not-one —
-  `Instant::now()+budget` overflow-panic (absurd Durations) + the ETXTBSY-recover test's sub-60ms
-  vacuous-pass window; folded into the deferred shared-subprocess-runner refactor. The post-grace
-  detached drain is unbounded-worst-case (a descendant holding stdout open + writing forever keeps the
-  thread appending to its `Vec`) — accepted for the local trusted runtime under no-unsafe + no-extra-dep
-  scope, capped or reaped in that same refactor (M2.9 r3 codex).
+- Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
+  Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
+  -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
+  reuses Z3's subprocess machinery — a shared cross-crate runner is a DEFERRED unit (don't
+  ad-hoc-dedup) that also absorbs the two codex-REJECTED fixes (`Instant+budget` overflow-panic +
+  ETXTBSY vacuous-window; rejected Z3-mirrored, non-realistic, fix-both-not-one) AND the cap/reap of the
+  STILL-unbounded post-grace detached drain (a descendant holding stdout open appends to its Vec forever;
+  accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep). `Completed{bytes}`
+  duplicates `stdout_bytes` on clean exit; PARTIAL capture on Timeout/ExitFailure/SpawnFailure diverges;
+  stdout stays RAW, never lossy-decoded (byte-stability = cassette determinism). NO
+  process-fate→DiagnosticCode here (§7.4 `ai_*` = output-parse, stage-model-fill's job). `set_var`
+  forbidden (`#![forbid(unsafe_code)]`) → pure `resolve_command(Option<String>)`; default neutral
+  `ckc-model-runtime`, `CKC_MODEL_COMMAND`-override. argv `&[&OsStr]` not `&str` → constraint PATH
+  reaches the runtime verbatim (`to_string_lossy` corrupts non-UTF-8 → silent open-fail; 0xFF-tested);
+  identity-probe strict `from_utf8`→`IdentityUnparsed` (recorded = true bytes, stderr lossy). COMMITTED
+  CLI CONTRACT (module consts+docs; run-m2.*/cassette/stage-model-fill/env-wrapper bind): probe
+  `--identity` → `key=value` model_id/quant/runtime_version (order-independent/first-wins/all-nonempty/
+  model_id a grammatical Id); generation `--constraint <path> --seed <u64>` + prompt on stdin → bytes on
+  stdout.
 - Model cassette (§4.4/§9, model-cassette.1 modules + .2 live bless). Crate split mirrors
   ModelIdentity(data, ckc-core)/ModelAdapter(runtime, ckc-cli): `CassettePayload` in ckc-core (needs
   pub(crate) `RawText`/`emit_u64`/`read_u64`), `CassetteStore` record/replay IO in ckc-cli (drives
@@ -220,82 +187,54 @@ full pre-consolidation text lives in git history.
   duplicated here. Registry: ONE single_ir-shaped `processing_stage.m2.model_fill` (nondeterministic,
   `[source_document_graph,segments]→[clinical_ir]`), UNREFERENCED (no chain check fires until a route
   pipeline references it); route-direct-smt adds its OWN smt_query-output entry.
-- Committed-artifact + hash-pin pattern (`schemas-export.1b` = first repo instance). EMITTER-BACKED
-  variant (committed file regenerable from code, e.g. `.1b`'s ClinicalIR JSON-Schema): two tests beat
-  one env-gated test —
-  a `CKC_BLESS`-style write-in-test masks drift the moment its token leaks into CI (codex M2.3): a
-  drift guard that NEVER writes (`assert_eq!` committed bytes vs emitter output, so no env state can
-  mask it) + an `#[ignore]`d bless that regenerates the file (`create_dir_all` + write), run manually
-  (`cargo test <bless_fn> -- --ignored`). Pin `const <X>_HASH = hash_bytes(bytes).as_str()` (plain
-  sha256 → `sha256:<hex>`, byte-identical to `sha256sum`; re-pin from `sha256sum` after blessing; the
-  assert_eq also cross-checks committed == emitted). Oracle = dev-only `jsonschema`,
-  `default-features=false` (drops remote-$ref resolvers + TLS a self-contained schema never needs,
-  keeps `validator_for`/`is_valid` + `pattern`). Pin the rejection REASON, not just `!is_valid`:
-  assert each malformed case's `(instance_path, schema_path)` via `iter_errors()` (a failed `oneOf`
-  reports at the parent's `.../oneOf`, not the nested keyword → prove the nested split, e.g. pattern
-  vs type, by the baseline accepting the canonical value). HAND-AUTHORED variant (no emitter — e.g.
-  schemas-export.2's BNF grammar, route prompt files): the file IS the source + its oracle is the
-  `bnf` recognizer (not jsonschema), so skip bless + the cross-check; the lone `hash_bytes(file) ==
-  <X>_HASH` pin IS the whole drift guard (edit → hash flips → fail). `bnf` 0.6 wiring (the working
-  form is in `emit.rs`; these two facts are not): recognize through `g.build_parser()?` +
-  `p.parse_input(s).next().is_some()` (full-match Earley) — `Grammar::parse_input` is DEPRECATED so
-  `-D warnings` forbids it; `parse_input` binds `input: &'gram str` to the parser's grammar borrow,
-  so rebuild the parser per call (or compute every input before `build_parser`) to free input
-  lifetimes — a tiny grammar makes the rebuild free. Oracle scope = SOUND SUPERSET of the
-  emitter image, NOT its exact shape: a CFG can't bind cross-field coupling
-  (logic↔produce↔result), assertion cardinality, or declare-before-use → the §8.6 byte pins own
-  those; keep the grammar the construct-surface union (downstream grammar-constrained decoding wants
-  the union, not the 2-query image), don't tighten it to match emit. Cover every production incl. the
-  easy-to-miss empty-context→`true` collapse. Reject-case honesty: full-match is proven ONLY by a
-  trailing-garbage case (complete query + extra bytes); a missing-terminator rejects via its terminal
-  production regardless of anchoring. Byte-pinned text file → `.gitattributes eol=lf` so the sha256 +
-  the literal-LF `<nl>` survive any checkout.
+- Committed-artifact + hash-pin pattern (`schemas-export.1b`, reused for any committed regenerable
+  artifact — report-m2 fixtures, cassettes). EMITTER-BACKED (file regenerable from code): two tests
+  beat one env-gated `CKC_BLESS` write-in-test (its token leaking into CI masks drift) — a drift guard
+  that NEVER writes (`assert_eq!` committed bytes vs emitter output) + an `#[ignore]`d bless that
+  regenerates (`create_dir_all`+write, run manually). Pin `const <X>_HASH = hash_bytes(bytes).as_str()`
+  (`sha256:<hex>`, byte-identical to `sha256sum`; re-pin after bless). jsonschema oracle = dev-only,
+  `default-features=false` (drops remote-$ref/TLS, keeps `validator_for`/`is_valid`/`pattern`); pin the
+  rejection REASON via `iter_errors()` `(instance_path, schema_path)` — a failed `oneOf` reports at the
+  parent `.../oneOf`, so prove the nested split (pattern vs type) by the baseline accepting the
+  canonical value. HAND-AUTHORED variant (no emitter — grammar / prompt files): the file IS the source,
+  its oracle is the format's own recognizer (working `bnf` Earley form in `emit.rs`; two facts that are
+  NOT: `Grammar::parse_input` is DEPRECATED → `-D warnings` forbids it, recognize via `g.build_parser()?`
+  + `p.parse_input(s).next().is_some()`; `parse_input` borrows `input: &'gram str` from the parser's
+  grammar → rebuild the parser per call to free input lifetimes, free for a tiny grammar) → skip bless +
+  cross-check; the lone `hash_bytes(file) == <X>_HASH` pin IS the whole drift guard. DESIGN LESSON
+  (any grammar/schema oracle): oracle = SOUND SUPERSET of the emitter image, NOT its exact shape — a
+  CFG can't bind cross-field coupling / assertion cardinality / declare-before-use, so §8.6 byte pins
+  own those; keep the grammar the construct-surface union (grammar-constrained decoding wants the
+  union), cover every production incl. the empty-context→`true` collapse, and prove full-match ONLY via
+  a trailing-garbage case. Byte-pinned text file → `.gitattributes eol=lf` (sha256 + literal-LF `<nl>`
+  survive checkout).
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —
   `schema_accepts_canonical_clinical_ir` is that guard (M3 ClinicalStatement additions must extend both).
   Non-obvious anchor: canonical integers are STRING-quoted (`emit_int`→`emit_string`), so interval bounds
   are schema `string`+INT_PATTERN (a bare JSON number is rejected), not `number`.
-- Registry model surface (§14, M2.5): `registry/schemas.yaml` (`SchemaEntry` =
-  id/path/schema_hash/target_kind) + `registry/prompts.yaml` (`PromptEntry` = id / path-xor-inline /
-  template_hash / route). Hash fields are `Hash`-typed → grammar-validated on load (Id/Hash use
-  `#[serde(try_from="String")]`; a plain derived newtype Deserialize would NOT validate). Validation is
-  SEPARATE: `validate_model_registry` (not folded into `validate_registries`) because the model surface
-  has no §8.4 cross-refs yet — model-fill stages will bind schema/prompt ids in route units; fold into
-  `validate_registries` only when a stage→schema/prompt dangling check is actually wanted (else 18
-  call sites churn for nothing). Layer split: pure findings (id uniqueness, schema path nonempty,
-  prompt path-xor-inline → `PromptSource`/`Empty`) live in core; schema FILE existence + `schema_hash`
-  match are I/O → CLI `check_model_registry` emits them as sorted-key `actual`/`expected`/`schema` (or
-  `reason`/`schema`) diagnostics mirroring `load`'s file/reason shape, NOT `RegistryFinding`s. Both
-  files are OPTIONAL via `load_optional` (absent→empty, no diagnostic — additive surface, M1 ran
-  without them; keeps existing tempdir CLI tests at their old counts). schemas.yaml seeded: ids
-  `schema.clinical_ir`/`schema.smt_query`, `target_kind` = constrained output layer
-  `clinical_ir`/`smt_query`. prompts.yaml seeded by route-single-ir.1: `prompt.single_ir` →
-  `registry/prompts/single_ir.txt` (route `route.single_ir`, `eol=lf`-pinned) + the symmetric prompt
-  file/hash loop in `check_model_registry` (path → file bytes, inline → text bytes, vs `template_hash`;
-  mismatch payload sorted `actual`/`expected`/`prompt`; read-error sorted `prompt`/`reason`). Prompt
-  CONTENT is NOT gated (only existence + hash + path-xor-inline shape) — first-draft wording, refined at
-  run-m2.2's live recording. route-direct-smt.1 then seeded `prompt.direct_smt`
-  (`registry/prompts/direct_smt.txt`) + `pipe.m2_direct_smt` + `processing_stage.m2.{model_fill_smt,
-  verify_smt}` through that same generic loop — a 2nd prompt route + pipeline needs ZERO
-  registry_check.rs change (pure additive data; both committed drift guards absorb it, counts unchanged).
-  (M2.15 codex-review: prompt
-  prose reframed negatives→positives per AGENTS.md pink-elephant rule + hash re-pinned; positive framing
-  is a standing style rule, distinct from the deferred perf tuning.) Drift guard =
-  `committed_model_surface_checks_ok` (schemas.yaml + prompts.yaml pinned hashes must equal the real
-  `schemas/` + `registry/prompts/` bytes).
-  Roadmap's schemas-export.2 spec carries a STALE .2-era schema hash/size (codex `ecca074` tightened the
-  grammar; collapses at M2 review) → read the live hash from schemas.yaml/emit.rs, never that spec.
-  M2.5 codex-review: registry paths checked safe-relative via `is_safe_relative_path` (pub ckc-core) —
-  ONE predicate, in the pure validator (`UnsafePath` finding, schema+prompt paths) AND reused at the
-  CLI read-guard (skip reading an unsafe path); don't duplicate. LEXICAL only (rejects absolute + `.`/`..`
-  components) → a committed repo-local SYMLINK pointing outside the tree still passes + the CLI
-  `std::fs::read` follows it (only the target's hash, not content, reaches a diagnostic); the pure
-  validator can't catch it (no I/O) → a real fix = an I/O-layer symlink/canonicalize guard across BOTH
-  read loops = its own scoped security unit (M2.15 codex-review deferred: low, pre-existing, local
-  repo-committed inputs only, not remotely exploitable). Core fixtures (SCHEMAS included) use
-  SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents` (it replaces a
-  SCHEMAS hash to forge a bad doc).
+- Registry model surface (§14): `schemas.yaml` (`SchemaEntry`=id/path/schema_hash/target_kind) +
+  `prompts.yaml` (`PromptEntry`=id/path-xor-inline/template_hash/route); both OPTIONAL via
+  `load_optional` (absent→empty, additive — M1 counts unchanged). Hash fields are `Hash`-typed →
+  grammar-validated on load (Id/Hash use `#[serde(try_from="String")]`; a plain derived Deserialize would
+  NOT validate). Validation is SEPARATE — `validate_model_registry`, NOT folded into
+  `validate_registries` (no §8.4 cross-refs yet; fold in only when a stage→schema/prompt dangling check
+  is wanted, else 18 call sites churn for nothing). Layer split: pure findings (id uniqueness, path
+  nonempty, path-xor-inline → `PromptSource`/`Empty`) in core; FILE existence + `schema_hash`/`template_hash`
+  match are I/O → CLI `check_model_registry` emits sorted-key `actual`/`expected`/`schema`|`prompt` (or
+  `reason`/…) diagnostics, NOT `RegistryFinding`s. Adding a route (prompt + pipeline + stages) is PURE
+  additive data through the generic loop → ZERO `registry_check.rs` change; drift guard
+  `committed_model_surface_checks_ok` (pinned hashes == real `schemas/` + `registry/prompts/` bytes)
+  absorbs it. Prompt CONTENT is ungated (existence + hash + shape only) — first-draft wording, refined at
+  run-m2.2's live recording. GOTCHA: roadmap's schemas-export.2 spec carries a STALE .2-era grammar
+  hash/size → read the live hash from schemas.yaml/emit.rs, never that spec. Path safety =
+  `is_safe_relative_path` (pub ckc-core), ONE predicate reused by the pure validator (`UnsafePath`) + the
+  CLI read-guard — LEXICAL only (rejects absolute + `.`/`..`), so a committed repo-local SYMLINK pointing
+  outside the tree passes and `std::fs::read` follows it → a real fix is an I/O-layer
+  symlink/canonicalize guard across BOTH read loops = its OWN scoped security unit (DEFERRED: low,
+  pre-existing, local repo-committed inputs only, not remotely exploitable). Core fixtures (SCHEMAS
+  included) use SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents`.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
   forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
   Option<Id>` (the §7.3 delta baseline), all `#[serde(default, skip_serializing_if=…)]` so the M1
@@ -314,12 +253,10 @@ full pre-consolidation text lives in git history.
   (no §14 byte-pin → free prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
-- "Oracle" cleanup (`b0e51b2`/`caefcbb`/`e4f983a`) renamed only the epistemic-overclaim sense
-  (`runtime-oracle`→`runtime reference`; results are locked measurements, not a real-world-truth authority)
-  across SPEC/Rust/registry/corpus/reference/IDs/config (`docs/` excluded). The TEST-ORACLE sense (deciding
-  a test's pass/fail vs the reference) deliberately persists in `run_oracle.rs` + `rules.rs` (`// THE
-  oracle`). Decision: NARROW — leave the test-sense; a global retirement (`run_oracle.rs`→
-  `run_reference_check.rs`) is an OPEN user/style call.
+- "Oracle" naming: the epistemic-overclaim sense was renamed `runtime-oracle`→`runtime reference`
+  (results = locked measurements, not a real-world-truth authority); the TEST-ORACLE sense (pass/fail
+  vs the reference) deliberately PERSISTS in `run_oracle.rs` + `rules.rs`. A global retirement
+  (`run_oracle.rs`→`run_reference_check.rs`) is an OPEN user/style call → don't auto-rename on a sweep.
 - ckc-smt's `serde` dep reads as unused (no `serde::`/`Serialize`/`Deserialize` in ckc-smt/src
   beyond the `fieldless_enum!` invocations) but is REQUIRED: that ckc-core macro expands to
   `::serde::Serialize`/`Deserialize` impls *in the caller's crate*, so every fieldless_enum! user
@@ -327,17 +264,14 @@ full pre-consolidation text lives in git history.
   crate adopting the macro. Those serde impls go unused there (the canonical path is
   Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; don't
   "tidy" the dep away.
-- M1 reviewed (REVIEWED; gates green; zero code defects in the milestone body — all nine §8.5
-  mechanisms + every §8.6 byte-pin verified live, the Q1/Q2 smt pins via run_oracle's
-  group.m1_conflict assertion as well as the emit-unit pins). §4.4-vs-§8.3 tension RESOLVED by SPEC
-  amendment (codex-review follow-up): a processing stage's total operation result IS its §4.6
-  EventRecord — the §8.3 run layout has no per-stage total artifact — and only commands materialize
-  the standalone TotalOperationResult, whose value/residual/ambiguity/incoherence buckets stay empty
-  until a milestone materializes typed placeholders. So do NOT add per-stage TotalOperationResults:
-  inert + redundant with EventRecords until typed placeholders exist (judged technical-debt-not-gain;
-  M2+ may revisit). One enhancement stays open: tests are example/byte-pin only; property-based /
-  fuzzing for the canon layer (round-trip identity, reject-any-mutation) and StringPolicy
-  (idempotence) is the AGENTS.md-preferred strengthening, currently unscheduled.
+- M1 reviewed (gates green, zero defects — git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED
+  by SPEC amendment: a processing stage's total operation result IS its §4.6 EventRecord (§8.3 has no
+  per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
+  residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: do NOT
+  add per-stage TotalOperationResults — inert + redundant with EventRecords until then (M2+ may
+  revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
+  property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
+  idempotence.
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema
@@ -499,24 +433,19 @@ full pre-consolidation text lives in git history.
     GOTCHA (codex .4): `input_hashes` canonicalize as a §4.3 SET — the landed wrapper sorts them by hash, the
     in-memory event keeps insertion order → multi-input provenance assertions compare as SETS, never pin
     emitted order (bit the .4 event/wrapper test; will bite metrics/report-m2).
-  - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
-    runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
-    schema-VALID output
-    that can be semantically WRONG (observed: a greedy run emitted a wrong enum) → the M2 report scores
-    BOTH acceptance-rate (schema-validity) AND verdict-accuracy, never validity alone. The baseline
-    deliberately pins a weak sub-4B model whose free-form/direct-route output degenerates → exercises §9's
-    "direct-route failures common" path (pin the exact model identity in the run config; alternatives ok).
-    Greedy output is byte-stable within + across processes on one host/device/quant but NOT across
-    environments → the recorded-bytes cassette (engine-agnostic boundary above), not a live re-run, is the
-    correctness mechanism; replay needs no model runtime present. Two M2.9-respec refinements: (a)
-    constrained output can be INCOMPLETE/INVALID (not just semantically wrong) when the constraint format
-    permits unbounded whitespace + the model is weak (greedy loops on free whitespace, truncates at the
-    token budget) → the acceptance-rate metric counts truncation/parse-incompleteness as a failure mode,
-    and the tight-grammar route (explicit newlines, no free whitespace) sidesteps it. (b) greedy is
-    SEED-INERT → the k per-sample seeds yield identical draws (convergence trivially 1.0); MEANINGFUL
-    k-sample convergence (metrics-m2.2) needs a sampling config (temperature > 0, the seed fixing
-    each draw) — a downstream config decision, NOT the adapter's (invoke_samples stays config-agnostic:
-    derive seeds, invoke, record).
+  - Runtime-gate findings (gate MET, confirmed functionally on a real test source; byte-stability +
+    seed-inertness + degeneration mechanics live in `## Runtime`, machine specifics in
+    `.agent/runtime.local.md`). Metrics/report conclusions: constrained decoding forces schema-VALID output
+    that can be semantically WRONG, or INCOMPLETE/INVALID when the constraint format permits unbounded
+    whitespace + the model is weak (greedy loops on free whitespace, truncates at the token budget) → the
+    M2 report scores BOTH acceptance-rate (schema-validity, counting truncation/parse-incompleteness as a
+    failure mode) AND verdict-accuracy, never validity alone; a tight-grammar route (explicit newlines, no
+    free whitespace) sidesteps the truncation mode. The baseline deliberately pins a weak model whose
+    free-form/direct-route output degenerates → exercises §9's "direct-route failures common" path (pin the
+    exact identity in the run config; alternatives ok). Greedy is SEED-INERT so k per-sample seeds draw
+    identically (convergence trivially 1.0) → MEANINGFUL k-sample convergence (metrics-m2.2) needs a
+    sampling config (temperature > 0, seed fixing each draw), a downstream decision NOT the adapter's
+    (`invoke_samples` stays config-agnostic: derive seeds, invoke, record).
 
 ## Runtime
 
