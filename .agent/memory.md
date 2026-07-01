@@ -434,6 +434,24 @@ full pre-consolidation text lives in git history.
     exhaustion needs malformed cassettes at the base AND each derived seed through the budget. Pin the
     `ai_schema_violation` payload SHAPE too (key `reason`, non-empty, empty refs), symmetric to the
     hallucinated/exceeded pins. route-direct-smt's rejection unit reuses this committed-bad-cassette shape.
+  - route.direct_smt seam (M2.20 respec → route-direct-smt.1-.5; user-confirmed both forks): the direct
+    route emits SMT, but `verdict::verify` consumes a `CompiledArtifact` whose `validate()` demands
+    non-empty `region_ids` per assertion — a no-IR route CANNOT honestly supply them, so do NOT reuse
+    `m1.verify` / build a fabricated artifact. Seam = BYPASS: extract verify()'s Q1→Q2 gate into a shared
+    `verify_pair`, add `pub verify_query_pairs(adapter, pairs, budget)` (caller-minted ids + model bodies →
+    `invoke` + `assemble_result`, no artifact); registry `processing_stage.m2.verify_smt` consumes
+    `smt_query` DIRECTLY (`kind: verify`, no `compiled`), so the 3-stage "model_fill→syntactic-validity→
+    verify" chain the roadmap first sketched collapses — "syntactic-validity" folds into that solver run
+    (`target_syntax_failure`/`TargetParseError`, .5's direct-unique terminal, NO repair). Per-query emission
+    (grammar `<query>` = ONE query, unchanged + hash-pinned): a pair = 2 `model_fill` replays keyed
+    (route.direct_smt, GROUP_id, base) + (…, `derive_seed(base,1)`); source = GROUP id (not doc); accept =
+    shallow well-formedness (utf8 + `(set-logic`/`(check-sat)`) → `Schema` only, NO grounding (the solver is
+    the syntactic authority). GOLDEN cassette bytes = the group's M1 emitted `query_bodies[2k]`/`[2k+1]`
+    VERBATIM → the `:named a.<rule_id>` labels == reference `expected_unsat_core` → scoring reuses
+    `single_ir_route_scores_m1_groups`'s shape. 5 units, not ≤4 (the bypass ADDS the `verify_pair` refactor
+    + `verify_query_pairs`; the roadmap's "likely fewer" guess assumed reusing m1.verify, which the region-id
+    wall rules out). direct tail is its OWN fn (`compile_verify_group` inlines `compile()` + hardcodes
+    COMPILE=4/VERIFY=5; the 4-stage direct pipeline has `verify_smt` at slot 3, no `compiled`).
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output

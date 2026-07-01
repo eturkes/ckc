@@ -518,19 +518,86 @@ argument).
   shape pinned (key `reason`, empty refs); `single_ir_fill` now asserts ROUTE-level §7.4 surfacing via
   `shell.ledger()` on a recovery + a terminal-hallucinated path; gates still 434/5 + fmt + clippy + audit
   clean.] 87% 175K/200K
-- [ ] route-direct-smt: `direct_smt` route + pipeline (the weak baseline). Seed `pipe.m2_direct_smt`
-  `PipelineEntry` (`candidates.yaml`: `model_fill`(target=SMT, grammar=`smt_query`) →
-  syntactic-validity → verify; stage chain validates). Implement: the model emits the
-  contradiction-query SMT (Q1 overlap + Q2 deontic) per conflict pair directly, no IR →
-  syntactic-validity check (solver parse) → `verdict::verify` via `Z3Adapter` + `assemble_result` →
-  verdict. Author the JA(pair)→SMT prompt (hashed). Reading: schemas-export.2, stage-model-fill,
-  ckc-smt `verify` (Z3Adapter/assemble_result) + `emit.rs` query structure; SPEC §9 direct_smt. Gate:
-  `cargo test`; `ckc registry check` validates `pipe.m2_direct_smt`; the route runs a recorded SMT
-  sample through verify to a verdict; syntactic validity recorded; verdict scored vs reference.
-  [Decision pinned: per-pair Q1/Q2 emission for comparability with the M1 group verdict; packaging
-  finalized in-unit.] [When active, split like route-single-ir.1-.4 (registry+prompt / fill / verdict /
-  rejection) — size from their recorded context-usage; it is simpler (model emits SMT directly, no
-  IR/grounding/assemble), so likely fewer units.]
+- [ ] route-direct-smt.1: `direct_smt` registry + prompt surface (additive, gate-independent; split from
+  the one-shot route-direct-smt — M2.20 respec, seam + chain decisions in the respec commit msg + memory
+  `route.direct_smt seam`). `candidates.yaml` += `pipe.m2_direct_smt` `processing_stages:` =
+  `processing_stage.m1.extract`, `.m1.segment`, `.m2.model_fill_smt`, `.m2.verify_smt` (chain validates:
+  extract→`source_document_graph`, segment→`segments`, `model_fill_smt` consumes both →`smt_query`,
+  `verify_smt` consumes `smt_query` →`verifier_results`). += NEW `processing_stage.m2.model_fill_smt`
+  (`kind: model_fill` / `determinism: nondeterministic` / `input_artifact_kinds: [source_document_graph,
+  segments]` / `output_artifact_kinds: [smt_query]` — mirror `m2.model_fill` L76-80, swap output
+  `clinical_ir`→`smt_query`). += NEW `processing_stage.m2.verify_smt` (`kind: verify` [reused label; the
+  chain rule is artifact-kind-only] / `determinism: deterministic` / `input_artifact_kinds: [smt_query]` /
+  `output_artifact_kinds: [verifier_results]` — NOT `m1.verify`: that needs `compiled`, and the no-IR route
+  builds no `CompiledArtifact` [seam B], so `verify_smt` consumes `smt_query` directly). REUSE
+  `schema.smt_query` (schemas.yaml L5-8; no new schema entry). `prompts.yaml` += `id: prompt.direct_smt` /
+  `path: registry/prompts/direct_smt.txt` / `route: route.direct_smt` / `template_hash: sha256:<hash>` (only
+  `prompt.single_ir` exists today). NEW `registry/prompts/direct_smt.txt` = a first-draft JA(pair)→SMT
+  prompt: instruct the model to emit ONE `smt_query`-grammar query for the given role (Q1 `context_overlap`
+  or Q2 `deontic_consistency`) over the two guidelines' JA text, naming its assertions with the supplied
+  `:named` label ids (positive phrasing, pink-elephant; `.gitattributes registry/prompts/*.txt eol=lf`
+  already covers it). CONTENT ungated (crafted cassettes; run-m2.2 refines the wording) → existence + hash +
+  chain-validation gate only. Reading: route-single-ir.1 (`git show e1c8c17`, the mirror); `candidates.yaml`
+  L22-29 + L76-80; `prompts.yaml`; memory `Registry model surface` + `route.direct_smt seam`. Gate: `cargo
+  test`; `ckc registry check` validates `pipe.m2_direct_smt` (chain) + the `prompt.direct_smt` file/hash and
+  rejects a missing / hash-mismatched prompt; engine-agnostic audit clean (JA prose + grammar surface, no
+  engine/dialect/format names); fmt + clippy.
+- [ ] route-direct-smt.2: `verify_pair` refactor + `verify_query_pairs` entry (ckc-smt, gate-independent
+  prep; the shared calibrated back end SPEC §9 needs across both routes). Extract the per-pair Q1→Q2 gate
+  from `verdict::verify` (`verdict.rs` ~L70-95: invoke the overlap query → `assemble_result(ContextOverlap)`;
+  if its verdict is `Sat`, invoke the deontic query → `assemble_result(DeonticConsistency)`) into `fn
+  verify_pair(adapter: &Z3Adapter, identity: &SolverIdentity, overlap: (&Id, &str), deontic: (&Id, &str),
+  budget: Duration) -> Vec<VerifierResult>`; `verify()` keeps its plan-order asserts then delegates per pair
+  (behavior-preserving — M1 verify tests + `single_ir_route_scores_m1_groups` stay byte-identical). NEW `pub
+  fn verify_query_pairs(adapter: &Z3Adapter, pairs: &[((Id, String), (Id, String))], budget: Duration) ->
+  Vec<VerifierResult>` (caller-minted query_ids + model bodies, no `CompiledArtifact`) looping `verify_pair`
+  — the direct route's verdict engine. Unit tests (z3 present): a hand-built Q1-sat / Q2-unsat pair (M1-shaped
+  `:named a.<id>`) → one `SemanticContradiction` carrying the core; a Q1-unsat pair → Q1 result only, no Q2.
+  Reading: `verdict.rs` `verify`/`assemble_result`/`QueryRole`; `verify.rs` `Z3Adapter::invoke`/`identity`.
+  Gate: `cargo test -p ckc-smt` (M1 verify unchanged + 2 new); fmt + clippy.
+- [ ] route-direct-smt.3: `direct_smt_accept` + `direct_smt_fill` + GOLDEN cassettes + bless helper (the
+  route's fill half; model-runtime-absent, z3 not needed; needs .1). `direct_smt_accept() -> impl Fn(&[u8])
+  -> Result<String, FillReject>`: shallow well-formedness only (utf8 + query-shaped: a `(set-logic` head +
+  `(check-sat)`) → a gross violation is `FillReject::Schema` (NO grounding — the direct route has none; the
+  solver is the real syntactic authority, surfaced as `target_syntax_failure` at verify, .5). `direct_smt_fill`
+  runs PER GROUP (a conflict pair spans 2 docs): extract+segment each member (parity/context with single_ir,
+  the reused deterministic head; refs left UNgrounded), then two `model_fill(store, &key, FillSource::Replay,
+  repair_limit, accept)` (`model_fill.rs` L119) replays — Q1 `key = CassetteKey { route:
+  static_id("route.direct_smt"), source: <group_id>, seed: base }`, Q2 `seed: derive_seed(base, 1)`
+  (`model.rs` L344) — yielding the pair's two query bodies. GOLDEN cassette bytes = the group's M1 emitted
+  query bodies VERBATIM (bless from `compile()`'s `query_bodies[2k]`/`[2k+1]`, so the model's `:named
+  a.<rule_id>` labels == the reference `expected_unsat_core` → .4 scores). NEW `bless_direct_smt_cassettes`
+  (`#[ignore]`, mirror `bless_single_ir_cassettes` run.rs L2329) writes
+  `cassettes/route.direct_smt/<group_id>/seed-{base,derived}.json` (SYNTHETIC identity → engine-agnostic
+  audit APPLIES). NEW `direct_smt_resolved()` (mirror `single_ir_resolved` L2254; `pipeline_id:
+  pipe.m2_direct_smt`, `pipeline_step_ids[0..4]` = extract / segment / model_fill_smt / verify_smt). Gate:
+  `cargo test` — a fill test that the replayed cassettes yield the exact M1 query bodies (byte-faithful);
+  fmt + clippy + audit clean.
+- [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3). NEW tail fn (its own fn,
+  NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
+  pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3's Q1+Q2 bodies (minted ids
+  `<gid>.overlap` / `.deontic`) to `verify_query_pairs` → `VerifierResults { results }` → `validate` → `wrapper(…,
+  "verifier_results", producer(resolved, 3), <the replayed Q1+Q2 cassette content_hashes>,
+  Origin::ExternalAdapterGenerated, EvidenceStatus::VerifierEvidenceStatus, …)` → `land` →
+  `finish_processing_stage` stamping `processing_stage.m2.verify_smt` (pattern = `compile_verify_group`
+  VERIFY half, run.rs L554-595). NEW test `direct_smt_route_scores_m1_groups` (mirror
+  `single_ir_route_scores_m1_groups` L2498): fill every group, resolve groups + reference from
+  `exp.m1_scaffold`, run the tail, score — a conflict group → exactly one `SemanticContradiction` whose
+  `unsat_core` set == `entry.expected_unsat_core` and rides the Q2 (`<gid>.deontic`) id; a no-conflict group → no
+  contradiction; `results.producer.pipeline_step_id == processing_stage.m2.verify_smt`. Reading: run.rs
+  L504-595 + L2498-2620; .2's `verify_query_pairs`; `run_oracle.rs assert_group_matches_reference`. Gate:
+  `cargo test` (both groups match reference); fmt + clippy.
+- [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3 + .4; mirror
+  route-single-ir.4 `git show 0feb50d 9da76b9`). Codes: (a) `ai_schema_violation` — a shallow-malformed SMT
+  cassette (not query-shaped) → `FillReject::Schema` → re-prompt; a second bad attempt →
+  `repair_limit_exceeded` (`repair_limit 1`, Q1 `seed s` + `derive_seed(s, 1)`; mirror
+  `bless_single_ir_rejection_cassettes` L2371, the `[AiSchemaViolation×2, RepairLimitExceeded("1")]` shape);
+  (b) `target_syntax_failure` / `TargetParseError` — a well-formed-but-solver-rejected query (an `(error …)`
+  reply, no verdict token) reaching `verify_smt` → the direct-route-UNIQUE terminal path (NO repair;
+  `assemble_result` maps it, `verdict.rs`). Route-level surfacing asserted via `shell.ledger()` (as
+  `single_ir_fill` does). NEW `bless_direct_smt_rejection_cassettes` (`#[ignore]`, SYNTHETIC → audit
+  applies). Gate: `cargo test` (every code over committed bad cassettes + the ledger surfacing); fmt +
+  clippy + audit clean.
 - [ ] metrics-m2.1: route-quality raw-row metrics. New metrics module → per-route raw rows over a
   run: schema-valid rate, acceptance rate, repair count, recorded-call counts, target syntactic
   validity (solver parse), conflict-verdict accuracy vs reference over the §8 conflict + no-conflict
@@ -573,7 +640,9 @@ argument).
   model/prompt/identity hash fields), over the locked M1 inputs. single_ir assemble-wrapper
   input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
   cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
-  used source+segments only, F4 payload-only, so add the cassette hash here). Add the `ckc run
+  used source+segments only, F4 payload-only, so add the cassette hash here). direct_smt has no assemble
+  wrapper + no `compiled`; its `verifier_results` cite the two replayed Q1/Q2 cassette `content_hash`es
+  (route-direct-smt.4 tail). Add the `ckc run
   --record` flag (default
   = replay committed cassettes runtime-absent; `--record` drives `CassetteStore::record` live — run-m2.2
   exercises that live path) + its default-replay acceptance. Tested via REPLAY of the route units'
