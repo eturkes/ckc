@@ -636,7 +636,7 @@ argument).
   / 6 ignored (was 437/6); fmt + clippy `-D` + engine-agnostic audit (run.rs) clean. Pre-existing rustdoc
   `private_intra_doc_links` debt unchanged (new fns are private → the lint doesn't fire on them; deferred to
   M2 review). wip blueprint consumed + removed.] 75% 151K/200K
-- [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3b). NEW tail fn (its own fn,
+- [x] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3b). NEW tail fn (its own fn,
   NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
   pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3b's Q1+Q2 bodies (minted ids
   `<gid>.overlap` / `.deontic`) to `verify_query_pairs` → `VerifierResults { results }` → `validate` → `wrapper(…,
@@ -656,6 +656,21 @@ argument).
   lacks, so key off the minted ids); `results.producer.pipeline_step_id == processing_stage.m2.verify_smt`.
   Reading: run.rs L504-595 + L1290-1316 + L2498-2645; .2's `verify_query_pairs`; `run_oracle.rs
   assert_group_matches_reference`. Gate: `cargo test` (both groups match reference); fmt + clippy.
+  [Done: `direct_smt_verify_group` (private, `#[allow(dead_code)]` until run-m2.1) beside
+  `compile_verify_group` — gather inputs+pairs BEFORE the clock (M2.14 discipline), `verify_query_pairs` over
+  the minted `(<gid>.overlap, <gid>.deontic)` pair, wrap `verifier_results` citing the two `smt_query`
+  `content_hash`es (`producer(resolved, DIRECT_VERIFY)`, `ExternalAdapterGenerated`/`VerifierEvidenceStatus`),
+  land, then emit the §4.6 verify event DIRECTLY (kind `verify`, step `pipeline_step_ids[DIRECT_VERIFY]`=
+  `m2.verify_smt`, `SOLVER_BUDGET_KEY` unconditional) — NOT `finish_processing_stage` (slot-3 mis-stamp of
+  `assemble` + dropped budget). NEW module const `DIRECT_VERIFY=3` (the M1 `VERIFY`=5 slot is inert padding in
+  the direct `[Id;8]`). Test `direct_smt_route_scores_m1_groups` mirrors `single_ir_route_scores_m1_groups`,
+  fills PER-GROUP via `direct_smt_fill`, keys the no-conflict closure off the minted ids (direct lacks
+  `solver_query_plan`): conflict → exactly one `SemanticContradiction`, `unsat_core`==`expected_unsat_core`,
+  rides `<gid>.deontic`; no_conflict → no contradiction, all `SemanticNoConflict`, documented result →
+  `<gid>.overlap` Unsat with no `<gid>.deontic` result; `results.producer.pipeline_step_id`==`m2.verify_smt`.
+  Gate: `cargo test --workspace` 440 passed / 6 ignored (was 439/6) + fmt + clippy `-D` clean + engine-agnostic
+  audit (run.rs) clean; no new rustdoc debt (pre-existing model.rs/replay.rs/trace.rs `private_intra_doc_links`
+  stays deferred to M2 review). M2 stays IN-PROGRESS (.5 + metrics/report/run/acceptance remain).] 77% 154K/200K
 - [ ] route-direct-smt.5: §7.4 rejection over committed bad cassettes (needs .3b + .4; mirror
   route-single-ir.4 `git show 0feb50d 9da76b9`). Codes: (a) `ai_schema_violation` — a shallow-malformed SMT
   cassette (not query-shaped) → `FillReject::Schema` → re-prompt; a second bad attempt →

@@ -42,7 +42,9 @@ use ckc_core::{
     content_hash, hash_bytes, parse_candidates, parse_corpora, parse_experiments,
     read_strict_canonical,
 };
-use ckc_smt::{QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify};
+use ckc_smt::{
+    QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
+};
 
 use crate::cassette::{CassetteKey, CassetteStore};
 use crate::extract::{ExtractConfig, extract};
@@ -98,6 +100,11 @@ const COMPILE: usize = 4;
 const VERIFY: usize = 5;
 const TRACE: usize = 6;
 const REPORT: usize = 7;
+
+/// The direct route's `verify_smt` slot in `pipe.m2_direct_smt`'s 4-stage step
+/// list (extract, segment, model_fill_smt, verify_smt) — distinct from the M1
+/// [`VERIFY`] slot (5), which is inert padding in the direct fixture's `[Id; 8]`.
+const DIRECT_VERIFY: usize = 3;
 
 /// §8.4 budget counter naming the per-query solver wall-clock cap in
 /// milliseconds — the one budget key the M1 vocabulary defines.
@@ -1015,6 +1022,101 @@ fn direct_smt_fill(
     let overlap = pair.next().expect("overlap query wrapped");
     let deontic = pair.next().expect("deontic query wrapped");
     Some((overlap, deontic))
+}
+
+/// The direct_smt route's per-group verdict tail: run the pair's two model-emitted
+/// SMT bodies (route-direct-smt.3b's `smt_query` wrappers) through the shared
+/// caller-minted verdict engine [`verify_query_pairs`] — no
+/// [`CompiledArtifact`](ckc_smt::CompiledArtifact), since the direct route emits raw
+/// SMT and builds no IR (the region-id wall) — then validate, land, and event the
+/// `verifier_results`. The results wrapper cites the two `smt_query` wrapper
+/// `content_hash`es (the upstream artifact, as single_ir's verify cites `compiled`).
+///
+/// The 4-stage `pipe.m2_direct_smt` places `verify_smt` at slot [`DIRECT_VERIFY`], so
+/// the §4.6 event is minted here rather than via [`finish_processing_stage`]: that
+/// derives the kind from `PROCESSING_STAGE_KINDS[3]` (`assemble`) and gates the
+/// solver-budget counter on the M1 [`VERIFY`] slot (5, inert padding in the direct
+/// fixture) — this stamps the `verify` kind, the slot-3 `m2.verify_smt` step id
+/// ([`producer`] uses the same), and the solver budget counter unconditionally. Wired
+/// into the experiment run by run-m2.1.
+#[allow(dead_code)]
+fn direct_smt_verify_group(
+    gid: &Id,
+    dir: &str,
+    overlap: &ArtifactWrapper<QueryBody>,
+    deontic: &ArtifactWrapper<QueryBody>,
+    resolved: &Resolved,
+    adapter: &Z3Adapter,
+    shell: &mut Shell,
+) -> Option<ArtifactWrapper<VerifierResults>> {
+    // Gather the pair's hashes and bodies before the clock so only the solver run and
+    // artifact production fall inside the timed interval (compile_verify_group's
+    // discipline; the M2.14 clock-boundary lesson).
+    let inputs = vec![overlap.content_hash.clone(), deontic.content_hash.clone()];
+    let pairs = [(
+        (
+            overlap.payload.query_id.clone(),
+            overlap.payload.body.clone(),
+        ),
+        (
+            deontic.payload.query_id.clone(),
+            deontic.payload.body.clone(),
+        ),
+    )];
+    let clock = processing_stage_clock();
+    let results = verify_query_pairs(adapter, &pairs, Duration::from_millis(resolved.budget_ms));
+    let wrapped = VerifierResults { results };
+    let built = wrapped
+        .validate()
+        .map_err(|e| {
+            processing_stage_diagnostic(VERIFY, "group", gid, format!("verifier results: {e}"))
+        })
+        .and_then(|()| {
+            let diagnostics =
+                canonical_diagnostic_set(wrapped.results.iter().flat_map(|r| &r.diagnostics))
+                    .map_err(|e| {
+                        processing_stage_diagnostic(VERIFY, "group", gid, e.to_string())
+                    })?;
+            wrapper(
+                format!("{gid}.verifier_results"),
+                "verifier_results",
+                producer(resolved, DIRECT_VERIFY),
+                inputs.clone(),
+                Origin::ExternalAdapterGenerated,
+                EvidenceStatus::VerifierEvidenceStatus,
+                diagnostics,
+                wrapped,
+            )
+            .map_err(|e| processing_stage_diagnostic(VERIFY, "group", gid, e.to_string()))
+        });
+    let landed = built.and_then(|env| land(shell, &format!("{dir}/verifier_results.json"), env));
+
+    // Emit the §4.6 verify event directly (see the doc comment): the direct pipeline's
+    // slot-3 verify_smt cannot go through the index-coupled finish_processing_stage.
+    let (started_at, ended_at, duration_ms) = clock.stop();
+    let (outcome, diagnostics, output_hashes, verifier_results) = match landed {
+        Ok(wrapper) => (
+            severity(&wrapper.diagnostics),
+            wrapper.diagnostics.clone(),
+            vec![wrapper.content_hash.clone()],
+            Some(wrapper),
+        ),
+        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
+    };
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[DIRECT_VERIFY].clone(),
+        processing_stage: static_id("verify"),
+        started_at,
+        ended_at,
+        duration_ms,
+        input_hashes: inputs,
+        output_hashes,
+        outcome,
+        diagnostics,
+        resource_counters: vec![(static_id(SOLVER_BUDGET_KEY), resolved.budget_ms)],
+    });
+    verifier_results
 }
 
 /// The §8.3 trace processing_stage, run once after the group loop: assemble the §7.1
@@ -3390,6 +3492,170 @@ processing_stages:
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
             let got = direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell);
             assert!(got.is_none(), "non-pair group (len {n}) must fail closed");
+        }
+    }
+
+    /// route-direct-smt.4 — the direct_smt route scores the M1 conflict and no-conflict
+    /// groups against `exp.m1_scaffold`'s reference (model-runtime-absent fill, live z3
+    /// verdict). For every group [`direct_smt_fill`] replays the golden cassettes into
+    /// the pair's two SMT bodies, [`direct_smt_verify_group`] runs the shared verdict
+    /// engine over them, and the results match the reference the same way run_oracle's
+    /// `assert_group_matches_reference` decides M1: a conflict group yields exactly one
+    /// `semantic_contradiction` whose unsat core equals `expected_unsat_core` and rides
+    /// the pair's deontic (`<gid>.deontic`) query; a no-conflict group yields no
+    /// contradiction and every query `semantic_no_conflict`, with a documented
+    /// no-conflict result closing on an unsat overlap query whose deontic query never
+    /// ran. The direct route mints its own `<gid>.<role>` query ids (no
+    /// `solver_query_plan`), so the no-conflict closure keys off those ids.
+    #[test]
+    fn direct_smt_route_scores_m1_groups() {
+        use std::collections::{BTreeMap, BTreeSet};
+
+        use ckc_smt::{SolverVerdict, VerifierCategory};
+
+        let root = repo_root();
+        let resolved = direct_smt_resolved();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let adapter = Z3Adapter::new().expect("z3 adapter on PATH");
+
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+        // Corpus entries keyed by test_source id so the groups and the reference resolve
+        // from `exp.m1_scaffold` (the run_oracle registry-driven shape), never a
+        // hardcoded membership list.
+        let corpus: BTreeMap<Id, CorpusEntry> = single_ir_corpus()
+            .into_iter()
+            .map(|entry| (entry.id.clone(), entry))
+            .collect();
+
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold");
+        let reference =
+            parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap())
+                .unwrap();
+        assert_eq!(
+            reference.len(),
+            exp.test_source_groups.len(),
+            "one reference entry per test_source group"
+        );
+
+        for group in &exp.test_source_groups {
+            let gid = group.group_id.clone();
+            let members: Vec<&CorpusEntry> = group
+                .test_sources
+                .iter()
+                .map(|s| {
+                    corpus
+                        .get(s)
+                        .unwrap_or_else(|| panic!("{gid}: unknown member {s}"))
+                })
+                .collect();
+            let (overlap, deontic) =
+                direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 0, &mut shell)
+                    .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+            let results = direct_smt_verify_group(
+                &gid,
+                &format!("groups/{gid}"),
+                &overlap,
+                &deontic,
+                &resolved,
+                &adapter,
+                &mut shell,
+            )
+            .unwrap_or_else(|| panic!("{gid}: no verifier results"));
+
+            // The verdict tail stamps `pipe.m2_direct_smt`'s slot-3 verify_smt step.
+            assert_eq!(
+                results.producer.pipeline_step_id,
+                static_id("processing_stage.m2.verify_smt"),
+                "{gid}"
+            );
+
+            let overlap_id = static_id(&format!("{gid}.overlap"));
+            let deontic_id = static_id(&format!("{gid}.deontic"));
+
+            // Score vs the reference (run_oracle's assert_group_matches_reference shape).
+            let entry = reference
+                .iter()
+                .find(|e| e.group_id == gid)
+                .unwrap_or_else(|| panic!("{gid}: no reference entry"));
+            let contradictions: Vec<_> = results
+                .payload
+                .results
+                .iter()
+                .filter(|r| r.category == VerifierCategory::SemanticContradiction)
+                .collect();
+            if entry.expected_outcome == static_id("semantic_contradiction") {
+                assert_eq!(contradictions.len(), 1, "{gid}: exactly one contradiction");
+                let hit = contradictions[0];
+                assert_eq!(
+                    hit.query_id, deontic_id,
+                    "{gid}: the contradiction rides the pair's deontic query"
+                );
+                assert_eq!(
+                    entry.expected_conflict_kind,
+                    Some(static_id("deontic_direction_conflict")),
+                    "{gid}: a deontic Q2 contradiction is the deontic_direction_conflict kind"
+                );
+                let core: BTreeSet<Id> = hit
+                    .unsat_core
+                    .clone()
+                    .expect("an unsat verdict carries its core")
+                    .into_iter()
+                    .collect();
+                assert_eq!(
+                    core, entry.expected_unsat_core,
+                    "{gid}: unsat core as a set"
+                );
+            } else if entry.expected_outcome == static_id("semantic_no_conflict") {
+                assert!(contradictions.is_empty(), "{gid}: no contradiction");
+                assert!(
+                    results
+                        .payload
+                        .results
+                        .iter()
+                        .all(|r| r.category == VerifierCategory::SemanticNoConflict),
+                    "{gid}: every query closed semantic_no_conflict"
+                );
+                if entry.expected_no_conflict_result {
+                    // §6 no-conflict closure: the pair's overlap query answered unsat and
+                    // its deontic query never ran. The direct route lacks a
+                    // solver_query_plan, so key off the minted <gid>.overlap/.deontic ids.
+                    let overlap_result = results
+                        .payload
+                        .results
+                        .iter()
+                        .find(|r| r.query_id == overlap_id)
+                        .unwrap_or_else(|| panic!("{gid}: no overlap result"));
+                    assert_eq!(
+                        overlap_result.verdict,
+                        Some(SolverVerdict::Unsat),
+                        "{gid}: the documented no-conflict overlap query closed unsat"
+                    );
+                    assert!(
+                        results
+                            .payload
+                            .results
+                            .iter()
+                            .all(|r| r.query_id != deontic_id),
+                        "{gid}: the closed pair skipped its deontic query"
+                    );
+                }
+            } else {
+                panic!(
+                    "{gid}: unhandled expected_outcome {}",
+                    entry.expected_outcome
+                );
+            }
         }
     }
 }
