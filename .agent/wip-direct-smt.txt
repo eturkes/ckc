@@ -45,7 +45,7 @@ ckc-smt (VERIFY QueryBody/SmtLogic field+variant names against crates/ckc-smt/sr
   compile(group_id:&Id, docs: impl IntoIterator<Item=(&FormalIr,&NormIr)>) -> CompiledArtifact  (emit.rs:119)
     → CompiledArtifact.query_bodies: Vec<QueryBody>; per planned pair pushes overlap THEN deontic
       → query_bodies[2k]=overlap (SmtLogic::QfLra), [2k+1]=deontic (SmtLogic::QfUf).
-  IrBundle payload access (VERIFY field names against ckc-core ir.rs / summary): wrapper.payload.formal (FormalIr), wrapper.payload.norm (NormIr).
+  IrBundle payload access (VERIFY field names against ckc-core bundle.rs:203-212): wrapper.payload.formal (FormalIr), wrapper.payload.norm (NormIr).
 
 PINNED DECISIONS (do NOT re-derive):
   • smt_query wrapper provenance = Origin::AiGenerated + EvidenceStatus::AcceptedEvidenceStatus + diagnostics Vec::new() (wrapper forces effects=[]).
@@ -161,7 +161,7 @@ fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {   // mi
 
 // PER-GROUP fill (a pair spans 2 members). VERIFY single_ir_fill 658-836 for: the shell type + how it
 // surfaces fill.diagnostics (ledger), and how it handles model_fill Err vs Ok{target:None}. Mirror that.
-fn direct_smt_fill(root:&Path, gid:&Id, members:&[&<TestSourceEntry>], store:&CassetteStore, seed:u64, resolved:&Resolved, repair_limit:u32, shell:&mut Shell)
+fn direct_smt_fill(root:&Path, gid:&Id, members:&[&CorpusEntry], store:&CassetteStore, seed:u64, resolved:&Resolved, repair_limit:u32, shell:&mut Shell)
     -> Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>
 {
     // 1. provenance inputs: extract+segment EACH member (refs UNgrounded), collect
@@ -194,7 +194,7 @@ fn direct_smt_fill_reproduces_m1_query_bodies() {
     //   let (ov, de) = direct_smt_fill(&root,&gid,&members,&store,42,&direct_smt_resolved(),<repair_limit e.g. 1>,&mut shell).unwrap();
     //   let want = &refs.iter().find(|(g,_)| *g==gid).unwrap().1;
     //   assert_eq!(ov.payload.body, want[0].body);  assert_eq!(ov.payload.query_id, static_id(&format!("{gid}.overlap")));  assert_eq!(ov.payload.logic, SmtLogic::QfLra);
-    //   assert_eq!(de.payload.body, want[1].body);  assert_eq!(de.payload.query_id, static_id(&format!("{gid}.deontic")));  assert_eq!(de.payload.logic, SmtLogic::QfUf);
+    //   assert_eq!(de.payload.body, want[1].body);  assert_eq!(de.payload.query_id, static_id(&format!("{gid}.deontic")));  assert_eq!(de.payload.logic, SmtLogic::QfUf);  provenance gate (validate() enforces ONLY effects-vs-status, NOT origin/status/kind → assert the novel raw-AI contract here): for w in [&ov,&de] { assert_eq!(w.artifact_kind, static_id("smt_query")); assert_eq!(w.schema_id, static_id("schema.smt_query")); assert_eq!(w.origin, Origin::AiGenerated); assert_eq!(w.evidence_status, EvidenceStatus::AcceptedEvidenceStatus); assert!(w.external_effects.is_empty()); assert_eq!(w.producer.pipeline_step_id, static_id("processing_stage.m2.model_fill_smt")); }
     //   // optional: assert content_hash equals a freshly-wrapped QueryBody's (payload-only hash ⇒ body+id+logic identity).
 }
 
@@ -203,5 +203,5 @@ fn direct_smt_fill_reproduces_m1_query_bodies() {
 ════════════════════════════════════════════════════════════════════════
 VERIFY-READ ANCHORS (only these; everything else is pinned above)
 ════════════════════════════════════════════════════════════════════════
-.3a: (v1) exp.m1_scaffold group-resolution head — single_ir_route_scores_m1_groups 2499-~2530 (parse_experiments, group→member ids, how lexicon+root+store loaded in bless_single_ir_cassettes 2329-2354).  (v2) IrBundle payload field names formal/norm (ckc-core ir.rs).  (v3) CompiledArtifact.query_bodies + QueryBody fields (ckc-smt artifact.rs 52-78, emit.rs 119).  (v4) CassettePayload output accessor name (output_bytes vs output).
-.3b: (v5) single_ir_fill 658-836 — shell type + fill.diagnostics surfacing + model_fill Err/target-None handling + the wrapper match 815-824.  (v6) invalid_diagnostic signature (grep in run.rs).  (v7) FillReject / FillSource import paths (model_fill.rs).  (v8) the TestSourceEntry type name + how members are borrowed (single_ir_route_scores_m1_groups).
+.3a: (v1) exp.m1_scaffold group-resolution head — single_ir_route_scores_m1_groups 2499-~2530 (parse_experiments, group→member ids, how lexicon+root+store loaded in bless_single_ir_cassettes 2329-2354).  (v2) IrBundle payload field names formal/norm (ckc-core bundle.rs:203-212, NOT ir.rs).  (v3) CompiledArtifact.query_bodies + QueryBody in ckc-smt artifact.rs (SmtLogic:21, QueryBody:52, CompiledArtifact.query_bodies:157); overlap-then-deontic push emit.rs:179-180; compile emit.rs:119.  (v4) CassettePayload output accessor name (output_bytes vs output).
+.3b: (v5) single_ir_fill 658-836 — shell type + fill.diagnostics surfacing + model_fill Err/target-None handling + the wrapper match 815-824.  (v6) invalid_diagnostic signature (grep in run.rs).  (v7) FillReject / FillSource import paths (model_fill.rs).  (v8) the CorpusEntry member type (single_ir_corpus / group-resolution head, run.rs ~2229) + how members are borrowed (single_ir_route_scores_m1_groups).

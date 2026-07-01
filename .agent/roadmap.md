@@ -606,16 +606,16 @@ argument).
   SmtLogic` to the `use ckc_smt` import. Reading: `.agent/wip-direct-smt.txt` (blueprint — VERIFY-read only its
   flagged .3b anchors v5-v8). Gate: `cargo test` — `direct_smt_fill_reproduces_m1_query_bodies` (fill every
   group via Replay over .3a's cassettes → each `QueryBody.body` == the M1 body byte-faithful, `query_id`/`logic`
-  correct); fmt + clippy `-D`; engine-agnostic audit clean. CLOSE: `rm .agent/wip-direct-smt.txt`.
+  correct, + the pinned smt_query provenance (`Origin::AiGenerated`, `AcceptedEvidenceStatus`, empty effects, `artifact_kind`/`schema_id` = smt_query, producer step `m2.model_fill_smt`)); fmt + clippy `-D`; engine-agnostic audit clean. CLOSE: `rm .agent/wip-direct-smt.txt`.
 - [ ] route-direct-smt.4: direct verdict tail + reference scoring (needs .2 + .3b). NEW tail fn (its own fn,
   NOT `compile_verify_group` — that inlines `compile()` + hardcodes COMPILE=4 / VERIFY=5; the 4-stage direct
-  pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3's Q1+Q2 bodies (minted ids
+  pipeline puts `verify_smt` at slot 3 and has no `compiled`): per group, feed .3b's Q1+Q2 bodies (minted ids
   `<gid>.overlap` / `.deontic`) to `verify_query_pairs` → `VerifierResults { results }` → `validate` → `wrapper(…,
-  "verifier_results", producer(resolved, 3), [the two `smt_query` wrapper `content_hash`es from .3],
+  "verifier_results", producer(resolved, 3), [the two `smt_query` wrapper `content_hash`es from .3b],
   Origin::ExternalAdapterGenerated, EvidenceStatus::VerifierEvidenceStatus, …)` → `land`. Emit the verify EVENT
   DIRECTLY (or via a NEW route-aware helper), NOT `finish_processing_stage(…, 3, …)`: that stamps the kind via
   `PROCESSING_STAGE_KINDS[3]` = `"assemble"` and gates the solver-budget counter on `== VERIFY` (5) [run.rs
-  L1310-1316] (index 5 would over-run the 4-entry `pipeline_step_ids`) → stamp `processing_stage =
+  L1310-1316] (index 5 is inert padding in the direct fixture's `[Id;8]` `pipeline_step_ids`; its real verify producer is slot 3) → stamp `processing_stage =
   static_id("verify")`, `pipeline_step_id = pipeline_step_ids[3]` (= `m2.verify_smt`, which `producer(resolved,
   3)` already yields), `resource_counters = [(SOLVER_BUDGET_KEY, budget_ms)]`. NEW test
   `direct_smt_route_scores_m1_groups` (mirror `single_ir_route_scores_m1_groups` L2498): fill every group,
@@ -681,7 +681,7 @@ argument).
   input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
   cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
   used source+segments only, F4 payload-only, so add the cassette hash here). direct_smt has no assemble
-  wrapper + no `compiled`: its `model_fill_smt` `smt_query` wrappers cite source+segments (.3) + the replayed
+  wrapper + no `compiled`: its `model_fill_smt` `smt_query` wrappers cite source+segments (.3b) + the replayed
   cassette `content_hash` added here (same model_fill provenance), and its `verifier_results` cite the two
   `smt_query` wrapper `content_hash`es (route-direct-smt.4 — the upstream artifact, as single_ir's verify cites
   `compiled`). Generalize `resolve()` (run.rs L208): today it selects only `experiment.baseline()` + iterates
