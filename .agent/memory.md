@@ -491,19 +491,14 @@ full pre-consolidation text lives in git history.
     effects=`[]`, and `validate()` enforces ONLY the effects↔status rule (non-empty effects ⇒
     `EvidenceDiscoveryOnly`), so empty-effects PERMITS an Accepted status; it does NOT check origin/status/kind
     → the `direct_smt_fill_reproduces_m1_query_bodies` test pins origin/status/kind/schema/producer explicitly.
-    Keep this shape (do not "fix" Accepted→DiscoveryOnly or add effects). route-direct-smt.4 LANDED the
-    verdict tail `direct_smt_verify_group(gid, dir, &overlap, &deontic, resolved, adapter, shell)` (private,
-    `#[allow(dead_code)]` until run-m2.1) beside `compile_verify_group`: gather inputs+pairs BEFORE the clock
-    (M2.14 clock discipline), `verify_query_pairs` over the one minted `(<gid>.overlap, <gid>.deontic)` pair,
-    wrap `verifier_results` citing the two `smt_query` `content_hash`es (`producer(resolved, DIRECT_VERIFY)`,
-    `ExternalAdapterGenerated`/`VerifierEvidenceStatus`), land, then emit the §4.6 event DIRECTLY per the
-    slot-3 rule above (kind `"verify"`, step `pipeline_step_ids[DIRECT_VERIFY]`=`m2.verify_smt`,
-    `SOLVER_BUDGET_KEY` unconditional). NEW module const `DIRECT_VERIFY=3` (the direct pipeline's verify_smt
-    slot; the M1 `VERIFY`=5 slot is inert padding in the direct `[Id;8]`). run-m2.1 wires
-    `direct_smt_fill`→`direct_smt_verify_group` into the execute loop. Scoring test
-    `direct_smt_route_scores_m1_groups` mirrors `single_ir_route_scores_m1_groups` but fills PER-GROUP via
-    `direct_smt_fill` and keys the no-conflict closure off the minted `<gid>.overlap`/`<gid>.deontic` ids
-    (direct has no `solver_query_plan`) — metrics/report-m2 reuse this key-off-minted-ids shape.
+    Keep this shape (do not "fix" Accepted→DiscoveryOnly or add effects). .4 verdict tail
+    `direct_smt_verify_group` LANDED beside `compile_verify_group` (its OWN fn per the slot-3 rule above;
+    `DIRECT_VERIFY=3` const, M1 `VERIFY`=5 = inert padding in the direct `[Id;8]`; run-m2.1 wires
+    `direct_smt_fill`→it). Scoring test `direct_smt_route_scores_m1_groups` keys the no-conflict closure off
+    minted `<gid>.overlap`/`.deontic` ids (no `solver_query_plan`) — metrics/report-m2 reuse this shape.
+    GOTCHA (codex .4): `input_hashes` canonicalize as a §4.3 SET — the landed wrapper sorts them by hash, the
+    in-memory event keeps insertion order → multi-input provenance assertions compare as SETS, never pin
+    emitted order (bit the .4 event/wrapper test; will bite metrics/report-m2).
   - Runtime-gate findings (the "gate MET" above, confirmed functionally on a real test source; concrete
     runtime/model identity → gitignored `.agent/runtime.local.md`; agnostic conclusions in `## Runtime`): constrained decoding forces
     schema-VALID output

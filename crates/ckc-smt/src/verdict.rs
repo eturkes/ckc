@@ -139,8 +139,11 @@ pub type MintedQueryPair = ((Id, String), (Id, String));
 /// [`CompiledArtifact::validate`]): query ids unique across `pairs`,
 /// distinct overlap/deontic ids per pair, non-empty bodies. The direct
 /// route mints group-unique `<gid>.overlap` / `<gid>.deontic` ids and lands
-/// through [`VerifierResults`](crate::VerifierResults), so a stray duplicate
-/// surfaces fail-closed there, not here.
+/// through [`VerifierResults`](crate::VerifierResults), whose
+/// [`validate`](crate::VerifierResults::validate) rejects a duplicate
+/// query id — so a stray duplicate-id pair surfaces fail-closed there, not
+/// here (this entry runs each pair verbatim, minting no error for a bad id
+/// set).
 pub fn verify_query_pairs(
     adapter: &Z3Adapter,
     pairs: &[MintedQueryPair],

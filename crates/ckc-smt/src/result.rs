@@ -8,6 +8,8 @@
 //! regardless of producer (§6: model on sat where relevant, unsat core on
 //! unsat, cores as canonical Id sets sorted by canonical_sort_key).
 
+use std::collections::BTreeSet;
+
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, DiagnosticRecord, Id, ObjectEmitter,
     ObjectReader, Reader, SolverIdentity, emit_array, emit_set, emit_string, fieldless_enum,
@@ -215,10 +217,26 @@ pub struct VerifierResults {
 }
 
 impl VerifierResults {
-    /// Every member satisfies [`VerifierResult::validate`]; first break
-    /// wins.
+    /// Every member satisfies [`VerifierResult::validate`] (first break
+    /// wins), then the query ids are plan-unique: each planned query runs at
+    /// most once, so no two results share a `query_id`. The order stays
+    /// producer-owned plan order, so this is a uniqueness check, not a
+    /// sortedness one. It is the fail-closed guard that
+    /// [`verify_query_pairs`](crate::verify_query_pairs)'s caller-owned
+    /// precondition leans on: a stray duplicate-id pair lands here as
+    /// [`VerifierError::Duplicate`], never as two same-id results.
     pub fn validate(&self) -> Result<(), VerifierError> {
-        self.results.iter().try_for_each(VerifierResult::validate)
+        self.results.iter().try_for_each(VerifierResult::validate)?;
+        let mut seen: BTreeSet<&Id> = BTreeSet::new();
+        for result in &self.results {
+            if !seen.insert(&result.query_id) {
+                return Err(VerifierError::Duplicate {
+                    pool: "results",
+                    id: result.query_id.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -521,5 +539,20 @@ mod tests {
         let mut broken = results;
         broken.results[1].model = Some("(model)".to_owned());
         assert_eq!(broken.validate(), Err(VerifierError::ModelWithoutSat));
+
+        // Plan-unique query ids: two individually valid results sharing a
+        // query_id fail closed — the guard verify_query_pairs's caller-owned
+        // precondition leans on (a duplicate/mis-role minted pair surfaces
+        // here, not as two same-id results downstream).
+        let duplicate = VerifierResults {
+            results: vec![q1_sat(), q1_sat()],
+        };
+        assert_eq!(
+            duplicate.validate(),
+            Err(VerifierError::Duplicate {
+                pool: "results",
+                id: id("q.m1_conflict.pair1.overlap"),
+            })
+        );
     }
 }

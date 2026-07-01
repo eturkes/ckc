@@ -3580,6 +3580,70 @@ processing_stages:
                 "{gid}"
             );
 
+            // Wrapper provenance: the verifier_results cite the pair's two
+            // smt_query bodies (not single_ir's one `compiled`), stamped
+            // external-adapter verifier evidence. input_hashes are a §4.3
+            // canonical set (the landed wrapper sorts them by hash), so compare
+            // as a set rather than pinning the emitted order.
+            let pair_inputs =
+                BTreeSet::from([overlap.content_hash.clone(), deontic.content_hash.clone()]);
+            assert_eq!(
+                results
+                    .input_hashes
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>(),
+                pair_inputs,
+                "{gid}: verifier_results cite the pair's two smt_query bodies"
+            );
+            assert_eq!(results.origin, Origin::ExternalAdapterGenerated, "{gid}");
+            assert_eq!(
+                results.evidence_status,
+                EvidenceStatus::VerifierEvidenceStatus,
+                "{gid}"
+            );
+            assert_eq!(
+                results.artifact_kind,
+                static_id("verifier_results"),
+                "{gid}"
+            );
+
+            // The directly-emitted §4.6 verify event: the slot-3 verify_smt step
+            // is stamped `verify` (not slot-3's `assemble`) and carries the solver
+            // budget counter — the two deviations from the index-coupled
+            // finish_processing_stage this tail hand-rolls to avoid.
+            let event = shell.events().last().expect("a verify event");
+            assert_eq!(
+                event.processing_stage,
+                static_id("verify"),
+                "{gid}: event kind"
+            );
+            assert_eq!(
+                event.pipeline_id, resolved.pipeline_id,
+                "{gid}: event pipeline"
+            );
+            assert_eq!(
+                event.pipeline_step_id,
+                static_id("processing_stage.m2.verify_smt"),
+                "{gid}: event step"
+            );
+            assert_eq!(
+                event.resource_counters,
+                vec![(static_id(SOLVER_BUDGET_KEY), resolved.budget_ms)],
+                "{gid}: solver budget counter rides the direct verify event"
+            );
+            assert_eq!(
+                event.input_hashes.iter().cloned().collect::<BTreeSet<_>>(),
+                pair_inputs,
+                "{gid}: event inputs = the two smt_query bodies (as a set)"
+            );
+            assert_eq!(
+                event.output_hashes,
+                vec![results.content_hash.clone()],
+                "{gid}: event output = the landed verifier_results"
+            );
+            assert_eq!(event.outcome, Outcome::Ok, "{gid}: a clean verdict");
+
             let overlap_id = static_id(&format!("{gid}.overlap"));
             let deontic_id = static_id(&format!("{gid}.deontic"));
 

@@ -221,6 +221,13 @@ impl Shell {
         });
     }
 
+    /// The processing_stage events recorded so far, in emission order — for
+    /// test inspection ahead of the closing command event `finish` appends.
+    #[cfg(test)]
+    pub(crate) fn events(&self) -> &[EventRecord] {
+        &self.events
+    }
+
     /// The single write primitive: every byte a command persists goes
     /// through here. `rel` must resolve inside the output directory — the
     /// guard is lexical (relative, normal components only) over a run
