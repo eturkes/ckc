@@ -53,7 +53,8 @@ pub enum QueryRole {
 /// documented no-conflict result or undecided, with no Q2 result).
 ///
 /// `artifact` must satisfy [`CompiledArtifact::validate`]; bodies out of
-/// plan order are a caller bug and panic, like emitter slot order.
+/// plan order are a caller bug and panic, like emitter slot order. Each
+/// pair delegates to [`verify_pair`], the shared per-pair gate.
 pub fn verify(
     adapter: &Z3Adapter,
     artifact: &CompiledArtifact,
@@ -77,19 +78,77 @@ pub fn verify(
             q2.query_id, pair.deontic_consistency_query_id,
             "bodies follow plan order: pair k slots 2k/2k+1"
         );
-        let run = adapter.invoke(&q1.body, budget);
-        let r1 = assemble_result(&q1.query_id, QueryRole::ContextOverlap, &run, identity);
-        let q1_sat = r1.verdict == Some(SolverVerdict::Sat);
-        results.push(r1);
-        if q1_sat {
-            let run = adapter.invoke(&q2.body, budget);
-            results.push(assemble_result(
-                &q2.query_id,
-                QueryRole::DeonticConsistency,
-                &run,
-                identity,
-            ));
-        }
+        results.extend(verify_pair(
+            adapter,
+            identity,
+            (&q1.query_id, q1.body.as_str()),
+            (&q2.query_id, q2.body.as_str()),
+            budget,
+        ));
+    }
+    results
+}
+
+/// SPEC §6 per-pair Q1→Q2 gate — the verdict engine shared by [`verify`]
+/// (compiled-artifact bodies) and [`verify_query_pairs`] (caller-minted
+/// bodies). Invoke the `overlap` query under `budget`, assemble its
+/// `context_overlap` result, then invoke the `deontic` query only when Q1
+/// answered sat (§6: every other Q1 fate closes the pair as the documented
+/// no-conflict result or undecided, with no Q2 result). Each argument pairs
+/// a query id with the SMT body invoked under it.
+fn verify_pair(
+    adapter: &Z3Adapter,
+    identity: &SolverIdentity,
+    overlap: (&Id, &str),
+    deontic: (&Id, &str),
+    budget: Duration,
+) -> Vec<VerifierResult> {
+    let (overlap_id, overlap_body) = overlap;
+    let (deontic_id, deontic_body) = deontic;
+    let mut results = Vec::new();
+    let run = adapter.invoke(overlap_body, budget);
+    let r1 = assemble_result(overlap_id, QueryRole::ContextOverlap, &run, identity);
+    let q1_sat = r1.verdict == Some(SolverVerdict::Sat);
+    results.push(r1);
+    if q1_sat {
+        let run = adapter.invoke(deontic_body, budget);
+        results.push(assemble_result(
+            deontic_id,
+            QueryRole::DeonticConsistency,
+            &run,
+            identity,
+        ));
+    }
+    results
+}
+
+/// One caller-minted contradiction-query pair for [`verify_query_pairs`]:
+/// the `(query_id, body)` of the context_overlap query then of the
+/// deontic_consistency query — the direct route's per-pair input, carrying
+/// the emitted bodies where the planned `ContradictionQueryPair` carries
+/// only ids.
+pub type MintedQueryPair = ((Id, String), (Id, String));
+
+/// SPEC §9 caller-minted verdict engine — run each `(overlap, deontic)`
+/// query pair through [`verify_pair`] with no [`CompiledArtifact`]. The
+/// direct route emits its own SMT bodies and mints their query ids, so it
+/// verifies through this entry rather than [`verify`]; results assemble the
+/// same way, pair by pair in argument order, Q2 gated on a sat Q1.
+pub fn verify_query_pairs(
+    adapter: &Z3Adapter,
+    pairs: &[MintedQueryPair],
+    budget: Duration,
+) -> Vec<VerifierResult> {
+    let identity = adapter.identity();
+    let mut results = Vec::new();
+    for ((overlap_id, overlap_body), (deontic_id, deontic_body)) in pairs {
+        results.extend(verify_pair(
+            adapter,
+            identity,
+            (overlap_id, overlap_body.as_str()),
+            (deontic_id, deontic_body.as_str()),
+            budget,
+        ));
     }
     results
 }
@@ -853,6 +912,116 @@ mod tests {
         assert_eq!(results.len(), 1, "unsat Q1 closes the pair without Q2");
         let q1 = &results[0];
         assert_eq!(q1.query_id, id("q.m1_no_conflict.pair1.overlap"));
+        assert_eq!(q1.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(q1.verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(q1.model, None);
+        assert_eq!(q1.unsat_core, None);
+        assert_eq!(q1.diagnostics, vec![]);
+        assert_eq!(q1.validate(), Ok(()));
+    }
+
+    // route-direct-smt.2: verify_query_pairs drives caller-minted bodies
+    // with no CompiledArtifact. A hand-built M1-shaped pair on live z3 — Q1
+    // sat over a shared concept, then Q2 unsat over the polarity
+    // contradiction with `:named a.<id>` assertions — scores as one
+    // semantic_contradiction carrying the cross-document core, the direct
+    // route's verdict engine matching the compiled route's gate.
+    #[test]
+    fn verify_query_pairs_scores_hand_built_conflict() {
+        let overlap = concat!(
+            "(set-logic QF_LRA)\n",
+            "(set-option :print-success false)\n",
+            "(set-option :produce-models true)\n",
+            "(declare-const |cond.sepsis| Bool)\n",
+            "(assert (! |cond.sepsis| :named |ctx.test_source.m1_guideline_a.rule.0|))\n",
+            "(assert (! |cond.sepsis| :named |ctx.test_source.m1_guideline_b.rule.0|))\n",
+            "(check-sat)\n",
+            "(get-model)\n",
+        );
+        let deontic = concat!(
+            "(set-logic QF_UF)\n",
+            "(set-option :print-success false)\n",
+            "(set-option :produce-unsat-cores true)\n",
+            "(declare-const |pos:act.administer:drug.abx_a| Bool)\n",
+            "(assert (! |pos:act.administer:drug.abx_a| :named |a.test_source.m1_guideline_a.rule.0|))\n",
+            "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.test_source.m1_guideline_b.rule.0|))\n",
+            "(check-sat)\n",
+            "(get-unsat-core)\n",
+        );
+        let pairs = [(
+            (id("q.direct.pair1.overlap"), overlap.to_owned()),
+            (id("q.direct.pair1.deontic"), deontic.to_owned()),
+        )];
+        let adapter = Z3Adapter::new().unwrap();
+        let results = verify_query_pairs(&adapter, &pairs, Duration::from_secs(30));
+
+        assert_eq!(results.len(), 2, "sat Q1 runs Q2");
+        let q1 = &results[0];
+        assert_eq!(q1.query_id, id("q.direct.pair1.overlap"));
+        assert_eq!(q1.category, VerifierCategory::SemanticNoConflict);
+        assert_eq!(q1.verdict, Some(SolverVerdict::Sat));
+        // Empty diagnostics prove the sat overlap model parsed (a missing
+        // model on a ContextOverlap sat mints one invalid diagnostic).
+        assert_eq!(q1.diagnostics, vec![]);
+        assert_eq!(&q1.solver_identity, adapter.identity());
+
+        let q2 = &results[1];
+        assert_eq!(q2.query_id, id("q.direct.pair1.deontic"));
+        assert_eq!(q2.category, VerifierCategory::SemanticContradiction);
+        assert_eq!(q2.verdict, Some(SolverVerdict::Unsat));
+        assert_eq!(
+            q2.unsat_core.as_deref(),
+            Some(
+                &[
+                    id("a.test_source.m1_guideline_a.rule.0"),
+                    id("a.test_source.m1_guideline_b.rule.0"),
+                ][..]
+            )
+        );
+        assert_eq!(q2.model, None);
+        assert_eq!(q2.diagnostics, vec![]);
+        assert_eq!(q2.validate(), Ok(()));
+        assert_eq!(&q2.solver_identity, adapter.identity());
+    }
+
+    // route-direct-smt.2: an unsat Q1 closes the pair — verify_query_pairs
+    // returns the Q1 result only, no Q2 invoked, matching the compiled
+    // route's documented no-conflict gate on live z3.
+    #[test]
+    fn verify_query_pairs_unsat_q1_closes_pair_without_q2() {
+        let overlap = concat!(
+            "(set-logic QF_LRA)\n",
+            "(set-option :print-success false)\n",
+            "(set-option :produce-models true)\n",
+            "(declare-const |cond.sepsis| Bool)\n",
+            "(assert (! |cond.sepsis| :named |ctx.test_source.m1_guideline_a.rule.0|))\n",
+            "(assert (! (not |cond.sepsis|) :named |ctx.test_source.m1_control.rule.0|))\n",
+            "(check-sat)\n",
+            "(get-model)\n",
+        );
+        // Never invoked once Q1 is unsat; a valid stand-in proving the gate
+        // skips Q2. Its body would core if run, so seeing no Q2 result and
+        // no core proves the skip, not a silent solver fallthrough.
+        let deontic = concat!(
+            "(set-logic QF_UF)\n",
+            "(set-option :print-success false)\n",
+            "(set-option :produce-unsat-cores true)\n",
+            "(declare-const |pos:act.administer:drug.abx_a| Bool)\n",
+            "(assert (! |pos:act.administer:drug.abx_a| :named |a.test_source.m1_guideline_a.rule.0|))\n",
+            "(assert (! (not |pos:act.administer:drug.abx_a|) :named |a.test_source.m1_guideline_b.rule.0|))\n",
+            "(check-sat)\n",
+            "(get-unsat-core)\n",
+        );
+        let pairs = [(
+            (id("q.direct.pair1.overlap"), overlap.to_owned()),
+            (id("q.direct.pair1.deontic"), deontic.to_owned()),
+        )];
+        let adapter = Z3Adapter::new().unwrap();
+        let results = verify_query_pairs(&adapter, &pairs, Duration::from_secs(30));
+
+        assert_eq!(results.len(), 1, "unsat Q1 closes the pair without Q2");
+        let q1 = &results[0];
+        assert_eq!(q1.query_id, id("q.direct.pair1.overlap"));
         assert_eq!(q1.category, VerifierCategory::SemanticNoConflict);
         assert_eq!(q1.verdict, Some(SolverVerdict::Unsat));
         assert_eq!(q1.model, None);

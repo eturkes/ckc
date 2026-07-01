@@ -551,7 +551,7 @@ argument).
   generic reject tests absorb it. `ckc registry check` ok end-to-end (exit 0, empty diagnostics);
   `cargo test --workspace` 434/5 unchanged; engine-agnostic audit clean; fmt + clippy `-D` clean.]
   67% 135K/200K
-- [ ] route-direct-smt.2: `verify_pair` refactor + `verify_query_pairs` entry (ckc-smt, gate-independent
+- [x] route-direct-smt.2: `verify_pair` refactor + `verify_query_pairs` entry (ckc-smt, gate-independent
   prep; the shared calibrated back end SPEC §9 needs across both routes). Extract the per-pair Q1→Q2 gate
   from `verdict::verify` (`verdict.rs` ~L70-95: invoke the overlap query → `assemble_result(ContextOverlap)`;
   if its verdict is `Sat`, invoke the deontic query → `assemble_result(DeonticConsistency)`) into `fn
@@ -564,7 +564,17 @@ argument).
   verify_query_pairs}` — `verdict` is a private mod, so `.4` in ckc-cli cannot call it otherwise). Unit tests (z3 present): a hand-built Q1-sat / Q2-unsat pair (M1-shaped
   `:named a.<id>`) → one `SemanticContradiction` carrying the core; a Q1-unsat pair → Q1 result only, no Q2.
   Reading: `verdict.rs` `verify`/`assemble_result`/`QueryRole`; `verify.rs` `Z3Adapter::invoke`/`identity`.
-  Gate: `cargo test -p ckc-smt` (M1 verify unchanged + 2 new); fmt + clippy.
+  Gate: `cargo test -p ckc-smt` (M1 verify unchanged + 2 new); fmt + clippy. [Done: extracted the per-pair
+  Q1→Q2 gate into private `verify_pair` (borrowed `(&Id,&str)` overlap/deontic tuples); `verify` keeps its
+  plan-order asserts + delegates via `results.extend(verify_pair(...))` — behavior-preserving (M1 verify +
+  `single_ir_route_scores_m1_groups` byte-identical, workspace 434→436). NEW `pub
+  verify_query_pairs(&Z3Adapter, &[MintedQueryPair], Duration)` loops `verify_pair` over caller-minted pairs
+  (no `CompiledArtifact`); `MintedQueryPair=((Id,String),(Id,String))` `pub type` dodges clippy
+  `type_complexity` on the pinned nested-tuple slice while staying type-identical — both + the alias
+  re-exported from ckc-smt `lib.rs`. 2 new live z3 tests through `verify_query_pairs`: hand-built
+  Q1-sat/Q2-unsat (`:named a.<id>`) → one `SemanticContradiction` carrying the cross-doc core; Q1-unsat →
+  Q1 result only, no Q2. Gate: `cargo test -p ckc-smt` 60 passed + `cargo test --workspace` 436/5 + fmt +
+  clippy `-D` clean.] 69% 139K/200K
 - [ ] route-direct-smt.3: `direct_smt_accept` + `direct_smt_fill` + GOLDEN cassettes + bless helper (the
   route's fill half; model-runtime-absent, z3 not needed; needs .1). `direct_smt_accept() -> impl Fn(&[u8])
   -> Result<String, FillReject>`: shallow well-formedness only (utf8 + query-shaped: a `(set-logic` head +

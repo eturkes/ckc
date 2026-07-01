@@ -442,8 +442,11 @@ full pre-consolidation text lives in git history.
     route emits SMT, but `verdict::verify` consumes a `CompiledArtifact` whose `validate()` demands
     non-empty `region_ids` per assertion — a no-IR route CANNOT honestly supply them, so do NOT reuse
     `m1.verify` / build a fabricated artifact. Seam = BYPASS: extract verify()'s Q1→Q2 gate into a shared
-    `verify_pair`, add `pub verify_query_pairs(adapter, pairs, budget)` (caller-minted ids + model bodies →
-    `invoke` + `assemble_result`, no artifact); registry `processing_stage.m2.verify_smt` consumes
+    `verify_pair` (private; borrowed `(&Id,&str)` overlap/deontic tuples), add `pub
+    verify_query_pairs(adapter, &[MintedQueryPair], budget)` (LANDED .2, both re-exported from ckc-smt lib;
+    `MintedQueryPair=((Id,String),(Id,String))` owned pairs — a `pub type` alias dodges clippy
+    `type_complexity` on the nested-tuple slice while preserving the pinned type; caller-minted ids + model
+    bodies → `invoke` + `assemble_result`, no artifact); registry `processing_stage.m2.verify_smt` consumes
     `smt_query` DIRECTLY (`kind: verify`, no `compiled`), so the 3-stage "model_fill→syntactic-validity→
     verify" chain the roadmap first sketched collapses — "syntactic-validity" folds into that solver run
     (`target_syntax_failure`/`TargetParseError`, .5's direct-unique terminal, NO repair). Per-query emission

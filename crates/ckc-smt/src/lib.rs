@@ -33,10 +33,13 @@
 //!   [`RunOutcome::failure_code`].
 //! - `verdict` — verify-processing_stage interpretation completing the processing_stage:
 //!   [`verify()`], the §8.3 processing_stage core driving one compiled group's plan
-//!   through the adapter (Q2 only after a sat Q1); [`assemble_result`],
-//!   one [`SolverRun`] parsed — verdict token, byte-exact satisfying_example model,
-//!   core normalized to a canonical Id set — and mapped to its §6 category
-//!   under a [`QueryRole`], validated by construction.
+//!   through the adapter (Q2 only after a sat Q1); [`verify_query_pairs`],
+//!   the same Q1→Q2 gate over caller-minted query ids and bodies with no
+//!   [`CompiledArtifact`] (§9, the direct route's verdict engine);
+//!   [`assemble_result`], one [`SolverRun`] parsed — verdict token,
+//!   byte-exact satisfying_example model, core normalized to a canonical Id
+//!   set — and mapped to its §6 category under a [`QueryRole`], validated by
+//!   construction.
 #![forbid(unsafe_code)]
 
 mod artifact;
@@ -50,7 +53,7 @@ pub use artifact::{ArtifactError, AssertionRecord, CompiledArtifact, QueryBody, 
 pub use emit::{compile, emit_deontic_query, emit_overlap_query};
 pub use plan::plan_queries;
 pub use result::{SolverVerdict, VerifierCategory, VerifierError, VerifierResult, VerifierResults};
-pub use verdict::{QueryRole, assemble_result, verify};
+pub use verdict::{MintedQueryPair, QueryRole, assemble_result, verify, verify_query_pairs};
 pub use verify::{AdapterError, RunOutcome, SolverRun, Z3Adapter};
 
 use ckc_core::Id;
