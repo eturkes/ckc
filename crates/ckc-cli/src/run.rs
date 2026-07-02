@@ -3957,4 +3957,304 @@ processing_stages:
             "the solver-budget counter rides the direct verify event"
         );
     }
+
+    /// metrics-m2.1 — fold both routes' recorded-run observation channels into
+    /// their §7.3 raw rows over the committed cassettes (z3 present,
+    /// model-runtime-absent). Each arm replays its route's real machinery rather
+    /// than hand-built observations: single_ir observes six fills (the three
+    /// golden documents at seed 42 plus guideline_a's hallucinated / repaired /
+    /// exhausted rejection seeds) and the two exp.m1_scaffold group verdict
+    /// tails; direct_smt observes seven role fills (four golden, the
+    /// schema-exhaustion overlap, the shallow-accepting syntax pair) and three
+    /// verified groups — the schema-exhaustion group fills terminally so lands
+    /// fill-only, and the syntax group's lone `TargetSyntaxFailure` is a
+    /// solver-executed parse failure inside the syntactic denominator while
+    /// sitting outside the reference (accuracy scores the two M1 groups alone).
+    /// Pins each arm's FULL id-sorted row vector to hand-derived exact reduced
+    /// fractions, with no omission diagnostics.
+    #[test]
+    fn route_metrics_score_recorded_two_route_run() {
+        use std::collections::BTreeMap;
+
+        use ckc_core::Rational;
+
+        use crate::metrics::{
+            ACCEPTANCE_RATE, CONFLICT_VERDICT_ACCURACY, FillObservation, GroupObservation,
+            MetricRow, MetricValue, RECORDED_CALL_COUNT, REPAIR_COUNT, SCHEMA_VALID_RATE,
+            TARGET_SYNTACTIC_VALIDITY, route_metrics,
+        };
+
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let store = CassetteStore::new(root.join("crates/ckc-cli/tests/fixtures"));
+        let adapter = Z3Adapter::new().expect("z3 adapter on PATH");
+
+        // Both arms score against the same locked M1 reference.
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let exp = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold");
+        let reference =
+            parse_reference(&std::fs::read_to_string(root.join(&exp.expected_outcomes)).unwrap())
+                .unwrap();
+
+        let row = |metric: &str, num: &str, den: &str| MetricRow {
+            metric: static_id(metric),
+            value: MetricValue::Value(Rational::from_parts(num, den).unwrap()),
+        };
+
+        // ARM A — pipe.m2_single_ir.
+        {
+            let resolved = single_ir_resolved();
+            let tmp = tempfile::tempdir().unwrap();
+            let out = tmp.path().join("m2");
+            std::fs::create_dir_all(&out).unwrap();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+            // Fill channel: one observed model_fill per (document, seed), each over
+            // the document's real grounding universe (the deterministic extract →
+            // segment head, the single_ir_route_rejection_codes shape).
+            let observe = |entry: &CorpusEntry, seed: u64| {
+                let html = std::fs::read(root.join(&entry.path)).unwrap();
+                let config = ExtractConfig {
+                    document_id: entry.id.clone(),
+                    source_family: static_id("synthetic_test_source_html"),
+                    provenance: entry.provenance,
+                    data_class: DataClass::None,
+                    producer: producer(&resolved, 0),
+                };
+                let source = extract(&html, &config).unwrap();
+                let segments = segment(&source, &producer(&resolved, 1)).unwrap();
+                let regions: HashSet<&Id> = source
+                    .payload
+                    .regions
+                    .iter()
+                    .map(|r| &r.region_id)
+                    .collect();
+                let segment_ids: HashSet<&Id> = segments
+                    .payload
+                    .segments
+                    .iter()
+                    .map(|s| &s.segment_id)
+                    .collect();
+                let fill = model_fill(
+                    &store,
+                    &CassetteKey {
+                        route: static_id("route.single_ir"),
+                        source: entry.id.clone(),
+                        seed,
+                    },
+                    FillSource::Replay,
+                    1,
+                    single_ir_accept(&regions, &segment_ids),
+                )
+                .unwrap();
+                FillObservation::from_fill(&fill)
+            };
+            let corpus = single_ir_corpus();
+            let guideline_a = corpus
+                .iter()
+                .find(|e| e.id == static_id("test_source.m1_guideline_a"))
+                .expect("guideline_a in the corpus");
+            let mut fills: Vec<FillObservation> =
+                corpus.iter().map(|entry| observe(entry, 42)).collect();
+            for seed in [99, 98, 97] {
+                fills.push(observe(guideline_a, seed));
+            }
+
+            // Verdict channel: fill every document once, then run each
+            // exp.m1_scaffold group through the compile → verify tail (the
+            // single_ir_route_scores_m1_groups shape).
+            let mut bundles = BTreeMap::new();
+            for entry in &corpus {
+                let bundle =
+                    single_ir_fill(&root, entry, &lexicon, &store, 42, &resolved, 1, &mut shell)
+                        .unwrap_or_else(|| {
+                            panic!("{}: single_ir_fill yielded no bundle", entry.id)
+                        });
+                bundles.insert(entry.id.clone(), bundle);
+            }
+            let mut groups = Vec::new();
+            for group in &exp.test_source_groups {
+                let gid = group.group_id.clone();
+                let members: Vec<_> = group
+                    .test_sources
+                    .iter()
+                    .map(|s| {
+                        bundles
+                            .get(s)
+                            .unwrap_or_else(|| panic!("{gid}: unfilled member {s}"))
+                    })
+                    .collect();
+                let (compiled, results) = compile_verify_group(
+                    &gid,
+                    &format!("groups/{gid}"),
+                    &members,
+                    processing_stage_clock(),
+                    &resolved,
+                    &adapter,
+                    &mut shell,
+                );
+                let compiled = compiled.unwrap_or_else(|| panic!("{gid}: no compiled artifact"));
+                let results = results.unwrap_or_else(|| panic!("{gid}: no verifier results"));
+                groups.push(GroupObservation {
+                    group_id: gid,
+                    query_pairs: compiled
+                        .payload
+                        .solver_query_plan
+                        .iter()
+                        .map(|p| {
+                            (
+                                p.context_overlap_query_id.clone(),
+                                p.deontic_consistency_query_id.clone(),
+                            )
+                        })
+                        .collect(),
+                    results: results.payload.results.clone(),
+                });
+            }
+
+            let metrics =
+                route_metrics(&static_id("pipe.m2_single_ir"), &fills, &groups, &reference);
+            assert_eq!(
+                metrics.rows,
+                vec![
+                    row(ACCEPTANCE_RATE, "2", "3"),
+                    row(CONFLICT_VERDICT_ACCURACY, "1", "1"),
+                    row(RECORDED_CALL_COUNT, "8", "1"),
+                    row(REPAIR_COUNT, "2", "1"),
+                    row(SCHEMA_VALID_RATE, "5", "8"),
+                    row(TARGET_SYNTACTIC_VALIDITY, "1", "1"),
+                ]
+            );
+            assert!(metrics.diagnostics.is_empty());
+        }
+
+        // ARM B — pipe.m2_direct_smt.
+        {
+            let resolved = direct_smt_resolved();
+            let tmp = tempfile::tempdir().unwrap();
+            let out = tmp.path().join("m2");
+            std::fs::create_dir_all(&out).unwrap();
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+
+            // Fill channel: one observed model_fill per (minted role source, seed) —
+            // the four golden seed-42 role fills plus the rejection sources
+            // (schema-exhausted overlap 91, shallow-accepting syntax pair 90).
+            let observe = |source: &str, seed: u64| {
+                let fill = model_fill(
+                    &store,
+                    &CassetteKey {
+                        route: static_id("route.direct_smt"),
+                        source: static_id(source),
+                        seed,
+                    },
+                    FillSource::Replay,
+                    1,
+                    direct_smt_accept(),
+                )
+                .unwrap();
+                FillObservation::from_fill(&fill)
+            };
+            let fills = vec![
+                observe("group.m1_conflict.overlap", 42),
+                observe("group.m1_conflict.deontic", 42),
+                observe("group.m1_no_conflict.overlap", 42),
+                observe("group.m1_no_conflict.deontic", 42),
+                observe("group.m2_direct_schema.overlap", 91),
+                observe("group.m2_direct_syntax.overlap", 90),
+                observe("group.m2_direct_syntax.deontic", 90),
+            ];
+
+            // Verdict channel: the two golden exp.m1_scaffold groups at seed 42 plus
+            // the syntax-failure group at seed 90 (the direct_smt_route_rejection_codes
+            // members), each through the fill → verify tail. The schema-exhaustion
+            // group fills terminally — no pair, no group observation.
+            let corpus: BTreeMap<Id, CorpusEntry> = single_ir_corpus()
+                .into_iter()
+                .map(|entry| (entry.id.clone(), entry))
+                .collect();
+            let member = |id: &str| {
+                corpus
+                    .get(&static_id(id))
+                    .unwrap_or_else(|| panic!("{id} in the corpus"))
+            };
+            let worklist: Vec<(Id, Vec<&CorpusEntry>, u64)> = exp
+                .test_source_groups
+                .iter()
+                .map(|group| {
+                    (
+                        group.group_id.clone(),
+                        group
+                            .test_sources
+                            .iter()
+                            .map(|s| {
+                                corpus
+                                    .get(s)
+                                    .unwrap_or_else(|| panic!("unknown member {s}"))
+                            })
+                            .collect(),
+                        42,
+                    )
+                })
+                .chain(std::iter::once((
+                    static_id("group.m2_direct_syntax"),
+                    vec![
+                        member("test_source.m1_guideline_a"),
+                        member("test_source.m1_guideline_b"),
+                    ],
+                    90,
+                )))
+                .collect();
+            let mut groups = Vec::new();
+            for (gid, members, seed) in worklist {
+                let (overlap, deontic) = direct_smt_fill(
+                    &root, &gid, &members, &store, seed, &resolved, 1, &mut shell,
+                )
+                .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+                let results = direct_smt_verify_group(
+                    &gid,
+                    &format!("groups/{gid}"),
+                    &overlap,
+                    &deontic,
+                    &resolved,
+                    &adapter,
+                    &mut shell,
+                )
+                .unwrap_or_else(|| panic!("{gid}: no verifier results"));
+                let query_pairs = vec![(
+                    static_id(&format!("{gid}.overlap")),
+                    static_id(&format!("{gid}.deontic")),
+                )];
+                groups.push(GroupObservation {
+                    group_id: gid,
+                    query_pairs,
+                    results: results.payload.results.clone(),
+                });
+            }
+
+            let metrics = route_metrics(
+                &static_id("pipe.m2_direct_smt"),
+                &fills,
+                &groups,
+                &reference,
+            );
+            assert_eq!(
+                metrics.rows,
+                vec![
+                    row(ACCEPTANCE_RATE, "6", "7"),
+                    row(CONFLICT_VERDICT_ACCURACY, "1", "1"),
+                    row(RECORDED_CALL_COUNT, "8", "1"),
+                    row(REPAIR_COUNT, "1", "1"),
+                    row(SCHEMA_VALID_RATE, "3", "4"),
+                    row(TARGET_SYNTACTIC_VALIDITY, "3", "4"),
+                ]
+            );
+            assert!(metrics.diagnostics.is_empty());
+        }
+    }
 }
