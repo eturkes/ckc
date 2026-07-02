@@ -115,7 +115,7 @@ doc-lint bullet).
   [S] 39% 79K/200K 6c28421
 - [x] report-m2.1b: Report M2 shape — failure_taxonomy/metrics/model_identity omit-None
   members + RouteTaxonomy + per-member validate rejections; M1 pins byte-identical.
-  72% 143K/200K
+  72% 143K/200K 822f924
 - [ ] report-m2.1c: populated report fixture + canonical byte pin (needs .1b). populated_report()
   = valid_report() + the 3 members Some + JA span text, values SETTLED: the four span(..) calls
   keep their id args VERBATIM (synthetic test_source.a/b, r.*, s.* stay — ids are opaque; ONLY

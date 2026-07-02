@@ -1241,6 +1241,30 @@ mod tests {
         assert_eq!(String::from_utf8(bytes).unwrap(), PINNED_REPORT);
     }
 
+    /// Exercises the three M2 `obj.optional` read slots with `Some` values —
+    /// a mis-slotted optional read would silently yield `None` and fail the
+    /// equality below. report-m2.1c pins the populated bytes.
+    #[test]
+    fn populated_report_round_trips_canonically() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![(id("pipe.base"), vec![(id("solver_timeout"), 2)])],
+            }),
+            metrics: Some(metrics_fixture()),
+            model_identity: Some(ModelIdentity {
+                model_id: id("model.baseline"),
+                quant: "fixture_quant".to_owned(),
+                runtime_version: "1.0.0".to_owned(),
+            }),
+            ..valid_report()
+        };
+        report.validate().unwrap();
+        let bytes = canonical_payload_bytes(&report).unwrap();
+        let read: Report = read_strict_canonical(&bytes).unwrap();
+        assert_eq!(read, report);
+        read.validate().unwrap();
+    }
+
     /// The full canonical bytes of [`valid_report`], pinned from observed
     /// output: alphabetical members, optionals omitted on the no-conflict row,
     /// u64 counts as §4.3 string-wrapped integers.
@@ -1688,6 +1712,48 @@ mod tests {
                 field: "runtime_version"
             })
         );
+    }
+
+    /// Pins the spec'd M2 Display strings — the variant asserts above would
+    /// let the wording drift.
+    #[test]
+    fn pins_m2_error_display_strings() {
+        let cases = [
+            (
+                ReportError::EmptyTaxonomy,
+                "failure_taxonomy is present but names no routes",
+            ),
+            (
+                ReportError::TaxonomyZeroCount {
+                    pipeline_id: id("pipe.route"),
+                    code: id("solver_timeout"),
+                },
+                "failure_taxonomy count for solver_timeout on route pipe.route is zero",
+            ),
+            (
+                ReportError::DuplicateRoute(id("pipe.route")),
+                "metrics raw rows claim route pipe.route more than once",
+            ),
+            (
+                ReportError::BaselineMissing(id("pipe.base")),
+                "metrics baseline pipe.base has no raw-rows section",
+            ),
+            (
+                ReportError::DeltaTableMismatch,
+                "metrics route_deltas must list exactly the non-baseline raw-rows routes in raw-rows order",
+            ),
+            (
+                ReportError::MetricRowOrder(id("pipe.base")),
+                "metrics rows for route pipe.base are not strictly ascending by metric id",
+            ),
+            (
+                ReportError::EmptyIdentityField { field: "quant" },
+                "model_identity quant is empty",
+            ),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(err.to_string(), expected);
+        }
     }
 
     fn identity() -> SolverIdentity {
