@@ -40,7 +40,9 @@ full pre-consolidation text lives in git history.
   commit. SPLIT RULES: refactor-to-share-internals → the refactor is its OWN behavior-locked unit FIRST
   (existing tests the gate, zero test edits); format walker + test-source integration = walker-core
   (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
-  artifact = 2; multi-invariant validator + full rejection coverage = 2; derivation fn + its
+  artifact = 2; multi-invariant validator + full rejection coverage = 2; pure-computation module (full
+  §-semantics + unit tests) + its recorded-run integration test = 2 (metrics-m2.1 overflowed deriving
+  both in one window); derivation fn + its
   test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
   (never paired with assembly or stage wiring); spec-byte amendment (re-pin + reference/test mirror sweep)
