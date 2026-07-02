@@ -1103,12 +1103,15 @@ impl std::error::Error for ReportError {}
 #[cfg(test)]
 mod tests {
     use ckc_core::{
-        DataClass, DiagnosticCode, EvidenceRegion, Outcome, Provenance, SourceDocument,
+        DataClass, DiagnosticCode, EvidenceRegion, Outcome, Provenance, Rational, SourceDocument,
         SourceTextSpan, canonical_payload_bytes, read_strict_canonical,
     };
 
     use super::*;
-    use crate::metrics::{MetricValue, RouteMetrics, experiment_metrics};
+    use crate::metrics::{
+        ACCEPTANCE_RATE, K_SAMPLE_CONVERGENCE, MetricValue, REPAIR_COUNT, RouteMetrics,
+        experiment_metrics,
+    };
     use crate::trace::{ClaimEvidenceRow, TraceNode};
 
     fn id(text: &str) -> Id {
@@ -1241,16 +1244,69 @@ mod tests {
         assert_eq!(String::from_utf8(bytes).unwrap(), PINNED_REPORT);
     }
 
-    /// Exercises the three M2 `obj.optional` read slots with `Some` values —
-    /// a mis-slotted optional read would silently yield `None` and fail the
-    /// equality below. report-m2.1c pins the populated bytes.
-    #[test]
-    fn populated_report_round_trips_canonically() {
-        let report = Report {
+    /// SPEC §8.2 test-source sentences, byte-exact with the committed
+    /// readable mirror `crates/ckc-core/tests/test_sources_m1.rs`.
+    const A_RECOMMENDATION: &str =
+        "成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)";
+    const B_CONTRAINDICATION: &str =
+        "成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)";
+    const CONTROL_SENTENCE: &str = "小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である";
+
+    /// [`valid_report`] with every M2 member `Some` and the four quoted-span
+    /// texts swapped to the §8.2 sentences (span ids stay verbatim): the
+    /// finding quotes A_RECOMMENDATION + B_CONTRAINDICATION, the no-conflict
+    /// row A_RECOMMENDATION + CONTROL_SENTENCE. Taxonomy counts carry §7.4
+    /// `DiagnosticCode` ids per route; metrics ride [`experiment_metrics`]'s
+    /// own assembly (`pipe.base` baseline, delta rows derived).
+    fn populated_report() -> Report {
+        let row = |name: &str, value: MetricValue| MetricRow {
+            metric: id(name),
+            value,
+        };
+        let frac =
+            |num: &str, den: &str| MetricValue::Value(Rational::from_parts(num, den).unwrap());
+        let mut report = Report {
             failure_taxonomy: Some(RouteTaxonomy {
-                routes: vec![(id("pipe.base"), vec![(id("solver_timeout"), 2)])],
+                routes: vec![
+                    (
+                        id("pipe.base"),
+                        vec![
+                            (id("ai_schema_violation"), 2),
+                            (id("target_parse_error"), 1),
+                        ],
+                    ),
+                    (
+                        id("pipe.route"),
+                        vec![
+                            (id("ai_hallucinated_source"), 1),
+                            (id("repair_limit_exceeded"), 1),
+                        ],
+                    ),
+                ],
             }),
-            metrics: Some(metrics_fixture()),
+            metrics: Some(experiment_metrics(
+                vec![
+                    RouteMetrics {
+                        pipeline_id: id("pipe.base"),
+                        rows: vec![
+                            row(ACCEPTANCE_RATE, frac("3", "4")),
+                            row(K_SAMPLE_CONVERGENCE, MetricValue::NotApplicable),
+                            row(REPAIR_COUNT, frac("2", "1")),
+                        ],
+                        diagnostics: vec![],
+                    },
+                    RouteMetrics {
+                        pipeline_id: id("pipe.route"),
+                        rows: vec![
+                            row(ACCEPTANCE_RATE, frac("1", "2")),
+                            row(K_SAMPLE_CONVERGENCE, frac("1", "1")),
+                            row(REPAIR_COUNT, frac("2", "1")),
+                        ],
+                        diagnostics: vec![],
+                    },
+                ],
+                &id("pipe.base"),
+            )),
             model_identity: Some(ModelIdentity {
                 model_id: id("model.baseline"),
                 quant: "fixture_quant".to_owned(),
@@ -1258,12 +1314,49 @@ mod tests {
             }),
             ..valid_report()
         };
+        report.findings[0].quoted_spans[0].text = A_RECOMMENDATION.to_owned();
+        report.findings[0].quoted_spans[1].text = B_CONTRAINDICATION.to_owned();
+        report.no_conflict_results[0].quoted_spans[0].text = A_RECOMMENDATION.to_owned();
+        report.no_conflict_results[0].quoted_spans[1].text = CONTROL_SENTENCE.to_owned();
+        report
+    }
+
+    /// Exercises the three M2 `obj.optional` read slots with `Some` values —
+    /// a mis-slotted optional read would silently yield `None` and fail the
+    /// equality below — and pins the populated canonical bytes (the §8.2
+    /// span texts ride as raw UTF-8: §4.3 escapes only `"`, `\`, <0x20).
+    #[test]
+    fn populated_report_round_trips_canonically() {
+        let report = populated_report();
         report.validate().unwrap();
         let bytes = canonical_payload_bytes(&report).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes.clone()).unwrap(),
+            PINNED_POPULATED_REPORT
+        );
         let read: Report = read_strict_canonical(&bytes).unwrap();
         assert_eq!(read, report);
         read.validate().unwrap();
     }
+
+    /// §9: raw metric rows land strictly before the baseline-delta table in
+    /// the report bytes — `metrics`'s `raw_rows` key sorts, and so appears,
+    /// before `route_deltas` in the pinned populated output.
+    #[test]
+    fn populated_report_orders_raw_rows_before_deltas() {
+        let raw = PINNED_POPULATED_REPORT
+            .find(r#""raw_rows":"#)
+            .expect("raw_rows member");
+        let deltas = PINNED_POPULATED_REPORT
+            .find(r#""route_deltas":"#)
+            .expect("route_deltas member");
+        assert!(raw < deltas);
+    }
+
+    /// The full canonical bytes of [`populated_report`], pinned from
+    /// observed output: the M2 members in their sorted slots, `metrics`
+    /// through [`experiment_metrics`], §8.2 span texts unescaped.
+    const PINNED_POPULATED_REPORT: &str = r#"{"corpus_hashes":{"test_source.a":"sha256:1111111111111111111111111111111111111111111111111111111111111111","test_source.b":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"},"failure_taxonomy":{"pipe.base":{"ai_schema_violation":"2","target_parse_error":"1"},"pipe.route":{"ai_hallucinated_source":"1","repair_limit_exceeded":"1"}},"findings":[{"assertion_ids":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"claim_tier":"s1_accepted","conflict_kind":"deontic_direction_conflict","core":["a.test_source.a.rule.0","a.test_source.b.rule.0"],"finding_id":"finding.group.g1.1","query_id":"q.g1.pair1.deontic","quoted_spans":[{"document_id":"test_source.a","region_id":"r.0","span_id":"s.0","text":"成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)"},{"document_id":"test_source.b","region_id":"r.0","span_id":"s.0","text":"成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)"}],"region_ids":["r.0"],"rule_ids":["test_source.a.rule.0","test_source.b.rule.0"],"verdict":"unsat","wording":"synthetic test source measurement"}],"lexicon_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","metrics":{"baseline_pipeline_id":"pipe.base","raw_rows":[{"diagnostics":[],"pipeline_id":"pipe.base","rows":[{"metric":"acceptance_rate","value":{"den":"4","num":"3"}},{"metric":"k_sample_convergence"},{"metric":"repair_count","value":{"den":"1","num":"2"}}]},{"diagnostics":[],"pipeline_id":"pipe.route","rows":[{"metric":"acceptance_rate","value":{"den":"2","num":"1"}},{"metric":"k_sample_convergence","value":{"den":"1","num":"1"}},{"metric":"repair_count","value":{"den":"1","num":"2"}}]}],"route_deltas":[{"pipeline_id":"pipe.route","rows":[{"metric":"acceptance_rate","value":{"den":"4","num":"-1"}},{"metric":"k_sample_convergence"},{"metric":"repair_count","value":{"den":"1","num":"0"}}]}]},"model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"no_conflict_results":[{"assertion_ids":["ctx.test_source.a.rule.1","ctx.test_source.b.rule.1"],"claim_tier":"s1_accepted","finding_id":"finding.group.g2.0","query_id":"q.g2.pair1.overlap","quoted_spans":[{"document_id":"test_source.a","region_id":"r.1","span_id":"s.1","text":"成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)"},{"document_id":"test_source.b","region_id":"r.1","span_id":"s.1","text":"小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である"}],"region_ids":["r.1"],"rule_ids":["test_source.a.rule.1","test_source.b.rule.1"],"verdict":"unsat","wording":"documented no-conflict result"}],"replay_status":"not_replayed","solver_identity":{"solver_id":"z3","version":"4.13.0"},"wording":["documented no-conflict result","synthetic test source measurement"]}"#;
 
     /// The full canonical bytes of [`valid_report`], pinned from observed
     /// output: alphabetical members, optionals omitted on the no-conflict row,

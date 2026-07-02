@@ -116,30 +116,8 @@ doc-lint bullet).
 - [x] report-m2.1b: Report M2 shape — failure_taxonomy/metrics/model_identity omit-None
   members + RouteTaxonomy + per-member validate rejections; M1 pins byte-identical.
   72% 143K/200K 822f924
-- [ ] report-m2.1c: populated report fixture + canonical byte pin (needs .1b). populated_report()
-  = valid_report() + the 3 members Some + JA span text, values SETTLED: the four span(..) calls
-  keep their id args VERBATIM (synthetic test_source.a/b, r.*, s.* stay — ids are opaque; ONLY
-  the 4th arg `text` swaps) to consts copied byte-exactly from
-  crates/ckc-core/tests/test_sources_m1.rs (the committed readable mirror; corpus/test_sources =
-  deny-Read): findings row → test_source.a span = A_RECOMMENDATION, test_source.b span =
-  B_CONTRAINDICATION; no_conflict row → test_source.a span = A_RECOMMENDATION, test_source.b
-  span = CONTROL_SENTENCE (3 distinct JA literals, A_EXCEPTION unused); every other field of
-  both rows + all other valid_report() members unchanged; failure_taxonomy = {pipe.base: [(ai_schema_violation, 2), (target_parse_error, 1)],
-  pipe.route: [(ai_hallucinated_source, 1), (repair_limit_exceeded, 1)]} (§7.4 codes —
-  target_parse_error is the DiagnosticCode; VerifierCategory's target_syntax_failure is a
-  different vocabulary); metrics = experiment_metrics(vec![base, route], &pipe.base), per-route
-  rows over consts ACCEPTANCE_RATE / K_SAMPLE_CONVERGENCE / REPAIR_COUNT (already ascending):
-  base 3/4, NA, 2/1 · route 1/2, 1/1, 2/1 (row-ctor pattern ← metrics.rs's own pinned test);
-  model_identity = SYNTHETIC {model.baseline, "fixture_quant", "1.0.0"}; `wording` member
-  UNCHANGED (= labels the rows carry; read_set::<Wording> already enforces §0 vocabulary at
-  parse). Tests: populated_report_round_trips_canonically — validate() ok + CanonRead round-trip
-  + PINNED_POPULATED_REPORT byte pin (r#"…"# style of PINNED_REPORT; JA rides raw UTF-8,
-  emit_string escapes only `"` `\` <0x20); populated_report_orders_raw_rows_before_deltas — §9
-  byte order, index("raw_rows") < index("route_deltas") in the pinned bytes. Pin capture: temp
-  fs::write of the emitted bytes → session scratchpad, run once, python-splice verbatim into the
-  const, DELETE the write line, re-run green. Gate: `cargo test -p ckc-cli` (M1 pins untouched);
-  python byte-containment check of the 3 JA literals vs test_sources_m1.rs; fmt/clippy/doc-lint
-  (17+17 hold); engine grep on report.rs.
+- [x] report-m2.1c: populated_report fixture (§8.2 JA spans, settled taxonomy/metrics/identity)
+  + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K
 - [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
   `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
   replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the
