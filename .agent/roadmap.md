@@ -101,15 +101,9 @@ doc-lint bullet).
 - [x] metrics-m2.2: k_sample_convergence row (pairwise fingerprint agreement, NA on k<2) +
   experiment_metrics baseline-delta assembly + emission_order §9 contract + Rational::sub. 87% 174K/200K
   05746ce
-- [ ] report-m2.1a: metrics.rs canonical layer — PROVEN source-diff salvage (the .1 session
-  overflowed post-derivation with this half green; recovery pre-proved every gate on the banked
-  tree, then reverted). Redo = `git apply .agent/wip-report-m2.1a.diff` → gates → close,
-  transcribing NOTHING; procedure + banked pass counts in `.agent/wip-report-m2.1.txt` §.1a.
-  Content: Canonical/CanonRead for MetricRow (NotApplicable = omitted `value` member) +
-  RouteMetrics/RouteDelta + ExperimentMetrics with LOAD-BEARING keys `raw_rows` < `route_deltas`
-  (§9 raw-before-delta in §4.3 sorted-key bytes — memory TRAP discharged) + 2 byte-pin/round-trip
-  tests. Gate (all PRE-PROVEN): `cargo test -p ckc-cli` = 231 passed; fmt + clippy `-D` clean;
-  doc-lint 18 standing; engine grep clean on metrics.rs. Close: rm the .diff.
+- [x] report-m2.1a: metrics.rs canonical layer (MetricRow/RouteMetrics/RouteDelta/
+  ExperimentMetrics) — §9 raw_rows<route_deltas byte pin; salvage redo, gates == banked.
+  39% 79K/200K
 - [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Apply the
   COMPILE-VERIFIED partial `.agent/wip-report-m2.1b.diff` (module doc + imports + RouteTaxonomy
   Canonical/CanonRead), then implement per `.agent/wip-report-m2.1.txt` §.1b — every decision

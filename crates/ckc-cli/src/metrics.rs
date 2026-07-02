@@ -14,12 +14,18 @@
 //! plus one per-metric (route − baseline) delta table per non-baseline
 //! route under the experiment's designated baseline;
 //! [`ExperimentMetrics::emission_order`] carries the §9
-//! raw-rows-before-ranking rendering contract. run-m2.1 wires the
-//! observations from the route loop; the report units embed the rows.
+//! raw-rows-before-ranking rendering contract. The output types are
+//! [`Canonical`]/[`CanonRead`] — `report.json` embeds [`ExperimentMetrics`]
+//! verbatim (report-m2.1). run-m2.1 wires the observations from the route
+//! loop.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ckc_core::{DiagnosticCode, DiagnosticRecord, Id, Outcome, Rational, ReferenceEntry};
+use ckc_core::{
+    CanonError, CanonRead, CanonReadError, Canonical, DiagnosticCode, DiagnosticRecord, Id,
+    ObjectEmitter, ObjectReader, Outcome, Rational, Reader, ReferenceEntry, emit_array, emit_set,
+    read_array, read_set,
+};
 use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult};
 
 use crate::model_fill::ModelFill;
@@ -111,6 +117,38 @@ pub struct MetricRow {
     pub value: MetricValue,
 }
 
+/// Canonical row: `{"metric":…}` plus an optional `value` member (the
+/// [`Rational`] object). The canonical form has no null (§4.3), so
+/// [`MetricValue::NotApplicable`] is the omitted `value` member — a present
+/// row with no value IS the §7.3 `not_applicable` emission, distinct from a
+/// metric omitted from the rows altogether (no row, one omission
+/// diagnostic).
+impl Canonical for MetricRow {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("metric", |b| self.metric.emit_canonical(b))?;
+        let value = match &self.value {
+            MetricValue::Value(rational) => Some(rational),
+            MetricValue::NotApplicable => None,
+        };
+        obj.optional("value", value, |b, v| v.emit_canonical(b))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for MetricRow {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let metric = obj.member("metric", Id::read)?;
+        let value = obj.optional("value", Rational::read)?;
+        obj.close()?;
+        Ok(MetricRow {
+            metric,
+            value: value.map_or(MetricValue::NotApplicable, MetricValue::Value),
+        })
+    }
+}
+
 /// One route's §7.3 raw rows, sorted by metric id, plus one omission
 /// diagnostic per metric this run's observations could not honestly support.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +156,35 @@ pub struct RouteMetrics {
     pub pipeline_id: Id,
     pub rows: Vec<MetricRow>,
     pub diagnostics: Vec<DiagnosticRecord>,
+}
+
+/// Canonical route rows. `rows` emits as a §4.3 set: `metric` is each row's
+/// first member and metric ids are unique per route ([`route_metrics`]'s
+/// sorted-row invariant, validated at the report boundary), so canonical
+/// byte order coincides with metric-id order.
+impl Canonical for RouteMetrics {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("diagnostics", |b| emit_set(b, &self.diagnostics))?;
+        obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
+        obj.member("rows", |b| emit_set(b, &self.rows))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for RouteMetrics {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let diagnostics = obj.member("diagnostics", read_set::<DiagnosticRecord>)?;
+        let pipeline_id = obj.member("pipeline_id", Id::read)?;
+        let rows = obj.member("rows", read_set::<MetricRow>)?;
+        obj.close()?;
+        Ok(RouteMetrics {
+            pipeline_id,
+            rows,
+            diagnostics,
+        })
+    }
 }
 
 /// One non-baseline route's §7.3 baseline-delta table: per-metric
@@ -130,6 +197,25 @@ pub struct RouteMetrics {
 pub struct RouteDelta {
     pub pipeline_id: Id,
     pub rows: Vec<MetricRow>,
+}
+
+impl Canonical for RouteDelta {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("pipeline_id", |b| self.pipeline_id.emit_canonical(b))?;
+        obj.member("rows", |b| emit_set(b, &self.rows))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for RouteDelta {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let pipeline_id = obj.member("pipeline_id", Id::read)?;
+        let rows = obj.member("rows", read_set::<MetricRow>)?;
+        obj.close()?;
+        Ok(RouteDelta { pipeline_id, rows })
+    }
 }
 
 /// One experiment's assembled §7.3 metrics: every route's raw rows plus a
@@ -146,6 +232,41 @@ pub struct ExperimentMetrics {
     pub deltas: Vec<RouteDelta>,
 }
 
+/// Canonical members `baseline_pipeline_id`, `raw_rows` (= `routes`),
+/// `route_deltas` (= `deltas`), both arrays order-preserving. The member
+/// names are load-bearing: §4.3 sorts object members by key bytes, and
+/// `raw_rows` < `route_deltas` keeps every raw row strictly before every
+/// delta table in the emitted bytes — [`emission_order`]'s §9
+/// raw-rows-before-ranking contract carried into `report.json` itself.
+///
+/// [`emission_order`]: ExperimentMetrics::emission_order
+impl Canonical for ExperimentMetrics {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let mut obj = ObjectEmitter::new();
+        obj.member("baseline_pipeline_id", |b| {
+            self.baseline_pipeline_id.emit_canonical(b)
+        })?;
+        obj.member("raw_rows", |b| emit_array(b, &self.routes))?;
+        obj.member("route_deltas", |b| emit_array(b, &self.deltas))?;
+        obj.finish(out)
+    }
+}
+
+impl CanonRead for ExperimentMetrics {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let mut obj = ObjectReader::open(r)?;
+        let baseline_pipeline_id = obj.member("baseline_pipeline_id", Id::read)?;
+        let routes = obj.member("raw_rows", read_array::<RouteMetrics>)?;
+        let deltas = obj.member("route_deltas", read_array::<RouteDelta>)?;
+        obj.close()?;
+        Ok(ExperimentMetrics {
+            baseline_pipeline_id,
+            routes,
+            deltas,
+        })
+    }
+}
+
 /// One §9-ordered rendering section ([`ExperimentMetrics::emission_order`]).
 #[derive(Debug, Clone, Copy)]
 pub enum MetricsSection<'a> {
@@ -158,9 +279,9 @@ pub enum MetricsSection<'a> {
 impl ExperimentMetrics {
     /// §9 raw-rows-before-ranking: every route's raw rows strictly precede
     /// every delta table. Renderers must walk this order, never the fields
-    /// ad hoc — the pending report units (report-m2) are the consumers; no
-    /// emitter reads it yet, so the §9 guarantee reaches artifacts only
-    /// once they land.
+    /// ad hoc. Carriers today: the canonical `report.json` bytes agree by
+    /// key naming (`raw_rows` < `route_deltas`, see [`Canonical`] above);
+    /// the markdown renderings (report-m2.3) are the pending walkers.
     pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
         self.routes
             .iter()
@@ -528,7 +649,7 @@ pub fn experiment_metrics(
 
 #[cfg(test)]
 mod tests {
-    use ckc_core::{RationalRepr, SolverIdentity};
+    use ckc_core::{RationalRepr, SolverIdentity, canonical_payload_bytes, read_strict_canonical};
 
     use super::*;
 
@@ -1249,4 +1370,54 @@ mod tests {
             &[],
         );
     }
+
+    #[test]
+    fn metric_row_bytes_omit_value_on_not_applicable() {
+        let valued = MetricRow {
+            metric: static_id("acceptance_rate"),
+            value: frac("1", "2"),
+        };
+        let bytes = canonical_payload_bytes(&valued).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes.clone()).unwrap(),
+            r#"{"metric":"acceptance_rate","value":{"den":"2","num":"1"}}"#
+        );
+        let read: MetricRow = read_strict_canonical(&bytes).unwrap();
+        assert_eq!(read, valued);
+
+        let na = MetricRow {
+            metric: static_id("k_sample_convergence"),
+            value: MetricValue::NotApplicable,
+        };
+        let bytes = canonical_payload_bytes(&na).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes.clone()).unwrap(),
+            r#"{"metric":"k_sample_convergence"}"#
+        );
+        let read: MetricRow = read_strict_canonical(&bytes).unwrap();
+        assert_eq!(read, na);
+    }
+
+    #[test]
+    fn experiment_metrics_round_trip_with_raw_rows_before_deltas() {
+        let (route, baseline) = delta_fixture();
+        let assembled = experiment_metrics(vec![route, baseline], &static_id("pipe.base"));
+        let bytes = canonical_payload_bytes(&assembled).unwrap();
+        let text = String::from_utf8(bytes.clone()).unwrap();
+        let raw = text.find(r#""raw_rows":"#).expect("raw_rows member");
+        let deltas = text
+            .find(r#""route_deltas":"#)
+            .expect("route_deltas member");
+        // §9 raw-rows-before-ranking holds in the canonical bytes themselves:
+        // the member names are chosen so key-byte order carries it.
+        assert!(raw < deltas, "raw rows precede the delta table in bytes");
+        // Full wire-shape pin: symmetric emit/read drift in the nested
+        // RouteMetrics/RouteDelta member names would survive the round-trip,
+        // so the whole assembly is pinned byte-for-byte.
+        assert_eq!(text, PINNED_EXPERIMENT_METRICS);
+        let read: ExperimentMetrics = read_strict_canonical(&bytes).unwrap();
+        assert_eq!(read, assembled);
+    }
+
+    const PINNED_EXPERIMENT_METRICS: &str = r#"{"baseline_pipeline_id":"pipe.base","raw_rows":[{"diagnostics":[],"pipeline_id":"pipe.route","rows":[{"metric":"acceptance_rate","value":{"den":"2","num":"1"}},{"metric":"conflict_verdict_accuracy","value":{"den":"1","num":"0"}},{"metric":"k_sample_convergence","value":{"den":"1","num":"1"}},{"metric":"recorded_call_count","value":{"den":"1","num":"4"}},{"metric":"repair_count","value":{"den":"1","num":"2"}},{"metric":"schema_valid_rate","value":{"den":"2","num":"1"}},{"metric":"target_syntactic_validity","value":{"den":"1","num":"1"}}]},{"diagnostics":[],"pipeline_id":"pipe.base","rows":[{"metric":"acceptance_rate","value":{"den":"4","num":"3"}},{"metric":"conflict_verdict_accuracy","value":{"den":"1","num":"1"}},{"metric":"k_sample_convergence"},{"metric":"recorded_call_count","value":{"den":"1","num":"6"}},{"metric":"repair_count","value":{"den":"1","num":"2"}},{"metric":"schema_valid_rate","value":{"den":"2","num":"1"}},{"metric":"target_syntactic_validity","value":{"den":"1","num":"1"}}]}],"route_deltas":[{"pipeline_id":"pipe.route","rows":[{"metric":"acceptance_rate","value":{"den":"4","num":"-1"}},{"metric":"conflict_verdict_accuracy","value":{"den":"1","num":"-1"}},{"metric":"k_sample_convergence"},{"metric":"recorded_call_count","value":{"den":"1","num":"-2"}},{"metric":"repair_count","value":{"den":"1","num":"0"}},{"metric":"schema_valid_rate","value":{"den":"1","num":"0"}},{"metric":"target_syntactic_validity","value":{"den":"1","num":"0"}}]}]}"#;
 }
