@@ -1269,6 +1269,9 @@ fn report_processing_stage(
         lexicon_hash,
         solver_identity,
         &ledger,
+        // M1 baseline run: no recorded model run — run-m2.1 supplies the
+        // two-route ModelRunSections here.
+        None,
     )
     .map_err(|e| fail(format!("report assembly: {e}")))
     .and_then(|report| {

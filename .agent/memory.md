@@ -129,6 +129,9 @@ full pre-consolidation text lives in git history.
   a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
   ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
   `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Caught by codex on M2.20 .2.
+  Counting gotcha: `grep -c "^error"` on the doc output includes the trailing ``error: could not
+  document `ckc-cli` `` summary line → real standing count = matches − 1 (17 link errors read as 18);
+  diff the error LIST against the standing set (model.rs/replay.rs/trace.rs/cassette.rs), not counts.
 - Contract-tense docs (codex flagged TWICE: M2.22 emission_order re-tense, M2.23 .1a follow-up):
   a doc claim about pending wiring must be unit-attributed — "report-m2.1b embeds X in
   `report.json`" holds before and after the unit lands; present-state phrasing ("carriers today:
@@ -443,6 +446,15 @@ full pre-consolidation text lives in git history.
   .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.
+  CONSUMPTION SEAM (report-m2.2, landed): `assemble_report` grew an 8th param
+  `Option<ModelRunSections>` — per-route §7.4 ledgers (`&[(Id, &[DiagnosticRecord])]`, ALL the
+  route's records, clean route = empty slice, dup → `DuplicateRouteLedger`, route set must equal the
+  RouteMetrics set → else `SectionRouteMismatch`) + `route_metrics()` outputs + baseline id +
+  ModelIdentity. `experiment_metrics` runs IN-assembly (its fail-closed panics = caller bugs there);
+  run-m2.1 must NOT call it in run.rs — hand over raw RouteMetrics. Taxonomy derives by counting
+  ledger codes per route (§4.3-sorted both levels); the M2-member expected values in tests tie to
+  the .1c byte-pinned populated_report fixture (`m2_route_metrics()`/`baseline_model_identity()`
+  shared helpers).
 
 ## Runtime
 

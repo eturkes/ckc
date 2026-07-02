@@ -11,8 +11,9 @@
 //! `report_en.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
 //! arrive with .4.1b.2b (manifest assembly lives in `crate::manifests`).
 //! M2 (report-m2.1b) adds the omit-None members `failure_taxonomy`,
-//! `metrics`, and `model_identity`; report-m2.2 populates them from the
-//! recorded two-route run.
+//! `metrics`, and `model_identity`; [`assemble_report`] populates them from
+//! a [`ModelRunSections`] bundle (report-m2.2); run-m2.1 supplies the
+//! recorded two-route run's sections.
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):
@@ -29,7 +30,7 @@
 //!   records rolled up in `diagnostics_summary`.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, DiagnosticRecord, Hash, Id,
@@ -39,7 +40,7 @@ use ckc_core::{
 };
 use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult, VerifierResults};
 
-use crate::metrics::{ExperimentMetrics, MetricRow};
+use crate::metrics::{ExperimentMetrics, MetricRow, RouteMetrics, experiment_metrics};
 use crate::trace::{
     ConflictKind, LineageIndex, LineageRow, TraceBundle, TraceNodeKind, canonical_id_set,
 };
@@ -211,7 +212,8 @@ impl CanonRead for ReportFinding {
 /// partitions; `wording` is the canonical set of §0 labels the rows carry.
 /// The M2 members (`failure_taxonomy`, `metrics`, `model_identity`) are
 /// omit-None optional — absent from M1 reports, so M1 bytes and pins stay
-/// unchanged; report-m2.2 populates them from the recorded two-route run.
+/// unchanged; [`assemble_report`] populates them from a
+/// [`ModelRunSections`] bundle (report-m2.2).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
     pub corpus_hashes: Vec<(Id, Hash)>,
@@ -460,8 +462,8 @@ impl CanonRead for Report {
 /// (pipeline) id to a map of §7.4 diagnostic code to count, mirroring
 /// `diagnostics_summary`'s string-wrapped u64 counts per route. Keys are
 /// plain [`Id`]s so the §7.4 vocabulary can grow without a shape change;
-/// §7.4 membership of the code keys is the assembler's duty (report-m2.2
-/// populates the taxonomy from the recorded two-route run).
+/// §7.4 membership of the code keys is the assembler's duty
+/// ([`assemble_report`] counts each route's §7.4 ledger, report-m2.2).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouteTaxonomy {
     pub routes: Vec<(Id, Vec<(Id, u64)>)>,
@@ -511,11 +513,35 @@ enum Role {
     Deontic,
 }
 
+/// The recorded model run's M2 report inputs (report-m2.2), one bundle per
+/// [`assemble_report`] call — `None` there is an M1 run (M2 members
+/// omitted). run-m2.1 gathers these sections from the recorded two-route
+/// run; the §7.2 M2 members derive from them at assembly.
+pub struct ModelRunSections<'a> {
+    /// Per-route §7.4 ledgers, the `failure_taxonomy` input: every record
+    /// the route's stages emitted, keyed by pipeline id. A clean route
+    /// still appears (empty ledger → empty code map). Routes must be
+    /// duplicate-free and name exactly `route_metrics`' route set.
+    pub route_diagnostics: &'a [(Id, &'a [DiagnosticRecord])],
+    /// Per-route §7.3 raw rows ([`RouteMetrics`], one per route in
+    /// experiment route order); [`experiment_metrics`] assembles the §9
+    /// `metrics` member (raw rows + baseline-delta table) from them at
+    /// assembly, so its fail-closed panics (duplicate routes, missing
+    /// baseline, unsorted rows) are caller bugs here too.
+    pub route_metrics: Vec<RouteMetrics>,
+    /// The experiment's designated baseline pipeline (§7.3 delta anchor).
+    pub baseline_pipeline_id: &'a Id,
+    /// §9 identity of the run's local-model runtime, the `model_identity`
+    /// member verbatim.
+    pub model_identity: &'a ModelIdentity,
+}
+
 /// Assemble the run's [`Report`] over the validated run artifact set:
 /// the strict-read §7.1 pair (claims and source nodes from `bundle`,
 /// per-document reference rows from `lineage`), each member document's
 /// SourceDocumentGraph, each group's VerifierResults, the run's lexicon hash and
-/// solver identity, and every §7.4 record the run emitted.
+/// solver identity, every §7.4 record the run emitted, and the recorded
+/// model run's [`ModelRunSections`] when one ran.
 ///
 /// Inputs must already satisfy their own validation (the §8.5 item 3 bar);
 /// breaks of those per-artifact guarantees panic as caller bugs. Errors
@@ -529,10 +555,18 @@ enum Role {
 /// recorded unsat core, and carries the M1 constants (`s1_accepted`, the
 /// partition's §0 label). `corpus_hashes` come from the bundle's source
 /// nodes; `diagnostics_summary` counts `diagnostics` by §7.4 code;
-/// `replay_status` starts [`NotReplayed`](ReplayStatus::NotReplayed). The
-/// M2 members stay `None` here — report-m2.2 populates them from the
-/// recorded two-route run. The caller runs [`Report::validate`] on the
+/// `replay_status` starts [`NotReplayed`](ReplayStatus::NotReplayed).
+///
+/// M2 members (report-m2.2): `model_run: None` is an M1 run — all three
+/// stay omitted. `Some` populates `failure_taxonomy` by counting each
+/// route's §7.4 ledger (sorted per §4.3 maps), `metrics` through
+/// [`experiment_metrics`] over the per-route raw rows, and
+/// `model_identity` verbatim. A duplicate route ledger or a route set
+/// disagreement between the ledgers and the raw rows is a cross-artifact
+/// gap (error); the metrics invariants panic per [`ModelRunSections`].
+/// The caller runs [`Report::validate`] on the
 /// value (the boundary discipline stays with the landing).
+#[allow(clippy::too_many_arguments)] // the §8.3 sink fans in the whole artifact set
 pub fn assemble_report(
     bundle: &TraceBundle,
     lineage: &LineageIndex,
@@ -541,6 +575,7 @@ pub fn assemble_report(
     lexicon_hash: &Hash,
     solver_identity: &SolverIdentity,
     diagnostics: &[DiagnosticRecord],
+    model_run: Option<ModelRunSections<'_>>,
 ) -> Result<Report, ReportError> {
     let mut graph_index: BTreeMap<&str, &SourceDocumentGraph> = BTreeMap::new();
     for &graph in graphs {
@@ -714,14 +749,60 @@ pub fn assemble_report(
     if !findings.is_empty() {
         wording.push(Wording::SyntheticTestSourceMeasurement);
     }
+    // report-m2.2: the three M2 members derive together from the recorded
+    // model run's sections; an M1 run (None) omits all three.
+    let (failure_taxonomy, metrics, model_identity) = match model_run {
+        None => (None, None, None),
+        Some(sections) => {
+            let mut routes: BTreeMap<&str, (Id, Vec<(Id, u64)>)> = BTreeMap::new();
+            for (pipeline_id, records) in sections.route_diagnostics {
+                let mut counts: BTreeMap<&'static str, u64> = BTreeMap::new();
+                for record in *records {
+                    *counts.entry(record.code.as_str()).or_insert(0) += 1;
+                }
+                let counts = counts
+                    .into_iter()
+                    .map(|(code, n)| {
+                        let code = Id::new(code.to_owned()).expect("§7.4 code tokens valid ids");
+                        (code, n)
+                    })
+                    .collect();
+                if routes
+                    .insert(pipeline_id.as_str(), (pipeline_id.clone(), counts))
+                    .is_some()
+                {
+                    return Err(ReportError::DuplicateRouteLedger(pipeline_id.clone()));
+                }
+            }
+            let ledger_routes: BTreeSet<&str> = routes.keys().copied().collect();
+            let metric_routes: BTreeSet<&str> = sections
+                .route_metrics
+                .iter()
+                .map(|r| r.pipeline_id.as_str())
+                .collect();
+            if ledger_routes != metric_routes {
+                return Err(ReportError::SectionRouteMismatch);
+            }
+            (
+                Some(RouteTaxonomy {
+                    routes: routes.into_values().collect(),
+                }),
+                Some(experiment_metrics(
+                    sections.route_metrics,
+                    sections.baseline_pipeline_id,
+                )),
+                Some(sections.model_identity.clone()),
+            )
+        }
+    };
     Ok(Report {
         corpus_hashes,
         diagnostics_summary,
-        failure_taxonomy: None,
+        failure_taxonomy,
         findings,
         lexicon_hash: lexicon_hash.clone(),
-        metrics: None,
-        model_identity: None,
+        metrics,
+        model_identity,
         no_conflict_results,
         replay_status: ReplayStatus::NotReplayed,
         solver_identity: solver_identity.clone(),
@@ -952,6 +1033,10 @@ pub enum ReportError {
     RoleVerdict(Id),
     /// The verifier result disagrees with its claim row.
     ResultMismatch(Id),
+    /// Two model-run §7.4 ledgers claim one route.
+    DuplicateRouteLedger(Id),
+    /// The model-run §7.4 ledgers and raw metric rows name different route sets.
+    SectionRouteMismatch,
     /// `failure_taxonomy` is present but names no routes.
     EmptyTaxonomy,
     /// A failure-taxonomy count is zero.
@@ -1061,6 +1146,15 @@ impl std::fmt::Display for ReportError {
                 write!(
                     f,
                     "query {id}: verifier result disagrees with its claim row"
+                )
+            }
+            ReportError::DuplicateRouteLedger(id) => {
+                write!(f, "model-run §7.4 ledgers claim route {id} more than once")
+            }
+            ReportError::SectionRouteMismatch => {
+                write!(
+                    f,
+                    "model-run sections disagree: the §7.4 ledgers and the raw metric rows name different route sets"
                 )
             }
             ReportError::EmptyTaxonomy => {
@@ -1258,13 +1352,48 @@ mod tests {
     /// row A_RECOMMENDATION + CONTROL_SENTENCE. Taxonomy counts carry §7.4
     /// `DiagnosticCode` ids per route; metrics ride [`experiment_metrics`]'s
     /// own assembly (`pipe.base` baseline, delta rows derived).
-    fn populated_report() -> Report {
+    /// The two-route §7.3 raw rows the M2 fixtures share: `pipe.base`
+    /// (baseline) and `pipe.route`, three rows each, metric-id-sorted.
+    fn m2_route_metrics() -> Vec<RouteMetrics> {
         let row = |name: &str, value: MetricValue| MetricRow {
             metric: id(name),
             value,
         };
         let frac =
             |num: &str, den: &str| MetricValue::Value(Rational::from_parts(num, den).unwrap());
+        vec![
+            RouteMetrics {
+                pipeline_id: id("pipe.base"),
+                rows: vec![
+                    row(ACCEPTANCE_RATE, frac("3", "4")),
+                    row(K_SAMPLE_CONVERGENCE, MetricValue::NotApplicable),
+                    row(REPAIR_COUNT, frac("2", "1")),
+                ],
+                diagnostics: vec![],
+            },
+            RouteMetrics {
+                pipeline_id: id("pipe.route"),
+                rows: vec![
+                    row(ACCEPTANCE_RATE, frac("1", "2")),
+                    row(K_SAMPLE_CONVERGENCE, frac("1", "1")),
+                    row(REPAIR_COUNT, frac("2", "1")),
+                ],
+                diagnostics: vec![],
+            },
+        ]
+    }
+
+    /// The synthetic §9 model identity the M2 fixtures share (memory's
+    /// engine-agnostic rule: unmistakably-synthetic tokens).
+    fn baseline_model_identity() -> ModelIdentity {
+        ModelIdentity {
+            model_id: id("model.baseline"),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        }
+    }
+
+    fn populated_report() -> Report {
         let mut report = Report {
             failure_taxonomy: Some(RouteTaxonomy {
                 routes: vec![
@@ -1284,34 +1413,8 @@ mod tests {
                     ),
                 ],
             }),
-            metrics: Some(experiment_metrics(
-                vec![
-                    RouteMetrics {
-                        pipeline_id: id("pipe.base"),
-                        rows: vec![
-                            row(ACCEPTANCE_RATE, frac("3", "4")),
-                            row(K_SAMPLE_CONVERGENCE, MetricValue::NotApplicable),
-                            row(REPAIR_COUNT, frac("2", "1")),
-                        ],
-                        diagnostics: vec![],
-                    },
-                    RouteMetrics {
-                        pipeline_id: id("pipe.route"),
-                        rows: vec![
-                            row(ACCEPTANCE_RATE, frac("1", "2")),
-                            row(K_SAMPLE_CONVERGENCE, frac("1", "1")),
-                            row(REPAIR_COUNT, frac("2", "1")),
-                        ],
-                        diagnostics: vec![],
-                    },
-                ],
-                &id("pipe.base"),
-            )),
-            model_identity: Some(ModelIdentity {
-                model_id: id("model.baseline"),
-                quant: "fixture_quant".to_owned(),
-                runtime_version: "1.0.0".to_owned(),
-            }),
+            metrics: Some(experiment_metrics(m2_route_metrics(), &id("pipe.base"))),
+            model_identity: Some(baseline_model_identity()),
             ..valid_report()
         };
         report.findings[0].quoted_spans[0].text = A_RECOMMENDATION.to_owned();
@@ -1843,6 +1946,14 @@ mod tests {
                 ReportError::EmptyIdentityField { field: "quant" },
                 "model_identity quant is empty",
             ),
+            (
+                ReportError::DuplicateRouteLedger(id("pipe.base")),
+                "model-run §7.4 ledgers claim route pipe.base more than once",
+            ),
+            (
+                ReportError::SectionRouteMismatch,
+                "model-run sections disagree: the §7.4 ledgers and the raw metric rows name different route sets",
+            ),
         ];
         for (err, expected) in cases {
             assert_eq!(err.to_string(), expected);
@@ -2132,6 +2243,13 @@ mod tests {
     }
 
     fn assemble(world: &World) -> Result<Report, ReportError> {
+        assemble_with(world, None)
+    }
+
+    fn assemble_with(
+        world: &World,
+        model_run: Option<ModelRunSections<'_>>,
+    ) -> Result<Report, ReportError> {
         assemble_report(
             &world.bundle,
             &world.lineage,
@@ -2140,6 +2258,7 @@ mod tests {
             &hash('f'),
             &identity(),
             &world.diagnostics,
+            model_run,
         )
     }
 
@@ -2162,6 +2281,10 @@ mod tests {
         );
         assert_eq!(report.replay_status, ReplayStatus::NotReplayed);
         assert_eq!(report.solver_identity, identity());
+        // No model run: the three M2 members stay omitted (M1 bytes).
+        assert_eq!(report.failure_taxonomy, None);
+        assert_eq!(report.metrics, None);
+        assert_eq!(report.model_identity, None);
         assert_eq!(
             report.wording,
             vec![
@@ -2252,6 +2375,142 @@ mod tests {
             text.contains(r#""diagnostics_summary":{"schema_invalid":"1","solver_timeout":"2"}"#)
         );
         assert!(text.contains(r#""replay_status":"not_replayed""#));
+    }
+
+    /// One §7.4 record for a model-run route ledger (taxonomy counts read
+    /// only the code).
+    fn route_record(code: DiagnosticCode) -> DiagnosticRecord {
+        DiagnosticRecord {
+            code,
+            outcome: Outcome::Invalid,
+            payload: vec![],
+            region_ids: vec![],
+            artifact_hashes: vec![],
+        }
+    }
+
+    /// The recorded two-route run's M2 sections over [`m2_route_metrics`]:
+    /// ledgers passed in REVERSE route order to prove the §4.3 map sort,
+    /// counts mirroring [`populated_report`]'s settled taxonomy.
+    #[test]
+    fn assembles_the_m2_model_run_report() {
+        let base_ledger = vec![
+            route_record(DiagnosticCode::AiSchemaViolation),
+            route_record(DiagnosticCode::TargetParseError),
+            route_record(DiagnosticCode::AiSchemaViolation),
+        ];
+        let route_ledger = vec![
+            route_record(DiagnosticCode::AiHallucinatedSource),
+            route_record(DiagnosticCode::RepairLimitExceeded),
+        ];
+        let ledgers = [
+            (id("pipe.route"), route_ledger.as_slice()),
+            (id("pipe.base"), base_ledger.as_slice()),
+        ];
+        let baseline = id("pipe.base");
+        let model_identity = baseline_model_identity();
+        let report = assemble_with(
+            &world(),
+            Some(ModelRunSections {
+                route_diagnostics: &ledgers,
+                route_metrics: m2_route_metrics(),
+                baseline_pipeline_id: &baseline,
+                model_identity: &model_identity,
+            }),
+        )
+        .unwrap();
+        report.validate().unwrap();
+
+        // Every M2 member lands exactly as the byte-pinned populated
+        // fixture carries it (PINNED_POPULATED_REPORT backs these shapes).
+        let expected = populated_report();
+        assert_eq!(report.failure_taxonomy, expected.failure_taxonomy);
+        assert_eq!(report.metrics, expected.metrics);
+        assert_eq!(report.model_identity, expected.model_identity);
+        // The M1 members ride along unchanged.
+        assert_eq!(report.replay_status, ReplayStatus::NotReplayed);
+        assert_eq!(report.solver_identity, identity());
+        assert_eq!(report.findings.len(), 1);
+        assert_eq!(report.no_conflict_results.len(), 1);
+
+        // Canonical-valid: the assembled M2 report round-trips strictly.
+        let bytes = canonical_payload_bytes(&report).unwrap();
+        let read: Report = read_strict_canonical(&bytes).unwrap();
+        assert_eq!(read, report);
+        read.validate().unwrap();
+    }
+
+    #[test]
+    fn clean_route_keeps_its_taxonomy_row() {
+        let base_ledger = vec![route_record(DiagnosticCode::AiSchemaViolation)];
+        let ledgers = [
+            (id("pipe.base"), base_ledger.as_slice()),
+            (id("pipe.route"), &[] as &[DiagnosticRecord]),
+        ];
+        let baseline = id("pipe.base");
+        let model_identity = baseline_model_identity();
+        let report = assemble_with(
+            &world(),
+            Some(ModelRunSections {
+                route_diagnostics: &ledgers,
+                route_metrics: m2_route_metrics(),
+                baseline_pipeline_id: &baseline,
+                model_identity: &model_identity,
+            }),
+        )
+        .unwrap();
+        report.validate().unwrap();
+        assert_eq!(
+            report.failure_taxonomy,
+            Some(RouteTaxonomy {
+                routes: vec![
+                    (id("pipe.base"), vec![(id("ai_schema_violation"), 1)]),
+                    (id("pipe.route"), vec![]),
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn duplicate_route_ledger_is_rejected() {
+        let ledger = vec![route_record(DiagnosticCode::AiSchemaViolation)];
+        let ledgers = [
+            (id("pipe.base"), ledger.as_slice()),
+            (id("pipe.base"), ledger.as_slice()),
+        ];
+        let baseline = id("pipe.base");
+        let model_identity = baseline_model_identity();
+        let err = assemble_with(
+            &world(),
+            Some(ModelRunSections {
+                route_diagnostics: &ledgers,
+                route_metrics: m2_route_metrics(),
+                baseline_pipeline_id: &baseline,
+                model_identity: &model_identity,
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(err, ReportError::DuplicateRouteLedger(id("pipe.base")));
+    }
+
+    #[test]
+    fn model_run_route_set_mismatch_is_rejected() {
+        // Ledgers name only the baseline; the raw rows carry both routes.
+        let ledger = vec![route_record(DiagnosticCode::AiSchemaViolation)];
+        let ledgers = [(id("pipe.base"), ledger.as_slice())];
+        let baseline = id("pipe.base");
+        let model_identity = baseline_model_identity();
+        let err = assemble_with(
+            &world(),
+            Some(ModelRunSections {
+                route_diagnostics: &ledgers,
+                route_metrics: m2_route_metrics(),
+                baseline_pipeline_id: &baseline,
+                model_identity: &model_identity,
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(err, ReportError::SectionRouteMismatch);
     }
 
     #[test]

@@ -118,12 +118,8 @@ doc-lint bullet).
   72% 143K/200K 822f924
 - [x] report-m2.1c: populated_report fixture (§8.2 JA spans, settled taxonomy/metrics/identity)
   + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K be3e772
-- [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
-  `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
-  replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the
-  metrics modules; SPEC §7.2, §9. Gate: `cargo test`; report.json assembles from a recorded-run
-  fixture with every M2 section present + canonical-valid. [Split from report-m2.1: canonical type/pin
-  vs assembly population.]
+- [x] report-m2.2: assemble_report M2 population — ModelRunSections (route §7.4 ledgers→taxonomy,
+  in-assembly experiment_metrics, identity verbatim). 71% 143K/200K
 - [ ] report-m2.3a: report_en.md M2 rendering. Extend the M1 renderer with the M2 sections —
   metrics raw rows + delta table walked VIA `ExperimentMetrics::emission_order` (the §9 carrier,
   memory), failure taxonomy, model identity, replay status; quoted JA spans verbatim; §0
@@ -146,7 +142,11 @@ doc-lint bullet).
   pipelines now exist, so `ckc registry check` validates the full experiment. Wire `run.rs` to execute
   both route pipelines under one experiment run → per-route `model_fill` → scoring → metrics →
   `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests (populating the
-  model/prompt/identity hash fields), over the locked M1 inputs. single_ir assemble-wrapper
+  model/prompt/identity hash fields), over the locked M1 inputs. Report call = assemble_report's
+  `Option<ModelRunSections>` (report-m2.2): per-route §7.4 ledgers (ALL the route's records; clean
+  route = empty slice) + per-route `RouteMetrics` (route set must match the ledgers') + baseline id +
+  ModelIdentity; `experiment_metrics` runs IN-assembly — run.rs supplies `route_metrics()` outputs
+  only, never calls experiment_metrics itself. single_ir assemble-wrapper
   input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
   cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
   used source+segments only, F4 payload-only, so add the cassette hash here). direct_smt has no assemble
