@@ -130,11 +130,18 @@
 //!   ([`model_fill::RECORDED_CALLS_COUNTER`]/[`model_fill::REPAIRS_COUNTER`]) for
 //!   the §4.6 event the route/run wiring emits (run-m2.1). Target-generic; the
 //!   route units wire the pipeline.
+//! - [`metrics`] — §7.3 route-quality raw rows (`metrics-m2.1`):
+//!   [`metrics::route_metrics`] folds a recorded run's per-route
+//!   [`metrics::FillObservation`]/[`metrics::GroupObservation`] channels and the
+//!   §8 reference into exact-fraction [`metrics::MetricRow`]s (sorted by metric
+//!   id; zero denominator → `not_applicable`, an unsupportable metric omitted
+//!   with one diagnostic); run-m2.1 wires it, the report units embed the rows.
 #![forbid(unsafe_code)]
 
 pub mod cassette;
 pub mod extract;
 pub mod manifests;
+pub mod metrics;
 pub mod model;
 pub mod model_fill;
 pub mod normalize;

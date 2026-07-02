@@ -96,8 +96,8 @@ Standing M2-review flag: pre-existing 18 rustdoc `private_intra_doc_links` error
   zero re-derivation: read `.agent/wip-metrics-m2-1.txt` (blueprint) and execute it. Module =
   `.agent/wip-metrics.rs.txt`, COMPLETE + gate-VERIFIED at pre-stage (9 unit tests green,
   fmt/clippy/audit clean, rustdoc count 18 = pre-existing; sha256 in blueprint §0). Session
-  .1a = blueprint §1: cp-restore the module + wire lib.rs (verbatim snippets) + workspace
-  gates -> commit; unit stays OPEN. Session .1b = blueprint §2-§3: run.rs test
+  .1a DONE 37% 74K/200K: module restored (sha256 == §0) + lib.rs wired, gates green
+  (450/7, fmt, clippy, rustdoc 18). Session .1b = blueprint §2-§3: run.rs test
   `route_metrics_score_recorded_two_route_run` over the committed two-route cassettes +
   m1_expected reference (observation recipe + expected row vectors + template/helper anchors
   all pre-derived; z3, model-runtime-absent). Gate: blueprint §1.3/§4 (cargo test --workspace
