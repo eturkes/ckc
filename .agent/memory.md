@@ -128,6 +128,11 @@ full pre-consolidation text lives in git history.
   a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
   ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
   `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Caught by codex on M2.20 .2.
+- Contract-tense docs (codex flagged TWICE: M2.22 emission_order re-tense, M2.23 .1a follow-up):
+  a doc claim about pending wiring must be unit-attributed — "report-m2.1b embeds X in
+  `report.json`" holds before and after the unit lands; present-state phrasing ("carriers today:
+  report.json bytes agree") overreaches until the wiring commit. House pattern: "run-m2.1 wires
+  the observations". Apply at write time — each violation costs a codex follow-up commit.
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not

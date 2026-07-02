@@ -103,7 +103,7 @@ doc-lint bullet).
   05746ce
 - [x] report-m2.1a: metrics.rs canonical layer (MetricRow/RouteMetrics/RouteDelta/
   ExperimentMetrics) — §9 raw_rows<route_deltas byte pin; salvage redo, gates == banked.
-  39% 79K/200K
+  39% 79K/200K 6c28421
 - [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Apply the
   COMPILE-VERIFIED partial `.agent/wip-report-m2.1b.diff` (module doc + imports + RouteTaxonomy
   Canonical/CanonRead), then implement per `.agent/wip-report-m2.1.txt` §.1b — every decision

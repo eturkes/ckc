@@ -15,9 +15,9 @@
 //! route under the experiment's designated baseline;
 //! [`ExperimentMetrics::emission_order`] carries the §9
 //! raw-rows-before-ranking rendering contract. The output types are
-//! [`Canonical`]/[`CanonRead`] — `report.json` embeds [`ExperimentMetrics`]
-//! verbatim (report-m2.1). run-m2.1 wires the observations from the route
-//! loop.
+//! [`Canonical`]/[`CanonRead`]; report-m2.1b embeds [`ExperimentMetrics`]
+//! verbatim in `report.json`. run-m2.1 wires the observations from the
+//! route loop.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -237,7 +237,10 @@ pub struct ExperimentMetrics {
 /// names are load-bearing: §4.3 sorts object members by key bytes, and
 /// `raw_rows` < `route_deltas` keeps every raw row strictly before every
 /// delta table in the emitted bytes — [`emission_order`]'s §9
-/// raw-rows-before-ranking contract carried into `report.json` itself.
+/// raw-rows-before-ranking contract carried into the `report.json`
+/// embedding (report-m2.1b). Reads are shape-only; the report boundary
+/// owns the semantic checks — route uniqueness, baseline membership,
+/// delta set/order (report-m2.1b's validate).
 ///
 /// [`emission_order`]: ExperimentMetrics::emission_order
 impl Canonical for ExperimentMetrics {
@@ -279,9 +282,10 @@ pub enum MetricsSection<'a> {
 impl ExperimentMetrics {
     /// §9 raw-rows-before-ranking: every route's raw rows strictly precede
     /// every delta table. Renderers must walk this order, never the fields
-    /// ad hoc. Carriers today: the canonical `report.json` bytes agree by
-    /// key naming (`raw_rows` < `route_deltas`, see [`Canonical`] above);
-    /// the markdown renderings (report-m2.3) are the pending walkers.
+    /// ad hoc. Carriers today: the canonical [`ExperimentMetrics`] bytes
+    /// agree by key naming (`raw_rows` < `route_deltas`, see [`Canonical`]
+    /// above); `report.json` inherits on embed (report-m2.1b); the markdown
+    /// renderings (report-m2.3) are the pending walkers.
     pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
         self.routes
             .iter()
