@@ -6,8 +6,3 @@
 schemas/smt_query.grammar text eol=lf
 schemas/clinical_ir.schema.json text eol=lf
 registry/prompts/*.txt text eol=lf
-
-# Salvage patches (.agent/wip-<unit>.patch): unified diffs whose blank-context lines are a single
-# space by format → `git show --check` would flag them. Skip the whitespace check (the patch still
-# applies; stripping those markers would corrupt it).
-.agent/*.patch -whitespace

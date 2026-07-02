@@ -116,14 +116,17 @@ doc-lint bullet).
 - [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Respecced FRESH —
   the 4a47fbb wip artifacts are retired (salvage caveat above): implement everything fresh from
   source. Extend `Report` with 3 omit-None Option members `failure_taxonomy`/`metrics`/
-  `model_identity` (Canonical/CanonRead, each in its sorted-key slot per the memory
-  extension-pattern bullet; RouteTaxonomy gains Canonical+CanonRead), validate() rules + matching
-  new ReportError variants, and a populated_report() fixture (verbatim JA spans from committed M1
+  `model_identity`, each in its sorted-key slot per the memory extension-pattern bullet. Confirmed
+  types: `metrics` = `metrics::ExperimentMetrics`, `model_identity` = core `plans::ModelIdentity`
+  — both landed with Canonical+CanonRead (wire-up only); `failure_taxonomy` = `RouteTaxonomy`,
+  ZERO landed code → this unit designs it fresh from SPEC §7.2's pin (code-keyed failure-taxonomy
+  summary; code vocabulary = §7.4) + gives it Canonical+CanonRead. Add validate() rules + matching
+  new variants on landed `ReportError`, and a populated_report() fixture (verbatim JA spans from committed M1
   fixtures + SYNTHETIC model identity; deltas always built via the real pub
   `crate::metrics::experiment_metrics` assembler). M1 PINNED_REPORT bytes
   stay untouched (omit-None regression guard); pin populated bytes from observed output. Reading:
   targeted report.rs regions (Report/validate/pin tests; 2023 lines — targeted regions only),
-  metrics.rs pub surface, SPEC §7.2/§9 excerpts as needed. Gate: `cargo test`; populated
+  metrics.rs pub surface, SPEC §7.2/§7.4/§9 excerpts as needed. Gate: `cargo test`; populated
   round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte order + §0 wording pin;
   validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold); engine grep on touched
   files.
