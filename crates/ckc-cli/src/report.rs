@@ -754,7 +754,9 @@ pub fn assemble_report(
     let (failure_taxonomy, metrics, model_identity) = match model_run {
         None => (None, None, None),
         Some(sections) => {
-            let mut routes: BTreeMap<&str, (Id, Vec<(Id, u64)>)> = BTreeMap::new();
+            // Route id + its ascending (code, count) rows, keyed by route for §4.3 order.
+            type RouteTally = (Id, Vec<(Id, u64)>);
+            let mut routes: BTreeMap<&str, RouteTally> = BTreeMap::new();
             for (pipeline_id, records) in sections.route_diagnostics {
                 let mut counts: BTreeMap<&'static str, u64> = BTreeMap::new();
                 for record in *records {
@@ -781,7 +783,15 @@ pub fn assemble_report(
                 .map(|r| r.pipeline_id.as_str())
                 .collect();
             if ledger_routes != metric_routes {
-                return Err(ReportError::SectionRouteMismatch);
+                let only = |own: &BTreeSet<&str>, other: &BTreeSet<&str>| -> Vec<Id> {
+                    own.difference(other)
+                        .map(|route| Id::new((*route).to_owned()).expect("route ids stay valid"))
+                        .collect()
+                };
+                return Err(ReportError::SectionRouteMismatch {
+                    ledger_only: only(&ledger_routes, &metric_routes),
+                    metrics_only: only(&metric_routes, &ledger_routes),
+                });
             }
             (
                 Some(RouteTaxonomy {
@@ -987,8 +997,8 @@ fn check_metric_rows(pipeline_id: &Id, rows: &[MetricRow]) -> Result<(), ReportE
     Ok(())
 }
 
-/// Structural/assembly failure taxonomy for [`Report`]; every variant
-/// names its offending id or pool.
+/// Structural/assembly failure taxonomy for [`Report`]; every variant's
+/// message names the offending id(s) or pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReportError {
     /// A set field is out of canonical order.
@@ -1035,8 +1045,12 @@ pub enum ReportError {
     ResultMismatch(Id),
     /// Two model-run §7.4 ledgers claim one route.
     DuplicateRouteLedger(Id),
-    /// The model-run §7.4 ledgers and raw metric rows name different route sets.
-    SectionRouteMismatch,
+    /// The model-run §7.4 ledgers and raw metric rows name different route
+    /// sets; each side lists its unmatched routes in ascending order.
+    SectionRouteMismatch {
+        ledger_only: Vec<Id>,
+        metrics_only: Vec<Id>,
+    },
     /// `failure_taxonomy` is present but names no routes.
     EmptyTaxonomy,
     /// A failure-taxonomy count is zero.
@@ -1151,10 +1165,16 @@ impl std::fmt::Display for ReportError {
             ReportError::DuplicateRouteLedger(id) => {
                 write!(f, "model-run §7.4 ledgers claim route {id} more than once")
             }
-            ReportError::SectionRouteMismatch => {
+            ReportError::SectionRouteMismatch {
+                ledger_only,
+                metrics_only,
+            } => {
+                let list = |ids: &[Id]| ids.iter().map(Id::as_str).collect::<Vec<_>>().join(", ");
                 write!(
                     f,
-                    "model-run sections disagree: the §7.4 ledgers and the raw metric rows name different route sets"
+                    "model-run sections disagree: routes only in the §7.4 ledgers = [{}], only in the raw metric rows = [{}]",
+                    list(ledger_only),
+                    list(metrics_only)
                 )
             }
             ReportError::EmptyTaxonomy => {
@@ -1951,8 +1971,11 @@ mod tests {
                 "model-run §7.4 ledgers claim route pipe.base more than once",
             ),
             (
-                ReportError::SectionRouteMismatch,
-                "model-run sections disagree: the §7.4 ledgers and the raw metric rows name different route sets",
+                ReportError::SectionRouteMismatch {
+                    ledger_only: vec![id("pipe.extra")],
+                    metrics_only: vec![id("pipe.route")],
+                },
+                "model-run sections disagree: routes only in the §7.4 ledgers = [pipe.extra], only in the raw metric rows = [pipe.route]",
             ),
         ];
         for (err, expected) in cases {
@@ -2510,7 +2533,13 @@ mod tests {
             }),
         )
         .unwrap_err();
-        assert_eq!(err, ReportError::SectionRouteMismatch);
+        assert_eq!(
+            err,
+            ReportError::SectionRouteMismatch {
+                ledger_only: vec![],
+                metrics_only: vec![id("pipe.route")],
+            }
+        );
     }
 
     #[test]

@@ -119,7 +119,7 @@ doc-lint bullet).
 - [x] report-m2.1c: populated_report fixture (§8.2 JA spans, settled taxonomy/metrics/identity)
   + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K be3e772
 - [x] report-m2.2: assemble_report M2 population — ModelRunSections (route §7.4 ledgers→taxonomy,
-  in-assembly experiment_metrics, identity verbatim). 71% 143K/200K
+  in-assembly experiment_metrics, identity verbatim). 71% 143K/200K 71058d3
 - [ ] report-m2.3a: report_en.md M2 rendering. Extend the M1 renderer with the M2 sections —
   metrics raw rows + delta table walked VIA `ExperimentMetrics::emission_order` (the §9 carrier,
   memory), failure taxonomy, model identity, replay status; quoted JA spans verbatim; §0
