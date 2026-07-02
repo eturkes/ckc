@@ -12,7 +12,7 @@ PURPOSE
 
 §0  VERIFIED STATUS (prep session — everything below already proven on this tree)
   .agent/wip-metrics.rs.txt (688 lines) =
-    sha256 6041a2fd6e01b8e803a1afda23df466983bbc21ec3f9043752559052f92c03e0
+    sha256 fbe39692b1c48478efcdbbdccd78efe92c8f4158477f1eb84608f04657648573
   With it at crates/ckc-cli/src/metrics.rs + the §1 lib.rs wiring:
     cargo test -p ckc-cli --lib metrics::                  → 9 passed
     cargo fmt --all --check                                → clean (file is fmt-final)
@@ -34,11 +34,12 @@ PURPOSE
   reduced Rationals; zero denominator → NotApplicable; unrecognized reference
   expected_outcome → the WHOLE accuracy metric omitted + one schema_invalid
   diagnostic (fail-closed); verdict matching mirrors run_oracle
-  assert_group_matches_reference IN FULL (conflict = exactly one SemanticContradiction
-  riding a pair's deontic id + unsat_core set-equal; no-conflict = non-empty + zero
-  contradictions + all SemanticNoConflict + documented ⇒ ≥1 pair closed overlap-unsat
-  w/ deontic never run); empty results never match; expected_conflict_kind unscored
-  (verdict layer carries no kind).
+  assert_group_matches_reference (conflict = exactly one SemanticContradiction riding
+  a pair's deontic id + reference expects the §6 deontic_direction_conflict kind +
+  unsat_core set-equal; no-conflict = non-empty + zero contradictions + all
+  SemanticNoConflict + documented ⇒ ≥1 pair closed overlap-unsat w/ deontic never
+  run); empty results never match (deliberate fail-closed strengthening over the
+  oracle, which never sees an empty run — codex M2.21).
 
 §1  SESSION .1a — restore + wire + gate (mechanical)
   1. cp .agent/wip-metrics.rs.txt crates/ckc-cli/src/metrics.rs

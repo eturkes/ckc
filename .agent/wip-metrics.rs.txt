@@ -155,17 +155,19 @@ fn omitted_metric_diagnostic(metric: &str, reason: String) -> DiagnosticRecord {
 }
 
 /// Does one group's observation match its §8 reference expectation? Mirrors
-/// the `run_oracle` scoring shape in full, as a predicate: a
-/// `semantic_contradiction` group needs exactly one
-/// [`VerifierCategory::SemanticContradiction`] result, riding a planned
-/// pair's deontic-consistency query, whose `unsat_core` set-equals the
-/// expected core; a `semantic_no_conflict` group needs at least one result,
-/// zero contradictions, every result [`VerifierCategory::SemanticNoConflict`]
+/// the `run_oracle` scoring shape as a predicate: a `semantic_contradiction`
+/// group needs exactly one [`VerifierCategory::SemanticContradiction`]
+/// result, riding a planned pair's deontic-consistency query — the §6
+/// `deontic_direction_conflict` kind, so the reference must expect exactly
+/// that kind — whose `unsat_core` set-equals the expected core; a
+/// `semantic_no_conflict` group needs at least one result, zero
+/// contradictions, every result [`VerifierCategory::SemanticNoConflict`]
 /// — and, when the reference documents the no-conflict result, at least one
 /// pair closed by an unsat overlap answer whose deontic query never ran.
-/// `expected_conflict_kind` stays unscored here: the verdict layer carries no
-/// conflict kind (the findings layer derives it). The caller rejects any
-/// other `expected_outcome` before calling.
+/// One deliberate strengthening over the oracle (an assertion helper that
+/// only ever sees real, non-empty runs): an empty result set never matches
+/// — a scorer stays fail-closed. The caller rejects any other
+/// `expected_outcome` before calling.
 fn group_matches_reference(group: &GroupObservation, entry: &ReferenceEntry) -> bool {
     let results = &group.results;
     let contradictions: Vec<&VerifierResult> = results
@@ -177,9 +179,11 @@ fn group_matches_reference(group: &GroupObservation, entry: &ReferenceEntry) -> 
             return false;
         };
         let rides_deontic = group.query_pairs.iter().any(|(_, d)| *d == hit.query_id);
+        let kind_expected =
+            entry.expected_conflict_kind == Some(static_id("deontic_direction_conflict"));
         let core: Option<BTreeSet<&Id>> = hit.unsat_core.as_ref().map(|c| c.iter().collect());
         let expected: BTreeSet<&Id> = entry.expected_unsat_core.iter().collect();
-        rides_deontic && core == Some(expected)
+        rides_deontic && kind_expected && core == Some(expected)
     } else {
         // semantic_no_conflict — the only other recognized outcome. An empty
         // result set is a route that produced no verdict, never a match.
@@ -502,6 +506,37 @@ mod tests {
             contradiction_on("q.d", &["a.r1"]),
         ];
         assert_eq!(accuracy(wrong_core, entry()), frac("0", "1"));
+        // The reference expects a different conflict kind — a deontic-Q2
+        // contradiction is the §6 deontic_direction_conflict kind, no other.
+        let wrong_kind = ReferenceEntry {
+            expected_conflict_kind: Some(static_id("kind.other")),
+            ..entry()
+        };
+        assert_eq!(
+            accuracy(
+                vec![
+                    no_conflict_on("q.o", SolverVerdict::Sat),
+                    contradiction_on("q.d", &["a.r2", "a.r1"]),
+                ],
+                wrong_kind
+            ),
+            frac("0", "1")
+        );
+        // The reference carries no expected kind at all.
+        let kindless = ReferenceEntry {
+            expected_conflict_kind: None,
+            ..entry()
+        };
+        assert_eq!(
+            accuracy(
+                vec![
+                    no_conflict_on("q.o", SolverVerdict::Sat),
+                    contradiction_on("q.d", &["a.r2", "a.r1"]),
+                ],
+                kindless
+            ),
+            frac("0", "1")
+        );
         // The contradiction rides the overlap query, not a deontic one.
         let rides_overlap = vec![contradiction_on("q.o", &["a.r1", "a.r2"])];
         assert_eq!(accuracy(rides_overlap, entry()), frac("0", "1"));
