@@ -158,10 +158,14 @@ doc-lint bullet).
   report.rs regions + metrics.rs pub items by grep. Gate: `cargo test -p ckc-cli` (all M1 pins
   green); fmt/clippy/doc-lint (18+17 hold); engine grep on report.rs.
 - [ ] report-m2.1c: populated report fixture + canonical byte pin (needs .1b). populated_report()
-  = valid_report() + the 3 members Some, values SETTLED: findings quoted_spans text ← verbatim JA
-  sentences A+B, no_conflict spans ← A+CONTROL, copied byte-exactly from
+  = valid_report() + the 3 members Some + JA span text, values SETTLED: the four span(..) calls
+  keep their id args VERBATIM (synthetic test_source.a/b, r.*, s.* stay — ids are opaque; ONLY
+  the 4th arg `text` swaps) to consts copied byte-exactly from
   crates/ckc-core/tests/test_sources_m1.rs (the committed readable mirror; corpus/test_sources =
-  deny-Read); failure_taxonomy = {pipe.base: [(ai_schema_violation, 2), (target_parse_error, 1)],
+  deny-Read): findings row → test_source.a span = A_RECOMMENDATION, test_source.b span =
+  B_CONTRAINDICATION; no_conflict row → test_source.a span = A_RECOMMENDATION, test_source.b
+  span = CONTROL_SENTENCE (3 distinct JA literals, A_EXCEPTION unused); every other field of
+  both rows + all other valid_report() members unchanged; failure_taxonomy = {pipe.base: [(ai_schema_violation, 2), (target_parse_error, 1)],
   pipe.route: [(ai_hallucinated_source, 1), (repair_limit_exceeded, 1)]} (§7.4 codes —
   target_parse_error is the DiagnosticCode; VerifierCategory's target_syntax_failure is a
   different vocabulary); metrics = experiment_metrics(vec![base, route], &pipe.base), per-route
