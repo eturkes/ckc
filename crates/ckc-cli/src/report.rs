@@ -8,7 +8,9 @@
 //! validation, and assembly ([`assemble_report`]) over the run's validated
 //! artifacts; `ckc run` drives it from the report processing_stage (cli-runner.4.1b.1);
 //! [`render_markdown`] is the deterministic §7.2 derived view, the
-//! `report_en.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
+//! `report_en.md` body (cli-runner.4.1b.2a), and [`render_markdown_ja`] its
+//! Japanese sibling, the `report_ja.md` body (report-m2.3b; run-m2.1 wires
+//! the write); the run/replay manifest landings
 //! arrive with .4.1b.2b (manifest assembly lives in `crate::manifests`).
 //! M2 (report-m2.1b) adds the omit-None members `failure_taxonomy`,
 //! `metrics`, and `model_identity`; [`assemble_report`] populates them from
@@ -858,45 +860,197 @@ pub fn assemble_report(
 /// §7.3 omission diagnostics by code exactly when it has them), and a
 /// model identity section after the solver identity.
 pub fn render_markdown(report: &Report) -> String {
-    let mut md = String::new();
-    md.push_str("# CKC report\n\n");
-    md.push_str(&format!("wording: {}\n", join_labels(&report.wording)));
+    render(report, &EN_LABELS)
+}
 
-    md.push_str("\n## Corpus\n\n");
+/// SPEC §7.2 `report_ja.md` body (from M2): the deterministic Japanese
+/// rendering of the same canonical [`Report`] — the exact [`render_markdown`]
+/// section walk under `JA_LABELS`, so the two bodies are views of one
+/// `report.json` with identical section order, omit-None behavior, and
+/// [`ExperimentMetrics::emission_order`] discipline. §0 vocabulary terms stay
+/// verbatim English in both renderings (§7.2: report wording draws from the
+/// closed §0 label set), as do ids, hashes, codes, and the §7.3 metric-schema
+/// token `not_applicable`; quoted §8.2 span texts are already Japanese source
+/// bytes and render verbatim. Empty content slots render as `なし。`. The
+/// caller validates first; run-m2.1 writes the returned body as
+/// `report_ja.md`.
+pub fn render_markdown_ja(report: &Report) -> String {
+    render(report, &JA_LABELS)
+}
+
+/// The fixed structural strings one rendering language feeds [`render`]:
+/// headings, table headers, list lead-ins, joiners, and the empty-slot
+/// marker. Only these differ between `report_en.md` and `report_ja.md`;
+/// every other rendered byte is canonical data verbatim (ids, hashes,
+/// codes, §0 wording labels, quoted span texts).
+struct Labels {
+    title: &'static str,
+    wording_prefix: &'static str,
+    none_word: &'static str,
+    corpus_heading: &'static str,
+    corpus_table_header: &'static str,
+    lexicon_prefix: &'static str,
+    findings_heading: &'static str,
+    no_conflict_heading: &'static str,
+    diagnostics_heading: &'static str,
+    code_count_table_header: &'static str,
+    taxonomy_heading: &'static str,
+    metrics_heading: &'static str,
+    metrics_lead_prefix: &'static str,
+    metrics_lead_suffix: &'static str,
+    raw_rows_prefix: &'static str,
+    omission_prefix: &'static str,
+    delta_prefix: &'static str,
+    metric_table_header: &'static str,
+    solver_heading: &'static str,
+    version_joiner: &'static str,
+    model_heading: &'static str,
+    quant_joiner: &'static str,
+    runtime_joiner: &'static str,
+    replay_heading: &'static str,
+    claim_tier_prefix: &'static str,
+    claim_tier_suffix: &'static str,
+    conflict_kind_prefix: &'static str,
+    query_prefix: &'static str,
+    verdict_joiner: &'static str,
+    rules_prefix: &'static str,
+    regions_prefix: &'static str,
+    assertions_prefix: &'static str,
+    core_prefix: &'static str,
+    quoted_spans_line: &'static str,
+}
+
+/// `report_en.md`'s structural strings (M1 shape; report-m2.3a M2 sections).
+const EN_LABELS: Labels = Labels {
+    title: "# CKC report\n\n",
+    wording_prefix: "wording: ",
+    none_word: "none.",
+    corpus_heading: "\n## Corpus\n\n",
+    corpus_table_header: "| document | source hash |\n| --- | --- |\n",
+    lexicon_prefix: "\nlexicon hash: `",
+    findings_heading: "\n## Findings\n",
+    no_conflict_heading: "\n## Documented no-conflict results\n",
+    diagnostics_heading: "\n## Diagnostics summary\n\n",
+    code_count_table_header: "| code | count |\n| --- | --- |\n",
+    taxonomy_heading: "\n## Failure taxonomy\n",
+    metrics_heading: "\n## Metrics\n\n",
+    metrics_lead_prefix: "raw benchmark output (locked measurement); raw rows precede every \
+                          baseline-delta table. baseline: `",
+    metrics_lead_suffix: "`.\n",
+    raw_rows_prefix: "\n### Raw rows: `",
+    omission_prefix: "\nomission diagnostics: ",
+    delta_prefix: "\n### Baseline delta: `",
+    metric_table_header: "| metric | value |\n| --- | --- |\n",
+    solver_heading: "\n## Solver identity\n\n",
+    version_joiner: " version `",
+    model_heading: "\n## Model identity\n\n",
+    quant_joiner: " quant `",
+    runtime_joiner: " runtime version `",
+    replay_heading: "\n## Replay status\n\n",
+    claim_tier_prefix: "; claim tier `",
+    claim_tier_suffix: "`.\n\n",
+    conflict_kind_prefix: "- conflict kind: `",
+    query_prefix: "- query: `",
+    verdict_joiner: "`, verdict `",
+    rules_prefix: "- rules: ",
+    regions_prefix: "- regions: ",
+    assertions_prefix: "- assertions: ",
+    core_prefix: "- core: ",
+    quoted_spans_line: "- quoted spans:\n",
+};
+
+/// `report_ja.md`'s structural strings (report-m2.3b). The metrics lead
+/// carries its §0 vocabulary terms verbatim inside Japanese prose; every
+/// other field is fixed Japanese chrome around verbatim canonical data.
+const JA_LABELS: Labels = Labels {
+    title: "# CKC レポート\n\n",
+    wording_prefix: "語彙: ",
+    none_word: "なし。",
+    corpus_heading: "\n## コーパス\n\n",
+    corpus_table_header: "| 文書 | ソースハッシュ |\n| --- | --- |\n",
+    lexicon_prefix: "\nレキシコンハッシュ: `",
+    findings_heading: "\n## 所見\n",
+    no_conflict_heading: "\n## 文書化された無矛盾結果\n",
+    diagnostics_heading: "\n## 診断サマリ\n\n",
+    code_count_table_header: "| コード | 件数 |\n| --- | --- |\n",
+    taxonomy_heading: "\n## 失敗分類\n",
+    metrics_heading: "\n## 指標\n\n",
+    metrics_lead_prefix: "raw benchmark output(locked measurement)。\
+                          生の指標行はすべてのベースライン差分表に先行する。ベースライン: `",
+    metrics_lead_suffix: "`。\n",
+    raw_rows_prefix: "\n### 生の指標行: `",
+    omission_prefix: "\n省略診断: ",
+    delta_prefix: "\n### ベースライン差分: `",
+    metric_table_header: "| 指標 | 値 |\n| --- | --- |\n",
+    solver_heading: "\n## ソルバー識別情報\n\n",
+    version_joiner: " バージョン `",
+    model_heading: "\n## モデル識別情報\n\n",
+    quant_joiner: " 量子化 `",
+    runtime_joiner: " ランタイムバージョン `",
+    replay_heading: "\n## リプレイ状態\n\n",
+    claim_tier_prefix: "。主張階層 `",
+    claim_tier_suffix: "`。\n\n",
+    conflict_kind_prefix: "- 矛盾種別: `",
+    query_prefix: "- クエリ: `",
+    verdict_joiner: "`、判定 `",
+    rules_prefix: "- 規則: ",
+    regions_prefix: "- 領域: ",
+    assertions_prefix: "- アサーション: ",
+    core_prefix: "- コア: ",
+    quoted_spans_line: "- 引用スパン:\n",
+};
+
+/// The shared §7.2 section walk both renderings are pure functions of (the
+/// [`render_markdown`] doc spells the section contract): every
+/// language-dependent byte comes from `l`; markdown scaffolding shared by
+/// both languages (table row shells, `###` id headings, code spans) stays
+/// inline.
+fn render(report: &Report, l: &Labels) -> String {
+    let mut md = String::new();
+    md.push_str(l.title);
+    md.push_str(l.wording_prefix);
+    md.push_str(&join_labels(&report.wording, l.none_word));
+    md.push('\n');
+
+    md.push_str(l.corpus_heading);
     if report.corpus_hashes.is_empty() {
-        md.push_str("none.\n");
+        md.push_str(l.none_word);
+        md.push('\n');
     } else {
-        md.push_str("| document | source hash |\n| --- | --- |\n");
+        md.push_str(l.corpus_table_header);
         for (document_id, hash) in &report.corpus_hashes {
             md.push_str(&format!("| `{document_id}` | `{hash}` |\n"));
         }
     }
-    md.push_str(&format!("\nlexicon hash: `{}`\n", report.lexicon_hash));
+    md.push_str(l.lexicon_prefix);
+    md.push_str(&format!("{}`\n", report.lexicon_hash));
 
-    md.push_str("\n## Findings\n");
-    render_rows(&mut md, &report.findings);
+    md.push_str(l.findings_heading);
+    render_rows(&mut md, &report.findings, l);
 
-    md.push_str("\n## Documented no-conflict results\n");
-    render_rows(&mut md, &report.no_conflict_results);
+    md.push_str(l.no_conflict_heading);
+    render_rows(&mut md, &report.no_conflict_results, l);
 
-    md.push_str("\n## Diagnostics summary\n\n");
+    md.push_str(l.diagnostics_heading);
     if report.diagnostics_summary.is_empty() {
-        md.push_str("none.\n");
+        md.push_str(l.none_word);
+        md.push('\n');
     } else {
-        md.push_str("| code | count |\n| --- | --- |\n");
+        md.push_str(l.code_count_table_header);
         for (code, count) in &report.diagnostics_summary {
             md.push_str(&format!("| `{code}` | {count} |\n"));
         }
     }
 
     if let Some(taxonomy) = &report.failure_taxonomy {
-        md.push_str("\n## Failure taxonomy\n");
+        md.push_str(l.taxonomy_heading);
         for (pipeline_id, counts) in &taxonomy.routes {
             md.push_str(&format!("\n### `{pipeline_id}`\n\n"));
             if counts.is_empty() {
-                md.push_str("none.\n");
+                md.push_str(l.none_word);
+                md.push('\n');
             } else {
-                md.push_str("| code | count |\n| --- | --- |\n");
+                md.push_str(l.code_count_table_header);
                 for (code, count) in counts {
                     md.push_str(&format!("| `{code}` | {count} |\n"));
                 }
@@ -905,17 +1059,18 @@ pub fn render_markdown(report: &Report) -> String {
     }
 
     if let Some(metrics) = &report.metrics {
-        md.push_str("\n## Metrics\n\n");
+        md.push_str(l.metrics_heading);
+        md.push_str(l.metrics_lead_prefix);
         md.push_str(&format!(
-            "raw benchmark output (locked measurement); raw rows precede every \
-             baseline-delta table. baseline: `{}`.\n",
-            metrics.baseline_pipeline_id
+            "{}{}",
+            metrics.baseline_pipeline_id, l.metrics_lead_suffix
         ));
         for section in metrics.emission_order() {
             match section {
                 MetricsSection::RawRows(route) => {
-                    md.push_str(&format!("\n### Raw rows: `{}`\n\n", route.pipeline_id));
-                    render_metric_rows(&mut md, &route.rows);
+                    md.push_str(l.raw_rows_prefix);
+                    md.push_str(&format!("{}`\n\n", route.pipeline_id));
+                    render_metric_rows(&mut md, &route.rows, l);
                     if !route.diagnostics.is_empty() {
                         let codes = route
                             .diagnostics
@@ -923,71 +1078,92 @@ pub fn render_markdown(report: &Report) -> String {
                             .map(|record| format!("`{}`", record.code.as_str()))
                             .collect::<Vec<_>>()
                             .join(", ");
-                        md.push_str(&format!("\nomission diagnostics: {codes}\n"));
+                        md.push_str(l.omission_prefix);
+                        md.push_str(&codes);
+                        md.push('\n');
                     }
                 }
                 MetricsSection::DeltaTable(delta) => {
+                    md.push_str(l.delta_prefix);
                     md.push_str(&format!(
-                        "\n### Baseline delta: `{}` - `{}`\n\n",
+                        "{}` - `{}`\n\n",
                         delta.pipeline_id, metrics.baseline_pipeline_id
                     ));
-                    render_metric_rows(&mut md, &delta.rows);
+                    render_metric_rows(&mut md, &delta.rows, l);
                 }
             }
         }
     }
 
-    md.push_str("\n## Solver identity\n\n");
+    md.push_str(l.solver_heading);
     md.push_str(&format!(
-        "`{}` version `{}`\n",
-        report.solver_identity.solver_id, report.solver_identity.version
+        "`{}`{}{}`\n",
+        report.solver_identity.solver_id, l.version_joiner, report.solver_identity.version
     ));
 
     if let Some(identity) = &report.model_identity {
-        md.push_str("\n## Model identity\n\n");
+        md.push_str(l.model_heading);
         md.push_str(&format!(
-            "`{}` quant `{}` runtime version `{}`\n",
-            identity.model_id, identity.quant, identity.runtime_version
+            "`{}`{}{}`{}{}`\n",
+            identity.model_id,
+            l.quant_joiner,
+            identity.quant,
+            l.runtime_joiner,
+            identity.runtime_version
         ));
     }
 
-    md.push_str("\n## Replay status\n\n");
+    md.push_str(l.replay_heading);
     md.push_str(&format!("`{}`\n", report.replay_status.as_str()));
     md
 }
 
 /// One partition's rows under its §7.2 heading: each row a `###` section
-/// headed by its finding id, its §0 label and claim tier as the lead
-/// sentence, evidence pools as backticked id lists, optionals
-/// (`conflict_kind`, `core`) rendered exactly when present — the
+/// headed by its finding id, its §0 label (verbatim in both languages) and
+/// claim tier as the lead sentence, evidence pools as backticked id lists,
+/// optionals (`conflict_kind`, `core`) rendered exactly when present — the
 /// partition rules make that findings-only.
-fn render_rows(md: &mut String, rows: &[ReportFinding]) {
+fn render_rows(md: &mut String, rows: &[ReportFinding], l: &Labels) {
     if rows.is_empty() {
-        md.push_str("\nnone.\n");
+        md.push('\n');
+        md.push_str(l.none_word);
+        md.push('\n');
         return;
     }
     for row in rows {
         md.push_str(&format!("\n### `{}`\n\n", row.finding_id));
         md.push_str(&format!(
-            "{}; claim tier `{}`.\n\n",
+            "{}{}{}{}",
             row.wording.as_str(),
-            row.claim_tier.as_str()
+            l.claim_tier_prefix,
+            row.claim_tier.as_str(),
+            l.claim_tier_suffix
         ));
         if let Some(kind) = row.conflict_kind {
-            md.push_str(&format!("- conflict kind: `{}`\n", kind.as_str()));
+            md.push_str(&format!("{}{}`\n", l.conflict_kind_prefix, kind.as_str()));
         }
         md.push_str(&format!(
-            "- query: `{}`, verdict `{}`\n",
+            "{}{}{}{}`\n",
+            l.query_prefix,
             row.query_id,
+            l.verdict_joiner,
             row.verdict.as_str()
         ));
-        md.push_str(&format!("- rules: {}\n", join_ids(&row.rule_ids)));
-        md.push_str(&format!("- regions: {}\n", join_ids(&row.region_ids)));
-        md.push_str(&format!("- assertions: {}\n", join_ids(&row.assertion_ids)));
+        md.push_str(&format!("{}{}\n", l.rules_prefix, join_ids(&row.rule_ids)));
+        md.push_str(&format!(
+            "{}{}\n",
+            l.regions_prefix,
+            join_ids(&row.region_ids)
+        ));
+        md.push_str(&format!(
+            "{}{}\n",
+            l.assertions_prefix,
+            join_ids(&row.assertion_ids)
+        ));
         if let Some(core) = &row.core {
-            md.push_str(&format!("- core: {}\n", join_ids(core)));
+            md.push_str(&format!("{}{}\n", l.core_prefix, join_ids(core)));
         }
-        md.push_str("- quoted spans:\n");
+        md.push_str(l.quoted_spans_line);
         for span in &row.quoted_spans {
             md.push_str(&format!(
                 "  - `{}` `{}` `{}`: {}\n",
@@ -999,16 +1175,18 @@ fn render_rows(md: &mut String, rows: &[ReportFinding]) {
 
 /// One metrics section's §7.3 rows as a metric/value table: values are
 /// exact reduced fractions rendered `numerator/denominator` ([`Rational`]'s
-/// display form), a zero-denominator emission renders `not_applicable`,
-/// and the empty row set renders `none.`.
+/// display form), a zero-denominator emission renders `not_applicable`
+/// (§7.3 metric-schema token, verbatim in both languages), and the empty
+/// row set renders the language's empty marker.
 ///
 /// [`Rational`]: ckc_core::Rational
-fn render_metric_rows(md: &mut String, rows: &[MetricRow]) {
+fn render_metric_rows(md: &mut String, rows: &[MetricRow], l: &Labels) {
     if rows.is_empty() {
-        md.push_str("none.\n");
+        md.push_str(l.none_word);
+        md.push('\n');
         return;
     }
-    md.push_str("| metric | value |\n| --- | --- |\n");
+    md.push_str(l.metric_table_header);
     for row in rows {
         let value = match &row.value {
             MetricValue::Value(rational) => rational.to_string(),
@@ -1026,10 +1204,12 @@ fn join_ids(ids: &[Id]) -> String {
         .join(", ")
 }
 
-/// Comma-joined §0 labels as plain prose; the empty set renders `none.`.
-fn join_labels(labels: &[Wording]) -> String {
+/// Comma-joined §0 labels as plain prose (the closed English label set,
+/// verbatim in both languages); the empty set renders the language's empty
+/// marker.
+fn join_labels(labels: &[Wording], none_word: &str) -> String {
     if labels.is_empty() {
-        return "none.".to_owned();
+        return none_word.to_owned();
     }
     labels
         .iter()
@@ -3211,9 +3391,12 @@ raw benchmark output (locked measurement); raw rows precede every baseline-delta
     /// taxonomy code map and an empty raw-row set render `none.` — and a
     /// raw-rows section lists its §7.3 omission diagnostics by code;
     /// pinned from observed output.
-    #[test]
-    fn render_markdown_marks_empty_m2_slots() {
-        let report = Report {
+    /// M2 members present but inner-empty over the all-empty M1 base — a
+    /// clean taxonomy route, an empty raw-row set carrying one omission
+    /// diagnostic, identity only: the empty-slot fixture both rendering
+    /// languages pin.
+    fn empty_m2_slots_report() -> Report {
+        Report {
             failure_taxonomy: Some(RouteTaxonomy {
                 routes: vec![(id("pipe.base"), vec![])],
             }),
@@ -3228,7 +3411,12 @@ raw benchmark output (locked measurement); raw rows precede every baseline-delta
             }),
             model_identity: Some(baseline_model_identity()),
             ..empty_report()
-        };
+        }
+    }
+
+    #[test]
+    fn render_markdown_marks_empty_m2_slots() {
+        let report = empty_m2_slots_report();
         report.validate().unwrap();
         let md = render_markdown(&report);
         assert_eq!(
@@ -3280,6 +3468,203 @@ omission diagnostics: `schema_invalid`
 `model.baseline` quant `fixture_quant` runtime version `1.0.0`
 
 ## Replay status
+
+`not_replayed`
+"#
+        );
+    }
+
+    /// §7.2 `report_ja.md` (from M2) pinned from observed output over the
+    /// same .1c populated fixture [`render_markdown_pins_the_populated_m2_view`]
+    /// pins — one canonical report, two byte-stable renderings sharing the
+    /// section walk. §0 vocabulary terms assert verbatim English (§7.2:
+    /// the closed §0 label set) inside the Japanese prose, and a quoted
+    /// §8.2 JA span text asserts verbatim before the byte pin.
+    #[test]
+    fn render_markdown_ja_pins_the_populated_m2_view() {
+        let report = populated_report();
+        report.validate().unwrap();
+        let md = render_markdown_ja(&report);
+        assert_eq!(md, render_markdown_ja(&report));
+        for term in [
+            "raw benchmark output",
+            "locked measurement",
+            "documented no-conflict result",
+            "synthetic test source measurement",
+        ] {
+            assert!(md.contains(term), "§0 vocabulary term missing: {term}");
+        }
+        assert!(
+            md.contains("成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)"),
+            "quoted JA span text must render verbatim"
+        );
+        assert_eq!(md, PINNED_M2_MARKDOWN_JA);
+    }
+
+    const PINNED_M2_MARKDOWN_JA: &str = r#"# CKC レポート
+
+語彙: documented no-conflict result, synthetic test source measurement
+
+## コーパス
+
+| 文書 | ソースハッシュ |
+| --- | --- |
+| `test_source.a` | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
+| `test_source.b` | `sha256:2222222222222222222222222222222222222222222222222222222222222222` |
+
+レキシコンハッシュ: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## 所見
+
+### `finding.group.g1.1`
+
+synthetic test source measurement。主張階層 `s1_accepted`。
+
+- 矛盾種別: `deontic_direction_conflict`
+- クエリ: `q.g1.pair1.deontic`、判定 `unsat`
+- 規則: `test_source.a.rule.0`, `test_source.b.rule.0`
+- 領域: `r.0`
+- アサーション: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- コア: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- 引用スパン:
+  - `test_source.a` `r.0` `s.0`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
+  - `test_source.b` `r.0` `s.0`: 成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)
+
+## 文書化された無矛盾結果
+
+### `finding.group.g2.0`
+
+documented no-conflict result。主張階層 `s1_accepted`。
+
+- クエリ: `q.g2.pair1.overlap`、判定 `unsat`
+- 規則: `test_source.a.rule.1`, `test_source.b.rule.1`
+- 領域: `r.1`
+- アサーション: `ctx.test_source.a.rule.1`, `ctx.test_source.b.rule.1`
+- 引用スパン:
+  - `test_source.a` `r.1` `s.1`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
+  - `test_source.b` `r.1` `s.1`: 小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である
+
+## 診断サマリ
+
+| コード | 件数 |
+| --- | --- |
+| `schema_invalid` | 1 |
+| `solver_timeout` | 2 |
+
+## 失敗分類
+
+### `pipe.base`
+
+| コード | 件数 |
+| --- | --- |
+| `ai_schema_violation` | 2 |
+| `target_parse_error` | 1 |
+
+### `pipe.route`
+
+| コード | 件数 |
+| --- | --- |
+| `ai_hallucinated_source` | 1 |
+| `repair_limit_exceeded` | 1 |
+
+## 指標
+
+raw benchmark output(locked measurement)。生の指標行はすべてのベースライン差分表に先行する。ベースライン: `pipe.base`。
+
+### 生の指標行: `pipe.base`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | 3/4 |
+| `k_sample_convergence` | not_applicable |
+| `repair_count` | 2/1 |
+
+### 生の指標行: `pipe.route`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | 1/2 |
+| `k_sample_convergence` | 1/1 |
+| `repair_count` | 2/1 |
+
+### ベースライン差分: `pipe.route` - `pipe.base`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | -1/4 |
+| `k_sample_convergence` | not_applicable |
+| `repair_count` | 0/1 |
+
+## ソルバー識別情報
+
+`z3` バージョン `4.13.0`
+
+## モデル識別情報
+
+`model.baseline` 量子化 `fixture_quant` ランタイムバージョン `1.0.0`
+
+## リプレイ状態
+
+`not_replayed`
+"#;
+
+    /// The JA rendering keeps every §7.2 slot visible when empty — `なし。`
+    /// in each empty content slot — and mirrors the M2 inner-empty slots +
+    /// omission-diagnostics line of [`render_markdown_marks_empty_m2_slots`]
+    /// over the same fixture; pinned from observed output.
+    #[test]
+    fn render_markdown_ja_marks_empty_m2_slots() {
+        let report = empty_m2_slots_report();
+        report.validate().unwrap();
+        assert_eq!(
+            render_markdown_ja(&report),
+            r#"# CKC レポート
+
+語彙: なし。
+
+## コーパス
+
+なし。
+
+レキシコンハッシュ: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## 所見
+
+なし。
+
+## 文書化された無矛盾結果
+
+なし。
+
+## 診断サマリ
+
+なし。
+
+## 失敗分類
+
+### `pipe.base`
+
+なし。
+
+## 指標
+
+raw benchmark output(locked measurement)。生の指標行はすべてのベースライン差分表に先行する。ベースライン: `pipe.base`。
+
+### 生の指標行: `pipe.base`
+
+なし。
+
+省略診断: `schema_invalid`
+
+## ソルバー識別情報
+
+`z3` バージョン `4.13.0`
+
+## モデル識別情報
+
+`model.baseline` 量子化 `fixture_quant` ランタイムバージョン `1.0.0`
+
+## リプレイ状態
 
 `not_replayed`
 "#

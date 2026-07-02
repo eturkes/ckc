@@ -286,9 +286,9 @@ impl ExperimentMetrics {
     /// every delta table. Renderers must walk this order, never the fields
     /// ad hoc. Carriers: the canonical [`ExperimentMetrics`] bytes agree by
     /// key naming (`raw_rows` < `route_deltas`, see [`Canonical`] above);
-    /// `report.json` inherits on embed (report-m2.1b); `render_markdown`
-    /// walks it for `report_en.md` (report-m2.3a); report-m2.3b adds the
-    /// `report_ja.md` walker.
+    /// `report.json` inherits on embed (report-m2.1b); `render_markdown` /
+    /// `render_markdown_ja` walk it for `report_en.md` / `report_ja.md`
+    /// (report-m2.3a/.3b).
     pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
         self.routes
             .iter()

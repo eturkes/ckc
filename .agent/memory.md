@@ -440,14 +440,19 @@ full pre-consolidation text lives in git history.
   baseline; per-route delta rows = union of metric ids (sorted), `Rational::sub` (ckc-core id.rs —
   signed exact, added .2) on Value×Value else `not_applicable`; baseline gets NO self-delta row.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
-  sections strictly before all DeltaTable sections) — report_en.md walks it (.3a); run-m2.1 +
-  report-m2.3b must render through it too, never the fields ad hoc (codex M2.22: the §9 guarantee
-  reaches artifacts only once an emitter walks it). report_en.md M2 rendering landed (.3a,
-  `render_markdown` + two pinned tests): §0 vocabulary must ride prose VERBATIM-lowercase (a
+  sections strictly before all DeltaTable sections) — report_en.md + report_ja.md walk it
+  (.3a/.3b); run-m2.1 must render through it too, never the fields ad hoc (codex M2.22: the §9
+  guarantee reaches artifacts only once an emitter walks it). report_en.md M2 rendering landed
+  (.3a, `render_markdown` + two pinned tests): §0 vocabulary must ride prose VERBATIM-lowercase (a
   sentence-case "Raw benchmark output" failed the contains-assert) → M2 lead lines use M1's
-  lowercase-label style; report_ja (.3b) mirrors the section order (taxonomy after diagnostics
-  summary, metrics next, model identity after solver identity) + the emission_order walk — shape
-  source = `render_markdown` + its two pinned tests, read those, not a memory copy. RENDERED ⇒
+  lowercase-label style. report_ja.md landed (.3b): ONE private `render(report, &Labels)` walk
+  serves both languages (`render_markdown`=EN_LABELS / `render_markdown_ja`=JA_LABELS; the three
+  pre-existing EN byte-pins locked the parameterization behavior-tight, so no refactor unit
+  needed) — resolved JA §0 mapping: §0 wording labels + ids/hashes/codes + `not_applicable` stay
+  verbatim ENGLISH inside JA prose (§7.2: wording draws from the closed §0 label set; translating
+  would exit it), structural chrome JA, empty slot `なし。`; two JA observed-output pins mirror
+  the EN pair over shared fixtures (`empty_m2_slots_report()`); run-m2.1 writes the bodies as
+  report_en.md/report_ja.md. RENDERED ⇒
   VALIDATED (codex M2.25): every member a renderer walks must sit under a `Report::validate` rule —
   `RouteMetrics::diagnostics` was the one rendered collection validate skipped, and `emit_set`
   sorts/dedups blindly, so a validate-passing unsorted store rendered ≠ its canonical read-back
