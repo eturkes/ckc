@@ -446,19 +446,25 @@ full pre-consolidation text lives in git history.
   (.3a, `render_markdown` + two pinned tests): §0 vocabulary must ride prose VERBATIM-lowercase (a
   sentence-case "Raw benchmark output" failed the contains-assert) → M2 lead lines use M1's
   lowercase-label style. report_ja.md landed (.3b): ONE private `render(report, &Labels)` walk
-  serves both languages (`render_markdown`=EN_LABELS / `render_markdown_ja`=JA_LABELS; the three
+  serves both languages (`render_markdown`=EN_LABELS / `render_markdown_ja`=JA_LABELS; the four
   pre-existing EN byte-pins locked the parameterization behavior-tight, so no refactor unit
   needed) — resolved JA §0 mapping: §0 wording labels + ids/hashes/codes + `not_applicable` stay
   verbatim ENGLISH inside JA prose (§7.2: wording draws from the closed §0 label set; translating
-  would exit it), structural chrome JA, empty slot `なし。`; two JA observed-output pins mirror
-  the EN pair over shared fixtures (`empty_m2_slots_report()`); run-m2.1 writes the bodies as
-  report_en.md/report_ja.md. RENDERED ⇒
+  would exit it), structural chrome JA incl. `Labels::list_joiner` `、` for every enumeration
+  (codex M2.25: chrome hardcoded as ASCII `, ` contradicted the mapping), empty slot `なし。`;
+  the delta heading's ` - ` stays language-invariant (§7.3 subtraction notation, not chrome);
+  two JA observed-output pins mirror the EN pair over shared fixtures
+  (`empty_m2_slots_report()`), and `one_canonical_report_renders_both_language_bodies` renders
+  both pinned bodies from the pinned canonical report.json bytes alone; run-m2.1 writes the
+  bodies as report_en.md/report_ja.md. RENDERED ⇒
   VALIDATED (codex M2.25): every member a renderer walks must sit under a `Report::validate` rule —
   `RouteMetrics::diagnostics` was the one rendered collection validate skipped, and `emit_set`
   sorts/dedups blindly, so a validate-passing unsorted store rendered ≠ its canonical read-back
   (rule 6 now demands the canonical set); identity free text (solver version, model quant +
   runtime_version) is rule-7 code-span-inert (non-empty, no backtick/line break) → renderers (.3b
-  incl.) interpolate those fields into code spans bare, no escaping layer. REPORT-m2.1 TRAP (DISCHARGED in landed
+  incl.) interpolate those fields into code spans bare, no escaping layer; quoted span text renders
+  BARE outside code spans as one list line → rule 3 rejects line breaks in it (codex M2.25 .3b:
+  empty-only check left valid multi-line text able to inject block structure into both bodies). REPORT-m2.1 TRAP (DISCHARGED in landed
   .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.

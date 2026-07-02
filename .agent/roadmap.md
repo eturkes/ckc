@@ -123,7 +123,7 @@ doc-lint bullet).
 - [x] report-m2.3a: report_en.md M2 sections — emission_order walk, §0-vocab lead, two pinned
   renders. 64% 127K/200K ebadf6b
 - [x] report-m2.3b: report_ja.md renderer — shared Labels walk, §0 verbatim-EN in JA prose, two
-  observed-output pins. 80% 160K/200K
+  observed-output pins. 80% 160K/200K 4b5f799
 - [ ] run-m2.1: `exp.m2_multihop` wiring + experiment entry. SIZE-CHECK FIRST (mandatory): this is
   a 4-deliverable stack (route loop + `resolve()` generalization; provenance input_hashes; `--record`
   flag; report/manifest wiring) over run.rs — the session STARTS by respec-splitting it at a seam

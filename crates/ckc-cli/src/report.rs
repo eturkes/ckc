@@ -250,7 +250,9 @@ impl Report {
     ///    core; Q1-unsat and deontic-sat no_conflict_results carry neither); finding
     ///    verdicts are `unsat` and no-conflict verdicts `sat` or `unsat`; the
     ///    three id pools, `quoted_spans`, and `core` are non-empty
-    ///    canonical sets; quoted texts are non-empty.
+    ///    canonical sets; quoted texts are non-empty and line-break-free
+    ///    (both renderers interpolate each bare as one Markdown list line;
+    ///    a line break would inject block structure).
     /// 4. Finding ids are unique across both partitions.
     /// 5. `failure_taxonomy` (when present) names at least one route; route
     ///    keys and each per-route code map are §4.3 maps; counts are
@@ -328,6 +330,16 @@ impl Report {
                 check_canonical_set("quoted_spans", &row.quoted_spans)?;
                 if let Some(span) = row.quoted_spans.iter().find(|s| s.text.is_empty()) {
                     return Err(ReportError::EmptyQuotedText {
+                        finding_id: row.finding_id.clone(),
+                        span_id: span.span_id.clone(),
+                    });
+                }
+                if let Some(span) = row
+                    .quoted_spans
+                    .iter()
+                    .find(|s| s.text.contains(['\n', '\r']))
+                {
+                    return Err(ReportError::QuotedTextLineBreak {
                         finding_id: row.finding_id.clone(),
                         span_id: span.span_id.clone(),
                     });
@@ -882,11 +894,15 @@ pub fn render_markdown_ja(report: &Report) -> String {
 /// headings, table headers, list lead-ins, joiners, and the empty-slot
 /// marker. Only these differ between `report_en.md` and `report_ja.md`;
 /// every other rendered byte is canonical data verbatim (ids, hashes,
-/// codes, §0 wording labels, quoted span texts).
+/// codes, §0 wording labels, quoted span texts) or language-invariant
+/// scaffolding (the [`render`] doc lists it).
 struct Labels {
     title: &'static str,
     wording_prefix: &'static str,
     none_word: &'static str,
+    /// Separator inside every rendered enumeration: §0 wording labels,
+    /// backticked id lists, omission-diagnostic codes.
+    list_joiner: &'static str,
     corpus_heading: &'static str,
     corpus_table_header: &'static str,
     lexicon_prefix: &'static str,
@@ -925,6 +941,7 @@ const EN_LABELS: Labels = Labels {
     title: "# CKC report\n\n",
     wording_prefix: "wording: ",
     none_word: "none.",
+    list_joiner: ", ",
     corpus_heading: "\n## Corpus\n\n",
     corpus_table_header: "| document | source hash |\n| --- | --- |\n",
     lexicon_prefix: "\nlexicon hash: `",
@@ -966,6 +983,7 @@ const JA_LABELS: Labels = Labels {
     title: "# CKC レポート\n\n",
     wording_prefix: "語彙: ",
     none_word: "なし。",
+    list_joiner: "、",
     corpus_heading: "\n## コーパス\n\n",
     corpus_table_header: "| 文書 | ソースハッシュ |\n| --- | --- |\n",
     lexicon_prefix: "\nレキシコンハッシュ: `",
@@ -1003,13 +1021,14 @@ const JA_LABELS: Labels = Labels {
 /// The shared §7.2 section walk both renderings are pure functions of (the
 /// [`render_markdown`] doc spells the section contract): every
 /// language-dependent byte comes from `l`; markdown scaffolding shared by
-/// both languages (table row shells, `###` id headings, code spans) stays
-/// inline.
+/// both languages (table row shells, `###` id headings, code spans, and the
+/// delta heading's ` - ` — §7.3 subtraction notation, language-invariant)
+/// stays inline.
 fn render(report: &Report, l: &Labels) -> String {
     let mut md = String::new();
     md.push_str(l.title);
     md.push_str(l.wording_prefix);
-    md.push_str(&join_labels(&report.wording, l.none_word));
+    md.push_str(&join_labels(&report.wording, l.list_joiner, l.none_word));
     md.push('\n');
 
     md.push_str(l.corpus_heading);
@@ -1077,7 +1096,7 @@ fn render(report: &Report, l: &Labels) -> String {
                             .iter()
                             .map(|record| format!("`{}`", record.code.as_str()))
                             .collect::<Vec<_>>()
-                            .join(", ");
+                            .join(l.list_joiner);
                         md.push_str(l.omission_prefix);
                         md.push_str(&codes);
                         md.push('\n');
@@ -1149,19 +1168,27 @@ fn render_rows(md: &mut String, rows: &[ReportFinding], l: &Labels) {
             l.verdict_joiner,
             row.verdict.as_str()
         ));
-        md.push_str(&format!("{}{}\n", l.rules_prefix, join_ids(&row.rule_ids)));
+        md.push_str(&format!(
+            "{}{}\n",
+            l.rules_prefix,
+            join_ids(&row.rule_ids, l.list_joiner)
+        ));
         md.push_str(&format!(
             "{}{}\n",
             l.regions_prefix,
-            join_ids(&row.region_ids)
+            join_ids(&row.region_ids, l.list_joiner)
         ));
         md.push_str(&format!(
             "{}{}\n",
             l.assertions_prefix,
-            join_ids(&row.assertion_ids)
+            join_ids(&row.assertion_ids, l.list_joiner)
         ));
         if let Some(core) = &row.core {
-            md.push_str(&format!("{}{}\n", l.core_prefix, join_ids(core)));
+            md.push_str(&format!(
+                "{}{}\n",
+                l.core_prefix,
+                join_ids(core, l.list_joiner)
+            ));
         }
         md.push_str(l.quoted_spans_line);
         for span in &row.quoted_spans {
@@ -1196,18 +1223,19 @@ fn render_metric_rows(md: &mut String, rows: &[MetricRow], l: &Labels) {
     }
 }
 
-/// Backticked, comma-joined id list (sets render in storage order).
-fn join_ids(ids: &[Id]) -> String {
+/// Backticked id list joined by the language's [`Labels::list_joiner`] (sets
+/// render in storage order).
+fn join_ids(ids: &[Id], joiner: &str) -> String {
     ids.iter()
         .map(|id| format!("`{id}`"))
         .collect::<Vec<_>>()
-        .join(", ")
+        .join(joiner)
 }
 
-/// Comma-joined §0 labels as plain prose (the closed English label set,
-/// verbatim in both languages); the empty set renders the language's empty
-/// marker.
-fn join_labels(labels: &[Wording], none_word: &str) -> String {
+/// §0 labels as plain prose joined by the language's
+/// [`Labels::list_joiner`] (the closed English label set, verbatim in both
+/// languages); the empty set renders the language's empty marker.
+fn join_labels(labels: &[Wording], joiner: &str, none_word: &str) -> String {
     if labels.is_empty() {
         return none_word.to_owned();
     }
@@ -1215,7 +1243,7 @@ fn join_labels(labels: &[Wording], none_word: &str) -> String {
         .iter()
         .map(|w| w.as_str())
         .collect::<Vec<_>>()
-        .join(", ")
+        .join(joiner)
 }
 
 /// Sort `items` into canonical-set storage order by [`canonical_sort_key`]
@@ -1305,6 +1333,9 @@ pub enum ReportError {
     EmptyEvidence { finding_id: Id, pool: &'static str },
     /// A quoted span carries no text.
     EmptyQuotedText { finding_id: Id, span_id: Id },
+    /// A quoted span's text carries a line break; both renderers interpolate
+    /// it bare as one Markdown list line.
+    QuotedTextLineBreak { finding_id: Id, span_id: Id },
     /// Two input graphs claim one document.
     DuplicateGraph(Id),
     /// Two input results claim one query.
@@ -1402,6 +1433,15 @@ impl std::fmt::Display for ReportError {
                 span_id,
             } => {
                 write!(f, "row {finding_id} quotes span {span_id} with no text")
+            }
+            ReportError::QuotedTextLineBreak {
+                finding_id,
+                span_id,
+            } => {
+                write!(
+                    f,
+                    "row {finding_id} quotes span {span_id} with a line break; §7.2 renders span text as one Markdown list line"
+                )
             }
             ReportError::DuplicateGraph(id) => {
                 write!(f, "two source document graphs claim document {id}")
@@ -2021,6 +2061,23 @@ mod tests {
                 span_id: id("s.1"),
             })
         );
+    }
+
+    /// Rule 3's line-break clause: both renderers interpolate quoted text
+    /// bare as one Markdown list line, so a valid report never carries one.
+    #[test]
+    fn rejects_quoted_text_line_break() {
+        for broken in ["administer\ndrug A", "administer\rdrug A"] {
+            let mut report = valid_report();
+            report.findings[0].quoted_spans[0].text = broken.to_owned();
+            assert_eq!(
+                report.validate(),
+                Err(ReportError::QuotedTextLineBreak {
+                    finding_id: id("finding.group.g1.1"),
+                    span_id: id("s.0"),
+                })
+            );
+        }
     }
 
     /// Two-route §7.3 metrics through [`experiment_metrics`]'s own assembly
@@ -3267,15 +3324,24 @@ none.
     /// walked via [`ExperimentMetrics::emission_order`] (both routes' raw
     /// rows strictly before the delta table), model identity after solver
     /// identity, quoted §8.2 JA span texts verbatim in the pinned bytes; §0
-    /// vocabulary asserted before the byte pin.
+    /// vocabulary asserted section-bound (term + its section chrome, so a
+    /// bad pin re-bless can't slip a paraphrase past the wording summary)
+    /// before the byte pin.
     #[test]
     fn render_markdown_pins_the_populated_m2_view() {
         let report = populated_report();
         report.validate().unwrap();
         let md = render_markdown(&report);
         assert_eq!(md, render_markdown(&report));
-        for term in ["raw benchmark output", "locked measurement"] {
-            assert!(md.contains(term), "§0 vocabulary term missing: {term}");
+        for fragment in [
+            "raw benchmark output (locked measurement); ",
+            "synthetic test source measurement; claim tier ",
+            "documented no-conflict result; claim tier ",
+        ] {
+            assert!(
+                md.contains(fragment),
+                "§0 section-bound fragment missing: {fragment}"
+            );
         }
         assert_eq!(md, PINNED_M2_MARKDOWN);
     }
@@ -3387,10 +3453,6 @@ raw benchmark output (locked measurement); raw rows precede every baseline-delta
 `not_replayed`
 "#;
 
-    /// The M2 sections' inner empty slots stay visible — a clean route's
-    /// taxonomy code map and an empty raw-row set render `none.` — and a
-    /// raw-rows section lists its §7.3 omission diagnostics by code;
-    /// pinned from observed output.
     /// M2 members present but inner-empty over the all-empty M1 base — a
     /// clean taxonomy route, an empty raw-row set carrying one omission
     /// diagnostic, identity only: the empty-slot fixture both rendering
@@ -3414,6 +3476,10 @@ raw benchmark output (locked measurement); raw rows precede every baseline-delta
         }
     }
 
+    /// The M2 sections' inner empty slots stay visible — a clean route's
+    /// taxonomy code map and an empty raw-row set render `none.` — and a
+    /// raw-rows section lists its §7.3 omission diagnostics by code;
+    /// pinned from observed output.
     #[test]
     fn render_markdown_marks_empty_m2_slots() {
         let report = empty_m2_slots_report();
@@ -3477,22 +3543,26 @@ omission diagnostics: `schema_invalid`
     /// §7.2 `report_ja.md` (from M2) pinned from observed output over the
     /// same .1c populated fixture [`render_markdown_pins_the_populated_m2_view`]
     /// pins — one canonical report, two byte-stable renderings sharing the
-    /// section walk. §0 vocabulary terms assert verbatim English (§7.2:
-    /// the closed §0 label set) inside the Japanese prose, and a quoted
-    /// §8.2 JA span text asserts verbatim before the byte pin.
+    /// section walk. §0 vocabulary asserts verbatim English (§7.2: the
+    /// closed §0 label set) section-bound inside the Japanese prose — each
+    /// term glued to its section's JA chrome, so a bad pin re-bless can't
+    /// slip a translated term past the wording summary — and a quoted §8.2
+    /// JA span text asserts verbatim before the byte pin.
     #[test]
     fn render_markdown_ja_pins_the_populated_m2_view() {
         let report = populated_report();
         report.validate().unwrap();
         let md = render_markdown_ja(&report);
         assert_eq!(md, render_markdown_ja(&report));
-        for term in [
-            "raw benchmark output",
-            "locked measurement",
-            "documented no-conflict result",
-            "synthetic test source measurement",
+        for fragment in [
+            "raw benchmark output(locked measurement)。",
+            "synthetic test source measurement。主張階層 ",
+            "documented no-conflict result。主張階層 ",
         ] {
-            assert!(md.contains(term), "§0 vocabulary term missing: {term}");
+            assert!(
+                md.contains(fragment),
+                "§0 section-bound fragment missing: {fragment}"
+            );
         }
         assert!(
             md.contains("成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)"),
@@ -3501,9 +3571,20 @@ omission diagnostics: `schema_invalid`
         assert_eq!(md, PINNED_M2_MARKDOWN_JA);
     }
 
+    /// §7.2 made literal: the pinned canonical `report.json` bytes alone
+    /// produce both pinned language bodies (no shared in-memory fixture in
+    /// the loop — parse, then render twice).
+    #[test]
+    fn one_canonical_report_renders_both_language_bodies() {
+        let report: Report = read_strict_canonical(PINNED_POPULATED_REPORT.as_bytes()).unwrap();
+        report.validate().unwrap();
+        assert_eq!(render_markdown(&report), PINNED_M2_MARKDOWN);
+        assert_eq!(render_markdown_ja(&report), PINNED_M2_MARKDOWN_JA);
+    }
+
     const PINNED_M2_MARKDOWN_JA: &str = r#"# CKC レポート
 
-語彙: documented no-conflict result, synthetic test source measurement
+語彙: documented no-conflict result、synthetic test source measurement
 
 ## コーパス
 
@@ -3522,10 +3603,10 @@ synthetic test source measurement。主張階層 `s1_accepted`。
 
 - 矛盾種別: `deontic_direction_conflict`
 - クエリ: `q.g1.pair1.deontic`、判定 `unsat`
-- 規則: `test_source.a.rule.0`, `test_source.b.rule.0`
+- 規則: `test_source.a.rule.0`、`test_source.b.rule.0`
 - 領域: `r.0`
-- アサーション: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
-- コア: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- アサーション: `a.test_source.a.rule.0`、`a.test_source.b.rule.0`
+- コア: `a.test_source.a.rule.0`、`a.test_source.b.rule.0`
 - 引用スパン:
   - `test_source.a` `r.0` `s.0`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
   - `test_source.b` `r.0` `s.0`: 成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)
@@ -3537,9 +3618,9 @@ synthetic test source measurement。主張階層 `s1_accepted`。
 documented no-conflict result。主張階層 `s1_accepted`。
 
 - クエリ: `q.g2.pair1.overlap`、判定 `unsat`
-- 規則: `test_source.a.rule.1`, `test_source.b.rule.1`
+- 規則: `test_source.a.rule.1`、`test_source.b.rule.1`
 - 領域: `r.1`
-- アサーション: `ctx.test_source.a.rule.1`, `ctx.test_source.b.rule.1`
+- アサーション: `ctx.test_source.a.rule.1`、`ctx.test_source.b.rule.1`
 - 引用スパン:
   - `test_source.a` `r.1` `s.1`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
   - `test_source.b` `r.1` `s.1`: 小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である
