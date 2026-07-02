@@ -282,10 +282,11 @@ pub enum MetricsSection<'a> {
 impl ExperimentMetrics {
     /// §9 raw-rows-before-ranking: every route's raw rows strictly precede
     /// every delta table. Renderers must walk this order, never the fields
-    /// ad hoc. Carriers today: the canonical [`ExperimentMetrics`] bytes
-    /// agree by key naming (`raw_rows` < `route_deltas`, see [`Canonical`]
-    /// above); `report.json` inherits on embed (report-m2.1b); the markdown
-    /// renderings (report-m2.3) are the pending walkers.
+    /// ad hoc. Carriers: the canonical [`ExperimentMetrics`] bytes agree by
+    /// key naming (`raw_rows` < `route_deltas`, see [`Canonical`] above);
+    /// `report.json` inherits on embed (report-m2.1b); `render_markdown`
+    /// walks it for `report_en.md` (report-m2.3a); report-m2.3b adds the
+    /// `report_ja.md` walker.
     pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
         self.routes
             .iter()

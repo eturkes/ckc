@@ -40,7 +40,9 @@ use ckc_core::{
 };
 use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult, VerifierResults};
 
-use crate::metrics::{ExperimentMetrics, MetricRow, RouteMetrics, experiment_metrics};
+use crate::metrics::{
+    ExperimentMetrics, MetricRow, MetricValue, MetricsSection, RouteMetrics, experiment_metrics,
+};
 use crate::trace::{
     ConflictKind, LineageIndex, LineageRow, TraceBundle, TraceNodeKind, canonical_id_set,
 };
@@ -830,6 +832,16 @@ pub fn assemble_report(
 /// render as `none.` so every §7.2 slot stays visible. The caller
 /// validates first (the [`assemble_report`] boundary discipline) and
 /// writes the returned body as `report_en.md` (cli-runner.4.1b.2b).
+///
+/// The M2 omit-None members render exactly when present, mirroring the
+/// canonical bytes (report-m2.3a; an M1 report shows no M2 section): a
+/// per-route failure-taxonomy section after the diagnostics summary (a
+/// clean route's empty code map renders `none.`), a metrics section walked
+/// strictly through [`ExperimentMetrics::emission_order`] (§9: every
+/// route's raw rows precede every baseline-delta table; §0 `raw benchmark
+/// output` / `locked measurement` wording; a raw-rows section lists its
+/// §7.3 omission diagnostics by code exactly when it has them), and a
+/// model identity section after the solver identity.
 pub fn render_markdown(report: &Report) -> String {
     let mut md = String::new();
     md.push_str("# CKC report\n\n");
@@ -862,11 +874,67 @@ pub fn render_markdown(report: &Report) -> String {
         }
     }
 
+    if let Some(taxonomy) = &report.failure_taxonomy {
+        md.push_str("\n## Failure taxonomy\n");
+        for (pipeline_id, counts) in &taxonomy.routes {
+            md.push_str(&format!("\n### `{pipeline_id}`\n\n"));
+            if counts.is_empty() {
+                md.push_str("none.\n");
+            } else {
+                md.push_str("| code | count |\n| --- | --- |\n");
+                for (code, count) in counts {
+                    md.push_str(&format!("| `{code}` | {count} |\n"));
+                }
+            }
+        }
+    }
+
+    if let Some(metrics) = &report.metrics {
+        md.push_str("\n## Metrics\n\n");
+        md.push_str(&format!(
+            "raw benchmark output (locked measurement); raw rows precede every \
+             baseline-delta table. baseline: `{}`.\n",
+            metrics.baseline_pipeline_id
+        ));
+        for section in metrics.emission_order() {
+            match section {
+                MetricsSection::RawRows(route) => {
+                    md.push_str(&format!("\n### Raw rows: `{}`\n\n", route.pipeline_id));
+                    render_metric_rows(&mut md, &route.rows);
+                    if !route.diagnostics.is_empty() {
+                        let codes = route
+                            .diagnostics
+                            .iter()
+                            .map(|record| format!("`{}`", record.code.as_str()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        md.push_str(&format!("\nomission diagnostics: {codes}\n"));
+                    }
+                }
+                MetricsSection::DeltaTable(delta) => {
+                    md.push_str(&format!(
+                        "\n### Baseline delta: `{}` - `{}`\n\n",
+                        delta.pipeline_id, metrics.baseline_pipeline_id
+                    ));
+                    render_metric_rows(&mut md, &delta.rows);
+                }
+            }
+        }
+    }
+
     md.push_str("\n## Solver identity\n\n");
     md.push_str(&format!(
         "`{}` version `{}`\n",
         report.solver_identity.solver_id, report.solver_identity.version
     ));
+
+    if let Some(identity) = &report.model_identity {
+        md.push_str("\n## Model identity\n\n");
+        md.push_str(&format!(
+            "`{}` quant `{}` runtime version `{}`\n",
+            identity.model_id, identity.quant, identity.runtime_version
+        ));
+    }
 
     md.push_str("\n## Replay status\n\n");
     md.push_str(&format!("`{}`\n", report.replay_status.as_str()));
@@ -911,6 +979,27 @@ fn render_rows(md: &mut String, rows: &[ReportFinding]) {
                 span.document_id, span.region_id, span.span_id, span.text
             ));
         }
+    }
+}
+
+/// One metrics section's §7.3 rows as a metric/value table: values are
+/// exact reduced fractions rendered `numerator/denominator` ([`Rational`]'s
+/// display form), a zero-denominator emission renders `not_applicable`,
+/// and the empty row set renders `none.`.
+///
+/// [`Rational`]: ckc_core::Rational
+fn render_metric_rows(md: &mut String, rows: &[MetricRow]) {
+    if rows.is_empty() {
+        md.push_str("none.\n");
+        return;
+    }
+    md.push_str("| metric | value |\n| --- | --- |\n");
+    for row in rows {
+        let value = match &row.value {
+            MetricValue::Value(rational) => rational.to_string(),
+            MetricValue::NotApplicable => "not_applicable".to_owned(),
+        };
+        md.push_str(&format!("| `{}` | {} |\n", row.metric, value));
     }
 }
 
@@ -2818,11 +2907,10 @@ documented no-conflict result; claim tier `s1_accepted`.
         assert_eq!(md, PINNED_MARKDOWN);
     }
 
-    /// Every §7.2 content slot stays visible when empty — pinned from
-    /// observed output over the all-empty report.
-    #[test]
-    fn render_markdown_marks_empty_slots() {
-        let report = Report {
+    /// The all-empty M1 report (M2 members `None`): every M1 content slot
+    /// present but empty, no M2 section input.
+    fn empty_report() -> Report {
+        Report {
             corpus_hashes: vec![],
             diagnostics_summary: vec![],
             failure_taxonomy: None,
@@ -2837,7 +2925,16 @@ documented no-conflict result; claim tier `s1_accepted`.
                 version: "4.13.0".to_owned(),
             },
             wording: vec![],
-        };
+        }
+    }
+
+    /// Every §7.2 content slot stays visible when empty — pinned from
+    /// observed output over the all-empty report. The M2 members are
+    /// `None`, so no M2 section appears (omit-None mirrored into the
+    /// rendering; the pinned literal is the guard).
+    #[test]
+    fn render_markdown_marks_empty_slots() {
+        let report = empty_report();
         report.validate().unwrap();
         assert_eq!(
             render_markdown(&report),
@@ -2866,6 +2963,210 @@ none.
 ## Solver identity
 
 `z3` version `4.13.0`
+
+## Replay status
+
+`not_replayed`
+"#
+        );
+    }
+
+    /// §7.2 M2 rendering pinned from observed output over the .1c populated
+    /// fixture: failure taxonomy after the diagnostics summary, metrics
+    /// walked via [`ExperimentMetrics::emission_order`] (both routes' raw
+    /// rows strictly before the delta table), model identity after solver
+    /// identity, quoted §8.2 JA span texts verbatim in the pinned bytes; §0
+    /// vocabulary asserted before the byte pin.
+    #[test]
+    fn render_markdown_pins_the_populated_m2_view() {
+        let report = populated_report();
+        report.validate().unwrap();
+        let md = render_markdown(&report);
+        assert_eq!(md, render_markdown(&report));
+        for term in ["raw benchmark output", "locked measurement"] {
+            assert!(md.contains(term), "§0 vocabulary term missing: {term}");
+        }
+        assert_eq!(md, PINNED_M2_MARKDOWN);
+    }
+
+    const PINNED_M2_MARKDOWN: &str = r#"# CKC report
+
+wording: documented no-conflict result, synthetic test source measurement
+
+## Corpus
+
+| document | source hash |
+| --- | --- |
+| `test_source.a` | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
+| `test_source.b` | `sha256:2222222222222222222222222222222222222222222222222222222222222222` |
+
+lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## Findings
+
+### `finding.group.g1.1`
+
+synthetic test source measurement; claim tier `s1_accepted`.
+
+- conflict kind: `deontic_direction_conflict`
+- query: `q.g1.pair1.deontic`, verdict `unsat`
+- rules: `test_source.a.rule.0`, `test_source.b.rule.0`
+- regions: `r.0`
+- assertions: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- core: `a.test_source.a.rule.0`, `a.test_source.b.rule.0`
+- quoted spans:
+  - `test_source.a` `r.0` `s.0`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
+  - `test_source.b` `r.0` `s.0`: 成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)
+
+## Documented no-conflict results
+
+### `finding.group.g2.0`
+
+documented no-conflict result; claim tier `s1_accepted`.
+
+- query: `q.g2.pair1.overlap`, verdict `unsat`
+- rules: `test_source.a.rule.1`, `test_source.b.rule.1`
+- regions: `r.1`
+- assertions: `ctx.test_source.a.rule.1`, `ctx.test_source.b.rule.1`
+- quoted spans:
+  - `test_source.a` `r.1` `s.1`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)
+  - `test_source.b` `r.1` `s.1`: 小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である
+
+## Diagnostics summary
+
+| code | count |
+| --- | --- |
+| `schema_invalid` | 1 |
+| `solver_timeout` | 2 |
+
+## Failure taxonomy
+
+### `pipe.base`
+
+| code | count |
+| --- | --- |
+| `ai_schema_violation` | 2 |
+| `target_parse_error` | 1 |
+
+### `pipe.route`
+
+| code | count |
+| --- | --- |
+| `ai_hallucinated_source` | 1 |
+| `repair_limit_exceeded` | 1 |
+
+## Metrics
+
+raw benchmark output (locked measurement); raw rows precede every baseline-delta table. baseline: `pipe.base`.
+
+### Raw rows: `pipe.base`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | 3/4 |
+| `k_sample_convergence` | not_applicable |
+| `repair_count` | 2/1 |
+
+### Raw rows: `pipe.route`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | 1/2 |
+| `k_sample_convergence` | 1/1 |
+| `repair_count` | 2/1 |
+
+### Baseline delta: `pipe.route` - `pipe.base`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | -1/4 |
+| `k_sample_convergence` | not_applicable |
+| `repair_count` | 0/1 |
+
+## Solver identity
+
+`z3` version `4.13.0`
+
+## Model identity
+
+`model.baseline` quant `fixture_quant` runtime version `1.0.0`
+
+## Replay status
+
+`not_replayed`
+"#;
+
+    /// The M2 sections' inner empty slots stay visible — a clean route's
+    /// taxonomy code map and an empty raw-row set render `none.` — and a
+    /// raw-rows section lists its §7.3 omission diagnostics by code;
+    /// pinned from observed output.
+    #[test]
+    fn render_markdown_marks_empty_m2_slots() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![(id("pipe.base"), vec![])],
+            }),
+            metrics: Some(ExperimentMetrics {
+                baseline_pipeline_id: id("pipe.base"),
+                routes: vec![RouteMetrics {
+                    pipeline_id: id("pipe.base"),
+                    rows: vec![],
+                    diagnostics: vec![route_record(DiagnosticCode::SchemaInvalid)],
+                }],
+                deltas: vec![],
+            }),
+            model_identity: Some(baseline_model_identity()),
+            ..empty_report()
+        };
+        report.validate().unwrap();
+        let md = render_markdown(&report);
+        assert_eq!(
+            md,
+            r#"# CKC report
+
+wording: none.
+
+## Corpus
+
+none.
+
+lexicon hash: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`
+
+## Findings
+
+none.
+
+## Documented no-conflict results
+
+none.
+
+## Diagnostics summary
+
+none.
+
+## Failure taxonomy
+
+### `pipe.base`
+
+none.
+
+## Metrics
+
+raw benchmark output (locked measurement); raw rows precede every baseline-delta table. baseline: `pipe.base`.
+
+### Raw rows: `pipe.base`
+
+none.
+
+omission diagnostics: `schema_invalid`
+
+## Solver identity
+
+`z3` version `4.13.0`
+
+## Model identity
+
+`model.baseline` quant `fixture_quant` runtime version `1.0.0`
 
 ## Replay status
 

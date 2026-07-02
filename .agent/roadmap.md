@@ -120,13 +120,8 @@ doc-lint bullet).
   + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K be3e772
 - [x] report-m2.2: assemble_report M2 population — ModelRunSections (route §7.4 ledgers→taxonomy,
   in-assembly experiment_metrics, identity verbatim). 71% 143K/200K 71058d3
-- [ ] report-m2.3a: report_en.md M2 rendering. Extend the M1 renderer with the M2 sections —
-  metrics raw rows + delta table walked VIA `ExperimentMetrics::emission_order` (the §9 carrier,
-  memory), failure taxonomy, model identity, replay status; quoted JA spans verbatim; §0
-  locked-measurement wording, no clinical claims. Reading: `report.rs` render_markdown +
-  report-m2.1b/.2 payload; SPEC §7.2. Gate: `cargo test`; deterministic byte-stable render from one
-  report.json; §0 vocabulary asserted. [Split from report-m2.3: two renderers = 2 units per the
-  memory format-walker sizing rule.]
+- [x] report-m2.3a: report_en.md M2 sections — emission_order walk, §0-vocab lead, two pinned
+  renders. 64% 127K/200K
 - [ ] report-m2.3b: report_ja.md renderer (needs .3a's section shape). NEW deterministic Japanese
   rendering of the same canonical report.json (SPEC §7.2: report_ja from M2); resolve the JA §0
   label mapping from SPEC §0 at session start (>2 open semantic decisions ⇒ stop + respec); quoted

@@ -440,9 +440,14 @@ full pre-consolidation text lives in git history.
   baseline; per-route delta rows = union of metric ids (sorted), `Rational::sub` (ckc-core id.rs —
   signed exact, added .2) on Value×Value else `not_applicable`; baseline gets NO self-delta row.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
-  sections strictly before all DeltaTable sections) — UNCONSUMED until run-m2.1/report-m2 land;
-  those units must render through it, never the fields ad hoc (codex M2.22: the §9 guarantee
-  reaches artifacts only once an emitter walks it). REPORT-m2.1 TRAP (DISCHARGED in landed
+  sections strictly before all DeltaTable sections) — report_en.md walks it (.3a); run-m2.1 +
+  report-m2.3b must render through it too, never the fields ad hoc (codex M2.22: the §9 guarantee
+  reaches artifacts only once an emitter walks it). report_en.md M2 rendering landed (.3a,
+  `render_markdown` + two pinned tests): §0 vocabulary must ride prose VERBATIM-lowercase (a
+  sentence-case "Raw benchmark output" failed the contains-assert) → M2 lead lines use M1's
+  lowercase-label style; report_ja (.3b) mirrors the section order (taxonomy after diagnostics
+  summary, metrics next, model identity after solver identity) + the emission_order walk — shape
+  source = `render_markdown` + its two pinned tests, read those, not a memory copy. REPORT-m2.1 TRAP (DISCHARGED in landed
   .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.
