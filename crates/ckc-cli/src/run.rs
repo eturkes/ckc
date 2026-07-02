@@ -4065,6 +4065,7 @@ processing_stages:
             for seed in [99, 98, 97] {
                 fills.push(observe(guideline_a, seed));
             }
+            assert_eq!(fills.len(), 6);
 
             // Verdict channel: fill every document once, then run each
             // exp.m1_scaffold group through the compile → verify tail (the
@@ -4118,8 +4119,10 @@ processing_stages:
                 });
             }
 
+            assert_eq!(groups.len(), 2);
             let metrics =
                 route_metrics(&static_id("pipe.m2_single_ir"), &fills, &groups, &reference);
+            assert_eq!(metrics.pipeline_id, static_id("pipe.m2_single_ir"));
             assert_eq!(
                 metrics.rows,
                 vec![
@@ -4237,12 +4240,14 @@ processing_stages:
                 });
             }
 
+            assert_eq!(groups.len(), 3);
             let metrics = route_metrics(
                 &static_id("pipe.m2_direct_smt"),
                 &fills,
                 &groups,
                 &reference,
             );
+            assert_eq!(metrics.pipeline_id, static_id("pipe.m2_direct_smt"));
             assert_eq!(
                 metrics.rows,
                 vec![

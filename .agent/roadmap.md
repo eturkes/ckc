@@ -92,18 +92,11 @@ Standing M2-review flag: pre-existing 18 rustdoc `private_intra_doc_links` error
 --no-deps`) — per-unit gates hold the count AT 18 (no new), the fix lands at milestone review
 (pattern: memory doc-lint bullet).
 
-- [x] metrics-m2.1: §7.3 route-quality raw-row metrics — TWO sessions, both commit (M2.21),
-  zero re-derivation: read `.agent/wip-metrics-m2-1.txt` (blueprint) and execute it. Module =
-  `.agent/wip-metrics.rs.txt`, COMPLETE + gate-VERIFIED at pre-stage (9 unit tests green,
-  fmt/clippy/audit clean, rustdoc count 18 = pre-existing; sha256 in blueprint §0). Session
-  .1a DONE 37% 74K/200K: module restored (sha256 == §0) + lib.rs wired, gates green
-  (450/7, fmt, clippy, rustdoc 18). Session .1b = blueprint §2-§3: run.rs test
-  `route_metrics_score_recorded_two_route_run` over the committed two-route cassettes +
-  m1_expected reference (observation recipe + expected row vectors + template/helper anchors
-  all pre-derived; z3, model-runtime-absent). Gate: blueprint §1.3/§4 (cargo test --workspace
-  450/7 then 451/7, fmt, clippy -D, engine-agnostic audit on touched files, rustdoc still 18).
-  Session .1b DONE 60% 120K/200K: test landed per blueprint, first-run green, expected rows
-  matched exactly; gates 451/7 + fmt + clippy + audit clean + rustdoc 18. Both wip files rm'd.
+- [x] metrics-m2.1: §7.3 raw-row metrics — metrics.rs (route_metrics + 9 unit tests) + run.rs
+  `route_metrics_score_recorded_two_route_run` (two-route recorded-cassette test, both arms'
+  full row vectors + pipeline_id + cardinalities pinned). Pre-staged blueprint executed
+  zero-re-derivation, first-run green; wip files consumed+rm'd. .1a 37% 74K/200K ad174a7 ·
+  .1b 60% 120K/200K 6f785b6
 - [ ] metrics-m2.2: k-sample stability + baseline-delta. k-sample verdict stability/convergence
   (per-route verdict agreement across k samples); baseline-delta table = per-metric (route −
   baseline) over identical inputs (baseline = the `direct_smt` pipeline per `exp.m2_multihop`), raw
