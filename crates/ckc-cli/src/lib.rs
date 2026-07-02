@@ -139,8 +139,9 @@
 //!   diagnostic); [`metrics::experiment_metrics`] assembles the routes' raw
 //!   rows plus the per-metric (route − baseline) delta tables, with
 //!   [`metrics::ExperimentMetrics::emission_order`] as the §9
-//!   raw-rows-before-ranking contract; run-m2.1 wires it, the report units
-//!   embed the rows.
+//!   raw-rows-before-ranking contract; the pending run-m2.1 wires the
+//!   observation channels and the pending report units render through it —
+//!   until they land no emitted artifact carries these rows.
 #![forbid(unsafe_code)]
 
 pub mod cassette;

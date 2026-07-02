@@ -157,8 +157,10 @@ pub enum MetricsSection<'a> {
 
 impl ExperimentMetrics {
     /// §9 raw-rows-before-ranking: every route's raw rows strictly precede
-    /// every delta table. Renderers (the report units) walk this order,
-    /// never the fields ad hoc.
+    /// every delta table. Renderers must walk this order, never the fields
+    /// ad hoc — the pending report units (report-m2) are the consumers; no
+    /// emitter reads it yet, so the §9 guarantee reaches artifacts only
+    /// once they land.
     pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
         self.routes
             .iter()
@@ -318,9 +320,10 @@ fn conflict_verdict_accuracy(
 /// solver-executed result's (query id, §6 category, raw verdict, unsat
 /// core), §4.3 array order preserved. Outside the projection: solver
 /// identity (run environment, not route output), diagnostics (telemetry),
-/// and a sat witness's `model` bytes (a different witness for the same
-/// verdict still agrees). Ids are single-line identifier_ascii, so the
-/// newline/space framing cannot collide.
+/// and a sat witness's `model`, bytes and presence alike (a different — or
+/// unparseable, hence absent — witness for the same verdict still agrees;
+/// the parse anomaly rides diagnostics). Ids are single-line
+/// identifier_ascii, so the newline/space framing cannot collide.
 fn verdict_fingerprint(group: &GroupObservation) -> String {
     let mut lines = Vec::new();
     for (overlap, deontic) in &group.query_pairs {
@@ -343,10 +346,15 @@ fn verdict_fingerprint(group: &GroupObservation) -> String {
 
 /// §7.3/§9 k-sample convergence over the sample battery: for each group in
 /// the union universe, the fraction of unordered sample pairs whose
-/// [`verdict_fingerprint`]s agree — a draw without the group carries a
-/// distinct no-verdict value, so consistent absence agrees and
-/// presence-versus-absence disagrees; the route value is the mean over
-/// groups.
+/// [`verdict_fingerprint`]s agree; the route value is the mean over groups.
+/// Agreement reads outcome-STATE stability — a draw without the group
+/// carries a distinct no-verdict state, so consistent absence agrees and
+/// presence-versus-absence disagrees. Deliberate consequence: a group
+/// produced in only 1 of k draws still scores its (k−1 choose 2)
+/// absent-absent pairs (absence is its stable outcome) while the k−1
+/// present-versus-absent pairs charge the unstable production; scoring
+/// only produced-verdict pairs would instead rate that group perfectly
+/// converged from the single draw, hiding k−1 production failures.
 fn k_sample_convergence(samples: &[Vec<GroupObservation>]) -> MetricValue {
     let mut universe: BTreeSet<&Id> = BTreeSet::new();
     let mut draws: Vec<BTreeMap<&Id, String>> = Vec::new();
@@ -475,9 +483,10 @@ fn metric_deltas(route: &RouteMetrics, baseline: &RouteMetrics) -> Vec<MetricRow
 /// Assemble one experiment's §7.3 metrics from its routes' raw rows.
 /// `baseline_pipeline_id` is the experiment's designated baseline
 /// (`exp.m2_multihop`: the direct_smt pipeline); it must name exactly one
-/// route and the routes must be duplicate-free — a miss is run-loop
-/// wiring, not observation, at fault (fail-closed panic, the
-/// duplicate-observation convention).
+/// route, the routes must be duplicate-free, and each route's rows
+/// strictly metric-id-sorted (the [`route_metrics`] invariant the delta
+/// lookup reads) — a miss is run-loop wiring, not observation, at fault
+/// (fail-closed panic, the duplicate-observation convention).
 pub fn experiment_metrics(
     routes: Vec<RouteMetrics>,
     baseline_pipeline_id: &Id,
@@ -489,6 +498,14 @@ pub fn experiment_metrics(
             "duplicate route metrics {}",
             route.pipeline_id
         );
+        for pair in route.rows.windows(2) {
+            assert!(
+                pair[0].metric < pair[1].metric,
+                "route {} metric rows duplicated or unsorted at {}",
+                route.pipeline_id,
+                pair[1].metric
+            );
+        }
     }
     let baseline = routes
         .iter()
@@ -1204,6 +1221,14 @@ mod tests {
     fn duplicate_route_metrics_is_a_wiring_bug() {
         let (route, _) = delta_fixture();
         experiment_metrics(vec![route.clone(), route], &static_id("pipe.route"));
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicated or unsorted")]
+    fn duplicated_metric_row_is_a_wiring_bug() {
+        let (mut route, _) = delta_fixture();
+        route.rows.push(route.rows[0].clone());
+        experiment_metrics(vec![route], &static_id("pipe.route"));
     }
 
     #[test]
