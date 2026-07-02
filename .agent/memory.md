@@ -448,6 +448,25 @@ full pre-consolidation text lives in git history.
     identically (convergence trivially 1.0) → MEANINGFUL k-sample convergence (metrics-m2.2) needs a
     sampling config (temperature > 0, seed fixing each draw), a downstream decision NOT the adapter's
     (`invoke_samples` stays config-agnostic: derive seeds, invoke, record).
+- Metrics assembly (§7.3/§9, metrics-m2.1/.2, `ckc-cli/src/metrics.rs`; run-m2.1 wires, report-m2
+  embeds). `route_metrics(pipeline_id, fills, groups, samples, reference)` — the `samples` channel
+  (`&[Vec<GroupObservation>]`, one battery per draw) feeds `k_sample_convergence` = mean over the
+  UNION group universe of pairwise verdict-fingerprint agreement (Σ agree_pairs / (|G|·C(k,2)));
+  k<2 or empty universe → zero denominator → `not_applicable`, so the row is ALWAYS emitted and a
+  single-draw recorded run honestly reads NA (the .1b run.rs pinned vectors carry it; greedy is
+  seed-inert → meaningful convergence waits on a sampling config, see runtime-gate bullet).
+  Fingerprint = verdict CONTENT projection: query_pairs + per-result (query_id, category,
+  verdict-or-`-`, unsat_core-or-`-`) in §4.3 order; EXCLUDES solver_identity (environment),
+  diagnostics (telemetry), model (sat witness bytes); None==None agrees (consistent absence =
+  stable); sensitivity to model-minted qids/pair-ids = by-design translation-instability signal.
+  `experiment_metrics(routes, baseline_pipeline_id)` fail-closed panics on dup routes / missing
+  baseline; per-route delta rows = union of metric ids (sorted), `Rational::sub` (ckc-core id.rs —
+  signed exact, added .2) on Value×Value else `not_applicable`; baseline gets NO self-delta row.
+  `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
+  sections strictly before all DeltaTable sections) — report units render through it. REPORT-m2.1
+  TRAP: §4.3 canonical JSON sorts member keys, so raw-before-delta in BYTES additionally needs the
+  raw-rows member key to sort below the delta key (e.g. `raw_rows` < `route_deltas`) — pick key
+  names accordingly or the emitted report violates §9 while `emission_order` tests stay green.
 
 ## Runtime
 

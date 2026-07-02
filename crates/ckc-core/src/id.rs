@@ -218,6 +218,14 @@ impl Rational {
     pub fn denom(&self) -> &BigInt {
         self.0.denom()
     }
+
+    /// Exact difference `self − other`: arbitrary precision, result reduced
+    /// with any sign on the numerator (§4.1 exact-value rule). The §7.3
+    /// baseline-delta rows subtract rates, so negative values are
+    /// first-class.
+    pub fn sub(&self, other: &Rational) -> Rational {
+        Rational(&self.0 - &other.0)
+    }
 }
 
 impl fmt::Display for Rational {
@@ -332,6 +340,22 @@ mod tests {
             assert_eq!(r.numer(), &BigInt::from(want_n), "{num}/{den} numer");
             assert_eq!(r.denom(), &BigInt::from(want_d), "{num}/{den} denom");
         }
+    }
+
+    #[test]
+    fn rational_sub_is_exact_and_signed() {
+        let r = |num, den| Rational::from_parts(num, den).unwrap();
+        // 2/3 − 6/7 = −4/21: sign lands on the numerator, result reduced.
+        assert_eq!(r("2", "3").sub(&r("6", "7")), r("-4", "21"));
+        // 1/2 − 1/4 = 1/4; equal values collapse to 0/1.
+        assert_eq!(r("1", "2").sub(&r("1", "4")), r("1", "4"));
+        assert_eq!(r("5", "8").sub(&r("5", "8")), r("0", "1"));
+        // Arbitrary precision survives past u128: 2^128 − 1.
+        let big = "340282366920938463463374607431768211456";
+        assert_eq!(
+            r(big, "1").sub(&r("1", "1")),
+            r("340282366920938463463374607431768211455", "1")
+        );
     }
 
     #[test]

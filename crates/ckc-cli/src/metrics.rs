@@ -1,4 +1,4 @@
-//! SPEC §7.3 route-quality raw-row metrics (M2, metrics-m2.1): pure
+//! SPEC §7.3 route-quality raw-row metrics (M2, metrics-m2.1/.2): pure
 //! computation from a recorded run's per-route observations to sorted metric
 //! rows, no I/O. Value rules (§7.3): every emitted value is an exact reduced
 //! [`Rational`] (counts ride as `<n>/1`); a zero denominator emits
@@ -7,10 +7,15 @@
 //! [`RouteMetrics::diagnostics`]. Channels: fills project [`ModelFill`]
 //! telemetry ([`FillObservation::from_fill`]); groups carry the solver
 //! results plus the planned query-pair ids the §6 match criteria key off
-//! ([`GroupObservation`]); the reference supplies the §8 conflict +
-//! no-conflict expectations (no-conflict groups first-class, §9). run-m2.1
-//! wires the observations from the route loop; the report units embed the
-//! rows (raw rows precede any ranking, §9).
+//! ([`GroupObservation`]); samples carry the k-sample battery's per-draw
+//! group observations (§9 k-sample verdict stability); the reference
+//! supplies the §8 conflict + no-conflict expectations (no-conflict groups
+//! first-class, §9). [`experiment_metrics`] assembles the routes' raw rows
+//! plus one per-metric (route − baseline) delta table per non-baseline
+//! route under the experiment's designated baseline;
+//! [`ExperimentMetrics::emission_order`] carries the §9
+//! raw-rows-before-ranking rendering contract. run-m2.1 wires the
+//! observations from the route loop; the report units embed the rows.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -27,6 +32,12 @@ pub const ACCEPTANCE_RATE: &str = "acceptance_rate";
 /// their §8 expectation, over all reference groups (a group the route
 /// produced no verdict for counts as a miss).
 pub const CONFLICT_VERDICT_ACCURACY: &str = "conflict_verdict_accuracy";
+/// §7.3 `k_sample_convergence` (§9 k-sample verdict stability): mean
+/// per-group pairwise verdict agreement across the k recorded samples —
+/// agreeing unordered sample pairs over `groups × C(k, 2)`. One draw
+/// (k < 2) cannot witness stability and an empty group universe has
+/// nothing to agree on: both are zero denominators (`not_applicable`).
+pub const K_SAMPLE_CONVERGENCE: &str = "k_sample_convergence";
 /// §7.3 `recorded_call_count`: total recorded model invocations, as `<n>/1`.
 pub const RECORDED_CALL_COUNT: &str = "recorded_call_count";
 /// §7.3 `repair_count`: total repair re-prompts spent, as `<n>/1`.
@@ -107,6 +118,54 @@ pub struct RouteMetrics {
     pub pipeline_id: Id,
     pub rows: Vec<MetricRow>,
     pub diagnostics: Vec<DiagnosticRecord>,
+}
+
+/// One non-baseline route's §7.3 baseline-delta table: per-metric
+/// (route − baseline) rows over identical inputs, sorted by metric id,
+/// reusing [`MetricRow`]. A delta value is an exact signed [`Rational`];
+/// a metric `not_applicable` or omitted on either side lands
+/// `not_applicable` (a delta cannot honestly subtract what a route did
+/// not measure).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteDelta {
+    pub pipeline_id: Id,
+    pub rows: Vec<MetricRow>,
+}
+
+/// One experiment's assembled §7.3 metrics: every route's raw rows plus a
+/// (route − baseline) delta table per non-baseline route, the baseline
+/// designated by the experiment binding (run-m2.1 passes
+/// `ExperimentEntry::baseline()`). The baseline's self-delta is
+/// identically zero, so it gets no table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExperimentMetrics {
+    pub baseline_pipeline_id: Id,
+    /// Raw rows per route, in the caller's (experiment pipeline-set) order.
+    pub routes: Vec<RouteMetrics>,
+    /// Delta tables for the non-baseline routes, in `routes` order.
+    pub deltas: Vec<RouteDelta>,
+}
+
+/// One §9-ordered rendering section ([`ExperimentMetrics::emission_order`]).
+#[derive(Debug, Clone, Copy)]
+pub enum MetricsSection<'a> {
+    /// A route's raw rows.
+    RawRows(&'a RouteMetrics),
+    /// A non-baseline route's (route − baseline) delta table.
+    DeltaTable(&'a RouteDelta),
+}
+
+impl ExperimentMetrics {
+    /// §9 raw-rows-before-ranking: every route's raw rows strictly precede
+    /// every delta table. Renderers (the report units) walk this order,
+    /// never the fields ad hoc.
+    pub fn emission_order(&self) -> Vec<MetricsSection<'_>> {
+        self.routes
+            .iter()
+            .map(MetricsSection::RawRows)
+            .chain(self.deltas.iter().map(MetricsSection::DeltaTable))
+            .collect()
+    }
 }
 
 /// Exact reduced fraction from decimal parts; the caller guarantees a
@@ -253,16 +312,86 @@ fn conflict_verdict_accuracy(
     Ok(ratio(matched as u128, reference.len() as u128))
 }
 
+/// One sample's verdict content for a group, projected to what two draws
+/// must reproduce to agree (§7.3 convergence = normalized hash agreement,
+/// here over the verdict payload): the planned pairs plus each
+/// solver-executed result's (query id, §6 category, raw verdict, unsat
+/// core), §4.3 array order preserved. Outside the projection: solver
+/// identity (run environment, not route output), diagnostics (telemetry),
+/// and a sat witness's `model` bytes (a different witness for the same
+/// verdict still agrees). Ids are single-line identifier_ascii, so the
+/// newline/space framing cannot collide.
+fn verdict_fingerprint(group: &GroupObservation) -> String {
+    let mut lines = Vec::new();
+    for (overlap, deontic) in &group.query_pairs {
+        lines.push(format!("pair {overlap} {deontic}"));
+    }
+    for result in &group.results {
+        let verdict = result.verdict.map_or("-", SolverVerdict::as_str);
+        let core = result.unsat_core.as_ref().map_or_else(
+            || "-".to_owned(),
+            |ids| ids.iter().map(Id::as_str).collect::<Vec<_>>().join(","),
+        );
+        lines.push(format!(
+            "result {} {} {verdict} {core}",
+            result.query_id,
+            result.category.as_str()
+        ));
+    }
+    lines.join("\n")
+}
+
+/// §7.3/§9 k-sample convergence over the sample battery: for each group in
+/// the union universe, the fraction of unordered sample pairs whose
+/// [`verdict_fingerprint`]s agree — a draw without the group carries a
+/// distinct no-verdict value, so consistent absence agrees and
+/// presence-versus-absence disagrees; the route value is the mean over
+/// groups.
+fn k_sample_convergence(samples: &[Vec<GroupObservation>]) -> MetricValue {
+    let mut universe: BTreeSet<&Id> = BTreeSet::new();
+    let mut draws: Vec<BTreeMap<&Id, String>> = Vec::new();
+    for sample in samples {
+        let mut draw = BTreeMap::new();
+        for group in sample {
+            assert!(
+                draw.insert(&group.group_id, verdict_fingerprint(group))
+                    .is_none(),
+                "duplicate group observation {} in a sample",
+                group.group_id
+            );
+            universe.insert(&group.group_id);
+        }
+        draws.push(draw);
+    }
+    let k = draws.len() as u128;
+    let sample_pairs = k * k.saturating_sub(1) / 2;
+    let mut agreeing: u128 = 0;
+    for gid in &universe {
+        for (i, left) in draws.iter().enumerate() {
+            for right in &draws[i + 1..] {
+                if left.get(gid) == right.get(gid) {
+                    agreeing += 1;
+                }
+            }
+        }
+    }
+    ratio(agreeing, universe.len() as u128 * sample_pairs)
+}
+
 /// Fold one route's recorded-run observations into its §7.3 raw rows. Rows
 /// emit sorted by metric id; an uncomputable metric is omitted and explained
 /// on `diagnostics`; a zero denominator emits `not_applicable`. Accuracy
 /// scores every reference group — a reference group with no observation (or
 /// an observation with no results) is a miss, an observed group absent from
 /// the reference (a rejection-path group) is outside the denominator.
+/// `samples` is the k-sample battery's per-draw verdict channel (§9
+/// per-sample seeds; whether the base draw is among them is the run's
+/// k-sample config) — empty when the run drew no battery.
 pub fn route_metrics(
     pipeline_id: &Id,
     fills: &[FillObservation],
     groups: &[GroupObservation],
+    samples: &[Vec<GroupObservation>],
     reference: &[ReferenceEntry],
 ) -> RouteMetrics {
     let calls: u128 = fills.iter().map(|f| u128::from(f.recorded_calls)).sum();
@@ -292,6 +421,7 @@ pub fn route_metrics(
 
     let mut rows = vec![
         row(ACCEPTANCE_RATE, ratio(accepted, fills.len() as u128)),
+        row(K_SAMPLE_CONVERGENCE, k_sample_convergence(samples)),
         row(RECORDED_CALL_COUNT, count(calls)),
         row(REPAIR_COUNT, count(repairs)),
         row(SCHEMA_VALID_RATE, ratio(calls - violations, calls)),
@@ -307,6 +437,75 @@ pub fn route_metrics(
         pipeline_id: pipeline_id.clone(),
         rows,
         diagnostics,
+    }
+}
+
+/// Per-metric (route − baseline) rows over the union of both row sets,
+/// sorted by metric id ([`RouteDelta`]'s value rules).
+fn metric_deltas(route: &RouteMetrics, baseline: &RouteMetrics) -> Vec<MetricRow> {
+    let metrics: BTreeSet<&Id> = route
+        .rows
+        .iter()
+        .chain(&baseline.rows)
+        .map(|r| &r.metric)
+        .collect();
+    metrics
+        .into_iter()
+        .map(|metric| {
+            let value_in = |side: &RouteMetrics| {
+                side.rows
+                    .iter()
+                    .find(|r| r.metric == *metric)
+                    .map(|r| r.value.clone())
+            };
+            let value = match (value_in(route), value_in(baseline)) {
+                (Some(MetricValue::Value(r)), Some(MetricValue::Value(b))) => {
+                    MetricValue::Value(r.sub(&b))
+                }
+                _ => MetricValue::NotApplicable,
+            };
+            MetricRow {
+                metric: metric.clone(),
+                value,
+            }
+        })
+        .collect()
+}
+
+/// Assemble one experiment's §7.3 metrics from its routes' raw rows.
+/// `baseline_pipeline_id` is the experiment's designated baseline
+/// (`exp.m2_multihop`: the direct_smt pipeline); it must name exactly one
+/// route and the routes must be duplicate-free — a miss is run-loop
+/// wiring, not observation, at fault (fail-closed panic, the
+/// duplicate-observation convention).
+pub fn experiment_metrics(
+    routes: Vec<RouteMetrics>,
+    baseline_pipeline_id: &Id,
+) -> ExperimentMetrics {
+    let mut seen: BTreeSet<&Id> = BTreeSet::new();
+    for route in &routes {
+        assert!(
+            seen.insert(&route.pipeline_id),
+            "duplicate route metrics {}",
+            route.pipeline_id
+        );
+    }
+    let baseline = routes
+        .iter()
+        .find(|r| r.pipeline_id == *baseline_pipeline_id)
+        .unwrap_or_else(|| panic!("baseline pipeline {baseline_pipeline_id} has no route metrics"));
+    let deltas: Vec<RouteDelta> = routes
+        .iter()
+        .filter(|r| r.pipeline_id != *baseline_pipeline_id)
+        .map(|route| RouteDelta {
+            pipeline_id: route.pipeline_id.clone(),
+            rows: metric_deltas(route, baseline),
+        })
+        .collect();
+    ExperimentMetrics {
+        baseline_pipeline_id: baseline_pipeline_id.clone(),
+        routes,
+        deltas,
     }
 }
 
@@ -390,7 +589,7 @@ mod tests {
     /// One-group accuracy probe: the match criteria under test, isolated.
     fn accuracy(results: Vec<VerifierResult>, entry: ReferenceEntry) -> MetricValue {
         let groups = vec![group(entry.group_id.as_str(), results)];
-        let metrics = route_metrics(&static_id("pipe.test"), &[], &groups, &[entry]);
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &groups, &[], &[entry]);
         value_of(&metrics, CONFLICT_VERDICT_ACCURACY)
     }
 
@@ -420,7 +619,7 @@ mod tests {
             obs(false, 2, 1, 2),
             obs(true, 1, 0, 0),
         ];
-        let metrics = route_metrics(&static_id("pipe.test"), &fills, &[], &[]);
+        let metrics = route_metrics(&static_id("pipe.test"), &fills, &[], &[], &[]);
         assert_eq!(value_of(&metrics, ACCEPTANCE_RATE), frac("3", "4"));
         assert_eq!(value_of(&metrics, RECORDED_CALL_COUNT), frac("6", "1"));
         assert_eq!(value_of(&metrics, REPAIR_COUNT), frac("2", "1"));
@@ -438,6 +637,7 @@ mod tests {
             vec![
                 ACCEPTANCE_RATE,
                 CONFLICT_VERDICT_ACCURACY,
+                K_SAMPLE_CONVERGENCE,
                 RECORDED_CALL_COUNT,
                 REPAIR_COUNT,
                 SCHEMA_VALID_RATE,
@@ -448,9 +648,13 @@ mod tests {
 
     #[test]
     fn zero_denominators_emit_not_applicable() {
-        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &[]);
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &[], &[]);
         assert_eq!(
             value_of(&metrics, ACCEPTANCE_RATE),
+            MetricValue::NotApplicable
+        );
+        assert_eq!(
+            value_of(&metrics, K_SAMPLE_CONVERGENCE),
             MetricValue::NotApplicable
         );
         assert_eq!(
@@ -468,7 +672,7 @@ mod tests {
         // Counts stay available on an empty run.
         assert_eq!(value_of(&metrics, RECORDED_CALL_COUNT), frac("0", "1"));
         assert_eq!(value_of(&metrics, REPAIR_COUNT), frac("0", "1"));
-        assert_eq!(metrics.rows.len(), 6);
+        assert_eq!(metrics.rows.len(), 7);
         assert!(metrics.diagnostics.is_empty());
     }
 
@@ -484,7 +688,7 @@ mod tests {
             ),
             group("g.b", vec![no_conflict_on("q.o", SolverVerdict::Unsat)]),
         ];
-        let metrics = route_metrics(&static_id("pipe.test"), &[], &groups, &[]);
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &groups, &[], &[]);
         assert_eq!(
             value_of(&metrics, TARGET_SYNTACTIC_VALIDITY),
             frac("2", "3")
@@ -549,7 +753,7 @@ mod tests {
         // No verdict at all.
         assert_eq!(accuracy(Vec::new(), entry()), frac("0", "1"));
         // No observation for the reference group at all.
-        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &[entry()]);
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &[], &[entry()]);
         assert_eq!(
             value_of(&metrics, CONFLICT_VERDICT_ACCURACY),
             frac("0", "1")
@@ -623,6 +827,7 @@ mod tests {
             &static_id("pipe.test"),
             &[obs(true, 1, 0, 0)],
             &[],
+            &[],
             &reference,
         );
         // The accuracy row is omitted; every other row still emits.
@@ -632,7 +837,7 @@ mod tests {
                 .iter()
                 .all(|r| r.metric != static_id(CONFLICT_VERDICT_ACCURACY))
         );
-        assert_eq!(metrics.rows.len(), 5);
+        assert_eq!(metrics.rows.len(), 6);
         assert_eq!(value_of(&metrics, ACCEPTANCE_RATE), frac("1", "1"));
         // One omission diagnostic, the schema-code shape: reason in the
         // payload, no resolved refs.
@@ -708,16 +913,315 @@ mod tests {
         assert_eq!(FillObservation::from_fill(&exhausted), obs(false, 2, 1, 2));
     }
 
+    /// Two-draw convergence probe: the fingerprint boundary under test,
+    /// isolated (one group, so the row is that group's lone pair fraction).
+    fn two_draw_convergence(a: GroupObservation, b: GroupObservation) -> MetricValue {
+        let samples = vec![vec![a], vec![b]];
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &samples, &[]);
+        value_of(&metrics, K_SAMPLE_CONVERGENCE)
+    }
+
+    #[test]
+    fn k_sample_convergence_measures_pairwise_verdict_agreement() {
+        // Three draws: g.a identical in all three (3 agreeing pairs), g.b
+        // flips in the third (1 agreeing pair) → (3 + 1) / (2 × 3) = 2/3.
+        let stable = || {
+            group(
+                "g.a",
+                vec![
+                    no_conflict_on("q.o", SolverVerdict::Sat),
+                    contradiction_on("q.d", &["a.r1", "a.r2"]),
+                ],
+            )
+        };
+        let agreeing = || group("g.b", vec![no_conflict_on("q.o", SolverVerdict::Sat)]);
+        let flipped = group("g.b", vec![contradiction_on("q.d", &["a.r1"])]);
+        let samples = vec![
+            vec![stable(), agreeing()],
+            vec![stable(), agreeing()],
+            vec![stable(), flipped],
+        ];
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &samples, &[]);
+        assert_eq!(value_of(&metrics, K_SAMPLE_CONVERGENCE), frac("2", "3"));
+    }
+
+    #[test]
+    fn k_sample_fingerprint_reads_verdict_content_only() {
+        let base = || group("g.s", vec![no_conflict_on("q.o", SolverVerdict::Sat)]);
+
+        // Environment and telemetry sit outside the projection: a draw
+        // differing only in solver identity, diagnostics, and witness
+        // bytes still agrees.
+        let mut noisy = base();
+        noisy.results[0].solver_identity.version = "2.0.0".to_owned();
+        noisy.results[0].model = Some("x1".to_owned());
+        noisy.results[0].diagnostics.push(DiagnosticRecord {
+            code: DiagnosticCode::AiSchemaViolation,
+            outcome: Outcome::Invalid,
+            payload: vec![(static_id("reason"), "noise".to_owned())],
+            region_ids: Vec::new(),
+            artifact_hashes: Vec::new(),
+        });
+        assert_eq!(two_draw_convergence(base(), noisy), frac("1", "1"));
+
+        // Verdict content is load-bearing: raw verdict, category, unsat
+        // core, result query id, planned pairs, §4.3 result order.
+        let verdict_flip = group("g.s", vec![no_conflict_on("q.o", SolverVerdict::Unsat)]);
+        assert_eq!(two_draw_convergence(base(), verdict_flip), frac("0", "1"));
+        let category_flip = group("g.s", vec![contradiction_on("q.o", &["a.r1"])]);
+        assert_eq!(two_draw_convergence(base(), category_flip), frac("0", "1"));
+        let with_core = |core: &[&str]| group("g.s", vec![contradiction_on("q.d", core)]);
+        assert_eq!(
+            two_draw_convergence(with_core(&["a.r1"]), with_core(&["a.r2"])),
+            frac("0", "1")
+        );
+        let query_flip = group("g.s", vec![no_conflict_on("q.x", SolverVerdict::Sat)]);
+        assert_eq!(two_draw_convergence(base(), query_flip), frac("0", "1"));
+        let mut pair_flip = base();
+        pair_flip.query_pairs = vec![(static_id("q.o"), static_id("q.z"))];
+        assert_eq!(two_draw_convergence(base(), pair_flip), frac("0", "1"));
+        let two = |first: &str, second: &str| {
+            group(
+                "g.s",
+                vec![
+                    no_conflict_on(first, SolverVerdict::Sat),
+                    no_conflict_on(second, SolverVerdict::Sat),
+                ],
+            )
+        };
+        assert_eq!(
+            two_draw_convergence(two("q.o", "q.d"), two("q.d", "q.o")),
+            frac("0", "1")
+        );
+    }
+
+    #[test]
+    fn k_sample_absence_is_a_distinct_fingerprint() {
+        // g.x observed only in the first of three draws: two
+        // presence-versus-absence pairs disagree, the both-absent pair
+        // agrees (consistent absence is stable); g.y agrees everywhere
+        // → (1 + 3) / (2 × 3) = 2/3.
+        let stable = || group("g.y", vec![no_conflict_on("q.o", SolverVerdict::Sat)]);
+        let extra = group("g.x", vec![no_conflict_on("q.o", SolverVerdict::Sat)]);
+        let samples = vec![vec![extra, stable()], vec![stable()], vec![stable()]];
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &samples, &[]);
+        assert_eq!(value_of(&metrics, K_SAMPLE_CONVERGENCE), frac("2", "3"));
+    }
+
+    #[test]
+    fn k_sample_zero_denominators_emit_not_applicable() {
+        // One draw cannot witness stability, however much it observed.
+        let one_draw = vec![vec![group(
+            "g.a",
+            vec![no_conflict_on("q.o", SolverVerdict::Sat)],
+        )]];
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &one_draw, &[]);
+        assert_eq!(
+            value_of(&metrics, K_SAMPLE_CONVERGENCE),
+            MetricValue::NotApplicable
+        );
+        // Two draws over an empty group universe have nothing to agree on.
+        let empty_draws: Vec<Vec<GroupObservation>> = vec![Vec::new(), Vec::new()];
+        let metrics = route_metrics(&static_id("pipe.test"), &[], &[], &empty_draws, &[]);
+        assert_eq!(
+            value_of(&metrics, K_SAMPLE_CONVERGENCE),
+            MetricValue::NotApplicable
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "in a sample")]
+    fn duplicate_group_in_a_sample_is_a_route_bug() {
+        let samples = vec![vec![group("g.a", Vec::new()), group("g.a", Vec::new())]];
+        route_metrics(&static_id("pipe.test"), &[], &[], &samples, &[]);
+    }
+
+    /// Two-route fixture over identical inputs (shared reference): the
+    /// route side accepts less, misses the conflict verdict, and carries a
+    /// two-draw agreeing battery; the baseline accepts more, matches the
+    /// reference, and drew no battery.
+    fn delta_fixture() -> (RouteMetrics, RouteMetrics) {
+        let reference = vec![conflict_entry("g.c", &["a.r1"])];
+        let hit = || {
+            group(
+                "g.c",
+                vec![
+                    no_conflict_on("q.o", SolverVerdict::Sat),
+                    contradiction_on("q.d", &["a.r1"]),
+                ],
+            )
+        };
+        let miss = group(
+            "g.c",
+            vec![
+                no_conflict_on("q.o", SolverVerdict::Sat),
+                no_conflict_on("q.d", SolverVerdict::Sat),
+            ],
+        );
+        let miss_again = miss.clone();
+        let route = route_metrics(
+            &static_id("pipe.route"),
+            &[obs(true, 1, 0, 0), obs(false, 3, 2, 2)],
+            &[miss],
+            &[vec![miss_again.clone()], vec![miss_again]],
+            &reference,
+        );
+        let baseline = route_metrics(
+            &static_id("pipe.base"),
+            &[
+                obs(true, 1, 0, 0),
+                obs(true, 2, 1, 1),
+                obs(true, 1, 0, 0),
+                obs(false, 2, 1, 2),
+            ],
+            &[hit()],
+            &[],
+            &reference,
+        );
+        (route, baseline)
+    }
+
+    #[test]
+    fn baseline_delta_rows_subtract_exact_and_signed() {
+        let (route, baseline) = delta_fixture();
+        // Raw sides, for the hand-derivation below: route acceptance 1/2,
+        // accuracy 0/1, convergence 1/1, calls 4, repairs 2, schema 1/2,
+        // syntactic 1/1; baseline 3/4, 1/1, n/a, 6, 2, 1/2, 1/1.
+        let assembled = experiment_metrics(vec![route, baseline], &static_id("pipe.base"));
+        assert_eq!(assembled.baseline_pipeline_id, static_id("pipe.base"));
+        let [delta] = assembled.deltas.as_slice() else {
+            panic!("one non-baseline delta table");
+        };
+        assert_eq!(delta.pipeline_id, static_id("pipe.route"));
+        let row = |metric: &str, num: &str, den: &str| MetricRow {
+            metric: static_id(metric),
+            value: frac(num, den),
+        };
+        assert_eq!(
+            delta.rows,
+            vec![
+                row(ACCEPTANCE_RATE, "-1", "4"),
+                row(CONFLICT_VERDICT_ACCURACY, "-1", "1"),
+                MetricRow {
+                    metric: static_id(K_SAMPLE_CONVERGENCE),
+                    value: MetricValue::NotApplicable,
+                },
+                row(RECORDED_CALL_COUNT, "-2", "1"),
+                row(REPAIR_COUNT, "0", "1"),
+                row(SCHEMA_VALID_RATE, "0", "1"),
+                row(TARGET_SYNTACTIC_VALIDITY, "0", "1"),
+            ]
+        );
+    }
+
+    #[test]
+    fn delta_union_covers_one_sided_metrics() {
+        let side = |pipeline: &str, rows: Vec<(&str, &str, &str)>| RouteMetrics {
+            pipeline_id: static_id(pipeline),
+            rows: rows
+                .into_iter()
+                .map(|(metric, num, den)| MetricRow {
+                    metric: static_id(metric),
+                    value: frac(num, den),
+                })
+                .collect(),
+            diagnostics: Vec::new(),
+        };
+        let route = side(
+            "pipe.route",
+            vec![("m.only_route", "1", "2"), ("m.shared", "1", "1")],
+        );
+        let baseline = side(
+            "pipe.base",
+            vec![("m.only_base", "2", "1"), ("m.shared", "1", "4")],
+        );
+        let rows = metric_deltas(&route, &baseline);
+        assert_eq!(
+            rows,
+            vec![
+                MetricRow {
+                    metric: static_id("m.only_base"),
+                    value: MetricValue::NotApplicable,
+                },
+                MetricRow {
+                    metric: static_id("m.only_route"),
+                    value: MetricValue::NotApplicable,
+                },
+                MetricRow {
+                    metric: static_id("m.shared"),
+                    value: frac("3", "4"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn raw_rows_emit_before_the_delta_table() {
+        let (route, baseline) = delta_fixture();
+        let assembled = experiment_metrics(
+            vec![route.clone(), baseline.clone()],
+            &static_id("pipe.base"),
+        );
+        // Every route's raw rows survive assembly in caller order; the
+        // baseline gets no self-delta.
+        assert_eq!(assembled.routes, vec![route, baseline]);
+        assert_eq!(assembled.deltas.len(), 1);
+        // §9 raw-rows-before-ranking: every raw-row section strictly
+        // precedes every delta-table section.
+        let sections = assembled.emission_order();
+        assert_eq!(sections.len(), 3);
+        let last_raw = sections
+            .iter()
+            .rposition(|s| matches!(s, MetricsSection::RawRows(_)))
+            .expect("raw sections present");
+        let first_delta = sections
+            .iter()
+            .position(|s| matches!(s, MetricsSection::DeltaTable(_)))
+            .expect("delta section present");
+        assert!(last_raw < first_delta, "raw rows precede the delta table");
+        let [
+            MetricsSection::RawRows(first),
+            MetricsSection::RawRows(second),
+            MetricsSection::DeltaTable(table),
+        ] = sections.as_slice()
+        else {
+            panic!("two raw sections then one delta table");
+        };
+        assert_eq!(first.pipeline_id, static_id("pipe.route"));
+        assert_eq!(second.pipeline_id, static_id("pipe.base"));
+        assert_eq!(table.pipeline_id, static_id("pipe.route"));
+    }
+
+    #[test]
+    #[should_panic(expected = "has no route metrics")]
+    fn missing_baseline_is_a_wiring_bug() {
+        let (route, _) = delta_fixture();
+        experiment_metrics(vec![route], &static_id("pipe.base"));
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate route metrics")]
+    fn duplicate_route_metrics_is_a_wiring_bug() {
+        let (route, _) = delta_fixture();
+        experiment_metrics(vec![route.clone(), route], &static_id("pipe.route"));
+    }
+
     #[test]
     #[should_panic(expected = "duplicate group observation")]
     fn duplicate_group_observation_is_a_route_bug() {
         let groups = vec![group("g.a", Vec::new()), group("g.a", Vec::new())];
-        route_metrics(&static_id("pipe.test"), &[], &groups, &[]);
+        route_metrics(&static_id("pipe.test"), &[], &groups, &[], &[]);
     }
 
     #[test]
     #[should_panic(expected = "more schema violations than recorded calls")]
     fn violations_beyond_calls_are_a_fill_bug() {
-        route_metrics(&static_id("pipe.test"), &[obs(false, 1, 0, 2)], &[], &[]);
+        route_metrics(
+            &static_id("pipe.test"),
+            &[obs(false, 1, 0, 2)],
+            &[],
+            &[],
+            &[],
+        );
     }
 }

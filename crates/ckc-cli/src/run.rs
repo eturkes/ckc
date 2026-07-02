@@ -3980,8 +3980,8 @@ processing_stages:
 
         use crate::metrics::{
             ACCEPTANCE_RATE, CONFLICT_VERDICT_ACCURACY, FillObservation, GroupObservation,
-            MetricRow, MetricValue, RECORDED_CALL_COUNT, REPAIR_COUNT, SCHEMA_VALID_RATE,
-            TARGET_SYNTACTIC_VALIDITY, route_metrics,
+            K_SAMPLE_CONVERGENCE, MetricRow, MetricValue, RECORDED_CALL_COUNT, REPAIR_COUNT,
+            SCHEMA_VALID_RATE, TARGET_SYNTACTIC_VALIDITY, route_metrics,
         };
 
         let root = repo_root();
@@ -4005,6 +4005,12 @@ processing_stages:
         let row = |metric: &str, num: &str, den: &str| MetricRow {
             metric: static_id(metric),
             value: MetricValue::Value(Rational::from_parts(num, den).unwrap()),
+        };
+        // The recorded run replays one draw per fill — no k-sample battery,
+        // so convergence is honestly not applicable on both arms.
+        let na = |metric: &str| MetricRow {
+            metric: static_id(metric),
+            value: MetricValue::NotApplicable,
         };
 
         // ARM A — pipe.m2_single_ir.
@@ -4120,14 +4126,20 @@ processing_stages:
             }
 
             assert_eq!(groups.len(), 2);
-            let metrics =
-                route_metrics(&static_id("pipe.m2_single_ir"), &fills, &groups, &reference);
+            let metrics = route_metrics(
+                &static_id("pipe.m2_single_ir"),
+                &fills,
+                &groups,
+                &[],
+                &reference,
+            );
             assert_eq!(metrics.pipeline_id, static_id("pipe.m2_single_ir"));
             assert_eq!(
                 metrics.rows,
                 vec![
                     row(ACCEPTANCE_RATE, "2", "3"),
                     row(CONFLICT_VERDICT_ACCURACY, "1", "1"),
+                    na(K_SAMPLE_CONVERGENCE),
                     row(RECORDED_CALL_COUNT, "8", "1"),
                     row(REPAIR_COUNT, "2", "1"),
                     row(SCHEMA_VALID_RATE, "5", "8"),
@@ -4245,6 +4257,7 @@ processing_stages:
                 &static_id("pipe.m2_direct_smt"),
                 &fills,
                 &groups,
+                &[],
                 &reference,
             );
             assert_eq!(metrics.pipeline_id, static_id("pipe.m2_direct_smt"));
@@ -4253,6 +4266,7 @@ processing_stages:
                 vec![
                     row(ACCEPTANCE_RATE, "6", "7"),
                     row(CONFLICT_VERDICT_ACCURACY, "1", "1"),
+                    na(K_SAMPLE_CONVERGENCE),
                     row(RECORDED_CALL_COUNT, "8", "1"),
                     row(REPAIR_COUNT, "1", "1"),
                     row(SCHEMA_VALID_RATE, "3", "4"),

@@ -87,23 +87,19 @@ argument).
 - [x] route-direct-smt.5: direct §7.4 rejection codes — schema exhaustion (seed 91) +
   TargetSyntaxFailure (seed 90). 63% 126K/200K cc555db
 
-Standing M2-review flag: pre-existing 18 rustdoc `private_intra_doc_links` errors
-(model.rs/cassette.rs/replay.rs/trace.rs; `RUSTDOCFLAGS='-D warnings' cargo doc -p ckc-cli
---no-deps`) — per-unit gates hold the count AT 18 (no new), the fix lands at milestone review
-(pattern: memory doc-lint bullet).
+Standing M2-review flag: pre-existing rustdoc errors — 18 `private_intra_doc_links` in ckc-cli
+(model.rs/cassette.rs/replay.rs/trace.rs) + 17 unresolved-link in ckc-core (enums.rs:50 macro doc,
+one per fieldless_enum! expansion; `RUSTDOCFLAGS='-D warnings' cargo doc -p <crate> --no-deps`) —
+per-unit gates hold both counts (no new), the fix lands at milestone review (pattern: memory
+doc-lint bullet).
 
 - [x] metrics-m2.1: §7.3 raw-row metrics — metrics.rs (route_metrics + 9 unit tests) + run.rs
   `route_metrics_score_recorded_two_route_run` (two-route recorded-cassette test, both arms'
   full row vectors + pipeline_id + cardinalities pinned). Pre-staged blueprint executed
   zero-re-derivation, first-run green; wip files consumed+rm'd. .1a 37% 74K/200K ad174a7 ·
   .1b 60% 120K/200K 6f785b6
-- [ ] metrics-m2.2: k-sample stability + baseline-delta. k-sample verdict stability/convergence
-  (per-route verdict agreement across k samples); baseline-delta table = per-metric (route −
-  baseline) over identical inputs (baseline = the `direct_smt` pipeline per `exp.m2_multihop`), raw
-  rows emitted BEFORE the delta table. Reading: metrics-m2.1 module, the experiment baseline
-  designation; SPEC §7.3 baseline delta + k-sample, §9 raw-rows-before-ranking. Gate: `cargo test`;
-  stability + delta correct on a fixture; raw-rows-before-delta ordering asserted. [Acceptance: raw
-  rows emit before the baseline-delta table.]
+- [x] metrics-m2.2: k_sample_convergence row (pairwise fingerprint agreement, NA on k<2) +
+  experiment_metrics baseline-delta assembly + emission_order §9 contract + Rational::sub. 87% 174K/200K
 - [ ] report-m2.1: report.json M2 shape + canonical. Extend the `Report` types + `report.json`
   canonical shape (Canonical/CanonRead) with per-route raw rows, the baseline-delta table, findings
   (quoted Japanese source spans + named assertions), a failure-taxonomy summary (§6 categories + §7.4

@@ -130,12 +130,17 @@
 //!   ([`model_fill::RECORDED_CALLS_COUNTER`]/[`model_fill::REPAIRS_COUNTER`]) for
 //!   the §4.6 event the route/run wiring emits (run-m2.1). Target-generic; the
 //!   route units wire the pipeline.
-//! - [`metrics`] — §7.3 route-quality raw rows (`metrics-m2.1`):
+//! - [`metrics`] — §7.3 route-quality raw rows (`metrics-m2.1/.2`):
 //!   [`metrics::route_metrics`] folds a recorded run's per-route
-//!   [`metrics::FillObservation`]/[`metrics::GroupObservation`] channels and the
-//!   §8 reference into exact-fraction [`metrics::MetricRow`]s (sorted by metric
-//!   id; zero denominator → `not_applicable`, an unsupportable metric omitted
-//!   with one diagnostic); run-m2.1 wires it, the report units embed the rows.
+//!   [`metrics::FillObservation`]/[`metrics::GroupObservation`] channels, the
+//!   k-sample battery (§9 verdict stability), and the §8 reference into
+//!   exact-fraction [`metrics::MetricRow`]s (sorted by metric id; zero
+//!   denominator → `not_applicable`, an unsupportable metric omitted with one
+//!   diagnostic); [`metrics::experiment_metrics`] assembles the routes' raw
+//!   rows plus the per-metric (route − baseline) delta tables, with
+//!   [`metrics::ExperimentMetrics::emission_order`] as the §9
+//!   raw-rows-before-ranking contract; run-m2.1 wires it, the report units
+//!   embed the rows.
 #![forbid(unsafe_code)]
 
 pub mod cassette;
