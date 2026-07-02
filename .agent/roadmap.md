@@ -13,11 +13,11 @@ commit is then known (M1's `89c4cba` was filled retroactively too).
 Salvage caveat: stubs tagged `[S]` (tag precedes the usage figure) closed by consuming banked
 `.agent/wip-*` salvage/blueprint artifacts — proven code/patches/transcription blueprints committed
 by an earlier overflowed session — so their recorded context-usage measures the apply/redo session
-only and materially UNDERSTATES the unit as specced; never cite an `[S]` stub as a sizing anchor.
+only and materially UNDERSTATES the unit as specced; sizing anchors come from untagged stubs only.
 M1's collapsed stubs cli-runner.3a.2a / cli-runner.4.1a.2 / cli-runner.4.1b.2b.1 carry the same
 caveat. Pattern RETIRED (user directive): banking applyable artifacts cheats the unit — overflow
 recovery = revert + respec into fresh self-contained units (memory's sizing bullet holds the
-standing rule); retired wip artifacts stay in git history only, restored never.
+standing rule); retired wip artifacts remain in git history as provenance only.
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
@@ -114,15 +114,15 @@ doc-lint bullet).
   ExperimentMetrics) — §9 raw_rows<route_deltas byte pin; salvage redo, gates == banked.
   [S] 39% 79K/200K 6c28421
 - [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Respecced FRESH —
-  the 4a47fbb wip artifacts are retired (salvage caveat above): implement from source, restore
-  nothing. Extend `Report` with 3 omit-None Option members `failure_taxonomy`/`metrics`/
+  the 4a47fbb wip artifacts are retired (salvage caveat above): implement everything fresh from
+  source. Extend `Report` with 3 omit-None Option members `failure_taxonomy`/`metrics`/
   `model_identity` (Canonical/CanonRead, each in its sorted-key slot per the memory
   extension-pattern bullet; RouteTaxonomy gains Canonical+CanonRead), validate() rules + matching
   new ReportError variants, and a populated_report() fixture (verbatim JA spans from committed M1
-  fixtures + SYNTHETIC model identity; deltas built via the real pub
-  `crate::metrics::experiment_metrics` assembler, never hand-assembled). M1 PINNED_REPORT bytes
+  fixtures + SYNTHETIC model identity; deltas always built via the real pub
+  `crate::metrics::experiment_metrics` assembler). M1 PINNED_REPORT bytes
   stay untouched (omit-None regression guard); pin populated bytes from observed output. Reading:
-  targeted report.rs regions (Report/validate/pin tests; 2023 lines — read targeted, not whole),
+  targeted report.rs regions (Report/validate/pin tests; 2023 lines — targeted regions only),
   metrics.rs pub surface, SPEC §7.2/§9 excerpts as needed. Gate: `cargo test`; populated
   round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte order + §0 wording pin;
   validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold); engine grep on touched

@@ -60,21 +60,22 @@ full pre-consolidation text lives in git history.
   PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
   read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
   skeleton before the full test battery; pin expected shapes from observed output, never hand-computed;
-  cite only checked roadmap lines as anchors (`[S]`-tagged stubs excluded —
+  cite only untagged checked roadmap lines as anchors (`[S]` =
   salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
   declaration/conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE RETIRED (user
   directive, 2026-07-02; roadmap salvage-caveat note): banking applyable wip artifacts (`.agent/wip-*`
   patches / byte-exact code copies / transcription blueprints a redo line points at) cheats the unit — the
-  redo's recorded context-usage measures artifact application, not the unit as specced, so roadmap `[S]`
-  stubs are excluded as sizing anchors. Overflow recovery is LAND-OR-REVERT: either the proven half closes
+  redo's recorded context-usage measures artifact application, not the unit as specced, so sizing
+  anchors come from untagged stubs only. Overflow recovery is LAND-OR-REVERT: either the proven half closes
   as its OWN completed unit (own gate, own honest usage figure, artifacts committed at their final paths)
   within the session's remaining margin, or the tree reverts CLEAN and the recovery respec-splits into
   fresh SELF-CONTAINED units. A respec line may resolve decisions, confirmed facts, and reading pointers
-  in prose (that is planning); it banks zero verbatim implementation code and zero apply/restore/
-  transcribe instructions. Retired wip artifacts live in git history only — a fresh redo restores nothing
-  from them. Any wip scratch file a session does create gets deleted before that session's closing commit.
+  in prose (that is planning); its banked content is prose only — the redo session itself writes every
+  line of implementation code. Retired wip artifacts remain in git history as provenance only — a fresh
+  redo derives and writes everything within its own session. Any wip scratch file a session does create
+  gets deleted before that session's closing commit.
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
