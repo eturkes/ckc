@@ -117,7 +117,7 @@ doc-lint bullet).
   members + RouteTaxonomy + per-member validate rejections; M1 pins byte-identical.
   72% 143K/200K 822f924
 - [x] report-m2.1c: populated_report fixture (§8.2 JA spans, settled taxonomy/metrics/identity)
-  + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K
+  + PINNED_POPULATED_REPORT + §9 raw-before-delta pin. 54% 108K/200K be3e772
 - [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
   `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
   replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the
