@@ -3734,7 +3734,7 @@ processing_stages:
     /// `target_syntax_failure`: its overlap source (seed 90) shallow-accepts — valid
     /// utf-8, a `(set-logic` head, a `(check-sat)` substring — yet z3 rejects the
     /// unbalanced parens with an `(error …)` and no verdict; its deontic source (seed 90)
-    /// is a minimal valid query that never runs (Q1 fails first). Synthetic-identity
+    /// is a minimal valid filler, unverified once Q1's failure closes the pair. Synthetic-identity
     /// crafted-fixture cassettes, so the engine-agnostic audit applies. `#[ignore]`d: run
     /// to regenerate, then commit the four json. Regenerate with
     /// `cargo test -p ckc-cli bless_direct_smt_rejection_cassettes -- --ignored`.
@@ -3765,13 +3765,13 @@ processing_stages:
         // SYNTAX FAILURE (group.m2_direct_syntax): the overlap source shallow-accepts
         // (utf-8, a (set-logic head, a (check-sat) substring) yet z3 rejects its
         // unbalanced parens → target_syntax_failure at verify. The deontic source is a
-        // minimal valid query that never runs (Q1 fails first).
+        // minimal valid filler, left unverified once Q1's failure closes the pair.
         write_direct_smt_cassette(
             static_id("group.m2_direct_syntax.overlap"),
             &resolved,
             &store,
             90,
-            b"(set-logic QF_UF)\n(declare-const x Bool)\n(assert (and x\n(check-sat)\n",
+            b"(set-logic QF_LRA)\n(declare-const x Bool)\n(assert (and x\n(check-sat)\n",
         );
         write_direct_smt_cassette(
             static_id("group.m2_direct_syntax.deontic"),
@@ -3784,7 +3784,7 @@ processing_stages:
 
     /// route-direct-smt.5 — the direct_smt route's §7.4 rejection codes wire through
     /// [`model_fill`] under [`direct_smt_accept`] and the §4.6 verify event (z3 present,
-    /// model-runtime-absent). Replaying the committed bad cassettes: (a) a
+    /// model-runtime-absent). Replaying the committed rejection-path cassettes: (a) a
     /// schema-exhaustion group whose overlap base (seed 91) and first-repair
     /// (`derive_seed(91, 1)`) outputs both fail the shallow SMT accept — a
     /// `repair_limit = 1` fill re-prompts once and terminates in `repair_limit_exceeded`,
@@ -3794,7 +3794,7 @@ processing_stages:
     /// body shallow-accepts (so [`direct_smt_fill`] lands the pair with an empty ledger)
     /// yet z3 rejects its unbalanced parens with an `(error …)` and no verdict, so
     /// [`direct_smt_verify_group`] mints a lone `target_syntax_failure` /
-    /// `target_parse_error` result and the §4.6 verify event surfaces it to the ledger.
+    /// `target_parse_error` result that rides the directly-emitted §4.6 verify event.
     /// The repair-loop mechanics live in `model_fill.rs`; this pins the direct route's
     /// accept → §7.4 code selection end-to-end.
     #[test]
@@ -3928,7 +3928,7 @@ processing_stages:
         assert_eq!(
             results.payload.results.len(),
             1,
-            "Q1's syntax failure closes the pair before Q2 runs"
+            "Q1's syntax failure closes the pair — no Q2 result"
         );
         let result = &results.payload.results[0];
         assert_eq!(result.query_id, static_id("group.m2_direct_syntax.overlap"));
@@ -3936,8 +3936,25 @@ processing_stages:
         assert_eq!(result.diagnostics[0].code, DiagnosticCode::TargetParseError);
         assert_eq!(result.diagnostics[0].outcome, Outcome::Invalid);
 
-        // The §4.6 verify event extended the ledger with the parse-error diagnostic.
+        // §7.4 surfaces on the aggregate ledger …
         let codes: Vec<_> = shell.ledger().iter().map(|d| d.code).collect();
         assert_eq!(codes, vec![DiagnosticCode::TargetParseError]);
+        // … and rides the directly-emitted §4.6 verify event itself (not a side-channel
+        // push): slot-3 verify_smt, Invalid, carrying the parse-error diagnostic and the
+        // solver-budget counter.
+        let event = shell.events().last().expect("a verify event");
+        assert_eq!(event.processing_stage, static_id("verify"));
+        assert_eq!(
+            event.pipeline_step_id,
+            static_id("processing_stage.m2.verify_smt")
+        );
+        assert_eq!(event.outcome, Outcome::Invalid);
+        let event_codes: Vec<_> = event.diagnostics.iter().map(|d| d.code).collect();
+        assert_eq!(event_codes, vec![DiagnosticCode::TargetParseError]);
+        assert_eq!(
+            event.resource_counters,
+            vec![(static_id(SOLVER_BUDGET_KEY), resolved.budget_ms)],
+            "the solver-budget counter rides the direct verify event"
+        );
     }
 }

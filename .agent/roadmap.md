@@ -685,7 +685,7 @@ argument).
   committed bad cassettes + ledger surfacing) + fmt + clippy `-D` + engine-agnostic audit (run.rs) clean.
   CLOSE: `rm .agent/wip-direct-smt-5.txt`. [Done: `bless_direct_smt_rejection_cassettes` (`#[ignore]`,
   synthetic identity) + `direct_smt_route_rejection_codes` added to run.rs `mod tests` (near-transcribed
-  from the compile-verified blueprint, ZERO non-test code change); blessed 4 committed bad cassettes under
+  from the compile-verified blueprint, ZERO non-test code change); blessed 4 rejection-path cassettes (3 malformed outputs + 1 valid deontic filler) under
   `route.direct_smt/group.m2_direct_{schema.overlap,syntax.overlap,syntax.deontic}` (no schema.deontic — the
   overlap query exhausts first). (a) SCHEMA EXHAUSTION: seed 91 base + `derive_seed(91,1)`=
   17894217328592812498 first-repair both non-SMT → `repair_limit 1` fill re-prompts once →
