@@ -255,10 +255,15 @@ impl Report {
     ///    positive (an empty per-route code map is a clean route, allowed).
     /// 6. `metrics` (when present): raw-rows routes are duplicate-free, the
     ///    baseline has a raw-rows section, `route_deltas` lists exactly the
-    ///    non-baseline routes in raw-rows order, and every raw and delta row
-    ///    list is strictly ascending by metric id.
-    /// 7. `model_identity` (when present) carries non-empty `quant` and
-    ///    `runtime_version` (`model_id` is Id-grammar-guaranteed).
+    ///    non-baseline routes in raw-rows order, every raw and delta row
+    ///    list is strictly ascending by metric id, and each route's omission
+    ///    diagnostics form a canonical set (emit sorts blindly, so unsorted
+    ///    storage would render differently from its canonical read-back).
+    /// 7. Identity free text — `solver_identity.version`, plus
+    ///    `model_identity`'s `quant` and `runtime_version` when present — is
+    ///    non-empty and code-span-inert (no backtick or line break;
+    ///    [`render_markdown`] quotes each inside a Markdown code span; the
+    ///    `_id` members are Id-grammar-guaranteed).
     pub fn validate(&self) -> Result<(), ReportError> {
         check_map_order("corpus_hashes", self.corpus_hashes.iter().map(|(k, _)| k))?;
         check_map_order(
@@ -359,6 +364,7 @@ impl Report {
                 }
                 seen.push(route.pipeline_id.as_str());
                 check_metric_rows(&route.pipeline_id, &route.rows)?;
+                check_canonical_set("metrics diagnostics", &route.diagnostics)?;
             }
             if !metrics
                 .routes
@@ -383,14 +389,23 @@ impl Report {
                 check_metric_rows(&delta.pipeline_id, &delta.rows)?;
             }
         }
+        let mut identity_fields = vec![(
+            "solver_identity version",
+            self.solver_identity.version.as_str(),
+        )];
         if let Some(identity) = &self.model_identity {
-            for (field, value) in [
-                ("quant", &identity.quant),
-                ("runtime_version", &identity.runtime_version),
-            ] {
-                if value.is_empty() {
-                    return Err(ReportError::EmptyIdentityField { field });
-                }
+            identity_fields.push(("model_identity quant", identity.quant.as_str()));
+            identity_fields.push((
+                "model_identity runtime_version",
+                identity.runtime_version.as_str(),
+            ));
+        }
+        for (field, value) in identity_fields {
+            if value.is_empty() {
+                return Err(ReportError::EmptyIdentityField { field });
+            }
+            if value.contains(['`', '\n', '\r']) {
+                return Err(ReportError::IdentityFieldCodeSpan { field });
             }
         }
         Ok(())
@@ -1152,8 +1167,10 @@ pub enum ReportError {
     DeltaTableMismatch,
     /// A metrics row list is not strictly ascending by metric id.
     MetricRowOrder(Id),
-    /// A model-identity text field is empty.
+    /// An identity text field is empty.
     EmptyIdentityField { field: &'static str },
+    /// An identity text field would break its rendered Markdown code span.
+    IdentityFieldCodeSpan { field: &'static str },
     /// Canonical emission failed while sorting or checking.
     Canon(CanonError),
 }
@@ -1294,7 +1311,13 @@ impl std::fmt::Display for ReportError {
                 )
             }
             ReportError::EmptyIdentityField { field } => {
-                write!(f, "model_identity {field} is empty")
+                write!(f, "{field} is empty")
+            }
+            ReportError::IdentityFieldCodeSpan { field } => {
+                write!(
+                    f,
+                    "{field} carries a backtick or line break, breaking its rendered code span"
+                )
             }
             ReportError::Canon(e) => write!(f, "canonical emission failed: {e:?}"),
         }
@@ -2001,7 +2024,9 @@ mod tests {
         };
         assert_eq!(
             report.validate(),
-            Err(ReportError::EmptyIdentityField { field: "quant" })
+            Err(ReportError::EmptyIdentityField {
+                field: "model_identity quant"
+            })
         );
 
         let report = Report {
@@ -2014,7 +2039,85 @@ mod tests {
         assert_eq!(
             report.validate(),
             Err(ReportError::EmptyIdentityField {
-                field: "runtime_version"
+                field: "model_identity runtime_version"
+            })
+        );
+    }
+
+    /// Rule 7's code-span-inert clause: backtick or line break in identity
+    /// free text breaks the rendered code span, and the M1 solver identity
+    /// line sits under the same rule (codex M2.25).
+    #[test]
+    fn rejects_code_span_breaking_identity_fields() {
+        let mut report = valid_report();
+        report.solver_identity.version = "4.13.0`".to_owned();
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::IdentityFieldCodeSpan {
+                field: "solver_identity version"
+            })
+        );
+
+        let mut report = valid_report();
+        report.solver_identity.version = String::new();
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::EmptyIdentityField {
+                field: "solver_identity version"
+            })
+        );
+
+        let report = Report {
+            model_identity: Some(ModelIdentity {
+                quant: "fixture\nquant".to_owned(),
+                ..baseline_model_identity()
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::IdentityFieldCodeSpan {
+                field: "model_identity quant"
+            })
+        );
+    }
+
+    /// Rule 6's canonical-set clause on omission diagnostics: emit would
+    /// sort (and dedup) blindly, so unsorted or duplicated storage renders
+    /// differently from its canonical read-back (codex M2.25).
+    #[test]
+    fn rejects_non_canonical_metric_diagnostics() {
+        // `ai_schema_violation` sorts before `target_parse_error` (records
+        // differ only in `code`), so this pair breaks ascending order.
+        let mut metrics = metrics_fixture();
+        metrics.routes[0].diagnostics = vec![
+            route_record(DiagnosticCode::TargetParseError),
+            route_record(DiagnosticCode::AiSchemaViolation),
+        ];
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::SetOrder {
+                pool: "metrics diagnostics"
+            })
+        );
+
+        let mut metrics = metrics_fixture();
+        metrics.routes[0].diagnostics = vec![
+            route_record(DiagnosticCode::AiSchemaViolation),
+            route_record(DiagnosticCode::AiSchemaViolation),
+        ];
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::SetDuplicate {
+                pool: "metrics diagnostics"
             })
         );
     }
@@ -2052,8 +2155,16 @@ mod tests {
                 "metrics rows for route pipe.base are not strictly ascending by metric id",
             ),
             (
-                ReportError::EmptyIdentityField { field: "quant" },
+                ReportError::EmptyIdentityField {
+                    field: "model_identity quant",
+                },
                 "model_identity quant is empty",
+            ),
+            (
+                ReportError::IdentityFieldCodeSpan {
+                    field: "solver_identity version",
+                },
+                "solver_identity version carries a backtick or line break, breaking its rendered code span",
             ),
             (
                 ReportError::DuplicateRouteLedger(id("pipe.base")),

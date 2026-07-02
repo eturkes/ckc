@@ -447,7 +447,13 @@ full pre-consolidation text lives in git history.
   sentence-case "Raw benchmark output" failed the contains-assert) → M2 lead lines use M1's
   lowercase-label style; report_ja (.3b) mirrors the section order (taxonomy after diagnostics
   summary, metrics next, model identity after solver identity) + the emission_order walk — shape
-  source = `render_markdown` + its two pinned tests, read those, not a memory copy. REPORT-m2.1 TRAP (DISCHARGED in landed
+  source = `render_markdown` + its two pinned tests, read those, not a memory copy. RENDERED ⇒
+  VALIDATED (codex M2.25): every member a renderer walks must sit under a `Report::validate` rule —
+  `RouteMetrics::diagnostics` was the one rendered collection validate skipped, and `emit_set`
+  sorts/dedups blindly, so a validate-passing unsorted store rendered ≠ its canonical read-back
+  (rule 6 now demands the canonical set); identity free text (solver version, model quant +
+  runtime_version) is rule-7 code-span-inert (non-empty, no backtick/line break) → renderers (.3b
+  incl.) interpolate those fields into code spans bare, no escaping layer. REPORT-m2.1 TRAP (DISCHARGED in landed
   .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.

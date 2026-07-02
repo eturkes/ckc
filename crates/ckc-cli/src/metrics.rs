@@ -161,7 +161,9 @@ pub struct RouteMetrics {
 /// Canonical route rows. `rows` emits as a §4.3 set: `metric` is each row's
 /// first member and metric ids are unique per route ([`route_metrics`]'s
 /// sorted-row invariant, validated at the report boundary), so canonical
-/// byte order coincides with metric-id order.
+/// byte order coincides with metric-id order. `diagnostics` emits as a §4.3
+/// set too, and emit sorts blindly — the report boundary validates stored
+/// order so renders agree with their canonical read-back.
 impl Canonical for RouteMetrics {
     fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
         let mut obj = ObjectEmitter::new();
