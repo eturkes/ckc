@@ -265,11 +265,15 @@ full pre-consolidation text lives in git history.
   Dangling; set `(None,[_,..])` → per-member Dangling + no dups (new experiment-scoped `DuplicatePipeline`; generic `note_duplicates`/`Duplicate{pool:"pipelines"}` would collide w/ the GLOBAL candidates pipelines-pool dup check, which has no experiment to scope it) + baseline must be Some (`Empty{field:"baseline_pipeline"}`)
   and ∈ set (new `BaselineNotInSet`); anything else (neither, both, or legacy + stray baseline) → new
   `PipelineBinding`. The CLI consumes findings via `to_string()`/Display (no exhaustive match) → new
-  RegistryFinding variants need ZERO `registry_check.rs` change. `run.rs` deliberately executes ONLY
-  `baseline()` and records `pipelines: vec![baseline]` (behavior-locked to M1) — run-m2.1 completes the
-  multi-route loop (`resolved_pipelines()` + recording the full set) AND seeds the real set-form
-  `exp.m2_multihop` (still unseeded; both route pipelines exist now → seeding is `check`-safe,
-  run-m2.1a does it). SPEC: §8.4
+  RegistryFinding variants need ZERO `registry_check.rs` change. run-m2.1a landed two-route
+  resolution: `resolve()` → `Option<Vec<Resolved>>`, one view per `resolved_pipelines()` member in set
+  order, each fingerprinted by `resolve_route` (declared kind sequence + model_fill
+  `output_artifact_kinds` → `RouteShape::{M1Layered,SingleIr,DirectSmt}`, else "unsupported
+  processing-stage sequence" naming the kinds; undefined stage / undefined pipeline / malformed binding
+  each carry their own reason — .1b pins the rejection battery); ONE shared plan carries the full set
+  (M1 = `[baseline]`, plan bytes unchanged); `execute()` runs exactly one M1Layered view, any
+  model-route set → one command diagnostic + zero artifacts (run-m2.1d wires the loop). Set-form
+  `exp.m2_multihop` SEEDED (registry check green). SPEC: §8.4
   stays M1-singular (faithful history); the M2 generalization went into §14's registry-evolution ledger
   (no §14 byte-pin → free prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
@@ -365,13 +369,15 @@ full pre-consolidation text lives in git history.
     stage granularity at plan time. Route→tail wiring (agent-confirmed): a route feeds the M1
     `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` (that fn reads only
     `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
-    `budget_ms`; `documents`/`groups`/`plan` are unread stubs); `resolve()` is NOT reusable (hard-requires
-    all 8 stage KINDS + `[Id; 8]`, returns None for the 6-stage single_ir pipeline); the route fn lives in
+    `budget_ms`; `documents`/`groups`/`plan` are unread stubs); `resolve()` NOW resolves route
+    pipelines too (run-m2.1a: per-route views, `[Id; 8]` = declared ids padded with `UNUSED_STAGE`,
+    `shape: RouteShape`); the route fn lives in
     `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
     accept-closure (`single_ir_accept`) + per-doc fill (`single_ir_fill`: extract→segment→`model_fill`
     Replay→deterministic tail mirroring `assemble_bundle`) + golden-cassette wiring LANDED in `run.rs`
-    (route-single-ir.2/.2b); run-m2.1 reuses this minimal-`Resolved` pattern (or generalizes `resolve()`
-    to N stages) for the in-`execute` route loop. route-single-ir.3 added the verdict-half scoring test
+    (route-single-ir.2/.2b); run-m2.1d consumes `resolve()`'s per-route views for the in-`execute`
+    loop; the hand-built minimal-`Resolved` stays a test-fixture pattern (both route fixtures carry
+    `shape` + `UNUSED_STAGE` padding now). route-single-ir.3 added the verdict-half scoring test
     (`single_ir_route_scores_m1_groups`): a route-scoring test mirrors
     `run_oracle.rs::assert_group_matches_reference` IN FULL (both branches, incl. the no-conflict
     `expected_no_conflict_result` Q1-unsat/Q2-skipped closure + panic-on-unknown-outcome; a partial

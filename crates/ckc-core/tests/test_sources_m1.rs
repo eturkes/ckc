@@ -82,7 +82,7 @@ fn registry_set_loads_and_validates() {
         ]
     );
 
-    assert_eq!(experiments.len(), 1);
+    assert_eq!(experiments.len(), 2);
     let exp = &experiments[0];
     assert_eq!(exp.id, id("exp.m1_scaffold"));
     assert_eq!(exp.pipeline, Some(id("pipe.layered_ckcir_to_smt")));
@@ -108,6 +108,27 @@ fn registry_set_loads_and_validates() {
         ]
     );
     assert!(exp.budget.contains_key(&id("solver_ms_per_query")));
+
+    // exp.m2_multihop (§9): the set-form binding over both model routes,
+    // the M1 test_source groups verbatim, baseline = the direct route.
+    let m2 = &experiments[1];
+    assert_eq!(m2.id, id("exp.m2_multihop"));
+    assert_eq!(m2.pipeline, None);
+    assert_eq!(
+        m2.pipelines,
+        vec![id("pipe.m2_direct_smt"), id("pipe.m2_single_ir")]
+    );
+    assert_eq!(m2.baseline(), Some(&id("pipe.m2_direct_smt")));
+    assert_eq!(m2.test_source_groups, exp.test_source_groups);
+    assert_eq!(m2.seed, exp.seed);
+    for key in [
+        "model_repair_limit",
+        "model_sample_count",
+        "solver_ms_per_query",
+    ] {
+        assert!(m2.budget.contains_key(&id(key)), "budget key {key}");
+    }
+    assert_eq!(m2.expected_outcomes, exp.expected_outcomes);
 
     // The pipeline chains the eight §8.3 processing_stages in execution order.
     let processing_stage_kind: BTreeMap<&Id, &Id> = candidates

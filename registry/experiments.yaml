@@ -13,3 +13,22 @@
   budget:
     solver_ms_per_query: 10000
   expected_outcomes: corpus/reference/m1_expected.yaml
+# §9 exp.m2_multihop: both model routes execute over identical locked inputs —
+# the M1 test_source groups verbatim, scored against the same reference.
+# Set-form binding (pipelines + baseline_pipeline); baseline = the direct route
+# for the §7.3 delta table. model_repair_limit / model_sample_count are the §9
+# model budget counters (one repair re-prompt, single-draw k=1).
+- id: exp.m2_multihop
+  pipelines: [pipe.m2_direct_smt, pipe.m2_single_ir]
+  baseline_pipeline: pipe.m2_direct_smt
+  test_source_groups:
+    - group_id: group.m1_conflict
+      test_sources: [test_source.m1_guideline_a, test_source.m1_guideline_b]
+    - group_id: group.m1_no_conflict
+      test_sources: [test_source.m1_guideline_a, test_source.m1_control]
+  seed: 42
+  budget:
+    model_repair_limit: 1
+    model_sample_count: 1
+    solver_ms_per_query: 10000
+  expected_outcomes: corpus/reference/m1_expected.yaml

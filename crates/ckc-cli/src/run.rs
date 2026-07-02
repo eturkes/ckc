@@ -35,12 +35,12 @@ use std::path::Path;
 use std::time::Duration;
 
 use ckc_core::{
-    ArtifactWrapper, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry, DataClass,
-    DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization, Origin,
-    Outcome, Producer, RunPlan, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup,
-    assemble, canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash,
-    content_hash, hash_bytes, parse_candidates, parse_corpora, parse_experiments,
-    read_strict_canonical,
+    ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry,
+    DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization,
+    Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
+    SourceDocumentGraph, TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
+    canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
+    parse_experiments, read_strict_canonical,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
@@ -106,6 +106,25 @@ const REPORT: usize = 7;
 /// [`VERIFY`] slot (5), which is inert padding in the direct fixture's `[Id; 8]`.
 const DIRECT_VERIFY: usize = 3;
 
+/// Declared processing-stage kind sequences the two §9 model-route pipelines
+/// fingerprint to in [`resolve_route`]: single_ir hands the model-filled IR
+/// to the M1 assemble→compile→verify back end; direct_smt goes straight from
+/// the model's smt_query output to verification (no IR, no compile).
+const SINGLE_IR_STAGE_KINDS: [&str; 6] = [
+    "extract",
+    "segment",
+    "model_fill",
+    "assemble",
+    "compile",
+    "verify",
+];
+const DIRECT_SMT_STAGE_KINDS: [&str; 4] = ["extract", "segment", "model_fill", "verify"];
+
+/// Inert padding id for the `[Id; 8]` slots past a route's declared stages —
+/// a non-stage sentinel, so an accidental read of an unused slot surfaces as
+/// an obviously wrong producer instead of a real stage id.
+const UNUSED_STAGE: &str = "processing_stage.unused";
+
 /// §8.4 budget counter naming the per-query solver wall-clock cap in
 /// milliseconds — the one budget key the M1 vocabulary defines.
 const SOLVER_BUDGET_KEY: &str = "solver_ms_per_query";
@@ -114,7 +133,22 @@ const SOLVER_BUDGET_KEY: &str = "solver_ms_per_query";
 /// anchors `registry/` and corpus paths at the repository root). Evidence,
 /// artifacts, and the outcome land entirely in the shell.
 pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
-    let Some(resolved) = resolve(root, experiment_id, shell) else {
+    let Some(mut views) = resolve(root, experiment_id, shell) else {
+        return;
+    };
+    // Exactly one layered-M1 view runs today's path verbatim; a model-route
+    // set resolves (proving the registry surface + route fingerprints) but
+    // executes nothing — run-m2.1d wires the multi-route execution loop.
+    let resolved = if views.len() == 1 && views[0].shape == RouteShape::M1Layered {
+        views.pop().expect("length checked above")
+    } else {
+        shell.diagnostic(invalid_diagnostic(vec![(
+            static_id("reason"),
+            format!(
+                "experiment {experiment_id} resolves model routes; \
+                 the run command executes only the layered M1 pipeline today"
+            ),
+        )]));
         return;
     };
     // §7.2's lexicon hash rides the raw reference-file bytes (§4.4: the
@@ -186,15 +220,32 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     );
 }
 
-/// The runner's resolved view of one experiment: the pipeline candidate,
-/// its pipeline step ids, the unique corpus documents across the test_source
-/// groups in first-appearance order, the groups themselves in evaluation
-/// order, the per-query solver resource limit, the §5 plan the run executes, and
-/// the toolchain manifest hash every producer carries.
+/// The §9 route family a pipeline's declared processing-stage sequence
+/// fingerprints to ([`resolve_route`]): the eight-stage layered M1 pipeline,
+/// the six-stage single_ir route, or the four-stage direct_smt route.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum RouteShape {
+    M1Layered,
+    SingleIr,
+    DirectSmt,
+}
+
+/// The runner's resolved view of one experiment pipeline: the pipeline
+/// candidate, its pipeline step ids and route shape, the unique corpus
+/// documents across the test_source groups in first-appearance order, the
+/// groups themselves in evaluation order, the per-query solver resource
+/// limit, the §5 plan the run executes, and the toolchain manifest hash every
+/// producer carries. [`resolve`] returns one view per bound pipeline in set
+/// order; documents, groups, budget, plan, and toolchain hash are shared
+/// across the set.
 struct Resolved {
     pipeline_id: Id,
-    /// Pipeline step ids parallel to [`PROCESSING_STAGE_KINDS`].
+    /// Pipeline step ids: the pipeline's declared stages filling slots
+    /// `0..n` in declared order, padded to eight with [`UNUSED_STAGE`]. The
+    /// M1 shape fills all eight parallel to [`PROCESSING_STAGE_KINDS`].
     pipeline_step_ids: [Id; 8],
+    /// The route family the pipeline fingerprinted to.
+    shape: RouteShape,
     documents: Vec<CorpusEntry>,
     groups: Vec<TestSourceGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
@@ -206,13 +257,16 @@ struct Resolved {
     toolchain_manifest_hash: Hash,
 }
 
-/// Resolve `experiment_id` against the §8.4 registry surface. Whole-set
-/// semantic validation is `ckc registry check`'s job; resolution diagnoses
-/// exactly the references this run needs, each failure one command-scope
-/// `schema_invalid` diagnostic. The toolchain manifest read rides last:
-/// every producer (and later both manifests) carries its hash, so a run
-/// that cannot attest its toolchain mints nothing.
-fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolved> {
+/// Resolve `experiment_id` against the §8.4 registry surface into one
+/// [`Resolved`] view per bound pipeline, in set order (the M1 legacy binding
+/// resolves to its single pipeline). Whole-set semantic validation is `ckc
+/// registry check`'s job; resolution diagnoses exactly the references this
+/// run needs, each failure one command-scope `schema_invalid` diagnostic.
+/// Per-view step ids and [`RouteShape`] come from [`resolve_route`]'s
+/// fingerprint of each pipeline's declared stages. The toolchain manifest
+/// read rides last: every producer (and later both manifests) carries its
+/// hash, so a run that cannot attest its toolchain mints nothing.
+fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Resolved>> {
     let corpora = load(root, CORPORA_FILE, parse_corpora, shell);
     let candidates = load(root, "registry/candidates.yaml", parse_candidates, shell);
     let experiments = load(root, "registry/experiments.yaml", parse_experiments, shell);
@@ -228,51 +282,29 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
         )]));
         return None;
     };
-    // M2 generalizes the experiment to a pipeline set + §7.3 baseline; multi-route
-    // execution lands in run-m2.1. Today the run drives the single baseline pipeline.
-    let Some(baseline) = experiment.baseline() else {
+    // The shape-aware baseline accessor mirrors `registry check`'s binding
+    // validation: a malformed binding (neither form, both, or a stray or
+    // out-of-set baseline) resolves nothing.
+    if experiment.baseline().is_none() {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("reason"),
             format!("experiment {experiment_id} has no valid pipeline binding"),
         )]));
         return None;
-    };
-    let Some(pipeline) = candidates.pipelines.iter().find(|p| p.id == *baseline) else {
-        shell.diagnostic(invalid_diagnostic(vec![(
-            static_id("reason"),
-            format!("experiment {experiment_id} names undefined pipeline {baseline}"),
-        )]));
-        return None;
-    };
-
-    let mut pipeline_step_ids: Vec<Id> = Vec::with_capacity(PROCESSING_STAGE_KINDS.len());
-    for kind in PROCESSING_STAGE_KINDS {
-        let found = pipeline
-            .processing_stages
-            .iter()
-            .find_map(|processing_stage_id| {
-                candidates
-                    .processing_stages
-                    .iter()
-                    .find(|s| s.id == *processing_stage_id && s.kind == static_id(kind))
-            });
-        match found {
-            Some(processing_stage) => pipeline_step_ids.push(processing_stage.id.clone()),
-            None => {
-                shell.diagnostic(invalid_diagnostic(vec![(
-                    static_id("reason"),
-                    format!(
-                        "pipeline {} declares no {kind} processing_stage entry",
-                        pipeline.id
-                    ),
-                )]));
-                return None;
-            }
-        }
     }
-    let pipeline_step_ids: [Id; 8] = pipeline_step_ids
-        .try_into()
-        .expect("the loop pushes one pipeline step id per processing_stage kind");
+    let pipelines = experiment.resolved_pipelines();
+    let mut routes: Vec<(Id, [Id; 8], RouteShape)> = Vec::with_capacity(pipelines.len());
+    for member in &pipelines {
+        let Some(pipeline) = candidates.pipelines.iter().find(|p| p.id == *member) else {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!("experiment {experiment_id} names undefined pipeline {member}"),
+            )]));
+            return None;
+        };
+        let (pipeline_step_ids, shape) = resolve_route(pipeline, &candidates, shell)?;
+        routes.push((pipeline.id.clone(), pipeline_step_ids, shape));
+    }
 
     let Some(&budget_ms) = experiment.budget.get(&static_id(SOLVER_BUDGET_KEY)) else {
         shell.diagnostic(invalid_diagnostic(vec![(
@@ -317,29 +349,99 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Resolve
             return None;
         }
     };
-    Some(Resolved {
-        pipeline_id: pipeline.id.clone(),
-        pipeline_step_ids,
-        documents,
-        groups: experiment.test_source_groups.clone(),
-        budget_ms,
-        plan: RunPlan {
-            experiment_id: experiment.id.clone(),
-            test_source_groups: experiment
-                .test_source_groups
-                .iter()
-                .map(|g| g.group_id.clone())
-                .collect(),
-            pipelines: vec![baseline.clone()],
-            seed: experiment.seed,
-            budget: experiment
-                .budget
-                .iter()
-                .map(|(k, v)| (k.clone(), *v))
-                .collect(),
-        },
-        toolchain_manifest_hash,
-    })
+    // ONE §5 plan shared by every view: the plan describes the run, not a
+    // route (M1's single binding keeps its exact prior plan bytes).
+    let plan = RunPlan {
+        experiment_id: experiment.id.clone(),
+        test_source_groups: experiment
+            .test_source_groups
+            .iter()
+            .map(|g| g.group_id.clone())
+            .collect(),
+        pipelines,
+        seed: experiment.seed,
+        budget: experiment
+            .budget
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect(),
+    };
+    Some(
+        routes
+            .into_iter()
+            .map(|(pipeline_id, pipeline_step_ids, shape)| Resolved {
+                pipeline_id,
+                pipeline_step_ids,
+                shape,
+                documents: documents.clone(),
+                groups: experiment.test_source_groups.clone(),
+                budget_ms,
+                plan: plan.clone(),
+                toolchain_manifest_hash: toolchain_manifest_hash.clone(),
+            })
+            .collect(),
+    )
+}
+
+/// Fingerprint one pipeline's declared processing stages against the route
+/// shapes this runner drives. Each declared stage id must name a registry
+/// entry; the declared kind sequence — plus the model_fill stage's output
+/// artifact kinds, which split the two §9 routes — must match exactly one of
+/// [`PROCESSING_STAGE_KINDS`] (M1 layered), [`SINGLE_IR_STAGE_KINDS`] with a
+/// `clinical_ir` fill, or [`DIRECT_SMT_STAGE_KINDS`] with an `smt_query`
+/// fill. Declared order fills slots `0..n` of the fixed `[Id; 8]`; the
+/// remainder pads with [`UNUSED_STAGE`]. Any failure is one command-scope
+/// diagnostic + `None`.
+fn resolve_route(
+    pipeline: &PipelineEntry,
+    candidates: &Candidates,
+    shell: &mut Shell,
+) -> Option<([Id; 8], RouteShape)> {
+    let mut kinds: Vec<&str> = Vec::with_capacity(pipeline.processing_stages.len());
+    let mut model_fill_outputs: &[Id] = &[];
+    for stage_id in &pipeline.processing_stages {
+        let Some(stage) = candidates
+            .processing_stages
+            .iter()
+            .find(|s| s.id == *stage_id)
+        else {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!(
+                    "pipeline {} declares undefined processing_stage {stage_id}",
+                    pipeline.id
+                ),
+            )]));
+            return None;
+        };
+        kinds.push(stage.kind.as_str());
+        if stage.kind == static_id("model_fill") {
+            model_fill_outputs = &stage.output_artifact_kinds;
+        }
+    }
+    let shape = if kinds == PROCESSING_STAGE_KINDS {
+        RouteShape::M1Layered
+    } else if kinds == SINGLE_IR_STAGE_KINDS && *model_fill_outputs == [static_id("clinical_ir")] {
+        RouteShape::SingleIr
+    } else if kinds == DIRECT_SMT_STAGE_KINDS && *model_fill_outputs == [static_id("smt_query")] {
+        RouteShape::DirectSmt
+    } else {
+        shell.diagnostic(invalid_diagnostic(vec![(
+            static_id("reason"),
+            format!(
+                "pipeline {} declares an unsupported processing-stage sequence [{}]",
+                pipeline.id,
+                kinds.join(", ")
+            ),
+        )]));
+        return None;
+    };
+    let mut pipeline_step_ids: Vec<Id> = pipeline.processing_stages.clone();
+    pipeline_step_ids.resize(PROCESSING_STAGE_KINDS.len(), static_id(UNUSED_STAGE));
+    let pipeline_step_ids: [Id; 8] = pipeline_step_ids
+        .try_into()
+        .expect("a fingerprinted sequence declares at most eight stages and pads to exactly eight");
+    Some((pipeline_step_ids, shape))
 }
 
 /// Drive one corpus document through the four document processing_stages. Every
@@ -2486,6 +2588,113 @@ processing_stages:
         assert!(!out.join("artifacts").exists());
     }
 
+    // run-m2.1a — the §9 two-route experiment resolves one view per set
+    // member over the committed registry: set order [direct_smt, single_ir],
+    // declared stages filling the fixed slots in declared order with the
+    // unused-sentinel padding, both views sharing the M1 corpus documents,
+    // groups, budget, and the one §5 plan.
+    #[test]
+    fn m2_experiment_resolves_one_view_per_route() {
+        let root = repo_root();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), None);
+        let views = resolve(&root, &"exp.m2_multihop".parse().unwrap(), &mut shell)
+            .expect("exp.m2_multihop resolves over the committed registry");
+        assert!(shell.ledger().is_empty(), "{:?}", shell.ledger());
+
+        assert_eq!(views.len(), 2);
+        let direct = &views[0];
+        assert_eq!(direct.pipeline_id, static_id("pipe.m2_direct_smt"));
+        assert_eq!(direct.shape, RouteShape::DirectSmt);
+        assert_eq!(
+            direct.pipeline_step_ids,
+            [
+                static_id("processing_stage.m1.extract"),
+                static_id("processing_stage.m1.segment"),
+                static_id("processing_stage.m2.model_fill_smt"),
+                static_id("processing_stage.m2.verify_smt"),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+            ]
+        );
+        let single_ir = &views[1];
+        assert_eq!(single_ir.pipeline_id, static_id("pipe.m2_single_ir"));
+        assert_eq!(single_ir.shape, RouteShape::SingleIr);
+        assert_eq!(
+            single_ir.pipeline_step_ids,
+            [
+                static_id("processing_stage.m1.extract"),
+                static_id("processing_stage.m1.segment"),
+                static_id("processing_stage.m2.model_fill"),
+                static_id("processing_stage.m2.assemble"),
+                static_id("processing_stage.m1.compile"),
+                static_id("processing_stage.m1.verify"),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+            ]
+        );
+        for view in &views {
+            assert_eq!(view.budget_ms, 10_000);
+            assert_eq!(
+                view.documents
+                    .iter()
+                    .map(|d| d.id.clone())
+                    .collect::<Vec<_>>(),
+                DOC_IDS.map(static_id)
+            );
+            assert_eq!(
+                view.groups
+                    .iter()
+                    .map(|g| g.group_id.clone())
+                    .collect::<Vec<_>>(),
+                [
+                    static_id("group.m1_conflict"),
+                    static_id("group.m1_no_conflict")
+                ]
+            );
+            assert_eq!(view.plan.experiment_id, static_id("exp.m2_multihop"));
+            assert_eq!(
+                view.plan.pipelines,
+                [
+                    static_id("pipe.m2_direct_smt"),
+                    static_id("pipe.m2_single_ir")
+                ]
+            );
+            assert_eq!(view.plan.seed, 42);
+            assert_eq!(
+                view.plan.budget,
+                [
+                    (static_id("model_repair_limit"), 1),
+                    (static_id("model_sample_count"), 1),
+                    (static_id("solver_ms_per_query"), 10_000),
+                ]
+            );
+        }
+    }
+
+    // run-m2.1a — the model-route experiment resolves but does not execute:
+    // one command-scope diagnostic names the gate, zero artifacts land.
+    // run-m2.1d wires the multi-route execution loop.
+    #[test]
+    fn m2_experiment_run_gates_until_the_route_loop_lands() {
+        let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m2_multihop");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].payload,
+            vec![(
+                static_id("reason"),
+                "experiment exp.m2_multihop resolves model routes; \
+                 the run command executes only the layered M1 pipeline today"
+                    .to_owned()
+            )],
+            "{diagnostics:?}"
+        );
+        assert!(!out.join("artifacts").exists());
+    }
+
     // The lexicon is load-bearing for the whole run: an unreadable file is
     // one command-scope diagnostic and no document runs.
     #[test]
@@ -2534,10 +2743,11 @@ processing_stages:
     /// carries a fixed `[Id; 8]`; slots `[0]`–`[5]` are `pipe.m2_single_ir`'s six stages
     /// (extract, segment, model_fill, assemble, compile, verify), so the route's producer
     /// stamps (the fill head, the cassette wrapper, the verdict tail) are faithful; slots
-    /// `[6]`/`[7]` (trace, report) are unread M1-shaped placeholders the verdict tail never
-    /// reaches. `documents` / `groups` / `plan` go unread so stay empty and the toolchain
-    /// hash stays synthetic — the bundle `content_hash` gate is payload-only; `budget_ms`
-    /// is exp.m1_scaffold's §8.4 `solver_ms_per_query`, the verdict tail's z3 cap.
+    /// `[6]`/`[7]` pad with the inert [`UNUSED_STAGE`] sentinel the resolver mints — the
+    /// verdict tail never reads them. `documents` / `groups` / `plan` go unread so stay
+    /// empty and the toolchain hash stays synthetic — the bundle `content_hash` gate is
+    /// payload-only; `budget_ms` is exp.m1_scaffold's §8.4 `solver_ms_per_query`, the
+    /// verdict tail's z3 cap.
     fn single_ir_resolved() -> Resolved {
         Resolved {
             pipeline_id: static_id("pipe.m2_single_ir"),
@@ -2548,9 +2758,10 @@ processing_stages:
                 static_id("processing_stage.m2.assemble"),
                 static_id("processing_stage.m1.compile"),
                 static_id("processing_stage.m1.verify"),
-                static_id("processing_stage.m1.trace"),
-                static_id("processing_stage.m1.report"),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
             ],
+            shape: RouteShape::SingleIr,
             documents: vec![],
             groups: vec![],
             budget_ms: 10_000,
@@ -3154,10 +3365,10 @@ processing_stages:
     /// route-direct-smt.3a — a minimal [`Resolved`] for the direct_smt route over
     /// the M1 inputs. `pipe.m2_direct_smt` is four stages (extract, segment,
     /// model_fill_smt, verify_smt), filling slots `[0]`–`[3]` of the fixed `[Id; 8]`;
-    /// only `producer(resolved, 0..=3)` is ever read, so slots `[4]`–`[7]` hold an inert `processing_stage.unused`
-    /// sentinel, a non-stage id, so an accidental read surfaces obviously rather
-    /// than posing as a real verify stage. `documents` / `groups` / `plan` go unread and
-    /// stay empty; `budget_ms` is exp.m1_scaffold's §8.4 `solver_ms_per_query`.
+    /// only `producer(resolved, 0..=3)` is ever read, so slots `[4]`–`[7]` hold the inert
+    /// [`UNUSED_STAGE`] sentinel, a non-stage id, so an accidental read surfaces obviously
+    /// rather than posing as a real verify stage. `documents` / `groups` / `plan` go unread
+    /// and stay empty; `budget_ms` is exp.m1_scaffold's §8.4 `solver_ms_per_query`.
     fn direct_smt_resolved() -> Resolved {
         Resolved {
             pipeline_id: static_id("pipe.m2_direct_smt"),
@@ -3166,11 +3377,12 @@ processing_stages:
                 static_id("processing_stage.m1.segment"),
                 static_id("processing_stage.m2.model_fill_smt"),
                 static_id("processing_stage.m2.verify_smt"),
-                static_id("processing_stage.unused"),
-                static_id("processing_stage.unused"),
-                static_id("processing_stage.unused"),
-                static_id("processing_stage.unused"),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
+                static_id(UNUSED_STAGE),
             ],
+            shape: RouteShape::DirectSmt,
             documents: vec![],
             groups: vec![],
             budget_ms: 10_000,

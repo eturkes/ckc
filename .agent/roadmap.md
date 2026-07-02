@@ -124,50 +124,10 @@ doc-lint bullet).
   renders. 64% 127K/200K ebadf6b
 - [x] report-m2.3b: report_ja.md renderer — shared Labels walk, §0 verbatim-EN in JA prose, two
   observed-output pins. 80% 160K/200K 4b5f799
-- [ ] run-m2.1a: two-route resolution + `exp.m2_multihop` seed. Seed the set-form entry
-  (`pipelines=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_pipeline=pipe.m2_direct_smt`, M1
-  groups verbatim, seed 42, budget `solver_ms_per_query: 10000` + `model_repair_limit: 1` +
-  `model_sample_count: 1`, `expected_outcomes: corpus/reference/m1_expected.yaml`) — pipelines +
-  stages exist, so `ckc registry check` validates it. run.rs edits: consts after `DIRECT_VERIFY` —
-  `SINGLE_IR_STAGE_KINDS=[extract,segment,model_fill,assemble,compile,verify]`,
-  `DIRECT_SMT_STAGE_KINDS=[extract,segment,model_fill,verify]`,
-  `UNUSED_STAGE="processing_stage.unused"` (the direct fixture's existing padding id); `RouteShape`
-  {M1Layered,SingleIr,DirectSmt} (Clone,Copy,PartialEq,Eq,Debug) + `shape: RouteShape` on
-  `Resolved`; `resolve()` → `Option<Vec<Resolved>>` — `baseline().is_none()` ⇒ reason "has no valid
-  pipeline binding" + None; budget/documents/toolchain blocks unchanged; ONE shared plan,
-  `pipelines = resolved_pipelines()` (M1 = `[baseline]` → plan bytes unchanged); per member in set
-  order find the PipelineEntry (else reason "names undefined pipeline {id}") + new
-  `resolve_route(&PipelineEntry, &Candidates, &mut Shell) -> Option<([Id; 8], RouteShape)>`: per
-  DECLARED stage id find its entry (else reason "pipeline {id} declares undefined processing_stage
-  {stage_id}"), collect the kind sequence + the model_fill stage's output_artifact_kinds, then
-  fingerprint — M1Layered = the 8 `PROCESSING_STAGE_KINDS`; SingleIr = SINGLE_IR_STAGE_KINDS +
-  model_fill outputs `[clinical_ir]`; DirectSmt = DIRECT_SMT_STAGE_KINDS + outputs `[smt_query]`;
-  else reason "pipeline {id} declares an unsupported processing-stage sequence [{kinds joined}]";
-  pad declared ids to 8 with UNUSED_STAGE (declared order fills slots 0..n — both route fixtures
-  already use declared order). `execute()` head: exactly one M1Layered view ⇒ today's path
-  verbatim; anything else ⇒ invalid_diagnostic reason "experiment {id} resolves model routes; the
-  run command executes only the layered M1 pipeline today" + return, zero artifacts (doc:
-  run-m2.1d wires the loop). CONFIRMED FACTS (grep-verified at respec — skip re-derivation):
-  `resolve()` has ONE caller, `execute` (~l.117); tests reach resolution only through `executed()`
-  (l.1844 → `(TotalOperationResult, Vec<EventRecord>, Vec<DiagnosticRecord>, PathBuf, TempDir)`) ⇒
-  signature fallout = the execute head alone; `Resolved{}` literals = 3, NOT 6 (resolve() +
-  fixtures single_ir_resolved l.2541 — realign padding slots 6/7 m1.trace/m1.report → UNUSED_STAGE,
-  shape SingleIr — and direct_smt_resolved l.3161 — already unused×4, add shape DirectSmt); direct
-  stage ids = m2.model_fill_smt / m2.verify_smt. Tests (2 new): two-view pin — direct
-  `resolve(&repo_root(), &parsed id, &mut Shell::open(run, m2, None))`, ledger empty, view order
-  [direct, single_ir], steps [m1.extract, m1.segment, m2.model_fill_smt, m2.verify_smt, unused×4]
-  +DirectSmt and [m1.extract, m1.segment, m2.model_fill, m2.assemble, m1.compile, m1.verify,
-  unused×2]+SingleIr, per view budget_ms 10000 + documents [guideline_a, guideline_b, control] +
-  2 groups + plan{experiment_id, pipelines [direct, single_ir], seed 42, budget
-  [(model_repair_limit,1),(model_sample_count,1),(solver_ms_per_query,10000)]}; and
-  `executed(&repo_root(), "exp.m2_multihop")` ⇒ Invalid outcome + exactly the routes diagnostic +
-  no artifacts dir. Reading: run.rs resolve/execute + the two fixtures only. Close: refresh
-  memory's pipeline-set-binding + minimal-`Resolved` recon clauses (both go stale as this lands).
-  Gate: cargo test (M1 resolution/pins unchanged + the 2 new tests); registry check green over the
-  seeded entry. [2nd respec: the 3b1066a session's own first-half attempt overflowed pre-compile →
-  reverted; facts above banked from it; rejection battery split out to .1b.]
+- [x] run-m2.1a: two-route resolve (per-route views + RouteShape fingerprint) + exp.m2_multihop
+  seed + execute M1-gate. 69% 138K/200K
 - [ ] run-m2.1b: resolution rejection battery over .1a's surface (production code untouched).
-  Tests: tiny-root mutations — `write_tiny_root` (l.2244) then string-replace the written registry
+  Tests: tiny-root mutations — `write_tiny_root` (l.2346) then string-replace the written registry
   bytes before resolving: (a) drop the tiny pipeline's normalize stage from its declared list →
   7-kind sequence ⇒ "unsupported processing-stage sequence" naming the kinds; (b) swap one in-list
   stage id for an undeclared one ⇒ "declares undefined processing_stage"; (c) point the experiment
