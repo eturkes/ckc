@@ -113,23 +113,70 @@ doc-lint bullet).
 - [x] report-m2.1a: metrics.rs canonical layer (MetricRow/RouteMetrics/RouteDelta/
   ExperimentMetrics) — §9 raw_rows<route_deltas byte pin; salvage redo, gates == banked.
   [S] 39% 79K/200K 6c28421
-- [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Respecced FRESH —
-  the 4a47fbb wip artifacts are retired (salvage caveat above): implement everything fresh from
-  source. Extend `Report` with 3 omit-None Option members `failure_taxonomy`/`metrics`/
-  `model_identity`, each in its sorted-key slot per the memory extension-pattern bullet. Confirmed
-  types: `metrics` = `metrics::ExperimentMetrics`, `model_identity` = core `plans::ModelIdentity`
-  — both landed with Canonical+CanonRead (wire-up only); `failure_taxonomy` = `RouteTaxonomy`,
-  ZERO landed code → this unit designs it fresh from SPEC §7.2's pin (code-keyed failure-taxonomy
-  summary; code vocabulary = §7.4) + gives it Canonical+CanonRead. Add validate() rules + matching
-  new variants on landed `ReportError`, and a populated_report() fixture (verbatim JA spans from committed M1
-  fixtures + SYNTHETIC model identity; deltas always built via the real pub
-  `crate::metrics::experiment_metrics` assembler). M1 PINNED_REPORT bytes
-  stay untouched (omit-None regression guard); pin populated bytes from observed output. Reading:
-  targeted report.rs regions (Report/validate/pin tests; 2023 lines — targeted regions only),
-  metrics.rs pub surface, SPEC §7.2/§7.4/§9 excerpts as needed. Gate: `cargo test`; populated
-  round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte order + §0 wording pin;
-  validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold); engine grep on touched
-  files.
+- [ ] report-m2.1b: report.json M2 shape — 3 omit-None members + RouteTaxonomy + validate (needs
+  .1a; populated fixture/pin = .1c). 3rd spec cut: 4a47fbb wip retired, then the fresh attempt
+  overflowed pre-compile by bundling the fixture+pin half → split out as .1c, and every decision
+  below is now SETTLED (confirmed against HEAD) — transcribe it, zero SPEC/API re-derivation.
+  PRACTICE: grep-anchor + narrow (<~125-line) reads only; `cargo check` after the production
+  edits BEFORE writing tests. (1) `Report` members in sorted slots per the memory
+  extension-pattern bullet: `failure_taxonomy: Option<RouteTaxonomy>` (diagnostics_summary <
+  failure_taxonomy < findings), `metrics: Option<crate::metrics::ExperimentMetrics>`,
+  `model_identity: Option<ModelIdentity>` (core root re-export; lexicon_hash < metrics <
+  model_identity < no_conflict_results); Canonical emit + positional CanonRead via the two
+  `obj.optional` forms (grep `obj.optional(` in ckc-core plans.rs for the landed manifest
+  precedent); 3 struct-literal sites gain `None`s: assemble_report (+ contract-tense doc:
+  report-m2.2 populates them from a recorded two-route run), tests valid_report() (L933),
+  render_markdown_marks_empty_slots (L1974). (2) NEW in report.rs (small Report-coupled type —
+  no new module): `pub struct RouteTaxonomy { pub routes: Vec<(Id, Vec<(Id, u64)>)> }` = SPEC
+  §7.2 code-keyed failure-taxonomy summary, canonical map pipeline_id→(map code→count) mirroring
+  diagnostics_summary's string-wrapped u64s; private `struct CodeCounts(Vec<(Id, u64)>)` impls
+  Canonical/CanonRead via pub emit_u64_map/read_u64_map (canon.rs L931/937; emit_map needs V:
+  Canonical — mirrors canon.rs's pub(crate) Count); RouteTaxonomy = emit_map / read_map::<Id,
+  CodeCounts> + unwrap `.0`. Id-keyed (not enum-keyed) → survives §7.4 vocab growth;
+  §7.4-membership guarantee = report-m2.2's assembler duty (doc it contract-tense). (3)
+  validate() — per-member independent rules (zero presence coupling), new ReportError variants
+  with Display pinned: EmptyTaxonomy "failure_taxonomy is present but names no routes" (empty
+  INNER count map = clean route, allowed); route keys + each inner map through existing
+  check_map_order (L737; pools "failure_taxonomy" / "failure_taxonomy counts");
+  TaxonomyZeroCount{pipeline_id, code} "failure_taxonomy count for {code} on route {pipeline_id}
+  is zero"; DuplicateRoute(Id) "metrics raw rows claim route {id} more than once";
+  BaselineMissing(Id) "metrics baseline {id} has no raw-rows section"; DeltaTableMismatch
+  "metrics route_deltas must list exactly the non-baseline raw-rows routes in raw-rows order"
+  (ordered id-vec compare); MetricRowOrder(Id) "metrics rows for route {id} are not strictly
+  ascending by metric id" via new helper `check_metric_rows(&Id, &[MetricRow])` — strict `<` on
+  `row.metric`, catches dup ids too, applied to EVERY `routes[]` AND `deltas[]` section (both
+  carry `rows: Vec<MetricRow>`, all fields pub); EmptyIdentityField{field: &'static str}
+  "model_identity {field} is empty" (quant + runtime_version; model_id Id-grammar-guaranteed).
+  (4) Tests — one rejection per variant + allows_a_clean_route_with_no_counts, each a tiny
+  inline Some(..) mutation of valid_report(); metrics cases: 2 routes × 1-2 rows, ALL values
+  MetricValue::NotApplicable (no Rational needed), built via pub experiment_metrics(routes,
+  &baseline) (metrics.rs L615; panics on invalid INPUTS) then PUB-field-mutated into the invalid
+  state; MetricRowOrder arms = raw (swap 2 rows) + delta (push dup row). M1 PINNED_REPORT +
+  every existing pin stay byte-identical (omit-None regression guard). Tests-mod imports land in
+  the SAME pass as the tests (crate::metrics::{MetricRow, MetricValue, RouteMetrics,
+  experiment_metrics, …}). Reading: this line + memory extension-pattern bullet + grep-anchored
+  report.rs regions + metrics.rs pub items by grep. Gate: `cargo test -p ckc-cli` (all M1 pins
+  green); fmt/clippy/doc-lint (18+17 hold); engine grep on report.rs.
+- [ ] report-m2.1c: populated report fixture + canonical byte pin (needs .1b). populated_report()
+  = valid_report() + the 3 members Some, values SETTLED: findings quoted_spans text ← verbatim JA
+  sentences A+B, no_conflict spans ← A+CONTROL, copied byte-exactly from
+  crates/ckc-core/tests/test_sources_m1.rs (the committed readable mirror; corpus/test_sources =
+  deny-Read); failure_taxonomy = {pipe.base: [(ai_schema_violation, 2), (target_parse_error, 1)],
+  pipe.route: [(ai_hallucinated_source, 1), (repair_limit_exceeded, 1)]} (§7.4 codes —
+  target_parse_error is the DiagnosticCode; VerifierCategory's target_syntax_failure is a
+  different vocabulary); metrics = experiment_metrics(vec![base, route], &pipe.base), per-route
+  rows over consts ACCEPTANCE_RATE / K_SAMPLE_CONVERGENCE / REPAIR_COUNT (already ascending):
+  base 3/4, NA, 2/1 · route 1/2, 1/1, 2/1 (row-ctor pattern ← metrics.rs's own pinned test);
+  model_identity = SYNTHETIC {model.baseline, "fixture_quant", "1.0.0"}; `wording` member
+  UNCHANGED (= labels the rows carry; read_set::<Wording> already enforces §0 vocabulary at
+  parse). Tests: populated_report_round_trips_canonically — validate() ok + CanonRead round-trip
+  + PINNED_POPULATED_REPORT byte pin (r#"…"# style of PINNED_REPORT; JA rides raw UTF-8,
+  emit_string escapes only `"` `\` <0x20); populated_report_orders_raw_rows_before_deltas — §9
+  byte order, index("raw_rows") < index("route_deltas") in the pinned bytes. Pin capture: temp
+  fs::write of the emitted bytes → session scratchpad, run once, python-splice verbatim into the
+  const, DELETE the write line, re-run green. Gate: `cargo test -p ckc-cli` (M1 pins untouched);
+  python byte-containment check of the 3 JA literals vs test_sources_m1.rs; fmt/clippy/doc-lint
+  (18+17 hold); engine grep on report.rs.
 - [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
   `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
   replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the

@@ -44,7 +44,11 @@ full pre-consolidation text lives in git history.
   §-semantics + unit tests) + its recorded-run integration test = 2 (metrics-m2.1 overflowed deriving
   both in one window); canonical-emit layer over an existing type family (one module) + a byte-pinned
   record-shape extension consuming it (a second module) = 2, split at the module seam (report-m2.1
-  overflowed: read+derive+first-module-green consumed the window before module 2 started); derivation fn + its
+  overflowed: read+derive+first-module-green consumed the window before module 2 started); record-shape
+  extension + fresh-designed member type + validator + per-variant rejections vs its populated fixture +
+  byte-pin capture = 2 (report-m2.1b's fresh redo overflowed pre-compile bundling both — 17 uncompiled
+  edit sites; the working respec pins EVERY decision in the line — names, key slots, Display strings,
+  fixture values, test list — so implementation is transcription); derivation fn + its
   test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
   (never paired with assembly or stage wiring); spec-byte amendment (re-pin + reference/test mirror sweep)
@@ -59,7 +63,8 @@ full pre-consolidation text lives in git history.
   statement builder over a prebuilt binding core = 1; exception attachment + determinism tests = 1.
   PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
   read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
-  skeleton before the full test battery; pin expected shapes from observed output, never hand-computed;
+  skeleton before the full test battery — `cargo check` after the production edits, an end-loaded
+  uncompiled battery leaves nothing landable (report-m2.1b); pin expected shapes from observed output, never hand-computed;
   cite only untagged checked roadmap lines as anchors (`[S]` =
   salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
@@ -379,58 +384,31 @@ full pre-consolidation text lives in git history.
     exhaustion needs malformed cassettes at the base AND each derived seed through the budget. Pin the
     `ai_schema_violation` payload SHAPE too (key `reason`, non-empty, empty refs), symmetric to the
     hallucinated/exceeded pins.
-  - route.direct_smt seam (M2.20 respec → route-direct-smt.1-.5; user-confirmed both forks): the direct
-    route emits SMT, but `verdict::verify` consumes a `CompiledArtifact` whose `validate()` demands
-    non-empty `region_ids` per assertion — a no-IR route CANNOT honestly supply them, so do NOT reuse
-    `m1.verify` / build a fabricated artifact. Seam = BYPASS: extract verify()'s Q1→Q2 gate into a shared
-    `verify_pair` (private; borrowed `(&Id,&str)` overlap/deontic tuples), add `pub
-    verify_query_pairs(adapter, &[MintedQueryPair], budget)` (LANDED .2, both re-exported from ckc-smt lib;
-    `MintedQueryPair=((Id,String),(Id,String))` owned pairs — a `pub type` alias dodges clippy
-    `type_complexity` on the nested-tuple slice while preserving the pinned type; caller-minted ids + model
-    bodies → `invoke` + `assemble_result`, no artifact); registry `processing_stage.m2.verify_smt` consumes
-    `smt_query` DIRECTLY (`kind: verify`, no `compiled`), so the 3-stage "model_fill→syntactic-validity→
-    verify" chain the roadmap first sketched collapses — "syntactic-validity" folds into that solver run
-    (`target_syntax_failure`/`TargetParseError`, .5's direct-unique terminal, NO repair). Per-query emission
-    (grammar `<query>` = ONE query, unchanged + hash-pinned): a pair = 2 `model_fill` replays keyed by
-    ROLE-namespaced source at the base seed — `source: <gid>.overlap` + `<gid>.deontic` (NOT a shared `<gid>`
-    source with Q2 at `derive_seed(base,1)`: `model_fill` reads repair attempt `i` under `derive_seed(base,i)`
-    on the SAME source [model_fill.rs L132], so a shared-source Q2 would ALIAS Q1's first repair — a real
-    collision, caught in codex review); accept =
-    shallow well-formedness (utf8 + `(set-logic`/`(check-sat)`) → `Schema` only, NO grounding (the solver is
-    the syntactic authority). GOLDEN cassette bytes = the group's M1 emitted `query_bodies[2k]`/`[2k+1]`
-    VERBATIM → the `:named a.<rule_id>` labels == reference `expected_unsat_core` → scoring reuses
-    `single_ir_route_scores_m1_groups`'s shape. These golden cassettes = harness/determinism
-    fixtures (both routes verify identical SMT → identical verdicts BY CONSTRUCTION): they prove
-    plumbing + scoring, NOT a §9 route-quality difference. The real route contrast is measured ONLY by
-    run-m2.2's LIVE weak-model run (the weak baseline degenerates on the direct route) + the degraded
-    rejection cassettes (route-single-ir.4 + route-direct-smt.5) → report/run units attribute
-    happy-path-replay parity to the harness, never to §9 evidence (codex M2.20 .3a). 5 units, not ≤4 (the bypass ADDS the `verify_pair` refactor
-    + `verify_query_pairs`; the roadmap's "likely fewer" guess assumed reusing m1.verify, which the region-id
-    wall rules out). direct tail is its OWN fn (`compile_verify_group` inlines `compile()` + hardcodes
-    COMPILE=4/VERIFY=5; the 4-stage direct pipeline has `verify_smt` at slot 3, no `compiled`). Two slot-3
-    consequences (codex review): (1) `finish_processing_stage(idx)` derives the kind from
-    `PROCESSING_STAGE_KINDS[idx]` AND gates the solver-budget counter on `idx == VERIFY(5)` [run.rs
-    L1310-1316] → idx-3 reuse mis-stamps `"assemble"` + drops the budget (idx-5 over-runs the 4-entry
-    step-id array) → emit the verify event directly with kind `"verify"` + `SOLVER_BUDGET_KEY`; (2) verify
-    cites the UPSTREAM artifact hash (single_ir: `compiled.content_hash`), so direct wraps each fill body as an
-    `smt_query` `ArtifactWrapper<QueryBody>` (Canonical+CanonRead) and `verifier_results` cite those two
-    `content_hash`es — the CASSETTE hash is fill-wrapper provenance deferred to run-m2.1 (both routes).
-    LANDED (.3a golden cassettes + .3b fill) in run.rs beside single_ir's — `direct_smt_accept` +
-    per-group `direct_smt_fill` exactly per the seam above. NOVEL raw-AI provenance (distinct from single_ir's ir_bundle
-    `DeterministicCompiler`/`MechanicalEvidenceStatus`): the smt_query IS the raw model body, only
-    shallow-accepted (no deterministic transform, no source linkage) → `Origin::AiGenerated` +
-    `EvidenceStatus::AcceptedEvidenceStatus` + EMPTY external effects. Why consistent: `wrapper()` forces
-    effects=`[]`, and `validate()` enforces ONLY the effects↔status rule (non-empty effects ⇒
-    `EvidenceDiscoveryOnly`), so empty-effects PERMITS an Accepted status; it does NOT check origin/status/kind
-    → the `direct_smt_fill_reproduces_m1_query_bodies` test pins origin/status/kind/schema/producer explicitly.
-    Keep this shape (do not "fix" Accepted→DiscoveryOnly or add effects). .4 verdict tail
-    `direct_smt_verify_group` LANDED beside `compile_verify_group` (its OWN fn per the slot-3 rule above;
-    `DIRECT_VERIFY=3` const, M1 `VERIFY`=5 = inert padding in the direct `[Id;8]`; run-m2.1 wires
-    `direct_smt_fill`→it). Scoring test `direct_smt_route_scores_m1_groups` keys the no-conflict closure off
-    minted `<gid>.overlap`/`.deontic` ids (no `solver_query_plan`) — metrics/report-m2 reuse this shape.
-    GOTCHA (codex .4): `input_hashes` canonicalize as a §4.3 SET — the landed wrapper sorts them by hash, the
-    in-memory event keeps insertion order → multi-input provenance assertions compare as SETS, never pin
-    emitted order (bit the .4 event/wrapper test; will bite metrics/report-m2).
+  - route.direct_smt residue (units .1-.5 DONE; git + run.rs hold the build story — only
+    forward-load-bearing facts here): the route verifies raw model SMT via pub ckc-smt
+    `verify_query_pairs(adapter, &[MintedQueryPair], budget)`; a no-IR route CANNOT honestly mint
+    `CompiledArtifact.region_ids`, so always verify via that bypass, never `m1.verify` or a fabricated
+    artifact (the wall that forced the seam). Cassette keying: ROLE-namespaced sources
+    `<gid>.overlap`/`<gid>.deontic` at the base seed — a shared `<gid>` source would ALIAS Q2 with Q1's
+    first repair (`model_fill` reads attempt `i` under `derive_seed(base, i)` on the SAME source); keep
+    the namespacing. Slot-3 consequences for run-m2.1's route loop: the direct 4-stage pipeline has
+    `verify_smt` at slot 3, but `finish_processing_stage(idx)` stamps kind from
+    `PROCESSING_STAGE_KINDS[idx]` + gates the solver-budget counter on `idx == VERIFY(5)` → the direct
+    tail (`direct_smt_verify_group`, `DIRECT_VERIFY=3`, M1 `VERIFY`=5 inert padding in its `[Id; 8]`)
+    emits its verify event DIRECTLY with kind `"verify"` + `SOLVER_BUDGET_KEY`; its `verifier_results`
+    cite the two `smt_query` wrapper `content_hash`es (cassette-hash provenance = run-m2.1, both
+    routes). Raw-AI provenance GUARDRAIL (keep the shape, never "fix"): smt_query = raw model body →
+    `Origin::AiGenerated` + `AcceptedEvidenceStatus` + EMPTY effects (validate() enforces only
+    non-empty-effects ⇒ DiscoveryOnly; the .3b test pins origin/status/kind/schema/producer
+    explicitly). Golden cassettes (M1 query bodies verbatim; `:named a.<rule_id>` ==
+    `expected_unsat_core`) = harness/determinism fixtures — both routes verify identical SMT →
+    identical verdicts BY CONSTRUCTION: report/run/acceptance units attribute happy-path-replay parity
+    to the harness, never to §9 evidence; the real contrast = run-m2.2's LIVE weak-model run + the
+    degraded rejection cassettes (route-single-ir.4 + route-direct-smt.5). Scoring-test shape for
+    metrics/report-m2 reuse: `direct_smt_route_scores_m1_groups` keys the no-conflict closure off the
+    minted `<gid>.overlap`/`.deontic` ids (no `solver_query_plan`). GOTCHA (bites report-m2.2 tests):
+    `input_hashes` canonicalize as a §4.3 SET — the wrapper sorts by hash, the in-memory event keeps
+    insertion order → multi-input provenance assertions compare as SETS, never pin emitted order.
   - Runtime-gate findings (gate MET, confirmed functionally on a real test source; byte-stability +
     seed-inertness + degeneration mechanics live in `## Runtime`, machine specifics in
     `.agent/runtime.local.md`). Metrics/report conclusions: constrained decoding forces schema-VALID output
