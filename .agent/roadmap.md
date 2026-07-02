@@ -124,38 +124,88 @@ doc-lint bullet).
   renders. 64% 127K/200K ebadf6b
 - [x] report-m2.3b: report_ja.md renderer — shared Labels walk, §0 verbatim-EN in JA prose, two
   observed-output pins. 80% 160K/200K 4b5f799
-- [ ] run-m2.1: `exp.m2_multihop` wiring + experiment entry. SIZE-CHECK FIRST (mandatory): this is
-  a 4-deliverable stack (route loop + `resolve()` generalization; provenance input_hashes; `--record`
-  flag; report/manifest wiring) over run.rs — the session STARTS by respec-splitting it at a seam
-  confirmed from a run.rs read (precedent M2.20/M2.23), committing `roadmap (M2.26 respec): …`, then
-  implements only the first half. Seed the `exp.m2_multihop`
-  `ExperimentEntry` (`pipelines=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_pipeline=
-  pipe.m2_direct_smt`, the M1 groups, seed, budget incl. k-sample count + repair limit) — both
-  pipelines now exist, so `ckc registry check` validates the full experiment. Wire `run.rs` to execute
-  both route pipelines under one experiment run → per-route `model_fill` → scoring → metrics →
-  `report.json` + `report_en.md` + `report_ja.md` + run/replay manifests (populating the
-  model/prompt/identity hash fields), over the locked M1 inputs. Report call = assemble_report's
-  `Option<ModelRunSections>` (report-m2.2): per-route §7.4 ledgers (ALL the route's records; clean
-  route = empty slice) + per-route `RouteMetrics` (route set must match the ledgers') + baseline id +
-  ModelIdentity; `experiment_metrics` runs IN-assembly — run.rs supplies `route_metrics()` outputs
-  only, never calls experiment_metrics itself. single_ir assemble-wrapper
-  input_hashes: M1 cites source+segments+normalization; single_ir has no normalization wrapper →
-  cite source+segments+the replayed cassette `content_hash` (the model_fill provenance; .2b's gate
-  used source+segments only, F4 payload-only, so add the cassette hash here). direct_smt has no assemble
-  wrapper + no `compiled`: its `model_fill_smt` `smt_query` wrappers cite source+segments (.3b) + the replayed
-  cassette `content_hash` added here (same model_fill provenance), and its `verifier_results` cite the two
-  `smt_query` wrapper `content_hash`es (route-direct-smt.4 — the upstream artifact, as single_ir's verify cites
-  `compiled`). Generalize `resolve()` (run.rs L208): today it selects only `experiment.baseline()` + iterates
-  all 8 `PROCESSING_STAGE_KINDS`, so make resolution route-aware over each pipeline's DECLARED stage list
-  (`pipe.m2_direct_smt` = 4, `pipe.m2_single_ir` = 6) — else `ckc run exp.m2_multihop` cannot resolve the
-  non-baseline route. Add the `ckc run --record` flag (default
-  = replay committed cassettes runtime-absent; `--record` drives `CassetteStore::record` live — run-m2.2
-  exercises that live path) + its default-replay acceptance. Tested via REPLAY of the route units'
-  committed cassettes (deterministic, no live call) — model-fill replays runtime-absent, so replay.rs
-  hash-compare covers the model-stage artifacts. Reading: `run.rs` execute (route loop), the
-  routes, metrics, report, manifests; `registry/experiments.yaml`; SPEC §1 command, §9. Gate:
-  `cargo test`; `ckc registry check` validates `exp.m2_multihop`; a replay-driven run lands all
-  artifacts deterministically; manifests carry the populated identity/hash fields.
+- [ ] run-m2.1a: two-route resolution + `exp.m2_multihop` seed. Seed the set-form entry
+  (`pipelines=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_pipeline=pipe.m2_direct_smt`, M1
+  groups verbatim, seed 42, budget `solver_ms_per_query: 10000` + `model_repair_limit: 1` +
+  `model_sample_count: 1`, `expected_outcomes: corpus/reference/m1_expected.yaml`) — pipelines +
+  stages exist, so `ckc registry check` validates it. Generalize `resolve()` → `Option<Vec<Resolved>>`,
+  one view per `resolved_pipelines()` member in set order, run-scoped fields cloned per view;
+  per-route `pipeline_step_ids` = the pipeline's DECLARED stage list positionally (confirmed: both
+  route fixtures use declared order; single_ir 6 = slots 0-5, direct 4 = slots 0-3), padded to 8 with
+  `processing_stage.unused` (align single_ir_resolved's trace/report padding — unread slots);
+  validate each declared id exists, then fingerprint the KIND sequence → new `RouteShape` field on
+  `Resolved` ({M1Layered, SingleIr, DirectSmt}): M1Layered = the 8 `PROCESSING_STAGE_KINDS`; SingleIr
+  = [extract,segment,model_fill,assemble,compile,verify] + model_fill stage outputs `[clinical_ir]`;
+  DirectSmt = [extract,segment,model_fill,verify] + outputs `[smt_query]`; else an
+  unsupported-sequence diagnostic. `plan.pipelines` = the full resolved set (M1 stays `[baseline]` —
+  plan bytes unchanged). `execute()` runs the M1Layered single-route path exactly as today; a
+  model-route experiment gets a command-scope invalid_diagnostic (doc: run-m2.1c wires the loop). The
+  6 `Resolved{}` literals gain `shape`. Reading: run.rs resolve/execute + resolution tests;
+  registry-m2.2 accessors (memory bullet). Gate: cargo test (M1 resolution/pins unchanged; new test
+  pins exp.m2_multihop's two views — ids, step arrays incl. padding, shapes, shared plan); registry
+  check green over the seeded entry.
+- [ ] run-m2.1b: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
+  `accepted_cassette_hash: Option<Hash>` (the accepted attempt's cassette wrapper `content_hash`,
+  Some iff target Some) + `model_identity: Option<ModelIdentity>` (the last attempt's cassette
+  identity, Some once any attempt lands a cassette) — both read from wrappers model_fill already
+  holds. single_ir_fill's bundle wrapper cites source+segments+accepted cassette hash; direct_smt_
+  fill's two smt_query wrappers cite source+segments (member order) + their own accepted cassette
+  hash. Existing fill/model_fill tests re-pin input_hashes as SETS (§4.3 sorts them — never pin
+  emitted order; memory GOTCHA). Reading: model_fill.rs, cassette.rs replay/record return shapes,
+  the two fills + their tests. Gate: cargo test; the model_fill test battery extended for both
+  fields.
+- [ ] run-m2.1c: the model-route loop in `execute()`. Dispatch on RouteShape per resolved view:
+  SingleIr = per-doc `single_ir_fill` → per-group `compile_verify_group`; DirectSmt = per-group
+  `direct_smt_fill` → `direct_smt_verify_group`; run's CassetteStore root = `<root>/cassettes/`
+  (production rule; run-m2.2 commits recorded cassettes there); base seed = experiment seed; repair
+  limit = budget `model_repair_limit` (a model-route experiment missing it → resolution-time
+  diagnostic — extend .1a's resolve). Artifacts land under `routes/<pipeline-id>/…` (docs +
+  `groups/<gid>/…`), minted artifact ids route-prefixed where the tails mint them (confirm exact id
+  formats from compile_verify_group/single_ir_fill at read; they collide across routes otherwise).
+  §4.6 events per DECLARED stage per route: extract/segment per doc; model_fill event carries
+  RECORDED_CALLS_COUNTER + REPAIRS_COUNTER (stage-model-fill memory bullet); assemble/compile/verify
+  as declared; solver-budget counter on verify. Run-scoped trace+report tails run ONCE over all
+  routes' collected DocTrace/GroupTrace but emit NO §4.6 events for M2 pipelines (undeclared steps;
+  M1 keeps its events — event emission becomes attribution-optional). Identity agreement: every
+  replayed cassette across routes carries ONE model_identity (committed goldens agree:
+  model.baseline/fixture_quant/1.0.0) — mismatch = command-scope diagnostic, fail-closed abort.
+  Collect per-route RouteRun{pipeline_id, ledger slice, FillObservation + GroupObservation batteries
+  (k=1 battery — `model_sample_count: 1`)} for .1d; report stage still passes sections=None. Reading:
+  run.rs execute/document_pipeline/group_pipeline + the route fns; trace assembly entry points.
+  Gate: integration test seeds a tempdir repo-root mirror (registry/, corpus/, toolchain, lockfile +
+  cassettes crafted via the existing helpers or copied goldens — implementer's call) → replay-driven
+  `execute(exp.m2_multihop)` lands both routes' artifacts + events deterministically (run twice,
+  byte-equal); M1 execute pins unchanged.
+- [ ] run-m2.1d: §9 measurement record — report sections + manifests. report_processing_stage builds
+  `ModelRunSections{route_diagnostics (per-route ledgers, clean route = empty slice), route_metrics
+  (metrics::route_metrics per route — samples = the k=1 battery → convergence NA), baseline_pipeline_
+  id, model_identity}`; `experiment_metrics` stays in-assembly (never called from run.rs). §7.1-vs-M2
+  section coexistence mirrors the .1c populated_report fixture (settled shape — read it +
+  Report::validate before wiring; graphs route-independent, results per route). Land report_ja.md
+  beside report_en.md (`render_markdown_ja`, same read-back discipline). ManifestInputs +
+  assemble_manifests gain the §9 omittable set, populated: model_identity = the run's agreed
+  identity; test_source_hash = hash_bytes over the run's per-source raw-byte `sha256:<hex>` strings
+  sorted + joined `\n`; reference_hash = raw bytes of the experiment's expected_outcomes file;
+  schema_hash = raw bytes of registry/schemas.yaml; prompt_template_hash = raw bytes of
+  registry/prompts.yaml (the registry files transitively pin the referenced files' hashes);
+  model_hash/runtime_hash = None (no committed model/runtime file — env wrapper outside git; honest
+  omission, run-m2.2 revisits). M1 runs keep every field None → M1 manifest pins byte-identical.
+  Reading: run.rs report/manifest fns; report.rs ModelRunSections + populated fixture; manifests.rs.
+  Gate: cargo test; full-run test pins report.json M2 sections + both md bodies + manifest fields on
+  the .1c replayed run; M1 pins hold.
+- [ ] run-m2.1e: `ckc run --record`. Dispatch: optional `--record` flag → `Run{record: bool}`
+  (default false = replay, the committed acceptance path); record mode: one `ModelAdapter::new()`
+  probe → identity into manifests/report verbatim; per route `FillSource::Record{adapter, prompt,
+  constraint, ctx}` — constraint file = the route target-kind's SchemaEntry path (clinical_ir /
+  smt_query), prompt = its PromptEntry file by route id (SingleIr↔route.single_ir,
+  DirectSmt↔route.direct_smt), composed as template bytes + (single_ir: the doc's id line + segment
+  texts in segment order; direct: a `role: overlap|deontic` line + both members' id lines + segment
+  texts) — first-draft composition, run-m2.2's live recording refines wording; RecordContext per
+  cassette.rs's shape (read at implementation). Replay stays the default everywhere (replay.rs
+  re-executes via run::execute → never records). Reading: dispatch.rs, model.rs adapter surface,
+  cassette.rs RecordContext, registry prompt/schema loaders. Gate: cargo test; default-replay
+  acceptance test (record=false constructs no adapter); the Record arm stays type-enforced thin
+  delegation (memory stage-model-fill) — live exercise = run-m2.2.
 - [ ] run-m2.2: live-pin battery over the run binary. Record the full experiment cassette via the env
   runtime command (LIVE, runtime indirection over deny-Read sources), commit the recorded model I/O as
   tracked test-source artifacts (origin `ai_generated`); live pins on `report.json` sections + manifest
