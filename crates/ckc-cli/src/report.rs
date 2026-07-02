@@ -10,6 +10,9 @@
 //! [`render_markdown`] is the deterministic §7.2 derived view, the
 //! `report_en.md` body (cli-runner.4.1b.2a); the run/replay manifest landings
 //! arrive with .4.1b.2b (manifest assembly lives in `crate::manifests`).
+//! M2 (report-m2.1b) adds the omit-None members `failure_taxonomy`,
+//! `metrics`, and `model_identity`; report-m2.2 populates them from the
+//! recorded two-route run.
 //!
 //! Partition (M1's two-query §6 plan, roles spelled by the §8.6 query-id
 //! suffixes `.overlap`/`.deontic`):
@@ -30,12 +33,13 @@ use std::collections::BTreeMap;
 
 use ckc_core::{
     CanonError, CanonRead, CanonReadError, Canonical, ClaimTier, DiagnosticRecord, Hash, Id,
-    ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceDocumentGraph, canonical_sort_key,
-    emit_map, emit_set, emit_string, emit_u64_map, fieldless_enum, read_map, read_set, read_string,
-    read_u64_map,
+    ModelIdentity, ObjectEmitter, ObjectReader, Reader, SolverIdentity, SourceDocumentGraph,
+    canonical_sort_key, emit_map, emit_set, emit_string, emit_u64_map, fieldless_enum, read_map,
+    read_set, read_string, read_u64_map,
 };
 use ckc_smt::{SolverVerdict, VerifierCategory, VerifierResult, VerifierResults};
 
+use crate::metrics::{ExperimentMetrics, MetricRow};
 use crate::trace::{
     ConflictKind, LineageIndex, LineageRow, TraceBundle, TraceNodeKind, canonical_id_set,
 };
@@ -205,14 +209,23 @@ impl CanonRead for ReportFinding {
 /// hash; `diagnostics_summary` is the code-keyed count summary over the
 /// run's §7.4 records; `findings` and `no_conflict_results` are the two claim
 /// partitions; `wording` is the canonical set of §0 labels the rows carry.
+/// The M2 members (`failure_taxonomy`, `metrics`, `model_identity`) are
+/// omit-None optional — absent from M1 reports, so M1 bytes and pins stay
+/// unchanged; report-m2.2 populates them from the recorded two-route run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
     pub corpus_hashes: Vec<(Id, Hash)>,
     pub diagnostics_summary: Vec<(Id, u64)>,
+    /// §7.2 per-route failure taxonomy over the run's §7.4 records.
+    pub failure_taxonomy: Option<RouteTaxonomy>,
     pub findings: Vec<ReportFinding>,
     /// Raw-byte hash of the §5 lexicon reference file (§4.4: the lexicon
     /// is a file, not an accepted artifact).
     pub lexicon_hash: Hash,
+    /// §7.3/§9 experiment metrics: per-route raw rows plus baseline deltas.
+    pub metrics: Option<ExperimentMetrics>,
+    /// §9 identity of the run's local-model runtime.
+    pub model_identity: Option<ModelIdentity>,
     pub no_conflict_results: Vec<ReportFinding>,
     pub replay_status: ReplayStatus,
     pub solver_identity: SolverIdentity,
@@ -233,6 +246,15 @@ impl Report {
     ///    three id pools, `quoted_spans`, and `core` are non-empty
     ///    canonical sets; quoted texts are non-empty.
     /// 4. Finding ids are unique across both partitions.
+    /// 5. `failure_taxonomy` (when present) names at least one route; route
+    ///    keys and each per-route code map are §4.3 maps; counts are
+    ///    positive (an empty per-route code map is a clean route, allowed).
+    /// 6. `metrics` (when present): raw-rows routes are duplicate-free, the
+    ///    baseline has a raw-rows section, `route_deltas` lists exactly the
+    ///    non-baseline routes in raw-rows order, and every raw and delta row
+    ///    list is strictly ascending by metric id.
+    /// 7. `model_identity` (when present) carries non-empty `quant` and
+    ///    `runtime_version` (`model_id` is Id-grammar-guaranteed).
     pub fn validate(&self) -> Result<(), ReportError> {
         check_map_order("corpus_hashes", self.corpus_hashes.iter().map(|(k, _)| k))?;
         check_map_order(
@@ -310,6 +332,63 @@ impl Report {
                 }
             }
         }
+        if let Some(taxonomy) = &self.failure_taxonomy {
+            if taxonomy.routes.is_empty() {
+                return Err(ReportError::EmptyTaxonomy);
+            }
+            check_map_order("failure_taxonomy", taxonomy.routes.iter().map(|(k, _)| k))?;
+            for (pipeline_id, counts) in &taxonomy.routes {
+                check_map_order("failure_taxonomy counts", counts.iter().map(|(k, _)| k))?;
+                if let Some((code, _)) = counts.iter().find(|(_, count)| *count == 0) {
+                    return Err(ReportError::TaxonomyZeroCount {
+                        pipeline_id: pipeline_id.clone(),
+                        code: code.clone(),
+                    });
+                }
+            }
+        }
+        if let Some(metrics) = &self.metrics {
+            let mut seen: Vec<&str> = Vec::new();
+            for route in &metrics.routes {
+                if seen.contains(&route.pipeline_id.as_str()) {
+                    return Err(ReportError::DuplicateRoute(route.pipeline_id.clone()));
+                }
+                seen.push(route.pipeline_id.as_str());
+                check_metric_rows(&route.pipeline_id, &route.rows)?;
+            }
+            if !metrics
+                .routes
+                .iter()
+                .any(|r| r.pipeline_id == metrics.baseline_pipeline_id)
+            {
+                return Err(ReportError::BaselineMissing(
+                    metrics.baseline_pipeline_id.clone(),
+                ));
+            }
+            let non_baseline: Vec<&Id> = metrics
+                .routes
+                .iter()
+                .map(|r| &r.pipeline_id)
+                .filter(|id| **id != metrics.baseline_pipeline_id)
+                .collect();
+            let listed: Vec<&Id> = metrics.deltas.iter().map(|d| &d.pipeline_id).collect();
+            if non_baseline != listed {
+                return Err(ReportError::DeltaTableMismatch);
+            }
+            for delta in &metrics.deltas {
+                check_metric_rows(&delta.pipeline_id, &delta.rows)?;
+            }
+        }
+        if let Some(identity) = &self.model_identity {
+            for (field, value) in [
+                ("quant", &identity.quant),
+                ("runtime_version", &identity.runtime_version),
+            ] {
+                if value.is_empty() {
+                    return Err(ReportError::EmptyIdentityField { field });
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -323,8 +402,17 @@ impl Canonical for Report {
         obj.member("diagnostics_summary", |b| {
             emit_u64_map(b, &self.diagnostics_summary)
         })?;
+        obj.optional(
+            "failure_taxonomy",
+            self.failure_taxonomy.as_ref(),
+            |b, v| v.emit_canonical(b),
+        )?;
         obj.member("findings", |b| emit_set(b, &self.findings))?;
         obj.member("lexicon_hash", |b| self.lexicon_hash.emit_canonical(b))?;
+        obj.optional("metrics", self.metrics.as_ref(), |b, v| v.emit_canonical(b))?;
+        obj.optional("model_identity", self.model_identity.as_ref(), |b, v| {
+            v.emit_canonical(b)
+        })?;
         obj.member("no_conflict_results", |b| {
             emit_set(b, &self.no_conflict_results)
         })?;
@@ -342,8 +430,11 @@ impl CanonRead for Report {
         let mut obj = ObjectReader::open(r)?;
         let corpus_hashes = obj.member("corpus_hashes", read_map::<Id, Hash>)?;
         let diagnostics_summary = obj.member("diagnostics_summary", read_u64_map)?;
+        let failure_taxonomy = obj.optional("failure_taxonomy", RouteTaxonomy::read)?;
         let findings = obj.member("findings", read_set::<ReportFinding>)?;
         let lexicon_hash = obj.member("lexicon_hash", Hash::read)?;
+        let metrics = obj.optional("metrics", ExperimentMetrics::read)?;
+        let model_identity = obj.optional("model_identity", ModelIdentity::read)?;
         let no_conflict_results = obj.member("no_conflict_results", read_set::<ReportFinding>)?;
         let replay_status = obj.member("replay_status", ReplayStatus::read)?;
         let solver_identity = obj.member("solver_identity", SolverIdentity::read)?;
@@ -352,13 +443,63 @@ impl CanonRead for Report {
         Ok(Report {
             corpus_hashes,
             diagnostics_summary,
+            failure_taxonomy,
             findings,
             lexicon_hash,
+            metrics,
+            model_identity,
             no_conflict_results,
             replay_status,
             solver_identity,
             wording,
         })
+    }
+}
+
+/// SPEC §7.2 code-keyed failure taxonomy: a canonical map of route
+/// (pipeline) id to a map of §7.4 diagnostic code to count, mirroring
+/// `diagnostics_summary`'s string-wrapped u64 counts per route. Keys are
+/// plain [`Id`]s so the §7.4 vocabulary can grow without a shape change;
+/// §7.4 membership of the code keys is the assembler's duty (report-m2.2
+/// populates the taxonomy from the recorded two-route run).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteTaxonomy {
+    pub routes: Vec<(Id, Vec<(Id, u64)>)>,
+}
+
+impl Canonical for RouteTaxonomy {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        let counts: Vec<CodeCounts> = self
+            .routes
+            .iter()
+            .map(|(_, counts)| CodeCounts(counts.clone()))
+            .collect();
+        emit_map(out, self.routes.iter().map(|(k, _)| k).zip(&counts))
+    }
+}
+
+impl CanonRead for RouteTaxonomy {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        let entries = read_map::<Id, CodeCounts>(r)?;
+        Ok(RouteTaxonomy {
+            routes: entries.into_iter().map(|(k, v)| (k, v.0)).collect(),
+        })
+    }
+}
+
+/// One route's code→count map, wrapped so it rides the §4.3 map generics
+/// (mirrors `canon`'s crate-internal `Count`).
+struct CodeCounts(Vec<(Id, u64)>);
+
+impl Canonical for CodeCounts {
+    fn emit_canonical(&self, out: &mut Vec<u8>) -> Result<(), CanonError> {
+        emit_u64_map(out, &self.0)
+    }
+}
+
+impl CanonRead for CodeCounts {
+    fn read(r: &mut Reader<'_>) -> Result<Self, CanonReadError> {
+        Ok(CodeCounts(read_u64_map(r)?))
     }
 }
 
@@ -389,8 +530,9 @@ enum Role {
 /// partition's §0 label). `corpus_hashes` come from the bundle's source
 /// nodes; `diagnostics_summary` counts `diagnostics` by §7.4 code;
 /// `replay_status` starts [`NotReplayed`](ReplayStatus::NotReplayed). The
-/// caller runs [`Report::validate`] on the value (the boundary discipline
-/// stays with the landing).
+/// M2 members stay `None` here — report-m2.2 populates them from the
+/// recorded two-route run. The caller runs [`Report::validate`] on the
+/// value (the boundary discipline stays with the landing).
 pub fn assemble_report(
     bundle: &TraceBundle,
     lineage: &LineageIndex,
@@ -575,8 +717,11 @@ pub fn assemble_report(
     Ok(Report {
         corpus_hashes,
         diagnostics_summary,
+        failure_taxonomy: None,
         findings,
         lexicon_hash: lexicon_hash.clone(),
+        metrics: None,
+        model_identity: None,
         no_conflict_results,
         replay_status: ReplayStatus::NotReplayed,
         solver_identity: solver_identity.clone(),
@@ -750,6 +895,17 @@ fn check_map_order<'a>(
     Ok(())
 }
 
+/// Enforce the metrics row invariant at the report boundary: a raw-rows or
+/// delta section's rows strictly ascending by metric id (covers duplicates).
+fn check_metric_rows(pipeline_id: &Id, rows: &[MetricRow]) -> Result<(), ReportError> {
+    for pair in rows.windows(2) {
+        if pair[0].metric >= pair[1].metric {
+            return Err(ReportError::MetricRowOrder(pipeline_id.clone()));
+        }
+    }
+    Ok(())
+}
+
 /// Structural/assembly failure taxonomy for [`Report`]; every variant
 /// names its offending id or pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -796,6 +952,20 @@ pub enum ReportError {
     RoleVerdict(Id),
     /// The verifier result disagrees with its claim row.
     ResultMismatch(Id),
+    /// `failure_taxonomy` is present but names no routes.
+    EmptyTaxonomy,
+    /// A failure-taxonomy count is zero.
+    TaxonomyZeroCount { pipeline_id: Id, code: Id },
+    /// Two metrics raw-rows sections claim one route.
+    DuplicateRoute(Id),
+    /// The metrics baseline has no raw-rows section.
+    BaselineMissing(Id),
+    /// `route_deltas` disagrees with the non-baseline raw-rows routes.
+    DeltaTableMismatch,
+    /// A metrics row list is not strictly ascending by metric id.
+    MetricRowOrder(Id),
+    /// A model-identity text field is empty.
+    EmptyIdentityField { field: &'static str },
     /// Canonical emission failed while sorting or checking.
     Canon(CanonError),
 }
@@ -893,6 +1063,36 @@ impl std::fmt::Display for ReportError {
                     "query {id}: verifier result disagrees with its claim row"
                 )
             }
+            ReportError::EmptyTaxonomy => {
+                write!(f, "failure_taxonomy is present but names no routes")
+            }
+            ReportError::TaxonomyZeroCount { pipeline_id, code } => {
+                write!(
+                    f,
+                    "failure_taxonomy count for {code} on route {pipeline_id} is zero"
+                )
+            }
+            ReportError::DuplicateRoute(id) => {
+                write!(f, "metrics raw rows claim route {id} more than once")
+            }
+            ReportError::BaselineMissing(id) => {
+                write!(f, "metrics baseline {id} has no raw-rows section")
+            }
+            ReportError::DeltaTableMismatch => {
+                write!(
+                    f,
+                    "metrics route_deltas must list exactly the non-baseline raw-rows routes in raw-rows order"
+                )
+            }
+            ReportError::MetricRowOrder(id) => {
+                write!(
+                    f,
+                    "metrics rows for route {id} are not strictly ascending by metric id"
+                )
+            }
+            ReportError::EmptyIdentityField { field } => {
+                write!(f, "model_identity {field} is empty")
+            }
             ReportError::Canon(e) => write!(f, "canonical emission failed: {e:?}"),
         }
     }
@@ -908,6 +1108,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::metrics::{MetricValue, RouteMetrics, experiment_metrics};
     use crate::trace::{ClaimEvidenceRow, TraceNode};
 
     fn id(text: &str) -> Id {
@@ -937,6 +1138,7 @@ mod tests {
                 (id("test_source.b"), hash('2')),
             ],
             diagnostics_summary: vec![(id("schema_invalid"), 1), (id("solver_timeout"), 2)],
+            failure_taxonomy: None,
             findings: vec![ReportFinding {
                 assertion_ids: vec![id("a.test_source.a.rule.0"), id("a.test_source.b.rule.0")],
                 claim_tier: ClaimTier::S1Accepted,
@@ -957,6 +1159,8 @@ mod tests {
                 wording: Wording::SyntheticTestSourceMeasurement,
             }],
             lexicon_hash: hash('f'),
+            metrics: None,
+            model_identity: None,
             no_conflict_results: vec![ReportFinding {
                 assertion_ids: vec![
                     id("ctx.test_source.a.rule.1"),
@@ -1283,6 +1487,205 @@ mod tests {
             Err(ReportError::EmptyQuotedText {
                 finding_id: id("finding.group.g2.0"),
                 span_id: id("s.1"),
+            })
+        );
+    }
+
+    /// Two-route §7.3 metrics through [`experiment_metrics`]'s own assembly
+    /// (`pipe.base` baseline + `pipe.route`), every value `not_applicable`;
+    /// rejection tests pub-field-mutate the result into the invalid shapes
+    /// the assembler itself refuses to build.
+    fn metrics_fixture() -> ExperimentMetrics {
+        let row = |name: &str| MetricRow {
+            metric: id(name),
+            value: MetricValue::NotApplicable,
+        };
+        experiment_metrics(
+            vec![
+                RouteMetrics {
+                    pipeline_id: id("pipe.base"),
+                    rows: vec![row("acceptance_rate"), row("repair_count")],
+                    diagnostics: vec![],
+                },
+                RouteMetrics {
+                    pipeline_id: id("pipe.route"),
+                    rows: vec![row("acceptance_rate")],
+                    diagnostics: vec![],
+                },
+            ],
+            &id("pipe.base"),
+        )
+    }
+
+    #[test]
+    fn rejects_empty_taxonomy() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy { routes: vec![] }),
+            ..valid_report()
+        };
+        assert_eq!(report.validate(), Err(ReportError::EmptyTaxonomy));
+    }
+
+    #[test]
+    fn allows_a_clean_route_with_no_counts() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![
+                    (id("pipe.base"), vec![(id("solver_timeout"), 2)]),
+                    (id("pipe.route"), vec![]),
+                ],
+            }),
+            ..valid_report()
+        };
+        report.validate().unwrap();
+    }
+
+    #[test]
+    fn rejects_taxonomy_order_breaks() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![(id("pipe.route"), vec![]), (id("pipe.base"), vec![])],
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::MapOrder {
+                pool: "failure_taxonomy"
+            })
+        );
+
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![(
+                    id("pipe.base"),
+                    vec![(id("solver_timeout"), 1), (id("schema_invalid"), 1)],
+                )],
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::MapOrder {
+                pool: "failure_taxonomy counts"
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_taxonomy_zero_counts() {
+        let report = Report {
+            failure_taxonomy: Some(RouteTaxonomy {
+                routes: vec![(id("pipe.base"), vec![(id("schema_invalid"), 0)])],
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::TaxonomyZeroCount {
+                pipeline_id: id("pipe.base"),
+                code: id("schema_invalid"),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_metrics_routes() {
+        let mut metrics = metrics_fixture();
+        metrics.routes.push(metrics.routes[1].clone());
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::DuplicateRoute(id("pipe.route")))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_metrics_baseline() {
+        let mut metrics = metrics_fixture();
+        metrics.baseline_pipeline_id = id("pipe.ghost");
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::BaselineMissing(id("pipe.ghost")))
+        );
+    }
+
+    #[test]
+    fn rejects_delta_table_mismatch() {
+        let mut metrics = metrics_fixture();
+        metrics.deltas.clear();
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(report.validate(), Err(ReportError::DeltaTableMismatch));
+    }
+
+    #[test]
+    fn rejects_metric_row_order_breaks() {
+        // Raw arm: swap the baseline's two sorted rows.
+        let mut metrics = metrics_fixture();
+        metrics.routes[0].rows.swap(0, 1);
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::MetricRowOrder(id("pipe.base")))
+        );
+
+        // Delta arm: append a duplicate delta row.
+        let mut metrics = metrics_fixture();
+        let dup = metrics.deltas[0].rows[0].clone();
+        metrics.deltas[0].rows.push(dup);
+        let report = Report {
+            metrics: Some(metrics),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::MetricRowOrder(id("pipe.route")))
+        );
+    }
+
+    #[test]
+    fn rejects_empty_identity_fields() {
+        let identity = ModelIdentity {
+            model_id: id("model.baseline"),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        };
+        let report = Report {
+            model_identity: Some(ModelIdentity {
+                quant: String::new(),
+                ..identity.clone()
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::EmptyIdentityField { field: "quant" })
+        );
+
+        let report = Report {
+            model_identity: Some(ModelIdentity {
+                runtime_version: String::new(),
+                ..identity
+            }),
+            ..valid_report()
+        };
+        assert_eq!(
+            report.validate(),
+            Err(ReportError::EmptyIdentityField {
+                field: "runtime_version"
             })
         );
     }
@@ -1975,8 +2378,11 @@ documented no-conflict result; claim tier `s1_accepted`.
         let report = Report {
             corpus_hashes: vec![],
             diagnostics_summary: vec![],
+            failure_taxonomy: None,
             findings: vec![],
             lexicon_hash: hash('f'),
+            metrics: None,
+            model_identity: None,
             no_conflict_results: vec![],
             replay_status: ReplayStatus::NotReplayed,
             solver_identity: SolverIdentity {
