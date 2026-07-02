@@ -100,26 +100,51 @@ doc-lint bullet).
   .1b 60% 120K/200K 6f785b6
 - [x] metrics-m2.2: k_sample_convergence row (pairwise fingerprint agreement, NA on k<2) +
   experiment_metrics baseline-delta assembly + emission_order §9 contract + Rational::sub. 87% 174K/200K
-- [ ] report-m2.1: report.json M2 shape + canonical. Extend the `Report` types + `report.json`
-  canonical shape (Canonical/CanonRead) with per-route raw rows, the baseline-delta table, findings
-  (quoted Japanese source spans + named assertions), a failure-taxonomy summary (§6 categories + §7.4
-  codes), model + solver identities, replay status, metrics (M2+). Byte-pin the canonical form on a
-  HAND-BUILT, fully-populated fixture (no run needed). Reading: `crates/ckc-cli/src/report.rs` Report
-  types + canon; SPEC §7.2, §9 report.json contents. Gate: `cargo test`; canonical round-trip + pinned
-  bytes for the populated fixture; §0 vocabulary in the wording fields.
+  05746ce
+- [ ] report-m2.1a: metrics.rs canonical layer — PROVEN source-diff salvage (the .1 session
+  overflowed post-derivation with this half green; recovery pre-proved every gate on the banked
+  tree, then reverted). Redo = `git apply .agent/wip-report-m2.1a.diff` → gates → close,
+  transcribing NOTHING; procedure + banked pass counts in `.agent/wip-report-m2.1.txt` §.1a.
+  Content: Canonical/CanonRead for MetricRow (NotApplicable = omitted `value` member) +
+  RouteMetrics/RouteDelta + ExperimentMetrics with LOAD-BEARING keys `raw_rows` < `route_deltas`
+  (§9 raw-before-delta in §4.3 sorted-key bytes — memory TRAP discharged) + 2 byte-pin/round-trip
+  tests. Gate (all PRE-PROVEN): `cargo test -p ckc-cli` = 231 passed; fmt + clippy `-D` clean;
+  doc-lint 18 standing; engine grep clean on metrics.rs. Close: rm the .diff.
+- [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Apply the
+  COMPILE-VERIFIED partial `.agent/wip-report-m2.1b.diff` (module doc + imports + RouteTaxonomy
+  Canonical/CanonRead), then implement per `.agent/wip-report-m2.1.txt` §.1b — every decision
+  RESOLVED there (Report's 3 omit-None Option members `failure_taxonomy`/`metrics`/`model_identity`
+  + sorted-slot order, validate() rules + 4 new ReportError variants, populated_report() fixture
+  values incl. verbatim JA spans + synthetic model identity, deltas via the real pub
+  `crate::metrics::experiment_metrics` assembler, test list, pin-from-observed protocol). M1
+  PINNED_REPORT bytes stay untouched (omit-None regression guard). Reading: the txt + targeted
+  report.rs regions ONLY (2023 lines — SPEC re-reads unneeded, § facts inlined in the txt). Gate:
+  `cargo test`; populated round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte
+  order + §0 wording pin; validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold);
+  engine grep on report.rs + metrics.rs. Close: rm .agent/wip-report-m2.1b.diff + the txt.
 - [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
   `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
   replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the
   metrics modules; SPEC §7.2, §9. Gate: `cargo test`; report.json assembles from a recorded-run
   fixture with every M2 section present + canonical-valid. [Split from report-m2.1: canonical type/pin
   vs assembly population.]
-- [ ] report-m2.3: bilingual rendering. Render `report_en.md` (extend the M1 renderer with M2
-  metrics/delta/taxonomy) + new `report_ja.md` (deterministic Japanese rendering of the same canonical
-  report.json); §0 locked-measurement wording, no clinical claims; quoted JA spans verbatim. Reading:
-  `report.rs` render_markdown + report-m2.1/.2 payload; SPEC §7.2 (report_ja from M2), §0 vocabulary.
-  Gate: `cargo test`; both md files render deterministically (byte-stable) from one report.json; the
-  JA rendering is well-formed; §0 vocabulary asserted.
-- [ ] run-m2.1: `exp.m2_multihop` wiring + experiment entry. Seed the `exp.m2_multihop`
+- [ ] report-m2.3a: report_en.md M2 rendering. Extend the M1 renderer with the M2 sections —
+  metrics raw rows + delta table walked VIA `ExperimentMetrics::emission_order` (the §9 carrier,
+  memory), failure taxonomy, model identity, replay status; quoted JA spans verbatim; §0
+  locked-measurement wording, no clinical claims. Reading: `report.rs` render_markdown +
+  report-m2.1b/.2 payload; SPEC §7.2. Gate: `cargo test`; deterministic byte-stable render from one
+  report.json; §0 vocabulary asserted. [Split from report-m2.3: two renderers = 2 units per the
+  memory format-walker sizing rule.]
+- [ ] report-m2.3b: report_ja.md renderer (needs .3a's section shape). NEW deterministic Japanese
+  rendering of the same canonical report.json (SPEC §7.2: report_ja from M2); resolve the JA §0
+  label mapping from SPEC §0 at session start (>2 open semantic decisions ⇒ stop + respec); quoted
+  JA spans verbatim. Gate: `cargo test`; both md files render deterministically (byte-stable) from
+  one report.json; the JA rendering is well-formed; §0 vocabulary asserted.
+- [ ] run-m2.1: `exp.m2_multihop` wiring + experiment entry. SIZE-CHECK FIRST (mandatory): this is
+  a 4-deliverable stack (route loop + `resolve()` generalization; provenance input_hashes; `--record`
+  flag; report/manifest wiring) over run.rs — the session STARTS by respec-splitting it at a seam
+  confirmed from a run.rs read (precedent M2.20/M2.23), committing `roadmap (M2.26 respec): …`, then
+  implements only the first half. Seed the `exp.m2_multihop`
   `ExperimentEntry` (`pipelines=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_pipeline=
   pipe.m2_direct_smt`, the M1 groups, seed, budget incl. k-sample count + repair limit) — both
   pipelines now exist, so `ckc registry check` validates the full experiment. Wire `run.rs` to execute

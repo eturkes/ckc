@@ -42,7 +42,9 @@ full pre-consolidation text lives in git history.
   (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
   artifact = 2; multi-invariant validator + full rejection coverage = 2; pure-computation module (full
   §-semantics + unit tests) + its recorded-run integration test = 2 (metrics-m2.1 overflowed deriving
-  both in one window); derivation fn + its
+  both in one window); canonical-emit layer over an existing type family (one module) + a byte-pinned
+  record-shape extension consuming it (a second module) = 2, split at the module seam (report-m2.1
+  overflowed: read+derive+first-module-green consumed the window before module 2 started); derivation fn + its
   test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
   (never paired with assembly or stage wiring); spec-byte amendment (re-pin + reference/test mirror sweep)
@@ -366,19 +368,16 @@ full pre-consolidation text lives in git history.
     `model_fill(store, key, Replay, repair_limit, single_ir_accept(regions, segs))` DIRECTLY (inspect
     `ModelFill.target`/`diagnostics`/`repairs`/`recorded_calls`); `single_ir_fill` is asserted via
     `shell.ledger()` for the ROUTE-level §7.4 surfacing (recovery → 1 `ai_schema_violation` + a bundle;
-    hallucinated → `ai_hallucinated_source` + `None`). Committed cassettes under
-    `route.single_ir/test_source.m1_guideline_a` (synthetic-identity → audited), blessed by `#[ignore]`d
-    `bless_single_ir_rejection_cassettes`: seed 99 = the golden ClinicalIr with one `source_segment_id`
-    rebound to an absent id (canonical → parses → terminal `ai_hallucinated_source`, spends no repair);
-    seed 98 = non-canonical bytes → `ai_schema_violation`, and `derive_seed(98,1)`=17360999193197444373 =
-    the golden recovery, so seed 98 + `repair_limit 1` recovers (recovered IR pinned == golden bytes);
-    a non-canonical PAIR seed 97 + `derive_seed(97,1)`=5718913436695043505 + `repair_limit 1` exhausts to
-    `repair_limit_exceeded` THROUGH the re-prompt path. LESSON (codex M2.19): `repair_limit=0` hits
+    hallucinated → `ai_hallucinated_source` + `None`). Committed bad cassettes under
+    `route.single_ir/test_source.m1_guideline_a` (synthetic-identity → audited), seeds 99/98/97
+    (+derived) = hallucinated-terminal / schema→recover / exhaust-through-re-prompt; mechanics +
+    derived-seed constants live in the tests (`single_ir_route_rejection_codes`,
+    `bless_single_ir_rejection_cassettes`). LESSON (codex M2.19): `repair_limit=0` hits
     model_fill's terminal branch at attempt 0 BEFORE the re-prompt loop → it proves only the zero-budget
     boundary (already model_fill.rs's coverage), NOT multi-attempt exhaustion; faithful route-level
     exhaustion needs malformed cassettes at the base AND each derived seed through the budget. Pin the
     `ai_schema_violation` payload SHAPE too (key `reason`, non-empty, empty refs), symmetric to the
-    hallucinated/exceeded pins. route-direct-smt's rejection unit reuses this committed-bad-cassette shape.
+    hallucinated/exceeded pins.
   - route.direct_smt seam (M2.20 respec → route-direct-smt.1-.5; user-confirmed both forks): the direct
     route emits SMT, but `verdict::verify` consumes a `CompiledArtifact` whose `validate()` demands
     non-empty `region_ids` per assertion — a no-IR route CANNOT honestly supply them, so do NOT reuse
@@ -415,12 +414,8 @@ full pre-consolidation text lives in git history.
     cites the UPSTREAM artifact hash (single_ir: `compiled.content_hash`), so direct wraps each fill body as an
     `smt_query` `ArtifactWrapper<QueryBody>` (Canonical+CanonRead) and `verifier_results` cite those two
     `content_hash`es — the CASSETTE hash is fill-wrapper provenance deferred to run-m2.1 (both routes).
-    LANDED (route-direct-smt.3a golden cassettes + .3b fill) in run.rs beside single_ir's: `direct_smt_accept`
-    (shallow SMT well-formedness = utf8 + `(set-logic` head + `(check-sat)`, `FillReject::Schema` only, NO
-    grounding — the solver is the syntactic authority) + per-group `direct_smt_fill` (extract+segment each
-    member for provenance input_hashes, two `model_fill` Replay under role-namespaced sources
-    `<gid>.overlap`/`<gid>.deontic` at the base seed, wrap each accepted body as an `smt_query`
-    `ArtifactWrapper<QueryBody>`). NOVEL raw-AI provenance (distinct from single_ir's ir_bundle
+    LANDED (.3a golden cassettes + .3b fill) in run.rs beside single_ir's — `direct_smt_accept` +
+    per-group `direct_smt_fill` exactly per the seam above. NOVEL raw-AI provenance (distinct from single_ir's ir_bundle
     `DeterministicCompiler`/`MechanicalEvidenceStatus`): the smt_query IS the raw model body, only
     shallow-accepted (no deterministic transform, no source linkage) → `Origin::AiGenerated` +
     `EvidenceStatus::AcceptedEvidenceStatus` + EMPTY external effects. Why consistent: `wrapper()` forces
@@ -465,10 +460,10 @@ full pre-consolidation text lives in git history.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
   sections strictly before all DeltaTable sections) — UNCONSUMED until run-m2.1/report-m2 land;
   those units must render through it, never the fields ad hoc (codex M2.22: the §9 guarantee
-  reaches artifacts only once an emitter walks it). REPORT-m2.1
-  TRAP: §4.3 canonical JSON sorts member keys, so raw-before-delta in BYTES additionally needs the
-  raw-rows member key to sort below the delta key (e.g. `raw_rows` < `route_deltas`) — pick key
-  names accordingly or the emitted report violates §9 while `emission_order` tests stay green.
+  reaches artifacts only once an emitter walks it). REPORT-m2.1 TRAP (DISCHARGED in the .1a
+  salvage, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
+  raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
+  routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.
 
 ## Runtime
 
