@@ -28,8 +28,11 @@ emission_order + module docs (contract tense). Tests appended after
 violations_beyond_calls_are_a_fill_bug: metric_row_bytes_omit_value_on_not_applicable
 pins {"metric":"acceptance_rate","value":{"den":"2","num":"1"}} and
 {"metric":"k_sample_convergence"}; experiment_metrics_round_trip_with_raw_rows_before_deltas
-pins find("\"raw_rows\":") < find("\"route_deltas\":") + strict round-trip, via
-delta_fixture() + experiment_metrics(vec![route, baseline], &static_id("pipe.base")).
+pins find("\"raw_rows\":") < find("\"route_deltas\":") + the FULL assembly byte-for-byte
+(PINNED_EXPERIMENT_METRICS const — nested RouteMetrics/RouteDelta member names +
+§4.3 key order; symmetric emit/read drift would survive round-trip alone) + strict
+round-trip, via delta_fixture() + experiment_metrics(vec![route, baseline],
+&static_id("pipe.base")).
 Commit: `report (M2.23): metrics.rs canonical layer — §9 raw_rows<route_deltas bytes (.1a)`
 
 .1b — report.rs M2 shape + populated pin (needs .1a)
@@ -94,8 +97,12 @@ only through the applied .1a diff + `pub fn experiment_metrics` grep.
      target_syntactic_validity 2/3; diagnostics []. single_ir_rm rows: acceptance_rate
      1/1, k_sample_convergence NA, recorded_call_count 3/1, repair_count 0/1,
      schema_valid_rate 2/3, target_syntactic_validity 1/1 — NO conflict_verdict_accuracy
-     row; diagnostics [omitted_metric_diagnostic("conflict_verdict_accuracy", <reason>)]
-     (metrics.rs fn — make pub(crate); mirror its existing metrics-test call). Expected
+     row; diagnostics [omitted_metric_diagnostic("conflict_verdict_accuracy",
+     "unrecognized expected_outcome(s): g.x=semantic_gibberish".into())] — reason
+     VERBATIM from the existing omission test (production format, synthetic tokens);
+     resulting record ✓: code SchemaInvalid, outcome Invalid, payload
+     [(metric,"conflict_verdict_accuracy"),(reason,<that string>)], region_ids +
+     artifact_hashes []. metrics.rs fn — make pub(crate). Expected
      assembler deltas (single_ir − baseline; sanity vs the pin): acceptance_rate 1/2,
      conflict_verdict_accuracy NA, k_sample_convergence NA, recorded_call_count -1/1,
      repair_count -1/1, schema_valid_rate -1/12, target_syntactic_validity 1/3.
