@@ -60,26 +60,21 @@ full pre-consolidation text lives in git history.
   PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
   read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
   skeleton before the full test battery; pin expected shapes from observed output, never hand-computed;
-  cite only checked roadmap lines as anchors. At plan/re-scope time audit any spec a unit must
+  cite only checked roadmap lines as anchors (`[S]`-tagged stubs excluded —
+  salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
   declaration/conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
-  deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE (a reverted session's compiling
-  half → committed `.agent/wip-<unit>.patch` the redo line points at; apply, verify vs the line, delete at
-  the closing commit): a recovery with margin PROVES the salvage green before reverting (apply full set,
-  run gate, fix, revert) → the redo is reproduction-only, gate pre-proven + pass counts banked in the redo
-  line. A SOURCE-DIFF salvage banks the whole proven change as a `git diff` + a thin procedure-only
-  `.txt` → redo = `git apply`→bless→gate→commit, transcribing NOTHING; a codex-review of a salvage targets
-  the wip as the real deliverable + folds accepted NEW TESTS into it pre-redo (else the "reproduction-only"
-  redo re-derives them) → re-prove green, re-bank sha + pass counts. An UNCOMPILED draft salvages the same
-  way flagged UNCOMPILED — recovery verifies its external assumptions (referenced types/APIs/field names)
-  against source, an assumption-verified target not a blind preserve; a whole-NEW-file draft salvages as a
-  byte-verified `.rs.txt` copy not a diff (dodges RTK diff-compression + LSP indexing; pre-format it —
-  rustfmt reflows an unformatted draft so a byte-exact restore else fails `cargo fmt --check`). A
-  DERIVATION overflow (SOTA notation/tool selection + empirical external-crate validation) salvages the
-  same — the redo line banks the LOCKED decision, the validated + hashed artifact (any committed file →
-  byte-exact `.agent/wip-<file>`, not only `.rs`), AND the wiring APIs pre-transcribed from source, so the
-  redo reads nothing but the line. Latent bugs surface in recovery not redo (e.g. a missing `Debug` on a
-  public result type); a salvage shared by a multi-unit split is deleted at the LAST consuming unit's close.
+  deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE RETIRED (user
+  directive, 2026-07-02; roadmap salvage-caveat note): banking applyable wip artifacts (`.agent/wip-*`
+  patches / byte-exact code copies / transcription blueprints a redo line points at) cheats the unit — the
+  redo's recorded context-usage measures artifact application, not the unit as specced, so roadmap `[S]`
+  stubs are excluded as sizing anchors. Overflow recovery is LAND-OR-REVERT: either the proven half closes
+  as its OWN completed unit (own gate, own honest usage figure, artifacts committed at their final paths)
+  within the session's remaining margin, or the tree reverts CLEAN and the recovery respec-splits into
+  fresh SELF-CONTAINED units. A respec line may resolve decisions, confirmed facts, and reading pointers
+  in prose (that is planning); it banks zero verbatim implementation code and zero apply/restore/
+  transcribe instructions. Retired wip artifacts live in git history only — a fresh redo restores nothing
+  from them. Any wip scratch file a session does create gets deleted before that session's closing commit.
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
@@ -87,13 +82,13 @@ full pre-consolidation text lives in git history.
   `Resolved`-style stamp structs — assembled across many modules; a deterministic-REPRODUCTION
   gate reads the WHOLE upstream type + helper set. Detect at PLAN time: count the modules a
   unit's gate/bless scaffolding must read for exact shapes, not just its conceptual pieces. A
-  nothing-written overflow recovers FORWARD (not via a backward `.patch`/`.rs.txt` salvage):
+  nothing-written overflow recovers FORWARD:
   (a) SPLIT the production fn from its golden-fixture + gate when separable (route-single-ir.2
-  = accept closure; .2b = fill+bless+gate); (b) pre-derive exact code + CONFIRMED signatures +
-  the verified equality-premise facts (e.g. clinical_ir diagnostics empty for the 3 docs) +
-  insertion anchors into a throwaway `.agent/wip-<unit>.txt` the impl line POINTS at — read
-  THAT not the N files, targeted reads only at flagged VERIFY points; delete it in the closing
-  commit. A self-checking gate (`content_hash == reference`) bounds transcription risk on the
+  = accept closure; .2b = fill+bless+gate); (b) pre-resolve the blocking FACTS — confirmed
+  signatures, verified equality premises (e.g. clinical_ir diagnostics empty for the 3 docs),
+  insertion anchors — into the respec'd roadmap LINE as prose (facts/decisions = planning;
+  verbatim code or a pointed-at wip artifact = retired salvage, sizing bullet); a fact set too
+  large for a line ⇒ the unit is still oversized, split further. A self-checking gate (`content_hash == reference`) bounds reproduction-error risk on the
   PAYLOAD path ONLY: a content-hash-affecting line fails loudly; off-payload lines don't (wrong
   signature → compile error; producer/wrapper/input_hash fields compile AND pass silently → still
   targeted-read those). Mark gate-IRRELEVANT fields (producer
@@ -465,8 +460,8 @@ full pre-consolidation text lives in git history.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
   sections strictly before all DeltaTable sections) — UNCONSUMED until run-m2.1/report-m2 land;
   those units must render through it, never the fields ad hoc (codex M2.22: the §9 guarantee
-  reaches artifacts only once an emitter walks it). REPORT-m2.1 TRAP (DISCHARGED in the .1a
-  salvage, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
+  reaches artifacts only once an emitter walks it). REPORT-m2.1 TRAP (DISCHARGED in landed
+  .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.
 

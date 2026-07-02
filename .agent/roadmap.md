@@ -10,6 +10,15 @@ then persists as a bare header; git history retains all removed text. The active
 `plan <hash>` shows `PENDING` until its first unit's closing commit fills it — the planning
 commit is then known (M1's `89c4cba` was filled retroactively too).
 
+Salvage caveat: stubs tagged `[S]` (tag precedes the usage figure) closed by consuming banked
+`.agent/wip-*` salvage/blueprint artifacts — proven code/patches/transcription blueprints committed
+by an earlier overflowed session — so their recorded context-usage measures the apply/redo session
+only and materially UNDERSTATES the unit as specced; never cite an `[S]` stub as a sizing anchor.
+M1's collapsed stubs cli-runner.3a.2a / cli-runner.4.1a.2 / cli-runner.4.1b.2b.1 carry the same
+caveat. Pattern RETIRED (user directive): banking applyable artifacts cheats the unit — overflow
+recovery = revert + respec into fresh self-contained units (memory's sizing bullet holds the
+standing rule); retired wip artifacts stay in git history only, restored never.
+
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
 ## M2 multi-hop PoC — plan 2a4f03d
@@ -37,11 +46,11 @@ argument).
 - [x] model-types: ModelIdentity + §9 manifest measurement record + §7.4 model-route codes; M1
   pins unchanged. 71% 142K/200K d9651c4
 - [x] schemas-export.1a: ClinicalIR JSON-Schema emitter-core + parse-only tests (salvage restore).
-  49% 97K/200K 6b61113
+  [S] 49% 97K/200K 6b61113
 - [x] schemas-export.1b: committed schemas/clinical_ir.schema.json + jsonschema oracle + hash pin;
-  drift-guard bless pattern. 55% 110K/200K 6f4f97a
+  drift-guard bless pattern. [S] 55% 110K/200K 6f4f97a
 - [x] schemas-export.2: committed schemas/smt_query.grammar (BNF) + bnf Earley recognizer oracle +
-  hash pin. 55% 110K/200K ad10279
+  hash pin. [S] 55% 110K/200K ad10279
 - [x] registry-m2.1: SchemaEntry/PromptEntry + loaders + CLI model-registry file/hash check.
   82% 164K/200K 09b58a6
 - [x] registry-m2.2: experiment pipeline-set binding (dual-form pipelines/baseline_pipeline) +
@@ -51,25 +60,25 @@ argument).
 - [x] model-adapter.1: env-command ModelAdapter — identity probe + invoke skeleton (bare PATH
   name). 76% 151K/200K 1b61cde
 - [x] model-adapter.2a: constrained invoke + k-sample derive_seed + EOF-gated capture-completeness.
-  46% 92K/200K 9ae5773
+  [S] 46% 92K/200K 9ae5773
 - [x] model-adapter.2a-codexfix: Completed race fix + capture/seed doc honesty + engine de-leak +
   grammar re-pin. 62% 123K/200K 19f6d30
 - [x] model-adapter.2b: live #[ignore]d end-to-end adapter confirm — byte-stability +
   constraint-conformance. 57% 114K/200K 6de7da7
 - [x] model-cassette.1: CassettePayload (core) + CassetteStore (cli) salvage restore; load-contract
-  hardened. 46% 92K/200K e6d990b
+  hardened. [S] 46% 92K/200K e6d990b
 - [x] model-cassette.2: live-blessed committed test cassette + runtime-absent content-hash-pinned
   replay. 72% 145K/200K b810753
 - [x] stage-model-fill.1: decoupled model_fill stage core (replay/record -> accept -> ModelFill).
-  51% 103K/200K da98bcc
+  [S] 51% 103K/200K da98bcc
 - [x] stage-model-fill.2: repair loop (derive_seed re-prompt) + grounding terminal + both counters.
-  58% 116K/200K bb18149
+  [S] 58% 116K/200K bb18149
 - [x] route-single-ir.1: pipe.m2_single_ir + m2.assemble stage + prompts.yaml/prompt + check loop.
   70% 140K/200K c9bff36
 - [x] route-single-ir.2: single_ir_accept closure — strict-read + grounding pre-check.
-  58% 116K/200K 5739d8d
+  [S] 58% 116K/200K 5739d8d
 - [x] route-single-ir.2b: single_ir_fill + 3 golden cassettes + reproduce-M1 gate (banked-patch
-  redo). 47% 94K/200K 93c1d18
+  redo). [S] 47% 94K/200K 93c1d18
 - [x] route-single-ir.3: single_ir verdict tail — scores m1 groups vs reference (z3, full oracle
   mirror). 88% 177K/200K ea77a93
 - [x] route-single-ir.4: single_ir §7.4 rejection codes over committed bad cassettes (seeds
@@ -79,13 +88,13 @@ argument).
 - [x] route-direct-smt.2: verify_pair extraction + pub verify_query_pairs (caller-minted pairs).
   69% 139K/200K 467cd85
 - [x] route-direct-smt.3a: 4 golden direct cassettes (M1 query bodies verbatim) + bless +
-  self-check. 70% 140K/200K ff656a4
+  self-check. [S] 70% 140K/200K ff656a4
 - [x] route-direct-smt.3b: direct_smt_accept + direct_smt_fill (role-namespaced sources, raw-AI
-  smt_query provenance). 75% 151K/200K 97cabd7
+  smt_query provenance). [S] 75% 151K/200K 97cabd7
 - [x] route-direct-smt.4: direct_smt_verify_group verdict tail + reference scoring
   (DIRECT_VERIFY=3, direct §4.6 event). 77% 154K/200K 3723430
 - [x] route-direct-smt.5: direct §7.4 rejection codes — schema exhaustion (seed 91) +
-  TargetSyntaxFailure (seed 90). 63% 126K/200K cc555db
+  TargetSyntaxFailure (seed 90). [S] 63% 126K/200K cc555db
 
 Standing M2-review flag: pre-existing rustdoc errors — 18 `private_intra_doc_links` in ckc-cli
 (model.rs/cassette.rs/replay.rs/trace.rs) + 17 unresolved-link in ckc-core (enums.rs:50 macro doc,
@@ -96,26 +105,28 @@ doc-lint bullet).
 - [x] metrics-m2.1: §7.3 raw-row metrics — metrics.rs (route_metrics + 9 unit tests) + run.rs
   `route_metrics_score_recorded_two_route_run` (two-route recorded-cassette test, both arms'
   full row vectors + pipeline_id + cardinalities pinned). Pre-staged blueprint executed
-  zero-re-derivation, first-run green; wip files consumed+rm'd. .1a 37% 74K/200K ad174a7 ·
+  zero-re-derivation, first-run green; wip files consumed+rm'd. [S] .1a 37% 74K/200K ad174a7 ·
   .1b 60% 120K/200K 6f785b6
 - [x] metrics-m2.2: k_sample_convergence row (pairwise fingerprint agreement, NA on k<2) +
   experiment_metrics baseline-delta assembly + emission_order §9 contract + Rational::sub. 87% 174K/200K
   05746ce
 - [x] report-m2.1a: metrics.rs canonical layer (MetricRow/RouteMetrics/RouteDelta/
   ExperimentMetrics) — §9 raw_rows<route_deltas byte pin; salvage redo, gates == banked.
-  39% 79K/200K 6c28421
-- [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Apply the
-  COMPILE-VERIFIED partial `.agent/wip-report-m2.1b.diff` (module doc + imports + RouteTaxonomy
-  Canonical/CanonRead), then implement per `.agent/wip-report-m2.1.txt` §.1b — every decision
-  RESOLVED there (Report's 3 omit-None Option members `failure_taxonomy`/`metrics`/`model_identity`
-  + sorted-slot order, validate() rules + 4 new ReportError variants, populated_report() fixture
-  values incl. verbatim JA spans + synthetic model identity, deltas via the real pub
-  `crate::metrics::experiment_metrics` assembler, test list, pin-from-observed protocol). M1
-  PINNED_REPORT bytes stay untouched (omit-None regression guard). Reading: the txt + targeted
-  report.rs regions ONLY (2023 lines — SPEC re-reads unneeded, § facts inlined in the txt). Gate:
-  `cargo test`; populated round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte
-  order + §0 wording pin; validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold);
-  engine grep on report.rs + metrics.rs. Close: rm .agent/wip-report-m2.1b.diff + the txt.
+  [S] 39% 79K/200K 6c28421
+- [ ] report-m2.1b: report.json M2 shape + populated canonical pin (needs .1a). Respecced FRESH —
+  the 4a47fbb wip artifacts are retired (salvage caveat above): implement from source, restore
+  nothing. Extend `Report` with 3 omit-None Option members `failure_taxonomy`/`metrics`/
+  `model_identity` (Canonical/CanonRead, each in its sorted-key slot per the memory
+  extension-pattern bullet; RouteTaxonomy gains Canonical+CanonRead), validate() rules + matching
+  new ReportError variants, and a populated_report() fixture (verbatim JA spans from committed M1
+  fixtures + SYNTHETIC model identity; deltas built via the real pub
+  `crate::metrics::experiment_metrics` assembler, never hand-assembled). M1 PINNED_REPORT bytes
+  stay untouched (omit-None regression guard); pin populated bytes from observed output. Reading:
+  targeted report.rs regions (Report/validate/pin tests; 2023 lines — read targeted, not whole),
+  metrics.rs pub surface, SPEC §7.2/§9 excerpts as needed. Gate: `cargo test`; populated
+  round-trip + PINNED_POPULATED_REPORT + §9 raw-rows-before-deltas byte order + §0 wording pin;
+  validate rejection per new variant; fmt/clippy/doc-lint (18+17 hold); engine grep on touched
+  files.
 - [ ] report-m2.2: assemble_report M2 population. Extend `assemble_report` to populate the M2
   `report.json` from a recorded two-route run — wire the metrics modules, model + solver identities,
   replay status, the failure-taxonomy. Reading: `report.rs` assemble_report + report-m2.1 types; the
