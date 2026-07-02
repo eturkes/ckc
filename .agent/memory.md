@@ -80,7 +80,14 @@ full pre-consolidation text lives in git history.
   in prose (that is planning); its banked content is prose only — the redo session itself writes every
   line of implementation code. Retired wip artifacts remain in git history as provenance only — a fresh
   redo derives and writes everything within its own session. Any wip scratch file a session does create
-  gets deleted before that session's closing commit.
+  gets deleted before that session's closing commit. RESPEC-SESSION CLOSE (run-m2.1 respec 3b1066a: the
+  same session's first-half attempt overflowed pre-compile — production edits landed, zero gates run —
+  and was reverted): a respec whose seam confirmation reads span multiple modules has already spent the
+  implementation margin → commit the respec, re-score the first half against the window REMAINING, and
+  implement only on a clear fit; the default close is the respec commit itself (the session-prompt
+  clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
+  the confirmed facts (caller counts, helper signatures, fixture slots, exact reasons) — bank those at
+  respec time while they are in-window.
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
@@ -261,7 +268,8 @@ full pre-consolidation text lives in git history.
   RegistryFinding variants need ZERO `registry_check.rs` change. `run.rs` deliberately executes ONLY
   `baseline()` and records `pipelines: vec![baseline]` (behavior-locked to M1) — run-m2.1 completes the
   multi-route loop (`resolved_pipelines()` + recording the full set) AND seeds the real set-form
-  `exp.m2_multihop` (still unseeded — its route pipelines don't exist yet, would dangle `check`). SPEC: §8.4
+  `exp.m2_multihop` (still unseeded; both route pipelines exist now → seeding is `check`-safe,
+  run-m2.1a does it). SPEC: §8.4
   stays M1-singular (faithful history); the M2 generalization went into §14's registry-evolution ledger
   (no §14 byte-pin → free prose).
 - Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.

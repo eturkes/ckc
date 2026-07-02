@@ -128,23 +128,54 @@ doc-lint bullet).
   (`pipelines=[pipe.m2_direct_smt, pipe.m2_single_ir]`, `baseline_pipeline=pipe.m2_direct_smt`, M1
   groups verbatim, seed 42, budget `solver_ms_per_query: 10000` + `model_repair_limit: 1` +
   `model_sample_count: 1`, `expected_outcomes: corpus/reference/m1_expected.yaml`) — pipelines +
-  stages exist, so `ckc registry check` validates it. Generalize `resolve()` → `Option<Vec<Resolved>>`,
-  one view per `resolved_pipelines()` member in set order, run-scoped fields cloned per view;
-  per-route `pipeline_step_ids` = the pipeline's DECLARED stage list positionally (confirmed: both
-  route fixtures use declared order; single_ir 6 = slots 0-5, direct 4 = slots 0-3), padded to 8 with
-  `processing_stage.unused` (align single_ir_resolved's trace/report padding — unread slots);
-  validate each declared id exists, then fingerprint the KIND sequence → new `RouteShape` field on
-  `Resolved` ({M1Layered, SingleIr, DirectSmt}): M1Layered = the 8 `PROCESSING_STAGE_KINDS`; SingleIr
-  = [extract,segment,model_fill,assemble,compile,verify] + model_fill stage outputs `[clinical_ir]`;
-  DirectSmt = [extract,segment,model_fill,verify] + outputs `[smt_query]`; else an
-  unsupported-sequence diagnostic. `plan.pipelines` = the full resolved set (M1 stays `[baseline]` —
-  plan bytes unchanged). `execute()` runs the M1Layered single-route path exactly as today; a
-  model-route experiment gets a command-scope invalid_diagnostic (doc: run-m2.1c wires the loop). The
-  6 `Resolved{}` literals gain `shape`. Reading: run.rs resolve/execute + resolution tests;
-  registry-m2.2 accessors (memory bullet). Gate: cargo test (M1 resolution/pins unchanged; new test
-  pins exp.m2_multihop's two views — ids, step arrays incl. padding, shapes, shared plan); registry
-  check green over the seeded entry.
-- [ ] run-m2.1b: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
+  stages exist, so `ckc registry check` validates it. run.rs edits: consts after `DIRECT_VERIFY` —
+  `SINGLE_IR_STAGE_KINDS=[extract,segment,model_fill,assemble,compile,verify]`,
+  `DIRECT_SMT_STAGE_KINDS=[extract,segment,model_fill,verify]`,
+  `UNUSED_STAGE="processing_stage.unused"` (the direct fixture's existing padding id); `RouteShape`
+  {M1Layered,SingleIr,DirectSmt} (Clone,Copy,PartialEq,Eq,Debug) + `shape: RouteShape` on
+  `Resolved`; `resolve()` → `Option<Vec<Resolved>>` — `baseline().is_none()` ⇒ reason "has no valid
+  pipeline binding" + None; budget/documents/toolchain blocks unchanged; ONE shared plan,
+  `pipelines = resolved_pipelines()` (M1 = `[baseline]` → plan bytes unchanged); per member in set
+  order find the PipelineEntry (else reason "names undefined pipeline {id}") + new
+  `resolve_route(&PipelineEntry, &Candidates, &mut Shell) -> Option<([Id; 8], RouteShape)>`: per
+  DECLARED stage id find its entry (else reason "pipeline {id} declares undefined processing_stage
+  {stage_id}"), collect the kind sequence + the model_fill stage's output_artifact_kinds, then
+  fingerprint — M1Layered = the 8 `PROCESSING_STAGE_KINDS`; SingleIr = SINGLE_IR_STAGE_KINDS +
+  model_fill outputs `[clinical_ir]`; DirectSmt = DIRECT_SMT_STAGE_KINDS + outputs `[smt_query]`;
+  else reason "pipeline {id} declares an unsupported processing-stage sequence [{kinds joined}]";
+  pad declared ids to 8 with UNUSED_STAGE (declared order fills slots 0..n — both route fixtures
+  already use declared order). `execute()` head: exactly one M1Layered view ⇒ today's path
+  verbatim; anything else ⇒ invalid_diagnostic reason "experiment {id} resolves model routes; the
+  run command executes only the layered M1 pipeline today" + return, zero artifacts (doc:
+  run-m2.1d wires the loop). CONFIRMED FACTS (grep-verified at respec — skip re-derivation):
+  `resolve()` has ONE caller, `execute` (~l.117); tests reach resolution only through `executed()`
+  (l.1844 → `(TotalOperationResult, Vec<EventRecord>, Vec<DiagnosticRecord>, PathBuf, TempDir)`) ⇒
+  signature fallout = the execute head alone; `Resolved{}` literals = 3, NOT 6 (resolve() +
+  fixtures single_ir_resolved l.2541 — realign padding slots 6/7 m1.trace/m1.report → UNUSED_STAGE,
+  shape SingleIr — and direct_smt_resolved l.3161 — already unused×4, add shape DirectSmt); direct
+  stage ids = m2.model_fill_smt / m2.verify_smt. Tests (2 new): two-view pin — direct
+  `resolve(&repo_root(), &parsed id, &mut Shell::open(run, m2, None))`, ledger empty, view order
+  [direct, single_ir], steps [m1.extract, m1.segment, m2.model_fill_smt, m2.verify_smt, unused×4]
+  +DirectSmt and [m1.extract, m1.segment, m2.model_fill, m2.assemble, m1.compile, m1.verify,
+  unused×2]+SingleIr, per view budget_ms 10000 + documents [guideline_a, guideline_b, control] +
+  2 groups + plan{experiment_id, pipelines [direct, single_ir], seed 42, budget
+  [(model_repair_limit,1),(model_sample_count,1),(solver_ms_per_query,10000)]}; and
+  `executed(&repo_root(), "exp.m2_multihop")` ⇒ Invalid outcome + exactly the routes diagnostic +
+  no artifacts dir. Reading: run.rs resolve/execute + the two fixtures only. Close: refresh
+  memory's pipeline-set-binding + minimal-`Resolved` recon clauses (both go stale as this lands).
+  Gate: cargo test (M1 resolution/pins unchanged + the 2 new tests); registry check green over the
+  seeded entry. [2nd respec: the 3b1066a session's own first-half attempt overflowed pre-compile →
+  reverted; facts above banked from it; rejection battery split out to .1b.]
+- [ ] run-m2.1b: resolution rejection battery over .1a's surface (production code untouched).
+  Tests: tiny-root mutations — `write_tiny_root` (l.2244) then string-replace the written registry
+  bytes before resolving: (a) drop the tiny pipeline's normalize stage from its declared list →
+  7-kind sequence ⇒ "unsupported processing-stage sequence" naming the kinds; (b) swap one in-list
+  stage id for an undeclared one ⇒ "declares undefined processing_stage"; (c) point the experiment
+  at a missing pipeline id ⇒ "names undefined pipeline"; (d) malformed binding (set form + stray
+  legacy `pipeline:` key, `baseline().is_none()`) ⇒ "has no valid pipeline binding". Each ⇒
+  resolve None + exactly one command-scope diagnostic (assert the reason substring). Reading:
+  run.rs mod tests helpers (write_tiny_root + neighbors) only. Gate: cargo test.
+- [ ] run-m2.1c: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
   `accepted_cassette_hash: Option<Hash>` (the accepted attempt's cassette wrapper `content_hash`,
   Some iff target Some) + `model_identity: Option<ModelIdentity>` (the last attempt's cassette
   identity, Some once any attempt lands a cassette) — both read from wrappers model_fill already
@@ -154,7 +185,7 @@ doc-lint bullet).
   emitted order; memory GOTCHA). Reading: model_fill.rs, cassette.rs replay/record return shapes,
   the two fills + their tests. Gate: cargo test; the model_fill test battery extended for both
   fields.
-- [ ] run-m2.1c: the model-route loop in `execute()`. Dispatch on RouteShape per resolved view:
+- [ ] run-m2.1d: the model-route loop in `execute()`. Dispatch on RouteShape per resolved view:
   SingleIr = per-doc `single_ir_fill` → per-group `compile_verify_group`; DirectSmt = per-group
   `direct_smt_fill` → `direct_smt_verify_group`; run's CassetteStore root = `<root>/cassettes/`
   (production rule; run-m2.2 commits recorded cassettes there); base seed = experiment seed; repair
@@ -170,17 +201,17 @@ doc-lint bullet).
   replayed cassette across routes carries ONE model_identity (committed goldens agree:
   model.baseline/fixture_quant/1.0.0) — mismatch = command-scope diagnostic, fail-closed abort.
   Collect per-route RouteRun{pipeline_id, ledger slice, FillObservation + GroupObservation batteries
-  (k=1 battery — `model_sample_count: 1`)} for .1d; report stage still passes sections=None. Reading:
+  (k=1 battery — `model_sample_count: 1`)} for .1e; report stage still passes sections=None. Reading:
   run.rs execute/document_pipeline/group_pipeline + the route fns; trace assembly entry points.
   Gate: integration test seeds a tempdir repo-root mirror (registry/, corpus/, toolchain, lockfile +
   cassettes crafted via the existing helpers or copied goldens — implementer's call) → replay-driven
   `execute(exp.m2_multihop)` lands both routes' artifacts + events deterministically (run twice,
   byte-equal); M1 execute pins unchanged.
-- [ ] run-m2.1d: §9 measurement record — report sections + manifests. report_processing_stage builds
+- [ ] run-m2.1e: §9 measurement record — report sections + manifests. report_processing_stage builds
   `ModelRunSections{route_diagnostics (per-route ledgers, clean route = empty slice), route_metrics
   (metrics::route_metrics per route — samples = the k=1 battery → convergence NA), baseline_pipeline_
   id, model_identity}`; `experiment_metrics` stays in-assembly (never called from run.rs). §7.1-vs-M2
-  section coexistence mirrors the .1c populated_report fixture (settled shape — read it +
+  section coexistence mirrors the report-m2.1c populated_report fixture (settled shape — read it +
   Report::validate before wiring; graphs route-independent, results per route). Land report_ja.md
   beside report_en.md (`render_markdown_ja`, same read-back discipline). ManifestInputs +
   assemble_manifests gain the §9 omittable set, populated: model_identity = the run's agreed
@@ -192,8 +223,8 @@ doc-lint bullet).
   omission, run-m2.2 revisits). M1 runs keep every field None → M1 manifest pins byte-identical.
   Reading: run.rs report/manifest fns; report.rs ModelRunSections + populated fixture; manifests.rs.
   Gate: cargo test; full-run test pins report.json M2 sections + both md bodies + manifest fields on
-  the .1c replayed run; M1 pins hold.
-- [ ] run-m2.1e: `ckc run --record`. Dispatch: optional `--record` flag → `Run{record: bool}`
+  the .1d replayed run; M1 pins hold.
+- [ ] run-m2.1f: `ckc run --record`. Dispatch: optional `--record` flag → `Run{record: bool}`
   (default false = replay, the committed acceptance path); record mode: one `ModelAdapter::new()`
   probe → identity into manifests/report verbatim; per route `FillSource::Record{adapter, prompt,
   constraint, ctx}` — constraint file = the route target-kind's SchemaEntry path (clinical_ir /
