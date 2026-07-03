@@ -99,7 +99,12 @@ full pre-consolidation text lives in git history.
   implement only on a clear fit; the default close is the respec commit itself (the session-prompt
   clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
   the confirmed facts (caller counts, helper signatures, fixture slots, exact reasons) — bank those at
-  respec time while they are in-window.
+  respec time while they are in-window, AND cap the READ list to the minimal apply-anchors: a respec that
+  ENUMERATES shapes (event/destructure fields, signatures) must also forbid re-reading their SOURCES (the
+  mirror fn, the type modules), else the implementer re-incurs the very derivation-read the respec prepaid
+  (run-m2.1d4a overflowed its first implement attempt DESPITE a fully-pinned respec — its READ-FIRST
+  relisted the mirror + shape modules whose every field the respec already enumerated → reverted,
+  READ-FIRST re-scoped to the two apply-anchors: the old fn as the replace span + the call sites).
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs

@@ -148,12 +148,19 @@ doc-lint bullet).
   touched-file engine-leak audit; M1 pins untouched. On close PRUNE the [A]-[E] detail + gotchas to a
   one-line summary.
 
-  READ FIRST (targeted — never the whole 5283-line file): mirror `single_ir_fill` body for the
-  `ProcessingStageEvent` literal + `clock.stop()` + the `ModelFill { … }` destructure; current
-  `direct_smt_fill` (~1206 to its closing `}` ~1360) for the role loop + `wrapper(…)` call to mutate;
-  `DocHead`/`RouteDoc` (~829/~843) + `route_document_head` signature (~868) for the head fields +
-  helper arg order; the 6 call sites at the lines in [E]. `ModelFill` / `FillObservation` shapes are
-  pinned in [B] step 6 → skip model_fill.rs + metrics.rs unless a field mismatches.
+  NEXT SESSION = PURE TRANSCRIPTION, one FRESH window (no inherited summary). The prior attempt
+  overflowed only as a CONTINUATION carrying a fat summary WHILE obeying a broad read list — both gone
+  now. Every shape / string / ordering is pinned in [A]-[E] + gotchas → derive nothing, verify nothing,
+  read ONLY these two anchors, apply ALL of [A]-[E], THEN run the gate ONCE (not per-edit):
+    - OLD `fn direct_smt_fill` — grep `fn direct_smt_fill` (the def at ~1206, NOT the two `#[test]` fns)
+      through its closing `}` just before verify_group's doc `/// The direct_smt route's per-group verdict
+      tail:` (~1355). This IS the [B] replacement span AND shows `route_document_head`'s real arg order
+      for [D] (called inside this body).
+    - the 6 call-site lines in [E] (one small Edit each).
+  Open NOTHING else — not single_ir_fill, model_fill.rs, metrics.rs, or DocHead/RouteDoc: the
+  `ProcessingStageEvent` fields ([B].8), `ModelFill` destructure fields ([B].6), `DocHead` +
+  `FillObservation` fields ([B].3/.6), and every helper signature are already enumerated below. Bounded
+  reads + banked edits + one gate → fits 200K with wide margin.
 
   [A] new `struct DirectFill` directly above `direct_smt_fill`'s doc (~1194), attr
   `#[allow(dead_code)]`; fields `pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>`
@@ -248,8 +255,9 @@ doc-lint bullet).
   `(root: &Path, gid: &Id, members: &[&CorpusEntry], store: &CassetteStore, seed: u64, resolved: &Resolved, repair_limit: u32, shell: &mut Shell) -> DirectFill`.
   Body: per `&m in members` push `route_document_head(root, m, resolved, shell).unwrap_or_else(|| panic!("{gid}: no head for {}", m.id))`
   into `heads: Vec<DocHead>`; `let head_refs: Vec<&DocHead> = heads.iter().collect();`; return
-  `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`. (Confirm
-  `route_document_head`'s real arg order at ~868 when writing.) `direct_fill_group` is a SINGLE-group
+  `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`.
+  (`route_document_head`'s arg order = its call inside the OLD `direct_smt_fill` body you have open — no
+  ~868 read.) `direct_fill_group` is a SINGLE-group
   convenience — NO cross-group head dedup, so a member in N groups (or shared across arms under one shell)
   heads N×. This matters ONLY where a pin counts head events: reproduce + scores gain such pins in .1d4b →
   .1d4b swaps THAT pair onto a per-route head prepass (each unique `DocHead` built once, refs passed to
