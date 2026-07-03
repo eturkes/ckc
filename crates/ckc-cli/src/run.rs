@@ -3453,6 +3453,28 @@ processing_stages:
         );
     }
 
+    /// [`single_ir_resolved`]'s hardcoded step ids + shape stay bound to the
+    /// committed `pipe.m2_single_ir` declaration through the production
+    /// [`resolve_route`] — registry drift (either side) breaks here, never
+    /// silently. The reproduce-M1 event battery pins the same ids as
+    /// literals, closing the chain events → fixture → registry.
+    #[test]
+    fn single_ir_resolved_matches_committed_registry() {
+        let text = std::fs::read_to_string(repo_root().join("registry/candidates.yaml")).unwrap();
+        let candidates = parse_candidates(&text).unwrap();
+        let pipeline = candidates
+            .pipelines
+            .iter()
+            .find(|p| p.id == static_id("pipe.m2_single_ir"))
+            .expect("registry/candidates.yaml declares pipe.m2_single_ir");
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), None);
+        let (step_ids, shape) =
+            resolve_route(pipeline, &candidates, &mut shell).expect("route resolves");
+        let fixture = single_ir_resolved();
+        assert_eq!(step_ids, fixture.pipeline_step_ids);
+        assert_eq!(shape, fixture.shape);
+    }
+
     /// The reproduce-M1 gate: for each M1 document, [`single_ir_fill`] replaying the
     /// committed golden cassette compiles a bundle byte-identical (by the payload-only
     /// `content_hash`) to the M1 deterministic [`assemble_bundle`] bundle.
@@ -3556,9 +3578,9 @@ processing_stages:
             );
 
             // Close the shell and pin the LANDED §4.6 stream + layout
-            // (run-m2.1d3b): the run dir holds exactly the shell logs and the
-            // route tree, the doc dir exactly the three route artifacts, each
-            // strict-read clean under a route-prefixed artifact id.
+            // (run-m2.1d3b): every directory level listed exact down to the
+            // three route artifacts, each strict-read clean under a
+            // route-prefixed artifact id.
             let finished = shell.finish().unwrap();
             assert_eq!(finished.result.outcome, Outcome::Ok, "{}", entry.id);
             assert!(finished.result.diagnostic_hashes.is_empty(), "{}", entry.id);
@@ -3572,6 +3594,30 @@ processing_stages:
                 names
             };
             assert_eq!(listing(&out), ["logs", "routes"], "{}", entry.id);
+            assert_eq!(
+                listing(&out.join("logs")),
+                ["diagnostics.jsonl", "events.jsonl"],
+                "{}",
+                entry.id
+            );
+            assert_eq!(
+                listing(&out.join("routes")),
+                ["pipe.m2_single_ir"],
+                "{}",
+                entry.id
+            );
+            assert_eq!(
+                listing(&out.join("routes/pipe.m2_single_ir")),
+                ["artifacts"],
+                "{}",
+                entry.id
+            );
+            assert_eq!(
+                listing(&out.join("routes/pipe.m2_single_ir/artifacts")),
+                [entry.id.to_string()],
+                "{}",
+                entry.id
+            );
             assert_eq!(
                 listing(&out.join(&doc_dir)),
                 [
@@ -3637,6 +3683,7 @@ processing_stages:
                 assert_eq!(event.pipeline_id, static_id("pipe.m2_single_ir"), "{kind}");
                 assert_eq!(event.pipeline_step_id, static_id(step_ids[s]), "{kind}");
                 assert_eq!(event.outcome, Outcome::Ok, "{kind}");
+                assert_eq!(event.log_level, static_id("info"), "{kind}");
                 assert!(event.diagnostics.is_empty(), "{kind}");
                 assert_eq!(event.output_hashes.len(), 1, "{kind}");
             }
@@ -3689,8 +3736,14 @@ processing_stages:
             assert!(events[3].resource_counters.is_empty());
             let command = &events[4];
             assert_eq!(command.processing_stage, static_id("run"));
+            assert_eq!(command.pipeline_id, static_id("cli"));
+            assert_eq!(command.pipeline_step_id, "cli.run".parse::<Id>().unwrap());
+            assert_eq!(command.log_level, static_id("info"));
             assert_eq!(command.outcome, Outcome::Ok);
             assert!(command.diagnostics.is_empty());
+            assert!(command.input_hashes.is_empty());
+            assert!(command.output_hashes.is_empty());
+            assert!(command.resource_counters.is_empty());
         }
     }
 
