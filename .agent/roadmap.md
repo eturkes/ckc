@@ -144,7 +144,8 @@ timing fields are real wall-clock (shell.rs clock, NO normalization) → determi
 landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes.
 - [ ] run-m2.1d1: trace route-dir plumbing, M1-byte-locked. `DocTrace`/`GroupTrace` (trace.rs
   ≈538/558) gain `dir: String` (the dir their nodes' paths cite); every M1 constructor site passes
-  today's exact strings `artifacts/{doc}` / `groups/{gid}` (sites: trace.rs tests 7+7, run.rs 1+2)
+  today's exact strings `artifacts/{doc}` / `groups/{gid}` (sites: grep `DocTrace {`/`GroupTrace {`
+  in trace.rs tests + run.rs; missing-field compile errors catch every literal)
   → existing byte-pins = the lock. `assemble_trace`(≈595) reads the fields instead of its two
   hardcoded `format!`s, plus two route-readiness changes: (a) per-doc Source node pushed ONCE —
   skip an IDENTICAL (id/kind/path/hash) duplicate, a MISMATCHED one still reaches `validate` →
@@ -154,7 +155,8 @@ landed artifacts byte-equal + events on a non-timing projection, never raw event
   DocTraces, distinct dirs/bundles, one GroupTrace citing one side's hashes → edges from that side
   only). Node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
   direct-route verifier_results = legal orphan node (validate has no orphan check). Reading:
-  trace.rs + the 3 run.rs literal sites only. Gate: workspace tests green (M1 pins prove bytes) +
+  trace.rs + the grepped run.rs literal sites only. Gate: workspace tests green (M1 pins prove
+  bytes) +
   new dedup/mismatch/hash-edge tests.
 - [ ] run-m2.1d2: model-route resolve extension. `Resolved` gains `repair_limit: Option<u32>` +
   `is_baseline: bool`; `resolve()` fills per view: shape != M1Layered ⇒ budget `model_repair_limit`
@@ -175,8 +177,10 @@ landed artifacts byte-equal + events on a non-timing projection, never raw event
   with slot-0/1 events via the existing stage helpers (kinds at slots 0/1 match M1 — mirror
   document_pipeline); returns both wrappers + DocTrace{dir: that path, normalization None}. Rework
   `single_ir_fill`: consume DocHead; model_fill Replay + single_ir_accept unchanged;
-  fill.diagnostics → ledger (today's behavior — route tests + .1d5 RouteRun slices read it) AND
-  ride the model_fill event, DIRECT-emitted (pattern: direct_smt_verify_group): slot 2, kind
+  fill.diagnostics ride the model_fill event ONLY — Shell::processing_stage_event extends the
+  ledger from event diagnostics (single path; route tests + .1d5 RouteRun ledger slices still see
+  them; an added shell.diagnostic call would double-push ledger + double-merge outcome) —
+  DIRECT-emitted (pattern: direct_smt_verify_group): slot 2, kind
   "model_fill", clock opened AFTER provenance gathering (M2.7 lesson), inputs [source, segments]
   hashes, outputs [accepted_cassette_hash] iff target, counters [(RECORDED_CALLS_COUNTER,
   recorded_calls), (REPAIRS_COUNTER, repairs)] (model_fill.rs 44/50), outcome =
@@ -197,8 +201,9 @@ landed artifacts byte-equal + events on a non-timing projection, never raw event
   `{prefix}{gid}.{role}.smt_query`) at `routes/{pid}/groups/{gid}/{role}.smt_query.json`; ONE group
   model_fill event, DIRECT-emitted: slot 2, kind "model_fill", clock after provenance, inputs =
   member-order [source, segments] hashes, outputs = landed wrapper hashes (present ones), counters
-  summed over both roles, outcome severity(both fills' diagnostics), diagnostics ride event +
-  ledger; Err(CassetteError) → command diagnostic, NO event. Returns DirectFill{pair:
+  summed over both roles, outcome severity(both fills' diagnostics), diagnostics ride the event
+  ONLY (ledger via Shell::processing_stage_event — .1d3's single path); Err(CassetteError) →
+  command diagnostic, NO event. Returns DirectFill{pair:
   Option<(overlap, deontic)>, fills: Vec<FillObservation>, identities: Vec<ModelIdentity>}
   (observations survive terminal reject). `direct_smt_verify_group` artifact_id gains the prefix;
   keeps its direct verify event; no .smt2 materialization. Update call sites: direct reproduces
@@ -246,8 +251,10 @@ landed artifacts byte-equal + events on a non-timing projection, never raw event
   model_hash/runtime_hash = None (no committed model/runtime file — env wrapper outside git; honest
   omission, run-m2.2 revisits). M1 runs keep every field None → M1 manifest pins byte-identical.
   Flagged from .1d: landed smt_query wrappers are ABSENT from manifest output_hashes + trace nodes
-  (GroupTrace carries no smt_query slots) — decide here with replay.rs coverage semantics in view:
-  extend GroupTrace + the manifest walk, or document the honest omission. Sections consume .1d5's
+  (GroupTrace carries no smt_query slots) — close the gap here: extend GroupTrace + the manifest
+  walk so every accepted landed artifact is manifested → replay-covered (replay.rs diffs
+  expected_output_hashes vs the rerun manifest; a landed-but-unmanifested wrapper = silent replay
+  hole, so omission is not an option). Sections consume .1d5's
   banked RouteRun{pipeline_id, ledger slice, fills, groups, samples}. Reading: run.rs
   report/manifest fns; report.rs ModelRunSections + populated fixture; manifests.rs; replay.rs +
   trace.rs GroupTrace for the smt_query decision. Gate: cargo test; full-run test pins report.json
