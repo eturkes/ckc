@@ -141,11 +141,14 @@ fn names). CassetteStore::new(root) appends `cassettes/` itself → run store = 
 `<root>/cassettes/<route>/<source>/seed-<seed>.json` (production rule; run-m2.2 commits recorded
 cassettes there). Base seed = experiment seed; repair limit = resolved.repair_limit (.1d2). Event
 timing fields are real wall-clock (shell.rs clock, NO normalization) → determinism gates compare
-landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes. Trace
-node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
-direct-route verifier_results = legal orphan node (validate has no orphan check).
-- [x] run-m2.1d1: DocTrace/GroupTrace `dir` plumbing + source-node dedup + hash-matched
-  bundle→compiled edges, M1-byte-locked. 79% 159K/200K
+landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes. Artifact
+trace node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
+source node ids stay raw document_ids (shared across routes), report id `report`; direct-route
+verifier_results = legal orphan node (validate has no orphan check). GroupTrace.member_bundles =
+compiled members' bundle artifact_ids, exact compile-edge provenance (byte-identical route bundles
+share content hashes → hash-only selection over-edges); compile-less groups pass empty.
+- [x] run-m2.1d1: DocTrace/GroupTrace `dir` plumbing + source-node dedup + member-id+hash
+  bundle→compiled edges, M1-byte-locked. 79% 159K/200K 1bfc7e0
 - [ ] run-m2.1d2: model-route resolve extension. `Resolved` gains `repair_limit: Option<u32>` +
   `is_baseline: bool`; `resolve()` fills per view: shape != M1Layered ⇒ budget `model_repair_limit`
   REQUIRED (u32::try_from; missing/overflow → resolution diagnostic in .1a's style, resolve fails)
@@ -218,7 +221,8 @@ direct-route verifier_results = legal orphan node (validate has no orphan check)
   None (.1e populates). Gate test: `write_m2_root` mirror (copy from repo_root(): registry/*.yaml,
   corpus lexicon + 3 html + reference yaml, rust-toolchain.toml, Cargo.lock; plant the 7 golden
   seed-42 cassettes under `<root>/cassettes/`) → executed twice: zero command diagnostics; 27
-  events (M1 baseline 19; single_ir 3×4+2×2=16, direct 3×2+2×2=10, +1 command, tails none) with
+  events (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline
+  run stays 19) with
   model_fill counters (single_ir per doc 1/0; direct per group 2/0); both routes' layout present;
   trace_bundle strict-parses, shared source nodes once; determinism = landed artifacts byte-equal
   across the two runs + manifests byte-equal after normalizing the one `--out` token

@@ -562,8 +562,9 @@ fn document_pipeline(
 /// through the solver adapter under the experiment's per-query budget into
 /// `groups/<gid>/verifier_results.json`. One processing_stage event each; a compile
 /// failure skips the group's verify and leaves other groups to proceed.
-/// Returns the group's [`GroupTrace`]: the §8.4 member set plus each group
-/// landing that happened, riding whole.
+/// Returns the group's [`GroupTrace`]: the §8.4 member set, the member
+/// bundle ids compile consumed, plus each group landing that happened,
+/// riding whole.
 fn group_pipeline(
     group: &TestSourceGroup,
     docs: &[DocTrace],
@@ -576,6 +577,7 @@ fn group_pipeline(
     let mut trace = GroupTrace {
         group_id: gid.clone(),
         test_sources: group.test_sources.clone(),
+        member_bundles: Vec::new(),
         dir: dir.clone(),
         compiled: None,
         verifier_results: None,
@@ -609,6 +611,7 @@ fn group_pipeline(
             }
         }
     }
+    trace.member_bundles = members.iter().map(|m| m.artifact_id.clone()).collect();
     let (compiled, verifier_results) =
         compile_verify_group(gid, &dir, &members, clock, resolved, adapter, shell);
     trace.compiled = compiled;

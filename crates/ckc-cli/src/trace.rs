@@ -562,6 +562,11 @@ pub struct GroupTrace {
     pub group_id: Id,
     /// Member document ids in §8.4 registry order.
     pub test_sources: Vec<Id>,
+    /// Ir_bundle artifact ids compile consumed, member order (M1: each
+    /// test_source's landed bundle; compile skipped ⇒ empty). Exact-id
+    /// edge provenance: byte-identical bundles across routes share a
+    /// content hash, so hash-only selection would over-edge.
+    pub member_bundles: Vec<Id>,
     /// Run-relative dir the group nodes' paths cite (M1 `groups/<group_id>`;
     /// a route stage passes its own landing dir).
     pub dir: String,
@@ -580,10 +585,11 @@ pub struct GroupTrace {
 /// nearest present predecessor. Hand-offs sharing a document (routes share
 /// corpus docs) collapse to one source node when the repeats are identical
 /// (id/kind/path/hash); a mismatched repeat still lands and fails
-/// [`TraceBundle::validate`] as `DuplicateNodeId`. Per group each member
-/// ir_bundle →compile→ compiled — the edge rises from the member bundle
-/// node whose content hash is among the compiled wrapper's `input_hashes`
-/// (compile consumed exactly the member bundles) — then compiled →verify→
+/// [`TraceBundle::validate`] as `DuplicateNodeId`. Per group each
+/// `member_bundles` id whose node landed and whose content hash is among
+/// the compiled wrapper's `input_hashes` edges →compile→ compiled (exact
+/// ids disambiguate byte-identical bundles across routes; absent or
+/// hash-unmatched members contribute no edge) — then compiled →verify→
 /// verifier_results →report→ the report node.
 ///
 /// Claims: one row per verifier result, sequence_number = its index in the group's
@@ -614,7 +620,7 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
     }];
     let mut edges = Vec::new();
 
-    let mut bundle_nodes: BTreeMap<&str, Vec<(&Id, &Hash)>> = BTreeMap::new();
+    let mut bundle_nodes: BTreeMap<&str, &Hash> = BTreeMap::new();
     for doc in docs {
         let source = TraceNode {
             node_id: doc.document_id.clone(),
@@ -668,10 +674,7 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 operation: TraceOperation::Assemble,
                 to: bundle.artifact_id.clone(),
             });
-            bundle_nodes
-                .entry(doc.document_id.as_str())
-                .or_default()
-                .push((&bundle.artifact_id, &bundle.content_hash));
+            bundle_nodes.insert(bundle.artifact_id.as_str(), &bundle.content_hash);
         }
     }
 
@@ -686,17 +689,17 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 path: format!("{dir}/compiled.json"),
                 content_hash: Some(compiled.content_hash.clone()),
             });
-            for test_source in &group.test_sources {
-                for &(bundle_id, bundle_hash) in
-                    bundle_nodes.get(test_source.as_str()).into_iter().flatten()
-                {
-                    if compiled.input_hashes.contains(bundle_hash) {
-                        edges.push(TraceEdge {
-                            from: bundle_id.clone(),
-                            operation: TraceOperation::Compile,
-                            to: compiled.artifact_id.clone(),
-                        });
-                    }
+            for member in &group.member_bundles {
+                let consumed = bundle_nodes
+                    .get(member.as_str())
+                    .copied()
+                    .is_some_and(|hash| compiled.input_hashes.contains(hash));
+                if consumed {
+                    edges.push(TraceEdge {
+                        from: member.clone(),
+                        operation: TraceOperation::Compile,
+                        to: compiled.artifact_id.clone(),
+                    });
                 }
             }
         }
@@ -1766,6 +1769,7 @@ mod tests {
         GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![id("doc.a"), id("doc.b")],
+            member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
             compiled: Some(wrapper(
                 "group.g1.compiled",
@@ -1879,6 +1883,7 @@ mod tests {
         let group = GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![id("doc.a")],
+            member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
             compiled: None,
             verifier_results: None,
@@ -1898,6 +1903,7 @@ mod tests {
         let group = GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![],
+            member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
             compiled: None,
             verifier_results: Some(wrapper(
@@ -2001,9 +2007,10 @@ mod tests {
         );
     }
 
-    // Two hand-offs of one document carry distinct bundles; the compiled
-    // wrapper cites one side's hash in `input_hashes` → the compile edge
-    // rises from that bundle node only.
+    // Two hand-offs of one document carry distinct bundles, both cited in
+    // `member_bundles`; the compiled wrapper's `input_hashes` names the
+    // FIRST side's hash → the compile edge rises from that node only
+    // (first-cited target also catches a last-member-wins selector).
     #[test]
     fn assemble_compile_edges_follow_input_hashes() {
         let mut m1 = bare_doc("doc.a");
@@ -2022,10 +2029,11 @@ mod tests {
             empty_ir_bundle("doc.a"),
         ));
         let mut compiled = wrapper("group.g1.compiled", "compiled", 'b', compiled_payload());
-        compiled.input_hashes = vec![hash('2')];
+        compiled.input_hashes = vec![hash('1')];
         let group = GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![id("doc.a")],
+            member_bundles: vec![id("doc.a.ir_bundle"), id("pipe.r.doc.a.ir_bundle")],
             dir: "groups/group.g1".to_owned(),
             compiled: Some(compiled),
             verifier_results: None,
@@ -2034,7 +2042,56 @@ mod tests {
         assert_eq!(bundle.validate(), Ok(()));
         assert!(has_edge(
             &bundle,
+            "doc.a.ir_bundle",
+            TraceOperation::Compile,
+            "group.g1.compiled"
+        ));
+        assert_eq!(
+            bundle
+                .edges
+                .iter()
+                .filter(|e| e.operation == TraceOperation::Compile)
+                .count(),
+            1
+        );
+    }
+
+    // Byte-identical bundles across routes share a content hash (route
+    // reproduction pins make that the norm), so `input_hashes` alone
+    // cannot tell the twins apart; the group's `member_bundles` ids pick
+    // the consumed node exactly — the twin stays edge-free.
+    #[test]
+    fn assemble_compile_edges_pick_cited_member_among_equal_hashes() {
+        let mut m1 = bare_doc("doc.a");
+        m1.bundle = Some(wrapper(
+            "doc.a.ir_bundle",
+            "ir_bundle",
+            '3',
+            empty_ir_bundle("doc.a"),
+        ));
+        let mut route = bare_doc("doc.a");
+        route.dir = "routes/pipe.r/artifacts/doc.a".to_owned();
+        route.bundle = Some(wrapper(
             "pipe.r.doc.a.ir_bundle",
+            "ir_bundle",
+            '3',
+            empty_ir_bundle("doc.a"),
+        ));
+        let mut compiled = wrapper("group.g1.compiled", "compiled", 'b', compiled_payload());
+        compiled.input_hashes = vec![hash('3')];
+        let group = GroupTrace {
+            group_id: id("group.g1"),
+            test_sources: vec![id("doc.a")],
+            member_bundles: vec![id("doc.a.ir_bundle")],
+            dir: "groups/group.g1".to_owned(),
+            compiled: Some(compiled),
+            verifier_results: None,
+        };
+        let (bundle, _) = assemble_trace(&[m1, route], &[group]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert!(has_edge(
+            &bundle,
+            "doc.a.ir_bundle",
             TraceOperation::Compile,
             "group.g1.compiled"
         ));
@@ -2284,9 +2341,9 @@ mod tests {
 
     /// run.rs's group pipeline mirrored: compile the members' (formal,
     /// norm) pairs, verify on live z3 under a generous budget; the compiled
-    /// wrapper cites the member bundle hashes as `input_hashes`, exactly as
-    /// `compile_verify_group` wraps it (the compile-edge selector matches
-    /// bundle nodes against them).
+    /// wrapper cites the member bundle hashes as `input_hashes` and the
+    /// trace the member bundle ids as `member_bundles`, exactly as
+    /// `group_pipeline` wires them (the compile-edge selector needs both).
     fn live_group(gid: &str, members: &[&DocTrace], adapter: &Z3Adapter) -> GroupTrace {
         let artifact = compile(
             &id(gid),
@@ -2304,6 +2361,10 @@ mod tests {
         GroupTrace {
             group_id: id(gid),
             test_sources: members.iter().map(|d| d.document_id.clone()).collect(),
+            member_bundles: members
+                .iter()
+                .map(|d| d.bundle.as_ref().unwrap().artifact_id.clone())
+                .collect(),
             dir: format!("groups/{gid}"),
             compiled: Some(compiled),
             verifier_results: Some(live_wrapper(
