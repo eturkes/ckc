@@ -136,16 +136,17 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     let Some(mut views) = resolve(root, experiment_id, shell) else {
         return;
     };
-    // Exactly one layered-M1 view runs today's path verbatim; a model-route
-    // set resolves (proving the registry surface + route fingerprints) but
-    // executes nothing — run-m2.1d wires the multi-route execution loop.
+    // Exactly one layered-M1 view runs today's path verbatim; any other
+    // resolved set (model routes, multi-view) resolves — proving the
+    // registry surface + route fingerprints — but executes nothing.
+    // run-m2.1d wires the multi-route execution loop.
     let resolved = if views.len() == 1 && views[0].shape == RouteShape::M1Layered {
         views.pop().expect("length checked above")
     } else {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("reason"),
             format!(
-                "experiment {experiment_id} resolves model routes; \
+                "experiment {experiment_id} resolves beyond a single layered M1 view; \
                  the run command executes only the layered M1 pipeline today"
             ),
         )]));
@@ -260,8 +261,10 @@ struct Resolved {
 /// Resolve `experiment_id` against the §8.4 registry surface into one
 /// [`Resolved`] view per bound pipeline, in set order (the M1 legacy binding
 /// resolves to its single pipeline). Whole-set semantic validation is `ckc
-/// registry check`'s job; resolution diagnoses exactly the references this
-/// run needs, each failure one command-scope `schema_invalid` diagnostic.
+/// registry check`'s job; resolution diagnoses exactly what this run
+/// consumes — every reference it follows plus member uniqueness (duplicate
+/// members would mint colliding views) — each failure one command-scope
+/// `schema_invalid` diagnostic.
 /// Per-view step ids and [`RouteShape`] come from [`resolve_route`]'s
 /// fingerprint of each pipeline's declared stages. The toolchain manifest
 /// read rides last: every producer (and later both manifests) carries its
@@ -295,6 +298,13 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
     let pipelines = experiment.resolved_pipelines();
     let mut routes: Vec<(Id, [Id; 8], RouteShape)> = Vec::with_capacity(pipelines.len());
     for member in &pipelines {
+        if routes.iter().any(|(id, _, _)| id == member) {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!("experiment {experiment_id} binds duplicate pipeline {member}"),
+            )]));
+            return None;
+        }
         let Some(pipeline) = candidates.pipelines.iter().find(|p| p.id == *member) else {
             shell.diagnostic(invalid_diagnostic(vec![(
                 static_id("reason"),
@@ -1965,6 +1975,17 @@ mod tests {
         (finished.result, events, diagnostics, out, tmp)
     }
 
+    /// A resolution/gate failure mints nothing: the run dir holds exactly
+    /// the shell's `logs/`, so any other minted path fails the pin.
+    fn assert_only_logs(out: &Path) {
+        let mut entries: Vec<String> = std::fs::read_dir(out)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        entries.sort();
+        assert_eq!(entries, ["logs"]);
+    }
+
     const DOC_IDS: [&str; 3] = [
         "test_source.m1_guideline_a",
         "test_source.m1_guideline_b",
@@ -2588,6 +2609,43 @@ processing_stages:
         assert!(!out.join("artifacts").exists());
     }
 
+    // Duplicate set members would mint colliding views (`registry check`
+    // flags the same invariant at the whole-set level), so the member loop
+    // rejects them before any view lands.
+    #[test]
+    fn duplicate_set_member_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        std::fs::write(
+            root.path().join("registry/experiments.yaml"),
+            "\
+- id: exp.tiny
+  pipelines: [pipe.tiny, pipe.tiny]
+  baseline_pipeline: pipe.tiny
+  test_source_groups:
+    - group_id: group.t
+      test_sources: [test_source.tiny]
+  seed: 1
+  budget: {solver_ms_per_query: 10000}
+  expected_outcomes: corpus/reference/t.yaml
+",
+        )
+        .unwrap();
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("binds duplicate pipeline pipe.tiny")),
+            "{diagnostics:?}"
+        );
+        assert_only_logs(&out);
+    }
+
     // run-m2.1a — the §9 two-route experiment resolves one view per set
     // member over the committed registry: set order [direct_smt, single_ir],
     // declared stages filling the fixed slots in declared order with the
@@ -2686,13 +2744,13 @@ processing_stages:
             diagnostics[0].payload,
             vec![(
                 static_id("reason"),
-                "experiment exp.m2_multihop resolves model routes; \
+                "experiment exp.m2_multihop resolves beyond a single layered M1 view; \
                  the run command executes only the layered M1 pipeline today"
                     .to_owned()
             )],
             "{diagnostics:?}"
         );
-        assert!(!out.join("artifacts").exists());
+        assert_only_logs(&out);
     }
 
     // The lexicon is load-bearing for the whole run: an unreadable file is

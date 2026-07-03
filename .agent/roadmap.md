@@ -125,16 +125,17 @@ doc-lint bullet).
 - [x] report-m2.3b: report_ja.md renderer — shared Labels walk, §0 verbatim-EN in JA prose, two
   observed-output pins. 80% 160K/200K 4b5f799
 - [x] run-m2.1a: two-route resolve (per-route views + RouteShape fingerprint) + exp.m2_multihop
-  seed + execute M1-gate. 69% 138K/200K
+  seed + execute M1-gate. 69% 138K/200K eb74f7d
 - [ ] run-m2.1b: resolution rejection battery over .1a's surface (production code untouched).
-  Tests: tiny-root mutations — `write_tiny_root` (l.2346) then string-replace the written registry
-  bytes before resolving: (a) drop the tiny pipeline's normalize stage from its declared list →
+  Tests: tiny-root mutations — `write_tiny_root` (run.rs mod tests) then string-replace the written
+  registry bytes before resolving: (a) drop the tiny pipeline's normalize stage from its declared list →
   7-kind sequence ⇒ "unsupported processing-stage sequence" naming the kinds; (b) swap one in-list
   stage id for an undeclared one ⇒ "declares undefined processing_stage"; (c) point the experiment
   at a missing pipeline id ⇒ "names undefined pipeline"; (d) malformed binding (set form + stray
   legacy `pipeline:` key, `baseline().is_none()`) ⇒ "has no valid pipeline binding". Each ⇒
-  resolve None + exactly one command-scope diagnostic (assert the reason substring). Reading:
-  run.rs mod tests helpers (write_tiny_root + neighbors) only. Gate: cargo test.
+  resolve None + exactly one command-scope diagnostic (assert the reason substring; close with
+  `assert_only_logs`). Reading: run.rs mod tests helpers (write_tiny_root + neighbors) only.
+  Gate: cargo test.
 - [ ] run-m2.1c: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
   `accepted_cassette_hash: Option<Hash>` (the accepted attempt's cassette wrapper `content_hash`,
   Some iff target Some) + `model_identity: Option<ModelIdentity>` (the last attempt's cassette
