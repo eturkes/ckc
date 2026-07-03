@@ -393,7 +393,7 @@ full pre-consolidation text lives in git history.
     stage granularity at plan time. Route→tail wiring (agent-confirmed): a route feeds the M1
     `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` (that fn reads only
     `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
-    `budget_ms`; `documents`/`groups`/`plan` are unread stubs); `resolve()` NOW resolves route
+    `budget_ms` + `shape` (via `route_id_prefix`, .1d3a); `documents`/`groups`/`plan` are unread stubs); `resolve()` NOW resolves route
     pipelines too (run-m2.1a: per-route views, `[Id; 8]` = declared ids padded with `UNUSED_STAGE`,
     `shape: RouteShape`); the route fn lives in
     `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
