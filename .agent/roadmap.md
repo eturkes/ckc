@@ -165,8 +165,10 @@ doc-lint bullet).
   verify_group's `/// direct_smt route's per-group verdict tail` doc). New signature, attrs
   `#[allow(dead_code)]` + `#[allow(clippy::too_many_arguments)]`, params
   `(gid: &Id, heads: &[&DocHead], store: &CassetteStore, seed: u64, resolved: &Resolved, repair_limit: u32, shell: &mut Shell) -> DirectFill`
-  (root / members / extract / segment params GONE — the caller supplies pre-built heads; a doc shared by
-  two groups lands + events once per route). Doc must convey: consumes the group's two member heads; the
+  (root / members / extract / segment params GONE — the caller supplies pre-built heads, landed + evented
+  upstream by `route_document_head`; `direct_smt_fill` dedups nothing, so a doc in two groups heads once
+  per route ONLY when the caller dedups — the .1d5a orchestrator, or .1d4b's prepass; see [D]/[E]).
+  Doc must convey: consumes the group's two member heads; the
   direct route grounds nothing (raw SMT, not an IR) so heads carry only provenance forward; replays each
   role cassette through `model_fill` under `direct_smt_accept()`, wraps + LANDS each accepted body as a
   raw-AI `smt_query`; direct-emits ONE group model_fill §4.6 event; a terminal role reject breaks the
@@ -175,7 +177,13 @@ doc-lint bullet).
   1. guard `heads.len() != 2` → `shell.diagnostic(invalid_diagnostic(…))` with pairs keyed
      `group`=`gid.to_string()`, `reason`=a count-mismatch message, `processing_stage`=`"model_fill_smt"`
      (`.to_owned()`) → `return DirectFill { pair: None, fills: Vec::new(), identities: Vec::new() }`.
-  2. `let prefix = route_id_prefix(resolved);` then `let dir = format!("routes/{}/groups/{gid}", resolved.pipeline_id);`.
+  2. `let prefix = route_id_prefix(resolved);` then `let dir = format!("groups/{gid}");` — bare
+     `groups/{gid}` co-locates the smt_query with the group's `verifier_results.json` (the
+     `direct_smt_verify_group` callers pass bare `groups/{gid}`, ~4570; M1 `compile_verify_group` lands
+     there too, ~809 / assert ~2484). The route `prefix` rides the artifact IDs ([B].6f / [C]) for
+     cross-route uniqueness, NOT the landing dir — routes never co-land (.1d5a rejects a mixed M1+model
+     set), so a flat `groups/{gid}` never collides; a uniform `routes/{pid}/…` dir for every group
+     artifact is a later-milestone concern, unneeded for correctness.
   3. member-order provenance BEFORE the clock (M2.7 boundary): build `input_hashes: Vec<Hash>` by, per
      head, pushing `head.source.content_hash.clone()` then `head.segments.content_hash.clone()`.
   4. `let clock = processing_stage_clock();`.
@@ -186,7 +194,8 @@ doc-lint bullet).
      source / key / `model_fill` call UNCHANGED from current (source `static_id(&format!("{gid}.{role}"))`,
      key `CassetteKey { route: static_id("route.direct_smt"), source: source.clone(), seed }`,
      `model_fill(store, &key, FillSource::Replay, repair_limit, direct_smt_accept())`). `ModelFill` fields
-     to destructure: `target: Option<QueryBody>`, `accepted_cassette_hash: Option<Hash>` (Some iff target
+     to destructure (the fill is `ModelFill<String>` — `direct_smt_accept` yields the raw SMT body `String`;
+     step e wraps it into `QueryBody`): `target: Option<String>`, `accepted_cassette_hash: Option<Hash>` (Some iff target
      Some), `model_identity: Option<ModelIdentity>`, `diagnostics: Vec<DiagnosticRecord>`,
      `recorded_calls: u64`, `repairs: u64`; `FillObservation::from_fill(&fill)` borrows before the move.
      Per role:
@@ -237,18 +246,27 @@ doc-lint bullet).
   Body: per `&m in members` push `route_document_head(root, m, resolved, shell).unwrap_or_else(|| panic!("{gid}: no head for {}", m.id))`
   into `heads: Vec<DocHead>`; `let head_refs: Vec<&DocHead> = heads.iter().collect();`; return
   `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`. (Confirm
-  `route_document_head`'s real arg order at ~868 when writing.)
+  `route_document_head`'s real arg order at ~868 when writing.) `direct_fill_group` is a SINGLE-group
+  convenience — NO cross-group head dedup, so a doc in two groups heads twice under one shell. The
+  single-group call sites (non_pair / rejection arms / route_metrics) use it directly. The two multi-group
+  tests (reproduce / scores: one shell, both groups, `test_source.m1_guideline_a` shared) keep the plain
+  rename for .1d4a — double-heading guideline_a is harmless (re-land overwrites; no .1d4a assert counts
+  head events / landings); .1d4b swaps those two onto a per-route head prepass.
 
   [E] call sites — rename `direct_smt_fill(&root, &gid, &members, …)` → `direct_fill_group(&root, &gid, &members, …)`
   (identical args), read `.pair`:
   - reproduce (~4389): `.pair` before the existing `.unwrap_or_else`; body / provenance / schema_id asserts
-    hold (land round-trips bytes; the id prefix touches only the payload-immune artifact_id).
+    hold (land round-trips bytes; the id prefix touches only the payload-immune artifact_id). One shell
+    spans both groups and `m1_guideline_a` is in both → the plain per-group rename heads it twice; harmless
+    (re-land overwrites, no assert counts head events), see [D]. .1d4b's prepass makes it once-per-doc.
   - non_pair (~4496) BEHAVIORAL: `let got = direct_fill_group(…);` then `assert!(got.pair.is_none(), …)` +
     `assert!(got.fills.is_empty(), "the guard precedes any cassette access — no role fill runs")`. Rewrite
     the fn doc: the OLD "short-circuits ahead of any cassette or filesystem access" premise dies (the helper
     lands the member head(s) — both cases use corpus[0], valid — BEFORE the guard); NEW: the guard still
     precedes cassette access → no role fill runs.
-  - scores (~4566): `.pair.expect(…)`.
+  - scores (~4566): `.pair.expect(…)`. Same one-shell multi-group double-head as reproduce (harmless in
+    .1d4a; see [D]). Its `direct_smt_verify_group` passes bare `groups/{gid}` (~4570) = the dir the
+    smt_query now shares ([B].2).
   - rejection schema-arm (~4874): `let filled = direct_fill_group(…);` +
     `assert!(filled.pair.is_none(), "schema exhaustion ends the route");`. Ledger
     `[AiSchemaViolation, AiSchemaViolation, RepairLimitExceeded]` HOLDS via break-on-first (overlap's 3
@@ -265,14 +283,25 @@ doc-lint bullet).
   only). (3) a clean event (empty diagnostics) leaves the ledger untouched (rejection syntax-arm). (4) `land`
   takes `&Shell` and auto-reborrows from `&mut shell`; the explicit-match landing form is borrow-obvious (no
   closure). (5) diagnostic / wrap MESSAGE strings are unpinned (write them freely); only codes / counters /
-  ids get pinned in .1d4b.
-- [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). Extend
-  direct_smt_fill_reproduces_m1_query_bodies: pin the group model_fill event tuple
-  (kind/step_id/outcome/counters/outputs — counters summed over roles) + smt_query landed paths +
-  the once-per-doc head events (a doc shared by two groups heads once per route); input_hashes
-  compared AS SETS; mirror .1d3b's battery shapes (strict_at landed reads, exact dir listings,
-  slice::from_ref for single-hash pins — clippy); pins from OBSERVED output sanity-checked
-  against the .1d4a contract; M1 pins untouched. Gate: cargo test.
+  ids get pinned in .1d4b. (6) the two loop exits differ BY DESIGN: a TERMINAL role reject ([B].6c
+  `else { break; }`) breaks → falls through to the ONE event, which CARRIES + ledgers the accumulated
+  diagnostics; a role `Err(CassetteError)` ([B].6a) records a command diagnostic + early-returns with NO
+  event (mirrors single_ir's infra-error rule). On that Err a prior role's already-landed smt_query is
+  ORPHANED but safe — a `pair: None` group never reaches `direct_smt_verify_group` (nothing cites it) and a
+  fixed re-run overwrites it; its dropped diagnostics / counters ride the already-failed run. Do NOT "fix"
+  this by reading all roles before landing (deontic would accumulate past a terminal overlap reject →
+  breaks the schema-arm ledger pin) or by eventing on Err (breaks the no-event infra-error rule).
+- [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). FIRST swap
+  direct_smt_fill_reproduces_m1_query_bodies + direct_smt_route_scores_m1_groups OFF per-group
+  `direct_fill_group` onto a per-route head prepass: build each unique `DocHead` once via
+  `route_document_head`, dedup by member id (`test_source.m1_guideline_a` is in BOTH groups), pass each
+  group's `&[&DocHead]` to `direct_smt_fill(gid, &refs, …)` directly → a shared doc heads ONCE per route.
+  THEN extend the two tests: pin the group model_fill event tuple (kind/step_id/outcome/counters/outputs —
+  counters summed over roles) + smt_query landed paths (`groups/{gid}/{role}.smt_query.json`, [B].2) + the
+  once-per-doc head events (a doc in two groups heads once per route); input_hashes compared AS SETS;
+  mirror .1d3b's battery shapes (strict_at landed reads, exact dir listings, slice::from_ref for
+  single-hash pins — clippy); pins from OBSERVED output sanity-checked against the .1d4a contract; M1 pins
+  untouched. Gate: cargo test.
 - [ ] run-m2.1d5a: model-route loop in `execute()` + structural smoke gate (two-run determinism +
   event census = .1d5b). Replace the model-route gate diagnostic (DELETE its test
   m2_experiment_run_gates_until_the_route_loop_lands ≈3093): single M1Layered view → existing path
