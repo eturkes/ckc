@@ -64,6 +64,8 @@ full pre-consolidation text lives in git history.
   read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
   skeleton before the full test battery — `cargo check` after the production edits, an end-loaded
   uncompiled battery leaves nothing landable (report-m2.1b); pin expected shapes from observed output, never hand-computed;
+  spec code references = fn/test NAMES, ≈line = secondary hint only (drifts under edits above it —
+  .1d5's bare ≈2886 went stale within days; codex M2.1d-respec catch);
   cite only untagged checked roadmap lines as anchors (`[S]` =
   salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative

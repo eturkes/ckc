@@ -176,7 +176,8 @@ doc-lint bullet).
   direct test extended to pin the group model_fill event tuple + smt_query landed paths +
   once-per-doc head events; M1 pins untouched.
 - [ ] run-m2.1d5: model-route loop in `execute()` + determinism gate. Replace the model-route gate
-  diagnostic (DELETE its test ≈2886): single M1Layered view → existing path verbatim; mixed
+  diagnostic (DELETE its test m2_experiment_run_gates_until_the_route_loop_lands ≈3090): single
+  M1Layered view → existing path verbatim; mixed
   M1+model set → command diagnostic, zero artifacts; model set → lexicon read +
   `CassetteStore::new(root)` + Z3Adapter::new (each failure → command diagnostic); base seed =
   experiment seed; then per view in set order: mark ledger start (shell.ledger().len());
@@ -202,8 +203,10 @@ doc-lint bullet).
   events (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline
   run stays 19) with
   model_fill counters (single_ir per doc 1/0; direct per group 2/0); both routes' layout present;
-  trace_bundle strict-parses, shared source nodes once, direct verifier_results = legal orphan
-  node (validate has no orphan check); determinism = landed artifacts byte-equal across the two
+  trace_bundle strict-parses, shared source nodes once, direct verifier_results = legal node
+  carrying only its →report out-edge (no compiled → no verify in-edge + zero claim rows:
+  assemble_trace claims need compiled+verifier_results; validate checks edge endpoints/rank/op,
+  never node connectivity); determinism = landed artifacts byte-equal across the two
   runs + manifests byte-equal after normalizing the one `--out` token
   (manifest_inputs ≈1497 embeds out_dir.display()) + events compared on a non-timing projection.
   M1 executed() pins unchanged.
