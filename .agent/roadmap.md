@@ -218,9 +218,12 @@ doc-lint bullet).
         `role_inputs`, `Origin::AiGenerated`, `EvidenceStatus::AcceptedEvidenceStatus`, `Vec::new()`, `payload`.
      g. land through an EXPLICIT match (not an `.and_then` closure — keeps the `&mut shell → &Shell`
         reborrow into `land` obvious): wrapper `Ok(env)` → `land(shell, &format!("{dir}/{role}.smt_query.json"), env)`
-        → `Ok(w)` push `landed`, `Err(d)` → `diagnostics.push(d)`; wrapper `Err(e)` →
-        `diagnostics.push(invalid_diagnostic(…))` keyed `group`, `artifact`=the same id string,
-        `reason`=`"wrap: {e}"`, `processing_stage`=`"model_fill_smt"`. Both failures ride the event, not the ledger.
+        → `Ok(w)` push `landed`, `Err(d)` → `diagnostics.push(d); break;`; wrapper `Err(e)` →
+        `diagnostics.push(invalid_diagnostic(…)); break;` keyed `group`, `artifact`=the same id string,
+        `reason`=`"wrap: {e}"`, `processing_stage`=`"model_fill_smt"`. Both failures ride the event (not the
+        ledger) then `break` — fail-closed: `landed` can't reach 2, so stop and fall to the ONE event like the
+        6c reject (NOT the current fn's `return None`, which predates the event + would skip it). Untested path
+        (golden bodies wrap + land) → break vs continue perturbs no pin.
   7. after the loop: `let (started_at, ended_at, duration_ms) = clock.stop();` then
      `let output_hashes: Vec<_> = landed.iter().map(|w| w.content_hash.clone()).collect();`.
   8. emit ONE event = the mirror's `ProcessingStageEvent` literal EXCEPT three fields —
@@ -247,11 +250,13 @@ doc-lint bullet).
   into `heads: Vec<DocHead>`; `let head_refs: Vec<&DocHead> = heads.iter().collect();`; return
   `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`. (Confirm
   `route_document_head`'s real arg order at ~868 when writing.) `direct_fill_group` is a SINGLE-group
-  convenience — NO cross-group head dedup, so a doc in two groups heads twice under one shell. The
-  single-group call sites (non_pair / rejection arms / route_metrics) use it directly. The two multi-group
-  tests (reproduce / scores: one shell, both groups, `test_source.m1_guideline_a` shared) keep the plain
-  rename for .1d4a — double-heading guideline_a is harmless (re-land overwrites; no .1d4a assert counts
-  head events / landings); .1d4b swaps those two onto a per-route head prepass.
+  convenience — NO cross-group head dedup, so a member in N groups (or shared across arms under one shell)
+  heads N×. This matters ONLY where a pin counts head events: reproduce + scores gain such pins in .1d4b →
+  .1d4b swaps THAT pair onto a per-route head prepass (each unique `DocHead` built once, refs passed to
+  `direct_smt_fill`) → a shared doc heads once per route. Every OTHER site keeps the plain per-group rename
+  PERMANENTLY, its (double-)heading harmless (re-land overwrites; no pin there counts head events /
+  landings): non_pair (1 group), the two rejection arms (ledger / last-event pins), route_metrics (3-group
+  loop, one shell, guideline_a heads 3×, scores the explicit `&fills` / `&groups` ~5260).
 
   [E] call sites — rename `direct_smt_fill(&root, &gid, &members, …)` → `direct_fill_group(&root, &gid, &members, …)`
   (identical args), read `.pair`:
@@ -275,8 +280,12 @@ doc-lint bullet).
     `shell.ledger().is_empty()` HOLDS — both roles accept → event diagnostics empty → the clean event leaves
     the ledger untouched (head events clean too; the later `shell.events().last()` = the verify event, since
     head / model_fill events precede it).
-  - route_metrics arm (~5234): `.pair.unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"))`.
-    The arm binds only the pair; route_metrics needs no `.fills` here.
+  - route_metrics arm (~5234): a `for … in worklist` loop over 3 groups under ONE shell (2 golden
+    `exp.test_source_groups` + a chained `group.m2_direct_syntax`, ~5205) → rename in the loop body,
+    `.pair.unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"))`. Multi-group like reproduce /
+    scores → guideline_a heads 3× (harmless; see [D]): binds only the pair (no `.fills`), and
+    `route_metrics(…, &fills, &groups, …)` (~5260) scores the explicit observation vecs, asserting only
+    `metrics.rows` / `metrics.diagnostics.is_empty()` — nothing on shell head events.
 
   gotchas (verified — do not re-derive): (1) content_hash is payload-only → the id-prefix changes disturb
   NO byte pin. (2) break-on-first terminal reject is load-bearing (rejection schema-arm ledger = overlap
@@ -288,7 +297,9 @@ doc-lint bullet).
   diagnostics; a role `Err(CassetteError)` ([B].6a) records a command diagnostic + early-returns with NO
   event (mirrors single_ir's infra-error rule). On that Err a prior role's already-landed smt_query is
   ORPHANED but safe — a `pair: None` group never reaches `direct_smt_verify_group` (nothing cites it) and a
-  fixed re-run overwrites it; its dropped diagnostics / counters ride the already-failed run. Do NOT "fix"
+  fixed re-run overwrites it. Only `fills` / `identities` survive in the returned `DirectFill`; the prior
+  role's accumulated raw `diagnostics` + the event counter totals (`recorded_calls` / `repairs`) are NOT
+  emitted (no event fires), and 6a's one command diagnostic in the ledger is the sole shell record. Do NOT "fix"
   this by reading all roles before landing (deontic would accumulate past a terminal overlap reject →
   breaks the schema-arm ledger pin) or by eventing on Err (breaks the no-event infra-error rule).
 - [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). FIRST swap
