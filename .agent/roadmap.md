@@ -127,7 +127,7 @@ doc-lint bullet).
 - [x] run-m2.1a: two-route resolve (per-route views + RouteShape fingerprint) + exp.m2_multihop
   seed + execute M1-gate. 69% 138K/200K eb74f7d
 - [x] run-m2.1b: 4-case resolve rejection battery (unsupported sequence / undefined stage /
-  undefined pipeline / malformed binding), tests-only. 48% 96K/200K
+  undefined pipeline / malformed binding), tests-only. 48% 96K/200K da51698
 - [ ] run-m2.1c: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
   `accepted_cassette_hash: Option<Hash>` (the accepted attempt's cassette wrapper `content_hash`,
   Some iff target Some) + `model_identity: Option<ModelIdentity>` (the last attempt's cassette

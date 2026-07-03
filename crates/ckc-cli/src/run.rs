@@ -2468,8 +2468,12 @@ processing_stages:
     fn mutate(root: &Path, rel: &str, from: &str, to: &str) {
         let path = root.join(rel);
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(text.contains(from), "{rel} lacks mutation anchor {from:?}");
-        std::fs::write(path, text.replace(from, to)).unwrap();
+        assert_eq!(
+            text.match_indices(from).count(),
+            1,
+            "{rel} must hold exactly one mutation anchor {from:?}"
+        );
+        std::fs::write(path, text.replacen(from, to, 1)).unwrap();
     }
 
     // §4.4 valid remainder: a document whose corpus file is missing takes a
