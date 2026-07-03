@@ -863,6 +863,12 @@ fn single_ir_fill(
         shell.diagnostic(diagnostic.clone());
     }
     let clinical = fill.target?;
+    // §9 attestation: an accepted fill always carries the accepted attempt's
+    // cassette wrapper hash (`Some` iff `target` is — model_fill's contract);
+    // the bundle wrapper cites it below.
+    let cassette_hash = fill
+        .accepted_cassette_hash
+        .expect("accepted fill carries its cassette wrapper hash");
 
     // Deterministic tail mirroring [`assemble_bundle`], substituting the model's
     // clinical layer and a norm recomputed over it; the model-fill route runs no
@@ -929,13 +935,18 @@ fn single_ir_fill(
     }
 
     // Wrap; the single_ir route has no normalization wrapper, so the bundle cites
-    // source + segments (run-m2.1 adds the replayed cassette hash for provenance).
+    // source + segments + the accepted attempt's cassette (§9 attestation: the
+    // artifact graph names the exact recording the clinical layer replayed from).
     // These wrapper-level fields do not reach the payload-only `content_hash`.
     match wrapper(
         format!("{}.ir_bundle", entry.id),
         "ir_bundle",
         producer(resolved, 3),
-        vec![source.content_hash.clone(), segments.content_hash.clone()],
+        vec![
+            source.content_hash.clone(),
+            segments.content_hash.clone(),
+            cassette_hash,
+        ],
         Origin::DeterministicCompiler,
         EvidenceStatus::MechanicalEvidenceStatus,
         Vec::new(),
@@ -990,7 +1001,8 @@ fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
 /// accepted body is wrapped as an `smt_query` [`ArtifactWrapper`] carrying the raw
 /// model output ([`Origin::AiGenerated`] + [`EvidenceStatus::AcceptedEvidenceStatus`],
 /// no external effects and no deterministic transform — distinct from single_ir's
-/// mechanical `ir_bundle`). Returns the pair's two wrappers (each `content_hash` is what
+/// mechanical `ir_bundle`), citing the member provenance plus its own accepted
+/// cassette hash. Returns the pair's two wrappers (each `content_hash` is what
 /// the verdict tail cites as its `verify_smt` input) or `None` on a recorded failure;
 /// wired into the experiment run by run-m2.1.
 #[allow(dead_code)]
@@ -1021,8 +1033,9 @@ fn direct_smt_fill(
         return None;
     }
     // Provenance inputs: extract + segment each member (the M1-chain head, references
-    // ungrounded). The wrapper cites these in member order; provenance-only, so they do
-    // not reach the payload-only `content_hash`.
+    // ungrounded). Each query wrapper cites these in member order plus its own accepted
+    // cassette hash (§9 attestation); provenance-only, so they do not reach the
+    // payload-only `content_hash`.
     let mut input_hashes: Vec<Hash> = Vec::new();
     for entry in members {
         let html = match std::fs::read(root.join(&entry.path)) {
@@ -1103,6 +1116,13 @@ fn direct_smt_fill(
             shell.diagnostic(diagnostic.clone());
         }
         let body = fill.target?;
+        // §9 attestation: cite this role's accepted cassette alongside the shared
+        // member provenance (`Some` iff `target` is — model_fill's contract).
+        let mut role_inputs = input_hashes.clone();
+        role_inputs.push(
+            fill.accepted_cassette_hash
+                .expect("accepted fill carries its cassette wrapper hash"),
+        );
         let payload = QueryBody {
             query_id: source,
             logic,
@@ -1112,7 +1132,7 @@ fn direct_smt_fill(
             format!("{gid}.{role}.smt_query"),
             "smt_query",
             producer(resolved, 2),
-            input_hashes.clone(),
+            role_inputs,
             Origin::AiGenerated,
             EvidenceStatus::AcceptedEvidenceStatus,
             Vec::new(),
@@ -3128,6 +3148,8 @@ processing_stages:
     /// diverge).
     #[test]
     fn single_ir_fill_reproduces_m1_bundles() {
+        use std::collections::BTreeSet;
+
         let root = repo_root();
         let lexicon = single_ir_lexicon();
         let resolved = single_ir_resolved();
@@ -3165,6 +3187,31 @@ processing_stages:
             assert_eq!(
                 route.content_hash, m1.content_hash,
                 "{} content_hash",
+                entry.id
+            );
+
+            // Wrapper provenance: source + segments + the replayed cassette (§9
+            // attestation) — the payload-only `content_hash` cannot catch a wrong
+            // or missing input hash. input_hashes canonicalize as a §4.3 set, so
+            // compare as a set, never the emitted order.
+            let cassette = store
+                .replay(&CassetteKey {
+                    route: static_id("route.single_ir"),
+                    source: entry.id.clone(),
+                    seed: 42,
+                })
+                .unwrap();
+            assert_eq!(route.input_hashes.len(), 3, "{} input count", entry.id);
+            assert_eq!(
+                route.input_hashes.iter().collect::<BTreeSet<_>>(),
+                [
+                    &source.content_hash,
+                    &segments.content_hash,
+                    &cassette.content_hash
+                ]
+                .into_iter()
+                .collect::<BTreeSet<_>>(),
+                "{} input_hashes",
                 entry.id
             );
         }
@@ -3489,10 +3536,22 @@ processing_stages:
                 &resolved,
                 1,
                 &mut shell,
+            )
+            .expect("the malformed base repairs to an accepted bundle");
+            // §9 attestation follows the ACCEPTED attempt: the bundle cites the
+            // recovery (derived-seed) cassette, never the rejected base recording.
+            let recovery = store
+                .replay(&key(crate::model::derive_seed(98, 1)))
+                .unwrap();
+            assert!(
+                bundle.input_hashes.contains(&recovery.content_hash),
+                "the bundle cites the recovery cassette"
             );
             assert!(
-                bundle.is_some(),
-                "the malformed base repairs to an accepted bundle"
+                !bundle
+                    .input_hashes
+                    .contains(&store.replay(&key(98)).unwrap().content_hash),
+                "the rejected base recording stays uncited"
             );
             assert_eq!(shell.ledger().len(), 1);
             assert_schema_shape(&shell.ledger()[0]);
@@ -3761,7 +3820,7 @@ processing_stages:
     /// provenance the verdict tail (route-direct-smt.4) cites.
     #[test]
     fn direct_smt_fill_reproduces_m1_query_bodies() {
-        use std::collections::BTreeMap;
+        use std::collections::{BTreeMap, BTreeSet};
 
         let root = repo_root();
         let lexicon = single_ir_lexicon();
@@ -3832,7 +3891,10 @@ processing_stages:
 
             // Provenance inputs: re-derive [source, segments] per member in group order —
             // the payload-only content_hash cannot catch a wrong or missing input hash, so
-            // pin the full input_hashes independently of the body equality above.
+            // pin the full input_hashes independently of the body equality above. Each
+            // role's wrapper adds its OWN accepted cassette hash (§9 attestation);
+            // input_hashes canonicalize as a §4.3 set, so compare as a set, never the
+            // emitted order.
             let mut want_inputs: Vec<Hash> = Vec::new();
             for m in &members {
                 let html = std::fs::read(root.join(&m.path)).unwrap();
@@ -3851,7 +3913,7 @@ processing_stages:
 
             // The pinned raw-AI `smt_query` provenance: `validate()` enforces only the
             // effects↔status rule, so pin origin / status / kind / producer here.
-            for w in [&overlap, &deontic] {
+            for (w, role) in [(&overlap, "overlap"), (&deontic, "deontic")] {
                 assert_eq!(w.artifact_kind, static_id("smt_query"), "{gid} kind");
                 assert_eq!(w.schema_id, static_id("schema.smt_query"), "{gid} schema");
                 assert_eq!(w.origin, Origin::AiGenerated, "{gid} origin");
@@ -3866,7 +3928,22 @@ processing_stages:
                     static_id("processing_stage.m2.model_fill_smt"),
                     "{gid} producer"
                 );
-                assert_eq!(w.input_hashes, want_inputs, "{gid} input_hashes");
+                let cassette = store
+                    .replay(&CassetteKey {
+                        route: static_id("route.direct_smt"),
+                        source: static_id(&format!("{gid}.{role}")),
+                        seed: 42,
+                    })
+                    .unwrap();
+                assert_eq!(w.input_hashes.len(), 5, "{gid} {role} input count");
+                assert_eq!(
+                    w.input_hashes.iter().collect::<BTreeSet<_>>(),
+                    want_inputs
+                        .iter()
+                        .chain([&cassette.content_hash])
+                        .collect::<BTreeSet<_>>(),
+                    "{gid} {role} input_hashes"
+                );
                 w.validate()
                     .unwrap_or_else(|e| panic!("{gid} wrapper validate: {e:?}"));
             }

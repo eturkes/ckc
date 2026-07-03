@@ -25,13 +25,15 @@
 //! collision-negligible against the base seed). The stage accounts both
 //! [`recorded_calls`](ModelFill::recorded_calls) and [`repairs`](ModelFill::repairs)
 //! for the §7.3 metrics; the route/run wiring (run-m2.1) builds the §4.6 event
-//! from them ([`RECORDED_CALLS_COUNTER`]/[`REPAIRS_COUNTER`]). A cassette
+//! from them ([`RECORDED_CALLS_COUNTER`]/[`REPAIRS_COUNTER`]) — and attests the
+//! recordings: [`accepted_cassette_hash`](ModelFill::accepted_cassette_hash) +
+//! [`model_identity`](ModelFill::model_identity) ride the result. A cassette
 //! IO/contract failure stays a [`CassetteError`], distinct from a model output
 //! that fails acceptance.
 
 use std::path::Path;
 
-use ckc_core::{DiagnosticCode, DiagnosticRecord, Id, Outcome};
+use ckc_core::{DiagnosticCode, DiagnosticRecord, Hash, Id, ModelIdentity, Outcome};
 
 use crate::cassette::{CassetteError, CassetteKey, CassetteStore, RecordContext};
 use crate::model::{ModelAdapter, derive_seed};
@@ -91,6 +93,16 @@ pub struct ModelFill<T> {
     /// diagnostics then hold the schema violations and the terminal
     /// `repair_limit_exceeded` / `ai_hallucinated_source`).
     pub target: Option<T>,
+    /// §9 attestation: the accepted attempt's cassette wrapper `content_hash`,
+    /// `Some` iff `target` is. Route wrappers built over the accepted output
+    /// cite it in their `input_hashes`, so the artifact graph names the exact
+    /// recording the output replayed from.
+    pub accepted_cassette_hash: Option<Hash>,
+    /// The last attempt's cassette [`ModelIdentity`], `Some` once any attempt
+    /// lands a cassette — always, on this stage's `Ok` path: attempt 0 either
+    /// lands one or the fill is an `Err`. Run wiring (run-m2.1d) checks
+    /// cross-route identity agreement against it.
+    pub model_identity: Option<ModelIdentity>,
     /// Stage diagnostics in attempt order: one `ai_schema_violation` per
     /// schema-failed attempt, then a terminal `repair_limit_exceeded` (budget
     /// exhausted) or `ai_hallucinated_source` (grounding failed). A
@@ -115,7 +127,9 @@ pub struct ModelFill<T> {
 /// re-prompts up to `repair_limit` times under fresh derived seeds, then yields a
 /// terminal `repair_limit_exceeded`; [`FillReject::Grounding`] is terminal at
 /// once. A cassette IO/contract failure returns `Err` — the recording is missing
-/// or malformed, distinct from an output that fails acceptance.
+/// or malformed, distinct from an output that fails acceptance. The result
+/// attests its recordings: the accepted attempt's cassette wrapper hash and the
+/// last attempt's [`ModelIdentity`] ride [`ModelFill`] for §9 provenance.
 pub fn model_fill<T>(
     store: &CassetteStore,
     key: &CassetteKey,
@@ -159,6 +173,8 @@ pub fn model_fill<T>(
             Ok(target) => {
                 return Ok(ModelFill {
                     target: Some(target),
+                    accepted_cassette_hash: Some(cassette.content_hash),
+                    model_identity: Some(cassette.payload.model_identity),
                     diagnostics,
                     recorded_calls,
                     repairs,
@@ -168,6 +184,8 @@ pub fn model_fill<T>(
                 diagnostics.push(ai_hallucinated_source(absent));
                 return Ok(ModelFill {
                     target: None,
+                    accepted_cassette_hash: None,
+                    model_identity: Some(cassette.payload.model_identity),
                     diagnostics,
                     recorded_calls,
                     repairs,
@@ -179,6 +197,8 @@ pub fn model_fill<T>(
                     diagnostics.push(repair_limit_exceeded(repair_limit));
                     return Ok(ModelFill {
                         target: None,
+                        accepted_cassette_hash: None,
+                        model_identity: Some(cassette.payload.model_identity),
                         diagnostics,
                         recorded_calls,
                         repairs,
@@ -277,6 +297,16 @@ mod tests {
         (CassetteStore::new(&dir), dir)
     }
 
+    // The identity every seeded fixture cassette carries — the expected
+    // `ModelFill::model_identity` value wherever an attempt landed a cassette.
+    fn fixture_identity() -> ModelIdentity {
+        ModelIdentity {
+            model_id: "model.fixture".parse().unwrap(),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        }
+    }
+
     // Persist a synthetic cassette carrying `output` for runtime-absent replay,
     // using the store's own contract-valid wrapper builder.
     fn seed_cassette(store: &CassetteStore, k: &CassetteKey, output: &[u8]) {
@@ -287,11 +317,7 @@ mod tests {
             "prompt body".to_owned(),
             hash_bytes(b"constraint"),
             hash_bytes(b"prompt template"),
-            ModelIdentity {
-                model_id: "model.fixture".parse().unwrap(),
-                quant: "fixture_quant".to_owned(),
-                runtime_version: "1.0.0".to_owned(),
-            },
+            fixture_identity(),
             output,
         );
         let wrapper = store.build_wrapper(k, payload, producer()).unwrap();
@@ -345,7 +371,8 @@ mod tests {
     }
 
     // A first-attempt accepted fill yields the target with no repairs or
-    // diagnostics, and one recorded call.
+    // diagnostics, and one recorded call; it attests the accepted cassette by
+    // wrapper hash and carries the recording's identity.
     #[test]
     fn valid_fill_yields_target_and_no_repairs() {
         let (store, dir) = temp_store("valid");
@@ -356,6 +383,11 @@ mod tests {
         assert!(fill.diagnostics.is_empty());
         assert_eq!(fill.recorded_calls, 1);
         assert_eq!(fill.repairs, 0);
+        assert_eq!(
+            fill.accepted_cassette_hash,
+            Some(store.replay(&k).unwrap().content_hash)
+        );
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -375,6 +407,18 @@ mod tests {
         assert!(assert_schema_violation(&fill.diagnostics[0]).starts_with("parse:"));
         assert_eq!(fill.recorded_calls, 2);
         assert_eq!(fill.repairs, 1);
+        // The attested hash is the ACCEPTED (derived-seed) attempt's cassette,
+        // not attempt 0's rejected recording.
+        assert_eq!(
+            fill.accepted_cassette_hash,
+            Some(
+                store
+                    .replay(&key_at(derive_seed(42, 1)))
+                    .unwrap()
+                    .content_hash
+            )
+        );
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -406,6 +450,10 @@ mod tests {
             last.payload,
             vec![(static_id("repair_limit"), "2".to_owned())]
         );
+        // No accepted attempt → no attested hash; identity still rides from the
+        // last attempt's cassette.
+        assert_eq!(fill.accepted_cassette_hash, None);
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -426,6 +474,8 @@ mod tests {
             fill.diagnostics[1].code,
             DiagnosticCode::RepairLimitExceeded
         );
+        assert_eq!(fill.accepted_cassette_hash, None);
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -451,6 +501,8 @@ mod tests {
             d.payload,
             vec![(static_id("absent_source_ids"), "seg.99".to_owned())]
         );
+        assert_eq!(fill.accepted_cassette_hash, None);
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -495,6 +547,8 @@ mod tests {
             ahs.payload,
             vec![(static_id("absent_source_ids"), "seg.7 seg.9".to_owned())]
         );
+        assert_eq!(fill.accepted_cassette_hash, None);
+        assert_eq!(fill.model_identity, Some(fixture_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

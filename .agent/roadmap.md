@@ -128,16 +128,8 @@ doc-lint bullet).
   seed + execute M1-gate. 69% 138K/200K eb74f7d
 - [x] run-m2.1b: 4-case resolve rejection battery (unsupported sequence / undefined stage /
   undefined pipeline / malformed binding), tests-only. 48% 96K/200K da51698
-- [ ] run-m2.1c: cassette attestation through model_fill + provenance input_hashes. ModelFill gains
-  `accepted_cassette_hash: Option<Hash>` (the accepted attempt's cassette wrapper `content_hash`,
-  Some iff target Some) + `model_identity: Option<ModelIdentity>` (the last attempt's cassette
-  identity, Some once any attempt lands a cassette) — both read from wrappers model_fill already
-  holds. single_ir_fill's bundle wrapper cites source+segments+accepted cassette hash; direct_smt_
-  fill's two smt_query wrappers cite source+segments (member order) + their own accepted cassette
-  hash. Existing fill/model_fill tests re-pin input_hashes as SETS (§4.3 sorts them — never pin
-  emitted order; memory GOTCHA). Reading: model_fill.rs, cassette.rs replay/record return shapes,
-  the two fills + their tests. Gate: cargo test; the model_fill test battery extended for both
-  fields.
+- [x] run-m2.1c: ModelFill attestation (accepted_cassette_hash + model_identity) + both route
+  wrappers cite the accepted cassette hash (set-pinned). 74% 148K/200K
 - [ ] run-m2.1d: the model-route loop in `execute()`. Dispatch on RouteShape per resolved view:
   SingleIr = per-doc `single_ir_fill` → per-group `compile_verify_group`; DirectSmt = per-group
   `direct_smt_fill` → `direct_smt_verify_group`; run's CassetteStore root = `<root>/cassettes/`

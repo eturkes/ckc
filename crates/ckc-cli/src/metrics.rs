@@ -1007,6 +1007,17 @@ mod tests {
 
     #[test]
     fn from_fill_projects_model_fill_telemetry() {
+        use ckc_core::{ModelIdentity, hash_bytes};
+
+        // Attestation fields per model_fill's contract (hash `Some` iff target is,
+        // identity present once any attempt landed); `from_fill` projects neither.
+        let identity = || {
+            Some(ModelIdentity {
+                model_id: "model.fixture".parse().unwrap(),
+                quant: "fixture_quant".to_owned(),
+                runtime_version: "1.0.0".to_owned(),
+            })
+        };
         let violation = DiagnosticRecord {
             code: DiagnosticCode::AiSchemaViolation,
             outcome: Outcome::Invalid,
@@ -1016,6 +1027,8 @@ mod tests {
         };
         let recovered = ModelFill {
             target: Some(()),
+            accepted_cassette_hash: Some(hash_bytes(b"cassette")),
+            model_identity: identity(),
             diagnostics: vec![violation.clone()],
             recorded_calls: 2,
             repairs: 1,
@@ -1024,6 +1037,8 @@ mod tests {
         // A hallucination parses: no schema violation counted.
         let hallucinated = ModelFill::<()> {
             target: None,
+            accepted_cassette_hash: None,
+            model_identity: identity(),
             diagnostics: vec![DiagnosticRecord {
                 code: DiagnosticCode::AiHallucinatedSource,
                 outcome: Outcome::Invalid,
@@ -1041,6 +1056,8 @@ mod tests {
         // Exhaustion: the terminal repair_limit_exceeded is no violation.
         let exhausted = ModelFill::<()> {
             target: None,
+            accepted_cassette_hash: None,
+            model_identity: identity(),
             diagnostics: vec![
                 violation.clone(),
                 violation,

@@ -180,7 +180,10 @@ full pre-consolidation text lives in git history.
 - Model-fill stage core (§7.4/§9, stage-model-fill.1 core + .2 repair/grounding,
   `ckc-cli/src/model_fill.rs`). DECOUPLED core
   `model_fill<T>(store, key, source: FillSource, repair_limit, accept) -> Result<ModelFill<T>, CassetteError>` →
-  `ModelFill<T>{target: Option<T>, diagnostics, recorded_calls, repairs}` — a plain value, NOT a §4.6
+  `ModelFill<T>{target: Option<T>, accepted_cassette_hash: Option<Hash> (accepted attempt's cassette
+  wrapper content_hash, Some iff target — run-m2.1c), model_identity: Option<ModelIdentity> (last
+  attempt's, always Some on Ok — .1d checks cross-route identity agreement against it), diagnostics,
+  recorded_calls, repairs}` — a plain value, NOT a §4.6
   event/`ArtifactWrapper`. `FillSource::Replay` (default, runtime-absent) / `Record{adapter,prompt,
   constraint,ctx}` (gated) gets each attempt's cassette via `CassetteStore`, decodes `output_bytes()`, runs
   the route's `accept: impl Fn(&[u8])->Result<T, FillReject>` = the §4 acceptance check (route supplies the
@@ -413,7 +416,11 @@ full pre-consolidation text lives in git history.
     `PROCESSING_STAGE_KINDS[idx]` + gates the solver-budget counter on `idx == VERIFY(5)` → the direct
     tail (`direct_smt_verify_group`, `DIRECT_VERIFY=3`, M1 `VERIFY`=5 inert padding in its `[Id; 8]`)
     emits its verify event DIRECTLY with kind `"verify"` + `SOLVER_BUDGET_KEY`; its `verifier_results`
-    cite the two `smt_query` wrapper `content_hash`es (cassette-hash provenance = run-m2.1, both
+    cite the two `smt_query` wrapper `content_hash`es (cassette-hash provenance LANDED run-m2.1c:
+    single_ir bundle cites source+segments+accepted cassette hash, direct per-role wrapper cites
+    member-order source+segments+its OWN accepted cassette hash; input_hashes = §4.3 set on emit →
+    tests compare as sets, and the recovery pin asserts the ACCEPTED attempt's hash, not the base's;
+    both
     routes). Raw-AI provenance GUARDRAIL (keep the shape, never "fix"): smt_query = raw model body →
     `Origin::AiGenerated` + `AcceptedEvidenceStatus` + EMPTY effects (validate() enforces only
     non-empty-effects ⇒ DiscoveryOnly; the .3b test pins origin/status/kind/schema/producer
