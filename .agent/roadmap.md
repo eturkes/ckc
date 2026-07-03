@@ -140,29 +140,132 @@ doc-lint bullet).
   wrapper ids, slot-3 fail-closed tail; M1 pins untouched. 85% 169K/200K 73f3c87
 - [x] run-m2.1d3b: single_ir §4.6 event + landed-layout pin battery over the reproduce-M1
   test. 66% 132K/200K
-- [ ] run-m2.1d4a: direct route stage — landing + §4.6 events (production + mechanical call-site
-  updates; the pin battery = .1d4b). Mirror .1d3a's landed patterns (route_document_head
-  consumption, direct emission literal, route_minted prefixing) — read them, derive nothing fresh.
-  Rework `direct_smt_fill` ≈1102: consume the two members' DocHeads (caller builds one per UNIQUE
-  doc via route_document_head — a doc in two groups lands/events once per route) replacing its
-  internal re-read/extract/segment; per-role model_fill + accept unchanged (role sources stay
-  unprefixed); land both smt_query wrappers (ids `{prefix}{gid}.{role}.smt_query`) at
-  `routes/{pid}/groups/{gid}/{role}.smt_query.json`; ONE group model_fill event, DIRECT-emitted:
-  slot 2, kind "model_fill", clock after provenance, inputs = member-order source + segments
-  hashes, outputs = landed wrapper hashes (present ones), counters summed over both roles, outcome
-  severity(both fills' diagnostics), diagnostics ride the event ONLY (ledger via
-  Shell::processing_stage_event — .1d3a's single path); Err(CassetteError) → command diagnostic,
-  NO event. Returns DirectFill{pair: Option of (overlap, deontic), fills: Vec of FillObservation,
-  identities: Vec of ModelIdentity} (observations survive terminal reject).
-  `direct_smt_verify_group` ≈1267 artifact_id gains the prefix; keeps its direct verify event; no
-  .smt2 materialization. Call sites (compiler = the checklist; ≈lines pre-.1d3a, names primary):
-  direct_smt_fill_reproduces_m1_query_bodies ≈4033, direct_smt_fill_rejects_non_pair_group ≈4170
-  (BEHAVIORAL rewrite, beyond call-shape: caller-built heads land+event BEFORE the guard, so its
-  "short-circuits ahead of any cassette or filesystem access" comment premise dies — guard still
-  precedes cassette access; rewrite comment + asserts to match),
-  direct_smt_route_scores_m1_groups ≈4200, direct_smt_route_rejection_codes ≈4490,
-  route_metrics_score_recorded_two_route_run ≈4665 direct arm. Gate: cargo test; M1 pins
-  untouched.
+- [ ] run-m2.1d4a: direct route stage — landing + §4.6 events (production rewrite + mechanical
+  call-site updates; the observed-output pin battery is .1d4b). DESIGN VERIFIED this respec against
+  mirror `single_ir_fill` (run.rs ~994) + current `direct_smt_fill` (~1206) + every call-site test;
+  the deltas below pin every decision / string / ordering, so implementation is TRANSCRIPTION against
+  the two anchors — derive nothing fresh. Gate: cargo test; then fmt + clippy -D warnings + doc-lint +
+  touched-file engine-leak audit; M1 pins untouched. On close PRUNE the [A]-[E] detail + gotchas to a
+  one-line summary.
+
+  READ FIRST (targeted — never the whole 5283-line file): mirror `single_ir_fill` body for the
+  `ProcessingStageEvent` literal + `clock.stop()` + the `ModelFill { … }` destructure; current
+  `direct_smt_fill` (~1206 to its closing `}` ~1360) for the role loop + `wrapper(…)` call to mutate;
+  `DocHead`/`RouteDoc` (~829/~843) + `route_document_head` signature (~868) for the head fields +
+  helper arg order; the 6 call sites at the lines in [E]. `ModelFill` / `FillObservation` shapes are
+  pinned in [B] step 6 → skip model_fill.rs + metrics.rs unless a field mismatches.
+
+  [A] new `struct DirectFill` directly above `direct_smt_fill`'s doc (~1194), attr
+  `#[allow(dead_code)]`; fields `pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>`
+  (Some iff BOTH roles accepted + landed), `fills: Vec<FillObservation>`, `identities: Vec<ModelIdentity>`
+  (fills + identities survive a terminal reject → the .1d5a orchestrator folds metrics + checks identity
+  agreement). Doc = one line to that effect.
+
+  [B] rewrite `direct_smt_fill` IN FULL (its doc ~1194 through the closing `}` ~1360, right before
+  verify_group's `/// direct_smt route's per-group verdict tail` doc). New signature, attrs
+  `#[allow(dead_code)]` + `#[allow(clippy::too_many_arguments)]`, params
+  `(gid: &Id, heads: &[&DocHead], store: &CassetteStore, seed: u64, resolved: &Resolved, repair_limit: u32, shell: &mut Shell) -> DirectFill`
+  (root / members / extract / segment params GONE — the caller supplies pre-built heads; a doc shared by
+  two groups lands + events once per route). Doc must convey: consumes the group's two member heads; the
+  direct route grounds nothing (raw SMT, not an IR) so heads carry only provenance forward; replays each
+  role cassette through `model_fill` under `direct_smt_accept()`, wraps + LANDS each accepted body as a
+  raw-AI `smt_query`; direct-emits ONE group model_fill §4.6 event; a terminal role reject breaks the
+  loop; `Err(CassetteError)` → command diagnostic, NO event; `pair` Some iff both roles landed,
+  fills / identities survive a reject. Body, in order:
+  1. guard `heads.len() != 2` → `shell.diagnostic(invalid_diagnostic(…))` with pairs keyed
+     `group`=`gid.to_string()`, `reason`=a count-mismatch message, `processing_stage`=`"model_fill_smt"`
+     (`.to_owned()`) → `return DirectFill { pair: None, fills: Vec::new(), identities: Vec::new() }`.
+  2. `let prefix = route_id_prefix(resolved);` then `let dir = format!("routes/{}/groups/{gid}", resolved.pipeline_id);`.
+  3. member-order provenance BEFORE the clock (M2.7 boundary): build `input_hashes: Vec<Hash>` by, per
+     head, pushing `head.source.content_hash.clone()` then `head.segments.content_hash.clone()`.
+  4. `let clock = processing_stage_clock();`.
+  5. init accumulators `fills: Vec<FillObservation>`, `identities: Vec<ModelIdentity>`,
+     `diagnostics: Vec<DiagnosticRecord>`, `recorded_calls: u64 = 0`, `repairs: u64 = 0`,
+     `landed: Vec<ArtifactWrapper<QueryBody>>` (DELETE the old `let mut pair = Vec::new();`).
+  6. role loop `for (role, logic) in [("overlap", SmtLogic::QfLra), ("deontic", SmtLogic::QfUf)]` —
+     source / key / `model_fill` call UNCHANGED from current (source `static_id(&format!("{gid}.{role}"))`,
+     key `CassetteKey { route: static_id("route.direct_smt"), source: source.clone(), seed }`,
+     `model_fill(store, &key, FillSource::Replay, repair_limit, direct_smt_accept())`). `ModelFill` fields
+     to destructure: `target: Option<QueryBody>`, `accepted_cassette_hash: Option<Hash>` (Some iff target
+     Some), `model_identity: Option<ModelIdentity>`, `diagnostics: Vec<DiagnosticRecord>`,
+     `recorded_calls: u64`, `repairs: u64`; `FillObservation::from_fill(&fill)` borrows before the move.
+     Per role:
+     a. `Err(e)` → command diagnostic keyed `cassette`=`source.to_string()`, `reason`=`e.to_string()`,
+        `processing_stage`=`"model_fill_smt"` → `return DirectFill { pair: None, fills, identities }`
+        (carries the partial accumulators; NO event — matches the current early return).
+     b. `Ok(fill)`: `fills.push(FillObservation::from_fill(&fill));` then destructure, renaming the three
+        loop-colliding fields to `role_diagnostics` / `role_recorded_calls` / `role_repairs`; then
+        `identities.extend(model_identity); diagnostics.extend(role_diagnostics);
+        recorded_calls += role_recorded_calls; repairs += role_repairs;`.
+     c. `let Some(body) = target else { break; };` — the BREAK is load-bearing (a terminal reject stops
+        the pair: overlap exhausts before the deontic source is read; the rejection schema-arm ledger =
+        overlap's diagnostics alone, riding the one event).
+     d. `let mut role_inputs = input_hashes.clone();` then push
+        `accepted_cassette_hash.expect("accepted fill carries its cassette wrapper hash")`.
+     e. `let payload = QueryBody { query_id: source, logic, body };`.
+     f. the current fn's `wrapper(…)` call with the SAME 8 args EXCEPT the id becomes
+        `format!("{prefix}{gid}.{role}.smt_query")` (gains `{prefix}`) and the producer stage arg becomes
+        `MODEL_FILL` (was literal `2`); kind stays the `"smt_query"` literal, then `producer(resolved, MODEL_FILL)`,
+        `role_inputs`, `Origin::AiGenerated`, `EvidenceStatus::AcceptedEvidenceStatus`, `Vec::new()`, `payload`.
+     g. land through an EXPLICIT match (not an `.and_then` closure — keeps the `&mut shell → &Shell`
+        reborrow into `land` obvious): wrapper `Ok(env)` → `land(shell, &format!("{dir}/{role}.smt_query.json"), env)`
+        → `Ok(w)` push `landed`, `Err(d)` → `diagnostics.push(d)`; wrapper `Err(e)` →
+        `diagnostics.push(invalid_diagnostic(…))` keyed `group`, `artifact`=the same id string,
+        `reason`=`"wrap: {e}"`, `processing_stage`=`"model_fill_smt"`. Both failures ride the event, not the ledger.
+  7. after the loop: `let (started_at, ended_at, duration_ms) = clock.stop();` then
+     `let output_hashes: Vec<_> = landed.iter().map(|w| w.content_hash.clone()).collect();`.
+  8. emit ONE event = the mirror's `ProcessingStageEvent` literal EXCEPT three fields —
+     `processing_stage: static_id(DIRECT_SMT_STAGE_KINDS[MODEL_FILL])`, `input_hashes` = the member vec
+     from step 3, `output_hashes` from step 7. Identical to the mirror otherwise:
+     `pipeline_id: resolved.pipeline_id.clone()`, `pipeline_step_id: resolved.pipeline_step_ids[MODEL_FILL].clone()`,
+     the three clock fields, `outcome: severity(&diagnostics)` written ABOVE `diagnostics` (so the borrow
+     ends before the move), `resource_counters: vec![(static_id(RECORDED_CALLS_COUNTER), recorded_calls),
+     (static_id(REPAIRS_COUNTER), repairs)]`.
+  9. return: `pair` = `Some((overlap, deontic))` iff `landed.len() == 2` (drain via `landed.into_iter()`,
+     `.expect("overlap query wrapped")` / `.expect("deontic query wrapped")`), else `None`; then
+     `DirectFill { pair, fills, identities }`.
+
+  [C] `direct_smt_verify_group` (~1371): add first body line `let prefix = route_id_prefix(resolved);`;
+  change its wrapper id `format!("{gid}.verifier_results")` → `format!("{prefix}{gid}.verifier_results")`.
+  Keep its verify event + `dir` param; no .smt2. SAFE — the sole `verifier_results` artifact_id assert
+  (run.rs ~2487) is M1 `compile_verify_group`, prefix empty.
+
+  [D] add helper `direct_fill_group` near `direct_smt_resolved` (~4140), attr
+  `#[allow(clippy::too_many_arguments)]`, signature = the OLD `direct_smt_fill` arg shape so call sites
+  only rename + read `.pair`:
+  `(root: &Path, gid: &Id, members: &[&CorpusEntry], store: &CassetteStore, seed: u64, resolved: &Resolved, repair_limit: u32, shell: &mut Shell) -> DirectFill`.
+  Body: per `&m in members` push `route_document_head(root, m, resolved, shell).unwrap_or_else(|| panic!("{gid}: no head for {}", m.id))`
+  into `heads: Vec<DocHead>`; `let head_refs: Vec<&DocHead> = heads.iter().collect();`; return
+  `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`. (Confirm
+  `route_document_head`'s real arg order at ~868 when writing.)
+
+  [E] call sites — rename `direct_smt_fill(&root, &gid, &members, …)` → `direct_fill_group(&root, &gid, &members, …)`
+  (identical args), read `.pair`:
+  - reproduce (~4389): `.pair` before the existing `.unwrap_or_else`; body / provenance / schema_id asserts
+    hold (land round-trips bytes; the id prefix touches only the payload-immune artifact_id).
+  - non_pair (~4496) BEHAVIORAL: `let got = direct_fill_group(…);` then `assert!(got.pair.is_none(), …)` +
+    `assert!(got.fills.is_empty(), "the guard precedes any cassette access — no role fill runs")`. Rewrite
+    the fn doc: the OLD "short-circuits ahead of any cassette or filesystem access" premise dies (the helper
+    lands the member head(s) — both cases use corpus[0], valid — BEFORE the guard); NEW: the guard still
+    precedes cassette access → no role fill runs.
+  - scores (~4566): `.pair.expect(…)`.
+  - rejection schema-arm (~4874): `let filled = direct_fill_group(…);` +
+    `assert!(filled.pair.is_none(), "schema exhaustion ends the route");`. Ledger
+    `[AiSchemaViolation, AiSchemaViolation, RepairLimitExceeded]` HOLDS via break-on-first (overlap's 3
+    diagnostics ride the one event → ledger); members guideline_a / guideline_b are valid → head events clean.
+  - rejection syntax-arm (~4905): `.pair.expect("the shallow-accepting pair fills")`.
+    `shell.ledger().is_empty()` HOLDS — both roles accept → event diagnostics empty → the clean event leaves
+    the ledger untouched (head events clean too; the later `shell.events().last()` = the verify event, since
+    head / model_fill events precede it).
+  - route_metrics arm (~5234): `.pair.unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"))`.
+    The arm binds only the pair; route_metrics needs no `.fills` here.
+
+  gotchas (verified — do not re-derive): (1) content_hash is payload-only → the id-prefix changes disturb
+  NO byte pin. (2) break-on-first terminal reject is load-bearing (rejection schema-arm ledger = overlap
+  only). (3) a clean event (empty diagnostics) leaves the ledger untouched (rejection syntax-arm). (4) `land`
+  takes `&Shell` and auto-reborrows from `&mut shell`; the explicit-match landing form is borrow-obvious (no
+  closure). (5) diagnostic / wrap MESSAGE strings are unpinned (write them freely); only codes / counters /
+  ids get pinned in .1d4b.
 - [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). Extend
   direct_smt_fill_reproduces_m1_query_bodies: pin the group model_fill event tuple
   (kind/step_id/outcome/counters/outputs — counters summed over roles) + smt_query landed paths +
