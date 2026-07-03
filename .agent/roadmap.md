@@ -191,9 +191,11 @@ doc-lint bullet).
   observation shapes = route_metrics test ≈4454 — single_ir pairs from compiled.solver_query_plan,
   direct pairs = minted role ids). Tails run ONCE over all routes' traces (graphs deduped by
   document_id — payload-identical so content_hash equal; results per route, the settled §7.1 shape
-  per .1e's populated fixture; report findings/no_conflict rows = BASELINE view's groups only —
-  finding.{gid}.{seq} mints dense per group + Report::validate dedups finding ids, so two views'
-  same-group results collide; model-route quality reaches the report as .1e's aggregate sections):
+  per .1e's populated fixture; report findings/no_conflict rows = single_ir's groups,
+  structurally: assemble_trace mints claims only for compiled+verifier_results groups and direct
+  lands no compiled (SPEC §9 baseline = model emits SMT directly; findings need region/quoted-span
+  provenance direct cannot source) — exactly one view mints finding.{gid}.{seq}, no id collision,
+  tails filter nothing; model-route quality reaches the report as .1e's aggregate sections):
   trace_processing_stage + report_processing_stage gain `emit_event:
   bool` — M1 true (bytes unchanged), M2 false (trace/report = undeclared steps of route pipelines;
   tail wrapper producer = baseline view → step id UNUSED_STAGE, honest sentinel); sections stay
@@ -203,10 +205,10 @@ doc-lint bullet).
   events (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline
   run stays 19) with
   model_fill counters (single_ir per doc 1/0; direct per group 2/0); both routes' layout present;
-  trace_bundle strict-parses, shared source nodes once, direct verifier_results = legal node
-  carrying only its →report out-edge (no compiled → no verify in-edge + zero claim rows:
-  assemble_trace claims need compiled+verifier_results; validate checks edge endpoints/rank/op,
-  never node connectivity); determinism = landed artifacts byte-equal across the two
+  trace_bundle strict-parses, claims = single_ir's 2 groups only, shared source nodes once, direct
+  verifier_results = legal node carrying only its →report out-edge (no verify in-edge — validate
+  checks edge endpoints/rank/op, never node connectivity); determinism = landed artifacts
+  byte-equal across the two
   runs + manifests byte-equal after normalizing the one `--out` token
   (manifest_inputs ≈1497 embeds out_dir.display()) + events compared on a non-timing projection.
   M1 executed() pins unchanged.

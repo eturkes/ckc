@@ -17,6 +17,10 @@ full pre-consolidation text lives in git history.
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
+- AI-written specs may carry mistakes (user, 2026-07-03): apparent incorrectness is likely
+  unintended — verify against SPEC.md + code and rule with best judgment, recording the ruling
+  where its implementer reads it (first applied: .1d5 findings body = single_ir structurally;
+  "BASELINE only" was a phantom-collision fix — direct lands no compiled, mints no claims).
 - LSP coverage map (ckc): Serena-served = rust, bash, json, yaml, toml, markdown (Marksman), html,
   lean4 (`.serena/project.yml` `languages:`; lean4's server starts once `.lean` files exist);
   `global`-marketplace plugins = xml, smt2 (dolmen), alloy, egglog. Audited gaps: TLA+, ASP/Clingo,

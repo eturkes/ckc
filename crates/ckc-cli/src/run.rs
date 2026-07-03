@@ -525,10 +525,13 @@ fn resolve_route(
 /// document or group never mint colliding wrapper ids. Payload-level ids —
 /// compile query ids, the `{gid}.overlap`/`{gid}.deontic` cassette sources —
 /// stay unprefixed inside their route-prefixed wrappers. Finding ids stay
-/// unprefixed on a stricter rule: trace assembly mints `finding.{gid}.{seq}`
-/// dense per group and `Report::validate` rejects duplicate finding ids, so
-/// exactly one view's group results feed the §7.1 findings body — the
-/// baseline view (`is_baseline` marks it for .1d5's tails). run-m2.1d3/.1d4
+/// unprefixed structurally: trace assembly mints `finding.{gid}.{seq}` only
+/// for groups carrying compiled + verifier_results, and the direct route
+/// lands no compiled artifact (SPEC §9: the model emits SMT-LIB directly —
+/// no assertion-to-source provenance), so exactly one view (single_ir)
+/// feeds the §7.1 findings body and duplicate ids never reach
+/// `Report::validate` (`is_baseline` still marks the baseline for .1d5's
+/// tail wrapper producer). run-m2.1d3/.1d4
 /// apply this prefix to every route-minted wrapper id.
 #[allow(dead_code)]
 fn route_id_prefix(resolved: &Resolved) -> String {
