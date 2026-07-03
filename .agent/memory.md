@@ -17,15 +17,11 @@ full pre-consolidation text lives in git history.
   docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
   Implement sessions match patterns from the latest unit-scoped commit (`git log
   --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- LSP coverage map (ckc inventory; the Serena-vs-marketplace wiring and diagnostic-delivery
-  mechanism live in each agent's own global guidance, not here). ckc's hand-authored/byte-pinned
-  formats → provider: rust, bash, json, yaml, toml, markdown (Marksman), html, lean4 are
-  Serena-served (in `.serena/project.yml` `languages:`); xml, smt2 (dolmen), alloy, egglog come
-  from the `global` LSP marketplace. §13 formal targets: alloy + egglog covered (marketplace
-  plugins); lean4 listed but its server starts only once `.lean` files exist. No standalone LSP
-  (audited): TLA+, ASP/Clingo, categorical-CQL; Isabelle lacks solidlsp (marketplace gap plugin at
-  adoption), Python is solidlsp-covered (add to `languages:` at adoption) — §13 additional-targets,
-  §13.1 adapter boundary. Compendium families present only as registry YAML data carry no LSP.
+- LSP coverage map (ckc): Serena-served = rust, bash, json, yaml, toml, markdown (Marksman), html,
+  lean4 (`.serena/project.yml` `languages:`; lean4's server starts once `.lean` files exist);
+  `global`-marketplace plugins = xml, smt2 (dolmen), alloy, egglog. Audited gaps: TLA+, ASP/Clingo,
+  categorical-CQL have no standalone LSP; Isabelle = marketplace gap plugin at adoption; Python
+  solidlsp-covered (add at adoption). Registry-YAML-only compendium families carry no LSP.
 
 ## Lessons
 
@@ -51,7 +47,10 @@ full pre-consolidation text lives in git history.
   fixture values, test list — so implementation is transcription); derivation fn + its
   test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
-  (never paired with assembly or stage wiring); spec-byte amendment (re-pin + reference/test mirror sweep)
+  (never paired with assembly or stage wiring); orchestrator wiring over N pre-built route stages +
+  per-stage landing/eventing + a determinism gate ≥ N+2 units — per-route stage-rework units first, the
+  orchestrator+gate last, cross-cutting type/trace plumbing its own opener (run-m2.1d bundled all of it,
+  consumed 200K on reads+design alone, zero code written → respec'd .1d1–.1d5); spec-byte amendment (re-pin + reference/test mirror sweep)
   + new feature code = 2 (an open decision that amends pinned bytes is a deliverable, not a preamble);
   crate foundations pair only with a small type surface (one payload module each); deterministic code + a
   SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
@@ -227,11 +226,9 @@ full pre-consolidation text lives in git history.
   rejection REASON via `iter_errors()` `(instance_path, schema_path)` — a failed `oneOf` reports at the
   parent `.../oneOf`, so prove the nested split (pattern vs type) by the baseline accepting the
   canonical value. HAND-AUTHORED variant (no emitter — grammar / prompt files): the file IS the source,
-  its oracle is the format's own recognizer (working `bnf` Earley form in `emit.rs`; two facts that are
-  NOT: `Grammar::parse_input` is DEPRECATED → `-D warnings` forbids it, recognize via `g.build_parser()?`
-  + `p.parse_input(s).next().is_some()`; `parse_input` borrows `input: &'gram str` from the parser's
-  grammar → rebuild the parser per call to free input lifetimes, free for a tiny grammar) → skip bless +
-  cross-check; the lone `hash_bytes(file) == <X>_HASH` pin IS the whole drift guard. DESIGN LESSON
+  its oracle is the format's own recognizer (working `bnf` Earley form + its two API pitfalls live in
+  `emit.rs` — copy it; deriving fresh from `bnf` docs re-hits them) → skip bless + cross-check; the
+  lone `hash_bytes(file) == <X>_HASH` pin IS the whole drift guard. DESIGN LESSON
   (any grammar/schema oracle): oracle = SOUND SUPERSET of the emitter image, NOT its exact shape — a
   CFG can't bind cross-field coupling / assertion cardinality / declare-before-use, so §8.6 byte pins
   own those; keep the grammar the construct-surface union (grammar-constrained decoding wants the
@@ -387,30 +384,16 @@ full pre-consolidation text lives in git history.
     Replay→deterministic tail mirroring `assemble_bundle`) + golden-cassette wiring LANDED in `run.rs`
     (route-single-ir.2/.2b); run-m2.1d consumes `resolve()`'s per-route views for the in-`execute`
     loop; the hand-built minimal-`Resolved` stays a test-fixture pattern (both route fixtures carry
-    `shape` + `UNUSED_STAGE` padding now). route-single-ir.3 added the verdict-half scoring test
-    (`single_ir_route_scores_m1_groups`): a route-scoring test mirrors
-    `run_oracle.rs::assert_group_matches_reference` IN FULL (both branches, incl. the no-conflict
-    `expected_no_conflict_result` Q1-unsat/Q2-skipped closure + panic-on-unknown-outcome; a partial
-    mirror passes vacuously) and resolves groups + reference from `exp.m1_scaffold` (doc-id→bundle map,
-    iterate `test_source_groups`, assert `reference.len()==test_source_groups.len()`), never a hardcoded
-    membership (drifts silently vs the registry) — codex M2.18 caught both. route-direct-smt +
-    metrics/report-m2 score the same M1 groups → reuse this shape. Ceiling = smoke test (`.2b` pins
-    payload-equality to M1, run_oracle pins M1 verdicts vs reference); the load-bearing route-execution
-    wiring is run-m2.1's. route-single-ir.4 closed the route's §7.4 rejection coverage
-    (`single_ir_route_rejection_codes`): pin the accept-closure→§7.4-code mapping by calling
-    `model_fill(store, key, Replay, repair_limit, single_ir_accept(regions, segs))` DIRECTLY (inspect
-    `ModelFill.target`/`diagnostics`/`repairs`/`recorded_calls`); `single_ir_fill` is asserted via
-    `shell.ledger()` for the ROUTE-level §7.4 surfacing (recovery → 1 `ai_schema_violation` + a bundle;
-    hallucinated → `ai_hallucinated_source` + `None`). Committed bad cassettes under
-    `route.single_ir/test_source.m1_guideline_a` (synthetic-identity → audited), seeds 99/98/97
-    (+derived) = hallucinated-terminal / schema→recover / exhaust-through-re-prompt; mechanics +
-    derived-seed constants live in the tests (`single_ir_route_rejection_codes`,
-    `bless_single_ir_rejection_cassettes`). LESSON (codex M2.19): `repair_limit=0` hits
-    model_fill's terminal branch at attempt 0 BEFORE the re-prompt loop → it proves only the zero-budget
-    boundary (already model_fill.rs's coverage), NOT multi-attempt exhaustion; faithful route-level
-    exhaustion needs malformed cassettes at the base AND each derived seed through the budget. Pin the
-    `ai_schema_violation` payload SHAPE too (key `reason`, non-empty, empty refs), symmetric to the
-    hallucinated/exceeded pins.
+    `shape` + `UNUSED_STAGE` padding now). Scoring/rejection test shapes (route-single-ir.3/.4,
+    consumers DONE; the tests hold mechanics + derived-seed constants) — durable lessons only: a
+    route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a partial
+    mirror passes vacuously) and resolves groups + reference from the registry, never hardcoded
+    membership (codex M2.18 caught both); `repair_limit=0` proves only the zero-budget boundary, NOT
+    multi-attempt exhaustion — faithful route-level exhaustion needs malformed cassettes at the base
+    AND each derived seed through the budget (codex M2.19); pin rejection payload SHAPE (key
+    `reason`, non-empty, empty refs) symmetric across codes. Rejection cassettes: single_ir seeds
+    99/98/97 (+derived) = hallucinated / recover / exhaust, under
+    `route.single_ir/test_source.m1_guideline_a`.
   - route.direct_smt residue (units .1-.5 DONE; git + run.rs hold the build story — only
     forward-load-bearing facts here): the route verifies raw model SMT via pub ckc-smt
     `verify_query_pairs(adapter, &[MintedQueryPair], budget)`; a no-IR route CANNOT honestly mint
@@ -468,31 +451,18 @@ full pre-consolidation text lives in git history.
   baseline; per-route delta rows = union of metric ids (sorted), `Rational::sub` (ckc-core id.rs —
   signed exact, added .2) on Value×Value else `not_applicable`; baseline gets NO self-delta row.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
-  sections strictly before all DeltaTable sections) — report_en.md + report_ja.md walk it
-  (.3a/.3b); run-m2.1 must render through it too, never the fields ad hoc (codex M2.22: the §9
-  guarantee reaches artifacts only once an emitter walks it). report_en.md M2 rendering landed
-  (.3a, `render_markdown` + two pinned tests): §0 vocabulary must ride prose VERBATIM-lowercase (a
-  sentence-case "Raw benchmark output" failed the contains-assert) → M2 lead lines use M1's
-  lowercase-label style. report_ja.md landed (.3b): ONE private `render(report, &Labels)` walk
-  serves both languages (`render_markdown`=EN_LABELS / `render_markdown_ja`=JA_LABELS; the four
-  pre-existing EN byte-pins locked the parameterization behavior-tight, so no refactor unit
-  needed) — resolved JA §0 mapping: §0 wording labels + ids/hashes/codes + `not_applicable` stay
-  verbatim ENGLISH inside JA prose (§7.2: wording draws from the closed §0 label set; translating
-  would exit it), structural chrome JA incl. `Labels::list_joiner` `、` for every enumeration
-  (codex M2.25: chrome hardcoded as ASCII `, ` contradicted the mapping), empty slot `なし。`;
-  the delta heading's ` - ` stays language-invariant (§7.3 subtraction notation, not chrome);
-  two JA observed-output pins mirror the EN pair over shared fixtures
-  (`empty_m2_slots_report()`), and `one_canonical_report_renders_both_language_bodies` renders
-  both pinned bodies from the pinned canonical report.json bytes alone; run-m2.1 writes the
-  bodies as report_en.md/report_ja.md. RENDERED ⇒
-  VALIDATED (codex M2.25): every member a renderer walks must sit under a `Report::validate` rule —
-  `RouteMetrics::diagnostics` was the one rendered collection validate skipped, and `emit_set`
-  sorts/dedups blindly, so a validate-passing unsorted store rendered ≠ its canonical read-back
-  (rule 6 now demands the canonical set); identity free text (solver version, model quant +
-  runtime_version) is rule-7 code-span-inert (non-empty, no backtick/line break) → renderers (.3b
-  incl.) interpolate those fields into code spans bare, no escaping layer; quoted span text renders
-  BARE outside code spans as one list line → rule 3 rejects line breaks in it (codex M2.25 .3b:
-  empty-only check left valid multi-line text able to inject block structure into both bodies). REPORT-m2.1 TRAP (DISCHARGED in landed
+  sections strictly before all DeltaTable sections) — both md renderers walk it (.3a/.3b);
+  run-m2.1e renders through the renderers, never the fields ad hoc (codex M2.22: the §9 guarantee
+  reaches artifacts only once an emitter walks it). Rendering landed (.3a/.3b; pins + Labels
+  mechanics live in report.rs tests): `render_markdown`/`render_markdown_ja` share one walk;
+  `one_canonical_report_renders_both_language_bodies` proves both pinned bodies render from the
+  pinned canonical report.json bytes alone; run-m2.1e writes them as report_en.md/report_ja.md. JA
+  mapping: §0 labels + ids/hashes/codes + `not_applicable` verbatim ENGLISH inside JA prose,
+  structural chrome JA (`、` joiner, `なし。` empty slot), delta heading's ` - ` language-invariant.
+  RENDERED ⇒ VALIDATED (codex M2.25): every member a renderer walks must sit under a
+  `Report::validate` rule (rule 6 canonical sets; rule 7 code-span-inert identity text → renderers
+  interpolate bare, no escaping layer; rule 3 rejects line breaks in quoted span text — else valid
+  text injects block structure into both bodies). REPORT-m2.1 TRAP (DISCHARGED in landed
   .1a code, byte-position-tested): §4.3 sorts member keys, so raw-before-delta in BYTES needs the
   raw-rows key below the delta key → keys `raw_rows` < `route_deltas`, Rust fields stay
   routes/deltas; the same key-sort trap applies to ANY future §-ordered canonical member pair.
