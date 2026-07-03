@@ -129,6 +129,19 @@ const UNUSED_STAGE: &str = "processing_stage.unused";
 /// milliseconds — the one budget key the M1 vocabulary defines.
 const SOLVER_BUDGET_KEY: &str = "solver_ms_per_query";
 
+/// §9 budget key naming the model-route repair cap: how many `derive_seed`
+/// re-prompts one fill may spend before `repair_limit_exceeded`. [`resolve`]
+/// requires it whenever the experiment binds a model route; the M1 layered
+/// shape never reads it.
+const MODEL_REPAIR_LIMIT_KEY: &str = "model_repair_limit";
+
+/// §9 budget key naming the per-fill sample count. Replay executes exactly
+/// one recorded draw per attempt, so on a model-route binding [`resolve`]
+/// accepts only the value 1 when the key is present — a larger count would
+/// promise samples the recorded run never draws (k-sample convergence waits
+/// on a sampling config, a downstream decision).
+const MODEL_SAMPLE_COUNT_KEY: &str = "model_sample_count";
+
 /// Run `ckc run` rooted at `root` (the invocation working directory: §3
 /// anchors `registry/` and corpus paths at the repository root). Evidence,
 /// artifacts, and the outcome land entirely in the shell.
@@ -238,7 +251,7 @@ enum RouteShape {
 /// limit, the §5 plan the run executes, and the toolchain manifest hash every
 /// producer carries. [`resolve`] returns one view per bound pipeline in set
 /// order; documents, groups, budget, plan, and toolchain hash are shared
-/// across the set.
+/// across the set, while the repair budget and baseline flag are per-view.
 struct Resolved {
     pipeline_id: Id,
     /// Pipeline step ids: the pipeline's declared stages filling slots
@@ -251,6 +264,16 @@ struct Resolved {
     groups: Vec<TestSourceGroup>,
     /// §8.4 `solver_ms_per_query` budget value.
     budget_ms: u64,
+    /// §9 `model_repair_limit` budget value: `Some` on the model routes
+    /// (resolution fails without it) and `None` on the M1 layered shape,
+    /// which spends no repairs. run-m2.1d3/.1d4 read it in the route loop.
+    #[allow(dead_code)]
+    repair_limit: Option<u32>,
+    /// Whether this view's pipeline is the experiment's §7.3 delta baseline
+    /// (the M1 legacy binding's single view is its own baseline).
+    /// run-m2.1d5's tails read it.
+    #[allow(dead_code)]
+    is_baseline: bool,
     /// §5 run plan built from the experiment entry; its content hash is
     /// the manifest's `run_plan_hash`.
     plan: RunPlan,
@@ -288,13 +311,13 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
     // The shape-aware baseline accessor mirrors `registry check`'s binding
     // validation: a malformed binding (neither form, both, or a stray or
     // out-of-set baseline) resolves nothing.
-    if experiment.baseline().is_none() {
+    let Some(baseline_id) = experiment.baseline().cloned() else {
         shell.diagnostic(invalid_diagnostic(vec![(
             static_id("reason"),
             format!("experiment {experiment_id} has no valid pipeline binding"),
         )]));
         return None;
-    }
+    };
     let pipelines = experiment.resolved_pipelines();
     let mut routes: Vec<(Id, [Id; 8], RouteShape)> = Vec::with_capacity(pipelines.len());
     for member in &pipelines {
@@ -322,6 +345,43 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
             format!("experiment {experiment_id} declares no {SOLVER_BUDGET_KEY} budget"),
         )]));
         return None;
+    };
+    // §9 model-route budget: a binding that resolves a model route must cap
+    // the repair loop explicitly, and a declared sample count other than 1
+    // would promise draws single-draw replay never makes.
+    let model_repair_limit = if routes.iter().any(|(_, _, s)| *s != RouteShape::M1Layered) {
+        let Some(&raw) = experiment.budget.get(&static_id(MODEL_REPAIR_LIMIT_KEY)) else {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!("experiment {experiment_id} declares no {MODEL_REPAIR_LIMIT_KEY} budget"),
+            )]));
+            return None;
+        };
+        let Ok(limit) = u32::try_from(raw) else {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!(
+                    "experiment {experiment_id} declares a {MODEL_REPAIR_LIMIT_KEY} budget \
+                     beyond u32 ({raw})"
+                ),
+            )]));
+            return None;
+        };
+        if let Some(&samples) = experiment.budget.get(&static_id(MODEL_SAMPLE_COUNT_KEY))
+            && samples != 1
+        {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!(
+                    "experiment {experiment_id} declares {MODEL_SAMPLE_COUNT_KEY} {samples}; \
+                     replay draws exactly one sample"
+                ),
+            )]));
+            return None;
+        }
+        Some(limit)
+    } else {
+        None
     };
 
     let mut documents: Vec<CorpusEntry> = Vec::new();
@@ -380,12 +440,17 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
         routes
             .into_iter()
             .map(|(pipeline_id, pipeline_step_ids, shape)| Resolved {
+                is_baseline: pipeline_id == baseline_id,
                 pipeline_id,
                 pipeline_step_ids,
                 shape,
                 documents: documents.clone(),
                 groups: experiment.test_source_groups.clone(),
                 budget_ms,
+                repair_limit: match shape {
+                    RouteShape::M1Layered => None,
+                    RouteShape::SingleIr | RouteShape::DirectSmt => model_repair_limit,
+                },
                 plan: plan.clone(),
                 toolchain_manifest_hash: toolchain_manifest_hash.clone(),
             })
@@ -452,6 +517,21 @@ fn resolve_route(
         .try_into()
         .expect("a fingerprinted sequence declares at most eight stages and pads to exactly eight");
     Some((pipeline_step_ids, shape))
+}
+
+/// Route namespace for run-minted wrapper artifact ids: empty on the M1
+/// layered shape (its artifact ids keep their exact M1 bytes) and
+/// `"{pipeline_id}."` on the model routes, so two routes landing the same
+/// document or group never mint colliding wrapper ids. Payload-level ids —
+/// compile query ids, the `{gid}.overlap`/`{gid}.deontic` cassette sources,
+/// finding ids — stay unprefixed. run-m2.1d3/.1d4 apply it to every
+/// route-minted wrapper id.
+#[allow(dead_code)]
+fn route_id_prefix(resolved: &Resolved) -> String {
+    match resolved.shape {
+        RouteShape::M1Layered => String::new(),
+        RouteShape::SingleIr | RouteShape::DirectSmt => format!("{}.", resolved.pipeline_id),
+    }
 }
 
 /// Drive one corpus document through the four document processing_stages. Every
@@ -2501,6 +2581,23 @@ processing_stages:
         std::fs::write(path, text.replacen(from, to, 1)).unwrap();
     }
 
+    /// Mirror the committed registry surface [`resolve`] reads — the three
+    /// registry files plus the toolchain provenance bytes — into `root`, so a
+    /// mutation test degrades the real `exp.m2_multihop` binding by one edit.
+    fn copy_committed_registry(root: &Path) {
+        let repo = repo_root();
+        for rel in [
+            CORPORA_FILE,
+            "registry/candidates.yaml",
+            "registry/experiments.yaml",
+            TOOLCHAIN_FILE,
+        ] {
+            let target = root.join(rel);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::copy(repo.join(rel), target).unwrap();
+        }
+    }
+
     // §4.4 valid remainder: a document whose corpus file is missing takes a
     // command-scope diagnostic while the other document still runs all four
     // processing_stages and lands its artifacts; the group misses a member bundle, so
@@ -2816,6 +2913,9 @@ processing_stages:
         let direct = &views[0];
         assert_eq!(direct.pipeline_id, static_id("pipe.m2_direct_smt"));
         assert_eq!(direct.shape, RouteShape::DirectSmt);
+        assert_eq!(direct.repair_limit, Some(1));
+        assert!(direct.is_baseline, "direct_smt is the §9 delta baseline");
+        assert_eq!(route_id_prefix(direct), "pipe.m2_direct_smt.");
         assert_eq!(
             direct.pipeline_step_ids,
             [
@@ -2832,6 +2932,9 @@ processing_stages:
         let single_ir = &views[1];
         assert_eq!(single_ir.pipeline_id, static_id("pipe.m2_single_ir"));
         assert_eq!(single_ir.shape, RouteShape::SingleIr);
+        assert_eq!(single_ir.repair_limit, Some(1));
+        assert!(!single_ir.is_baseline);
+        assert_eq!(route_id_prefix(single_ir), "pipe.m2_single_ir.");
         assert_eq!(
             single_ir.pipeline_step_ids,
             [
@@ -2882,6 +2985,98 @@ processing_stages:
                 ]
             );
         }
+    }
+
+    // run-m2.1d2 — the M1 legacy binding's single view is its own baseline,
+    // spends no repairs, and keeps its unprefixed artifact-id namespace, so
+    // M1 behavior is unchanged by the model-route resolve extension.
+    #[test]
+    fn m1_view_resolves_unprefixed_baseline() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        let mut shell = Shell::open(static_id("run"), static_id("t"), None);
+        let views = resolve(root.path(), &"exp.tiny".parse().unwrap(), &mut shell)
+            .expect("exp.tiny resolves over the tiny root");
+        assert!(shell.ledger().is_empty(), "{:?}", shell.ledger());
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].shape, RouteShape::M1Layered);
+        assert_eq!(views[0].repair_limit, None);
+        assert!(views[0].is_baseline);
+        assert_eq!(route_id_prefix(&views[0]), "");
+    }
+
+    // run-m2.1d2 — a model-route binding without the §9 repair budget stops
+    // resolution: the repair loop needs an explicit cap before a route runs.
+    #[test]
+    fn missing_model_repair_limit_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        copy_committed_registry(root.path());
+        mutate(
+            root.path(),
+            "registry/experiments.yaml",
+            "    model_repair_limit: 1\n",
+            "",
+        );
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), None);
+        assert!(resolve(root.path(), &"exp.m2_multihop".parse().unwrap(), &mut shell).is_none());
+        let ledger = shell.ledger();
+        assert_eq!(ledger.len(), 1);
+        assert!(
+            ledger[0].payload.iter().any(|(_, v)| v
+                .contains("experiment exp.m2_multihop declares no model_repair_limit budget")),
+            "{ledger:?}"
+        );
+    }
+
+    // run-m2.1d2 — a repair budget beyond u32 stops resolution rather than
+    // truncating the cap.
+    #[test]
+    fn model_repair_limit_beyond_u32_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        copy_committed_registry(root.path());
+        mutate(
+            root.path(),
+            "registry/experiments.yaml",
+            "model_repair_limit: 1\n",
+            "model_repair_limit: 4294967296\n",
+        );
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), None);
+        assert!(resolve(root.path(), &"exp.m2_multihop".parse().unwrap(), &mut shell).is_none());
+        let ledger = shell.ledger();
+        assert_eq!(ledger.len(), 1);
+        assert!(
+            ledger[0].payload.iter().any(|(_, v)| v.contains(
+                "experiment exp.m2_multihop declares a model_repair_limit budget beyond u32 \
+                 (4294967296)"
+            )),
+            "{ledger:?}"
+        );
+    }
+
+    // run-m2.1d2 — a declared sample count other than 1 stops resolution:
+    // replay executes exactly one recorded draw per attempt, so a larger
+    // count would promise samples the recorded run never draws.
+    #[test]
+    fn model_sample_count_beyond_one_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        copy_committed_registry(root.path());
+        mutate(
+            root.path(),
+            "registry/experiments.yaml",
+            "model_sample_count: 1",
+            "model_sample_count: 2",
+        );
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), None);
+        assert!(resolve(root.path(), &"exp.m2_multihop".parse().unwrap(), &mut shell).is_none());
+        let ledger = shell.ledger();
+        assert_eq!(ledger.len(), 1);
+        assert!(
+            ledger[0].payload.iter().any(|(_, v)| v.contains(
+                "experiment exp.m2_multihop declares model_sample_count 2; \
+                 replay draws exactly one sample"
+            )),
+            "{ledger:?}"
+        );
     }
 
     // run-m2.1a — the model-route experiment resolves but does not execute:
@@ -2976,6 +3171,8 @@ processing_stages:
             documents: vec![],
             groups: vec![],
             budget_ms: 10_000,
+            repair_limit: Some(1),
+            is_baseline: false,
             plan: RunPlan {
                 experiment_id: static_id("exp.m2_multihop"),
                 test_source_groups: vec![],
@@ -3636,6 +3833,8 @@ processing_stages:
             documents: vec![],
             groups: vec![],
             budget_ms: 10_000,
+            repair_limit: Some(1),
+            is_baseline: true,
             plan: RunPlan {
                 experiment_id: static_id("exp.m2_multihop"),
                 test_source_groups: vec![],

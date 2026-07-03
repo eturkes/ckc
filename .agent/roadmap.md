@@ -149,18 +149,9 @@ compiled members' bundle artifact_ids, exact compile-edge provenance (byte-ident
 share content hashes → hash-only selection over-edges); compile-less groups pass empty.
 - [x] run-m2.1d1: DocTrace/GroupTrace `dir` plumbing + source-node dedup + member-id+hash
   bundle→compiled edges, M1-byte-locked. 79% 159K/200K 1bfc7e0
-- [ ] run-m2.1d2: model-route resolve extension. `Resolved` gains `repair_limit: Option<u32>` +
-  `is_baseline: bool`; `resolve()` fills per view: shape != M1Layered ⇒ budget `model_repair_limit`
-  REQUIRED (u32::try_from; missing/overflow → resolution diagnostic in .1a's style, resolve fails)
-  and `model_sample_count`, when present, must == 1 (single-draw replay honesty; else same-style
-  diagnostic); `is_baseline` = view id == experiment.baseline() (M1 single view → true,
-  repair_limit None, bytes/behavior unchanged). New `route_id_prefix(&Resolved) -> String`: "" for
-  M1Layered else `"{pipeline_id}."` — .1d3/.1d4 apply it to every route-minted wrapper artifact_id
-  (cross-route collisions otherwise); payload-level ids (compile query ids, `{gid}.overlap`/
-  `{gid}.deontic` cassette sources, finding ids) stay unprefixed. Update both fixture `Resolved`
-  literals mechanically. Gate: cargo test; extend `m2_experiment_resolves_one_view_per_route`
-  (≈2803) pinning repair_limit=Some(1) + is_baseline (direct true / single_ir false); new tiny-root
-  mutation rejections: budget missing model_repair_limit; model_sample_count: 2.
+- [x] run-m2.1d2: per-view repair_limit/is_baseline resolve extension + route_id_prefix +
+  committed-registry mutation rejections (missing/overflow repair limit, sample count 2), M1 pins
+  untouched. 63% 126K/200K
 - [ ] run-m2.1d3: single_ir route stage — landing + §4.6 events. New `route_document_head(root,
   entry, resolved, shell) -> Option<DocHead>` = document_pipeline's extract+segment half, shared by
   both routes (.1d4 reuses): read/extract/segment failures → today's diagnostics + None; lands
