@@ -141,23 +141,11 @@ fn names). CassetteStore::new(root) appends `cassettes/` itself → run store = 
 `<root>/cassettes/<route>/<source>/seed-<seed>.json` (production rule; run-m2.2 commits recorded
 cassettes there). Base seed = experiment seed; repair limit = resolved.repair_limit (.1d2). Event
 timing fields are real wall-clock (shell.rs clock, NO normalization) → determinism gates compare
-landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes.
-- [ ] run-m2.1d1: trace route-dir plumbing, M1-byte-locked. `DocTrace`/`GroupTrace` (trace.rs
-  ≈538/558) gain `dir: String` (the dir their nodes' paths cite); every M1 constructor site passes
-  today's exact strings `artifacts/{doc}` / `groups/{gid}` (sites: grep `DocTrace {`/`GroupTrace {`
-  in trace.rs tests + run.rs; missing-field compile errors catch every literal)
-  → existing byte-pins = the lock. `assemble_trace`(≈595) reads the fields instead of its two
-  hardcoded `format!`s, plus two route-readiness changes: (a) per-doc Source node pushed ONCE —
-  skip an IDENTICAL (id/kind/path/hash) duplicate, a MISMATCHED one still reaches `validate` →
-  `DuplicateNodeId` fail-closed (routes share corpus docs); (b) bundle→compiled edge source = the
-  bundle node whose content_hash ∈ that compiled's input_hashes (M1-identical: compile inputs are
-  the member bundle hashes; memory's selector rule ⇒ discriminating fixture — two same-document
-  DocTraces, distinct dirs/bundles, one GroupTrace citing one side's hashes → edges from that side
-  only). Node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
-  direct-route verifier_results = legal orphan node (validate has no orphan check). Reading:
-  trace.rs + the grepped run.rs literal sites only. Gate: workspace tests green (M1 pins prove
-  bytes) +
-  new dedup/mismatch/hash-edge tests.
+landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes. Trace
+node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
+direct-route verifier_results = legal orphan node (validate has no orphan check).
+- [x] run-m2.1d1: DocTrace/GroupTrace `dir` plumbing + source-node dedup + hash-matched
+  bundle→compiled edges, M1-byte-locked. 79% 159K/200K
 - [ ] run-m2.1d2: model-route resolve extension. `Resolved` gains `repair_limit: Option<u32>` +
   `is_baseline: bool`; `resolve()` fills per view: shape != M1Layered ⇒ budget `model_repair_limit`
   REQUIRED (u32::try_from; missing/overflow → resolution diagnostic in .1a's style, resolve fails)

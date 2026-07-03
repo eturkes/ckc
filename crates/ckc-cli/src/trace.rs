@@ -541,6 +541,9 @@ pub struct DocTrace {
     pub test_source_path: String,
     /// Raw source-byte hash, the source node's content hash.
     pub source_hash: Hash,
+    /// Run-relative dir the chain nodes' paths cite (M1
+    /// `artifacts/<document_id>`; a route stage passes its own landing dir).
+    pub dir: String,
     /// Landed (artifact id, wrapper content hash) per document processing_stage.
     pub source_document_graph: Option<(Id, Hash)>,
     pub segments: Option<(Id, Hash)>,
@@ -559,6 +562,9 @@ pub struct GroupTrace {
     pub group_id: Id,
     /// Member document ids in §8.4 registry order.
     pub test_sources: Vec<Id>,
+    /// Run-relative dir the group nodes' paths cite (M1 `groups/<group_id>`;
+    /// a route stage passes its own landing dir).
+    pub dir: String,
     pub compiled: Option<ArtifactWrapper<CompiledArtifact>>,
     pub verifier_results: Option<ArtifactWrapper<VerifierResults>>,
 }
@@ -569,10 +575,16 @@ pub struct GroupTrace {
 /// DAG: one static report node (id `report`, path `report.json`, hashless)
 /// as the sink; per document the §8.3 chain source →extract→ source_document_graph
 /// →segment→ segments →normalize→ normalization →assemble→ ir_bundle —
-/// node ids the artifact ids, paths the §8.3 run-relative layout, hashes
-/// the wrapper content hashes, each present landing edged from its
-/// nearest present predecessor; per group every member ir_bundle →compile→
-/// compiled →verify→ verifier_results →report→ the report node.
+/// node ids the artifact ids, chain paths under the hand-off's `dir`,
+/// hashes the wrapper content hashes, each present landing edged from its
+/// nearest present predecessor. Hand-offs sharing a document (routes share
+/// corpus docs) collapse to one source node when the repeats are identical
+/// (id/kind/path/hash); a mismatched repeat still lands and fails
+/// [`TraceBundle::validate`] as `DuplicateNodeId`. Per group each member
+/// ir_bundle →compile→ compiled — the edge rises from the member bundle
+/// node whose content hash is among the compiled wrapper's `input_hashes`
+/// (compile consumed exactly the member bundles) — then compiled →verify→
+/// verifier_results →report→ the report node.
 ///
 /// Claims: one row per verifier result, sequence_number = its index in the group's
 /// plan-ordered results vector (§7.2 finding ids; a result resolving to no
@@ -602,15 +614,18 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
     }];
     let mut edges = Vec::new();
 
-    let mut bundle_nodes: BTreeMap<&str, &Id> = BTreeMap::new();
+    let mut bundle_nodes: BTreeMap<&str, Vec<(&Id, &Hash)>> = BTreeMap::new();
     for doc in docs {
-        nodes.push(TraceNode {
+        let source = TraceNode {
             node_id: doc.document_id.clone(),
             kind: TraceNodeKind::Source,
             path: doc.test_source_path.clone(),
             content_hash: Some(doc.source_hash.clone()),
-        });
-        let dir = format!("artifacts/{}", doc.document_id);
+        };
+        if !nodes.contains(&source) {
+            nodes.push(source);
+        }
+        let dir = &doc.dir;
         let mut prev = &doc.document_id;
         for (landing, kind, file) in [
             (
@@ -653,14 +668,17 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 operation: TraceOperation::Assemble,
                 to: bundle.artifact_id.clone(),
             });
-            bundle_nodes.insert(doc.document_id.as_str(), &bundle.artifact_id);
+            bundle_nodes
+                .entry(doc.document_id.as_str())
+                .or_default()
+                .push((&bundle.artifact_id, &bundle.content_hash));
         }
     }
 
     let mut claims = Vec::new();
     let mut rows = Vec::new();
     for group in groups {
-        let dir = format!("groups/{}", group.group_id);
+        let dir = &group.dir;
         if let Some(compiled) = &group.compiled {
             nodes.push(TraceNode {
                 node_id: compiled.artifact_id.clone(),
@@ -669,12 +687,16 @@ pub fn assemble_trace(docs: &[DocTrace], groups: &[GroupTrace]) -> (TraceBundle,
                 content_hash: Some(compiled.content_hash.clone()),
             });
             for test_source in &group.test_sources {
-                if let Some(bundle_id) = bundle_nodes.get(test_source.as_str()) {
-                    edges.push(TraceEdge {
-                        from: (*bundle_id).clone(),
-                        operation: TraceOperation::Compile,
-                        to: compiled.artifact_id.clone(),
-                    });
+                for &(bundle_id, bundle_hash) in
+                    bundle_nodes.get(test_source.as_str()).into_iter().flatten()
+                {
+                    if compiled.input_hashes.contains(bundle_hash) {
+                        edges.push(TraceEdge {
+                            from: bundle_id.clone(),
+                            operation: TraceOperation::Compile,
+                            to: compiled.artifact_id.clone(),
+                        });
+                    }
                 }
             }
         }
@@ -1663,6 +1685,7 @@ mod tests {
             document_id: id(doc),
             test_source_path: format!("corpus/test_sources/{doc}.html"),
             source_hash: hash('a'),
+            dir: format!("artifacts/{doc}"),
             source_document_graph: None,
             segments: None,
             normalization: None,
@@ -1743,6 +1766,7 @@ mod tests {
         GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![id("doc.a"), id("doc.b")],
+            dir: "groups/group.g1".to_owned(),
             compiled: Some(wrapper(
                 "group.g1.compiled",
                 "compiled",
@@ -1855,6 +1879,7 @@ mod tests {
         let group = GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![id("doc.a")],
+            dir: "groups/group.g1".to_owned(),
             compiled: None,
             verifier_results: None,
         };
@@ -1873,6 +1898,7 @@ mod tests {
         let group = GroupTrace {
             group_id: id("group.g1"),
             test_sources: vec![],
+            dir: "groups/group.g1".to_owned(),
             compiled: None,
             verifier_results: Some(wrapper(
                 "group.g1.verifier_results",
@@ -1896,6 +1922,130 @@ mod tests {
         ));
         assert!(bundle.claims.is_empty());
         assert!(index.rows.is_empty());
+    }
+
+    /// Inert empty bundle payload: the compile-edge selector reads the
+    /// bundle wrapper's `artifact_id`/`content_hash` only ([`wrapper`] pins
+    /// synthetic ones), and claim/lineage assembly never opens the payload
+    /// while the group carries no verifier results.
+    fn empty_ir_bundle(doc: &str) -> IrBundle {
+        assemble(
+            DocIr {
+                document_id: id(doc),
+                blocks: vec![],
+                tables: vec![],
+                diagnostics: vec![],
+            },
+            SegmentIr { segments: vec![] },
+            ClinicalIr {
+                bindings: vec![],
+                statements: vec![],
+            },
+            NormIr { rules: vec![] },
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap()
+    }
+
+    // Two hand-offs of one document (routes share corpus docs): identical
+    // source facts collapse to one source node; each hand-off's chain lands
+    // under its own dir, both edged from the shared source.
+    #[test]
+    fn assemble_dedups_identical_source_nodes() {
+        let route = DocTrace {
+            dir: "routes/pipe.r/artifacts/doc.full".to_owned(),
+            source_document_graph: Some((id("pipe.r.doc.full.source_document_graph"), hash('e'))),
+            ..bare_doc("doc.full")
+        };
+        let (bundle, _) = assemble_trace(&[chain_doc(), route], &[]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert_eq!(
+            bundle
+                .nodes
+                .iter()
+                .filter(|n| n.kind == TraceNodeKind::Source)
+                .count(),
+            1
+        );
+        assert_eq!(bundle.nodes.len(), 6);
+        assert_eq!(bundle.edges.len(), 4);
+        assert_eq!(
+            node(&bundle, "pipe.r.doc.full.source_document_graph").path,
+            "routes/pipe.r/artifacts/doc.full/source_document_graph.json"
+        );
+        assert!(has_edge(
+            &bundle,
+            "doc.full",
+            TraceOperation::Extract,
+            "doc.full.source_document_graph"
+        ));
+        assert!(has_edge(
+            &bundle,
+            "doc.full",
+            TraceOperation::Extract,
+            "pipe.r.doc.full.source_document_graph"
+        ));
+    }
+
+    // The same document id with diverging source facts still lands both
+    // nodes: validate fails closed on the duplicate id.
+    #[test]
+    fn assemble_mismatched_source_repeat_fails_validate() {
+        let mut other = bare_doc("doc.full");
+        other.source_hash = hash('9');
+        let (bundle, _) = assemble_trace(&[bare_doc("doc.full"), other], &[]);
+        assert_eq!(
+            bundle.validate(),
+            Err(TraceError::DuplicateNodeId(id("doc.full")))
+        );
+    }
+
+    // Two hand-offs of one document carry distinct bundles; the compiled
+    // wrapper cites one side's hash in `input_hashes` → the compile edge
+    // rises from that bundle node only.
+    #[test]
+    fn assemble_compile_edges_follow_input_hashes() {
+        let mut m1 = bare_doc("doc.a");
+        m1.bundle = Some(wrapper(
+            "doc.a.ir_bundle",
+            "ir_bundle",
+            '1',
+            empty_ir_bundle("doc.a"),
+        ));
+        let mut route = bare_doc("doc.a");
+        route.dir = "routes/pipe.r/artifacts/doc.a".to_owned();
+        route.bundle = Some(wrapper(
+            "pipe.r.doc.a.ir_bundle",
+            "ir_bundle",
+            '2',
+            empty_ir_bundle("doc.a"),
+        ));
+        let mut compiled = wrapper("group.g1.compiled", "compiled", 'b', compiled_payload());
+        compiled.input_hashes = vec![hash('2')];
+        let group = GroupTrace {
+            group_id: id("group.g1"),
+            test_sources: vec![id("doc.a")],
+            dir: "groups/group.g1".to_owned(),
+            compiled: Some(compiled),
+            verifier_results: None,
+        };
+        let (bundle, _) = assemble_trace(&[m1, route], &[group]);
+        assert_eq!(bundle.validate(), Ok(()));
+        assert!(has_edge(
+            &bundle,
+            "pipe.r.doc.a.ir_bundle",
+            TraceOperation::Compile,
+            "group.g1.compiled"
+        ));
+        assert_eq!(
+            bundle
+                .edges
+                .iter()
+                .filter(|e| e.operation == TraceOperation::Compile)
+                .count(),
+            1
+        );
     }
 
     // The hand-built claims battery: sequence_numbers from the results vector,
@@ -2024,8 +2174,8 @@ mod tests {
     use crate::normalize::{Lexicon, load_lexicon, normalize};
     use crate::segment::segment;
     use ckc_core::{
-        DataClass, DiagnosticRecord, DocIr, Provenance, assemble, canonicalization_policy_hash,
-        content_hash, hash_bytes,
+        ClinicalIr, DataClass, DiagnosticRecord, DocIr, NormIr, Provenance, SegmentIr, assemble,
+        canonicalization_policy_hash, content_hash, hash_bytes,
     };
     use ckc_smt::{Z3Adapter, compile, verify};
 
@@ -2116,6 +2266,7 @@ mod tests {
         DocTrace {
             test_source_path: format!("corpus/test_sources/{stem}.html"),
             source_hash: hash_bytes(&raw),
+            dir: format!("artifacts/{document_id}"),
             source_document_graph: Some((source.artifact_id.clone(), source.content_hash.clone())),
             segments: Some((segments.artifact_id.clone(), segments.content_hash.clone())),
             normalization: Some((
@@ -2132,7 +2283,10 @@ mod tests {
     }
 
     /// run.rs's group pipeline mirrored: compile the members' (formal,
-    /// norm) pairs, verify on live z3 under a generous budget.
+    /// norm) pairs, verify on live z3 under a generous budget; the compiled
+    /// wrapper cites the member bundle hashes as `input_hashes`, exactly as
+    /// `compile_verify_group` wraps it (the compile-edge selector matches
+    /// bundle nodes against them).
     fn live_group(gid: &str, members: &[&DocTrace], adapter: &Z3Adapter) -> GroupTrace {
         let artifact = compile(
             &id(gid),
@@ -2142,14 +2296,16 @@ mod tests {
             }),
         );
         let results = verify(adapter, &artifact, Duration::from_secs(30));
+        let mut compiled = live_wrapper(&format!("{gid}.compiled"), "compiled", artifact);
+        compiled.input_hashes = members
+            .iter()
+            .map(|d| d.bundle.as_ref().unwrap().content_hash.clone())
+            .collect();
         GroupTrace {
             group_id: id(gid),
             test_sources: members.iter().map(|d| d.document_id.clone()).collect(),
-            compiled: Some(live_wrapper(
-                &format!("{gid}.compiled"),
-                "compiled",
-                artifact,
-            )),
+            dir: format!("groups/{gid}"),
+            compiled: Some(compiled),
             verifier_results: Some(live_wrapper(
                 &format!("{gid}.verifier_results"),
                 "verifier_results",

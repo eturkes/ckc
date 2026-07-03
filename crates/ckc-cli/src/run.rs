@@ -480,16 +480,17 @@ fn document_pipeline(
             return None;
         }
     };
+    let dir = format!("artifacts/{}", entry.id);
     let mut trace = DocTrace {
         document_id: entry.id.clone(),
         test_source_path: entry.path.clone(),
         source_hash: hash_bytes(&html),
+        dir: dir.clone(),
         source_document_graph: None,
         segments: None,
         normalization: None,
         bundle: None,
     };
-    let dir = format!("artifacts/{}", entry.id);
     let mut graph: Option<ArtifactWrapper<SourceDocumentGraph>> = None;
 
     'chain: {
@@ -575,6 +576,7 @@ fn group_pipeline(
     let mut trace = GroupTrace {
         group_id: gid.clone(),
         test_sources: group.test_sources.clone(),
+        dir: dir.clone(),
         compiled: None,
         verifier_results: None,
     };
