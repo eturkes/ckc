@@ -2462,6 +2462,16 @@ processing_stages:
         write(LOCKFILE, "# staged lockfile\n");
     }
 
+    /// run-m2.1b mutation lever: string-replace one anchored slice of a
+    /// written registry file, so each rejection case derives from
+    /// [`write_tiny_root`]'s valid trio by exactly one byte-level edit.
+    fn mutate(root: &Path, rel: &str, from: &str, to: &str) {
+        let path = root.join(rel);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains(from), "{rel} lacks mutation anchor {from:?}");
+        std::fs::write(path, text.replace(from, to)).unwrap();
+    }
+
     // §4.4 valid remainder: a document whose corpus file is missing takes a
     // command-scope diagnostic while the other document still runs all four
     // processing_stages and lands its artifacts; the group misses a member bundle, so
@@ -2641,6 +2651,120 @@ processing_stages:
                 .payload
                 .iter()
                 .any(|(_, v)| v.contains("binds duplicate pipeline pipe.tiny")),
+            "{diagnostics:?}"
+        );
+        assert_only_logs(&out);
+    }
+
+    // run-m2.1b (a) — dropping the declared normalize stage leaves a 7-kind
+    // sequence matching no supported route shape; the diagnostic names the
+    // kinds the pipeline actually declares.
+    #[test]
+    fn unsupported_stage_sequence_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        mutate(
+            root.path(),
+            "registry/candidates.yaml",
+            "processing_stage.t.normalize, ",
+            "",
+        );
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0].payload.iter().any(|(_, v)| {
+                v.contains(
+                    "pipeline pipe.tiny declares an unsupported processing-stage sequence \
+                     [extract, segment, assemble, compile, verify, trace, report]",
+                )
+            }),
+            "{diagnostics:?}"
+        );
+        assert_only_logs(&out);
+    }
+
+    // run-m2.1b (b) — the declared list references a stage id the registry
+    // never defines.
+    #[test]
+    fn undefined_processing_stage_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        mutate(
+            root.path(),
+            "registry/candidates.yaml",
+            "processing_stage.t.normalize, ",
+            "processing_stage.t.ghost, ",
+        );
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0].payload.iter().any(|(_, v)| {
+                v.contains(
+                    "pipeline pipe.tiny declares undefined processing_stage \
+                     processing_stage.t.ghost",
+                )
+            }),
+            "{diagnostics:?}"
+        );
+        assert_only_logs(&out);
+    }
+
+    // run-m2.1b (c) — the experiment names a pipeline id the registry never
+    // defines.
+    #[test]
+    fn undefined_pipeline_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        mutate(
+            root.path(),
+            "registry/experiments.yaml",
+            "pipeline: pipe.tiny",
+            "pipeline: pipe.ghost",
+        );
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("experiment exp.tiny names undefined pipeline pipe.ghost")),
+            "{diagnostics:?}"
+        );
+        assert_only_logs(&out);
+    }
+
+    // run-m2.1b (d) — set form plus a stray legacy `pipeline:` key is a
+    // malformed binding: the shape-aware `baseline()` resolves nothing, so
+    // the run rejects exactly what `registry check` rejects.
+    #[test]
+    fn malformed_binding_stops_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        write_tiny_root(root.path());
+        mutate(
+            root.path(),
+            "registry/experiments.yaml",
+            "  pipeline: pipe.tiny\n",
+            "  pipeline: pipe.tiny\n  pipelines: [pipe.tiny]\n  baseline_pipeline: pipe.tiny\n",
+        );
+
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.tiny");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(events.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("experiment exp.tiny has no valid pipeline binding")),
             "{diagnostics:?}"
         );
         assert_only_logs(&out);
