@@ -523,9 +523,13 @@ fn resolve_route(
 /// layered shape (its artifact ids keep their exact M1 bytes) and
 /// `"{pipeline_id}."` on the model routes, so two routes landing the same
 /// document or group never mint colliding wrapper ids. Payload-level ids —
-/// compile query ids, the `{gid}.overlap`/`{gid}.deontic` cassette sources,
-/// finding ids — stay unprefixed. run-m2.1d3/.1d4 apply it to every
-/// route-minted wrapper id.
+/// compile query ids, the `{gid}.overlap`/`{gid}.deontic` cassette sources —
+/// stay unprefixed inside their route-prefixed wrappers. Finding ids stay
+/// unprefixed on a stricter rule: trace assembly mints `finding.{gid}.{seq}`
+/// dense per group and `Report::validate` rejects duplicate finding ids, so
+/// exactly one view's group results feed the §7.1 findings body — the
+/// baseline view (`is_baseline` marks it for .1d5's tails). run-m2.1d3/.1d4
+/// apply this prefix to every route-minted wrapper id.
 #[allow(dead_code)]
 fn route_id_prefix(resolved: &Resolved) -> String {
     match resolved.shape {

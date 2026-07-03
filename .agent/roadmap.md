@@ -151,7 +151,7 @@ share content hashes → hash-only selection over-edges); compile-less groups pa
   bundle→compiled edges, M1-byte-locked. 79% 159K/200K 1bfc7e0
 - [x] run-m2.1d2: per-view repair_limit/is_baseline resolve extension + route_id_prefix +
   committed-registry mutation rejections (missing/overflow repair limit, sample count 2), M1 pins
-  untouched. 63% 126K/200K
+  untouched. 63% 126K/200K b958cbb
 - [ ] run-m2.1d3: single_ir route stage — landing + §4.6 events. New `route_document_head(root,
   entry, resolved, shell) -> Option<DocHead>` = document_pipeline's extract+segment half, shared by
   both routes (.1d4 reuses): read/extract/segment failures → today's diagnostics + None; lands
@@ -206,7 +206,10 @@ share content hashes → hash-only selection over-edges); compile-less groups pa
   observation shapes = route_metrics test ≈4454 — single_ir pairs from compiled.solver_query_plan,
   direct pairs = minted role ids). Tails run ONCE over all routes' traces (graphs deduped by
   document_id — payload-identical so content_hash equal; results per route, the settled §7.1 shape
-  per .1e's populated fixture): trace_processing_stage + report_processing_stage gain `emit_event:
+  per .1e's populated fixture; report findings/no_conflict rows = BASELINE view's groups only —
+  finding.{gid}.{seq} mints dense per group + Report::validate dedups finding ids, so two views'
+  same-group results collide; model-route quality reaches the report as .1e's aggregate sections):
+  trace_processing_stage + report_processing_stage gain `emit_event:
   bool` — M1 true (bytes unchanged), M2 false (trace/report = undeclared steps of route pipelines;
   tail wrapper producer = baseline view → step id UNUSED_STAGE, honest sentinel); sections stay
   None (.1e populates). Gate test: `write_m2_root` mirror (copy from repo_root(): registry/*.yaml,
