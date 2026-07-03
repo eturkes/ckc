@@ -144,6 +144,13 @@ full pre-consolidation text lives in git history.
   `report.json`" holds before and after the unit lands; present-state phrasing ("carriers today:
   report.json bytes agree") overreaches until the wiring commit. House pattern: "run-m2.1 wires
   the observations". Apply at write time — each violation costs a codex follow-up commit.
+- Selector-semantics fields need discriminating fixtures (codex M2.28): a contract picking ONE
+  candidate among several (`model_identity` = LAST attempt's cassette; `accepted_cassette_hash` =
+  ACCEPTED attempt's, never the base recording) is pinned only when the fixture makes candidates
+  DIFFER — uniform fixtures satisfy the assert under an any-candidate regression. Pattern:
+  `later_identity()` seeded at the last attempt via `seed_cassette_as` (model_fill tests); the hash
+  side already discriminated (recovery pins derived-seed cassette cited + base NOT). Apply at
+  test-write time whenever a field's doc says "the last/accepted/first X".
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not

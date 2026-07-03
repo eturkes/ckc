@@ -129,7 +129,7 @@ doc-lint bullet).
 - [x] run-m2.1b: 4-case resolve rejection battery (unsupported sequence / undefined stage /
   undefined pipeline / malformed binding), tests-only. 48% 96K/200K da51698
 - [x] run-m2.1c: ModelFill attestation (accepted_cassette_hash + model_identity) + both route
-  wrappers cite the accepted cassette hash (set-pinned). 74% 148K/200K
+  wrappers cite the accepted cassette hash (set-pinned). 74% 148K/200K a767898
 - [ ] run-m2.1d: the model-route loop in `execute()`. Dispatch on RouteShape per resolved view:
   SingleIr = per-doc `single_ir_fill` → per-group `compile_verify_group`; DirectSmt = per-group
   `direct_smt_fill` → `direct_smt_verify_group`; run's CassetteStore root = `<root>/cassettes/`

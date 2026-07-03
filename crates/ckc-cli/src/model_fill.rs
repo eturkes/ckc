@@ -297,8 +297,8 @@ mod tests {
         (CassetteStore::new(&dir), dir)
     }
 
-    // The identity every seeded fixture cassette carries — the expected
-    // `ModelFill::model_identity` value wherever an attempt landed a cassette.
+    // The identity attempt-0 fixture cassettes carry — the expected
+    // `ModelFill::model_identity` value in single-attempt tests.
     fn fixture_identity() -> ModelIdentity {
         ModelIdentity {
             model_id: "model.fixture".parse().unwrap(),
@@ -307,9 +307,31 @@ mod tests {
         }
     }
 
+    // A distinct identity multi-attempt tests seed at the LAST attempt's
+    // cassette: asserting it pins `model_identity`'s last-attempt semantics —
+    // a regression holding attempt 0's identity fails the assert.
+    fn later_identity() -> ModelIdentity {
+        ModelIdentity {
+            model_id: "model.fixture".parse().unwrap(),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.1".to_owned(),
+        }
+    }
+
     // Persist a synthetic cassette carrying `output` for runtime-absent replay,
     // using the store's own contract-valid wrapper builder.
     fn seed_cassette(store: &CassetteStore, k: &CassetteKey, output: &[u8]) {
+        seed_cassette_as(store, k, fixture_identity(), output);
+    }
+
+    // `seed_cassette` with an explicit identity — multi-attempt tests give the
+    // last attempt a distinct one.
+    fn seed_cassette_as(
+        store: &CassetteStore,
+        k: &CassetteKey,
+        identity: ModelIdentity,
+        output: &[u8],
+    ) {
         let payload = CassettePayload::from_output(
             k.route.clone(),
             k.source.clone(),
@@ -317,7 +339,7 @@ mod tests {
             "prompt body".to_owned(),
             hash_bytes(b"constraint"),
             hash_bytes(b"prompt template"),
-            fixture_identity(),
+            identity,
             output,
         );
         let wrapper = store.build_wrapper(k, payload, producer()).unwrap();
@@ -399,7 +421,12 @@ mod tests {
         let (store, dir) = temp_store("recover");
         let k0 = key();
         seed_cassette(&store, &k0, b"not json");
-        seed_cassette(&store, &key_at(derive_seed(42, 1)), br#"{"ok":true}"#);
+        seed_cassette_as(
+            &store,
+            &key_at(derive_seed(42, 1)),
+            later_identity(),
+            br#"{"ok":true}"#,
+        );
         let fill =
             model_fill(&store, &k0, FillSource::Replay, 2, accept_json(&upstream())).unwrap();
         assert!(fill.target.is_some());
@@ -418,7 +445,7 @@ mod tests {
                     .content_hash
             )
         );
-        assert_eq!(fill.model_identity, Some(fixture_identity()));
+        assert_eq!(fill.model_identity, Some(later_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -431,7 +458,12 @@ mod tests {
         let k0 = key();
         seed_cassette(&store, &k0, br#"{"other":1}"#);
         seed_cassette(&store, &key_at(derive_seed(42, 1)), br#"{"other":1}"#);
-        seed_cassette(&store, &key_at(derive_seed(42, 2)), br#"{"other":1}"#);
+        seed_cassette_as(
+            &store,
+            &key_at(derive_seed(42, 2)),
+            later_identity(),
+            br#"{"other":1}"#,
+        );
         let fill =
             model_fill(&store, &k0, FillSource::Replay, 2, accept_json(&upstream())).unwrap();
         assert!(fill.target.is_none());
@@ -451,9 +483,10 @@ mod tests {
             vec![(static_id("repair_limit"), "2".to_owned())]
         );
         // No accepted attempt → no attested hash; identity still rides from the
-        // last attempt's cassette.
+        // last attempt's cassette (seeded distinct above — a first-attempt
+        // identity would fail here).
         assert_eq!(fill.accepted_cassette_hash, None);
-        assert_eq!(fill.model_identity, Some(fixture_identity()));
+        assert_eq!(fill.model_identity, Some(later_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -518,7 +551,12 @@ mod tests {
         let (store, dir) = temp_store("groundonrepair");
         let k = key();
         seed_cassette(&store, &k, b"not json");
-        seed_cassette(&store, &key_at(derive_seed(42, 1)), br#"{"ok":true}"#);
+        seed_cassette_as(
+            &store,
+            &key_at(derive_seed(42, 1)),
+            later_identity(),
+            br#"{"ok":true}"#,
+        );
         // Parse stands in for the schema check (bad JSON → repairable Schema); a
         // parsed output is then forced to hallucinate three absent ids
         // (duplicated, unsorted) to exercise the canonicalization.
@@ -548,7 +586,7 @@ mod tests {
             vec![(static_id("absent_source_ids"), "seg.7 seg.9".to_owned())]
         );
         assert_eq!(fill.accepted_cassette_hash, None);
-        assert_eq!(fill.model_identity, Some(fixture_identity()));
+        assert_eq!(fill.model_identity, Some(later_identity()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
