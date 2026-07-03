@@ -54,7 +54,12 @@ full pre-consolidation text lives in git history.
   (never paired with assembly or stage wiring); orchestrator wiring over N pre-built route stages +
   per-stage landing/eventing + a determinism gate ≥ N+2 units — per-route stage-rework units first, the
   orchestrator+gate last, cross-cutting type/trace plumbing its own opener (run-m2.1d bundled all of it,
-  consumed 200K on reads+design alone, zero code written → respec'd .1d1–.1d5); spec-byte amendment (re-pin + reference/test mirror sweep)
+  consumed 200K on reads+design alone, zero code written → respec'd .1d1–.1d5); a route-stage rework
+  (landing+eventing rewiring of an existing fill fn + mechanical call-site updates) and its
+  event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next (run-m2.1d3
+  bundled them + overflowed mid-edit: production edits in, imports/tests/gates unreached → reverted,
+  respec .1d3a/b with the full design frozen into the line; rule re-audited .1d4→a/b + .1d5→a/b in the
+  same commit); spec-byte amendment (re-pin + reference/test mirror sweep)
   + new feature code = 2 (an open decision that amends pinned bytes is a deliverable, not a preamble);
   crate foundations pair only with a small type surface (one payload module each); deterministic code + a
   SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
@@ -65,7 +70,9 @@ full pre-consolidation text lives in git history.
   five-layer recursive type family = 3; lexicon-driven derivation half (loader/binding/builder) = 3;
   statement builder over a prebuilt binding core = 1; exception attachment + determinism tests = 1.
   PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
-  read); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
+  read); on a big file gather EVERY region the session's edits touch BEFORE the first edit — post-edit
+  reads re-orient against shifted lines and can return stale (.1d3 attempt 1 bled margin re-reading
+  run.rs mid-edit); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
   skeleton before the full test battery — `cargo check` after the production edits, an end-loaded
   uncompiled battery leaves nothing landable (report-m2.1b); pin expected shapes from observed output, never hand-computed;
   spec code references = fn/test NAMES, ≈line = secondary hint only (drifts under edits above it —

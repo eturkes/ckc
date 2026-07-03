@@ -135,50 +135,108 @@ doc-lint bullet).
 - [x] run-m2.1d2: per-view repair_limit/is_baseline resolve extension + route_id_prefix +
   committed-registry mutation rejections (missing/overflow repair limit, sample count 2), M1 pins
   untouched. 63% 126K/200K b958cbb
-- [ ] run-m2.1d3: single_ir route stage — landing + §4.6 events. New `route_document_head(root,
-  entry, resolved, shell) -> Option<DocHead>` = document_pipeline's extract+segment half, shared by
-  both routes (.1d4 reuses): read/extract/segment failures → today's diagnostics + None; lands
-  graph+segments (M1 file names, route-prefixed artifact_ids) under `routes/{pid}/artifacts/{doc}/`
-  with slot-0/1 events via the existing stage helpers (kinds at slots 0/1 match M1 — mirror
-  document_pipeline); returns both wrappers + DocTrace{dir: that path, normalization None}. Rework
-  `single_ir_fill`: consume DocHead; model_fill Replay + single_ir_accept unchanged;
-  fill.diagnostics ride the model_fill event ONLY — Shell::processing_stage_event extends the
-  ledger from event diagnostics (single path; route tests + .1d5 RouteRun ledger slices still see
-  them; an added shell.diagnostic call would double-push ledger + double-merge outcome) —
-  DIRECT-emitted (pattern: direct_smt_verify_group): slot 2, kind
-  "model_fill", clock opened AFTER provenance gathering (M2.7 lesson), inputs [source, segments]
-  hashes, outputs [accepted_cassette_hash] iff target, counters [(RECORDED_CALLS_COUNTER,
-  recorded_calls), (REPAIRS_COUNTER, repairs)] (model_fill.rs 44/50), outcome =
-  severity(fill.diagnostics); Err(CassetteError) → command diagnostic, NO event (infra rule). On
-  target: derive tail unchanged under an assemble event via finish_processing_stage(3) (kind
-  matches), bundle id `{prefix}{doc}.ir_bundle` landed beside graph/segments. Returns
-  RouteDoc{trace (bundle slot set), graph wrapper, fill: Option<FillObservation> (metrics.rs
-  from_fill ≈78, build before consuming fill), identity: fill.model_identity}.
-  `compile_verify_group` artifact_ids gain the prefix (M1 "" → unchanged). Update call sites
-  mechanically: reproduces ≈3150 (payload+content_hash pins hold; artifact_id unpinned by design),
-  scores ≈3230, rejection ≈3409 (ledger asserts hold), route_metrics ≈4454 single_ir half. Gate:
-  cargo test; reproduces-test extended to read events.jsonl + pin the 4 per-doc event tuples
-  (kind/step_id/outcome/counters/outputs) + landed paths; M1 execute pins untouched.
-- [ ] run-m2.1d4: direct route stage — landing + §4.6 events. Rework `direct_smt_fill`: consume the
-  two members' DocHeads (caller builds one per UNIQUE doc via route_document_head — a doc in two
-  groups lands/events once per route) replacing its internal re-read/extract/segment; per-role
-  model_fill + accept unchanged (role sources stay unprefixed); land both smt_query wrappers (ids
-  `{prefix}{gid}.{role}.smt_query`) at `routes/{pid}/groups/{gid}/{role}.smt_query.json`; ONE group
-  model_fill event, DIRECT-emitted: slot 2, kind "model_fill", clock after provenance, inputs =
-  member-order [source, segments] hashes, outputs = landed wrapper hashes (present ones), counters
-  summed over both roles, outcome severity(both fills' diagnostics), diagnostics ride the event
-  ONLY (ledger via Shell::processing_stage_event — .1d3's single path); Err(CassetteError) →
-  command diagnostic, NO event. Returns DirectFill{pair:
-  Option<(overlap, deontic)>, fills: Vec<FillObservation>, identities: Vec<ModelIdentity>}
-  (observations survive terminal reject). `direct_smt_verify_group` artifact_id gains the prefix;
-  keeps its direct verify event; no .smt2 materialization. Update call sites: direct reproduces
-  ≈3822, non-pair ≈3959, rejection battery, route_metrics ≈4454 direct half. Gate: cargo test; one
-  direct test extended to pin the group model_fill event tuple + smt_query landed paths +
-  once-per-doc head events; M1 pins untouched.
-- [ ] run-m2.1d5: model-route loop in `execute()` + determinism gate. Replace the model-route gate
-  diagnostic (DELETE its test m2_experiment_run_gates_until_the_route_loop_lands ≈3090): single
-  M1Layered view → existing path verbatim; mixed
-  M1+model set → command diagnostic, zero artifacts; model set → lexicon read +
+- [ ] run-m2.1d3a: single_ir route stage — landing + §4.6 events (production + mechanical
+  call-site updates; the pin battery = .1d3b). Overflow-respec of .1d3 (attempt reverted): every
+  design decision is FROZEN below (read-confirmed vs HEAD, uncompiled) — implementation =
+  transcription; gather every run.rs region named here BEFORE the first edit (attempt 1 bled
+  margin on post-edit re-reads). (1) `const MODEL_FILL: usize = 2` beside DIRECT_VERIFY ≈107: both
+  route step lists declare `model_fill` at slot 2 where `PROCESSING_STAGE_KINDS[2]` = normalize →
+  the fill event is DIRECT-emitted (pattern: direct_smt_verify_group ≈1267), never via the
+  index-coupled helpers. (2) route_id_prefix ≈537 goes live: drop its allow(dead_code), re-tense
+  the doc to name its consumers (head + bundle + group wrappers here; .1d4a the direct route's).
+  (3) compile_verify_group ≈715: `prefix = route_id_prefix(resolved)` after the gid binding; both
+  wrapper ids gain it (`{prefix}{gid}.compiled`/`.verifier_results`); doc notes empty-on-M1 → ids
+  + pins unchanged. (4) Insert between compile_verify_group and single_ir_accept ≈818:
+  DocHead{trace: DocTrace, source: ArtifactWrapper of SourceDocumentGraph, segments: of
+  SegmentIr}; RouteDoc{trace, graph, fill: Option of FillObservation, identity: Option of
+  ModelIdentity}; route_minted(wrapper, prefix) re-mints wrapper.artifact_id under the prefix
+  (Id::new + expect "a grammatical artifact id stays grammatical under a pipeline-id prefix";
+  content_hash is payload-only → re-minting never disturbs byte pins); route_document_head(root,
+  entry, resolved, shell) -> Option of DocHead = document_pipeline ≈553's read+extract+segment
+  half mirrored (that one read carries every helper signature): html read failure → the same
+  command diagnostic + None; dir = `routes/{resolved.pipeline_id}/artifacts/{entry.id}`; DocTrace
+  literal = M1's with that dir, landing slots None → slots 0/1 filled from the landed wrappers;
+  extract then segment each gather inputs, open processing_stage_clock(), build, route_minted,
+  then close_processing_stage ≈1776 (slot 0: inputs empty, rel `{dir}/source_document_graph.json`;
+  slot 1: inputs = source.content_hash, rel `{dir}/segments.json`), `?`-None on failure;
+  Some(DocHead). allow(dead_code) exactly where the clippy `--lib` gate demands (pre-consumer
+  fns/types until .1d5a; memory's pub-or-allow rule). (5) single_ir_fill ≈869 consumes DocHead:
+  (head, lexicon, store, seed, resolved, repair_limit, shell) -> RouteDoc — 7 params, drop the
+  too_many_arguments allow; destructure head (mut trace), doc_id = trace.document_id.clone();
+  grounding sets + single_ir_accept + CassetteKey + model_fill Replay = today's body; fill_inputs
+  = both content_hashes cloned BEFORE processing_stage_clock() (M2.7 boundary); Err(CassetteError)
+  → today's command diagnostic, NO event (infra rule), RouteDoc{trace, graph: source, fill: None,
+  identity: None}. Ok: stop the clock; observation = FillObservation::from_fill(&fill) BEFORE
+  destructuring ModelFill{target, accepted_cassette_hash, model_identity, diagnostics,
+  recorded_calls, repairs}; shell.processing_stage_event — step id =
+  `resolved.pipeline_step_ids[MODEL_FILL]`, processing_stage =
+  `static_id(SINGLE_IR_STAGE_KINDS[MODEL_FILL])`, input_hashes = fill_inputs, output_hashes =
+  accepted_cassette_hash iter-cloned-collect (empty iff no target), outcome =
+  severity(&diagnostics) written ABOVE the diagnostics member (literal fields evaluate in written
+  order → the borrow ends before the move), resource_counters = static_id(RECORDED_CALLS_COUNTER)
+  with recorded_calls + static_id(REPAIRS_COUNTER) with repairs; diagnostics ride the event ONLY —
+  processing_stage_event extends the ledger (an added shell.diagnostic would double-push ledger +
+  double-merge outcome; route tests + .1d5a RouteRun slices still see them). target None →
+  RouteDoc{trace, graph: source, fill: Some(observation), identity: model_identity}; Some →
+  cassette_hash = accepted_cassette_hash.expect("accepted fill carries its cassette wrapper
+  hash"); slot 3 = today's deterministic tail (derive_norm_ir → DocIr::from_graph →
+  canonical_diagnostic_set → assemble → validate → wrapper ≈1844) under the slot-3 fail-closure
+  (processing_stage_diagnostic ≈1936, "document", doc_id), bundle id `{prefix}{doc_id}.ir_bundle`,
+  wrapper inputs = source + segments + cassette_hash, landed via close_processing_stage slot 3
+  (declared kind = assemble = M1's, so the index helper serves) at `{trace.dir}/ir_bundle.json` →
+  trace.bundle; return the RouteDoc. (6) Imports: add FillObservation (crate::metrics),
+  ModelIdentity (ckc_core), ModelFill + RECORDED_CALLS_COUNTER + REPAIRS_COUNTER
+  (crate::model_fill) — grep both import blocks first (top-of-file + mod tests; attempt 1 never
+  verified them). (7) Call sites mechanically (same asserts, head+fill call shape; compiler = the
+  checklist): single_ir_fill_reproduces_m1_bundles ≈3359 (payload+content_hash pins hold;
+  artifact_id unpinned by design), single_ir_route_scores_m1_groups ≈3439 (bundle = trace.bundle),
+  single_ir_route_rejection_codes ≈3618 (ledger asserts hold — clean head events extend nothing),
+  route_metrics_score_recorded_two_route_run ≈4665 single_ir arm (READ it before editing —
+  attempt 1 never did; seed 42, repair_limit 1). Gate: cargo test; M1 execute pins untouched.
+- [ ] run-m2.1d3b: single_ir event + landing pin battery (split from .1d3 — .1d3a lands the
+  behavior unpinned). Extend single_ir_fill_reproduces_m1_bundles: read the test's shell/loop
+  structure first; shell.finish() then read_jsonl of EventRecord (wrapper.rs ≈400) over
+  logs/events.jsonl (cfg(test) Shell::events() exists; the gate pins the LANDED file). Pin per doc
+  the 4 stage tuples — kinds extract/segment/model_fill/assemble, step ids = pipe.m2_single_ir's
+  declared entries, outcome Ok, model_fill counters recorded_calls=1 + repairs=0 and outputs = the
+  accepted cassette hash, slot-0/1/3 outputs = the landed wrapper hash — plus the total event
+  census (stage events + closing command event), input_hashes compared AS SETS (§4.3 set, memory).
+  Pin the landed layout: routes/pipe.m2_single_ir/artifacts/{doc}/ source_document_graph.json +
+  segments.json + ir_bundle.json strict-parse, artifact_ids prefixed. Assert RouteDoc.fill =
+  Some(FillObservation{accepted true, recorded_calls 1, repairs 0, schema_violations 0}) +
+  identity = the goldens' synthetic identity (model.baseline/fixture_quant/1.0.0). Pin values from
+  OBSERVED output sanity-checked against the .1d3a contract; M1 execute pins untouched. Gate:
+  cargo test.
+- [ ] run-m2.1d4a: direct route stage — landing + §4.6 events (production + mechanical call-site
+  updates; the pin battery = .1d4b). Mirror .1d3a's landed patterns (route_document_head
+  consumption, direct emission literal, route_minted prefixing) — read them, derive nothing fresh.
+  Rework `direct_smt_fill` ≈1102: consume the two members' DocHeads (caller builds one per UNIQUE
+  doc via route_document_head — a doc in two groups lands/events once per route) replacing its
+  internal re-read/extract/segment; per-role model_fill + accept unchanged (role sources stay
+  unprefixed); land both smt_query wrappers (ids `{prefix}{gid}.{role}.smt_query`) at
+  `routes/{pid}/groups/{gid}/{role}.smt_query.json`; ONE group model_fill event, DIRECT-emitted:
+  slot 2, kind "model_fill", clock after provenance, inputs = member-order source + segments
+  hashes, outputs = landed wrapper hashes (present ones), counters summed over both roles, outcome
+  severity(both fills' diagnostics), diagnostics ride the event ONLY (ledger via
+  Shell::processing_stage_event — .1d3a's single path); Err(CassetteError) → command diagnostic,
+  NO event. Returns DirectFill{pair: Option of (overlap, deontic), fills: Vec of FillObservation,
+  identities: Vec of ModelIdentity} (observations survive terminal reject).
+  `direct_smt_verify_group` ≈1267 artifact_id gains the prefix; keeps its direct verify event; no
+  .smt2 materialization. Call sites (compiler = the checklist; ≈lines pre-.1d3a, names primary):
+  direct_smt_fill_reproduces_m1_query_bodies ≈4033, direct_smt_fill_rejects_non_pair_group ≈4170,
+  direct_smt_route_scores_m1_groups ≈4200, direct_smt_route_rejection_codes ≈4490,
+  route_metrics_score_recorded_two_route_run ≈4665 direct arm. Gate: cargo test; M1 pins
+  untouched.
+- [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). Extend
+  direct_smt_fill_reproduces_m1_query_bodies: pin the group model_fill event tuple
+  (kind/step_id/outcome/counters/outputs — counters summed over roles) + smt_query landed paths +
+  the once-per-doc head events (a doc shared by two groups heads once per route); input_hashes
+  compared AS SETS; pins from OBSERVED output sanity-checked against the .1d4a contract; M1 pins
+  untouched. Gate: cargo test.
+- [ ] run-m2.1d5a: model-route loop in `execute()` + structural smoke gate (two-run determinism +
+  event census = .1d5b). Replace the model-route gate diagnostic (DELETE its test
+  m2_experiment_run_gates_until_the_route_loop_lands ≈3093): single M1Layered view → existing path
+  verbatim; mixed M1+model set → command diagnostic, zero artifacts; model set → lexicon read +
   `CassetteStore::new(root)` + Z3Adapter::new (each failure → command diagnostic); base seed =
   experiment seed; then per view in set order: mark ledger start (shell.ledger().len());
   SingleIr = per-doc route_document_head →
@@ -188,7 +246,7 @@ doc-lint bullet).
   Option<ModelIdentity> — mismatch = command diagnostic, fail-closed return (goldens agree:
   model.baseline/fixture_quant/1.0.0). Collect per view RouteRun{pipeline_id, ledger slice, fills,
   groups: Vec<GroupObservation>, samples: vec![groups.clone()]} (#[allow(dead_code)]; .1e consumes;
-  observation shapes = route_metrics test ≈4454 — single_ir pairs from compiled.solver_query_plan,
+  observation shapes = route_metrics test ≈4665 — single_ir pairs from compiled.solver_query_plan,
   direct pairs = minted role ids). Tails run ONCE over all routes' traces (graphs deduped by
   document_id — payload-identical so content_hash equal; results per route, the settled §7.1 shape
   per .1e's populated fixture; report findings/no_conflict rows = single_ir's groups,
@@ -201,17 +259,19 @@ doc-lint bullet).
   tail wrapper producer = baseline view → step id UNUSED_STAGE, honest sentinel); sections stay
   None (.1e populates). Gate test: `write_m2_root` mirror (copy from repo_root(): registry/*.yaml,
   corpus lexicon + 3 html + reference yaml, rust-toolchain.toml, Cargo.lock; plant the 7 golden
-  seed-42 cassettes under `<root>/cassettes/`) → executed twice: zero command diagnostics; 27
-  events (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline
-  run stays 19) with
-  model_fill counters (single_ir per doc 1/0; direct per group 2/0); both routes' layout present;
-  trace_bundle strict-parses, claims = single_ir's 2 groups only, shared source nodes once, direct
-  verifier_results = legal node carrying only its →report out-edge (no verify in-edge — validate
-  checks edge endpoints/rank/op, never node connectivity); determinism = landed artifacts
-  byte-equal across the two
-  runs + manifests byte-equal after normalizing the one `--out` token
-  (manifest_inputs ≈1497 embeds out_dir.display()) + events compared on a non-timing projection.
-  M1 executed() pins unchanged.
+  seed-42 cassettes under `<root>/cassettes/`) → executed ONCE: zero command diagnostics; both
+  routes' layout present; trace_bundle strict-parses, claims = single_ir's 2 groups only, shared
+  source nodes once, direct verifier_results = legal node carrying only its →report out-edge (no
+  verify in-edge — validate checks edge endpoints/rank/op, never node connectivity). M1 executed()
+  pins unchanged. Gate: cargo test.
+- [ ] run-m2.1d5b: two-run determinism + event census over .1d5a's write_m2_root mirror (split
+  from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
+  across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589
+  embeds out_dir.display()); events compared on a non-timing projection; event census = 27
+  (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline run
+  stays 19) with model_fill counters (single_ir per doc 1/0; direct per group 2/0). Census +
+  counters pinned from OBSERVED output sanity-checked against the .1d3a/.1d4a contracts. M1
+  executed() pins unchanged. Gate: cargo test.
 - [ ] run-m2.1e: §9 measurement record — report sections + manifests. report_processing_stage builds
   `ModelRunSections{route_diagnostics (per-route ledgers, clean route = empty slice), route_metrics
   (metrics::route_metrics per route — samples = the k=1 battery → convergence NA), baseline_pipeline_
@@ -230,11 +290,11 @@ doc-lint bullet).
   (GroupTrace carries no smt_query slots) — close the gap here: extend GroupTrace + the manifest
   walk so every accepted landed artifact is manifested → replay-covered (replay.rs diffs
   expected_output_hashes vs the rerun manifest; a landed-but-unmanifested wrapper = silent replay
-  hole, so omission is not an option). Sections consume .1d5's
+  hole, so omission is not an option). Sections consume .1d5a's
   banked RouteRun{pipeline_id, ledger slice, fills, groups, samples}. Reading: run.rs
   report/manifest fns; report.rs ModelRunSections + populated fixture; manifests.rs; replay.rs +
   trace.rs GroupTrace for the smt_query decision. Gate: cargo test; full-run test pins report.json
-  M2 sections + both md bodies + manifest fields on the .1d5 replayed run; M1 pins hold.
+  M2 sections + both md bodies + manifest fields on the .1d5a replayed run; M1 pins hold.
 - [ ] run-m2.1f: `ckc run --record`. Dispatch: optional `--record` flag → `Run{record: bool}`
   (default false = replay, the committed acceptance path); record mode: one `ModelAdapter::new()`
   probe → identity into manifests/report verbatim; per route `FillSource::Record{adapter, prompt,
