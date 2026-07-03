@@ -135,67 +135,9 @@ doc-lint bullet).
 - [x] run-m2.1d2: per-view repair_limit/is_baseline resolve extension + route_id_prefix +
   committed-registry mutation rejections (missing/overflow repair limit, sample count 2), M1 pins
   untouched. 63% 126K/200K b958cbb
-- [ ] run-m2.1d3a: single_ir route stage — landing + §4.6 events (production + mechanical
-  call-site updates; the pin battery = .1d3b). Overflow-respec of .1d3 (attempt reverted): every
-  design decision is FROZEN below (read-confirmed vs HEAD, uncompiled) — implementation =
-  transcription; gather every run.rs region named here BEFORE the first edit (attempt 1 bled
-  margin on post-edit re-reads). (1) `const MODEL_FILL: usize = 2` beside DIRECT_VERIFY ≈107: both
-  route step lists declare `model_fill` at slot 2 where `PROCESSING_STAGE_KINDS[2]` = normalize →
-  the fill event is DIRECT-emitted (pattern: direct_smt_verify_group ≈1267), never via the
-  index-coupled helpers. (2) route_id_prefix ≈537 goes live: drop its allow(dead_code), re-tense
-  the doc to name its consumers (head + bundle + group wrappers here; .1d4a the direct route's).
-  (3) compile_verify_group ≈715: `prefix = route_id_prefix(resolved)` after the gid binding; both
-  wrapper ids gain it (`{prefix}{gid}.compiled`/`.verifier_results`); doc notes empty-on-M1 → ids
-  + pins unchanged. (4) Insert between compile_verify_group and single_ir_accept ≈818:
-  DocHead{trace: DocTrace, source: ArtifactWrapper of SourceDocumentGraph, segments: of
-  SegmentIr}; RouteDoc{trace, graph, fill: Option of FillObservation, identity: Option of
-  ModelIdentity}; route_minted(wrapper, prefix) re-mints wrapper.artifact_id under the prefix
-  (Id::new + expect "a grammatical artifact id stays grammatical under a pipeline-id prefix";
-  content_hash is payload-only → re-minting never disturbs byte pins); route_document_head(root,
-  entry, resolved, shell) -> Option of DocHead = document_pipeline ≈553's read+extract+segment
-  half mirrored (that one read carries every helper signature): html read failure → the same
-  command diagnostic + None; dir = `routes/{resolved.pipeline_id}/artifacts/{entry.id}`; DocTrace
-  literal = M1's with that dir, landing slots None → slots 0/1 filled from the landed wrappers;
-  extract then segment each gather inputs, open processing_stage_clock(), build, route_minted,
-  then close_processing_stage ≈1776 (slot 0: inputs empty, rel `{dir}/source_document_graph.json`;
-  slot 1: inputs = source.content_hash, rel `{dir}/segments.json`), `?`-None on failure;
-  Some(DocHead). allow(dead_code) exactly where the clippy `--lib` gate demands (pre-consumer
-  fns/types until .1d5a; memory's pub-or-allow rule). (5) single_ir_fill ≈869 consumes DocHead:
-  (head, lexicon, store, seed, resolved, repair_limit, shell) -> RouteDoc — 7 params, drop the
-  too_many_arguments allow; destructure head (mut trace), doc_id = trace.document_id.clone();
-  grounding sets + single_ir_accept + CassetteKey + model_fill Replay = today's body; fill_inputs
-  = both content_hashes cloned BEFORE processing_stage_clock() (M2.7 boundary); Err(CassetteError)
-  → today's command diagnostic, NO event (infra rule), RouteDoc{trace, graph: source, fill: None,
-  identity: None}. Ok: stop the clock; observation = FillObservation::from_fill(&fill) BEFORE
-  destructuring ModelFill{target, accepted_cassette_hash, model_identity, diagnostics,
-  recorded_calls, repairs}; shell.processing_stage_event — step id =
-  `resolved.pipeline_step_ids[MODEL_FILL]`, processing_stage =
-  `static_id(SINGLE_IR_STAGE_KINDS[MODEL_FILL])`, input_hashes = fill_inputs, output_hashes =
-  accepted_cassette_hash iter-cloned-collect (empty iff no target), outcome =
-  severity(&diagnostics) written ABOVE the diagnostics member (literal fields evaluate in written
-  order → the borrow ends before the move), resource_counters = static_id(RECORDED_CALLS_COUNTER)
-  with recorded_calls + static_id(REPAIRS_COUNTER) with repairs; diagnostics ride the event ONLY —
-  processing_stage_event extends the ledger (an added shell.diagnostic would double-push ledger +
-  double-merge outcome; route tests + .1d5a RouteRun slices still see them). target None →
-  RouteDoc{trace, graph: source, fill: Some(observation), identity: model_identity}; Some →
-  cassette_hash = accepted_cassette_hash.expect("accepted fill carries its cassette wrapper
-  hash"); slot 3 = today's deterministic tail (derive_norm_ir → DocIr::from_graph →
-  canonical_diagnostic_set → assemble → validate → wrapper ≈1844) under the slot-3 fail-closure
-  (processing_stage_diagnostic ≈1936, "document", doc_id), bundle id `{prefix}{doc_id}.ir_bundle`,
-  wrapper inputs = source + segments + cassette_hash, landed via close_processing_stage slot 3
-  (declared kind = assemble = M1's, so the index helper serves) at `{trace.dir}/ir_bundle.json` →
-  trace.bundle; return the RouteDoc. (6) Imports: add FillObservation (crate::metrics),
-  ModelIdentity (ckc_core), ModelFill + RECORDED_CALLS_COUNTER + REPAIRS_COUNTER
-  (crate::model_fill) — grep both import blocks first (top-of-file + mod tests; attempt 1 never
-  verified them). (7) Call sites (head+fill call shape; pin VALUES hold, assert RECEIVERS re-path
-  onto RouteDoc: wrapper asserts → the trace.bundle wrapper, Option-shape checks →
-  trace.bundle/fill; compiler = the checklist): single_ir_fill_reproduces_m1_bundles ≈3359
-  (payload+content_hash+input_hashes asserts move onto the trace.bundle wrapper; artifact_id
-  unpinned by design), single_ir_route_scores_m1_groups ≈3439 (bundle = trace.bundle),
-  single_ir_route_rejection_codes ≈3618 (mixed Some/None fill sites; ledger asserts hold — clean
-  head events extend nothing),
-  route_metrics_score_recorded_two_route_run ≈4665 single_ir arm (READ it before editing —
-  attempt 1 never did; seed 42, repair_limit 1). Gate: cargo test; M1 execute pins untouched.
+- [x] run-m2.1d3a: single_ir stage rework — DocHead/RouteDoc + route_document_head landing,
+  direct-emitted model_fill §4.6 event (§7.3 counters, event-only diagnostics), route-prefixed
+  wrapper ids, slot-3 fail-closed tail; M1 pins untouched. 85% 169K/200K
 - [ ] run-m2.1d3b: single_ir event + landing pin battery (split from .1d3 — .1d3a lands the
   behavior unpinned). Extend single_ir_fill_reproduces_m1_bundles: read the test's shell/loop
   structure first; shell.finish() then read_jsonl of EventRecord (ckc-core wrapper.rs ≈271) over

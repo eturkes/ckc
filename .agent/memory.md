@@ -397,10 +397,12 @@ full pre-consolidation text lives in git history.
     pipelines too (run-m2.1a: per-route views, `[Id; 8]` = declared ids padded with `UNUSED_STAGE`,
     `shape: RouteShape`); the route fn lives in
     `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
-    accept-closure (`single_ir_accept`) + per-doc fill (`single_ir_fill`: extract→segment→`model_fill`
-    Replay→deterministic tail mirroring `assemble_bundle`) + golden-cassette wiring LANDED in `run.rs`
-    (route-single-ir.2/.2b); run-m2.1d consumes `resolve()`'s per-route views for the in-`execute`
-    loop; the hand-built minimal-`Resolved` stays a test-fixture pattern (both route fixtures carry
+    accept-closure (`single_ir_accept`) + per-doc fill + golden-cassette wiring LANDED in `run.rs`
+    (route-single-ir.2/.2b; reshaped .1d3a: `route_document_head` lands the extract→segment head as
+    a `DocHead`, `single_ir_fill(head, …)` replays + direct-emits the model_fill §4.6 event —
+    diagnostics ride the event ONLY, `processing_stage_event` ledgers them — and returns a
+    `RouteDoc{trace, graph, fill, identity}`; tail lands via slot-3 `close_processing_stage`);
+    run-m2.1d5a consumes `resolve()`'s per-route views for the in-`execute` loop; the hand-built minimal-`Resolved` stays a test-fixture pattern (both route fixtures carry
     `shape` + `UNUSED_STAGE` padding now). Scoring/rejection test shapes (route-single-ir.3/.4,
     consumers DONE; the tests hold mechanics + derived-seed constants) — durable lessons only: a
     route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a partial

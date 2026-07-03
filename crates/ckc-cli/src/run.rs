@@ -36,8 +36,8 @@ use std::time::Duration;
 
 use ckc_core::{
     ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry,
-    DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, Normalization,
-    Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
+    DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, ModelIdentity,
+    Normalization, Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
     SourceDocumentGraph, TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
     canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
     parse_experiments, read_strict_canonical,
@@ -49,7 +49,10 @@ use ckc_smt::{
 use crate::cassette::{CassetteKey, CassetteStore};
 use crate::extract::{ExtractConfig, extract};
 use crate::manifests::{ManifestInputs, assemble_manifests};
-use crate::model_fill::{FillReject, FillSource, model_fill};
+use crate::metrics::FillObservation;
+use crate::model_fill::{
+    FillReject, FillSource, ModelFill, RECORDED_CALLS_COUNTER, REPAIRS_COUNTER, model_fill,
+};
 use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
 use crate::report::{Report, assemble_report, render_markdown};
@@ -105,6 +108,13 @@ const REPORT: usize = 7;
 /// list (extract, segment, model_fill_smt, verify_smt) — distinct from the M1
 /// [`VERIFY`] slot (5), which is inert padding in the direct fixture's `[Id; 8]`.
 const DIRECT_VERIFY: usize = 3;
+
+/// The model_fill slot shared by both model-route step lists
+/// ([`SINGLE_IR_STAGE_KINDS`] and [`DIRECT_SMT_STAGE_KINDS`]). The M1 kind
+/// table holds `normalize` at index 2, so the index-coupled event helpers
+/// cannot serve this slot: the fill stage emits its §4.6 event directly
+/// ([`direct_smt_verify_group`]'s pattern).
+const MODEL_FILL: usize = 2;
 
 /// Declared processing-stage kind sequences the two §9 model-route pipelines
 /// fingerprint to in [`resolve_route`]: single_ir hands the model-filled IR
@@ -531,9 +541,10 @@ fn resolve_route(
 /// no assertion-to-source provenance), so exactly one view (single_ir)
 /// feeds the §7.1 findings body and duplicate ids never reach
 /// `Report::validate` (`is_baseline` still marks the baseline for .1d5's
-/// tail wrapper producer). run-m2.1d3/.1d4
-/// apply this prefix to every route-minted wrapper id.
-#[allow(dead_code)]
+/// tail wrapper producer). The single_ir consumers hold it now —
+/// [`route_document_head`]'s two head wrappers, [`single_ir_fill`]'s bundle,
+/// and [`compile_verify_group`]'s two group wrappers; run-m2.1d4a applies it
+/// to the direct route's minted wrappers.
 fn route_id_prefix(resolved: &Resolved) -> String {
     match resolved.shape {
         RouteShape::M1Layered => String::new(),
@@ -711,7 +722,9 @@ fn group_pipeline(
 /// artifact `dir`. The caller fixes `dir` and opens the COMPILE `clock` ahead
 /// of the timed body, so the compile interval spans the same work as the inline
 /// form; opens a fresh clock for verify. Each tuple slot is `None` on that
-/// processing_stage's failure; a compile failure skips verify.
+/// processing_stage's failure; a compile failure skips verify. Both wrapper
+/// ids carry the caller's [`route_id_prefix`] — empty on the M1 layered
+/// shape, so M1 artifact ids and byte pins hold unchanged.
 fn compile_verify_group(
     group_id: &Id,
     dir: &str,
@@ -725,6 +738,7 @@ fn compile_verify_group(
     Option<ArtifactWrapper<VerifierResults>>,
 ) {
     let gid = group_id;
+    let prefix = route_id_prefix(resolved);
     let inputs: Vec<Hash> = members.iter().map(|m| m.content_hash.clone()).collect();
 
     let artifact = compile(
@@ -740,7 +754,7 @@ fn compile_verify_group(
             let diagnostics = canonical_diagnostic_set(&artifact.diagnostics)
                 .map_err(|e| processing_stage_diagnostic(COMPILE, "group", gid, e.to_string()))?;
             wrapper(
-                format!("{gid}.compiled"),
+                format!("{prefix}{gid}.compiled"),
                 "compiled",
                 producer(resolved, COMPILE),
                 inputs.clone(),
@@ -781,7 +795,7 @@ fn compile_verify_group(
                         processing_stage_diagnostic(VERIFY, "group", gid, e.to_string())
                     })?;
             wrapper(
-                format!("{gid}.verifier_results"),
+                format!("{prefix}{gid}.verifier_results"),
                 "verifier_results",
                 producer(resolved, VERIFY),
                 vec![compiled.content_hash.clone()],
@@ -802,6 +816,113 @@ fn compile_verify_group(
         landed,
     );
     (Some(compiled), verifier_results)
+}
+
+/// One document's deterministic route head: the [`DocTrace`] with the
+/// extract + segment landings recorded under the route's artifact dir,
+/// beside the two landed wrappers the fill stage consumes — the source
+/// graph and the segments, whose payloads carry the grounding id universes.
+/// Built by [`route_document_head`]; consumed by [`single_ir_fill`]
+/// (run-m2.1d4a feeds the direct route's per-group fill from the same
+/// heads).
+#[allow(dead_code)]
+struct DocHead {
+    trace: DocTrace,
+    source: ArtifactWrapper<SourceDocumentGraph>,
+    segments: ArtifactWrapper<SegmentIr>,
+}
+
+/// One document's completed route passage: the [`DocTrace`] holding every
+/// landing, the source graph riding whole (the report processing_stage's
+/// quoted-span source), and the fill stage's §7.3 telemetry — `fill` is
+/// `None` only on a cassette IO/contract failure (no completed fill, per
+/// [`FillObservation`]'s contract), `identity` the last attempt's cassette
+/// [`ModelIdentity`] (run-m2.1d5a checks cross-route identity agreement
+/// against it).
+#[allow(dead_code)]
+struct RouteDoc {
+    trace: DocTrace,
+    graph: ArtifactWrapper<SourceDocumentGraph>,
+    fill: Option<FillObservation>,
+    identity: Option<ModelIdentity>,
+}
+
+/// Re-mint a wrapper's artifact id under the route's [`route_id_prefix`].
+/// `content_hash` is payload-only, so re-minting never disturbs byte pins;
+/// the M1 shape's empty prefix re-mints the id to itself.
+#[allow(dead_code)]
+fn route_minted<P>(mut wrapper: ArtifactWrapper<P>, prefix: &str) -> ArtifactWrapper<P> {
+    wrapper.artifact_id = Id::new(format!("{prefix}{}", wrapper.artifact_id))
+        .expect("a grammatical artifact id stays grammatical under a pipeline-id prefix");
+    wrapper
+}
+
+/// [`document_pipeline`]'s read + extract + segment half for a model route:
+/// land the deterministic head under `routes/{pipeline_id}/artifacts/{doc}`
+/// with route-minted wrapper ids, one §4.6 event per attempted stage through
+/// the index-coupled helpers (the declared slot-0/1 kinds equal M1's). An
+/// unreadable corpus file is the same command-scope diagnostic + `None`; a
+/// failed stage records its event and yields `None` (the fill stage needs
+/// both wrappers). run-m2.1d5a drives it once per unique document.
+#[allow(dead_code)]
+fn route_document_head(
+    root: &Path,
+    entry: &CorpusEntry,
+    resolved: &Resolved,
+    shell: &mut Shell,
+) -> Option<DocHead> {
+    let html = match std::fs::read(root.join(&entry.path)) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            shell.diagnostic(invalid_diagnostic(vec![
+                (static_id("file"), entry.path.clone()),
+                (static_id("reason"), format!("read {}: {e}", entry.path)),
+            ]));
+            return None;
+        }
+    };
+    let prefix = route_id_prefix(resolved);
+    let dir = format!("routes/{}/artifacts/{}", resolved.pipeline_id, entry.id);
+    let mut trace = DocTrace {
+        document_id: entry.id.clone(),
+        test_source_path: entry.path.clone(),
+        source_hash: hash_bytes(&html),
+        dir: dir.clone(),
+        source_document_graph: None,
+        segments: None,
+        normalization: None,
+        bundle: None,
+    };
+
+    let rel = format!("{dir}/source_document_graph.json");
+    let clock = processing_stage_clock();
+    let config = ExtractConfig {
+        document_id: entry.id.clone(),
+        source_family: static_id("synthetic_test_source_html"),
+        provenance: entry.provenance,
+        data_class: DataClass::None,
+        producer: producer(resolved, 0),
+    };
+    let built = extract(&html, &config)
+        .map(|w| route_minted(w, &prefix))
+        .map_err(|e| processing_stage_diagnostic(0, "document", &entry.id, e.to_string()));
+    let source = close_processing_stage(shell, resolved, 0, clock, Vec::new(), &rel, built)?;
+    trace.source_document_graph = Some((source.artifact_id.clone(), source.content_hash.clone()));
+
+    let rel = format!("{dir}/segments.json");
+    let inputs = vec![source.content_hash.clone()];
+    let clock = processing_stage_clock();
+    let built = segment(&source, &producer(resolved, 1))
+        .map(|w| route_minted(w, &prefix))
+        .map_err(|e| processing_stage_diagnostic(1, "document", &entry.id, e.to_string()));
+    let segments = close_processing_stage(shell, resolved, 1, clock, inputs, &rel, built)?;
+    trace.segments = Some((segments.artifact_id.clone(), segments.content_hash.clone()));
+
+    Some(DocHead {
+        trace,
+        source,
+        segments,
+    })
 }
 
 /// The `route.single_ir` §4 acceptance closure over one model output: strict-read
@@ -852,71 +973,40 @@ fn single_ir_accept<'a>(
     }
 }
 
-/// The single_ir route's per-document fill back end: drive a corpus document
-/// through extract → segment, replay its committed model cassette through
-/// [`model_fill`] under [`single_ir_accept`], and compile the accepted
-/// [`ClinicalIr`] over the deterministic upstream into an [`IrBundle`] — the same
-/// five-layer assembly [`assemble_bundle`] produces, but with the model's clinical
-/// layer and a norm [`derive_norm_ir`](crate::rules::derive_norm_ir)-recomputed
-/// over it in place of the deterministic normalizer's. The grounding scaffold is
-/// the deterministic head: extract + segment mint the real region and segment ids
-/// the accept closure grounds the model's references against, so a hallucinated
-/// reference surfaces as `ai_hallucinated_source` rather than corrupting the
-/// bundle. Each failure rides a shell diagnostic and yields `None`; wired into the
-/// experiment run by run-m2.1.
+/// The single_ir route's per-document fill stage over a landed [`DocHead`]:
+/// replay the document's committed model cassette through [`model_fill`]
+/// under [`single_ir_accept`], emit the fill's §4.6 event directly (the M1
+/// kind table holds `normalize` at [`MODEL_FILL`]'s slot, so the
+/// index-coupled helpers cannot serve it; the §7.4 fill diagnostics ride
+/// the event only, which ledgers them), and compile an accepted
+/// [`ClinicalIr`] over the head into an [`IrBundle`] — the same five-layer
+/// assembly [`assemble_bundle`] produces, but with the model's clinical
+/// layer and a norm [`derive_norm_ir`](crate::rules::derive_norm_ir)-
+/// recomputed over it in place of the deterministic normalizer's — landed
+/// under slot 3's fail-closure. The head is the grounding scaffold: its
+/// wrappers carry the real region and segment ids the accept closure
+/// grounds the model's references against, so a hallucinated reference
+/// surfaces as `ai_hallucinated_source` rather than corrupting the bundle.
+/// A cassette IO/contract failure is a command-scope diagnostic with no
+/// event (infrastructure, not a stage outcome). Returns the document's
+/// [`RouteDoc`]; run-m2.1d5a drives it per document.
 #[allow(dead_code)]
-#[allow(clippy::too_many_arguments)]
 fn single_ir_fill(
-    root: &Path,
-    entry: &CorpusEntry,
+    head: DocHead,
     lexicon: &Lexicon,
     store: &CassetteStore,
     seed: u64,
     resolved: &Resolved,
     repair_limit: u32,
     shell: &mut Shell,
-) -> Option<ArtifactWrapper<IrBundle>> {
-    let html = match std::fs::read(root.join(&entry.path)) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            shell.diagnostic(invalid_diagnostic(vec![
-                (static_id("file"), entry.path.clone()),
-                (static_id("reason"), format!("read {}: {e}", entry.path)),
-            ]));
-            return None;
-        }
-    };
-    let config = ExtractConfig {
-        document_id: entry.id.clone(),
-        source_family: static_id("synthetic_test_source_html"),
-        provenance: entry.provenance,
-        data_class: DataClass::None,
-        producer: producer(resolved, 0),
-    };
-    let source = match extract(&html, &config) {
-        Ok(source) => source,
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                0,
-                "document",
-                &entry.id,
-                e.to_string(),
-            ));
-            return None;
-        }
-    };
-    let segments = match segment(&source, &producer(resolved, 1)) {
-        Ok(segments) => segments,
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                1,
-                "document",
-                &entry.id,
-                e.to_string(),
-            ));
-            return None;
-        }
-    };
+) -> RouteDoc {
+    let DocHead {
+        mut trace,
+        source,
+        segments,
+    } = head;
+    let doc_id = trace.document_id.clone();
+    let prefix = route_id_prefix(resolved);
 
     // Ground the model's references against the deterministic head's real ids
     // (§4 acceptance steps 4 + 5), then replay the committed cassette.
@@ -935,125 +1025,139 @@ fn single_ir_fill(
     let accept = single_ir_accept(&regions, &segment_ids);
     let key = CassetteKey {
         route: static_id("route.single_ir"),
-        source: entry.id.clone(),
+        source: doc_id.clone(),
         seed,
     };
+    // The fill event's inputs, cloned ahead of the clock (the M2.7 boundary
+    // discipline: pure setup stays outside the timed interval).
+    let fill_inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
+    let clock = processing_stage_clock();
     let fill = match model_fill(store, &key, FillSource::Replay, repair_limit, accept) {
         Ok(fill) => fill,
         Err(e) => {
             shell.diagnostic(invalid_diagnostic(vec![
-                (static_id("cassette"), entry.id.to_string()),
+                (static_id("cassette"), doc_id.to_string()),
                 (static_id("reason"), e.to_string()),
                 (static_id("processing_stage"), "model_fill".to_owned()),
             ]));
-            return None;
+            return RouteDoc {
+                trace,
+                graph: source,
+                fill: None,
+                identity: None,
+            };
         }
     };
-    // Surface the §7.4 fill diagnostics (schema violations, terminal grounding or
-    // repair-limit), then a terminal reject (no accepted target) ends the route.
-    for diagnostic in &fill.diagnostics {
-        shell.diagnostic(diagnostic.clone());
-    }
-    let clinical = fill.target?;
+    let (started_at, ended_at, duration_ms) = clock.stop();
+    let observation = FillObservation::from_fill(&fill);
+    let ModelFill {
+        target,
+        accepted_cassette_hash,
+        model_identity,
+        diagnostics,
+        recorded_calls,
+        repairs,
+    } = fill;
+    // The fill's §4.6 event, emitted directly (see the doc comment): the
+    // accepted attempt's cassette wrapper hash is the stage output (empty iff
+    // no attempt was accepted), the two §7.3 counters ride resource_counters,
+    // and the §7.4 fill diagnostics ride the event only —
+    // processing_stage_event extends the ledger with them. `outcome` is
+    // written above `diagnostics`: struct-literal fields evaluate in written
+    // order, so the borrow ends before the move.
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[MODEL_FILL].clone(),
+        processing_stage: static_id(SINGLE_IR_STAGE_KINDS[MODEL_FILL]),
+        started_at,
+        ended_at,
+        duration_ms,
+        input_hashes: fill_inputs,
+        output_hashes: accepted_cassette_hash.iter().cloned().collect(),
+        outcome: severity(&diagnostics),
+        diagnostics,
+        resource_counters: vec![
+            (static_id(RECORDED_CALLS_COUNTER), recorded_calls),
+            (static_id(REPAIRS_COUNTER), repairs),
+        ],
+    });
+    let Some(clinical) = target else {
+        // A terminal reject (no accepted target) ends the route: the trace
+        // keeps its head landings, the bundle slot stays empty.
+        return RouteDoc {
+            trace,
+            graph: source,
+            fill: Some(observation),
+            identity: model_identity,
+        };
+    };
     // §9 attestation: an accepted fill always carries the accepted attempt's
     // cassette wrapper hash (`Some` iff `target` is — model_fill's contract);
     // the bundle wrapper cites it below.
-    let cassette_hash = fill
-        .accepted_cassette_hash
-        .expect("accepted fill carries its cassette wrapper hash");
+    let cassette_hash =
+        accepted_cassette_hash.expect("accepted fill carries its cassette wrapper hash");
 
     // Deterministic tail mirroring [`assemble_bundle`], substituting the model's
     // clinical layer and a norm recomputed over it; the model-fill route runs no
     // normalizer, so the bundle diagnostics are the segments' alone — equal to M1's
     // segments ∪ normalization set because the normalizer adds none for grounded
-    // output (route-single-ir.2b's reproduce-M1 gate proves the equality).
+    // output (route-single-ir.2b's reproduce-M1 gate proves the equality). Landed
+    // under slot 3's fail-closure: the declared kind equals M1's `assemble`, so
+    // the index-coupled close serves, and any tail failure records its event.
+    let inputs = vec![
+        source.content_hash.clone(),
+        segments.content_hash.clone(),
+        cassette_hash,
+    ];
+    let rel = format!("{}/ir_bundle.json", trace.dir);
+    let fail = |reason: String| processing_stage_diagnostic(3, "document", &doc_id, reason);
+    let clock = processing_stage_clock();
     let norm = crate::rules::derive_norm_ir(
         &source.payload.document.document_id,
         &clinical,
         &segments.payload,
         lexicon,
     );
-    let doc = match ckc_core::DocIr::from_graph(&source.payload, source.diagnostics.clone()) {
-        Ok(doc) => doc,
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                3,
-                "document",
-                &entry.id,
-                format!("doc layer: {e}"),
-            ));
-            return None;
-        }
-    };
-    let diagnostics = match canonical_diagnostic_set(segments.diagnostics.iter()) {
-        Ok(diagnostics) => diagnostics,
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                3,
-                "document",
-                &entry.id,
-                format!("diagnostic sort key: {e}"),
-            ));
-            return None;
-        }
-    };
-    let bundle = match assemble(
-        doc,
-        segments.payload.clone(),
-        clinical,
-        norm,
-        Vec::new(),
-        diagnostics,
-    ) {
-        Ok(bundle) => bundle,
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                3,
-                "document",
-                &entry.id,
-                format!("assembly: {e}"),
-            ));
-            return None;
-        }
-    };
-    if let Err(e) = bundle.validate(&source.payload) {
-        shell.diagnostic(processing_stage_diagnostic(
-            3,
-            "document",
-            &entry.id,
-            format!("bundle invariant: {e}"),
-        ));
-        return None;
-    }
-
-    // Wrap; the single_ir route has no normalization wrapper, so the bundle cites
-    // source + segments + the accepted attempt's cassette (§9 attestation: the
-    // artifact graph names the exact recording the clinical layer replayed from).
-    // These wrapper-level fields do not reach the payload-only `content_hash`.
-    match wrapper(
-        format!("{}.ir_bundle", entry.id),
-        "ir_bundle",
-        producer(resolved, 3),
-        vec![
-            source.content_hash.clone(),
-            segments.content_hash.clone(),
-            cassette_hash,
-        ],
-        Origin::DeterministicCompiler,
-        EvidenceStatus::MechanicalEvidenceStatus,
-        Vec::new(),
-        bundle,
-    ) {
-        Ok(wrapped) => Some(wrapped),
-        Err(e) => {
-            shell.diagnostic(processing_stage_diagnostic(
-                3,
-                "document",
-                &entry.id,
-                format!("content hash: {e}"),
-            ));
-            None
-        }
+    let built = ckc_core::DocIr::from_graph(&source.payload, source.diagnostics.clone())
+        .map_err(|e| fail(format!("doc layer: {e}")))
+        .and_then(|doc| {
+            let diagnostics = canonical_diagnostic_set(segments.diagnostics.iter())
+                .map_err(|e| fail(format!("diagnostic sort key: {e}")))?;
+            let bundle = assemble(
+                doc,
+                segments.payload.clone(),
+                clinical,
+                norm,
+                Vec::new(),
+                diagnostics,
+            )
+            .map_err(|e| fail(format!("assembly: {e}")))?;
+            bundle
+                .validate(&source.payload)
+                .map_err(|e| fail(format!("bundle invariant: {e}")))?;
+            // The single_ir route has no normalization wrapper, so the bundle
+            // cites source + segments + the accepted attempt's cassette (§9
+            // attestation: the artifact graph names the exact recording the
+            // clinical layer replayed from). Wrapper-level fields stay off the
+            // payload-only `content_hash`.
+            wrapper(
+                format!("{prefix}{doc_id}.ir_bundle"),
+                "ir_bundle",
+                producer(resolved, 3),
+                inputs.clone(),
+                Origin::DeterministicCompiler,
+                EvidenceStatus::MechanicalEvidenceStatus,
+                Vec::new(),
+                bundle,
+            )
+            .map_err(|e| fail(format!("content hash: {e}")))
+        });
+    trace.bundle = close_processing_stage(shell, resolved, 3, clock, inputs, &rel, built);
+    RouteDoc {
+        trace,
+        graph: source,
+        fill: Some(observation),
+        identity: model_identity,
     }
 }
 
@@ -3387,10 +3491,12 @@ processing_stages:
             let out = tmp.path().join("m2");
             std::fs::create_dir_all(&out).unwrap();
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
-            let route = single_ir_fill(
-                &root, &entry, &lexicon, &store, 42, &resolved, 0, &mut shell,
-            )
-            .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
+            let head = route_document_head(&root, &entry, &resolved, &mut shell)
+                .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
+            let route = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell)
+                .trace
+                .bundle
+                .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
 
             assert_eq!(route.payload, m1.payload, "{} payload", entry.id);
             assert_eq!(
@@ -3457,10 +3563,12 @@ processing_stages:
         // shape) rather than a hardcoded membership list.
         let mut bundles = BTreeMap::new();
         for entry in single_ir_corpus() {
-            let bundle = single_ir_fill(
-                &root, &entry, &lexicon, &store, 42, &resolved, 0, &mut shell,
-            )
-            .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
+            let head = route_document_head(&root, &entry, &resolved, &mut shell)
+                .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
+            let bundle = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell)
+                .trace
+                .bundle
+                .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
             bundles.insert(entry.id.clone(), bundle);
         }
 
@@ -3736,17 +3844,12 @@ processing_stages:
             let out = tmp.path().join("m2");
             std::fs::create_dir_all(&out).unwrap();
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
-            let bundle = single_ir_fill(
-                &root,
-                &guideline_a,
-                &lexicon,
-                &store,
-                98,
-                &resolved,
-                1,
-                &mut shell,
-            )
-            .expect("the malformed base repairs to an accepted bundle");
+            let head = route_document_head(&root, &guideline_a, &resolved, &mut shell)
+                .expect("guideline_a lands its deterministic route head");
+            let bundle = single_ir_fill(head, &lexicon, &store, 98, &resolved, 1, &mut shell)
+                .trace
+                .bundle
+                .expect("the malformed base repairs to an accepted bundle");
             // §9 attestation follows the ACCEPTED attempt: the bundle cites the
             // recovery (derived-seed) cassette, never the rejected base recording.
             let recovery = store
@@ -3774,17 +3877,13 @@ processing_stages:
             let out = tmp.path().join("m2");
             std::fs::create_dir_all(&out).unwrap();
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
-            let bundle = single_ir_fill(
-                &root,
-                &guideline_a,
-                &lexicon,
-                &store,
-                99,
-                &resolved,
-                2,
-                &mut shell,
+            let head = route_document_head(&root, &guideline_a, &resolved, &mut shell)
+                .expect("guideline_a lands its deterministic route head");
+            let route = single_ir_fill(head, &lexicon, &store, 99, &resolved, 2, &mut shell);
+            assert!(
+                route.trace.bundle.is_none(),
+                "a hallucinated reference ends the route"
             );
-            assert!(bundle.is_none(), "a hallucinated reference ends the route");
             assert_eq!(shell.ledger().len(), 1);
             assert_eq!(shell.ledger()[0].code, DiagnosticCode::AiHallucinatedSource);
         }
@@ -4767,11 +4866,12 @@ processing_stages:
             // single_ir_route_scores_m1_groups shape).
             let mut bundles = BTreeMap::new();
             for entry in &corpus {
-                let bundle =
-                    single_ir_fill(&root, entry, &lexicon, &store, 42, &resolved, 1, &mut shell)
-                        .unwrap_or_else(|| {
-                            panic!("{}: single_ir_fill yielded no bundle", entry.id)
-                        });
+                let head = route_document_head(&root, entry, &resolved, &mut shell)
+                    .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
+                let bundle = single_ir_fill(head, &lexicon, &store, 42, &resolved, 1, &mut shell)
+                    .trace
+                    .bundle
+                    .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
                 bundles.insert(entry.id.clone(), bundle);
             }
             let mut groups = Vec::new();
