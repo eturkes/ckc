@@ -3490,10 +3490,35 @@ processing_stages:
             let tmp = tempfile::tempdir().unwrap();
             let out = tmp.path().join("m2");
             std::fs::create_dir_all(&out).unwrap();
-            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+            let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
             let head = route_document_head(&root, &entry, &resolved, &mut shell)
                 .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
-            let route = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell)
+            let route_doc = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell);
+
+            // §7.3 telemetry + §9 identity ride the RouteDoc whole: one clean
+            // recorded call, and the goldens' synthetic identity.
+            assert_eq!(
+                route_doc.fill,
+                Some(FillObservation {
+                    accepted: true,
+                    recorded_calls: 1,
+                    repairs: 0,
+                    schema_violations: 0,
+                }),
+                "{} fill observation",
+                entry.id
+            );
+            assert_eq!(
+                route_doc.identity,
+                Some(ModelIdentity {
+                    model_id: static_id("model.baseline"),
+                    quant: "fixture_quant".to_string(),
+                    runtime_version: "1.0.0".to_string(),
+                }),
+                "{} identity",
+                entry.id
+            );
+            let route = route_doc
                 .trace
                 .bundle
                 .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
@@ -3529,6 +3554,143 @@ processing_stages:
                 "{} input_hashes",
                 entry.id
             );
+
+            // Close the shell and pin the LANDED §4.6 stream + layout
+            // (run-m2.1d3b): the run dir holds exactly the shell logs and the
+            // route tree, the doc dir exactly the three route artifacts, each
+            // strict-read clean under a route-prefixed artifact id.
+            let finished = shell.finish().unwrap();
+            assert_eq!(finished.result.outcome, Outcome::Ok, "{}", entry.id);
+            assert!(finished.result.diagnostic_hashes.is_empty(), "{}", entry.id);
+            let doc_dir = format!("routes/pipe.m2_single_ir/artifacts/{}", entry.id);
+            let listing = |path: &Path| -> Vec<String> {
+                let mut names: Vec<String> = std::fs::read_dir(path)
+                    .unwrap()
+                    .map(|e| e.unwrap().file_name().into_string().unwrap())
+                    .collect();
+                names.sort();
+                names
+            };
+            assert_eq!(listing(&out), ["logs", "routes"], "{}", entry.id);
+            assert_eq!(
+                listing(&out.join(&doc_dir)),
+                [
+                    "ir_bundle.json",
+                    "segments.json",
+                    "source_document_graph.json"
+                ],
+                "{}",
+                entry.id
+            );
+            let landed_source: ArtifactWrapper<SourceDocumentGraph> =
+                strict_at(&out, &format!("{doc_dir}/source_document_graph.json"));
+            let landed_segments: ArtifactWrapper<SegmentIr> =
+                strict_at(&out, &format!("{doc_dir}/segments.json"));
+            let landed_bundle: ArtifactWrapper<IrBundle> =
+                strict_at(&out, &format!("{doc_dir}/ir_bundle.json"));
+            assert_eq!(
+                landed_source.artifact_id,
+                format!("pipe.m2_single_ir.{}.source_document_graph", entry.id)
+                    .parse()
+                    .unwrap()
+            );
+            assert_eq!(
+                landed_segments.artifact_id,
+                format!("pipe.m2_single_ir.{}.segments", entry.id)
+                    .parse()
+                    .unwrap()
+            );
+            assert_eq!(
+                landed_bundle.artifact_id,
+                format!("pipe.m2_single_ir.{}.ir_bundle", entry.id)
+                    .parse()
+                    .unwrap()
+            );
+            assert_eq!(
+                landed_bundle.content_hash, route.content_hash,
+                "{}",
+                entry.id
+            );
+
+            // The §4.6 event battery: four stage events (extract, segment,
+            // model_fill, assemble) then the closing command event, hashes
+            // cross-checked against the landed wrappers. Read-back input and
+            // output hashes canonicalize as §4.3 sets, so multi-input slots
+            // compare as sets.
+            let events: Vec<EventRecord> =
+                read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
+            assert_eq!(events.len(), 5, "{} event census", entry.id);
+            for (n, event) in events.iter().enumerate() {
+                assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
+                assert_eq!(event.event_sequence_number, n as u64);
+                assert_eq!(event.run_id, static_id("m2"));
+            }
+            let step_ids = [
+                "processing_stage.m1.extract",
+                "processing_stage.m1.segment",
+                "processing_stage.m2.model_fill",
+                "processing_stage.m2.assemble",
+            ];
+            for (s, kind) in SINGLE_IR_STAGE_KINDS[..4].iter().enumerate() {
+                let event = &events[s];
+                assert_eq!(event.processing_stage, static_id(kind), "{}", entry.id);
+                assert_eq!(event.pipeline_id, static_id("pipe.m2_single_ir"), "{kind}");
+                assert_eq!(event.pipeline_step_id, static_id(step_ids[s]), "{kind}");
+                assert_eq!(event.outcome, Outcome::Ok, "{kind}");
+                assert!(event.diagnostics.is_empty(), "{kind}");
+                assert_eq!(event.output_hashes.len(), 1, "{kind}");
+            }
+            // Slots 0/1/3 output the landed wrapper; slot 2 (model_fill,
+            // direct-emitted) outputs the accepted cassette wrapper and
+            // carries both §7.3 counters.
+            assert!(events[0].input_hashes.is_empty());
+            assert_eq!(
+                events[0].output_hashes,
+                std::slice::from_ref(&landed_source.content_hash)
+            );
+            assert!(events[0].resource_counters.is_empty());
+            assert_eq!(
+                events[1].input_hashes,
+                std::slice::from_ref(&landed_source.content_hash)
+            );
+            assert_eq!(
+                events[1].output_hashes,
+                std::slice::from_ref(&landed_segments.content_hash)
+            );
+            assert!(events[1].resource_counters.is_empty());
+            assert_eq!(
+                events[2].input_hashes.iter().collect::<BTreeSet<_>>(),
+                [&landed_source.content_hash, &landed_segments.content_hash]
+                    .into_iter()
+                    .collect::<BTreeSet<_>>()
+            );
+            assert_eq!(
+                events[2].output_hashes,
+                std::slice::from_ref(&cassette.content_hash)
+            );
+            assert_eq!(
+                events[2].resource_counters,
+                vec![(static_id("recorded_calls"), 1), (static_id("repairs"), 0)]
+            );
+            assert_eq!(
+                events[3].input_hashes.iter().collect::<BTreeSet<_>>(),
+                [
+                    &landed_source.content_hash,
+                    &landed_segments.content_hash,
+                    &cassette.content_hash
+                ]
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+            );
+            assert_eq!(
+                events[3].output_hashes,
+                std::slice::from_ref(&landed_bundle.content_hash)
+            );
+            assert!(events[3].resource_counters.is_empty());
+            let command = &events[4];
+            assert_eq!(command.processing_stage, static_id("run"));
+            assert_eq!(command.outcome, Outcome::Ok);
+            assert!(command.diagnostics.is_empty());
         }
     }
 

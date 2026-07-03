@@ -137,21 +137,9 @@ doc-lint bullet).
   untouched. 63% 126K/200K b958cbb
 - [x] run-m2.1d3a: single_ir stage rework — DocHead/RouteDoc + route_document_head landing,
   direct-emitted model_fill §4.6 event (§7.3 counters, event-only diagnostics), route-prefixed
-  wrapper ids, slot-3 fail-closed tail; M1 pins untouched. 85% 169K/200K
-- [ ] run-m2.1d3b: single_ir event + landing pin battery (split from .1d3 — .1d3a lands the
-  behavior unpinned). Extend single_ir_fill_reproduces_m1_bundles: read the test's shell/loop
-  structure first; shell.finish() then read_jsonl of EventRecord (ckc-core wrapper.rs ≈271) over
-  logs/events.jsonl (cfg(test) Shell::events() exists; the gate pins the LANDED file). Pin per doc
-  the 4 stage tuples — kinds extract/segment/model_fill/assemble, step ids = pipe.m2_single_ir's
-  declared entries, outcome Ok, model_fill counters recorded_calls=1 + repairs=0 and outputs = the
-  accepted cassette hash, slot-0/1/3 outputs = the landed wrapper hash — plus the total event
-  census (stage events + closing command event), input_hashes compared AS SETS (§4.3 set, memory).
-  Pin the landed layout: routes/pipe.m2_single_ir/artifacts/{doc}/ source_document_graph.json +
-  segments.json + ir_bundle.json strict-parse, artifact_ids prefixed. Assert RouteDoc.fill =
-  Some(FillObservation{accepted true, recorded_calls 1, repairs 0, schema_violations 0}) +
-  identity = the goldens' synthetic identity (model.baseline/fixture_quant/1.0.0). Pin values from
-  OBSERVED output sanity-checked against the .1d3a contract; M1 execute pins untouched. Gate:
-  cargo test.
+  wrapper ids, slot-3 fail-closed tail; M1 pins untouched. 85% 169K/200K 73f3c87
+- [x] run-m2.1d3b: single_ir §4.6 event + landed-layout pin battery over the reproduce-M1
+  test. 66% 132K/200K
 - [ ] run-m2.1d4a: direct route stage — landing + §4.6 events (production + mechanical call-site
   updates; the pin battery = .1d4b). Mirror .1d3a's landed patterns (route_document_head
   consumption, direct emission literal, route_minted prefixing) — read them, derive nothing fresh.
@@ -179,8 +167,9 @@ doc-lint bullet).
   direct_smt_fill_reproduces_m1_query_bodies: pin the group model_fill event tuple
   (kind/step_id/outcome/counters/outputs — counters summed over roles) + smt_query landed paths +
   the once-per-doc head events (a doc shared by two groups heads once per route); input_hashes
-  compared AS SETS; pins from OBSERVED output sanity-checked against the .1d4a contract; M1 pins
-  untouched. Gate: cargo test.
+  compared AS SETS; mirror .1d3b's battery shapes (strict_at landed reads, exact dir listings,
+  slice::from_ref for single-hash pins — clippy); pins from OBSERVED output sanity-checked
+  against the .1d4a contract; M1 pins untouched. Gate: cargo test.
 - [ ] run-m2.1d5a: model-route loop in `execute()` + structural smoke gate (two-run determinism +
   event census = .1d5b). Replace the model-route gate diagnostic (DELETE its test
   m2_experiment_run_gates_until_the_route_loop_lands ≈3093): single M1Layered view → existing path
