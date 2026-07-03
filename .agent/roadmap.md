@@ -130,23 +130,6 @@ doc-lint bullet).
   undefined pipeline / malformed binding), tests-only. 48% 96K/200K da51698
 - [x] run-m2.1c: ModelFill attestation (accepted_cassette_hash + model_identity) + both route
   wrappers cite the accepted cassette hash (set-pinned). 74% 148K/200K a767898
-run-m2.1d respec (session overflowed 200K on reads+design, zero code) → .1d1–.1d5 below carry the
-settled design verbatim; implement as transcription, re-deriving nothing. Shared facts (verified):
-run.rs anchors ≈ execute 135 / resolve 272 / document_pipeline 466 / group_pipeline 566 /
-compile_verify_group 623 / single_ir_fill 777 / direct_smt_fill 1010 / direct_smt_verify_group 1175
-/ trace_processing_stage 1263 / report_processing_stage 1369 / close_processing_stage 1684 /
-finish_processing_stage 1709 / executed 1976 / M1 event count 19 @2100 / gate-diag test 2886 /
-fixture Resolved literals 2957+3617 / route_metrics blueprint 4454 (≈ = drifts as units land; grep
-fn names). CassetteStore::new(root) appends `cassettes/` itself → run store = `new(root)`, files at
-`<root>/cassettes/<route>/<source>/seed-<seed>.json` (production rule; run-m2.2 commits recorded
-cassettes there). Base seed = experiment seed; repair limit = resolved.repair_limit (.1d2). Event
-timing fields are real wall-clock (shell.rs clock, NO normalization) → determinism gates compare
-landed artifacts byte-equal + events on a non-timing projection, never raw events.jsonl bytes. Artifact
-trace node ids stay wrapper artifact_ids (.1d3/.1d4 route-prefix them → cross-route uniqueness);
-source node ids stay raw document_ids (shared across routes), report id `report`; direct-route
-verifier_results = legal orphan node (validate has no orphan check). GroupTrace.member_bundles =
-compiled members' bundle artifact_ids, exact compile-edge provenance (byte-identical route bundles
-share content hashes → hash-only selection over-edges); compile-less groups pass empty.
 - [x] run-m2.1d1: DocTrace/GroupTrace `dir` plumbing + source-node dedup + member-id+hash
   bundle→compiled edges, M1-byte-locked. 79% 159K/200K 1bfc7e0
 - [x] run-m2.1d2: per-view repair_limit/is_baseline resolve extension + route_id_prefix +
@@ -195,8 +178,9 @@ share content hashes → hash-only selection over-edges); compile-less groups pa
 - [ ] run-m2.1d5: model-route loop in `execute()` + determinism gate. Replace the model-route gate
   diagnostic (DELETE its test ≈2886): single M1Layered view → existing path verbatim; mixed
   M1+model set → command diagnostic, zero artifacts; model set → lexicon read +
-  `CassetteStore::new(root)` + Z3Adapter::new (each failure → command diagnostic), then per view in
-  set order: mark ledger start (shell.ledger().len()); SingleIr = per-doc route_document_head →
+  `CassetteStore::new(root)` + Z3Adapter::new (each failure → command diagnostic); base seed =
+  experiment seed; then per view in set order: mark ledger start (shell.ledger().len());
+  SingleIr = per-doc route_document_head →
   single_ir_fill, per-group compile_verify_group (dir `routes/{pid}/groups/{gid}`, smt under it);
   DirectSmt = per-unique-doc route_document_head, per-group direct_smt_fill →
   direct_smt_verify_group. Identity agreement: each fill's model_identity folds into one agreed
@@ -218,8 +202,9 @@ share content hashes → hash-only selection over-edges); compile-less groups pa
   events (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline
   run stays 19) with
   model_fill counters (single_ir per doc 1/0; direct per group 2/0); both routes' layout present;
-  trace_bundle strict-parses, shared source nodes once; determinism = landed artifacts byte-equal
-  across the two runs + manifests byte-equal after normalizing the one `--out` token
+  trace_bundle strict-parses, shared source nodes once, direct verifier_results = legal orphan
+  node (validate has no orphan check); determinism = landed artifacts byte-equal across the two
+  runs + manifests byte-equal after normalizing the one `--out` token
   (manifest_inputs ≈1497 embeds out_dir.display()) + events compared on a non-timing projection.
   M1 executed() pins unchanged.
 - [ ] run-m2.1e: §9 measurement record — report sections + manifests. report_processing_stage builds
