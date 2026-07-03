@@ -187,15 +187,18 @@ doc-lint bullet).
   trace.bundle; return the RouteDoc. (6) Imports: add FillObservation (crate::metrics),
   ModelIdentity (ckc_core), ModelFill + RECORDED_CALLS_COUNTER + REPAIRS_COUNTER
   (crate::model_fill) — grep both import blocks first (top-of-file + mod tests; attempt 1 never
-  verified them). (7) Call sites mechanically (same asserts, head+fill call shape; compiler = the
-  checklist): single_ir_fill_reproduces_m1_bundles ≈3359 (payload+content_hash pins hold;
-  artifact_id unpinned by design), single_ir_route_scores_m1_groups ≈3439 (bundle = trace.bundle),
-  single_ir_route_rejection_codes ≈3618 (ledger asserts hold — clean head events extend nothing),
+  verified them). (7) Call sites (head+fill call shape; pin VALUES hold, assert RECEIVERS re-path
+  onto RouteDoc: wrapper asserts → the trace.bundle wrapper, Option-shape checks →
+  trace.bundle/fill; compiler = the checklist): single_ir_fill_reproduces_m1_bundles ≈3359
+  (payload+content_hash+input_hashes asserts move onto the trace.bundle wrapper; artifact_id
+  unpinned by design), single_ir_route_scores_m1_groups ≈3439 (bundle = trace.bundle),
+  single_ir_route_rejection_codes ≈3618 (mixed Some/None fill sites; ledger asserts hold — clean
+  head events extend nothing),
   route_metrics_score_recorded_two_route_run ≈4665 single_ir arm (READ it before editing —
   attempt 1 never did; seed 42, repair_limit 1). Gate: cargo test; M1 execute pins untouched.
 - [ ] run-m2.1d3b: single_ir event + landing pin battery (split from .1d3 — .1d3a lands the
   behavior unpinned). Extend single_ir_fill_reproduces_m1_bundles: read the test's shell/loop
-  structure first; shell.finish() then read_jsonl of EventRecord (wrapper.rs ≈400) over
+  structure first; shell.finish() then read_jsonl of EventRecord (ckc-core wrapper.rs ≈271) over
   logs/events.jsonl (cfg(test) Shell::events() exists; the gate pins the LANDED file). Pin per doc
   the 4 stage tuples — kinds extract/segment/model_fill/assemble, step ids = pipe.m2_single_ir's
   declared entries, outcome Ok, model_fill counters recorded_calls=1 + repairs=0 and outputs = the
@@ -223,7 +226,10 @@ doc-lint bullet).
   identities: Vec of ModelIdentity} (observations survive terminal reject).
   `direct_smt_verify_group` ≈1267 artifact_id gains the prefix; keeps its direct verify event; no
   .smt2 materialization. Call sites (compiler = the checklist; ≈lines pre-.1d3a, names primary):
-  direct_smt_fill_reproduces_m1_query_bodies ≈4033, direct_smt_fill_rejects_non_pair_group ≈4170,
+  direct_smt_fill_reproduces_m1_query_bodies ≈4033, direct_smt_fill_rejects_non_pair_group ≈4170
+  (BEHAVIORAL rewrite, beyond call-shape: caller-built heads land+event BEFORE the guard, so its
+  "short-circuits ahead of any cassette or filesystem access" comment premise dies — guard still
+  precedes cassette access; rewrite comment + asserts to match),
   direct_smt_route_scores_m1_groups ≈4200, direct_smt_route_rejection_codes ≈4490,
   route_metrics_score_recorded_two_route_run ≈4665 direct arm. Gate: cargo test; M1 pins
   untouched.
