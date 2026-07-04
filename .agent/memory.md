@@ -317,6 +317,12 @@ aggressively; full pre-consolidation text in git history.
   revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
+- §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
+  its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
+  single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
+  orphans the already-landed artifact + drops its counters. Event-less abort is safe ONLY before the
+  first land; after, ride the event like the wrap/land-error break paths (`direct_smt_fill` deontic
+  cassette-fails-after-overlap-lands; codex .1d4a).
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema

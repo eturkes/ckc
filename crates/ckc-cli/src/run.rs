@@ -1210,10 +1210,12 @@ struct DirectFill {
 /// no external effects and no deterministic transform — distinct from single_ir's
 /// mechanical `ir_bundle`), citing the member provenance plus its own accepted cassette
 /// hash, then lands it under `groups/<gid>`. Direct-emits one group model_fill §4.6 event;
-/// a terminal role reject breaks the loop but still rides that event, whereas an
-/// `Err(CassetteError)` cassette IO/contract failure records a command diagnostic with no
-/// event. The returned [`DirectFill`] carries the pair (`Some` only when both roles
-/// landed) beside the `fills`/`identities` that survive a reject; wired into the
+/// a terminal role reject or a wrap/land failure breaks the loop but still rides that event.
+/// An `Err(CassetteError)` cassette IO/contract failure records a command diagnostic and
+/// aborts event-less while nothing has landed (pure infra); once a role has landed it rides
+/// the one event (like a wrap/land failure) so the landed artifact stays attested and its
+/// counters are not dropped. The returned [`DirectFill`] carries the pair (`Some` only when
+/// both roles landed) beside the `fills`/`identities` that survive a reject; wired into the
 /// experiment run by run-m2.1.
 #[allow(dead_code)]
 #[allow(clippy::too_many_arguments)]
@@ -1277,18 +1279,25 @@ fn direct_smt_fill(
         ) {
             Ok(fill) => fill,
             Err(e) => {
-                // A cassette IO/contract failure is infrastructure, not a stage outcome:
-                // a command diagnostic with no event, carrying the partial accumulators.
-                shell.diagnostic(invalid_diagnostic(vec![
+                // A cassette IO/contract failure is infrastructure, not a stage outcome.
+                // While nothing has landed it aborts event-less (a command diagnostic on the
+                // ledger); once a role has landed it rides the one event like a wrap/land
+                // failure, so the landed artifact stays attested and its counters ride out.
+                let cassette_diag = invalid_diagnostic(vec![
                     (static_id("cassette"), source.to_string()),
                     (static_id("reason"), e.to_string()),
                     (static_id("processing_stage"), "model_fill_smt".to_owned()),
-                ]));
-                return DirectFill {
-                    pair: None,
-                    fills,
-                    identities,
-                };
+                ]);
+                if landed.is_empty() {
+                    shell.diagnostic(cassette_diag);
+                    return DirectFill {
+                        pair: None,
+                        fills,
+                        identities,
+                    };
+                }
+                diagnostics.push(cassette_diag);
+                break;
             }
         };
         fills.push(FillObservation::from_fill(&fill));
@@ -4573,6 +4582,118 @@ processing_stages:
                 "the guard precedes any cassette access — no role fill runs"
             );
         }
+    }
+
+    /// route-direct-smt.3b partial-landing attestation (codex-review .1d4a follow-up): a
+    /// deontic cassette IO failure AFTER the overlap role has landed still rides the one
+    /// model_fill §4.6 event, like a wrap/land failure, so the orphaned overlap `smt_query`
+    /// stays attested and overlap's counters are not dropped. Regression guard: the pre-fix
+    /// arm early-returned event-less, leaving a landed artifact covered by no event.
+    #[test]
+    fn direct_smt_fill_landed_then_missing_deontic_still_emits_event() {
+        use ckc_core::Outcome;
+        use std::collections::BTreeMap;
+
+        let root = repo_root();
+        let lexicon = single_ir_lexicon();
+        let resolved = direct_smt_resolved();
+
+        // A store holding ONLY one group's overlap cassette: overlap replays and lands,
+        // then the absent deontic cassette raises a CassetteError mid-pair.
+        let tmp = tempfile::tempdir().unwrap();
+        let store = CassetteStore::new(tmp.path().join("fixtures"));
+        let (gid, qbodies) = m1_reference_query_bodies(&root, &lexicon)
+            .into_iter()
+            .next()
+            .expect("at least one exp.m1_scaffold group");
+        write_direct_smt_cassette(
+            static_id(&format!("{gid}.overlap")),
+            &resolved,
+            &store,
+            42,
+            qbodies[0].body.as_bytes(),
+        );
+
+        // Resolve the group's real members from exp.m1_scaffold (route_document_head reads
+        // their HTML), never a hardcoded membership.
+        let corpus: BTreeMap<Id, CorpusEntry> = single_ir_corpus()
+            .into_iter()
+            .map(|entry| (entry.id.clone(), entry))
+            .collect();
+        let experiments = parse_experiments(
+            &std::fs::read_to_string(root.join("registry/experiments.yaml")).unwrap(),
+        )
+        .unwrap();
+        let group = experiments
+            .iter()
+            .find(|e| e.id == static_id("exp.m1_scaffold"))
+            .expect("exp.m1_scaffold")
+            .test_source_groups
+            .iter()
+            .find(|g| g.group_id == gid)
+            .expect("the group is in exp.m1_scaffold");
+        let members: Vec<&CorpusEntry> = group
+            .test_sources
+            .iter()
+            .map(|s| {
+                corpus
+                    .get(s)
+                    .unwrap_or_else(|| panic!("{gid}: unknown member {s}"))
+            })
+            .collect();
+
+        let out = tmp.path().join("m2");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
+        let got = direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell);
+
+        // No pair (deontic never landed), yet overlap is observed and the group's one
+        // model_fill event is emitted, attesting the landed overlap and folding its counter.
+        assert!(
+            got.pair.is_none(),
+            "a missing deontic cassette yields no pair"
+        );
+        assert_eq!(
+            got.fills.len(),
+            1,
+            "the overlap role is observed before the deontic failure"
+        );
+        let model_fill_events: Vec<_> = shell
+            .events()
+            .iter()
+            .filter(|e| e.processing_stage == static_id(DIRECT_SMT_STAGE_KINDS[MODEL_FILL]))
+            .collect();
+        assert_eq!(
+            model_fill_events.len(),
+            1,
+            "exactly one model_fill event rides despite the infra failure"
+        );
+        let event = model_fill_events[0];
+        assert_eq!(
+            event.output_hashes.len(),
+            1,
+            "the landed overlap smt_query is attested by the event"
+        );
+        assert_eq!(
+            event.outcome,
+            Outcome::Invalid,
+            "the deontic cassette failure marks the stage invalid"
+        );
+        let recorded = event
+            .resource_counters
+            .iter()
+            .find(|(k, _)| *k == static_id(RECORDED_CALLS_COUNTER))
+            .map(|(_, v)| *v)
+            .expect("recorded_calls counter present");
+        assert!(
+            recorded >= 1,
+            "overlap's recorded call folds into the event, not dropped"
+        );
+        assert!(
+            out.join(format!("groups/{gid}/overlap.smt_query.json"))
+                .exists(),
+            "overlap landed on disk before the deontic cassette failed"
+        );
     }
 
     /// route-direct-smt.4 — the direct_smt route scores the M1 conflict and no-conflict
