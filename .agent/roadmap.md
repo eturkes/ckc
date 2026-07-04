@@ -141,29 +141,26 @@ doc-lint bullet).
 - [x] run-m2.1d3b: single_ir §4.6 event + landed-layout pin battery over the reproduce-M1
   test. 66% 132K/200K
 - [ ] run-m2.1d4a: direct route stage — landing + §4.6 events (production rewrite + mechanical
-  call-site updates; the observed-output pin battery is .1d4b). DESIGN VERIFIED this respec against
-  mirror `single_ir_fill` (run.rs ~994) + current `direct_smt_fill` (~1206) + every call-site test;
-  the deltas below pin every decision / string / ordering, so implementation is TRANSCRIPTION against
-  the two anchors — derive nothing fresh. Gate: cargo test; then fmt + clippy -D warnings + doc-lint +
+  call-site updates; the observed-output pin battery is .1d4b). [A]-[E] below are SELF-CONTAINED +
+  design-verified: they pin every decision / string / ordering / field, so implementation is pure
+  TRANSCRIPTION — paste each block, deriving nothing fresh. Gate: cargo test; then fmt + clippy -D warnings + doc-lint +
   touched-file engine-leak audit; M1 pins untouched. On close PRUNE the [A]-[E] detail + gotchas to a
   one-line summary.
 
-  NEXT SESSION = PURE TRANSCRIPTION, one FRESH window (no inherited summary). The prior attempt
-  overflowed only as a CONTINUATION carrying a fat summary WHILE obeying a broad read list — both gone
-  now. Every shape / string / ordering is pinned in [A]-[E] + gotchas → derive nothing, verify nothing,
-  read ONLY these two anchors, apply ALL of [A]-[E], THEN run the gate ONCE (not per-edit):
-    - OLD `fn direct_smt_fill` + `direct_smt_verify_group` — grep `fn direct_smt_fill` (the def at ~1206,
-      NOT the two `#[test]` fns) through `direct_smt_verify_group`'s `verifier_results` wrapper-id line
-      (~1410): covers BOTH the [B] replacement span (its closing `}` ~1360, just before verify_group's
-      `/// The direct_smt route's per-group verdict tail:` doc) AND [C]'s two verify-tail edits — [C] is a
-      required edit no test pins (prefix empty for M1), so a dropped [C] passes the gate silently.
-      `route_document_head`'s arg order is NOT shown here (the old body inlines extract + segment, never
-      calls it) → transcribe [D]'s pinned call verbatim; no ~868 read.
-    - the 6 call-site REGIONS in [E] (one small Edit each, except non_pair which also rewrites its fn doc).
-  Open NOTHING else — not single_ir_fill, model_fill.rs, metrics.rs, or DocHead/RouteDoc: the
-  `ProcessingStageEvent` fields ([B].8), `ModelFill` destructure fields ([B].6), `DocHead` +
-  `FillObservation` fields ([B].3/.6), and every helper signature are already enumerated below. Bounded
-  reads + banked edits + one gate → fits 200K with wide margin.
+  ONE FRESH window, pure transcription. [A]-[E] + gotchas enumerate every field, signature, and literal
+  you need — the `ProcessingStageEvent` fields ([B].8), `ModelFill` destructure ([B].6), `DocHead` +
+  `FillObservation` fields ([B].3/.6), and every helper signature are all inline below. Apply ALL of
+  [A]-[E], THEN run the gate ONCE (not per-edit). Read exactly these two spans, only to capture the
+  current text each Edit replaces:
+    - `fn direct_smt_fill` through `direct_smt_verify_group` — grep `fn direct_smt_fill` (the def at
+      ~1206, NOT the two `#[test]` fns) through `direct_smt_verify_group`'s `verifier_results` wrapper-id
+      line (~1410): this one span holds BOTH the [B] replacement (its closing `}` ~1360, just before
+      verify_group's `/// The direct_smt route's per-group verdict tail:` doc) AND [C]'s two verify-tail
+      edits — [C] is a required edit NO test pins (prefix empty for M1), so applying it is on you; a
+      dropped [C] passes the gate silently. [D] writes `route_document_head`'s call verbatim → transcribe
+      it; the old body never calls it, so this span alone suffices.
+    - the 6 call-site REGIONS in [E] (one small Edit each; non_pair also rewrites its fn doc).
+  Those two spans + [A]-[E] + one gate fit 200K with wide margin.
 
   [A] new `struct DirectFill` directly above `direct_smt_fill`'s doc (~1194), attr
   `#[allow(dead_code)]`; fields `pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>`
@@ -259,8 +256,8 @@ doc-lint bullet).
   Body: per `&m in members` push `route_document_head(root, m, resolved, shell).unwrap_or_else(|| panic!("{gid}: no head for {}", m.id))`
   into `heads: Vec<DocHead>`; `let head_refs: Vec<&DocHead> = heads.iter().collect();`; return
   `direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)`.
-  (`route_document_head`'s arg order is pinned in the call just above — transcribe it verbatim; the OLD
-  `direct_smt_fill` body inlines extract + segment and never calls it, so do NOT hunt there or read ~868.)
+  (the `route_document_head(root, m, resolved, shell)` call above pins its arg order verbatim —
+  transcribe it; that call is the only place the head helper is needed.)
   `direct_fill_group` is a SINGLE-group
   convenience — NO cross-group head dedup, so a member in N groups (or shared across arms under one shell)
   heads N×. This matters ONLY where a pin counts head events: reproduce + scores gain such pins in .1d4b →

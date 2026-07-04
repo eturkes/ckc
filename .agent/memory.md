@@ -1,26 +1,23 @@
 # Agent Memory
 
-Entries must add value beyond the spec, AGENTS.md, codebase, git history, and runtime
-environment — project-independent tooling pitfalls (RTK, Headroom, Serena, Claude Code, web
-access) live in each agent's own global guidance, not here. Exception: high-value reminders that
-are derivable but easily forgotten under token pressure. Entries are consolidated aggressively;
-full pre-consolidation text lives in git history.
+Entries add value beyond spec / AGENTS.md / code / git / runtime env — project-independent tooling
+pitfalls (RTK, Headroom, Serena, Claude Code, web) live in each agent's global guidance, not here.
+Exception: high-value reminders derivable but easily forgotten under token pressure. Consolidated
+aggressively; full pre-consolidation text in git history.
 
 ## Policy
 
-- Context hygiene (user directive; background: `git show 531f586`): keep every
-  session lean and phrased in project vocabulary (processing stages, units, gates, artifacts) — plain
-  operational words over research jargon in memory, roadmap, commits, and code alike.
-  Consult `docs/` through read-only subagents so its vocabulary stays out of
-  the main window. Root `.rgignore` keeps ripgrep-backed sweeps (subagent Grep, `rtk proxy
-  rg`) out of `docs/`; Bash `grep -r` still enters it — scope Bash greps by path; deliberate
-  docs searches use `git grep <pat> -- docs/`, `rg --no-ignore`, or explicit file paths.
-  Implement sessions match patterns from the latest unit-scoped commit (`git log
-  --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
-- AI-written specs may carry mistakes (user, 2026-07-03): apparent incorrectness is likely
-  unintended — verify against SPEC.md + code and rule with best judgment, recording the ruling
-  where its implementer reads it (first applied: .1d5 findings body = single_ir structurally;
-  "BASELINE only" was a phantom-collision fix — direct lands no compiled, mints no claims).
+- Context hygiene (user directive; bg `git show 531f586`): keep every session lean + phrased in project
+  vocabulary (processing stages, units, gates, artifacts) — plain operational words over research jargon
+  in memory/roadmap/commits/code. Consult `docs/` via read-only subagents so its vocabulary stays out of
+  the main window. Root `.rgignore` keeps ripgrep sweeps (subagent Grep, `rtk proxy rg`) out of `docs/`;
+  Bash `grep -r` still enters it → scope Bash greps by path; deliberate docs searches use `git grep <pat>
+  -- docs/`, `rg --no-ignore`, or explicit paths. Implement sessions match patterns from the latest
+  unit-scoped commit (`git log --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
+- AI-written specs may carry mistakes (user, 2026-07-03): apparent incorrectness is likely unintended —
+  verify against SPEC.md + code, rule with best judgment, record the ruling where its implementer reads it
+  (first applied .1d5: findings body = single_ir structurally; "BASELINE only" was a phantom-collision fix
+  — direct lands no compiled, mints no claims).
 - LSP coverage map (ckc): Serena-served = rust, bash, json, yaml, toml, markdown (Marksman), html,
   lean4 (`.serena/project.yml` `languages:`; lean4's server starts once `.lean` files exist);
   `global`-marketplace plugins = xml, smt2 (dolmen), alloy, egglog. Audited gaps: TLA+, ASP/Clingo,
@@ -41,27 +38,19 @@ full pre-consolidation text lives in git history.
   (existing tests the gate, zero test edits); format walker + test-source integration = walker-core
   (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
   artifact = 2; multi-invariant validator + full rejection coverage = 2; pure-computation module (full
-  §-semantics + unit tests) + its recorded-run integration test = 2 (metrics-m2.1 overflowed deriving
-  both in one window); canonical-emit layer over an existing type family (one module) + a byte-pinned
-  record-shape extension consuming it (a second module) = 2, split at the module seam (report-m2.1
-  overflowed: read+derive+first-module-green consumed the window before module 2 started); record-shape
+  §-semantics + unit tests) + its recorded-run integration test = 2; canonical-emit layer over an
+  existing type family (one module) + a byte-pinned record-shape extension consuming it (a second module) = 2, split at the module seam; record-shape
   extension + fresh-designed member type + validator + per-variant rejections vs its populated fixture +
-  byte-pin capture = 2 (report-m2.1b's fresh redo overflowed pre-compile bundling both — 17 uncompiled
-  edit sites; the working respec pins EVERY decision in the line — names, key slots, Display strings,
-  fixture values, test list — so implementation is transcription); derivation fn + its
-  test-source-pinned battery + an attachment sub-feature = 2; type family + assembly + validation = 3;
+  byte-pin capture = 2; derivation fn + its test-source-pinned battery + an attachment sub-feature = 2;
+  type family + assembly + validation = 3;
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
   (never paired with assembly or stage wiring); orchestrator wiring over N pre-built route stages +
   per-stage landing/eventing + a determinism gate ≥ N+2 units — per-route stage-rework units first, the
-  orchestrator+gate last, cross-cutting type/trace plumbing its own opener (run-m2.1d bundled all of it,
-  consumed 200K on reads+design alone, zero code written → respec'd .1d1–.1d5); a route-stage rework
+  orchestrator+gate last, cross-cutting type/trace plumbing its own opener; a route-stage rework
   (landing+eventing rewiring of an existing fill fn + mechanical call-site updates) and its
-  event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next (run-m2.1d3
-  bundled them + overflowed mid-edit: production edits in, imports/tests/gates unreached → reverted,
-  respec .1d3a/b with the full design frozen into the line; rule re-audited .1d4→a/b + .1d5→a/b in the
-  same commit); spec-byte amendment (re-pin + reference/test mirror sweep)
-  + new feature code = 2 (an open decision that amends pinned bytes is a deliverable, not a preamble);
-  crate foundations pair only with a small type surface (one payload module each); deterministic code + a
+  event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next; spec-byte
+  amendment (re-pin + reference/test mirror sweep) + new feature code = 2 (an open decision that amends
+  pinned bytes is a deliverable, not a preamble); crate foundations pair only with a small type surface (one payload module each); deterministic code + a
   SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
   confirm its own unit) → apply to EVERY live-runtime-gated unit at plan time, not only the obviously-slow,
   and on recovery discharge the one-time exploration into memory `## Runtime` + persist any
@@ -71,18 +60,16 @@ full pre-consolidation text lives in git history.
   statement builder over a prebuilt binding core = 1; exception attachment + determinism tests = 1.
   PRACTICES: house new type families in fresh modules (extending a ~2K-line module costs a full-file
   read); on a big file gather EVERY region the session's edits touch BEFORE the first edit — post-edit
-  reads re-orient against shifted lines and can return stale (.1d3 attempt 1 bled margin re-reading
-  run.rs mid-edit); scope each split's Reading slice to exclude files its half leaves untouched; land a compiling
-  skeleton before the full test battery — `cargo check` after the production edits, an end-loaded
-  uncompiled battery leaves nothing landable (report-m2.1b); pin expected shapes from observed output, never hand-computed;
-  spec code references = fn/test NAMES, ≈line = secondary hint only (drifts under edits above it —
-  .1d5's bare ≈2886 went stale within days; codex M2.1d-respec catch);
-  cite only untagged checked roadmap lines as anchors (`[S]` =
-  salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
+  reads re-orient against shifted lines and can return stale; scope each split's Reading slice to exclude
+  files its half leaves untouched; land a compiling skeleton before the full test battery — `cargo check`
+  after the production edits, an end-loaded uncompiled battery leaves nothing landable; pin expected
+  shapes from observed output, never hand-computed; spec code references = fn/test NAMES, ≈line =
+  secondary hint only (drifts under edits above it); cite only untagged checked roadmap lines as anchors
+  (`[S]` = salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
   declaration/conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
-  deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE RETIRED (user
-  directive, 2026-07-02; roadmap salvage-caveat note): banking applyable wip artifacts (`.agent/wip-*`
+  deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE RETIRED (user directive,
+  2026-07-02): banking applyable wip artifacts (`.agent/wip-*`
   patches / byte-exact code copies / transcription blueprints a redo line points at) cheats the unit — the
   redo's recorded context-usage measures artifact application, not the unit as specced, so sizing
   anchors come from untagged stubs only. Overflow recovery is LAND-OR-REVERT: either the proven half closes
@@ -90,12 +77,11 @@ full pre-consolidation text lives in git history.
   within the session's remaining margin, or the tree reverts CLEAN and the recovery respec-splits into
   fresh SELF-CONTAINED units. A respec line may resolve decisions, confirmed facts, and reading pointers
   in prose (that is planning); its banked content is prose only — the redo session itself writes every
-  line of implementation code. Retired wip artifacts remain in git history as provenance only — a fresh
-  redo derives and writes everything within its own session. Any wip scratch file a session does create
-  gets deleted before that session's closing commit. RESPEC-SESSION CLOSE (run-m2.1 respec 3b1066a: the
-  same session's first-half attempt overflowed pre-compile — production edits landed, zero gates run —
-  and was reverted): a respec whose seam confirmation reads span multiple modules has already spent the
-  implementation margin → commit the respec, re-score the first half against the window REMAINING, and
+  line of implementation code. Retired wip artifacts remain in git history as provenance only. Any wip
+  scratch file a session does create gets deleted before that session's closing commit. RESPEC-SESSION
+  CLOSE (run-m2.1 respec 3b1066a): a respec whose seam confirmation reads span multiple modules has
+  already spent the implementation margin → commit the respec, re-score the first half against the window
+  REMAINING, and
   implement only on a clear fit; the default close is the respec commit itself (the session-prompt
   clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
   the confirmed facts (caller counts, helper signatures, fixture slots, exact reasons) — bank those at
@@ -107,73 +93,76 @@ full pre-consolidation text lives in git history.
   its first implement attempt DESPITE a fully-pinned respec — its READ-FIRST relisted the mirror + shape
   modules whose every field the respec already enumerated → reverted, re-scoped to the edit set: the
   replace span, the adjacent verify-tail edits, and the call-site regions incl. their docs (sources out).
-- Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
-  a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
-  deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
-  byte-exact shapes — signatures, sorted-field orders, enum variants, harness helpers, the
-  `Resolved`-style stamp structs — assembled across many modules; a deterministic-REPRODUCTION
-  gate reads the WHOLE upstream type + helper set. Detect at PLAN time: count the modules a
-  unit's gate/bless scaffolding must read for exact shapes, not just its conceptual pieces. A
-  nothing-written overflow recovers FORWARD:
-  (a) SPLIT the production fn from its golden-fixture + gate when separable (route-single-ir.2
-  = accept closure; .2b = fill+bless+gate); (b) pre-resolve the blocking FACTS — confirmed
-  signatures, verified equality premises (e.g. clinical_ir diagnostics empty for the 3 docs),
-  insertion anchors — into the respec'd roadmap LINE as prose (facts/decisions = planning;
-  verbatim code or a pointed-at wip artifact = retired salvage, sizing bullet); a fact set too
-  large for a line ⇒ the unit is still oversized, split further. A self-checking gate (`content_hash == reference`) bounds reproduction-error risk on the
-  PAYLOAD path ONLY: a content-hash-affecting line fails loudly; off-payload lines don't (wrong
-  signature → compile error; producer/wrapper/input_hash fields compile AND pass silently → still
-  targeted-read those). Mark gate-IRRELEVANT fields (producer
-  stamps / step-ids / wrapper-level fields under a payload-only `content_hash`) explicit so the
-  session skips pinning them.
-- Renaming canonical (§4.3) JSON member keys is a silent test-breaker. The object emitter buffers members then sorts them by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — it peeks the next key and demands the caller request keys in ascending byte order. So a key rename moves its sort slot: the code still compiles, but round-trip reads fail `MissingField` at runtime and pinned canonical byte-string literals mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum serializes by variant name, so a snake wire-key rename must also rename the CamelCase variant (e.g. ViewText→RenderedText) — caught by name-pin asserts, never the compiler. And hyphenated scope-IDs (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments are git-commit-traceability keys: keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` and living prose).
-- Backward-compatible canonical-record extension (proven M2.1 model-types, inverse of the rename
-  break above): adding fields to a byte-pinned §4.3 record without disturbing pins = make them
-  `Option<T>`, emit `obj.optional(name, self.f.as_ref(), |b,v| v.emit_canonical(b))`, read
-  `obj.optional(name, T::read)?`, each in the field's sorted-key slot. Omit-None emits nothing →
-  prior pins stay byte-identical (the unchanged-expected-bytes M1 pin tests are the regression
-  guard — never edit their literals). Emitter sorts on `finish` (emit-call order cosmetic) but the
-  positional reader REQUIRES the `obj.optional` call in ascending-key position (peek next key:
-  `<name`→UnknownField, `==`→consume, `>name`/absent→None) → a misplaced optional misreads. Pin
-  BOTH an all-None fixture (locks old bytes) AND a fully-populated one (locks the new members'
-  slots) — once per extended record type, not one exemplar for the family (a populated round-trip
-  proves read/write inverse but only a byte-pin locks canonical order/content → each record,
-  RunManifest AND ReplayManifest, needs its own populated pin; M2.1 codex follow-up caught the
-  missing replay pin). `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type
-  gets it with zero per-type code (a roadmap "content_hash for the new types" clause needs no
-  extra impl).
-- Behavior-locked extraction past a timed interval (M2.7 run-refactor, codex follow-up): a
-  `ProcessingStageClock` opens in the CALLER before the extracted call → pure setup (`format!`/alloc)
-  left in the callee body runs INSIDE the timed interval, falsifying a timing-identity claim that byte
-  pins CAN'T catch (`duration_ms` is normalized → tests stay green while the guarantee breaks). Audit
-  clock boundaries when extracting: hoist pre-clock setup to the caller, pass it in — `compile_verify_group`
-  takes `dir: &str` so its `format!("groups/{gid}")` stays outside COMPILE timing (route.single_ir
-  supplies its own dir + clock the same way). The call-boundary overhead itself is inherent + below
-  ms/normalization resolution — only named setup is worth hoisting.
+- Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed a 200K
+  window during READING, ZERO code written → nothing to salvage). A 'one deliverable + one gate' unit
+  still overflows when its test/bless/fixture scaffolding needs byte-exact shapes — signatures,
+  sorted-field orders, enum variants, harness helpers, `Resolved`-style stamp structs — assembled across
+  many modules; a deterministic-REPRODUCTION gate reads the WHOLE upstream type + helper set. Detect at
+  PLAN time: count the modules a unit's gate/bless scaffolding must read for exact shapes, not just its
+  conceptual pieces. Nothing-written overflow recovers FORWARD: (a) SPLIT the production fn from its
+  golden-fixture + gate when separable (route-single-ir.2 = accept closure; .2b = fill+bless+gate);
+  (b) pre-resolve the blocking FACTS — confirmed signatures, verified equality premises (e.g. clinical_ir
+  diagnostics empty for the 3 docs), insertion anchors — into the respec'd roadmap LINE as prose
+  (facts/decisions = planning; verbatim code or a pointed-at wip artifact = retired salvage); a fact set
+  too large for a line ⇒ still oversized, split further. A self-checking gate (`content_hash ==
+  reference`) bounds reproduction-error risk on the PAYLOAD path ONLY: a content-hash-affecting line fails
+  loudly; off-payload lines don't (wrong signature → compile error; producer/wrapper/input_hash fields
+  compile AND pass silently → still targeted-read those). Mark gate-IRRELEVANT fields (producer stamps /
+  step-ids / wrapper-level fields under a payload-only `content_hash`) explicit so the session skips
+  pinning them.
+- Renaming canonical (§4.3) JSON member keys = silent test-breaker. The object emitter buffers members
+  then sorts by key bytes on `finish`; the reader (`canon.rs` `member`/`optional`) is positional — peeks
+  the next key, demands keys requested in ascending byte order. So a rename moves the sort slot: code
+  still compiles, but round-trip reads fail `MissingField` at runtime + pinned byte-string literals
+  mismatch. Fix = re-sort each Canonical read+emit member sequence AND every pinned byte-string to the new
+  key order (`printf '%s\n' k1 k2 … | LC_ALL=C sort`). Related: a `#[serde(rename_all="snake_case")]` enum
+  serializes by variant name → a snake wire-key rename must also rename the CamelCase variant (e.g.
+  ViewText→RenderedText) — caught by name-pin asserts, never the compiler. Hyphenated scope-IDs
+  (`stage-extract.1`, `core-grounding`, `fixtures-m1`) in roadmap+comments = git-commit-traceability keys:
+  keep them historical on a terminology rename (rename only dotted runtime IDs `processing_stage.m1.*` +
+  living prose).
+- Backward-compatible canonical-record extension (proven M2.1 model-types, inverse of the rename break):
+  add fields to a byte-pinned §4.3 record without disturbing pins = make them `Option<T>`, emit
+  `obj.optional(name, self.f.as_ref(), |b,v| v.emit_canonical(b))`, read `obj.optional(name, T::read)?`,
+  each in the field's sorted-key slot. Omit-None emits nothing → prior pins stay byte-identical (the M1
+  unchanged-expected-bytes pin tests = the regression guard, never edit their literals). Emitter sorts on
+  `finish` (emit-call order cosmetic) but the positional reader REQUIRES the `obj.optional` call in
+  ascending-key position (peek next key: `<name`→UnknownField, `==`→consume, `>name`/absent→None) → a
+  misplaced optional misreads. Pin BOTH an all-None fixture (locks old bytes) AND a fully-populated one
+  (locks new members' slots) — once per extended record type, not one exemplar per family (a populated
+  round-trip proves read/write inverse but only a byte-pin locks canonical order/content → each record,
+  RunManifest AND ReplayManifest, needs its own populated pin; codex caught the missing replay pin).
+  `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type gets it with
+  zero per-type code (a roadmap "content_hash for the new types" clause needs no impl).
+- Behavior-locked extraction past a timed interval (M2.7 run-refactor): a `ProcessingStageClock` opens in
+  the CALLER before the extracted call → pure setup (`format!`/alloc) left in the callee body runs INSIDE
+  the timed interval, falsifying a timing-identity claim byte pins CAN'T catch (`duration_ms` normalized →
+  tests stay green while the guarantee breaks). Audit clock boundaries when extracting: hoist pre-clock
+  setup to the caller, pass it in — `compile_verify_group` takes `dir: &str` so its
+  `format!("groups/{gid}")` stays outside COMPILE timing (route.single_ir supplies its own dir + clock
+  likewise). Call-boundary overhead is inherent + below ms/normalization resolution — only named setup is
+  worth hoisting.
 - Doc-lint gate (Rust): the per-unit test+fmt+clippy gate MISSES rustdoc → run `RUSTDOCFLAGS='-D
   warnings' cargo doc -p <crate> --no-deps` whenever a unit touches doc comments. Two failure shapes:
   a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
   ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
-  `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Caught by codex on M2.20 .2.
-  Counting gotcha: `grep -c "^error"` on the doc output includes the trailing ``error: could not
+  `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Counting gotcha: `grep -c "^error"` on the doc output includes the trailing ``error: could not
   document `ckc-cli` `` summary line → real standing count = matches − 1 (17 link errors read as 18);
   diff the error LIST against the standing set (model.rs/replay.rs/trace.rs/cassette.rs), not counts.
-- Contract-tense docs (codex flagged TWICE: M2.22 emission_order re-tense, M2.23 .1a follow-up):
-  a doc claim about pending wiring must be unit-attributed — "report-m2.1b embeds X in
-  `report.json`" holds before and after the unit lands; present-state phrasing ("carriers today:
-  report.json bytes agree") overreaches until the wiring commit. House pattern: "run-m2.1 wires
-  the observations". Apply at write time — each violation costs a codex follow-up commit.
-- Selector-semantics fields need discriminating fixtures (codex M2.28): a contract picking ONE
-  candidate among several (`model_identity` = LAST attempt's cassette; `accepted_cassette_hash` =
-  ACCEPTED attempt's, never the base recording) is pinned only when the fixture makes candidates
-  DIFFER — uniform fixtures satisfy the assert under an any-candidate regression. Pattern:
-  `later_identity()` seeded at the last attempt via `seed_cassette_as` (model_fill tests); the hash
-  side already discriminated (recovery pins derived-seed cassette cited + base NOT). Apply at
-  test-write time whenever a field's doc says "the last/accepted/first X". Design-side corollary
-  (codex M2.29): content-hash selection collapses where reproduction pins make byte-equal
-  candidates the NORM (route bundle hash == M1's) → select by identity ids, keep the hash as a
-  conjunct check (`GroupTrace.member_bundles` ∧ `input_hashes`); fixture axis = candidates
-  differing in id while EQUAL in content.
+- Contract-tense docs (codex flagged twice): a doc claim about pending wiring must be unit-attributed —
+  "report-m2.1b embeds X in `report.json`" holds before + after the unit lands; present-state phrasing
+  ("carriers today: report.json bytes agree") overreaches until the wiring commit. House pattern:
+  "run-m2.1 wires the observations". Apply at write time — each violation costs a codex follow-up commit.
+- Selector-semantics fields need discriminating fixtures: a contract picking ONE candidate among several
+  (`model_identity` = LAST attempt's cassette; `accepted_cassette_hash` = ACCEPTED attempt's, never the
+  base recording) is pinned only when the fixture makes candidates DIFFER — uniform fixtures satisfy the
+  assert under an any-candidate regression. Pattern: `later_identity()` seeded at the last attempt via
+  `seed_cassette_as` (model_fill tests); the hash side already discriminated (recovery pins derived-seed
+  cassette cited + base NOT). Apply at test-write time whenever a field's doc says "the last/accepted/
+  first X". Design-side corollary: content-hash selection collapses where reproduction pins make byte-equal
+  candidates the NORM (route bundle hash == M1's) → select by identity ids, keep the hash as a conjunct
+  check (`GroupTrace.member_bundles` ∧ `input_hashes`); fixture axis = candidates differing in id while
+  EQUAL in content.
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
@@ -223,7 +212,7 @@ full pre-consolidation text lives in git history.
   terminal `repair_limit_exceeded`; `Grounding(absent)` → terminal `ai_hallucinated_source`, spends NO
   repair. The stage ASSERTS the closure's `Grounding` carries ≥1 absent id (empty = a deterministic route
   bug → fail-closed panic, house `expect`/`unreachable` style, not a silent empty-`absent_source_ids`
-  diagnostic); route-single-ir still enforces route-side too (defense-in-depth, M2.14 codex follow-up). A
+  diagnostic); route-single-ir still enforces route-side too (defense-in-depth). A
   cassette IO/contract failure stays `Err(CassetteError)`, DISTINCT (route tells a broken recording from a
   bad model output). Two §7.3 counters both surfaced so run-m2.1 emits both without re-deriving:
   `RECORDED_CALLS_COUNTER="recorded_calls"` (one per attempt), `REPAIRS_COUNTER="repairs"`
@@ -320,8 +309,8 @@ full pre-consolidation text lives in git history.
   crate adopting the macro. Those serde impls go unused there (the canonical path is
   Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; don't
   "tidy" the dep away.
-- M1 reviewed (gates green, zero code defects in the milestone body — git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED
-  by SPEC amendment: a processing stage's total operation result IS its §4.6 EventRecord (§8.3 has no
+- M1 reviewed (git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED by SPEC amendment: a
+  processing stage's total operation result IS its §4.6 EventRecord (§8.3 has no
   per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
   residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: do NOT
   add per-stage TotalOperationResults — inert + redundant with EventRecords until then (M2+ may
@@ -414,9 +403,9 @@ full pre-consolidation text lives in git history.
     consumers DONE; the tests hold mechanics + derived-seed constants) — durable lessons only: a
     route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a partial
     mirror passes vacuously) and resolves groups + reference from the registry, never hardcoded
-    membership (codex M2.18 caught both); `repair_limit=0` proves only the zero-budget boundary, NOT
+    membership; `repair_limit=0` proves only the zero-budget boundary, NOT
     multi-attempt exhaustion — faithful route-level exhaustion needs malformed cassettes at the base
-    AND each derived seed through the budget (codex M2.19); pin rejection payload SHAPE (key
+    AND each derived seed through the budget; pin rejection payload SHAPE (key
     `reason`, non-empty, empty refs) symmetric across codes. Rejection cassettes: single_ir seeds
     99/98/97 (+derived) = hallucinated / recover / exhaust, under
     `route.single_ir/test_source.m1_guideline_a`.
@@ -478,14 +467,14 @@ full pre-consolidation text lives in git history.
   signed exact, added .2) on Value×Value else `not_applicable`; baseline gets NO self-delta row.
   `ExperimentMetrics::emission_order()` IS the §9 raw-rows-before-ranking contract (all RawRows
   sections strictly before all DeltaTable sections) — both md renderers walk it (.3a/.3b);
-  run-m2.1e renders through the renderers, never the fields ad hoc (codex M2.22: the §9 guarantee
-  reaches artifacts only once an emitter walks it). Rendering landed (.3a/.3b; pins + Labels
+  run-m2.1e renders through the renderers, never the fields ad hoc (the §9 guarantee reaches
+  artifacts only once an emitter walks it). Rendering landed (.3a/.3b; pins + Labels
   mechanics live in report.rs tests): `render_markdown`/`render_markdown_ja` share one walk;
   `one_canonical_report_renders_both_language_bodies` proves both pinned bodies render from the
   pinned canonical report.json bytes alone; run-m2.1e writes them as report_en.md/report_ja.md. JA
   mapping: §0 labels + ids/hashes/codes + `not_applicable` verbatim ENGLISH inside JA prose,
   structural chrome JA (`、` joiner, `なし。` empty slot), delta heading's ` - ` language-invariant.
-  RENDERED ⇒ VALIDATED (codex M2.25): every member a renderer walks must sit under a
+  RENDERED ⇒ VALIDATED: every member a renderer walks must sit under a
   `Report::validate` rule (rule 6 canonical sets; rule 7 code-span-inert identity text → renderers
   interpolate bare, no escaping layer; rule 3 rejects line breaks in quoted span text — else valid
   text injects block structure into both bodies). REPORT-m2.1 TRAP (DISCHARGED in landed
