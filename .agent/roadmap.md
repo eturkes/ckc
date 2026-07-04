@@ -150,17 +150,19 @@ doc-lint bullet).
   ONE FRESH window, pure transcription. [A]-[E] + gotchas enumerate every field, signature, and literal
   you need — the `ProcessingStageEvent` fields ([B].8), `ModelFill` destructure ([B].6), `DocHead` +
   `FillObservation` fields ([B].3/.6), and every helper signature are all inline below. Apply ALL of
-  [A]-[E], THEN run the gate ONCE (not per-edit). Read exactly these two spans, only to capture the
-  current text each Edit replaces:
+  [A]-[E], THEN run the gate ONCE (not per-edit). Read these two replacement spans, only to capture the
+  current text each Edit replaces (plus [D]'s insertion anchor, the third bullet — a cheap grep read):
     - `fn direct_smt_fill` through `direct_smt_verify_group` — grep `fn direct_smt_fill` (the def at
       ~1206, NOT the two `#[test]` fns) through `direct_smt_verify_group`'s `verifier_results` wrapper-id
       line (~1410): this one span holds BOTH the [B] replacement (its closing `}` ~1360, just before
       verify_group's `/// The direct_smt route's per-group verdict tail:` doc) AND [C]'s two verify-tail
       edits — [C] is a required edit NO test pins (prefix empty for M1), so applying it is on you; a
       dropped [C] passes the gate silently. [D] writes `route_document_head`'s call verbatim → transcribe
-      it; the old body never calls it, so this span alone suffices.
+      it; the old body never calls it, so [D]'s pinned call is the sole source for its arg order.
     - the 6 call-site REGIONS in [E] (one small Edit each; non_pair also rewrites its fn doc).
-  Those two spans + [A]-[E] + one gate fit 200K with wide margin.
+    - [D] INSERTS `direct_fill_group` (no old_string to capture): grep `fn direct_smt_resolved` (~4140),
+      place the new helper just above it — a few lines read, outside both spans above.
+  Those spans + [D]'s anchor + [A]-[E] + one gate fit 200K with wide margin.
 
   [A] new `struct DirectFill` directly above `direct_smt_fill`'s doc (~1194), attr
   `#[allow(dead_code)]`; fields `pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>`
