@@ -1187,101 +1187,80 @@ fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
     }
 }
 
-/// The direct_smt route's per-group fill back end: extract + segment each member for
-/// provenance (references ungrounded — the direct route emits raw SMT, not an IR),
-/// then replay the group's two committed model cassettes through [`model_fill`] under
-/// [`direct_smt_accept`] — the overlap query keyed under `<gid>.overlap`, the deontic
-/// query under `<gid>.deontic`, both at the base seed. The sources are role-namespaced
-/// so a Q2 repair never aliases Q1's: [`model_fill`] reads attempt `i` under
-/// `derive_seed(base, i)` on the one source, so a shared source would collide. Each
-/// accepted body is wrapped as an `smt_query` [`ArtifactWrapper`] carrying the raw
-/// model output ([`Origin::AiGenerated`] + [`EvidenceStatus::AcceptedEvidenceStatus`],
+/// The pair fill's outcome for one direct_smt group: `pair` is `Some` only when both
+/// roles accepted and landed, while `fills` and `identities` survive a terminal role
+/// reject so the run-m2.1d5a orchestrator can fold their §7.3 telemetry and check
+/// cross-route model-identity agreement.
+#[allow(dead_code)]
+struct DirectFill {
+    pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>,
+    fills: Vec<FillObservation>,
+    identities: Vec<ModelIdentity>,
+}
+
+/// The direct_smt route's per-group fill back end over the group's two member
+/// [`DocHead`]s: the direct route grounds nothing (it emits raw SMT, not an IR), so the
+/// heads carry only member provenance forward. Replays each role's committed cassette
+/// through [`model_fill`] under [`direct_smt_accept`] — the overlap query keyed under
+/// `<gid>.overlap`, the deontic query under `<gid>.deontic`, both at the base seed. The
+/// sources are role-namespaced so a Q2 repair never aliases Q1's: [`model_fill`] reads
+/// attempt `i` under `derive_seed(base, i)` on the one source, so a shared source would
+/// collide. Each accepted body is wrapped as an `smt_query` [`ArtifactWrapper`] carrying
+/// the raw model output ([`Origin::AiGenerated`] + [`EvidenceStatus::AcceptedEvidenceStatus`],
 /// no external effects and no deterministic transform — distinct from single_ir's
-/// mechanical `ir_bundle`), citing the member provenance plus its own accepted
-/// cassette hash. Returns the pair's two wrappers (each `content_hash` is what
-/// the verdict tail cites as its `verify_smt` input) or `None` on a recorded failure;
-/// wired into the experiment run by run-m2.1.
+/// mechanical `ir_bundle`), citing the member provenance plus its own accepted cassette
+/// hash, then lands it under `groups/<gid>`. Direct-emits one group model_fill §4.6 event;
+/// a terminal role reject breaks the loop but still rides that event, whereas an
+/// `Err(CassetteError)` cassette IO/contract failure records a command diagnostic with no
+/// event. The returned [`DirectFill`] carries the pair (`Some` only when both roles
+/// landed) beside the `fills`/`identities` that survive a reject; wired into the
+/// experiment run by run-m2.1.
 #[allow(dead_code)]
 #[allow(clippy::too_many_arguments)]
 fn direct_smt_fill(
-    root: &Path,
     gid: &Id,
-    members: &[&CorpusEntry],
+    heads: &[&DocHead],
     store: &CassetteStore,
     seed: u64,
     resolved: &Resolved,
     repair_limit: u32,
     shell: &mut Shell,
-) -> Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)> {
-    // The cassette-role design mints exactly one (overlap, deontic) pair per group — the
-    // shape of the M1 planner's single constraint-pair over a minimal pair of members.
-    // Fail closed on any other cardinality so an expanded registry cannot silently emit a
-    // two-query artifact that under-covers a 3+-member group's pairwise queries.
-    if members.len() != 2 {
+) -> DirectFill {
+    // The cassette-role design mints exactly one (overlap, deontic) pair per group, so a
+    // non-pair head set fails closed with a command diagnostic and no event.
+    if heads.len() != 2 {
         shell.diagnostic(invalid_diagnostic(vec![
             (static_id("group"), gid.to_string()),
             (
                 static_id("reason"),
-                format!("expected a 2-member minimal pair, got {}", members.len()),
+                format!("expected 2 member heads, got {}", heads.len()),
             ),
             (static_id("processing_stage"), "model_fill_smt".to_owned()),
         ]));
-        return None;
+        return DirectFill {
+            pair: None,
+            fills: Vec::new(),
+            identities: Vec::new(),
+        };
     }
-    // Provenance inputs: extract + segment each member (the M1-chain head, references
-    // ungrounded). Each query wrapper cites these in member order plus its own accepted
-    // cassette hash (§9 attestation); provenance-only, so they do not reach the
-    // payload-only `content_hash`.
+    let prefix = route_id_prefix(resolved);
+    let dir = format!("groups/{gid}");
+    // Member-order provenance, gathered before the clock so only the fill work falls
+    // inside the timed interval (the M2.7 clock-boundary discipline).
     let mut input_hashes: Vec<Hash> = Vec::new();
-    for entry in members {
-        let html = match std::fs::read(root.join(&entry.path)) {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                shell.diagnostic(invalid_diagnostic(vec![
-                    (static_id("file"), entry.path.clone()),
-                    (static_id("reason"), format!("read {}: {e}", entry.path)),
-                ]));
-                return None;
-            }
-        };
-        let config = ExtractConfig {
-            document_id: entry.id.clone(),
-            source_family: static_id("synthetic_test_source_html"),
-            provenance: entry.provenance,
-            data_class: DataClass::None,
-            producer: producer(resolved, 0),
-        };
-        let source = match extract(&html, &config) {
-            Ok(source) => source,
-            Err(e) => {
-                shell.diagnostic(processing_stage_diagnostic(
-                    0,
-                    "document",
-                    &entry.id,
-                    e.to_string(),
-                ));
-                return None;
-            }
-        };
-        let segments = match segment(&source, &producer(resolved, 1)) {
-            Ok(segments) => segments,
-            Err(e) => {
-                shell.diagnostic(processing_stage_diagnostic(
-                    1,
-                    "document",
-                    &entry.id,
-                    e.to_string(),
-                ));
-                return None;
-            }
-        };
-        input_hashes.push(source.content_hash.clone());
-        input_hashes.push(segments.content_hash.clone());
+    for head in heads {
+        input_hashes.push(head.source.content_hash.clone());
+        input_hashes.push(head.segments.content_hash.clone());
     }
-
-    // Replay the pair's two role-namespaced cassettes at the base seed, wrapping each
-    // shallow-accepted body as the raw-AI `smt_query` the verdict tail consumes.
-    let mut pair: Vec<ArtifactWrapper<QueryBody>> = Vec::new();
+    let clock = processing_stage_clock();
+    let mut fills: Vec<FillObservation> = Vec::new();
+    let mut identities: Vec<ModelIdentity> = Vec::new();
+    let mut diagnostics: Vec<DiagnosticRecord> = Vec::new();
+    let mut recorded_calls: u64 = 0;
+    let mut repairs: u64 = 0;
+    let mut landed: Vec<ArtifactWrapper<QueryBody>> = Vec::new();
+    // Replay the pair's two role-namespaced cassettes at the base seed, wrapping and
+    // landing each shallow-accepted body as a raw-AI `smt_query` the verdict tail consumes.
     for (role, logic) in [("overlap", SmtLogic::QfLra), ("deontic", SmtLogic::QfUf)] {
         let source = static_id(&format!("{gid}.{role}"));
         let key = CassetteKey {
@@ -1298,58 +1277,116 @@ fn direct_smt_fill(
         ) {
             Ok(fill) => fill,
             Err(e) => {
+                // A cassette IO/contract failure is infrastructure, not a stage outcome:
+                // a command diagnostic with no event, carrying the partial accumulators.
                 shell.diagnostic(invalid_diagnostic(vec![
                     (static_id("cassette"), source.to_string()),
                     (static_id("reason"), e.to_string()),
                     (static_id("processing_stage"), "model_fill_smt".to_owned()),
                 ]));
-                return None;
+                return DirectFill {
+                    pair: None,
+                    fills,
+                    identities,
+                };
             }
         };
-        // Surface §7.4 fill diagnostics (schema violations, repair-limit), then a
-        // terminal reject (no accepted target) ends the route.
-        for diagnostic in &fill.diagnostics {
-            shell.diagnostic(diagnostic.clone());
-        }
-        let body = fill.target?;
-        // §9 attestation: cite this role's accepted cassette alongside the shared
-        // member provenance (`Some` iff `target` is — model_fill's contract).
+        fills.push(FillObservation::from_fill(&fill));
+        let ModelFill {
+            target,
+            accepted_cassette_hash,
+            model_identity,
+            diagnostics: role_diagnostics,
+            recorded_calls: role_recorded_calls,
+            repairs: role_repairs,
+        } = fill;
+        identities.extend(model_identity);
+        diagnostics.extend(role_diagnostics);
+        recorded_calls += role_recorded_calls;
+        repairs += role_repairs;
+        let Some(body) = target else {
+            // A terminal reject stops the pair: the overlap query exhausts before the
+            // deontic source is read, so its diagnostics ride the one event below.
+            break;
+        };
+        // §9 attestation: cite this role's accepted cassette alongside the shared member
+        // provenance (`Some` iff `target` is — model_fill's contract).
         let mut role_inputs = input_hashes.clone();
-        role_inputs.push(
-            fill.accepted_cassette_hash
-                .expect("accepted fill carries its cassette wrapper hash"),
-        );
+        role_inputs
+            .push(accepted_cassette_hash.expect("accepted fill carries its cassette wrapper hash"));
         let payload = QueryBody {
             query_id: source,
             logic,
             body,
         };
         match wrapper(
-            format!("{gid}.{role}.smt_query"),
+            format!("{prefix}{gid}.{role}.smt_query"),
             "smt_query",
-            producer(resolved, 2),
+            producer(resolved, MODEL_FILL),
             role_inputs,
             Origin::AiGenerated,
             EvidenceStatus::AcceptedEvidenceStatus,
             Vec::new(),
             payload,
         ) {
-            Ok(wrapped) => pair.push(wrapped),
+            Ok(env) => match land(shell, &format!("{dir}/{role}.smt_query.json"), env) {
+                Ok(w) => landed.push(w),
+                Err(d) => {
+                    // A landing failure is fail-closed: record it on the event and stop, so
+                    // the pair never reaches two and this group yields no pair.
+                    diagnostics.push(d);
+                    break;
+                }
+            },
             Err(e) => {
-                shell.diagnostic(invalid_diagnostic(vec![
+                diagnostics.push(invalid_diagnostic(vec![
                     (static_id("group"), gid.to_string()),
-                    (static_id("artifact"), format!("{gid}.{role}.smt_query")),
+                    (
+                        static_id("artifact"),
+                        format!("{prefix}{gid}.{role}.smt_query"),
+                    ),
                     (static_id("reason"), format!("wrap: {e}")),
                     (static_id("processing_stage"), "model_fill_smt".to_owned()),
                 ]));
-                return None;
+                break;
             }
         }
     }
-    let mut pair = pair.into_iter();
-    let overlap = pair.next().expect("overlap query wrapped");
-    let deontic = pair.next().expect("deontic query wrapped");
-    Some((overlap, deontic))
+    let (started_at, ended_at, duration_ms) = clock.stop();
+    let output_hashes: Vec<_> = landed.iter().map(|w| w.content_hash.clone()).collect();
+    // One directly-emitted model_fill §4.6 event covers the group: the pair's member
+    // provenance as inputs, the landed smt_query bodies as outputs, and the summed
+    // recorded-call / repair counters. `outcome` reads `diagnostics` before it is moved.
+    shell.processing_stage_event(ProcessingStageEvent {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: resolved.pipeline_step_ids[MODEL_FILL].clone(),
+        processing_stage: static_id(DIRECT_SMT_STAGE_KINDS[MODEL_FILL]),
+        started_at,
+        ended_at,
+        duration_ms,
+        input_hashes,
+        output_hashes,
+        outcome: severity(&diagnostics),
+        diagnostics,
+        resource_counters: vec![
+            (static_id(RECORDED_CALLS_COUNTER), recorded_calls),
+            (static_id(REPAIRS_COUNTER), repairs),
+        ],
+    });
+    let pair = if landed.len() == 2 {
+        let mut landed = landed.into_iter();
+        Some((
+            landed.next().expect("overlap query wrapped"),
+            landed.next().expect("deontic query wrapped"),
+        ))
+    } else {
+        None
+    };
+    DirectFill {
+        pair,
+        fills,
+        identities,
+    }
 }
 
 /// The direct_smt route's per-group verdict tail: run the pair's two model-emitted
@@ -1377,6 +1414,7 @@ fn direct_smt_verify_group(
     adapter: &Z3Adapter,
     shell: &mut Shell,
 ) -> Option<ArtifactWrapper<VerifierResults>> {
+    let prefix = route_id_prefix(resolved);
     // Gather the pair's hashes and bodies before the clock so only the solver run and
     // artifact production fall inside the timed interval (compile_verify_group's
     // discipline; the M2.14 clock-boundary lesson).
@@ -1406,7 +1444,7 @@ fn direct_smt_verify_group(
                         processing_stage_diagnostic(VERIFY, "group", gid, e.to_string())
                     })?;
             wrapper(
-                format!("{gid}.verifier_results"),
+                format!("{prefix}{gid}.verifier_results"),
                 "verifier_results",
                 producer(resolved, DIRECT_VERIFY),
                 inputs.clone(),
@@ -4130,6 +4168,35 @@ processing_stages:
         );
     }
 
+    /// run-m2.1d4a test convenience: rebuild the OLD per-group fill signature over the
+    /// new [`DocHead`]-consuming [`direct_smt_fill`] so the call sites only rename and read
+    /// `.pair`. Builds each member's [`DocHead`] via [`route_document_head`], then fills the
+    /// group. A single-group convenience with no cross-group head dedup, so a member shared
+    /// across groups (under one shell) heads once per group — harmless (the re-land
+    /// overwrites and no assert here counts head events); run-m2.1d4b's reproduce / scores
+    /// pair swaps onto a per-route head prepass where a pin counts head events.
+    #[allow(clippy::too_many_arguments)]
+    fn direct_fill_group(
+        root: &Path,
+        gid: &Id,
+        members: &[&CorpusEntry],
+        store: &CassetteStore,
+        seed: u64,
+        resolved: &Resolved,
+        repair_limit: u32,
+        shell: &mut Shell,
+    ) -> DirectFill {
+        let mut heads: Vec<DocHead> = Vec::new();
+        for &m in members {
+            heads.push(
+                route_document_head(root, m, resolved, shell)
+                    .unwrap_or_else(|| panic!("{gid}: no head for {}", m.id)),
+            );
+        }
+        let head_refs: Vec<&DocHead> = heads.iter().collect();
+        direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)
+    }
+
     /// route-direct-smt.3a — a minimal [`Resolved`] for the direct_smt route over
     /// the M1 inputs. `pipe.m2_direct_smt` is four stages (extract, segment,
     /// model_fill_smt, verify_smt), filling slots `[0]`–`[3]` of the fixed `[Id; 8]`;
@@ -4386,8 +4453,9 @@ processing_stages:
                 })
                 .collect();
             let (overlap, deontic) =
-                direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell)
-                    .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+                direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell)
+                    .pair
+                    .unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"));
 
             let want = &refs
                 .iter()
@@ -4476,10 +4544,11 @@ processing_stages:
     }
 
     /// route-direct-smt.3b fail-closed guard: the cassette-role design mints exactly one
-    /// (overlap, deontic) pair per group, so a non-pair member set must yield no artifact
-    /// rather than a two-query wrapper that silently under-covers the group. The guard
-    /// short-circuits ahead of any cassette or filesystem access, so repeating one corpus
-    /// entry to reach a given cardinality is sufficient.
+    /// (overlap, deontic) pair per group, so a non-pair member set must yield no pair
+    /// rather than a two-query wrapper that silently under-covers the group.
+    /// [`direct_fill_group`] lands each member's [`DocHead`] first (both cases reuse the
+    /// valid `corpus[0]`), but [`direct_smt_fill`]'s head-count guard still precedes any
+    /// cassette access, so no role fill runs and `fills` stays empty.
     #[test]
     fn direct_smt_fill_rejects_non_pair_group() {
         let root = repo_root();
@@ -4493,8 +4562,16 @@ processing_stages:
         for members in [vec![&corpus[0]], vec![&corpus[0], &corpus[0], &corpus[0]]] {
             let n = members.len();
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
-            let got = direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell);
-            assert!(got.is_none(), "non-pair group (len {n}) must fail closed");
+            let got =
+                direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell);
+            assert!(
+                got.pair.is_none(),
+                "non-pair group (len {n}) must fail closed"
+            );
+            assert!(
+                got.fills.is_empty(),
+                "the guard precedes any cassette access — no role fill runs"
+            );
         }
     }
 
@@ -4563,8 +4640,9 @@ processing_stages:
                 })
                 .collect();
             let (overlap, deontic) =
-                direct_smt_fill(&root, &gid, &members, &store, 42, &resolved, 0, &mut shell)
-                    .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+                direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 0, &mut shell)
+                    .pair
+                    .expect("the scored group fills a pair");
             let results = direct_smt_verify_group(
                 &gid,
                 &format!("groups/{gid}"),
@@ -4871,7 +4949,7 @@ processing_stages:
             let out = tmp.path().join("m2");
             std::fs::create_dir_all(&out).unwrap();
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
-            let filled = direct_smt_fill(
+            let filled = direct_fill_group(
                 &root,
                 &static_id("group.m2_direct_schema"),
                 &members,
@@ -4881,7 +4959,7 @@ processing_stages:
                 1,
                 &mut shell,
             );
-            assert!(filled.is_none(), "schema exhaustion ends the route");
+            assert!(filled.pair.is_none(), "schema exhaustion ends the route");
             let codes: Vec<_> = shell.ledger().iter().map(|d| d.code).collect();
             assert_eq!(
                 codes,
@@ -4902,7 +4980,7 @@ processing_stages:
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
 
-        let (overlap, deontic) = direct_smt_fill(
+        let (overlap, deontic) = direct_fill_group(
             &root,
             &syntax_gid,
             &members,
@@ -4912,6 +4990,7 @@ processing_stages:
             0,
             &mut shell,
         )
+        .pair
         .expect("the shallow-accepting pair fills");
         assert!(
             shell.ledger().is_empty(),
@@ -5231,10 +5310,11 @@ processing_stages:
                 .collect();
             let mut groups = Vec::new();
             for (gid, members, seed) in worklist {
-                let (overlap, deontic) = direct_smt_fill(
+                let (overlap, deontic) = direct_fill_group(
                     &root, &gid, &members, &store, seed, &resolved, 1, &mut shell,
                 )
-                .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
+                .pair
+                .unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"));
                 let results = direct_smt_verify_group(
                     &gid,
                     &format!("groups/{gid}"),
