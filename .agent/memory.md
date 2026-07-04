@@ -99,12 +99,14 @@ full pre-consolidation text lives in git history.
   implement only on a clear fit; the default close is the respec commit itself (the session-prompt
   clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
   the confirmed facts (caller counts, helper signatures, fixture slots, exact reasons) — bank those at
-  respec time while they are in-window, AND cap the READ list to the minimal apply-anchors: a respec that
-  ENUMERATES shapes (event/destructure fields, signatures) must also forbid re-reading their SOURCES (the
-  mirror fn, the type modules), else the implementer re-incurs the very derivation-read the respec prepaid
-  (run-m2.1d4a overflowed its first implement attempt DESPITE a fully-pinned respec — its READ-FIRST
-  relisted the mirror + shape modules whose every field the respec already enumerated → reverted,
-  READ-FIRST re-scoped to the two apply-anchors: the old fn as the replace span + the call sites).
+  respec time while they are in-window, AND cap the READ list to the minimal COMPLETE apply-anchor set —
+  EVERY edit site listed, the enumerated SOURCES (the mirror fn, the type modules) EXCLUDED: a respec that
+  ENUMERATES shapes (event/destructure fields, signatures) must forbid re-reading those sources, else the
+  implementer re-incurs the very derivation-read the respec prepaid; but the set must still name every EDIT
+  target, or an unlisted-but-required edit silently drops (esp. one no test pins). run-m2.1d4a overflowed
+  its first implement attempt DESPITE a fully-pinned respec — its READ-FIRST relisted the mirror + shape
+  modules whose every field the respec already enumerated → reverted, re-scoped to the edit set: the
+  replace span, the adjacent verify-tail edits, and the call-site regions incl. their docs (sources out).
 - Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed
   a 200K window during READING, ZERO code written → nothing to salvage). A unit framed 'one
   deliverable + one gate' still overflows when its test/bless/fixture scaffolding needs
