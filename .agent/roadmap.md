@@ -149,48 +149,91 @@ doc-lint bullet).
   tuple (kind/step/counters summed over roles/output set) + landed `groups/{gid}/{role}.smt_query.json`
   layout + once-per-route head-event census. 77% 153K/200K
 - [x] run-m2.1d5a-1: model-route loop in execute() — 3-way dispatch + execute_routes over both routes + cross-route group namespacing (routes/{pid}/groups/{gid}) + per-route landing gate; RouteRun banked for .1d5a-2 tails/.1e metrics. 88% 177K/200K
-- [ ] run-m2.1d5a-2: unified run tails over both routes + trace-parse gate. `trace_processing_stage`
-  (≈1506) + `report_processing_stage` (≈1612) gain a trailing `emit_event: bool` gating the §4.6
-  census EVENT only — wrap `shell.processing_stage_event(ProcessingStageEvent{…})` in `if emit_event`,
-  but on the `landed` Err branch STILL deliver the failure diagnostic to the ledger (e.g.
-  `shell.diagnostic(diagnostic)`) even when `emit_event==false`: that diagnostic reaches the shell ONLY
-  through this call's `diagnostics` field (no separate raise — run.rs:1567/1706), so gating the whole
-  call fail-OPENs M2 trace/report (a failed tail → run still Ok, no diagnostic). Keep M2 fail-CLOSED;
-  suppress only the clean-path census event. `emit_event` (runtime bool) → the event-only locals
-  started_at/outcome/… stay conditionally-used, no unused warning; return `pair` regardless for trace.
-  M1 execute() callers pass `true` (event census + landed bytes unchanged); the
-  M2 tails pass `false` (trace/report = undeclared route-pipeline steps; wrapper producer stays
-  `producer(baseline_resolved, TRACE|REPORT)` → step id UNUSED_STAGE since direct_smt pads slots 6/7,
-  honest sentinel). After the route loop in `execute_routes`, augment the loop to collect `docs` (all
-  routes' DocTraces: single_ir `rd.trace`, direct `head.trace`), `graphs` DEDUPED by document_id (both
-  routes' source graphs payload-identical → content_hash equal, keep one/doc), and per-route GroupTraces
-  built from the stashed (compiled, results); then run ONCE: `trace_processing_stage(&docs, &groups,
-  baseline_resolved, shell, false)` → (bundle, lineage); `report_processing_stage(root, &docs, &graphs,
-  &groups, &bundle, &lineage, &lexicon_hash, &adapter.identity(), baseline_resolved, shell, false)` with
-  the assemble_report `sections=None` (.1e populates). `baseline_resolved` = the view whose `is_baseline`
-  holds (= the direct_smt pipeline). Gate: EXTEND the .1d5a-1 test — `out/trace_bundle.json`
-  strict-parses; claims come from single_ir's 2 groups ONLY — assemble_trace mints finding.{gid}.{seq}
-  per verifier_result (NOT per group) for compiled+verifier_results groups, so `bundle.claims.len()==3`
-  (m1_conflict + m1_no_conflict; assert 3, NOT 2 — cf. the M1 trace test trace.rs:2509); direct lands no
-  compiled → mints none → no id collision, tails filter nothing; shared source nodes appear once (graphs
-  deduped); direct verifier_results = legal node
-  carrying only its →report out-edge (no verify in-edge — validate checks edge endpoints/rank/op, never
-  node connectivity). M1 executed() pins unchanged. Gate: cargo test.
-  - READ (the design reads .1d5a-1 deferred — this unit owns them): `assemble_trace` (trace.rs ≈613)
-    node/finding minting (source-node dedup + finding-per-compiled-group + id formation); `GroupTrace`
-    shape + how M1 `group_pipeline` (≈666) builds it from compiled+results (mirror for routes);
-    `route_document_head` body (≈868) — does it route-mint the source-graph id (the "shared source nodes
-    once" question, reconcile with graph dedup); the emit_event edit sites (trace final event 1506-1611,
-    report final event 1612-1739, the 2 M1 callers in `execute`). `route_id_prefix` = `""` for M1, else
-    `"{pipeline_id}."` (banked).
-  - DEFERRED error-path TESTS (from .1d5a-1 Codex review, finding 3 — this unit adds them beside the
-    tails; the dispatch/loop branches already landed in .1d5a-1): (a) single_ir member-short group → ONE
-    COMPILE partial-group diagnostic+event naming the missing member (mirror the M1 partial-group test);
-    (b) mixed-shape view set `[M1Layered, single_ir]` → ONE command diagnostic + zero artifacts + return;
-    (c) identity-disagreement (a later route's `ModelIdentity` differs) → fail-closed, ONE command
-    diagnostic + return. Each via a crafted `write_m2_root` variant (drop a member cassette for (a); a
-    mixed registry for (b); a divergent-identity cassette for (c)). Separate failing-input fixtures →
-    .1d5b's clean-path census stays untouched.
+- [ ] run-m2.1d5a-2: unified run tails over both routes + trace-parse gate (respec of .1d5a-2 —
+  tails-only half; error-path battery split to .1d5a-2b, seam confirmed). Add a trailing `emit_event:
+  bool` to `trace_processing_stage` (run.rs ≈1799) + `report_processing_stage` (≈1905) gating the §4.6
+  census EVENT only: gate the single final `shell.processing_stage_event(ProcessingStageEvent{…})` (after
+  `clock.stop()`) in `if emit_event`; in the `match landed` `Err(diagnostic)` arm, when `!emit_event`
+  ALSO `shell.diagnostic(diagnostic.clone())` — the diagnostic reaches the shell ONLY through the event's
+  `diagnostics` field (no separate raise), so gating the whole call would fail-OPEN M2 (a failed tail →
+  run still Ok, no diagnostic). Keep M2 fail-CLOSED. The runtime `emit_event` keeps
+  started_at/outcome/output_hashes conditionally-used (no unused warning); trace returns `pair` unchanged.
+  execute() (run.rs:163) tail callers (~245/250) append `true` (M1 census + landed bytes byte-identical);
+  the M2 tails pass `false` (trace/report = undeclared route-pipeline steps; producer stays
+  `producer(baseline_resolved, TRACE|REPORT)`, step id UNUSED_STAGE since a route pads slots 6/7 — honest
+  sentinel). In `execute_routes` (run.rs:315): un-underscore `_lexicon_hash`→`lexicon_hash`; before `for
+  resolved in views` add outer vecs `all_docs: Vec<DocTrace>`, `all_graphs:
+  Vec<ArtifactWrapper<SourceDocumentGraph>>`, `all_group_traces: Vec<GroupTrace>`. single_ir arm: CLONE
+  `rd.trace.bundle` into the `bundles` map (do NOT move — rd.trace keeps its bundle for the trace), then
+  push `rd.graph`→all_graphs + `rd.trace`→all_docs; in the group loop capture `members.iter().map(|m|
+  m.artifact_id.clone())` as `member_bundles`, keep the `(compiled, results)` wrappers, build
+  GroupObservation from `&compiled`/`&results` refs FIRST, then push `GroupTrace{group_id, test_sources,
+  member_bundles, dir, compiled, verifier_results: results}`. direct arm: build GroupObservation from
+  `results.payload` FIRST, then push `GroupTrace{group_id: gid, test_sources: group.test_sources.clone(),
+  member_bundles: Vec::new(), dir, compiled: None, verifier_results: Some(results)}`; AFTER the group loop
+  drain `heads` — `for (_, head) in heads { all_graphs.push(head.source); all_docs.push(head.trace); }`.
+  After the `for resolved in views` loop (after `let _ = &route_runs;`): dedup all_graphs by
+  `g.payload.document_id` (keep first/doc — payload-identical across routes → content_hash equal); `let
+  baseline_resolved = views.iter().find(|v| v.is_baseline).expect(...)`; `let Some((bundle, lineage)) =
+  trace_processing_stage(&all_docs, &all_group_traces, baseline_resolved, shell, false) else { return;
+  };`; `report_processing_stage(root, &all_docs, &all_graphs, &all_group_traces, &bundle, &lineage,
+  &lexicon_hash, adapter.identity(), baseline_resolved, shell, false)` (assemble_report `sections=None`;
+  .1e populates). CONFIRMED (do NOT re-read the sources): tails land run-level at the BARE run root
+  (`trace_bundle.json`/`lineage_index.json`/`report.json`/`report_en.md`/`manifest.json`/
+  `replay_manifest.json`), beside `routes/`+`logs/`. assemble_trace dedups the SOURCE node via `if
+  !nodes.contains(&source)` (whole-node eq); chain nodes carry route-PREFIXED artifact_ids → distinct
+  across routes, parallel chains, no DuplicateNodeId; findings mint ONLY under `if let Some(compiled)` →
+  single_ir's 2 groups only → claims.len()==3. RISK to VERIFY at the gate (best-judgment; user only on a
+  spec contradiction): report_processing_stage collects `results` = ALL groups' verifier_results
+  (single_ir 2 + direct 2 = 4) → confirm `assemble_report(sections=None)` accepts 4 results for 2 groups
+  + the cross-route bundle without a validation error. Gate: EXTEND
+  `m2_route_loop_lands_both_routes_namespaced` (run.rs:3581, which asserts `listing(routes/…)` +
+  `!out.join("groups").exists()`, NOT a bare `listing(out)` → tail artifacts at root do NOT break it):
+  add `strict_at::<TraceBundle>(out, "trace_bundle.json")` asserting `bundle.claims.len()==3` + existence
+  of report.json/report_en.md/lineage_index.json/manifest.json/replay_manifest.json at root. M1
+  executed() pins unchanged. Banked shapes (do NOT re-read): DocTrace{document_id, test_source_path,
+  source_hash, dir, source_document_graph: Option<(Id,Hash)>, segments, normalization, bundle:
+  Option<ArtifactWrapper<IrBundle>>}; GroupTrace{group_id, test_sources: Vec<Id>, member_bundles:
+  Vec<Id>, dir: String, compiled: Option<ArtifactWrapper<CompiledArtifact>>, verifier_results:
+  Option<ArtifactWrapper<VerifierResults>>}; RouteDoc{trace,graph,fill,identity}; DocHead{trace, source:
+  ArtifactWrapper<SourceDocumentGraph>, segments}; SourceDocumentGraph.document_id (source_linkage.rs:570);
+  single_ir_fill(head,&lexicon,&store,seed,resolved,repair_limit,shell)->RouteDoc;
+  route_document_head(root,entry,resolved,shell)->Option<DocHead>; executed(root,exp)->(
+  TotalOperationResult, Vec<EventRecord>, Vec<DiagnosticRecord>, PathBuf, TempDir);
+  strict_at::<P>(out,rel)->ArtifactWrapper<P>; route_id_prefix=`""` M1 / `"{pipeline_id}."` route;
+  route_group_dir(resolved,gid)=`routes/{pid}/groups/{gid}`. READ FRESH only the Edit-anchor spans right
+  before editing (trace/report fn tails ~1868/~2110, execute() callers ~245, execute_routes arms
+  ~365-490, gate test 3581+). Gate: cargo test -p ckc-cli; if docs touched, `RUSTDOCFLAGS='-D warnings'
+  cargo doc -p ckc-cli --no-deps`; fmt + clippy.
+- [ ] run-m2.1d5a-2b: error-path pin battery over the loop's already-landed branches (from .1d5a-1 Codex
+  review finding 3 — INDEPENDENT of .1d5a-2's tails wiring; these pin .1d5a-1's dispatch/loop branches).
+  Three `#[test]`s over the run binary via `executed()`, each a crafted `write_m2_root` variant: (a)
+  single_ir member-short group → the COMPILE partial-group diagnostic+event naming the missing member —
+  craft a variant DROPPING one single_ir member cassette (e.g.
+  `cassettes/route.single_ir/test_source.m1_guideline_a/seed-42.json`) so that doc lands no ir_bundle →
+  its group(s) go member-short → the single_ir group loop emits
+  `processing_stage_diagnostic(COMPILE,"group",gid,"member {s} landed no ir_bundle artifact")`; assert
+  that diagnostic + a COMPILE event (mirror the M1 partial-group test); CONFIRM from the run which/
+  how-many groups short (guideline_a ∈ m1_conflict). (b) mixed-shape `[M1Layered, single_ir]` → ONE
+  command diagnostic ("mixes the layered M1 pipeline with model routes") + zero artifacts
+  (`assert_only_logs(out)`, run.rs:2534) + Outcome::Invalid — craft a registry variant binding BOTH the
+  M1 layered pipeline AND a single_ir pipeline in one experiment (overwrite `registry/experiments.yaml`
+  after `copy_committed_registry`, run.rs:3038); hits execute()'s dispatch (run.rs:171
+  `views.iter().any(|v| v.shape==RouteShape::M1Layered)` with len>1). (c) identity-disagreement →
+  fail-closed, ONE command diagnostic ("model routes disagree on the model identity attesting the run") +
+  Outcome::Invalid — craft a variant re-blessing ONE cassette with a DIVERGENT synthetic ModelIdentity
+  (model.other / fixture_quant / 1.0.0 — crafted-fixture rule, no real engine/quant/format token) so
+  `agree_model_identity` (run.rs ≈262) trips on the second differing Some. Separate failing-input
+  fixtures → .1d5b's clean-path census untouched. Banked infra: write_m2_root (run.rs:3540) copies
+  copy_committed_registry + LOCKFILE + LEXICON + 3 corpus html + reference + 7 cassettes (3 single_ir
+  `route.single_ir/<source>/seed-42.json`, 4 direct `route.direct_smt/<gid>.{overlap,deontic}/seed-42.json`)
+  from crates/ckc-cli/tests/fixtures; a variant = a modified copy omitting/overwriting the target.
+  Cassette build:
+  `CassettePayload::from_output(route,source,seed,prompt,constraint_hash,template_hash,ModelIdentity{model_id,quant,runtime_version},output)`
+  + `store.build_wrapper(&key,payload,producer(resolved,2))` + `store.persist(&key,wrapper)` (see
+  `write_single_ir_cassette`). READ FRESH: committed registry/experiments.yaml + registry/candidates.yaml
+  (for the mixed binding), write_m2_root + write_single_ir_cassette + assert_only_logs bodies. Gate: cargo
+  test -p ckc-cli.
 - [ ] run-m2.1d5b: two-run determinism + event census over .1d5a-1's write_m2_root mirror, after
   .1d5a-2's tails land (split from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
   across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589

@@ -61,7 +61,12 @@ aggressively; full pre-consolidation text in git history.
   combined unit lives in the tails, so land the loop first (run-m2.1d5a respec: overflowed the combined
   unit at 51% on READING alone, zero code); a route-stage rework
   (landing+eventing rewiring of an existing fill fn + mechanical call-site updates) and its
-  event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next; spec-byte
+  event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next (and an
+  error-path pin battery that tests a PRIOR unit's ALREADY-landed branches is independent of the current
+  unit's new wiring → its OWN unit, never folded into the wiring unit: run-m2.1d5a-2 respec split the
+  unified-tails wiring from the partial-group/mixed-shape/identity-disagreement tests, which pin
+  .1d5a-1's branches; the read+write cost of crafting per-branch fixture variants alone justifies the
+  split); spec-byte
   amendment (re-pin + reference/test mirror sweep) + new feature code = 2 (an open decision that amends
   pinned bytes is a deliverable, not a preamble); crate foundations pair only with a small type surface (one payload module each); deterministic code + a
   SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
