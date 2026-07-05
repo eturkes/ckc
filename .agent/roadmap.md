@@ -156,19 +156,20 @@ doc-lint bullet).
   `execute()` M1-view branch, run.rs ≈158-250): `views.len()==1 && views[0].shape==M1Layered` → keep
   the existing M1 path inline verbatim; else `views.iter().any(|v| v.shape==M1Layered)` → mixed → one
   command diagnostic (`shell.diagnostic(invalid_diagnostic(vec![(static_id("reason"), …)]))`), zero
-  artifacts, return; else all-model → new fn `execute_routes(root, &views, shell)` (fresh code over
-  already-built route fns → NO behavior-lock refactor unit). `execute_routes`: mirror the M1 lexicon
+  artifacts, return; else all-model → new fn `execute_routes(root, &views, shell)` (mostly fresh
+  orchestration over already-built route fns + the one `direct_smt_fill` landing-dir change per
+  CROSS-ROUTE LANDING below — no broad behavior-lock refactor). `execute_routes`: mirror the M1 lexicon
   read → `(lexicon, lexicon_hash)` (command diagnostic on failure); `store = CassetteStore::new(root)`
   (INFALLIBLE, no `?` — points at `<root>/cassettes/`, so the roadmap's "each failure" applies to
   lexicon + `Z3Adapter::new()` only); `adapter = Z3Adapter::new()` (Result → command diagnostic on
   Err); `seed = views[0].plan.seed` (plan shared across the set; = experiment.seed). Per view in set
   order: `ledger_start = shell.ledger().len()`; `repair_limit = resolved.repair_limit.expect("model
   route resolves Some")`.
-  - CONFIRMED loop template (from `single_ir_route_scores_m1_groups` ≈3807 + `direct_smt_route_scores_m1_groups` ≈4953 + `route_metrics_score_recorded_two_route_run` ≈5473 — do NOT re-read these):
+  - CONFIRMED call sequence (from `single_ir_route_scores_m1_groups` ≈3807 + `direct_smt_route_scores_m1_groups` ≈4953 + `route_metrics_score_recorded_two_route_run` ≈5473 — do NOT re-read these; the group-landing DIR shown is the route-namespaced TARGET per CROSS-ROUTE LANDING below, NOT the scores-test literal `groups/{gid}` — those tests run one route so never namespace):
     SingleIr → `for entry in &resolved.documents`: `let head = route_document_head(root, entry,
     resolved, shell)` (None → skip doc, diagnostic already raised); `let rd = single_ir_fill(head,
     &lexicon, &store, seed, resolved, repair_limit, shell)`; fold `rd.identity` (Option<ModelIdentity>)
-    into the agreement, push `rd.fill` (Option<FillObservation>) into `fills`, `bundles[entry.id] =
+    into the agreement, extend `fills` with `rd.fill` (Option<FillObservation> → 0/1; `fills: Vec<FillObservation>`, push the inner value not the Option), `bundles[entry.id] =
     rd.trace.bundle` (Option<ArtifactWrapper<IrBundle>>). Then `for group in &resolved.groups`:
     `members = group.test_sources → bundles[s]` (skip group on any None member); `let (compiled,
     results) = compile_verify_group(&group.group_id, &format!("routes/{}/groups/{}",
@@ -184,6 +185,25 @@ doc-lint bullet).
     pid, gid), &overlap, &deontic, resolved, &adapter, shell); when Some push GroupObservation{group_id,
     query_pairs: vec![(static_id(&format!("{gid}.overlap")), static_id(&format!("{gid}.deontic")))],
     results: results.payload.results.clone()} }`.
+  - CROSS-ROUTE LANDING (Codex .1d5a review — the loop's first design decision; the respec missed it):
+    every existing route test runs ONE route into its OWN out (the two-route metrics test opens a fresh
+    tmpdir per arm) → bare `groups/{gid}` never collides. `execute_routes` runs BOTH routes through ONE
+    shell/out: heads ARE route-namespaced (`route_document_head` → `routes/{pid}/artifacts/{doc}`,
+    run.rs:885) but group artifacts are NOT — the scores tests pass `dir = groups/{gid}` (run.rs:3867,
+    5039), so single_ir (`{dir}/{compiled,verifier_results}.json`) and direct
+    (`{dir}/verifier_results.json`) BOTH write `groups/{gid}/verifier_results.json` → COLLISION (land
+    overwrites, or fail-closed errors → breaks the gate's "zero diagnostics" + honest scoring).
+    RESOLUTION (recommended; mirrors the head namespacing): land every route's group artifacts under
+    `routes/{pid}/groups/{gid}`. single_ir's `compile_verify_group` + both `*_verify_group` take `dir` →
+    pass `format!("routes/{}/groups/{}", resolved.pipeline_id, gid)` (the DIR the template shows). BUT
+    `direct_smt_fill` hard-codes `let dir = format!("groups/{gid}")` (run.rs:1249), applying its
+    `route_id_prefix` to the artifact ID only, not the path → change its dir too (it holds `resolved`).
+    Then UPDATE the committed `.1d4b` direct landing pin (≈4653, asserts bare `groups/{gid}`) + any
+    scores-test layout assertion to the namespaced path, and AUDIT every per-route landing dir
+    (single_ir_fill's bundle too) for the same gap. This adds a `direct_smt_fill` landing change + pin
+    updates → .1d5a-1 is NOT pure orchestration (correct the framing). CONFIRM the namespacing choice
+    before coding (alternative: a separate out-subtree per route, but the baked `routes/{pid}/artifacts/`
+    head path assumes one shared out → namespacing the group dir is the smaller change).
   - SIGNATURES (banked; re-read a body only on a call mismatch): `route_document_head(root:&Path,
     entry:&CorpusEntry, resolved:&Resolved, shell) -> Option<DocHead>`; `single_ir_fill(head:DocHead,
     lexicon:&Lexicon, store:&CassetteStore, seed:u64, resolved:&Resolved, repair_limit:u32, shell) ->
@@ -214,17 +234,25 @@ doc-lint bullet).
     `route.direct_smt/{group.m1_conflict,group.m1_no_conflict}.{overlap,deontic}`) under
     `<root>/cassettes/`. `executed(&m2_root, "exp.m2_multihop")` (reads inputs from root, owns its tmp
     out): zero command diagnostics; both routes' per-route layout present under `out/routes/
-    pipe.m2_single_ir/` + `out/routes/pipe.m2_direct_smt/` (artifacts + groups). M1 `executed()` pins
+    pipe.m2_single_ir/` + `out/routes/pipe.m2_direct_smt/` — heads under `…/artifacts/{doc}`, group
+    artifacts under `…/groups/{gid}/` (single_ir `{compiled,verifier_results}.json`; direct
+    `{overlap,deontic}.smt_query.json` + `verifier_results.json`), and NO bare `out/groups/` (the
+    CROSS-ROUTE LANDING namespacing moved them). M1 `executed()` pins
     unchanged (M1 path untouched). Gate: cargo test.
   - READ (apply-anchor set; the banked SOURCES above EXCLUDED): `execute()` 158-250 (dispatch edit site +
     M1 lexicon-read to mirror); `write_tiny_root` 2630-2730 + `copy_committed_registry` 2745-2767;
     `Resolved` fields (documents:Vec<CorpusEntry>, groups:Vec<TestSourceGroup>, plan.seed, repair_limit,
     pipeline_id, shape). Do NOT re-read the route_scores tests nor the route fn bodies.
 - [ ] run-m2.1d5a-2: unified run tails over both routes + trace-parse gate. `trace_processing_stage`
-  (≈1506) + `report_processing_stage` (≈1612) gain a trailing `emit_event: bool`: gate ONLY the final
-  `shell.processing_stage_event(ProcessingStageEvent{…})` on it (`emit_event` is a runtime bool → the
-  event-only locals started_at/outcome/… stay conditionally-used, no unused warning; return `pair`
-  regardless for trace). M1 execute() callers pass `true` (event census + landed bytes unchanged); the
+  (≈1506) + `report_processing_stage` (≈1612) gain a trailing `emit_event: bool` gating the §4.6
+  census EVENT only — wrap `shell.processing_stage_event(ProcessingStageEvent{…})` in `if emit_event`,
+  but on the `landed` Err branch STILL deliver the failure diagnostic to the ledger (e.g.
+  `shell.diagnostic(diagnostic)`) even when `emit_event==false`: that diagnostic reaches the shell ONLY
+  through this call's `diagnostics` field (no separate raise — run.rs:1567/1706), so gating the whole
+  call fail-OPENs M2 trace/report (a failed tail → run still Ok, no diagnostic). Keep M2 fail-CLOSED;
+  suppress only the clean-path census event. `emit_event` (runtime bool) → the event-only locals
+  started_at/outcome/… stay conditionally-used, no unused warning; return `pair` regardless for trace.
+  M1 execute() callers pass `true` (event census + landed bytes unchanged); the
   M2 tails pass `false` (trace/report = undeclared route-pipeline steps; wrapper producer stays
   `producer(baseline_resolved, TRACE|REPORT)` → step id UNUSED_STAGE since direct_smt pads slots 6/7,
   honest sentinel). After the route loop in `execute_routes`, augment the loop to collect `docs` (all
@@ -235,9 +263,11 @@ doc-lint bullet).
   &groups, &bundle, &lineage, &lexicon_hash, &adapter.identity(), baseline_resolved, shell, false)` with
   the assemble_report `sections=None` (.1e populates). `baseline_resolved` = the view whose `is_baseline`
   holds (= the direct_smt pipeline). Gate: EXTEND the .1d5a-1 test — `out/trace_bundle.json`
-  strict-parses; claims = single_ir's 2 groups ONLY (assemble_trace mints finding.{gid}.{seq} for
-  compiled+verifier_results groups; direct lands no compiled → mints none → no id collision, tails filter
-  nothing); shared source nodes appear once (graphs deduped); direct verifier_results = legal node
+  strict-parses; claims come from single_ir's 2 groups ONLY — assemble_trace mints finding.{gid}.{seq}
+  per verifier_result (NOT per group) for compiled+verifier_results groups, so `bundle.claims.len()==3`
+  (m1_conflict + m1_no_conflict; assert 3, NOT 2 — cf. the M1 trace test trace.rs:2509); direct lands no
+  compiled → mints none → no id collision, tails filter nothing; shared source nodes appear once (graphs
+  deduped); direct verifier_results = legal node
   carrying only its →report out-edge (no verify in-edge — validate checks edge endpoints/rank/op, never
   node connectivity). M1 executed() pins unchanged. Gate: cargo test.
   - READ (the design reads .1d5a-1 deferred — this unit owns them): `assemble_trace` (trace.rs ≈613)

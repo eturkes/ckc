@@ -49,8 +49,14 @@ aggressively; full pre-consolidation text in git history.
   orchestrator+gate last, cross-cutting type/trace plumbing its own opener; the orchestrator+gate unit
   ITSELF splits at the loop/tails seam when its tails do cross-route work (dedup, per-route→node
   assembly) — the per-view LOOP (lands per-route artifacts, own landing gate) vs the UNIFIED TAILS-ONCE
-  (run-level trace/report over all routes, own trace-parse gate); the loop is mechanical off the
-  per-route *_scores tests (fully bankable), the tails hold the cross-route design uncertainty
+  (run-level trace/report over all routes, own trace-parse gate); the loop's CALL SEQUENCE is bankable
+  off the per-route *_scores tests but its cross-route LANDING is NOT — those tests each run ONE route
+  into its own out, so they never exercise the shared-out collision (both routes write bare
+  `groups/{gid}/verifier_results.json` → clash unless the group dir is route-namespaced like the heads).
+  Banking a route-namespaced dir as "confirmed from the scores tests" hid it (Codex .1d5a caught it):
+  a banked "CONFIRMED from test X" literal must be byte-diffed against X's actual literal — a divergent
+  value is a DESIGN choice not a confirmation, and single-route tests never cover multi-route landing.
+  The tails hold further cross-route uncertainty
   (source-node dedup vs route-prefixed ids, GroupTrace-from-route) → the read-cost that overflows a
   combined unit lives in the tails, so land the loop first (run-m2.1d5a respec: overflowed the combined
   unit at 51% on READING alone, zero code); a route-stage rework
