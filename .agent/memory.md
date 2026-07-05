@@ -353,7 +353,16 @@ aggressively; full pre-consolidation text in git history.
   (shell.ledger()[start..]), fills, groups, samples: vec![groups.clone()]}` collected
   `#[allow(dead_code)]` (`let _ = &route_runs`) → .1d5a-2 tails + .1e metrics consume. Identity
   agreement folds each Some ModelIdentity into `agreed`; a differing Some → one command diagnostic +
-  fail-closed return (goldens agree → the clean gate never trips it).
+  fail-closed return (goldens agree → the clean gate never trips it). Codex .1d5a-1 follow-up:
+  single_ir's group loop emits the COMPILE partial-group diagnostic+event (mirrors `group_pipeline`,
+  the module header's documented partial-group rule) on a member-short group; direct's loop keeps a
+  bare skip — it mints no compiled artifact, so that compile-stage rule does not apply, and the member
+  head already failed+diagnosed upstream. Neither skip is ever fully silent (the short member's own
+  head/fill stage always diagnosed first) → the dedicated error-path TESTS defer to .1d5a-2 (single_ir
+  partial-group event; mixed-shape→command-diagnostic; identity-disagreement→fail-closed). Helper
+  `route_group_dir(resolved,gid)` now centralizes the `routes/{pid}/groups/{gid}` dir (was 6 duplicated
+  format strings across both loops + `direct_smt_fill` + 3 direct-verify test sites — a split-dir class
+  Codex flagged where the fill landed route-namespaced but the paired verify landed bare).
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema

@@ -183,6 +183,14 @@ doc-lint bullet).
     once" question, reconcile with graph dedup); the emit_event edit sites (trace final event 1506-1611,
     report final event 1612-1739, the 2 M1 callers in `execute`). `route_id_prefix` = `""` for M1, else
     `"{pipeline_id}."` (banked).
+  - DEFERRED error-path TESTS (from .1d5a-1 Codex review, finding 3 — this unit adds them beside the
+    tails; the dispatch/loop branches already landed in .1d5a-1): (a) single_ir member-short group → ONE
+    COMPILE partial-group diagnostic+event naming the missing member (mirror the M1 partial-group test);
+    (b) mixed-shape view set `[M1Layered, single_ir]` → ONE command diagnostic + zero artifacts + return;
+    (c) identity-disagreement (a later route's `ModelIdentity` differs) → fail-closed, ONE command
+    diagnostic + return. Each via a crafted `write_m2_root` variant (drop a member cassette for (a); a
+    mixed registry for (b); a divergent-identity cassette for (c)). Separate failing-input fixtures →
+    .1d5b's clean-path census stays untouched.
 - [ ] run-m2.1d5b: two-run determinism + event census over .1d5a-1's write_m2_root mirror, after
   .1d5a-2's tails land (split from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
   across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589

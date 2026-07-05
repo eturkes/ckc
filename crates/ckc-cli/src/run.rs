@@ -17,6 +17,11 @@
 //! failure diagnostic); the §4.4 total outcome is the severity fold over
 //! every event and command-scope diagnostic.
 //!
+//! A model-route experiment (SPEC §9) instead runs each route pipeline into its
+//! own `routes/<pipeline_id>/{artifacts,groups}/` subtree under one shared run
+//! out ([`execute_routes`]); the run-level trace/report/manifest tails over both
+//! routes land in a later unit.
+//!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
 //! ([`Shell::diagnostic`]); a processing_stage failure rides its processing_stage event and skips
@@ -381,16 +386,41 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                     }
                 }
                 for group in &resolved.groups {
-                    // Compile needs every member bundle: a group short one is skipped.
-                    let Some(members) = group
-                        .test_sources
-                        .iter()
-                        .map(|s| bundles.get(s))
-                        .collect::<Option<Vec<&ArtifactWrapper<IrBundle>>>>()
-                    else {
+                    // Compile needs every member bundle. A member-short group fails its
+                    // compile processing_stage (the module's partial-group rule, mirroring
+                    // M1's `group_pipeline`) rather than scoring a partial verdict, then the
+                    // loop proceeds; the short member's own upstream failure already raised
+                    // its diagnostic.
+                    let mut members: Vec<&ArtifactWrapper<IrBundle>> =
+                        Vec::with_capacity(group.test_sources.len());
+                    let mut member_short = false;
+                    for s in &group.test_sources {
+                        match bundles.get(s) {
+                            Some(bundle) => members.push(bundle),
+                            None => {
+                                let built = Err(processing_stage_diagnostic(
+                                    COMPILE,
+                                    "group",
+                                    &group.group_id,
+                                    format!("member {s} landed no ir_bundle artifact"),
+                                ));
+                                finish_processing_stage::<IrBundle>(
+                                    shell,
+                                    resolved,
+                                    COMPILE,
+                                    processing_stage_clock(),
+                                    Vec::new(),
+                                    built,
+                                );
+                                member_short = true;
+                                break;
+                            }
+                        }
+                    }
+                    if member_short {
                         continue;
-                    };
-                    let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, group.group_id);
+                    }
+                    let dir = route_group_dir(resolved, &group.group_id);
                     let (compiled, results) = compile_verify_group(
                         &group.group_id,
                         &dir,
@@ -431,7 +461,10 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                 }
                 for group in &resolved.groups {
                     let gid = group.group_id.clone();
-                    // The pair fill needs every member head: a group short one is skipped.
+                    // The pair fill needs every member head; a member-short group is
+                    // skipped (the direct route mints no compiled artifact, so the module's
+                    // compile-stage partial-group rule does not apply — the short member's
+                    // head failure already raised its diagnostic upstream).
                     let Some(head_refs) = group
                         .test_sources
                         .iter()
@@ -456,7 +489,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         }
                     }
                     if let Some((overlap, deontic)) = df.pair {
-                        let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, gid);
+                        let dir = route_group_dir(resolved, &gid);
                         if let Some(results) = direct_smt_verify_group(
                             &gid, &dir, &overlap, &deontic, resolved, &adapter, shell,
                         ) {
@@ -798,6 +831,15 @@ fn route_id_prefix(resolved: &Resolved) -> String {
         RouteShape::M1Layered => String::new(),
         RouteShape::SingleIr | RouteShape::DirectSmt => format!("{}.", resolved.pipeline_id),
     }
+}
+
+/// The route-namespaced group landing dir `routes/<pipeline_id>/groups/<gid>`,
+/// mirroring the route head namespacing `routes/<pipeline_id>/artifacts/<doc>`.
+/// Both model routes run through one shared run out ([`execute_routes`]), so each
+/// route's group artifacts nest under their route and never collide; the M1
+/// layered path keeps its bare `groups/<gid>` ([`group_pipeline`]).
+fn route_group_dir(resolved: &Resolved, gid: &Id) -> String {
+    format!("routes/{}/groups/{}", resolved.pipeline_id, gid)
 }
 
 /// Drive one corpus document through the four document processing_stages. Every
@@ -1457,8 +1499,9 @@ struct DirectFill {
 /// the raw model output ([`Origin::AiGenerated`] + [`EvidenceStatus::AcceptedEvidenceStatus`],
 /// no external effects and no deterministic transform — distinct from single_ir's
 /// mechanical `ir_bundle`), citing the member provenance plus its own accepted cassette
-/// hash, then lands it under `groups/<gid>`. Direct-emits one group model_fill §4.6 event;
-/// a terminal role reject or a wrap/land failure breaks the loop but still rides that event.
+/// hash, then lands it under `routes/<pipeline_id>/groups/<gid>`. Direct-emits one group
+/// model_fill §4.6 event; a terminal role reject or a wrap/land failure breaks the loop but
+/// still rides that event.
 /// An `Err(CassetteError)` cassette IO/contract failure records a command diagnostic and
 /// aborts event-less while nothing has landed (pure infra); once a role has landed it rides
 /// the one event (like a wrap/land failure) so the landed artifact stays attested and its
@@ -1494,10 +1537,9 @@ fn direct_smt_fill(
         };
     }
     let prefix = route_id_prefix(resolved);
-    // Group artifacts land route-namespaced (`routes/{pipeline_id}/groups/{gid}`,
-    // the head-namespacing mirror) so both routes' groups never collide under the
-    // one run out when [`execute_routes`] runs them through the same shell.
-    let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, gid);
+    // Route-namespaced ([`route_group_dir`]) so both routes' groups never collide
+    // under the one shared run out when [`execute_routes`] runs them.
+    let dir = route_group_dir(resolved, gid);
     // Member-order provenance, gathered before the clock so only the fill work falls
     // inside the timed interval (the M2.7 clock-boundary discipline).
     let mut input_hashes: Vec<Hash> = Vec::new();
@@ -3552,6 +3594,10 @@ processing_stages:
             names
         };
 
+        // The shared run out holds exactly the event log and the two route
+        // subtrees: no bare artifacts/ or groups/ at the root.
+        assert_eq!(listing(&out), ["logs", "routes"]);
+
         // The run out holds exactly the two route subtrees.
         assert_eq!(
             listing(&out.join("routes")),
@@ -5399,7 +5445,7 @@ processing_stages:
                     .expect("the scored group fills a pair");
             let results = direct_smt_verify_group(
                 &gid,
-                &format!("groups/{gid}"),
+                &route_group_dir(&resolved, &gid),
                 &overlap,
                 &deontic,
                 &resolved,
@@ -5777,7 +5823,7 @@ processing_stages:
 
         let results = direct_smt_verify_group(
             &syntax_gid,
-            &format!("groups/{syntax_gid}"),
+            &route_group_dir(&resolved, &syntax_gid),
             &overlap,
             &deontic,
             &resolved,
@@ -6095,7 +6141,7 @@ processing_stages:
                 .unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"));
                 let results = direct_smt_verify_group(
                     &gid,
-                    &format!("groups/{gid}"),
+                    &route_group_dir(&resolved, &gid),
                     &overlap,
                     &deontic,
                     &resolved,
