@@ -144,17 +144,10 @@ doc-lint bullet).
   accepted body as a raw-AI smt_query under `groups/{gid}`, direct-emits one model_fill §4.6
   event; DirectFill{pair,fills,identities} + direct_fill_group test bridge; 6 call sites
   migrated; route prefix on smt_query/verifier_results ids. 88% 176K/200K
-- [ ] run-m2.1d4b: direct event + landing pin battery (split from .1d4). FIRST swap
-  direct_smt_fill_reproduces_m1_query_bodies + direct_smt_route_scores_m1_groups OFF per-group
-  `direct_fill_group` onto a per-route head prepass: build each unique `DocHead` once via
-  `route_document_head`, dedup by member id (`test_source.m1_guideline_a` is in BOTH groups), pass each
-  group's `&[&DocHead]` to `direct_smt_fill(gid, &refs, …)` directly → a shared doc heads ONCE per route.
-  THEN extend the two tests: pin the group model_fill event tuple (kind/step_id/outcome/counters/outputs —
-  counters summed over roles) + smt_query landed paths (`groups/{gid}/{role}.smt_query.json`, [B].2) + the
-  once-per-doc head events (a doc in two groups heads once per route); input_hashes compared AS SETS;
-  mirror .1d3b's battery shapes (strict_at landed reads, exact dir listings, slice::from_ref for
-  single-hash pins — clippy); pins from OBSERVED output sanity-checked against the .1d4a contract; M1 pins
-  untouched. Gate: cargo test.
+- [x] run-m2.1d4b: direct event + landing pin battery — reproduce/scores tests swapped onto a
+  per-route unique-`DocHead` prepass (shared guideline_a heads once); pin per-group model_fill §4.6 event
+  tuple (kind/step/counters summed over roles/output set) + landed `groups/{gid}/{role}.smt_query.json`
+  layout + once-per-route head-event census. 77% 153K/200K
 - [ ] run-m2.1d5a: model-route loop in `execute()` + structural smoke gate (two-run determinism +
   event census = .1d5b). Replace the model-route gate diagnostic (DELETE its test
   m2_experiment_run_gates_until_the_route_loop_lands ≈3093): single M1Layered view → existing path

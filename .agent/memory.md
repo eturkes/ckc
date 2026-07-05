@@ -443,7 +443,11 @@ aggressively; full pre-consolidation text in git history.
     metrics/report-m2 reuse: `direct_smt_route_scores_m1_groups` keys the no-conflict closure off the
     minted `<gid>.overlap`/`.deontic` ids (no `solver_query_plan`). GOTCHA (bites report-m2.2 tests):
     `input_hashes` canonicalize as a §4.3 SET — the wrapper sorts by hash, the in-memory event keeps
-    insertion order → multi-input provenance assertions compare as SETS, never pin emitted order.
+    insertion order → multi-input provenance assertions compare as SETS, never pin emitted order. The
+    EventRecord emits BOTH `input_hashes` AND `output_hashes` via `emit_set` (wrapper.rs) → a read-back
+    multi-output event (the direct model_fill event's two smt_query bodies, run-m2.1d4b) is hash-sorted
+    too, so compare event `output_hashes` as a SET whenever >1 (single-output pins stay order-free); the
+    remaining .1d5/.1e event census pins inherit this.
   - Runtime-gate findings (gate MET, confirmed functionally on a real test source; byte-stability +
     seed-inertness + degeneration mechanics live in `## Runtime`, machine specifics in
     `.agent/runtime.local.md`). Metrics/report conclusions: constrained decoding forces schema-VALID output

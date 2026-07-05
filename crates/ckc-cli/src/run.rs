@@ -4423,6 +4423,8 @@ processing_stages:
     fn direct_smt_fill_reproduces_m1_query_bodies() {
         use std::collections::{BTreeMap, BTreeSet};
 
+        use ckc_core::Outcome;
+
         let root = repo_root();
         let lexicon = single_ir_lexicon();
         let resolved = direct_smt_resolved();
@@ -4448,7 +4450,36 @@ processing_stages:
         let tmp = tempfile::tempdir().unwrap();
         let out = tmp.path().join("m2");
         std::fs::create_dir_all(&out).unwrap();
-        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
+        let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
+
+        // Per-route head prepass: build each UNIQUE member's DocHead once through
+        // `route_document_head` (test_source.m1_guideline_a is in both groups), the
+        // .1d5a orchestrator's dedup — a shared document heads once per route, pinned by
+        // the head-event census below. Each group then fills from the shared heads.
+        let mut unique_members: Vec<Id> = Vec::new();
+        for group in &exp.test_source_groups {
+            for s in &group.test_sources {
+                if !unique_members.contains(s) {
+                    unique_members.push(s.clone());
+                }
+            }
+        }
+        let mut heads: BTreeMap<Id, DocHead> = BTreeMap::new();
+        for id in &unique_members {
+            let entry = corpus
+                .get(id)
+                .unwrap_or_else(|| panic!("unknown member {id}"));
+            let head = route_document_head(&root, entry, &resolved, &mut shell)
+                .unwrap_or_else(|| panic!("{id}: no deterministic route head"));
+            heads.insert(id.clone(), head);
+        }
+
+        // Each group's landed (overlap, deontic) pair, kept for the post-run layout and
+        // §4.6 event pins after the loop.
+        let mut landed_pairs: BTreeMap<
+            Id,
+            (ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>),
+        > = BTreeMap::new();
 
         for group in &exp.test_source_groups {
             let gid = group.group_id.clone();
@@ -4461,10 +4492,18 @@ processing_stages:
                         .unwrap_or_else(|| panic!("{gid}: unknown member {s}"))
                 })
                 .collect();
+            let head_refs: Vec<&DocHead> = members
+                .iter()
+                .map(|m| {
+                    heads
+                        .get(&m.id)
+                        .unwrap_or_else(|| panic!("{gid}: prepass built no head for {}", m.id))
+                })
+                .collect();
             let (overlap, deontic) =
-                direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 1, &mut shell)
+                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 1, &mut shell)
                     .pair
-                    .unwrap_or_else(|| panic!("{gid}: direct_fill_group yielded no pair"));
+                    .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
 
             let want = &refs
                 .iter()
@@ -4549,7 +4588,186 @@ processing_stages:
                 w.validate()
                     .unwrap_or_else(|e| panic!("{gid} wrapper validate: {e:?}"));
             }
+
+            landed_pairs.insert(gid, (overlap, deontic));
         }
+
+        // Close the run and pin the landed §4.6 stream + on-disk layout (run-m2.1d4b),
+        // mirroring the single_ir reproduce battery (.1d3b): the per-route head prepass
+        // heads each unique document once, each group lands its two smt_query bodies, and
+        // one model_fill event per group attests them.
+        let finished = shell.finish().unwrap();
+        assert_eq!(finished.result.outcome, Outcome::Ok);
+        assert!(finished.result.diagnostic_hashes.is_empty());
+
+        let listing = |path: &Path| -> Vec<String> {
+            let mut names: Vec<String> = std::fs::read_dir(path)
+                .unwrap()
+                .map(|e| e.unwrap().file_name().into_string().unwrap())
+                .collect();
+            names.sort();
+            names
+        };
+
+        // Layout: the head prepass lands under routes/<pipeline>/artifacts/<doc> and the
+        // fills under groups/<gid>; guideline_a appears once under artifacts (headed once).
+        assert_eq!(listing(&out), ["groups", "logs", "routes"]);
+        assert_eq!(
+            listing(&out.join("routes/pipe.m2_direct_smt/artifacts")),
+            [
+                "test_source.m1_control",
+                "test_source.m1_guideline_a",
+                "test_source.m1_guideline_b"
+            ]
+        );
+        for doc in [
+            "test_source.m1_control",
+            "test_source.m1_guideline_a",
+            "test_source.m1_guideline_b",
+        ] {
+            assert_eq!(
+                listing(&out.join(format!("routes/pipe.m2_direct_smt/artifacts/{doc}"))),
+                ["segments.json", "source_document_graph.json"],
+                "{doc}"
+            );
+        }
+        assert_eq!(
+            listing(&out.join("groups")),
+            ["group.m1_conflict", "group.m1_no_conflict"]
+        );
+
+        // Per group: the two landed smt_query wrappers strict-read clean, their ids
+        // route-prefixed, their content hashes equal the fill's returned pair.
+        for (gid, (overlap, deontic)) in &landed_pairs {
+            assert_eq!(
+                listing(&out.join(format!("groups/{gid}"))),
+                ["deontic.smt_query.json", "overlap.smt_query.json"],
+                "{gid}"
+            );
+            let overlap_landed: ArtifactWrapper<QueryBody> =
+                strict_at(&out, &format!("groups/{gid}/overlap.smt_query.json"));
+            let deontic_landed: ArtifactWrapper<QueryBody> =
+                strict_at(&out, &format!("groups/{gid}/deontic.smt_query.json"));
+            assert_eq!(
+                overlap_landed.artifact_id,
+                format!("pipe.m2_direct_smt.{gid}.overlap.smt_query")
+                    .parse()
+                    .unwrap(),
+                "{gid} overlap id"
+            );
+            assert_eq!(
+                deontic_landed.artifact_id,
+                format!("pipe.m2_direct_smt.{gid}.deontic.smt_query")
+                    .parse()
+                    .unwrap(),
+                "{gid} deontic id"
+            );
+            assert_eq!(
+                overlap_landed.content_hash, overlap.content_hash,
+                "{gid} overlap landed hash"
+            );
+            assert_eq!(
+                deontic_landed.content_hash, deontic.content_hash,
+                "{gid} deontic landed hash"
+            );
+        }
+
+        // The §4.6 event stream: six head events (extract + segment for the three unique
+        // documents — guideline_a once, not twice) then one model_fill event per group,
+        // then the closing command event.
+        let events: Vec<EventRecord> =
+            read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
+        assert_eq!(events.len(), 9, "event census");
+        for (n, event) in events.iter().enumerate() {
+            assert_eq!(event.event_id, format!("event.{n}").parse::<Id>().unwrap());
+            assert_eq!(event.event_sequence_number, n as u64);
+            assert_eq!(event.run_id, static_id("m2"));
+        }
+        // Head events: three extract + three segment, one per unique document — a
+        // per-group build would head the shared guideline_a twice (four extract events).
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| e.processing_stage == static_id("extract"))
+                .count(),
+            3,
+            "one extract per unique document (guideline_a once)"
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| e.processing_stage == static_id("segment"))
+                .count(),
+            3,
+            "one segment per unique document"
+        );
+        for event in events.iter().take(6) {
+            assert!(
+                event.processing_stage == static_id("extract")
+                    || event.processing_stage == static_id("segment"),
+                "the first six events are the head prepass"
+            );
+            assert_eq!(event.pipeline_id, static_id("pipe.m2_direct_smt"));
+            assert_eq!(event.outcome, Outcome::Ok);
+            assert_eq!(event.log_level, static_id("info"));
+            assert!(event.diagnostics.is_empty());
+            assert_eq!(event.output_hashes.len(), 1);
+        }
+
+        // One model_fill event per group (events[6] = m1_conflict, events[7] =
+        // m1_no_conflict, in test_source_groups order): the direct route's model_fill kind
+        // and model_fill_smt step, both roles' recorded calls summed, and the two landed
+        // smt_query bodies as outputs (input/output hashes canonicalize as §4.3 sets).
+        for (i, group) in exp.test_source_groups.iter().enumerate() {
+            let event = &events[6 + i];
+            let (overlap, deontic) = &landed_pairs[&group.group_id];
+            assert_eq!(
+                event.processing_stage,
+                static_id(DIRECT_SMT_STAGE_KINDS[MODEL_FILL]),
+                "{}: model_fill kind",
+                group.group_id
+            );
+            assert_eq!(
+                event.pipeline_id,
+                static_id("pipe.m2_direct_smt"),
+                "{}",
+                group.group_id
+            );
+            assert_eq!(
+                event.pipeline_step_id,
+                static_id("processing_stage.m2.model_fill_smt"),
+                "{}: model_fill step",
+                group.group_id
+            );
+            assert_eq!(event.outcome, Outcome::Ok, "{}", group.group_id);
+            assert_eq!(event.log_level, static_id("info"), "{}", group.group_id);
+            assert!(event.diagnostics.is_empty(), "{}", group.group_id);
+            assert_eq!(
+                event.resource_counters,
+                vec![
+                    (static_id(RECORDED_CALLS_COUNTER), 2),
+                    (static_id(REPAIRS_COUNTER), 0)
+                ],
+                "{}: both roles' recorded calls summed",
+                group.group_id
+            );
+            assert_eq!(
+                event.output_hashes.iter().collect::<BTreeSet<_>>(),
+                [&overlap.content_hash, &deontic.content_hash]
+                    .into_iter()
+                    .collect::<BTreeSet<_>>(),
+                "{}: the two landed smt_query bodies",
+                group.group_id
+            );
+        }
+
+        // The closing command event.
+        let command = &events[8];
+        assert_eq!(command.processing_stage, static_id("run"));
+        assert_eq!(command.pipeline_id, static_id("cli"));
+        assert_eq!(command.pipeline_step_id, "cli.run".parse::<Id>().unwrap());
+        assert_eq!(command.outcome, Outcome::Ok);
+        assert!(command.diagnostics.is_empty());
     }
 
     /// route-direct-smt.3b fail-closed guard: the cassette-role design mints exactly one
@@ -4749,6 +4967,27 @@ processing_stages:
             "one reference entry per test_source group"
         );
 
+        // Per-route head prepass: build each unique member's DocHead once (guideline_a is
+        // in both groups), the .1d5a orchestrator's dedup — a shared document heads once
+        // per route, pinned by the head-event census after the loop.
+        let mut unique_members: Vec<Id> = Vec::new();
+        for group in &exp.test_source_groups {
+            for s in &group.test_sources {
+                if !unique_members.contains(s) {
+                    unique_members.push(s.clone());
+                }
+            }
+        }
+        let mut heads: BTreeMap<Id, DocHead> = BTreeMap::new();
+        for id in &unique_members {
+            let entry = corpus
+                .get(id)
+                .unwrap_or_else(|| panic!("unknown member {id}"));
+            let head = route_document_head(&root, entry, &resolved, &mut shell)
+                .unwrap_or_else(|| panic!("{id}: no deterministic route head"));
+            heads.insert(id.clone(), head);
+        }
+
         for group in &exp.test_source_groups {
             let gid = group.group_id.clone();
             let members: Vec<&CorpusEntry> = group
@@ -4760,8 +4999,16 @@ processing_stages:
                         .unwrap_or_else(|| panic!("{gid}: unknown member {s}"))
                 })
                 .collect();
+            let head_refs: Vec<&DocHead> = members
+                .iter()
+                .map(|m| {
+                    heads
+                        .get(&m.id)
+                        .unwrap_or_else(|| panic!("{gid}: prepass built no head for {}", m.id))
+                })
+                .collect();
             let (overlap, deontic) =
-                direct_fill_group(&root, &gid, &members, &store, 42, &resolved, 0, &mut shell)
+                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 0, &mut shell)
                     .pair
                     .expect("the scored group fills a pair");
             let results = direct_smt_verify_group(
@@ -4923,6 +5170,30 @@ processing_stages:
                 );
             }
         }
+
+        // The per-route head prepass heads each unique document once: three extract and
+        // three segment events (guideline_a, shared by both groups, heads once — a
+        // per-group build would extract it twice), then one model_fill and one verify
+        // event per group.
+        let stage_count = |kind: &str| {
+            shell
+                .events()
+                .iter()
+                .filter(|e| e.processing_stage == static_id(kind))
+                .count()
+        };
+        assert_eq!(
+            stage_count("extract"),
+            3,
+            "one extract per unique document (guideline_a once)"
+        );
+        assert_eq!(stage_count("segment"), 3, "one segment per unique document");
+        assert_eq!(
+            stage_count("model_fill"),
+            2,
+            "one model_fill event per group"
+        );
+        assert_eq!(stage_count("verify"), 2, "one verify event per group");
     }
 
     /// Bless the committed `route.direct_smt` rejection cassettes route-direct-smt.5
