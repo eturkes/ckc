@@ -35,7 +35,7 @@
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::time::Duration;
 
@@ -235,7 +235,8 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     }
     // Run-scoped chain: a trace-processing_stage failure stops it before the report,
     // the same first-failure rule the document chain runs under.
-    let Some((bundle, lineage)) = trace_processing_stage(&docs, &groups, &resolved, shell) else {
+    let Some((bundle, lineage)) = trace_processing_stage(&docs, &groups, &resolved, shell, true)
+    else {
         return;
     };
     report_processing_stage(
@@ -249,11 +250,11 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         adapter.identity(),
         &resolved,
         shell,
+        true,
     );
 }
 
-/// One model route's collected observations, held for the run-level tails
-/// (run-m2.1d5a-2's trace/report over both routes) and the §7.3 metrics
+/// One model route's collected observations, held for the §7.3 metrics
 /// (run-m2.1e): the route's pipeline id, its slice of the run ledger, the per-fill
 /// observations, the per-group verdict observations, and the k-sample battery — one
 /// recorded draw here, so `samples` holds a single `groups` snapshot.
@@ -309,13 +310,13 @@ fn agree_model_identity(
 /// artifacts land route-namespaced under `routes/{pipeline_id}/groups/{gid}` (the
 /// head-namespacing mirror), so the two routes never collide under the one run out.
 ///
-/// The per-route observations collect into a [`RouteRun`] each; the run-level
-/// trace/report tails over both routes (run-m2.1d5a-2) and the §7.3 metrics
-/// (run-m2.1e) consume them, so the collected runs stay unread here.
+/// The per-route observations collect into a [`RouteRun`] each for the §7.3
+/// metrics (run-m2.1e); the run-level trace/report tails over both routes then
+/// run once, over every route's docs, source graphs, and group traces.
 fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
     // §7.2's lexicon hash rides the raw reference-file bytes, mirroring the M1 path;
-    // the hash itself waits on the run-m2.1d5a-2 tails, so it is unread today.
-    let (lexicon, _lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
+    // the run-level report tail below hashes them.
+    let (lexicon, lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
         Ok(bytes) => match load_lexicon(&bytes) {
             Ok(lexicon) => (lexicon, hash_bytes(&bytes)),
             Err(e) => {
@@ -357,6 +358,13 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
     let mut agreed: Option<ModelIdentity> = None;
     let mut route_runs: Vec<RouteRun> = Vec::with_capacity(views.len());
 
+    // The run-level trace/report tails run once over every route's docs, source
+    // graphs, and group traces; both routes chain in parallel under the one run
+    // trace, so collect them across the view loop below.
+    let mut all_docs: Vec<DocTrace> = Vec::new();
+    let mut all_graphs: Vec<ArtifactWrapper<SourceDocumentGraph>> = Vec::new();
+    let mut all_group_traces: Vec<GroupTrace> = Vec::new();
+
     for resolved in views {
         let ledger_start = shell.ledger().len();
         let repair_limit = resolved
@@ -381,9 +389,13 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         return;
                     }
                     fills.extend(rd.fill);
-                    if let Some(bundle) = rd.trace.bundle {
-                        bundles.insert(entry.id.clone(), bundle);
+                    // Clone the bundle into the compile map so `rd.trace` keeps it for
+                    // the run trace's lineage row.
+                    if let Some(bundle) = &rd.trace.bundle {
+                        bundles.insert(entry.id.clone(), bundle.clone());
                     }
+                    all_graphs.push(rd.graph);
+                    all_docs.push(rd.trace);
                 }
                 for group in &resolved.groups {
                     // Compile needs every member bundle. A member-short group fails its
@@ -421,6 +433,8 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         continue;
                     }
                     let dir = route_group_dir(resolved, &group.group_id);
+                    let member_bundles: Vec<Id> =
+                        members.iter().map(|m| m.artifact_id.clone()).collect();
                     let (compiled, results) = compile_verify_group(
                         &group.group_id,
                         &dir,
@@ -445,6 +459,16 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                                 })
                                 .collect(),
                             results: results.payload.results.clone(),
+                        });
+                        // The compiled group chains into the run trace: its member IR
+                        // bundles, the compiled artifact, and the landed verifier results.
+                        all_group_traces.push(GroupTrace {
+                            group_id: group.group_id.clone(),
+                            test_sources: group.test_sources.clone(),
+                            member_bundles,
+                            dir,
+                            compiled: Some(compiled),
+                            verifier_results: Some(results),
                         });
                     }
                 }
@@ -501,8 +525,25 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                                 )],
                                 results: results.payload.results.clone(),
                             });
+                            // The direct route compiles no IR, so the group trace carries
+                            // no member bundles and no compiled artifact — only the landed
+                            // verifier results for the run report's group row.
+                            all_group_traces.push(GroupTrace {
+                                group_id: gid.clone(),
+                                test_sources: group.test_sources.clone(),
+                                member_bundles: Vec::new(),
+                                dir,
+                                compiled: None,
+                                verifier_results: Some(results),
+                            });
                         }
                     }
+                }
+                // Each unique document's head chains into the run trace as a parallel
+                // (bundle-less) branch beside the single_ir route's IR chain.
+                for (_, head) in heads {
+                    all_graphs.push(head.source);
+                    all_docs.push(head.trace);
                 }
             }
             RouteShape::M1Layered => {
@@ -520,9 +561,49 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
         });
     }
 
-    // run-m2.1d5a-2's unified trace/report tails and run-m2.1e's §7.3 metrics consume
-    // the collected per-route runs; the loop only lands per-route artifacts here.
+    // run-m2.1e's §7.3 metrics consume the collected per-route runs.
     let _ = &route_runs;
+
+    // The run-level tails run once over both routes. Every route builds the same
+    // source graph per document (payload-identical, so equal content hashes), so keep
+    // one per document for the report; the run trace instead keeps every route's
+    // parallel chain (deduping only the shared source node).
+    let mut seen_docs: BTreeSet<Id> = BTreeSet::new();
+    all_graphs.retain(|g| seen_docs.insert(g.payload.document.document_id.clone()));
+    // assemble_trace's lineage lookup takes the first doc by id; the direct route is
+    // bundle-less and resolves first in the set, so surface the bundle-bearing
+    // single_ir doc first while the stable sort keeps both routes' chain nodes.
+    all_docs.sort_by_key(|d| d.bundle.is_none());
+
+    // The route pipelines declare no trace/report step, so the run-level tails run as
+    // the baseline route's steps with the census event suppressed (`emit_event`
+    // false); a failed tail still fails the run closed by raising its diagnostic.
+    let baseline_resolved = views
+        .iter()
+        .find(|v| v.is_baseline)
+        .expect("the resolved set names a baseline pipeline");
+    let Some((bundle, lineage)) = trace_processing_stage(
+        &all_docs,
+        &all_group_traces,
+        baseline_resolved,
+        shell,
+        false,
+    ) else {
+        return;
+    };
+    report_processing_stage(
+        root,
+        &all_docs,
+        &all_graphs,
+        &all_group_traces,
+        &bundle,
+        &lineage,
+        &lexicon_hash,
+        adapter.identity(),
+        baseline_resolved,
+        shell,
+        false,
+    );
 }
 
 /// The §9 route family a pipeline's declared processing-stage sequence
@@ -1801,6 +1882,7 @@ fn trace_processing_stage(
     groups: &[GroupTrace],
     resolved: &Resolved,
     shell: &mut Shell,
+    emit_event: bool,
 ) -> Option<(ArtifactWrapper<TraceBundle>, ArtifactWrapper<LineageIndex>)> {
     let clock = processing_stage_clock();
     let (bundle, lineage) = assemble_trace(docs, groups);
@@ -1867,21 +1949,31 @@ fn trace_processing_stage(
             vec![bundle.content_hash.clone(), lineage.content_hash.clone()],
             Some((bundle, lineage)),
         ),
-        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new(), None),
+        Err(diagnostic) => {
+            // A route-pipeline tail (`emit_event` false) declares no census event, so
+            // the event's `diagnostics` field never reaches the shell; raise the
+            // diagnostic directly to keep a failed tail fail-closed.
+            if !emit_event {
+                shell.diagnostic(diagnostic.clone());
+            }
+            (diagnostic.outcome, vec![diagnostic], Vec::new(), None)
+        }
     };
-    shell.processing_stage_event(ProcessingStageEvent {
-        pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.pipeline_step_ids[TRACE].clone(),
-        processing_stage: static_id(PROCESSING_STAGE_KINDS[TRACE]),
-        started_at,
-        ended_at,
-        duration_ms,
-        input_hashes,
-        output_hashes,
-        outcome,
-        diagnostics,
-        resource_counters: Vec::new(),
-    });
+    if emit_event {
+        shell.processing_stage_event(ProcessingStageEvent {
+            pipeline_id: resolved.pipeline_id.clone(),
+            pipeline_step_id: resolved.pipeline_step_ids[TRACE].clone(),
+            processing_stage: static_id(PROCESSING_STAGE_KINDS[TRACE]),
+            started_at,
+            ended_at,
+            duration_ms,
+            input_hashes,
+            output_hashes,
+            outcome,
+            diagnostics,
+            resource_counters: Vec::new(),
+        });
+    }
     pair
 }
 
@@ -1913,6 +2005,7 @@ fn report_processing_stage(
     solver_identity: &SolverIdentity,
     resolved: &Resolved,
     shell: &mut Shell,
+    emit_event: bool,
 ) {
     let clock = processing_stage_clock();
     let ledger = shell.ledger().to_vec();
@@ -2001,21 +2094,31 @@ fn report_processing_stage(
         // The wrapper is built with empty diagnostics (assembly raises
         // nothing of its own), so a landed report is a clean processing_stage.
         Ok(report) => (Outcome::Ok, Vec::new(), vec![report.content_hash]),
-        Err(diagnostic) => (diagnostic.outcome, vec![diagnostic], Vec::new()),
+        Err(diagnostic) => {
+            // A route-pipeline tail (`emit_event` false) declares no census event, so
+            // the event's `diagnostics` field never reaches the shell; raise the
+            // diagnostic directly to keep a failed tail fail-closed.
+            if !emit_event {
+                shell.diagnostic(diagnostic.clone());
+            }
+            (diagnostic.outcome, vec![diagnostic], Vec::new())
+        }
     };
-    shell.processing_stage_event(ProcessingStageEvent {
-        pipeline_id: resolved.pipeline_id.clone(),
-        pipeline_step_id: resolved.pipeline_step_ids[REPORT].clone(),
-        processing_stage: static_id(PROCESSING_STAGE_KINDS[REPORT]),
-        started_at,
-        ended_at,
-        duration_ms,
-        input_hashes,
-        output_hashes,
-        outcome,
-        diagnostics,
-        resource_counters: Vec::new(),
-    });
+    if emit_event {
+        shell.processing_stage_event(ProcessingStageEvent {
+            pipeline_id: resolved.pipeline_id.clone(),
+            pipeline_step_id: resolved.pipeline_step_ids[REPORT].clone(),
+            processing_stage: static_id(PROCESSING_STAGE_KINDS[REPORT]),
+            started_at,
+            ended_at,
+            duration_ms,
+            input_hashes,
+            output_hashes,
+            outcome,
+            diagnostics,
+            resource_counters: Vec::new(),
+        });
+    }
 }
 
 /// Gather the run state the §5/§4.6 manifests attest, one value per
@@ -3575,8 +3678,9 @@ processing_stages:
     // document heads (each with its ClinicalIR bundle) and both groups' compiled +
     // verifier_results; direct_smt lands three heads and both groups' overlap/deontic
     // smt_query pair + verifier_results. A clean replay raises no command diagnostics
-    // and leaves no bare `out/groups/`. (The unified trace/report tails and the census
-    // pins land in run-m2.1d5a-2 / run-m2.1d5b.)
+    // and leaves no bare `out/groups/`. The unified trace/report tails then land the
+    // run-level artifacts at the bare run root; the two-run determinism and event
+    // census pins land in run-m2.1d5b.
     #[test]
     fn m2_route_loop_lands_both_routes_namespaced() {
         let root = tempfile::tempdir().unwrap();
@@ -3594,9 +3698,28 @@ processing_stages:
             names
         };
 
-        // The shared run out holds exactly the event log and the two route
-        // subtrees: no bare artifacts/ or groups/ at the root.
-        assert_eq!(listing(&out), ["logs", "routes"]);
+        // The shared run out holds the event log, both route subtrees, and the
+        // run-level tail artifacts the unified tails land at the bare root: the trace
+        // bundle + lineage index, the report + its EN render, and the run + replay
+        // manifests. No bare artifacts/ or groups/ at the root.
+        assert_eq!(
+            listing(&out),
+            [
+                "lineage_index.json",
+                "logs",
+                "manifest.json",
+                "replay_manifest.json",
+                "report.json",
+                "report_en.md",
+                "routes",
+                "trace_bundle.json"
+            ]
+        );
+        // The run trace binds both routes' parallel chains under one bundle; its three
+        // §8.3 claims mint from the single_ir route's compiled groups (the direct route
+        // lands no compiled artifact, so it mints no claim).
+        let bundle = strict_at::<TraceBundle>(&out, "trace_bundle.json");
+        assert_eq!(bundle.payload.claims.len(), 3, "run trace claims");
 
         // The run out holds exactly the two route subtrees.
         assert_eq!(

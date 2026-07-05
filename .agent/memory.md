@@ -354,18 +354,43 @@ aggressively; full pre-consolidation text in git history.
   (NO ir_bundle — mints no IR) + group `[deontic.smt_query.json, overlap.smt_query.json,
   verifier_results.json]`; NO bare `out/groups/`. `RouteRun{pipeline_id, ledger slice
   (shell.ledger()[start..]), fills, groups, samples: vec![groups.clone()]}` collected
-  `#[allow(dead_code)]` (`let _ = &route_runs`) → .1d5a-2 tails + .1e metrics consume. Identity
+  `#[allow(dead_code)]` (`let _ = &route_runs`) → .1e metrics consume (the .1d5a-2 tails use the
+  separate `all_*` vecs, NOT RouteRun). Identity
   agreement folds each Some ModelIdentity into `agreed`; a differing Some → one command diagnostic +
   fail-closed return (goldens agree → the clean gate never trips it). Codex .1d5a-1 follow-up:
   single_ir's group loop emits the COMPILE partial-group diagnostic+event (mirrors `group_pipeline`,
   the module header's documented partial-group rule) on a member-short group; direct's loop keeps a
   bare skip — it mints no compiled artifact, so that compile-stage rule does not apply, and the member
   head already failed+diagnosed upstream. Neither skip is ever fully silent (the short member's own
-  head/fill stage always diagnosed first) → the dedicated error-path TESTS defer to .1d5a-2 (single_ir
+  head/fill stage always diagnosed first) → the dedicated error-path TESTS defer to .1d5a-2b (single_ir
   partial-group event; mixed-shape→command-diagnostic; identity-disagreement→fail-closed). Helper
   `route_group_dir(resolved,gid)` now centralizes the `routes/{pid}/groups/{gid}` dir (was 6 duplicated
   format strings across both loops + `direct_smt_fill` + 3 direct-verify test sites — a split-dir class
   Codex flagged where the fill landed route-namespaced but the paired verify landed bare).
+- run-m2.1d5a-2 LANDED the unified run-level tails. `execute_routes` collects
+  `all_docs`/`all_graphs`/`all_group_traces` across the view loop, then runs
+  `trace_processing_stage`/`report_processing_stage` ONCE over both routes at the BARE run root
+  (trace_bundle.json/lineage_index.json/report.json/report_en.md/manifest.json/replay_manifest.json
+  beside `routes/`+`logs/`). NEW `emit_event: bool` on both tail fns gates the §4.6 census EVENT
+  only: M1 execute() callers pass `true` (M1 byte-identical); the M2 tails pass `false` (route
+  pipelines declare no trace/report step, run under the baseline route's padded `UNUSED_STAGE`
+  slots) → M2 tails emit NO event yet stay fail-CLOSED by raising the failure diagnostic DIRECTLY
+  (`shell.diagnostic(diagnostic.clone())` on the Err arm when `!emit_event`; the diagnostic
+  otherwise reaches the shell ONLY through the un-emitted event). Cross-route correctness (in-code,
+  commented): all_graphs deduped keep-FIRST-per-`payload.document.document_id` via a seen-set
+  `retain` — NOT `dedup_by_key`, since all_graphs = direct's BTreeMap-sorted heads ++ single_ir's
+  first-appearance graphs → dupes are non-adjacent and consecutive dedup misses them; all_docs
+  STABLE-sorted bundle-bearing-first (`sort_by_key(|d| d.bundle.is_none())`) so assemble_trace's
+  first-by-id lineage lookup resolves the single_ir bundle-doc, not direct's bundle-less head (views
+  run direct-first per `pipelines:[direct,single_ir]`), else assemble_report rejects `MissingLineage`.
+  The trace keeps BOTH routes' parallel chains (route-prefixed artifact_ids → distinct chain nodes;
+  the shared source node dedups whole-node) → `TraceBundle.claims.len()==3` (single_ir's 2 compiled
+  groups mint claims; direct mints none). RESPEC banked-fact ERROR corrected (verify-against-code
+  rule): the gate test DID carry `assert_eq!(listing(&out), ["logs","routes"])` — the respec's
+  do-not-read note claimed it did NOT — so it now pins the 8-entry root set + a
+  `strict_at::<TraceBundle>` claims assertion. Error-path diagnostics → .1d5a-2b; two-run
+  determinism + event census (tails contribute 0 events) → .1d5b; §9 report sections (passed `None`
+  here) → .1e.
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema
