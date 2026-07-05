@@ -447,7 +447,11 @@ aggressively; full pre-consolidation text in git history.
     EventRecord emits BOTH `input_hashes` AND `output_hashes` via `emit_set` (wrapper.rs) → a read-back
     multi-output event (the direct model_fill event's two smt_query bodies, run-m2.1d4b) is hash-sorted
     too, so compare event `output_hashes` as a SET whenever >1 (single-output pins stay order-free); the
-    remaining .1d5/.1e event census pins inherit this.
+    remaining .1d5/.1e event census pins inherit this. COMPLETENESS (codex-caught .1d4b): a
+    directly-emitted event needs its `input_hashes` pinned INDEPENDENTLY — the payload `content_hash`
+    equality and the role WRAPPER's own input pin do not cover the §4.6 EVENT's `input_hashes` field, so
+    an empty/wrong event-input regression slips a body-only battery (mirror single_ir's `events[2]` input
+    pin: the direct model_fill event carries the pair's member source+segments, no cassette hashes).
   - Runtime-gate findings (gate MET, confirmed functionally on a real test source; byte-stability +
     seed-inertness + degeneration mechanics live in `## Runtime`, machine specifics in
     `.agent/runtime.local.md`). Metrics/report conclusions: constrained decoding forces schema-VALID output

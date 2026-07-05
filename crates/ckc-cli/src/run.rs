@@ -4453,9 +4453,10 @@ processing_stages:
         let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
 
         // Per-route head prepass: build each UNIQUE member's DocHead once through
-        // `route_document_head` (test_source.m1_guideline_a is in both groups), the
-        // .1d5a orchestrator's dedup — a shared document heads once per route, pinned by
-        // the head-event census below. Each group then fills from the shared heads.
+        // `route_document_head` (test_source.m1_guideline_a is in both groups) so a shared
+        // document heads once per route — the per-route dedup shape .1d5a's orchestrator
+        // adopts in execute(), pinned here at the fill boundary by the head-event census
+        // below (execute()'s own route loop is pinned in .1d5a). Each group fills the heads.
         let mut unique_members: Vec<Id> = Vec::new();
         for group in &exp.test_source_groups {
             for s in &group.test_sources {
@@ -4613,6 +4614,15 @@ processing_stages:
         // fills under groups/<gid>; guideline_a appears once under artifacts (headed once).
         assert_eq!(listing(&out), ["groups", "logs", "routes"]);
         assert_eq!(
+            listing(&out.join("logs")),
+            ["diagnostics.jsonl", "events.jsonl"]
+        );
+        assert_eq!(listing(&out.join("routes")), ["pipe.m2_direct_smt"]);
+        assert_eq!(
+            listing(&out.join("routes/pipe.m2_direct_smt")),
+            ["artifacts"]
+        );
+        assert_eq!(
             listing(&out.join("routes/pipe.m2_direct_smt/artifacts")),
             [
                 "test_source.m1_control",
@@ -4716,8 +4726,9 @@ processing_stages:
 
         // One model_fill event per group (events[6] = m1_conflict, events[7] =
         // m1_no_conflict, in test_source_groups order): the direct route's model_fill kind
-        // and model_fill_smt step, both roles' recorded calls summed, and the two landed
-        // smt_query bodies as outputs (input/output hashes canonicalize as §4.3 sets).
+        // and model_fill_smt step, both roles' recorded calls summed, the pair's member
+        // source+segments as inputs, and the two landed smt_query bodies as outputs
+        // (input/output hashes canonicalize as §4.3 sets, so compare each as a set).
         for (i, group) in exp.test_source_groups.iter().enumerate() {
             let event = &events[6 + i];
             let (overlap, deontic) = &landed_pairs[&group.group_id];
@@ -4749,6 +4760,18 @@ processing_stages:
                     (static_id(REPAIRS_COUNTER), 0)
                 ],
                 "{}: both roles' recorded calls summed",
+                group.group_id
+            );
+            let mut want_event_inputs: BTreeSet<&Hash> = BTreeSet::new();
+            for s in &group.test_sources {
+                let h = &heads[s];
+                want_event_inputs.insert(&h.source.content_hash);
+                want_event_inputs.insert(&h.segments.content_hash);
+            }
+            assert_eq!(
+                event.input_hashes.iter().collect::<BTreeSet<_>>(),
+                want_event_inputs,
+                "{}: the pair's member source+segments provenance (no cassette hashes)",
                 group.group_id
             );
             assert_eq!(
