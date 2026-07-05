@@ -205,11 +205,17 @@ doc-lint bullet).
   registry/prompts.yaml (the registry files transitively pin the referenced files' hashes);
   model_hash/runtime_hash = None (no committed model/runtime file — env wrapper outside git; honest
   omission, run-m2.2 revisits). M1 runs keep every field None → M1 manifest pins byte-identical.
-  Flagged from .1d: landed smt_query wrappers are ABSENT from manifest output_hashes + trace nodes
-  (GroupTrace carries no smt_query slots) — close the gap here: extend GroupTrace + the manifest
+  Flagged from .1d + the .1d5a-2 codex review: the GroupTrace shape ({compiled?, verifier_results?})
+  omits accepted landed artifacts — the direct route's overlap/deontic smt_query pair (no smt_query
+  slots) always, plus a single_ir group's landed compiled AND the direct pair whenever verify fails
+  (both arms push GroupTrace only on the full-success (Some,Some) path, so a landed-but-unverified
+  artifact vanishes) — close the gap here: extend GroupTrace with smt_query slots + restructure both
+  push conditions to attest on landing (compiled/pair), not verdict success, + extend the manifest
   walk so every accepted landed artifact is manifested → replay-covered (replay.rs diffs
   expected_output_hashes vs the rerun manifest; a landed-but-unmanifested wrapper = silent replay
-  hole, so omission is not an option). Sections consume .1d5a's
+  hole, so omission is not an option). Also settle the run-level trace/report producer: the M2 tails
+  borrow the baseline route's padded UNUSED_STAGE slot (inert write-only provenance, never read back,
+  but contra the run.rs producer invariant) → give run-level artifacts an honest producer. Sections consume .1d5a's
   banked RouteRun{pipeline_id, ledger slice, fills, groups, samples}. Reading: run.rs
   report/manifest fns; report.rs ModelRunSections + populated fixture; manifests.rs; replay.rs +
   trace.rs GroupTrace for the smt_query decision. Gate: cargo test; full-run test pins report.json

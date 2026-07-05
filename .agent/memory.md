@@ -391,6 +391,22 @@ aggressively; full pre-consolidation text in git history.
   `strict_at::<TraceBundle>` claims assertion. Error-path diagnostics → .1d5a-2b; two-run
   determinism + event census (tails contribute 0 events) → .1d5b; §9 report sections (passed `None`
   here) → .1e.
+- run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
+  `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
+  `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
+  `pipelines.contains` → exactly one is_baseline view). DURABLE analysis: trace determinism does NOT
+  rest on the all_docs/all_graphs merge order — `assemble_trace` `sort_canonical`s nodes/edges/
+  claims/rows before returning, so merge order is MOOT for the trace bytes; the bundle-first sort
+  matters ONLY for the pre-sort first-by-id lineage lookup (`find(document_id).and_then(bundle)`
+  skips a bundle-less doc that sorts first). `producer.pipeline_step_id` is write-only provenance
+  (lives only in wrapper.rs emit/read, never consumed by replay/manifest, payload-excluded from
+  `content_hash`) → the `UNUSED_STAGE` tail producer is inert + deterministic. DEFERRED to .1e
+  (accepted, roadmap broadened): GroupTrace omits accepted landed artifacts on non-full-success
+  paths (direct smt_query pair always; single_ir compiled + direct pair when verify fails — both
+  arms push only on `(Some,Some)`) + the run-level producer. Fixed this follow-up: stale module doc
+  ("later unit" → tails land here); gate now asserts both routes' route-prefixed nodes reach the run
+  trace (`claims.len()==3` alone is single_ir-satisfiable, so it did not prove the tail ran over the
+  direct route).
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema

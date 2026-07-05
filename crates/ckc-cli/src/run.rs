@@ -19,8 +19,9 @@
 //!
 //! A model-route experiment (SPEC §9) instead runs each route pipeline into its
 //! own `routes/<pipeline_id>/{artifacts,groups}/` subtree under one shared run
-//! out ([`execute_routes`]); the run-level trace/report/manifest tails over both
-//! routes land in a later unit.
+//! out ([`execute_routes`]); the run-level trace/report/manifest tails then run
+//! once over both routes' collected docs, source graphs, and group traces,
+//! landing the run artifacts at the bare run root.
 //!
 //! Failure scoping: registry resolution, lexicon loading, solver-adapter
 //! construction, and corpus-file reads are command-scope
@@ -31,7 +32,10 @@
 //! partial group: a cross-document verdict over fewer documents than the
 //! group declares would document a no-conflict result the test_sources never earned.
 //! Producer values are runner-owned: pipeline_id = the experiment's pipeline,
-//! pipeline_step_id = the registry processing_stage entry, toolchain manifest hash = the
+//! pipeline_step_id = the registry processing_stage entry (the model-route run-level
+//! tails are no route pipeline's declared stage, so they carry the baseline route's
+//! padded [`UNUSED_STAGE`] slot until run-m2.1e settles a run-level producer; this
+//! step id is write-only provenance, never read back for logic), toolchain manifest hash = the
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
@@ -2030,8 +2034,8 @@ fn report_processing_stage(
         lexicon_hash,
         solver_identity,
         &ledger,
-        // M1 baseline run: no recorded model run — run-m2.1 supplies the
-        // two-route ModelRunSections here.
+        // No recorded model run: an M1 baseline run has none, and the model-route
+        // run-level tail defers its two-route ModelRunSections to run-m2.1e.
         None,
     )
     .map_err(|e| fail(format!("report assembly: {e}")))
@@ -3720,6 +3724,29 @@ processing_stages:
         // lands no compiled artifact, so it mints no claim).
         let bundle = strict_at::<TraceBundle>(&out, "trace_bundle.json");
         assert_eq!(bundle.payload.claims.len(), 3, "run trace claims");
+        // Both routes' chains reach the one run trace, so the tail ran over every
+        // route rather than single_ir alone (which `claims.len()` alone would allow):
+        // each route's nodes carry its route-prefixed path, and the direct route —
+        // claim-less, since it lands no compiled artifact — still binds its verdicts.
+        let node_paths: Vec<&str> = bundle
+            .payload
+            .nodes
+            .iter()
+            .map(|n| n.path.as_str())
+            .collect();
+        assert!(
+            node_paths
+                .iter()
+                .any(|p| p.starts_with("routes/pipe.m2_single_ir/")),
+            "run trace chains the single_ir route"
+        );
+        assert!(
+            node_paths.iter().any(|p| {
+                p.starts_with("routes/pipe.m2_direct_smt/groups/")
+                    && p.ends_with("/verifier_results.json")
+            }),
+            "run trace binds the direct route's verifier_results"
+        );
 
         // The run out holds exactly the two route subtrees.
         assert_eq!(
