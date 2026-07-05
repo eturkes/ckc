@@ -148,39 +148,107 @@ doc-lint bullet).
   per-route unique-`DocHead` prepass (shared guideline_a heads once); pin per-group model_fill §4.6 event
   tuple (kind/step/counters summed over roles/output set) + landed `groups/{gid}/{role}.smt_query.json`
   layout + once-per-route head-event census. 77% 153K/200K
-- [ ] run-m2.1d5a: model-route loop in `execute()` + structural smoke gate (two-run determinism +
-  event census = .1d5b). Replace the model-route gate diagnostic (DELETE its test
-  m2_experiment_run_gates_until_the_route_loop_lands ≈3093): single M1Layered view → existing path
-  verbatim; mixed M1+model set → command diagnostic, zero artifacts; model set → lexicon read +
-  `CassetteStore::new(root)` + Z3Adapter::new (each failure → command diagnostic); base seed =
-  experiment seed; then per view in set order: mark ledger start (shell.ledger().len());
-  SingleIr = per-doc route_document_head →
-  single_ir_fill, per-group compile_verify_group (dir `routes/{pid}/groups/{gid}`, smt under it);
-  DirectSmt = per-unique-doc route_document_head, per-group direct_smt_fill →
-  direct_smt_verify_group. Identity agreement: each fill's model_identity folds into one agreed
-  Option<ModelIdentity> — mismatch = command diagnostic, fail-closed return (goldens agree:
-  model.baseline/fixture_quant/1.0.0). Collect per view RouteRun{pipeline_id, ledger slice, fills,
-  groups: Vec<GroupObservation>, samples: vec![groups.clone()]} (#[allow(dead_code)]; .1e consumes;
-  observation shapes = route_metrics test ≈4665 — single_ir pairs from compiled.solver_query_plan,
-  direct pairs = minted role ids). Tails run ONCE over all routes' traces (graphs deduped by
-  document_id — payload-identical so content_hash equal; results per route, the settled §7.1 shape
-  per .1e's populated fixture; report findings/no_conflict rows = single_ir's groups,
-  structurally: assemble_trace mints claims only for compiled+verifier_results groups and direct
-  lands no compiled (SPEC §9 baseline = model emits SMT directly; findings need region/quoted-span
-  provenance direct cannot source) — exactly one view mints finding.{gid}.{seq}, no id collision,
-  tails filter nothing; model-route quality reaches the report as .1e's aggregate sections):
-  trace_processing_stage + report_processing_stage gain `emit_event:
-  bool` — M1 true (bytes unchanged), M2 false (trace/report = undeclared steps of route pipelines;
-  tail wrapper producer = baseline view → step id UNUSED_STAGE, honest sentinel); sections stay
-  None (.1e populates). Gate test: `write_m2_root` mirror (copy from repo_root(): registry/*.yaml,
-  corpus lexicon + 3 html + reference yaml, rust-toolchain.toml, Cargo.lock; plant the 7 golden
-  seed-42 cassettes under `<root>/cassettes/`) → executed ONCE: zero command diagnostics; both
-  routes' layout present; trace_bundle strict-parses, claims = single_ir's 2 groups only, shared
-  source nodes once, direct verifier_results = legal node carrying only its →report out-edge (no
-  verify in-edge — validate checks edge endpoints/rank/op, never node connectivity). M1 executed()
-  pins unchanged. Gate: cargo test.
-- [ ] run-m2.1d5b: two-run determinism + event census over .1d5a's write_m2_root mirror (split
-  from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
+- [ ] run-m2.1d5a-1: model-route loop in `execute()` + per-route landing gate (unified tails +
+  trace-parse gate = .1d5a-2; two-run + census = .1d5b). Split from .1d5a: the loop lands per-route
+  artifacts (self-contained, gate-verifiable); the cross-route unified tails carry the design
+  uncertainty (source-node dedup, GroupTrace-from-route) → .1d5a-2. DELETE the old gate test
+  `m2_experiment_run_gates_until_the_route_loop_lands` (≈3244). DISPATCH after `resolve()` (edit the
+  `execute()` M1-view branch, run.rs ≈158-250): `views.len()==1 && views[0].shape==M1Layered` → keep
+  the existing M1 path inline verbatim; else `views.iter().any(|v| v.shape==M1Layered)` → mixed → one
+  command diagnostic (`shell.diagnostic(invalid_diagnostic(vec![(static_id("reason"), …)]))`), zero
+  artifacts, return; else all-model → new fn `execute_routes(root, &views, shell)` (fresh code over
+  already-built route fns → NO behavior-lock refactor unit). `execute_routes`: mirror the M1 lexicon
+  read → `(lexicon, lexicon_hash)` (command diagnostic on failure); `store = CassetteStore::new(root)`
+  (INFALLIBLE, no `?` — points at `<root>/cassettes/`, so the roadmap's "each failure" applies to
+  lexicon + `Z3Adapter::new()` only); `adapter = Z3Adapter::new()` (Result → command diagnostic on
+  Err); `seed = views[0].plan.seed` (plan shared across the set; = experiment.seed). Per view in set
+  order: `ledger_start = shell.ledger().len()`; `repair_limit = resolved.repair_limit.expect("model
+  route resolves Some")`.
+  - CONFIRMED loop template (from `single_ir_route_scores_m1_groups` ≈3807 + `direct_smt_route_scores_m1_groups` ≈4953 + `route_metrics_score_recorded_two_route_run` ≈5473 — do NOT re-read these):
+    SingleIr → `for entry in &resolved.documents`: `let head = route_document_head(root, entry,
+    resolved, shell)` (None → skip doc, diagnostic already raised); `let rd = single_ir_fill(head,
+    &lexicon, &store, seed, resolved, repair_limit, shell)`; fold `rd.identity` (Option<ModelIdentity>)
+    into the agreement, push `rd.fill` (Option<FillObservation>) into `fills`, `bundles[entry.id] =
+    rd.trace.bundle` (Option<ArtifactWrapper<IrBundle>>). Then `for group in &resolved.groups`:
+    `members = group.test_sources → bundles[s]` (skip group on any None member); `let (compiled,
+    results) = compile_verify_group(&group.group_id, &format!("routes/{}/groups/{}",
+    resolved.pipeline_id, group.group_id), &members, processing_stage_clock(), resolved, &adapter,
+    shell)`; when both Some push `GroupObservation{group_id, query_pairs =
+    compiled.payload.solver_query_plan.iter().map(|p| (p.context_overlap_query_id.clone(),
+    p.deontic_consistency_query_id.clone())), results: results.payload.results.clone()}`.
+    DirectSmt → head prepass: unique member ids first-appearance-ordered across `resolved.groups`,
+    `route_document_head` each → `BTreeMap<Id, DocHead>`. Then `for group in &resolved.groups`:
+    head_refs = members' heads; `let df = direct_smt_fill(&gid, &head_refs, &store, seed, resolved,
+    repair_limit, shell)`; `fills.extend(df.fills)`, fold `df.identities`; `if let Some((overlap,
+    deontic)) = df.pair { let results = direct_smt_verify_group(&gid, &format!("routes/{}/groups/{}",
+    pid, gid), &overlap, &deontic, resolved, &adapter, shell); when Some push GroupObservation{group_id,
+    query_pairs: vec![(static_id(&format!("{gid}.overlap")), static_id(&format!("{gid}.deontic")))],
+    results: results.payload.results.clone()} }`.
+  - SIGNATURES (banked; re-read a body only on a call mismatch): `route_document_head(root:&Path,
+    entry:&CorpusEntry, resolved:&Resolved, shell) -> Option<DocHead>`; `single_ir_fill(head:DocHead,
+    lexicon:&Lexicon, store:&CassetteStore, seed:u64, resolved:&Resolved, repair_limit:u32, shell) ->
+    RouteDoc`; `compile_verify_group(group_id:&Id, dir:&str, members:&[&ArtifactWrapper<IrBundle>],
+    clock:ProcessingStageClock, resolved:&Resolved, adapter:&Z3Adapter, shell) ->
+    (Option<ArtifactWrapper<CompiledArtifact>>, Option<ArtifactWrapper<VerifierResults>>)`;
+    `direct_smt_fill(gid:&Id, heads:&[&DocHead], store, seed:u64, resolved, repair_limit:u32, shell) ->
+    DirectFill`; `direct_smt_verify_group(gid:&Id, dir:&str, overlap:&ArtifactWrapper<QueryBody>,
+    deontic:&ArtifactWrapper<QueryBody>, resolved, adapter:&Z3Adapter, shell) ->
+    Option<ArtifactWrapper<VerifierResults>>`. Types: `DocHead{trace:DocTrace,
+    source:ArtifactWrapper<SourceDocumentGraph>, segments}`; `RouteDoc{trace:DocTrace (.bundle:
+    Option<ArtifactWrapper<IrBundle>>), graph, fill:Option<FillObservation>,
+    identity:Option<ModelIdentity>}`; `DirectFill{pair:Option<(ArtifactWrapper<QueryBody>,
+    ArtifactWrapper<QueryBody>)>, fills:Vec<FillObservation>, identities:Vec<ModelIdentity>}`. Imports:
+    `use crate::metrics::{FillObservation, GroupObservation};`.
+  - Identity agreement: fold each Some identity into `agreed: Option<ModelIdentity>` — first Some sets
+    it, a later DIFFERING Some → one command diagnostic + fail-closed `return` (no partial run). Goldens
+    agree (model.baseline/fixture_quant/1.0.0) so the clean gate never trips it.
+  - `RouteRun{pipeline_id: resolved.pipeline_id.clone(), ledger: shell.ledger()[ledger_start..].to_vec()
+    (Vec<DiagnosticRecord>), fills, groups: Vec<GroupObservation>, samples: vec![groups.clone()]}` —
+    #[allow(dead_code)] struct; collect a local `Vec<RouteRun>` (bind + `let _ = &route_runs;` with a
+    "// .1e metrics + .1d5a-2 tails consume" note so no unused warning). No unified tails here (M2 path
+    lands per-route artifacts only; run-level trace/report = .1d5a-2).
+  - Gate: NEW test — `write_m2_root(&Path)` mirrors `write_tiny_root` (≈2630) + `copy_committed_registry`
+    (≈2745): copy from `repo_root()` registry/*.yaml, corpus lexicon + 3 html + `exp.m1_scaffold`
+    expected_outcomes yaml, rust-toolchain.toml, Cargo.lock; plant the 7 golden seed-42 cassettes
+    (`tests/fixtures/cassettes/route.single_ir/{test_source.m1_control,m1_guideline_a,m1_guideline_b}` +
+    `route.direct_smt/{group.m1_conflict,group.m1_no_conflict}.{overlap,deontic}`) under
+    `<root>/cassettes/`. `executed(&m2_root, "exp.m2_multihop")` (reads inputs from root, owns its tmp
+    out): zero command diagnostics; both routes' per-route layout present under `out/routes/
+    pipe.m2_single_ir/` + `out/routes/pipe.m2_direct_smt/` (artifacts + groups). M1 `executed()` pins
+    unchanged (M1 path untouched). Gate: cargo test.
+  - READ (apply-anchor set; the banked SOURCES above EXCLUDED): `execute()` 158-250 (dispatch edit site +
+    M1 lexicon-read to mirror); `write_tiny_root` 2630-2730 + `copy_committed_registry` 2745-2767;
+    `Resolved` fields (documents:Vec<CorpusEntry>, groups:Vec<TestSourceGroup>, plan.seed, repair_limit,
+    pipeline_id, shape). Do NOT re-read the route_scores tests nor the route fn bodies.
+- [ ] run-m2.1d5a-2: unified run tails over both routes + trace-parse gate. `trace_processing_stage`
+  (≈1506) + `report_processing_stage` (≈1612) gain a trailing `emit_event: bool`: gate ONLY the final
+  `shell.processing_stage_event(ProcessingStageEvent{…})` on it (`emit_event` is a runtime bool → the
+  event-only locals started_at/outcome/… stay conditionally-used, no unused warning; return `pair`
+  regardless for trace). M1 execute() callers pass `true` (event census + landed bytes unchanged); the
+  M2 tails pass `false` (trace/report = undeclared route-pipeline steps; wrapper producer stays
+  `producer(baseline_resolved, TRACE|REPORT)` → step id UNUSED_STAGE since direct_smt pads slots 6/7,
+  honest sentinel). After the route loop in `execute_routes`, augment the loop to collect `docs` (all
+  routes' DocTraces: single_ir `rd.trace`, direct `head.trace`), `graphs` DEDUPED by document_id (both
+  routes' source graphs payload-identical → content_hash equal, keep one/doc), and per-route GroupTraces
+  built from the stashed (compiled, results); then run ONCE: `trace_processing_stage(&docs, &groups,
+  baseline_resolved, shell, false)` → (bundle, lineage); `report_processing_stage(root, &docs, &graphs,
+  &groups, &bundle, &lineage, &lexicon_hash, &adapter.identity(), baseline_resolved, shell, false)` with
+  the assemble_report `sections=None` (.1e populates). `baseline_resolved` = the view whose `is_baseline`
+  holds (= the direct_smt pipeline). Gate: EXTEND the .1d5a-1 test — `out/trace_bundle.json`
+  strict-parses; claims = single_ir's 2 groups ONLY (assemble_trace mints finding.{gid}.{seq} for
+  compiled+verifier_results groups; direct lands no compiled → mints none → no id collision, tails filter
+  nothing); shared source nodes appear once (graphs deduped); direct verifier_results = legal node
+  carrying only its →report out-edge (no verify in-edge — validate checks edge endpoints/rank/op, never
+  node connectivity). M1 executed() pins unchanged. Gate: cargo test.
+  - READ (the design reads .1d5a-1 deferred — this unit owns them): `assemble_trace` (trace.rs ≈613)
+    node/finding minting (source-node dedup + finding-per-compiled-group + id formation); `GroupTrace`
+    shape + how M1 `group_pipeline` (≈666) builds it from compiled+results (mirror for routes);
+    `route_document_head` body (≈868) — does it route-mint the source-graph id (the "shared source nodes
+    once" question, reconcile with graph dedup); the emit_event edit sites (trace final event 1506-1611,
+    report final event 1612-1739, the 2 M1 callers in `execute`). `route_id_prefix` = `""` for M1, else
+    `"{pipeline_id}."` (banked).
+- [ ] run-m2.1d5b: two-run determinism + event census over .1d5a-1's write_m2_root mirror, after
+  .1d5a-2's tails land (split from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
   across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589
   embeds out_dir.display()); events compared on a non-timing projection; event census = 27
   (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline run

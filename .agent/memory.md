@@ -46,7 +46,14 @@ aggressively; full pre-consolidation text in git history.
   assembly fn + its live-pipeline pin battery = 2; a live-pin battery over the run binary is its OWN unit
   (never paired with assembly or stage wiring); orchestrator wiring over N pre-built route stages +
   per-stage landing/eventing + a determinism gate ≥ N+2 units — per-route stage-rework units first, the
-  orchestrator+gate last, cross-cutting type/trace plumbing its own opener; a route-stage rework
+  orchestrator+gate last, cross-cutting type/trace plumbing its own opener; the orchestrator+gate unit
+  ITSELF splits at the loop/tails seam when its tails do cross-route work (dedup, per-route→node
+  assembly) — the per-view LOOP (lands per-route artifacts, own landing gate) vs the UNIFIED TAILS-ONCE
+  (run-level trace/report over all routes, own trace-parse gate); the loop is mechanical off the
+  per-route *_scores tests (fully bankable), the tails hold the cross-route design uncertainty
+  (source-node dedup vs route-prefixed ids, GroupTrace-from-route) → the read-cost that overflows a
+  combined unit lives in the tails, so land the loop first (run-m2.1d5a respec: overflowed the combined
+  unit at 51% on READING alone, zero code); a route-stage rework
   (landing+eventing rewiring of an existing fill fn + mechanical call-site updates) and its
   event/landing PIN battery = 2 — behavior lands one unit, observed-output pins the next; spec-byte
   amendment (re-pin + reference/test mirror sweep) + new feature code = 2 (an open decision that amends
