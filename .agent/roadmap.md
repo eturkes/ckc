@@ -173,8 +173,14 @@ doc-lint bullet).
   member_bundles: Vec::new(), dir, compiled: None, verifier_results: Some(results)}`; AFTER the group loop
   drain `heads` — `for (_, head) in heads { all_graphs.push(head.source); all_docs.push(head.trace); }`.
   After the `for resolved in views` loop (after `let _ = &route_runs;`): dedup all_graphs by
-  `g.payload.document_id` (keep first/doc — payload-identical across routes → content_hash equal); `let
-  baseline_resolved = views.iter().find(|v| v.is_baseline).expect(...)`; `let Some((bundle, lineage)) =
+  `g.payload.document.document_id` (keep first/doc — payload-identical across routes → content_hash
+  equal); STABLE-SORT all_docs bundle-bearing FIRST — `all_docs.sort_by_key(|d| d.bundle.is_none())` —
+  because assemble_trace's lineage lookup (trace.rs:778) `docs.iter().find(|d| d.document_id ==
+  *ts).and_then(|d| d.bundle.as_ref())` takes the FIRST doc by id, and views run direct-FIRST
+  (`pipelines:[direct,single_ir]`) so direct's `bundle:None` heads would shadow single_ir's `Some` → the
+  lineage row is skipped → assemble_report rejects the claim `MissingLineage` (report.rs:700); the stable
+  sort keeps BOTH routes' parallel chain nodes (the trace needs them) while surfacing the bundle-bearing
+  doc for lineage. `let baseline_resolved = views.iter().find(|v| v.is_baseline).expect(...)`; `let Some((bundle, lineage)) =
   trace_processing_stage(&all_docs, &all_group_traces, baseline_resolved, shell, false) else { return;
   };`; `report_processing_stage(root, &all_docs, &all_graphs, &all_group_traces, &bundle, &lineage,
   &lexicon_hash, adapter.identity(), baseline_resolved, shell, false)` (assemble_report `sections=None`;
@@ -183,10 +189,11 @@ doc-lint bullet).
   `replay_manifest.json`), beside `routes/`+`logs/`. assemble_trace dedups the SOURCE node via `if
   !nodes.contains(&source)` (whole-node eq); chain nodes carry route-PREFIXED artifact_ids → distinct
   across routes, parallel chains, no DuplicateNodeId; findings mint ONLY under `if let Some(compiled)` →
-  single_ir's 2 groups only → claims.len()==3. RISK to VERIFY at the gate (best-judgment; user only on a
-  spec contradiction): report_processing_stage collects `results` = ALL groups' verifier_results
-  (single_ir 2 + direct 2 = 4) → confirm `assemble_report(sections=None)` accepts 4 results for 2 groups
-  + the cross-route bundle without a validation error. Gate: EXTEND
+  single_ir's 2 groups only → claims.len()==3. CONFIRMED acceptable (was a flagged risk):
+  report_processing_stage collects `results` = ALL 4 verifier_results (single_ir 2 + direct 2);
+  assemble_report indexes verifier rows by `query_id` (distinct: single_ir `q…` vs direct
+  `{gid}.{overlap,deontic}`), rejects only duplicate ids, never validates group count → 4-over-2-groups
+  is fine. The real cross-route hazard was the all_docs ordering (fixed above). Gate: EXTEND
   `m2_route_loop_lands_both_routes_namespaced` (run.rs:3581, which asserts `listing(routes/…)` +
   `!out.join("groups").exists()`, NOT a bare `listing(out)` → tail artifacts at root do NOT break it):
   add `strict_at::<TraceBundle>(out, "trace_bundle.json")` asserting `bundle.claims.len()==3` + existence
@@ -196,25 +203,29 @@ doc-lint bullet).
   Option<ArtifactWrapper<IrBundle>>}; GroupTrace{group_id, test_sources: Vec<Id>, member_bundles:
   Vec<Id>, dir: String, compiled: Option<ArtifactWrapper<CompiledArtifact>>, verifier_results:
   Option<ArtifactWrapper<VerifierResults>>}; RouteDoc{trace,graph,fill,identity}; DocHead{trace, source:
-  ArtifactWrapper<SourceDocumentGraph>, segments}; SourceDocumentGraph.document_id (source_linkage.rs:570);
+  ArtifactWrapper<SourceDocumentGraph>, segments}; SourceDocumentGraph.document: SourceDocument (source id=`.document.document_id`; source_linkage.rs:570);
   single_ir_fill(head,&lexicon,&store,seed,resolved,repair_limit,shell)->RouteDoc;
   route_document_head(root,entry,resolved,shell)->Option<DocHead>; executed(root,exp)->(
   TotalOperationResult, Vec<EventRecord>, Vec<DiagnosticRecord>, PathBuf, TempDir);
   strict_at::<P>(out,rel)->ArtifactWrapper<P>; route_id_prefix=`""` M1 / `"{pipeline_id}."` route;
   route_group_dir(resolved,gid)=`routes/{pid}/groups/{gid}`. READ FRESH only the Edit-anchor spans right
-  before editing (trace/report fn tails ~1868/~2110, execute() callers ~245, execute_routes arms
-  ~365-490, gate test 3581+). Gate: cargo test -p ckc-cli; if docs touched, `RUSTDOCFLAGS='-D warnings'
+  before editing (trace/report fn tails ~1872/~2006, execute() callers ~245, execute_routes arms
+  ~365-510, gate test 3581+). Gate: cargo test -p ckc-cli; if docs touched, `RUSTDOCFLAGS='-D warnings'
   cargo doc -p ckc-cli --no-deps`; fmt + clippy.
 - [ ] run-m2.1d5a-2b: error-path pin battery over the loop's already-landed branches (from .1d5a-1 Codex
   review finding 3 — INDEPENDENT of .1d5a-2's tails wiring; these pin .1d5a-1's dispatch/loop branches).
   Three `#[test]`s over the run binary via `executed()`, each a crafted `write_m2_root` variant: (a)
-  single_ir member-short group → the COMPILE partial-group diagnostic+event naming the missing member —
-  craft a variant DROPPING one single_ir member cassette (e.g.
-  `cassettes/route.single_ir/test_source.m1_guideline_a/seed-42.json`) so that doc lands no ir_bundle →
-  its group(s) go member-short → the single_ir group loop emits
-  `processing_stage_diagnostic(COMPILE,"group",gid,"member {s} landed no ir_bundle artifact")`; assert
-  that diagnostic + a COMPILE event (mirror the M1 partial-group test); CONFIRM from the run which/
-  how-many groups short (guideline_a ∈ m1_conflict). (b) mixed-shape `[M1Layered, single_ir]` → ONE
+  single_ir member-short group → assert BOTH diagnostics a dropped member raises. Drop guideline_b's
+  cassette (`cassettes/route.single_ir/test_source.m1_guideline_b/seed-42.json`) — guideline_b ∈ ONLY
+  group.m1_conflict, so exactly ONE group shorts (dropping guideline_a shorts BOTH: it's in m1_conflict
+  AND m1_no_conflict, per registry/experiments.yaml). The dropped cassette makes single_ir_fill's
+  model_fill Err → a COMMAND diagnostic `invalid_diagnostic{cassette,reason,processing_stage:"model_fill"}`
+  (run.rs:1327); the member's bundle stays absent → group.m1_conflict goes member-short → ONE
+  partial-group COMPILE diagnostic+event `processing_stage_diagnostic(COMPILE,"group","group.m1_conflict",
+  "member … landed no ir_bundle artifact")` (run.rs:400). Assert the fill command diagnostic AND the
+  single compile diagnostic+event (they CO-OCCUR — a compile short is always preceded by the member's own
+  upstream fill diagnostic, per the loop comment); m1_no_conflict compiles clean (guideline_a+control both
+  fill); direct route unaffected (its cassettes key by group, not source). (b) mixed-shape `[M1Layered, single_ir]` → ONE
   command diagnostic ("mixes the layered M1 pipeline with model routes") + zero artifacts
   (`assert_only_logs(out)`, run.rs:2534) + Outcome::Invalid — craft a registry variant binding BOTH the
   M1 layered pipeline AND a single_ir pipeline in one experiment (overwrite `registry/experiments.yaml`
@@ -223,7 +234,7 @@ doc-lint bullet).
   fail-closed, ONE command diagnostic ("model routes disagree on the model identity attesting the run") +
   Outcome::Invalid — craft a variant re-blessing ONE cassette with a DIVERGENT synthetic ModelIdentity
   (model.other / fixture_quant / 1.0.0 — crafted-fixture rule, no real engine/quant/format token) so
-  `agree_model_identity` (run.rs ≈262) trips on the second differing Some. Separate failing-input
+  `agree_model_identity` (run.rs:274) trips on the second differing Some. Separate failing-input
   fixtures → .1d5b's clean-path census untouched. Banked infra: write_m2_root (run.rs:3540) copies
   copy_committed_registry + LOCKFILE + LEXICON + 3 corpus html + reference + 7 cassettes (3 single_ir
   `route.single_ir/<source>/seed-42.json`, 4 direct `route.direct_smt/<gid>.{overlap,deontic}/seed-42.json`)
