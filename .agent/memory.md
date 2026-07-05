@@ -336,6 +336,24 @@ aggressively; full pre-consolidation text in git history.
   orphans the already-landed artifact + drops its counters. Event-less abort is safe ONLY before the
   first land; after, ride the event like the wrap/land-error break paths (`direct_smt_fill` deontic
   cassette-fails-after-overlap-lands; codex .1d4a).
+- run-m2.1d5a-1 LANDED the model-route loop in `execute()` + the cross-route group-namespacing
+  collision fix (the sizing bullet's CROSS-ROUTE LANDING problem). `execute()` dispatch is 3-way: a
+  lone `[M1Layered]` view runs the M1 body inline verbatim; any set MIXING M1Layered + model routes →
+  ONE command diagnostic + zero artifacts; all-model → `execute_routes(root, &views, shell)`. BOTH
+  routes' group artifacts now land under `out/routes/{pid}/groups/{gid}/` (mirrors head namespacing
+  `routes/{pid}/artifacts/{doc}`): `direct_smt_fill` mints that dir internally (it holds `resolved`);
+  the M1-shared `compile_verify_group`/`direct_smt_verify_group` stay param-driven, so `execute_routes`
+  passes the namespaced `dir` while the M1 layered path keeps bare `groups/{gid}`. OBSERVED landed
+  layout (the .1d5a-1 gate's literals — pin .1d5a-2/.1e from these, don't recompute): `out/routes/` =
+  `[pipe.m2_direct_smt, pipe.m2_single_ir]`; single_ir artifacts `[ir_bundle.json, segments.json,
+  source_document_graph.json]` + group `[compiled.json, smt, verifier_results.json]` (compile lands
+  SMT bodies under an `smt/` subdir); direct artifacts `[segments.json, source_document_graph.json]`
+  (NO ir_bundle — mints no IR) + group `[deontic.smt_query.json, overlap.smt_query.json,
+  verifier_results.json]`; NO bare `out/groups/`. `RouteRun{pipeline_id, ledger slice
+  (shell.ledger()[start..]), fills, groups, samples: vec![groups.clone()]}` collected
+  `#[allow(dead_code)]` (`let _ = &route_runs`) → .1d5a-2 tails + .1e metrics consume. Identity
+  agreement folds each Some ModelIdentity into `agreed`; a differing Some → one command diagnostic +
+  fail-closed return (goldens agree → the clean gate never trips it).
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema

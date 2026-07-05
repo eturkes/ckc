@@ -30,7 +30,7 @@
 //! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
 //! shared verbatim with the §5/§4.6 manifests.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 use std::time::Duration;
 
@@ -49,7 +49,7 @@ use ckc_smt::{
 use crate::cassette::{CassetteKey, CassetteStore};
 use crate::extract::{ExtractConfig, extract};
 use crate::manifests::{ManifestInputs, assemble_manifests};
-use crate::metrics::FillObservation;
+use crate::metrics::{FillObservation, GroupObservation};
 use crate::model_fill::{
     FillReject, FillSource, ModelFill, RECORDED_CALLS_COUNTER, REPAIRS_COUNTER, model_fill,
 };
@@ -159,22 +159,25 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
     let Some(mut views) = resolve(root, experiment_id, shell) else {
         return;
     };
-    // Exactly one layered-M1 view runs today's path verbatim; any other
-    // resolved set (model routes, multi-view) resolves — proving the
-    // registry surface + route fingerprints — but executes nothing.
-    // run-m2.1d wires the multi-route execution loop.
-    let resolved = if views.len() == 1 && views[0].shape == RouteShape::M1Layered {
-        views.pop().expect("length checked above")
-    } else {
-        shell.diagnostic(invalid_diagnostic(vec![(
-            static_id("reason"),
-            format!(
-                "experiment {experiment_id} resolves beyond a single layered M1 view; \
-                 the run command executes only the layered M1 pipeline today"
-            ),
-        )]));
+    // run-m2.1d5a dispatch on the resolved route set. A lone layered M1 view runs
+    // today's path below verbatim; a model-route-only set runs the route loop; a set
+    // mixing the layered M1 pipeline with model routes has no defined joint execution
+    // and fails closed with one command diagnostic, landing nothing.
+    if views.len() != 1 || views[0].shape != RouteShape::M1Layered {
+        if views.iter().any(|v| v.shape == RouteShape::M1Layered) {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!(
+                    "experiment {experiment_id} mixes the layered M1 pipeline with model \
+                     routes; the run command executes a single-shape route set"
+                ),
+            )]));
+        } else {
+            execute_routes(root, &views, shell);
+        }
         return;
-    };
+    }
+    let resolved = views.pop().expect("single layered M1 view checked above");
     // §7.2's lexicon hash rides the raw reference-file bytes (§4.4: the
     // lexicon is a file, not an accepted artifact), taken here where the
     // run already holds them.
@@ -242,6 +245,251 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         &resolved,
         shell,
     );
+}
+
+/// One model route's collected observations, held for the run-level tails
+/// (run-m2.1d5a-2's trace/report over both routes) and the §7.3 metrics
+/// (run-m2.1e): the route's pipeline id, its slice of the run ledger, the per-fill
+/// observations, the per-group verdict observations, and the k-sample battery — one
+/// recorded draw here, so `samples` holds a single `groups` snapshot.
+#[allow(dead_code)]
+struct RouteRun {
+    pipeline_id: Id,
+    ledger: Vec<DiagnosticRecord>,
+    fills: Vec<FillObservation>,
+    groups: Vec<GroupObservation>,
+    samples: Vec<Vec<GroupObservation>>,
+}
+
+/// Fold one fill's model identity into the run's agreed identity: a fill with no
+/// identity agrees vacuously; the first `Some` sets it; a later differing `Some` is a
+/// fail-closed conflict — the run's routes must attest one evaluator — recorded as one
+/// command diagnostic. Returns `false` on conflict so the caller stops the run. The
+/// golden cassettes all agree, so the clean route loop never trips this.
+fn agree_model_identity(
+    agreed: &mut Option<ModelIdentity>,
+    candidate: Option<ModelIdentity>,
+    shell: &mut Shell,
+) -> bool {
+    let Some(candidate) = candidate else {
+        return true;
+    };
+    match agreed {
+        Some(existing) if *existing != candidate => {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                "model routes disagree on the model identity attesting the run".to_owned(),
+            )]));
+            false
+        }
+        Some(_) => true,
+        None => {
+            *agreed = Some(candidate);
+            true
+        }
+    }
+}
+
+/// The model-route execution loop (run-m2.1d5a): run each resolved model route
+/// (single_ir, direct_smt) over the shared locked inputs, landing its per-route
+/// artifacts under `routes/{pipeline_id}/`. [`execute`] reaches here only for a set
+/// whose every view is a model route — it runs a lone layered M1 view inline and
+/// fails a mixed set closed — so a layered M1 view here is unreachable.
+///
+/// Each route reuses the already-built route processing-stages: [`route_document_head`]
+/// lands the deterministic head, then single_ir fills one ClinicalIR bundle per
+/// document ([`single_ir_fill`]) and compiles + verifies each group
+/// ([`compile_verify_group`]), while direct_smt fills one overlap/deontic SMT pair per
+/// group ([`direct_smt_fill`]) and verifies it ([`direct_smt_verify_group`]). Group
+/// artifacts land route-namespaced under `routes/{pipeline_id}/groups/{gid}` (the
+/// head-namespacing mirror), so the two routes never collide under the one run out.
+///
+/// The per-route observations collect into a [`RouteRun`] each; the run-level
+/// trace/report tails over both routes (run-m2.1d5a-2) and the §7.3 metrics
+/// (run-m2.1e) consume them, so the collected runs stay unread here.
+fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
+    // §7.2's lexicon hash rides the raw reference-file bytes, mirroring the M1 path;
+    // the hash itself waits on the run-m2.1d5a-2 tails, so it is unread today.
+    let (lexicon, _lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
+        Ok(bytes) => match load_lexicon(&bytes) {
+            Ok(lexicon) => (lexicon, hash_bytes(&bytes)),
+            Err(e) => {
+                shell.diagnostic(invalid_diagnostic(vec![
+                    (static_id("file"), LEXICON_FILE.to_owned()),
+                    (static_id("reason"), e.to_string()),
+                ]));
+                return;
+            }
+        },
+        Err(e) => {
+            shell.diagnostic(invalid_diagnostic(vec![
+                (static_id("file"), LEXICON_FILE.to_owned()),
+                (static_id("reason"), format!("read {LEXICON_FILE}: {e}")),
+            ]));
+            return;
+        }
+    };
+    // The cassette store points at `<root>/cassettes/` (infallible); the solver
+    // adapter is load-bearing for every group verdict, so its failure is command-scope.
+    let store = CassetteStore::new(root);
+    let adapter = match Z3Adapter::new() {
+        Ok(adapter) => adapter,
+        Err(e) => {
+            shell.diagnostic(DiagnosticRecord {
+                code: DiagnosticCode::SolverExecutionFailure,
+                outcome: Outcome::Invalid,
+                payload: vec![(static_id("reason"), format!("solver adapter: {e}"))],
+                region_ids: vec![],
+                artifact_hashes: vec![],
+            });
+            return;
+        }
+    };
+    // The plan (and its seed) is shared across the resolved set (= experiment.seed).
+    let seed = views[0].plan.seed;
+
+    // One agreed model identity across every route's fills (see [`agree_model_identity`]).
+    let mut agreed: Option<ModelIdentity> = None;
+    let mut route_runs: Vec<RouteRun> = Vec::with_capacity(views.len());
+
+    for resolved in views {
+        let ledger_start = shell.ledger().len();
+        let repair_limit = resolved
+            .repair_limit
+            .expect("a model route resolves Some repair limit");
+        let mut fills: Vec<FillObservation> = Vec::new();
+        let mut groups: Vec<GroupObservation> = Vec::new();
+
+        match resolved.shape {
+            RouteShape::SingleIr => {
+                // One ClinicalIR bundle per unique document, keyed by document id for
+                // the group compile below; a document whose head fails is skipped (its
+                // diagnostic already raised), leaving its groups member-short.
+                let mut bundles: BTreeMap<Id, ArtifactWrapper<IrBundle>> = BTreeMap::new();
+                for entry in &resolved.documents {
+                    let Some(head) = route_document_head(root, entry, resolved, shell) else {
+                        continue;
+                    };
+                    let rd =
+                        single_ir_fill(head, &lexicon, &store, seed, resolved, repair_limit, shell);
+                    if !agree_model_identity(&mut agreed, rd.identity, shell) {
+                        return;
+                    }
+                    fills.extend(rd.fill);
+                    if let Some(bundle) = rd.trace.bundle {
+                        bundles.insert(entry.id.clone(), bundle);
+                    }
+                }
+                for group in &resolved.groups {
+                    // Compile needs every member bundle: a group short one is skipped.
+                    let Some(members) = group
+                        .test_sources
+                        .iter()
+                        .map(|s| bundles.get(s))
+                        .collect::<Option<Vec<&ArtifactWrapper<IrBundle>>>>()
+                    else {
+                        continue;
+                    };
+                    let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, group.group_id);
+                    let (compiled, results) = compile_verify_group(
+                        &group.group_id,
+                        &dir,
+                        &members,
+                        processing_stage_clock(),
+                        resolved,
+                        &adapter,
+                        shell,
+                    );
+                    if let (Some(compiled), Some(results)) = (compiled, results) {
+                        groups.push(GroupObservation {
+                            group_id: group.group_id.clone(),
+                            query_pairs: compiled
+                                .payload
+                                .solver_query_plan
+                                .iter()
+                                .map(|p| {
+                                    (
+                                        p.context_overlap_query_id.clone(),
+                                        p.deontic_consistency_query_id.clone(),
+                                    )
+                                })
+                                .collect(),
+                            results: results.payload.results.clone(),
+                        });
+                    }
+                }
+            }
+            RouteShape::DirectSmt => {
+                // Head prepass: build each unique document's deterministic head once
+                // in first-appearance order (`resolved.documents`), reused across the
+                // groups that share a member.
+                let mut heads: BTreeMap<Id, DocHead> = BTreeMap::new();
+                for entry in &resolved.documents {
+                    if let Some(head) = route_document_head(root, entry, resolved, shell) {
+                        heads.insert(entry.id.clone(), head);
+                    }
+                }
+                for group in &resolved.groups {
+                    let gid = group.group_id.clone();
+                    // The pair fill needs every member head: a group short one is skipped.
+                    let Some(head_refs) = group
+                        .test_sources
+                        .iter()
+                        .map(|s| heads.get(s))
+                        .collect::<Option<Vec<&DocHead>>>()
+                    else {
+                        continue;
+                    };
+                    let df = direct_smt_fill(
+                        &gid,
+                        &head_refs,
+                        &store,
+                        seed,
+                        resolved,
+                        repair_limit,
+                        shell,
+                    );
+                    fills.extend(df.fills);
+                    for identity in df.identities {
+                        if !agree_model_identity(&mut agreed, Some(identity), shell) {
+                            return;
+                        }
+                    }
+                    if let Some((overlap, deontic)) = df.pair {
+                        let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, gid);
+                        if let Some(results) = direct_smt_verify_group(
+                            &gid, &dir, &overlap, &deontic, resolved, &adapter, shell,
+                        ) {
+                            groups.push(GroupObservation {
+                                group_id: gid.clone(),
+                                query_pairs: vec![(
+                                    static_id(&format!("{gid}.overlap")),
+                                    static_id(&format!("{gid}.deontic")),
+                                )],
+                                results: results.payload.results.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            RouteShape::M1Layered => {
+                unreachable!("execute_routes runs only model-route views")
+            }
+        }
+
+        let ledger = shell.ledger()[ledger_start..].to_vec();
+        route_runs.push(RouteRun {
+            pipeline_id: resolved.pipeline_id.clone(),
+            ledger,
+            fills,
+            samples: vec![groups.clone()],
+            groups,
+        });
+    }
+
+    // run-m2.1d5a-2's unified trace/report tails and run-m2.1e's §7.3 metrics consume
+    // the collected per-route runs; the loop only lands per-route artifacts here.
+    let _ = &route_runs;
 }
 
 /// The §9 route family a pipeline's declared processing-stage sequence
@@ -1246,7 +1494,10 @@ fn direct_smt_fill(
         };
     }
     let prefix = route_id_prefix(resolved);
-    let dir = format!("groups/{gid}");
+    // Group artifacts land route-namespaced (`routes/{pipeline_id}/groups/{gid}`,
+    // the head-namespacing mirror) so both routes' groups never collide under the
+    // one run out when [`execute_routes`] runs them through the same shell.
+    let dir = format!("routes/{}/groups/{}", resolved.pipeline_id, gid);
     // Member-order provenance, gathered before the clock so only the fill work falls
     // inside the timed interval (the M2.7 clock-boundary discipline).
     let mut input_hashes: Vec<Hash> = Vec::new();
@@ -3237,26 +3488,133 @@ processing_stages:
         );
     }
 
-    // run-m2.1a — the model-route experiment resolves but does not execute:
-    // one command-scope diagnostic names the gate, zero artifacts land.
-    // run-m2.1d wires the multi-route execution loop.
+    /// Mirror the committed inputs `exp.m2_multihop` reads into a fresh `root` so the
+    /// route loop runs model-runtime-absent: the three registry files and toolchain
+    /// provenance ([`copy_committed_registry`]), plus `Cargo.lock`, the lexicon, the
+    /// three M1 corpus documents, and the shared reference — and, under
+    /// `<root>/cassettes/` where [`CassetteStore::new`] reads them, the seven golden
+    /// seed-42 cassettes both routes replay (three single_ir ClinicalIR fills, two
+    /// direct_smt overlap/deontic pairs), sourced from the committed test fixtures.
+    fn write_m2_root(root: &Path) {
+        let repo = repo_root();
+        let copy = |rel: &str, from: PathBuf| {
+            let target = root.join(rel);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::copy(from, target).unwrap();
+        };
+        copy_committed_registry(root);
+        for rel in [
+            LOCKFILE,
+            LEXICON_FILE,
+            "corpus/test_sources/m1_guideline_a.html",
+            "corpus/test_sources/m1_guideline_b.html",
+            "corpus/test_sources/m1_control.html",
+            "corpus/reference/m1_expected.yaml",
+        ] {
+            copy(rel, repo.join(rel));
+        }
+        let fixtures = repo.join("crates/ckc-cli/tests/fixtures");
+        for rel in [
+            "cassettes/route.single_ir/test_source.m1_control/seed-42.json",
+            "cassettes/route.single_ir/test_source.m1_guideline_a/seed-42.json",
+            "cassettes/route.single_ir/test_source.m1_guideline_b/seed-42.json",
+            "cassettes/route.direct_smt/group.m1_conflict.overlap/seed-42.json",
+            "cassettes/route.direct_smt/group.m1_conflict.deontic/seed-42.json",
+            "cassettes/route.direct_smt/group.m1_no_conflict.overlap/seed-42.json",
+            "cassettes/route.direct_smt/group.m1_no_conflict.deontic/seed-42.json",
+        ] {
+            copy(rel, fixtures.join(rel));
+        }
+    }
+
+    // run-m2.1d5a-1 — the model-route loop executes `exp.m2_multihop`'s two routes over
+    // one shared run out, landing each route's artifacts route-namespaced under
+    // `out/routes/{pipeline_id}/` so the two never collide: single_ir lands three
+    // document heads (each with its ClinicalIR bundle) and both groups' compiled +
+    // verifier_results; direct_smt lands three heads and both groups' overlap/deontic
+    // smt_query pair + verifier_results. A clean replay raises no command diagnostics
+    // and leaves no bare `out/groups/`. (The unified trace/report tails and the census
+    // pins land in run-m2.1d5a-2 / run-m2.1d5b.)
     #[test]
-    fn m2_experiment_run_gates_until_the_route_loop_lands() {
-        let (result, events, diagnostics, out, _tmp) = executed(&repo_root(), "exp.m2_multihop");
-        assert_eq!(result.outcome, Outcome::Invalid);
-        assert_eq!(events.len(), 1);
-        assert_eq!(diagnostics.len(), 1);
+    fn m2_route_loop_lands_both_routes_namespaced() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+
+        let (_result, _events, diagnostics, out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        assert!(diagnostics.is_empty(), "clean route loop: {diagnostics:?}");
+
+        let listing = |path: &Path| -> Vec<String> {
+            let mut names: Vec<String> = std::fs::read_dir(path)
+                .unwrap()
+                .map(|e| e.unwrap().file_name().into_string().unwrap())
+                .collect();
+            names.sort();
+            names
+        };
+
+        // The run out holds exactly the two route subtrees.
         assert_eq!(
-            diagnostics[0].payload,
-            vec![(
-                static_id("reason"),
-                "experiment exp.m2_multihop resolves beyond a single layered M1 view; \
-                 the run command executes only the layered M1 pipeline today"
-                    .to_owned()
-            )],
-            "{diagnostics:?}"
+            listing(&out.join("routes")),
+            ["pipe.m2_direct_smt", "pipe.m2_single_ir"]
         );
-        assert_only_logs(&out);
+
+        // single_ir: three document heads, each carrying its ClinicalIR bundle beside
+        // the extract + segment landings, and both groups' compiled + verifier_results.
+        assert_eq!(
+            listing(&out.join("routes/pipe.m2_single_ir")),
+            ["artifacts", "groups"]
+        );
+        for doc in DOC_IDS {
+            assert_eq!(
+                listing(&out.join(format!("routes/pipe.m2_single_ir/artifacts/{doc}"))),
+                [
+                    "ir_bundle.json",
+                    "segments.json",
+                    "source_document_graph.json"
+                ],
+                "single_ir {doc}"
+            );
+        }
+        for gid in ["group.m1_conflict", "group.m1_no_conflict"] {
+            // `compile` lands the emitted SMT bodies under an `smt/` subdir beside the
+            // compiled artifact, as in the M1 group layout.
+            assert_eq!(
+                listing(&out.join(format!("routes/pipe.m2_single_ir/groups/{gid}"))),
+                ["compiled.json", "smt", "verifier_results.json"],
+                "single_ir {gid}"
+            );
+        }
+
+        // direct_smt: three document heads (no bundle — raw SMT) and both groups'
+        // overlap/deontic smt_query pair plus verifier_results.
+        assert_eq!(
+            listing(&out.join("routes/pipe.m2_direct_smt")),
+            ["artifacts", "groups"]
+        );
+        for doc in DOC_IDS {
+            assert_eq!(
+                listing(&out.join(format!("routes/pipe.m2_direct_smt/artifacts/{doc}"))),
+                ["segments.json", "source_document_graph.json"],
+                "direct {doc}"
+            );
+        }
+        for gid in ["group.m1_conflict", "group.m1_no_conflict"] {
+            assert_eq!(
+                listing(&out.join(format!("routes/pipe.m2_direct_smt/groups/{gid}"))),
+                [
+                    "deontic.smt_query.json",
+                    "overlap.smt_query.json",
+                    "verifier_results.json"
+                ],
+                "direct {gid}"
+            );
+        }
+
+        // The cross-route namespacing moved every group under its route: no bare dir.
+        assert!(
+            !out.join("groups").exists(),
+            "no bare out/groups/ under the shared run out"
+        );
     }
 
     // The lexicon is load-bearing for the whole run: an unreadable file is
@@ -4611,8 +4969,9 @@ processing_stages:
         };
 
         // Layout: the head prepass lands under routes/<pipeline>/artifacts/<doc> and the
-        // fills under groups/<gid>; guideline_a appears once under artifacts (headed once).
-        assert_eq!(listing(&out), ["groups", "logs", "routes"]);
+        // fills under routes/<pipeline>/groups/<gid>; guideline_a appears once under
+        // artifacts (headed once).
+        assert_eq!(listing(&out), ["logs", "routes"]);
         assert_eq!(
             listing(&out.join("logs")),
             ["diagnostics.jsonl", "events.jsonl"]
@@ -4620,7 +4979,7 @@ processing_stages:
         assert_eq!(listing(&out.join("routes")), ["pipe.m2_direct_smt"]);
         assert_eq!(
             listing(&out.join("routes/pipe.m2_direct_smt")),
-            ["artifacts"]
+            ["artifacts", "groups"]
         );
         assert_eq!(
             listing(&out.join("routes/pipe.m2_direct_smt/artifacts")),
@@ -4642,22 +5001,24 @@ processing_stages:
             );
         }
         assert_eq!(
-            listing(&out.join("groups")),
+            listing(&out.join("routes/pipe.m2_direct_smt/groups")),
             ["group.m1_conflict", "group.m1_no_conflict"]
         );
 
         // Per group: the two landed smt_query wrappers strict-read clean, their ids
-        // route-prefixed, their content hashes equal the fill's returned pair.
+        // route-prefixed, their content hashes equal the fill's returned pair. Group
+        // artifacts land route-namespaced (the head-namespacing mirror).
         for (gid, (overlap, deontic)) in &landed_pairs {
+            let group_dir = format!("routes/pipe.m2_direct_smt/groups/{gid}");
             assert_eq!(
-                listing(&out.join(format!("groups/{gid}"))),
+                listing(&out.join(&group_dir)),
                 ["deontic.smt_query.json", "overlap.smt_query.json"],
                 "{gid}"
             );
             let overlap_landed: ArtifactWrapper<QueryBody> =
-                strict_at(&out, &format!("groups/{gid}/overlap.smt_query.json"));
+                strict_at(&out, &format!("{group_dir}/overlap.smt_query.json"));
             let deontic_landed: ArtifactWrapper<QueryBody> =
-                strict_at(&out, &format!("groups/{gid}/deontic.smt_query.json"));
+                strict_at(&out, &format!("{group_dir}/deontic.smt_query.json"));
             assert_eq!(
                 overlap_landed.artifact_id,
                 format!("pipe.m2_direct_smt.{gid}.overlap.smt_query")
@@ -4931,8 +5292,10 @@ processing_stages:
             "overlap's recorded call folds into the event, not dropped"
         );
         assert!(
-            out.join(format!("groups/{gid}/overlap.smt_query.json"))
-                .exists(),
+            out.join(format!(
+                "routes/pipe.m2_direct_smt/groups/{gid}/overlap.smt_query.json"
+            ))
+            .exists(),
             "overlap landed on disk before the deontic cassette failed"
         );
     }
