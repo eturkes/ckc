@@ -73,9 +73,18 @@ impl Fail {
 #[derive(Debug)]
 enum RawCommand {
     RegistryCheck,
-    Run { experiment: String, out: String },
-    Replay { run_dir: String },
-    Trace { run_dir: String, finding: String },
+    Run {
+        experiment: String,
+        out: String,
+        record: bool,
+    },
+    Replay {
+        run_dir: String,
+    },
+    Trace {
+        run_dir: String,
+        finding: String,
+    },
 }
 
 /// Validated command.
@@ -86,6 +95,7 @@ enum Command {
         experiment: Id,
         out: PathBuf,
         run_id: Id,
+        record: bool,
     },
     Replay {
         run_dir: PathBuf,
@@ -121,8 +131,15 @@ fn parse(args: &[String]) -> Result<RawCommand, Fail> {
             }
         }
         "run" => {
-            let [experiment, out] = take_flags(OP_RUN, ["--experiment", "--out"], rest)?;
-            Ok(RawCommand::Run { experiment, out })
+            // `--record` is a bare boolean; pull it out before the value-flag
+            // pass, which accounts for exactly `--experiment` and `--out`.
+            let (record, rest) = take_bool_flag(OP_RUN, "--record", rest)?;
+            let [experiment, out] = take_flags(OP_RUN, ["--experiment", "--out"], &rest)?;
+            Ok(RawCommand::Run {
+                experiment,
+                out,
+                record,
+            })
         }
         "replay" => {
             let op = static_id(OP_REPLAY);
@@ -149,6 +166,26 @@ fn parse(args: &[String]) -> Result<RawCommand, Fail> {
             format!("unknown command {other:?}; expected one of: registry run replay trace"),
         )),
     }
+}
+
+/// Pull an optional bare boolean flag out of `args`, returning whether it was
+/// present and the remaining tokens for the value-flag pass. A repeat is a
+/// duplicate error; a value-bearing form (`--flag=x`) does not match the bare
+/// name, so it stays in `rest` and the value-flag pass rejects it as unexpected.
+fn take_bool_flag(op: &str, name: &str, args: &[String]) -> Result<(bool, Vec<String>), Fail> {
+    let mut present = false;
+    let mut rest = Vec::with_capacity(args.len());
+    for token in args {
+        if token.as_str() == name {
+            if present {
+                return Err(Fail::new(static_id(op), format!("duplicate {name}")));
+            }
+            present = true;
+        } else {
+            rest.push(token.clone());
+        }
+    }
+    Ok((present, rest))
 }
 
 /// Collect exactly the named flags, each once with one value, no extras.
@@ -198,7 +235,11 @@ fn take_flags<const N: usize>(
 fn validate(raw: RawCommand) -> Result<Command, Fail> {
     match raw {
         RawCommand::RegistryCheck => Ok(Command::RegistryCheck),
-        RawCommand::Run { experiment, out } => {
+        RawCommand::Run {
+            experiment,
+            out,
+            record,
+        } => {
             let op = static_id(OP_RUN);
             let experiment = parse_id(&op, "--experiment", &experiment)?;
             let out = PathBuf::from(out);
@@ -219,6 +260,7 @@ fn validate(raw: RawCommand) -> Result<Command, Fail> {
                 experiment,
                 out,
                 run_id,
+                record,
             })
         }
         RawCommand::Replay { run_dir } => {
@@ -306,8 +348,10 @@ fn execute(command: &Command, shell: &mut Shell) -> Option<Vec<u8>> {
             crate::registry_check::check(Path::new("."), shell);
             None
         }
-        Command::Run { experiment, .. } => {
-            crate::run::execute(Path::new("."), experiment, shell);
+        Command::Run {
+            experiment, record, ..
+        } => {
+            crate::run::execute(Path::new("."), experiment, *record, shell);
             None
         }
         Command::Trace {
@@ -529,6 +573,62 @@ mod tests {
         }
         // Validation failed before creation in every case.
         assert!(!fresh.exists());
+    }
+
+    #[test]
+    fn run_record_flag_parses() {
+        // No `--record` → record false.
+        let Ok(RawCommand::Run { record, .. }) =
+            parse(&args(&["run", "--experiment", "e", "--out", "o"]))
+        else {
+            panic!("expected a run command");
+        };
+        assert!(!record);
+
+        // Bare `--record` → record true, position-independent, other flags intact.
+        let Ok(RawCommand::Run {
+            record,
+            experiment,
+            out,
+        }) = parse(&args(&[
+            "run",
+            "--record",
+            "--experiment",
+            "e",
+            "--out",
+            "o",
+        ]))
+        else {
+            panic!("expected a run command");
+        };
+        assert!(record);
+        assert_eq!(experiment, "e");
+        assert_eq!(out, "o");
+
+        // Duplicate `--record` → reject.
+        let err = parse(&args(&[
+            "run",
+            "--record",
+            "--record",
+            "--experiment",
+            "e",
+            "--out",
+            "o",
+        ]))
+        .unwrap_err();
+        assert!(err.reason.contains("duplicate --record"), "{}", err.reason);
+
+        // Value-bearing `--record=x` → unexpected argument (left for the value pass).
+        let err = parse(&args(&[
+            "run",
+            "--record=x",
+            "--experiment",
+            "e",
+            "--out",
+            "o",
+        ]))
+        .unwrap_err();
+        assert!(err.reason.contains("unexpected argument"), "{}", err.reason);
     }
 
     #[test]

@@ -41,7 +41,7 @@
 //! resolution and shared verbatim with the §5/§4.6 manifests.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ckc_core::{
@@ -51,16 +51,17 @@ use ckc_core::{
     SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
     canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
     hash_bytes, parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
-    parse_schemas, read_strict_canonical,
+    parse_schemas, read_strict_canonical, validate_model_registry,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
 };
 
-use crate::cassette::{CassetteKey, CassetteStore};
+use crate::cassette::{CassetteKey, CassetteStore, RecordContext};
 use crate::extract::{ExtractConfig, extract};
 use crate::manifests::{ManifestInputs, assemble_manifests};
 use crate::metrics::{FillObservation, GroupObservation, RouteMetrics, route_metrics};
+use crate::model::ModelAdapter;
 use crate::model_fill::{
     FillReject, FillSource, ModelFill, RECORDED_CALLS_COUNTER, REPAIRS_COUNTER, model_fill,
 };
@@ -188,7 +189,7 @@ const MODEL_SAMPLE_COUNT_KEY: &str = "model_sample_count";
 /// Run `ckc run` rooted at `root` (the invocation working directory: §3
 /// anchors `registry/` and corpus paths at the repository root). Evidence,
 /// artifacts, and the outcome land entirely in the shell.
-pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
+pub(crate) fn execute(root: &Path, experiment_id: &Id, record: bool, shell: &mut Shell) {
     let Some(mut views) = resolve(root, experiment_id, shell) else {
         return;
     };
@@ -206,7 +207,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
                 ),
             )]));
         } else {
-            execute_routes(root, &views, shell);
+            execute_routes(root, &views, record, shell);
         }
         return;
     }
@@ -344,7 +345,7 @@ fn agree_model_identity(
 /// The per-route observations collect into a [`RouteRun`] each for the §7.3
 /// metrics (run-m2.1e); the run-level trace/report tails over both routes then
 /// run once, over every route's docs, source graphs, and group traces.
-fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
+fn execute_routes(root: &Path, views: &[Resolved], record: bool, shell: &mut Shell) {
     // §7.2's lexicon hash rides the raw reference-file bytes, mirroring the M1 path;
     // the run-level report tail below hashes them.
     let (lexicon, lexicon_hash) = match std::fs::read(root.join(LEXICON_FILE)) {
@@ -382,6 +383,18 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
             return;
         }
     };
+    // Record mode (run-m2.1f): `ckc run --record` invokes the runtime once per
+    // model fill and persists each cassette. Probe the live adapter and load the
+    // validated committed model registry once here; a replay run (the default)
+    // builds none of this and never touches the runtime.
+    let record_setup = if record {
+        match build_record_setup(root, shell) {
+            Some(setup) => Some(setup),
+            None => return,
+        }
+    } else {
+        None
+    };
     // The plan (and its seed) is shared across the resolved set (= experiment.seed).
     let seed = views[0].plan.seed;
 
@@ -407,6 +420,20 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
         let mut fills: Vec<FillObservation> = Vec::new();
         let mut groups: Vec<GroupObservation> = Vec::new();
 
+        // This route's record-mode inputs (schema/prompt/context), assembled once
+        // per view for both fills below; `None` on a replay run, so the fills
+        // default to cassette replay. A registry gap here is command-scope.
+        let route_record = match &record_setup {
+            Some(setup) => match build_route_record(root, setup, resolved) {
+                Ok(record) => Some(record),
+                Err(reason) => {
+                    shell.diagnostic(invalid_diagnostic(vec![(static_id("reason"), reason)]));
+                    return;
+                }
+            },
+            None => None,
+        };
+
         match resolved.shape {
             RouteShape::SingleIr => {
                 // One ClinicalIR bundle per unique document, keyed by document id for
@@ -417,8 +444,16 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                     let Some(head) = route_document_head(root, entry, resolved, shell) else {
                         continue;
                     };
-                    let rd =
-                        single_ir_fill(head, &lexicon, &store, seed, resolved, repair_limit, shell);
+                    let rd = single_ir_fill(
+                        head,
+                        &lexicon,
+                        &store,
+                        seed,
+                        resolved,
+                        repair_limit,
+                        route_record.as_ref(),
+                        shell,
+                    );
                     if !agree_model_identity(&mut agreed, rd.identity, shell) {
                         return;
                     }
@@ -543,6 +578,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         seed,
                         resolved,
                         repair_limit,
+                        route_record.as_ref(),
                         shell,
                     );
                     fills.extend(df.fills);
@@ -1413,6 +1449,7 @@ fn single_ir_accept<'a>(
 /// event (infrastructure, not a stage outcome). Returns the document's
 /// [`RouteDoc`]; run-m2.1d5a drives it per document.
 #[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
 fn single_ir_fill(
     head: DocHead,
     lexicon: &Lexicon,
@@ -1420,6 +1457,7 @@ fn single_ir_fill(
     seed: u64,
     resolved: &Resolved,
     repair_limit: u32,
+    record: Option<&RouteRecord>,
     shell: &mut Shell,
 ) -> RouteDoc {
     let DocHead {
@@ -1453,8 +1491,21 @@ fn single_ir_fill(
     // The fill event's inputs, cloned ahead of the clock (the M2.7 boundary
     // discipline: pure setup stays outside the timed interval).
     let fill_inputs = vec![source.content_hash.clone(), segments.content_hash.clone()];
+    // Compose the record prompt outside the timed interval (the M2.7 clock
+    // boundary): pure setup stays out of the fill's measured span. A replay run
+    // composes nothing and sends `FillSource::Replay`.
+    let record_prompt = record.map(|r| single_ir_prompt(&r.template, &doc_id, &source.payload));
     let clock = processing_stage_clock();
-    let fill = match model_fill(store, &key, FillSource::Replay, repair_limit, accept) {
+    let source_fill = match record.zip(record_prompt.as_deref()) {
+        Some((r, prompt)) => FillSource::Record {
+            adapter: r.adapter,
+            prompt,
+            constraint: &r.constraint,
+            ctx: &r.ctx,
+        },
+        None => FillSource::Replay,
+    };
+    let fill = match model_fill(store, &key, source_fill, repair_limit, accept) {
         Ok(fill) => fill,
         Err(e) => {
             shell.diagnostic(invalid_diagnostic(vec![
@@ -1654,6 +1705,7 @@ fn direct_smt_fill(
     seed: u64,
     resolved: &Resolved,
     repair_limit: u32,
+    record: Option<&RouteRecord>,
     shell: &mut Shell,
 ) -> DirectFill {
     // The cassette-role design mints exactly one (overlap, deontic) pair per group, so a
@@ -1685,6 +1737,14 @@ fn direct_smt_fill(
         input_hashes.push(head.source.content_hash.clone());
         input_hashes.push(head.segments.content_hash.clone());
     }
+    // Member (doc-id, source graph) pairs for the record prompt, gathered once
+    // (both roles share them) and only when recording; a replay run gathers none.
+    let record_members: Option<Vec<(&Id, &SourceDocumentGraph)>> = record.map(|_| {
+        heads
+            .iter()
+            .map(|h| (&h.trace.document_id, &h.source.payload))
+            .collect()
+    });
     let clock = processing_stage_clock();
     let mut fills: Vec<FillObservation> = Vec::new();
     let mut identities: Vec<ModelIdentity> = Vec::new();
@@ -1701,13 +1761,21 @@ fn direct_smt_fill(
             source: source.clone(),
             seed,
         };
-        let fill = match model_fill(
-            store,
-            &key,
-            FillSource::Replay,
-            repair_limit,
-            direct_smt_accept(),
-        ) {
+        // Per-role record prompt (both roles share the members); a replay run
+        // composes none and sends `FillSource::Replay`.
+        let record_prompt = record
+            .zip(record_members.as_deref())
+            .map(|(r, members)| direct_smt_prompt(&r.template, gid, role, members));
+        let role_fill = match record.zip(record_prompt.as_deref()) {
+            Some((r, prompt)) => FillSource::Record {
+                adapter: r.adapter,
+                prompt,
+                constraint: &r.constraint,
+                ctx: &r.ctx,
+            },
+            None => FillSource::Replay,
+        };
+        let fill = match model_fill(store, &key, role_fill, repair_limit, direct_smt_accept()) {
             Ok(fill) => fill,
             Err(e) => {
                 // A cassette IO/contract failure is infrastructure, not a stage outcome.
@@ -2326,13 +2394,12 @@ fn select_route_hashes<'a>(
 // want-set), and compose the first-draft prompt a route sends the runtime from
 // its template plus the source graph's guideline text. run-m2.1f2 threads these
 // into `execute_routes`; run-m2.2 refines the composed wording against a live
-// recording. Pre-consumers here, hence `#[allow(dead_code)]`.
+// recording.
 
 /// The `registry/schemas.yaml` entry a model route records against, keyed by
 /// entry `id` like [`manifest_inputs`]' want-set: single_ir constrains against
 /// `schema.clinical_ir`, direct_smt against `schema.smt_query`. The layered M1
 /// shape records no model fill, so it selects nothing.
-#[allow(dead_code)]
 fn select_record_schema(schemas: &[SchemaEntry], shape: RouteShape) -> Option<&SchemaEntry> {
     let want = match shape {
         RouteShape::SingleIr => "schema.clinical_ir",
@@ -2346,7 +2413,6 @@ fn select_record_schema(schemas: &[SchemaEntry], shape: RouteShape) -> Option<&S
 /// entry `id` like [`manifest_inputs`]' want-set: single_ir sends
 /// `prompt.single_ir`, direct_smt sends `prompt.direct_smt`. The layered M1
 /// shape records no model fill, so it selects nothing.
-#[allow(dead_code)]
 fn select_record_prompt(prompts: &[PromptEntry], shape: RouteShape) -> Option<&PromptEntry> {
     let want = match shape {
         RouteShape::SingleIr => "prompt.single_ir",
@@ -2360,7 +2426,6 @@ fn select_record_prompt(prompts: &[PromptEntry], shape: RouteShape) -> Option<&P
 /// one line each. The §4.5 graph already stores spans in reading order, but the
 /// composer sorts explicitly so a partial or reordered graph still yields a
 /// deterministic prompt.
-#[allow(dead_code)]
 fn reading_order_text(graph: &SourceDocumentGraph) -> Vec<String> {
     let mut spans: Vec<_> = graph.spans.iter().collect();
     spans.sort_by_key(|s| s.reading_order);
@@ -2370,7 +2435,6 @@ fn reading_order_text(graph: &SourceDocumentGraph) -> Vec<String> {
 /// Compose the first-draft single_ir record prompt: the route `template`, a
 /// document-id line, then the document's guideline text in `reading_order`,
 /// newline-joined. run-m2.2 refines the wording against a live recording.
-#[allow(dead_code)]
 fn single_ir_prompt(template: &str, doc_id: &Id, graph: &SourceDocumentGraph) -> String {
     let mut lines = vec![template.to_owned(), format!("document: {doc_id}")];
     lines.extend(reading_order_text(graph));
@@ -2381,7 +2445,6 @@ fn single_ir_prompt(template: &str, doc_id: &Id, graph: &SourceDocumentGraph) ->
 /// (`overlap`/`deontic`) of group `gid`: the route `template`, group and role
 /// lines, then each member's document-id line followed by its guideline text in
 /// `reading_order`, newline-joined. run-m2.2 refines the wording.
-#[allow(dead_code)]
 fn direct_smt_prompt(
     template: &str,
     gid: &Id,
@@ -2398,6 +2461,108 @@ fn direct_smt_prompt(
         lines.extend(reading_order_text(graph));
     }
     lines.join("\n")
+}
+
+/// The shared record-mode inputs assembled once per `ckc run --record` model
+/// run: the live runtime adapter and the validated committed model registry.
+/// Each view then selects its route-relevant schema and prompt from these (see
+/// [`build_route_record`]).
+struct RecordSetup {
+    adapter: ModelAdapter,
+    schemas: Vec<SchemaEntry>,
+    prompts: Vec<PromptEntry>,
+}
+
+/// One model route's record-mode inputs, assembled per view: a borrow of the
+/// shared runtime adapter, the route prompt template text (its `inline` text or
+/// the read `path` file), the constraint (schema/grammar) path handed to the
+/// runtime, and the recording context (producer, template hash, budget). The
+/// fills compose the per-document/per-role prompt from `template` and pass a
+/// borrow of this value as [`FillSource::Record`].
+struct RouteRecord<'a> {
+    adapter: &'a ModelAdapter,
+    template: String,
+    constraint: PathBuf,
+    ctx: RecordContext,
+}
+
+/// Assemble the shared record-mode inputs once for a `ckc run --record` model
+/// run: probe the live model-runtime adapter, then load and validate the
+/// committed model registry (`schemas.yaml` / `prompts.yaml`). Any failure is
+/// command-scope — the adapter is load-bearing for every fill, and an invalid
+/// registry cannot be joined safely — so it lands one diagnostic and returns
+/// `None`, stopping the run. The adapter failure is a plain `invalid`
+/// diagnostic, not a solver code: no model-runtime diagnostic code exists yet
+/// (a dedicated §7.4 code is a later concern).
+fn build_record_setup(root: &Path, shell: &mut Shell) -> Option<RecordSetup> {
+    let adapter = match ModelAdapter::new() {
+        Ok(adapter) => adapter,
+        Err(e) => {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("reason"),
+                format!("model adapter: {e}"),
+            )]));
+            return None;
+        }
+    };
+    let schemas = load(root, SCHEMAS_FILE, parse_schemas, shell)?;
+    let prompts = load(root, PROMPTS_FILE, parse_prompts, shell)?;
+    let findings = validate_model_registry(&schemas, &prompts);
+    if !findings.is_empty() {
+        for finding in findings {
+            shell.diagnostic(invalid_diagnostic(vec![(
+                static_id("finding"),
+                finding.to_string(),
+            )]));
+        }
+        return None;
+    }
+    Some(RecordSetup {
+        adapter,
+        schemas,
+        prompts,
+    })
+}
+
+/// Assemble one view's [`RouteRecord`] from the shared record setup: the
+/// route-relevant schema and prompt entry ([`select_record_schema`] /
+/// [`select_record_prompt`], mirroring the §9 manifest want-set), the prompt
+/// template (its `inline` text or the read `path` file), the constraint path,
+/// and the recording context. A missing wanted entry — a layered M1 shape
+/// reaching here, or a registry gap [`validate_model_registry`] did not catch —
+/// fails loudly (`Err`), never a silent replay. The `path` joins are safe:
+/// [`build_record_setup`] validated every path before this.
+fn build_route_record<'a>(
+    root: &Path,
+    setup: &'a RecordSetup,
+    resolved: &Resolved,
+) -> Result<RouteRecord<'a>, String> {
+    let shape = resolved.shape;
+    let schema = select_record_schema(&setup.schemas, shape)
+        .ok_or_else(|| format!("record: no committed schema for route shape {shape:?}"))?;
+    let prompt = select_record_prompt(&setup.prompts, shape)
+        .ok_or_else(|| format!("record: no committed prompt for route shape {shape:?}"))?;
+    let template = match (&prompt.inline, &prompt.path) {
+        (Some(inline), _) => inline.clone(),
+        (None, Some(path)) => std::fs::read_to_string(root.join(path))
+            .map_err(|e| format!("record: read prompt {path}: {e}"))?,
+        (None, None) => {
+            return Err(format!(
+                "record: prompt {} has neither inline nor path",
+                prompt.id
+            ));
+        }
+    };
+    Ok(RouteRecord {
+        adapter: &setup.adapter,
+        template,
+        constraint: root.join(&schema.path),
+        ctx: RecordContext {
+            producer: producer(resolved, MODEL_FILL),
+            prompt_template_hash: prompt.template_hash.clone(),
+            budget: Duration::from_millis(resolved.budget_ms),
+        },
+    })
 }
 
 /// Gather the run state the §5/§4.6 manifests attest, one value per
@@ -3153,7 +3318,7 @@ mod tests {
         let out = tmp.path().join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m1"), Some(out.clone()));
-        execute(root, &experiment.parse().unwrap(), &mut shell);
+        execute(root, &experiment.parse().unwrap(), false, &mut shell);
         let finished = shell.finish().unwrap();
         let events = read_jsonl(&std::fs::read(out.join("logs/events.jsonl")).unwrap()).unwrap();
         let diagnostics =
@@ -5626,7 +5791,8 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out.clone()));
             let head = route_document_head(&root, &entry, &resolved, &mut shell)
                 .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
-            let route_doc = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell);
+            let route_doc =
+                single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, None, &mut shell);
 
             // §7.3 telemetry + §9 identity ride the RouteDoc whole: one clean
             // recorded call, and the goldens' synthetic identity.
@@ -5891,7 +6057,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
         for entry in single_ir_corpus() {
             let head = route_document_head(&root, &entry, &resolved, &mut shell)
                 .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
-            let bundle = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, &mut shell)
+            let bundle = single_ir_fill(head, &lexicon, &store, 42, &resolved, 0, None, &mut shell)
                 .trace
                 .bundle
                 .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
@@ -6172,7 +6338,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
             let head = route_document_head(&root, &guideline_a, &resolved, &mut shell)
                 .expect("guideline_a lands its deterministic route head");
-            let bundle = single_ir_fill(head, &lexicon, &store, 98, &resolved, 1, &mut shell)
+            let bundle = single_ir_fill(head, &lexicon, &store, 98, &resolved, 1, None, &mut shell)
                 .trace
                 .bundle
                 .expect("the malformed base repairs to an accepted bundle");
@@ -6205,7 +6371,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             let mut shell = Shell::open(static_id("run"), static_id("m2"), Some(out));
             let head = route_document_head(&root, &guideline_a, &resolved, &mut shell)
                 .expect("guideline_a lands its deterministic route head");
-            let route = single_ir_fill(head, &lexicon, &store, 99, &resolved, 2, &mut shell);
+            let route = single_ir_fill(head, &lexicon, &store, 99, &resolved, 2, None, &mut shell);
             assert!(
                 route.trace.bundle.is_none(),
                 "a hallucinated reference ends the route"
@@ -6267,7 +6433,16 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             );
         }
         let head_refs: Vec<&DocHead> = heads.iter().collect();
-        direct_smt_fill(gid, &head_refs, store, seed, resolved, repair_limit, shell)
+        direct_smt_fill(
+            gid,
+            &head_refs,
+            store,
+            seed,
+            resolved,
+            repair_limit,
+            None,
+            shell,
+        )
     }
 
     /// route-direct-smt.3a — a minimal [`Resolved`] for the direct_smt route over
@@ -6566,7 +6741,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
                 })
                 .collect();
             let (overlap, deontic) =
-                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 1, &mut shell)
+                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 1, None, &mut shell)
                     .pair
                     .unwrap_or_else(|| panic!("{gid}: direct_smt_fill yielded no pair"));
 
@@ -7108,7 +7283,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
                 })
                 .collect();
             let (overlap, deontic) =
-                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 0, &mut shell)
+                direct_smt_fill(&gid, &head_refs, &store, 42, &resolved, 0, None, &mut shell)
                     .pair
                     .expect("the scored group fills a pair");
             let results = direct_smt_verify_group(
@@ -7654,10 +7829,13 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             for entry in &corpus {
                 let head = route_document_head(&root, entry, &resolved, &mut shell)
                     .unwrap_or_else(|| panic!("{}: no deterministic route head", entry.id));
-                let bundle = single_ir_fill(head, &lexicon, &store, 42, &resolved, 1, &mut shell)
-                    .trace
-                    .bundle
-                    .unwrap_or_else(|| panic!("{}: single_ir_fill yielded no bundle", entry.id));
+                let bundle =
+                    single_ir_fill(head, &lexicon, &store, 42, &resolved, 1, None, &mut shell)
+                        .trace
+                        .bundle
+                        .unwrap_or_else(|| {
+                            panic!("{}: single_ir_fill yielded no bundle", entry.id)
+                        });
                 bundles.insert(entry.id.clone(), bundle);
             }
             let mut groups = Vec::new();

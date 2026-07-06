@@ -237,9 +237,21 @@ aggressively; full pre-consolidation text in git history.
   runtime-ABSENT, `record` (gated) needs the runtime + a clean `Completed`. Committed TEST cassette →
   `crates/ckc-cli/tests/fixtures/cassettes/...` (.2b precedent — test artifact, NOT `corpus/test_sources/`
   (route units own those) NOR `schemas/`), blessed via an `#[ignore]`d `CKC_MODEL_COMMAND`-unset-guarded
-  test mirroring `tests/model_live.rs`, content-hash-pinned. DEFERRED (run-m2.1): the `--record`
-  surface + replay.rs model-artifact coverage + §9 manifest `prompt_template_hash` (stage-model-fill.1
-  now drives replay/record via `FillSource`, next bullet).
+  test mirroring `tests/model_live.rs`, content-hash-pinned. LANDED run-m2.1f1+f2: the `--record`
+  surface = f1 pure selectors/composers + f2 dispatch flag (`take_bool_flag` pre-partitions `--record`
+  out of `rest` BEFORE `take_flags`)→validate→execute→execute_routes threading; `execute_routes` builds
+  `RecordSetup` (adapter probe + `validate_model_registry`) ONCE `if record` else `None`, then per-view
+  `build_route_record` (f1 select→template/constraint/`RecordContext`) feeds both fills' new
+  `Option<&RouteRecord>` → `FillSource::Record` (type-enforced, NO live call); §9 manifest fields landed
+  e-B. DEFERRED to run-m2.2 (LIVE, via `FillSource`): live record exercise + replay.rs model-artifact
+  coverage. f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
+  void under `#![forbid(unsafe_code)]` (set_var forbidden, above) → the no-probe property is STRUCTURAL
+  (record_setup built only `if record`, else `None` → a replay run never constructs `ModelAdapter`),
+  proven by threading `false` through the green `m2_route_loop_lands_both_routes_namespaced`; the flag
+  itself is pinned by a direct-`parse()` `run_record_flag_parses` (no-flag→false / bare→true, flags
+  intact / dup→reject / `--record=x`→reject). RULE: a respec step prescribing `set_var` for
+  env-dependent test setup is unimplementable here → substitute the structural guard + a green
+  regression + a direct parse-level unit test.
 - Model-fill stage core (§7.4/§9, stage-model-fill.1 core + .2 repair/grounding,
   `ckc-cli/src/model_fill.rs`). DECOUPLED core
   `model_fill<T>(store, key, source: FillSource, repair_limit, accept) -> Result<ModelFill<T>, CassetteError>` →

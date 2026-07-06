@@ -208,34 +208,28 @@ all live in run.rs (used by the fills); `budget_ms` is the §8.4 `solver_ms_per_
   verbatim, run-m2.2 refines). Tests: selector hit/miss/M1Layered-None + each composer pins the EXACT
   string over a 2-span array-order≠reading_order graph (`SourceTextSpan::derive`); SchemaEntry/
   PromptEntry first literal builders in-crate. 84% 168K/200K
-- [ ] run-m2.1f2: dispatch `--record` + record-mode threading (consumes f1; B2a-style
-  compute-then-green; Record arm type-enforced, live exercise = run-m2.2). (1) dispatch.rs: `--record`
-  optional boolean — pre-partition it out of `rest` BEFORE `take_flags(OP_RUN,["--experiment","--out"],
-  …)` (:124, fixed-arity value-flags), thread through `RawCommand::Run{experiment,out,record}` +
-  `validate` (:201) + `Command::Run{…,record}` + `execute` (:309) → `crate::run::execute(Path::new("."),
-  experiment, record, shell)`. (2) run.rs `execute` (:190): add `record:bool`, pass to execute_routes
-  (M1-only inline path ignores it). (3) `execute_routes` (:346): when `record`, `ModelAdapter::new()`
-  ONCE (Err→command-scope `invalid_diagnostic` `reason`=`model adapter: {e}` + return, NOT
-  `SolverExecutionFailure`), load schemas.yaml+prompts.yaml (mirror manifest_inputs read+parse) THEN
-  `validate_model_registry(&schemas,&prompts)` (read/parse/non-empty-findings→`invalid_diagnostic` +
-  return — guards path-XOR + safe paths before the joins), build per-view
-  `RouteRecord{adapter:&ModelAdapter, template:String (f1 select_record_prompt → `entry.inline` else
-  read `root.join(entry.path)`), constraint:PathBuf (`root.join(`f1 select_record_schema`.path)`),
-  ctx:RecordContext{producer(resolved,MODEL_FILL), `entry.template_hash`, budget:Duration from
-  resolved.budget_ms (SOLVER budget reused first-draft; dedicated model budget = run-m2.2)}}`; pass `Option<&RouteRecord>` to `single_ir_fill` (:1415, call ~420) +
-  `direct_smt_fill` (:1649, call ~544; map heads→`(&h.trace.document_id, &h.source.payload)`). (4)
-  fills: add `record:Option<&RouteRecord>`; None→`FillSource::Replay` (unchanged), Some→build the
-  prompt via f1 (single_ir: `single_ir_prompt(&r.template,&doc_id,&source.payload)` at the model_fill
-  call :1456; direct: per-role `direct_smt_prompt(&r.template,gid,role,&members)` inside the role loop
-  at model_fill call ~1704) + `FillSource::Record{r.adapter,&prompt,&r.constraint,&r.ctx}`. (5) update
-  ALL execute/execute_routes callers to thread `record` (M1 callers pass false). (6) tests: (a) default-replay
-  acceptance — record=false builds NO adapter — set `CKC_MODEL_COMMAND` to a bogus command, assert
-  a record=false model-route run still lands (no probe fires), thread false into
-  `m2_route_loop_lands_both_routes_namespaced` (stays green); (b) dispatch parse-level (mirror existing
-  dispatch tests): no flag→record=false, bare `--record`→record=true, dup `--record`→reject,
-  value-bearing `--record=x`→reject. Reading: f1 fns (this crate); all
-  run.rs/dispatch.rs/cassette.rs/model.rs facts BANKED in the RESPEC note (do NOT re-read). Gate:
-  `cargo test -p ckc-cli`; fmt/clippy; doc-lint; type-enforced Record arm (live exercise = run-m2.2).
+- [x] run-m2.1f2: dispatch `--record` + record-mode threading (consumes f1; B2a-style compute-then-green,
+  Record arm type-enforced, live exercise = run-m2.2). dispatch.rs `take_bool_flag(op,name,args)`
+  pre-partitions `--record` out of `rest` BEFORE `take_flags` (dup→`duplicate --record`; `--record=x`
+  stays in rest → `take_flags` rejects unexpected-argument) → `RawCommand`/`Command::Run{…,record}` →
+  `crate::run::execute(…, *record, shell)`; replay re-exec + both M1 callers thread `false`. run.rs
+  threads `record` `execute`→`execute_routes`, which builds `RecordSetup{adapter,schemas,prompts}` ONCE
+  `if record` else `None` (`build_record_setup`: `ModelAdapter::new()` Err→command-scope
+  `invalid_diagnostic` reason=`model adapter: {e}`, NOT `SolverExecutionFailure`; loads
+  SCHEMAS/PROMPTS_FILE + `validate_model_registry`, non-empty findings→diagnostic+return, guarding
+  path-XOR/safe-paths before any join), then per-view `build_route_record` (f1
+  `select_record_{schema,prompt}` → `template`=inline|read `root.join(path)`, `constraint`=
+  `root.join(schema.path)`, `ctx`=`RecordContext{producer(resolved,MODEL_FILL), prompt.template_hash,
+  budget=from_millis(budget_ms)}`; missing shape entry→command-scope+return). Both fills gain
+  `record:Option<&RouteRecord>` (`single_ir_fill` +`#[allow(clippy::too_many_arguments)]`=8/7 mirroring
+  `direct_smt_fill`): `None`→`FillSource::Replay`, `Some`→f1-composed prompt (single_ir
+  `single_ir_prompt`, direct per-role `direct_smt_prompt` over heads→`(&document_id,&source.payload)`) +
+  `FillSource::Record`. Tests: (6b) `run_record_flag_parses` direct `parse()` (no-flag→false / bare→true,
+  flags intact / dup→reject / `--record=x`→reject); (6a) DEVIATION — the respec's
+  `set_var(CKC_MODEL_COMMAND,bogus)` no-probe assert is void under `#![forbid(unsafe_code)]` → no-probe is
+  STRUCTURAL (the `if record` gate → a replay run never constructs `ModelAdapter`), proven by threading
+  `false` through the green `m2_route_loop_lands_both_routes_namespaced` (memory records the rule). Gate
+  green: 286 pass/7 ignored, fmt/clippy clean, rustdoc 17 (baseline unchanged). 87% 175K/200K
 - [ ] run-m2.2: live-pin battery over the run binary. Record the full experiment cassette via the env
   runtime command (LIVE, runtime indirection over deny-Read sources), commit the recorded model I/O as
   tracked test-source artifacts (origin `ai_generated`); live pins on `report.json` sections + manifest

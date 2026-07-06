@@ -135,7 +135,8 @@ pub fn execute(
         static_id("replay"),
         Some(scratch.to_path_buf()),
     );
-    crate::run::execute(root, &experiment, &mut shell);
+    // Replay re-executes from the committed cassettes; it never records.
+    crate::run::execute(root, &experiment, false, &mut shell);
     let rerun_outcome = match shell.finish() {
         Ok(finished) => finished.result.outcome,
         Err(e) => {
@@ -287,7 +288,7 @@ mod tests {
         let out = tmp.join("m1");
         std::fs::create_dir_all(&out).unwrap();
         let mut shell = Shell::open(static_id("run"), static_id("m1"), Some(out.clone()));
-        crate::run::execute(root, &static_id("exp.m1_scaffold"), &mut shell);
+        crate::run::execute(root, &static_id("exp.m1_scaffold"), false, &mut shell);
         let finished = shell.finish().unwrap();
         assert_eq!(finished.result.outcome, Outcome::Ok);
         out
