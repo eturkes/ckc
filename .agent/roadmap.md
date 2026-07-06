@@ -342,18 +342,9 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   fail-closes on it non-empty → clean the scratch before re-running. Gate: cargo test -p ckc-cli 291 pass/7 ignored (unit
   touched zero committed code); touched-file engine-token audit clean (memory rule-doc + dev-tool
   hits = standing exemptions). 88% 177K/200K.
-- [ ] run-m2.2c: recorded-run pin battery + replay coverage (deterministic, runtime-absent; gate:
-  run-m2.2b landed). New tests/ integration file: temp root = committed registry+corpus+schemas+
-  prompts (write_m2_root pattern) + repo `/cassettes/**` copied in; `execute()` exp.m2_multihop →
-  bless-from-observed pins: report.json M2 sections (typed strict_at structure per the C2 split —
-  taxonomy route maps, metrics emission_order + k_sample NA, agreed identity == the cassettes'
-  recorded identity by EQUALITY, never a literal), RunManifest+ReplayManifest §9 7-tuple (4 hashes
-  blessed; reference_hash cross-checked == raw sha256 of expected_outcomes), rendered bodies via a
-  run_oracle-style re-render compare (NO const body pin: solver version env-dependent, identity
-  literals banned from test code); replay::execute over the run → matched() (closes the deferred
-  replay.rs model-artifact coverage). Reading capped: the m2 loop test + write_m2_root helpers +
-  replay.rs:105-180; report.rs/metrics.rs/manifests.rs EXCLUDED (pins bless from observed bytes).
-  Gate: full battery + doc-lint green.
+- [x] run-m2.2c: recorded-run battery tests/recorded_run.rs — census/§9/re-render/replay-matched
+  pins over committed cassettes (identity by equality; attestation = exact 5-head+3-tail set).
+  88% 176K/200K
 - [ ] acceptance-m2: §9 acceptance. Verify the §9 themes against the recorded run — both routes
   execute over identical locked inputs (`exp.m2_multihop`); recorded model I/O replays byte-stably
   (runtime absent); raw rows before the baseline-delta table; expected conflict/no-conflict per

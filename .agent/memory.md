@@ -248,8 +248,9 @@ aggressively; full pre-consolidation text in git history.
   `Option<&RouteRecord>` → `FillSource::Record` (type-enforced; Record arm live-capable via `CassetteStore::record`→`adapter.invoke`, not live-exercised in f2); §9 manifest fields landed
   e-B. Pre-write BYTE-verify LANDED 2a — `build_record_parts` hashes the SELECTED template/schema bytes
   against the registry-declared `template_hash`/`schema_hash` before any record (the record path no
-  longer trusts declared hashes; `registry check` remains the replay-path verifier). DEFERRED
-  (respec'd into run-m2.2b/c): live record exercise → 2b, replay.rs model-artifact coverage → 2c. f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
+  longer trusts declared hashes; `registry check` remains the replay-path verifier). Both deferrals
+  CLOSED: live record exercise → 2b, replay.rs model-artifact coverage → 2c
+  (`tests/recorded_run.rs` `replay::execute` → `matched()` over the recorded experiment run). f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
   void under `#![forbid(unsafe_code)]` (set_var forbidden, above) → the no-probe property is STRUCTURAL
   (record_setup built only `if record`, else `None` → a replay run never constructs `ModelAdapter`),
   proven by threading `false` through the green `m2_route_loop_lands_both_routes_namespaced`; the flag
@@ -798,6 +799,17 @@ aggressively; full pre-consolidation text in git history.
   property: codex caught f1's direct_smt fixture accidentally pre-sorted (an identity no-op sort
   would've passed the pin; single_ir alone proved it) → a test that only half-proves its claim is a
   fake success criterion.
+- Recorded-run battery (run-m2.2c, `crates/ckc-cli/tests/recorded_run.rs`) = the standing
+  runtime-absent proof over repo `/cassettes/**` (weak-baseline census + §9 manifests + re-render +
+  `replay::execute` matched); acceptance-m2 reads it. §4.3 attestation-census facts it pinned:
+  manifest/replay `output_hashes` is a payload-content SET → route-independent heads dedup
+  ACROSS routes AND `SegmentIr` dedups across structurally-identical DOCS (control ≡ guideline_b
+  segments payload — SegmentIr carries no doc id/text; text distinctions ride the graph, all 3
+  graph hashes distinct) → 12 landed head wrappers attest as 5 hashes + 3 run-level tail wrappers
+  (trace/lineage/report) = 8. Census pins must derive from landed wrappers (set equality), never
+  doc-count arithmetic. Identity EQUALITY pattern: anchor = one committed cassette strict-read
+  from the copied root at runtime (deny-Read honored; identity-agreement gate makes any one
+  representative); report/manifest identities assert equal to it — no literal.
 
 ## Runtime
 
