@@ -39,7 +39,7 @@ aggressively; full pre-consolidation text in git history.
   (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
   artifact = 2; multi-invariant validator + full rejection coverage = 2; pure-computation module (full
   §-semantics + unit tests) + its recorded-run integration test = 2; canonical-emit layer over an
-  existing type family (one module) + a byte-pinned record-shape extension consuming it (a second module) = 2, split at the module seam; a record-shape extension's PLUMBING (fields + assembly wiring + fixtures/byte-pins, one module) vs its cross-module COMPUTATION+THREADING (populate the fields from a gated source + thread a new param through the caller chain + a run-binary integration test, a second module) = 2 at the module seam EVEN WITH THE DESIGN LOCKED (run-m2.1e-B overflowed read+write with the full design locked in-session, ZERO code — a locked design removes REASONING but not the read-to-place-edits over a large caller + byte-pin-test authoring, which alone overflow; the plumbing half leaves the crate green fields-plumbed-but-None so omit-None keeps bytes byte-identical); record-shape
+  existing type family (one module) + a byte-pinned record-shape extension consuming it (a second module) = 2, split at the module seam; a record-shape extension's PLUMBING (fields + assembly wiring + fixtures/byte-pins in the record module + a trivial None-stub at each cross-module construction site, no signature change) vs its cross-module COMPUTATION+THREADING (populate the fields from a gated source + thread a new param through the caller chain + a run-binary integration test, a second module) = 2 at the module seam EVEN WITH THE DESIGN LOCKED (run-m2.1e-B overflowed read+write with the full design locked in-session, ZERO code — a locked design removes REASONING but not the read-to-place-edits over a large caller + byte-pin-test authoring, which alone overflow; the plumbing half leaves the crate green fields-plumbed-but-None so omit-None keeps bytes byte-identical); record-shape
   extension + fresh-designed member type + validator + per-variant rejections vs its populated fixture +
   byte-pin capture = 2; derivation fn + its test-source-pinned battery + an attachment sub-feature = 2;
   type family + assembly + validation = 3;
@@ -56,6 +56,13 @@ aggressively; full pre-consolidation text in git history.
   Banking a route-namespaced dir as "confirmed from the scores tests" hid it (Codex .1d5a caught it):
   a banked "CONFIRMED from test X" literal must be byte-diffed against X's actual literal — a divergent
   value is a DESIGN choice not a confirmation, and single-route tests never cover multi-route landing.
+  Beyond banked VALUES, banked DESIGNS hide CORRECTNESS bugs codex catches even in a fully-LOCKED spec
+  (.1e-B2, 2 blockers): a gate keyed on an `Option<T>`'s presence aliases two run-modes when T is
+  legitimately absent (a failed model route ≡ M1's all-None) → gate on the MODE signal + fill the optional
+  field honestly; a provenance/measurement hash must cover the run's ACTUAL inputs not the whole registry
+  even when equal today, else later registry-growth silently rewrites an unrelated run's golden + breaks
+  the SPEC per-run locked-measurement semantic → adversarial-verify a banked DESIGN against SPEC intent +
+  reachability, not only its apply-anchors.
   The tails hold further cross-route uncertainty
   (source-node dedup vs route-prefixed ids, GroupTrace-from-route) → the read-cost that overflows a
   combined unit lives in the tails, so land the loop first (run-m2.1d5a respec: overflowed the combined
