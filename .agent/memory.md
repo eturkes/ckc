@@ -539,12 +539,17 @@ aggressively; full pre-consolidation text in git history.
     bare-name commands, no committed bytes; identity rides `model_identity`). Fixture:
     `copy_committed_registry` gained schemas.yaml + prompts.yaml → `write_m2_root` (calls it)
     provisions the model-route test; reference file already copied. B2b DONE — value-pinned
-    (bless-from-observed) the RunManifest §9 record + ReplayManifest 7-tuple parity in
-    `m2_route_loop_lands_both_routes_namespaced`. GUARD: a multi-field observed-bless of
-    same-typed fields (the 4 `Option<Hash>`) can silently slot-swap two aggregates → anchor
-    ordering by cross-checking the one INDEPENDENTLY-verifiable field (`reference_hash` ==
-    `sha256sum` of the expected_outcomes file, a raw-byte hash) before pinning; recurs at
-    run-m2.2's live manifest/report value-pins.
+    (bless-from-observed) the RunManifest §9 record + ReplayManifest parity in
+    `m2_route_loop_lands_both_routes_namespaced`. GUARDS (durable, recur at run-m2.2's live
+    value-pins) — (1) same-typed observed-bless: slot→field is fixed BY CONSTRUCTION (each slot
+    built from its named accessor in the assert diff; a verbatim copy can't swap them), and a
+    single independently-verifiable field (`reference_hash` == `sha256sum` of expected_outcomes)
+    proves THAT slot ALONE — to anchor another same-typed field, recompute it from its input
+    bytes (codex caught "one cross-check anchors all 4" as overreach); (2) a cross-record
+    "parity" assert over two records that clone one `manifest_inputs` = disk-round-trip + MIRROR
+    parity, NOT independent recompute; (3) an assembly-level all-None byte-pin proves only the
+    encoder — the pipeline mode-gate (empty `model_routes`→None) needs a live-run assert to
+    cover end-to-end (codex: was waved off as "already held", now asserted live in run_oracle).
   - Registry `check` is referential (finder-confirmed `validate_registries`): FAILS on dangling
     experiment→pipeline / pipeline→stage refs + §8.4 ChainBreak → seed an experiment entry ONLY after
     its pipelines + stages exist (real `exp.m2_multihop` seeds in run-m2.1, not the type-extension

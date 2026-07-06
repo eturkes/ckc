@@ -944,5 +944,47 @@ mod report {
         assert_eq!(replay.lockfile_hashes, manifest.lockfile_hashes);
         assert_eq!(replay.solver_identity, manifest.solver_identity);
         assert_eq!(replay.expected_output_hashes, manifest.output_hashes);
+
+        // §9 measurement record — the M1 mode-gate holds end-to-end. The scaffold
+        // experiment drives no model route, so `manifest_inputs` returns every measurement
+        // field None and the omit-None encoding drops all seven, keeping both records
+        // byte-identical to their pre-§9 shape. The assembly-level all-None byte-pin
+        // (manifests.rs) proves only the encoder; this live-run assert proves the pipeline
+        // actually feeds None in M1 mode (an empty `model_routes` argument) — the wiring the
+        // encoder pin cannot reach.
+        assert!(
+            manifest.model_identity.is_none(),
+            "M1 run manifest carries no §9 evaluator identity"
+        );
+        assert!(
+            [
+                &manifest.test_source_hash,
+                &manifest.reference_hash,
+                &manifest.schema_hash,
+                &manifest.prompt_template_hash,
+                &manifest.model_hash,
+                &manifest.runtime_hash,
+            ]
+            .iter()
+            .all(|h| h.is_none()),
+            "M1 run manifest carries no §9 measurement hashes"
+        );
+        assert!(
+            replay.model_identity.is_none(),
+            "M1 replay manifest carries no §9 evaluator identity"
+        );
+        assert!(
+            [
+                &replay.test_source_hash,
+                &replay.reference_hash,
+                &replay.schema_hash,
+                &replay.prompt_template_hash,
+                &replay.model_hash,
+                &replay.runtime_hash,
+            ]
+            .iter()
+            .all(|h| h.is_none()),
+            "M1 replay manifest carries no §9 measurement hashes"
+        );
     }
 }

@@ -4049,13 +4049,14 @@ processing_stages:
             "manifest output_hashes cover the direct deontic smt_query"
         );
 
-        // run-m2.1e-B2b — the model-route manifest carries the §9 measurement record: the
-        // agreed evaluator identity (the golden cassettes' synthetic `model.baseline`), the
-        // four input hashes over THIS run's actual inputs — the aggregated test sources, the
-        // route-relevant schema and prompt entries, and the raw reference bytes — and
-        // model_hash/runtime_hash left None, since the runtime is an environment bare-name
-        // command committing no bytes (identity rides `model_identity`). Values blessed from
-        // the observed run.
+        // run-m2.1e-B2b — the run-level manifest carries the §9 measurement record (populated
+        // because the run drives a model route, so `manifest_inputs` computes it rather than
+        // gating to None): the agreed evaluator identity (the golden cassettes' synthetic
+        // `model.baseline`), the four input hashes over THIS run's actual inputs — the
+        // aggregated test sources, the route-relevant schema and prompt entries, and the raw
+        // reference bytes — and model_hash/runtime_hash left None, since the runtime is an
+        // environment bare-name command committing no bytes (identity rides `model_identity`).
+        // Values blessed from the observed run.
         assert_eq!(
             manifest.model_identity,
             Some(ModelIdentity {
@@ -4585,6 +4586,19 @@ processing_stages:
         let covered: BTreeSet<Id> = [clinical.clone()].into_iter().collect();
         assert_eq!(
             select_route_hashes(&covered, entries.iter().map(|(i, h)| (i, h)), "schema").unwrap(),
+            aggregate_hashes(vec![h1.as_str().to_owned()]),
+        );
+
+        // Route-relevance, not whole-registry: an entry the want-set omits is dropped,
+        // never folded into the aggregate — so a registry that later grows an unused entry
+        // cannot silently rewrite this run's §9 attestation hash. Dropping the
+        // `want.contains` filter (hashing the whole registry) is caught here alone: the
+        // covered and missing cases both pass without it, since neither feeds an extra entry.
+        let smt_extra = hash_bytes(b"smt-schema-bytes");
+        let with_extra = [(clinical.clone(), h1.clone()), (smt.clone(), smt_extra)];
+        assert_eq!(
+            select_route_hashes(&covered, with_extra.iter().map(|(i, h)| (i, h)), "schema")
+                .unwrap(),
             aggregate_hashes(vec![h1.as_str().to_owned()]),
         );
 
