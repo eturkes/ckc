@@ -9,7 +9,9 @@
 //! §4.6 expected output hashes are exactly the §5 output hashes, so a
 //! replay that matches the replay manifest matches the run manifest too.
 
-use ckc_core::{CanonError, Hash, Id, ReplayManifest, RunManifest, RunPlan, SolverIdentity};
+use ckc_core::{
+    CanonError, Hash, Id, ModelIdentity, ReplayManifest, RunManifest, RunPlan, SolverIdentity,
+};
 
 /// Caller-supplied run state, one value per fact the §5/§4.6 records
 /// attest. Collection fields arrive in any order; assembly sorts them into
@@ -41,6 +43,21 @@ pub struct ManifestInputs {
     /// Content hashes of the run's accepted artifacts — the §5 output
     /// hashes and, verbatim, the §4.6 expected output hashes.
     pub output_hashes: Vec<Hash>,
+    /// §9 measurement record: model evaluator identity, omitted on
+    /// deterministic runs and populated by the model-route run path.
+    pub model_identity: Option<ModelIdentity>,
+    /// §9 aggregate hash of the run's test-source bytes.
+    pub test_source_hash: Option<Hash>,
+    /// §9 hash of the run's reference-outcome bytes.
+    pub reference_hash: Option<Hash>,
+    /// §9 aggregate hash of the route schema bytes.
+    pub schema_hash: Option<Hash>,
+    /// §9 aggregate hash of the route prompt-template bytes.
+    pub prompt_template_hash: Option<Hash>,
+    /// §9 hash of the model bytes — None while the model is an env command.
+    pub model_hash: Option<Hash>,
+    /// §9 hash of the runtime bytes — None while the runtime is an env command.
+    pub runtime_hash: Option<Hash>,
 }
 
 /// Assemble the §5 run manifest and §4.6 replay manifest over one set of
@@ -80,13 +97,13 @@ pub fn assemble_manifests(
         output_hashes: output_hashes.clone(),
         // §9 M2 measurement record: omitted on deterministic runs, populated
         // by the model-route run path.
-        model_identity: None,
-        test_source_hash: None,
-        reference_hash: None,
-        schema_hash: None,
-        prompt_template_hash: None,
-        model_hash: None,
-        runtime_hash: None,
+        model_identity: inputs.model_identity.clone(),
+        test_source_hash: inputs.test_source_hash.clone(),
+        reference_hash: inputs.reference_hash.clone(),
+        schema_hash: inputs.schema_hash.clone(),
+        prompt_template_hash: inputs.prompt_template_hash.clone(),
+        model_hash: inputs.model_hash.clone(),
+        runtime_hash: inputs.runtime_hash.clone(),
     };
     let replay = ReplayManifest {
         command: inputs.command.clone(),
@@ -99,13 +116,13 @@ pub fn assemble_manifests(
         solver_identity: inputs.solver_identity.clone(),
         expected_output_hashes: output_hashes,
         // §9 M2 measurement record: omitted on deterministic runs.
-        model_identity: None,
-        test_source_hash: None,
-        reference_hash: None,
-        schema_hash: None,
-        prompt_template_hash: None,
-        model_hash: None,
-        runtime_hash: None,
+        model_identity: inputs.model_identity.clone(),
+        test_source_hash: inputs.test_source_hash.clone(),
+        reference_hash: inputs.reference_hash.clone(),
+        schema_hash: inputs.schema_hash.clone(),
+        prompt_template_hash: inputs.prompt_template_hash.clone(),
+        model_hash: inputs.model_hash.clone(),
+        runtime_hash: inputs.runtime_hash.clone(),
     };
     Ok((manifest, replay))
 }
@@ -224,6 +241,13 @@ mod tests {
             },
             input_hashes: vec![hash('9'), hash('1')],
             output_hashes: vec![hash('7'), hash('2'), hash('7')],
+            model_identity: None,
+            test_source_hash: None,
+            reference_hash: None,
+            schema_hash: None,
+            prompt_template_hash: None,
+            model_hash: None,
+            runtime_hash: None,
         }
     }
 
@@ -332,4 +356,37 @@ mod tests {
             );
         }
     }
+
+    /// Populated §9: both records carry the measurement slots. The all-`None`
+    /// path stays byte-identical (the run-level M1 manifest pins guard those
+    /// bytes); these pins lock the new slots' canonical position and content
+    /// on both the run manifest and the replay manifest.
+    #[test]
+    fn populated_measurement_record_pins_both_manifests() {
+        let mut ins = inputs();
+        ins.model_identity = Some(ModelIdentity {
+            model_id: id("model.baseline"),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        });
+        ins.test_source_hash = Some(hash('a'));
+        ins.reference_hash = Some(hash('b'));
+        ins.schema_hash = Some(hash('c'));
+        ins.prompt_template_hash = Some(hash('d'));
+        ins.model_hash = Some(hash('e'));
+        ins.runtime_hash = Some(hash('f'));
+        let (manifest, replay) = assemble_manifests(&ins).unwrap();
+        assert_eq!(
+            String::from_utf8(canonical_payload_bytes(&manifest).unwrap()).unwrap(),
+            PINNED_POPULATED_RUN_MANIFEST
+        );
+        assert_eq!(
+            String::from_utf8(canonical_payload_bytes(&replay).unwrap()).unwrap(),
+            PINNED_POPULATED_REPLAY_MANIFEST
+        );
+    }
+
+    const PINNED_POPULATED_RUN_MANIFEST: &str = r#"{"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"git_commit":"79bc570fffffffffffffffffffffffffffffffff","lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"prompt_template_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reference_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","run_plan_hash":"sha256:892701b5e60ecd33c09bda189eff2b952b5c6589844cb73b9a841b065faebe0d","runtime_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","schema_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+
+    const PINNED_POPULATED_REPLAY_MANIFEST: &str = r#"{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"expected_output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"input_hashes":["sha256:1111111111111111111111111111111111111111111111111111111111111111","sha256:9999999999999999999999999999999999999999999999999999999999999999"],"lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"prompt_template_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reference_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtime_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","schema_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
 }

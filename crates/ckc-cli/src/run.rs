@@ -2230,6 +2230,15 @@ fn manifest_inputs(
         solver_identity: solver_identity.clone(),
         input_hashes: docs.iter().map(|d| d.source_hash.clone()).collect(),
         output_hashes,
+        // §9 M2 measurement record: stubbed None on every run; the
+        // model-route computation lands in run-m2.1e-B2.
+        model_identity: None,
+        test_source_hash: None,
+        reference_hash: None,
+        schema_hash: None,
+        prompt_template_hash: None,
+        model_hash: None,
+        runtime_hash: None,
     })
 }
 
