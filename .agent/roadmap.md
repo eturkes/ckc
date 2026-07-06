@@ -150,39 +150,7 @@ doc-lint bullet).
   layout + once-per-route head-event census. 77% 153K/200K
 - [x] run-m2.1d5a-1: model-route loop in execute() — 3-way dispatch + execute_routes over both routes + cross-route group namespacing (routes/{pid}/groups/{gid}) + per-route landing gate; RouteRun banked for .1d5a-2 tails/.1e metrics. 88% 177K/200K
 - [x] run-m2.1d5a-2: unified run-level tails over both routes (run-root trace/lineage/report + EN render + manifests); `emit_event: bool` gates the §4.6 event (M1 `true`, M2 tails `false`, fail-closed via direct `shell.diagnostic`); all_graphs seen-set dedup + all_docs bundle-first sort; landing gate pins the 8-entry root layout + `claims.len()==3`. 80% 160K/200K
-- [ ] run-m2.1d5a-2b: error-path pin battery over the loop's already-landed branches (from .1d5a-1 Codex
-  review finding 3 — INDEPENDENT of .1d5a-2's tails wiring; these pin .1d5a-1's dispatch/loop branches).
-  Three `#[test]`s over the run binary via `executed()`, each a crafted `write_m2_root` variant: (a)
-  single_ir member-short group → assert BOTH diagnostics a dropped member raises. Drop guideline_b's
-  cassette (`cassettes/route.single_ir/test_source.m1_guideline_b/seed-42.json`) — guideline_b ∈ ONLY
-  group.m1_conflict, so exactly ONE group shorts (dropping guideline_a shorts BOTH: it's in m1_conflict
-  AND m1_no_conflict, per registry/experiments.yaml). The dropped cassette makes single_ir_fill's
-  model_fill Err → a COMMAND diagnostic `invalid_diagnostic{cassette,reason,processing_stage:"model_fill"}`
-  (run.rs:1327); the member's bundle stays absent → group.m1_conflict goes member-short → ONE
-  partial-group COMPILE diagnostic+event `processing_stage_diagnostic(COMPILE,"group","group.m1_conflict",
-  "member … landed no ir_bundle artifact")` (run.rs:400). Assert the fill command diagnostic AND the
-  single compile diagnostic+event (they CO-OCCUR — a compile short is always preceded by the member's own
-  upstream fill diagnostic, per the loop comment); m1_no_conflict compiles clean (guideline_a+control both
-  fill); direct route unaffected (its cassettes key by group, not source). (b) mixed-shape `[M1Layered, single_ir]` → ONE
-  command diagnostic ("mixes the layered M1 pipeline with model routes") + zero artifacts
-  (`assert_only_logs(out)`, run.rs:2534) + Outcome::Invalid — craft a registry variant binding BOTH the
-  M1 layered pipeline AND a single_ir pipeline in one experiment (overwrite `registry/experiments.yaml`
-  after `copy_committed_registry`, run.rs:3038); hits execute()'s dispatch (run.rs:171
-  `views.iter().any(|v| v.shape==RouteShape::M1Layered)` with len>1). (c) identity-disagreement →
-  fail-closed, ONE command diagnostic ("model routes disagree on the model identity attesting the run") +
-  Outcome::Invalid — craft a variant re-blessing ONE cassette with a DIVERGENT synthetic ModelIdentity
-  (model.other / fixture_quant / 1.0.0 — crafted-fixture rule, no real engine/quant/format token) so
-  `agree_model_identity` (run.rs:274) trips on the second differing Some. Separate failing-input
-  fixtures → .1d5b's clean-path census untouched. Banked infra: write_m2_root (run.rs:3540) copies
-  copy_committed_registry + LOCKFILE + LEXICON + 3 corpus html + reference + 7 cassettes (3 single_ir
-  `route.single_ir/<source>/seed-42.json`, 4 direct `route.direct_smt/<gid>.{overlap,deontic}/seed-42.json`)
-  from crates/ckc-cli/tests/fixtures; a variant = a modified copy omitting/overwriting the target.
-  Cassette build:
-  `CassettePayload::from_output(route,source,seed,prompt,constraint_hash,template_hash,ModelIdentity{model_id,quant,runtime_version},output)`
-  + `store.build_wrapper(&key,payload,producer(resolved,2))` + `store.persist(&key,wrapper)` (see
-  `write_single_ir_cassette`). READ FRESH: committed registry/experiments.yaml + registry/candidates.yaml
-  (for the mixed binding), write_m2_root + write_single_ir_cassette + assert_only_logs bodies. Gate: cargo
-  test -p ckc-cli.
+- [x] run-m2.1d5a-2b: 3 run-binary error-path pins over write_m2_root variants — single_ir member-short group (dropped guideline_b cassette → fill + partial-group compile diagnostics co-occur, order fill<compile), mixed-shape [M1Layered, single_ir] → command diagnostic + assert_only_logs, model-identity disagreement → fail-closed command diagnostic. 81% 161K/200K
 - [ ] run-m2.1d5b: two-run determinism + event census over .1d5a-1's write_m2_root mirror, after
   .1d5a-2's tails land (split from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
   across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589

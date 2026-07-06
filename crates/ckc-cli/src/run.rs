@@ -3813,6 +3813,165 @@ processing_stages:
         );
     }
 
+    // run-m2.1d5a-2b — error-path battery over the .1d5a-1 model-route loop's
+    // already-landed branches (independent of .1d5a-2's tails wiring).
+
+    // A single_ir document whose model_fill reads no cassette takes a command-scope
+    // read diagnostic, leaving its bundle absent; every group holding that member then
+    // shorts its compile processing_stage rather than compiling a partial group. The
+    // two diagnostics co-occur — a compile short is always preceded by its member's own
+    // upstream fill failure. Dropping guideline_b's cassette shorts exactly
+    // group.m1_conflict (its sole group); m1_no_conflict (guideline_a + control) still
+    // fills and compiles clean, and the direct route — cassettes keyed by group, not
+    // source — is untouched, so the run-level tails complete over what landed.
+    #[test]
+    fn m2_single_ir_member_short_group_co_emits_fill_and_compile_diagnostics() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        std::fs::remove_file(
+            root.path()
+                .join("cassettes/route.single_ir/test_source.m1_guideline_b/seed-42.json"),
+        )
+        .unwrap();
+
+        let (result, events, diagnostics, _out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        assert_eq!(result.outcome, Outcome::Invalid);
+
+        // The fill loop runs before the group loop, so the member's model_fill read
+        // failure is diagnosed first, then the group's partial-group compile short.
+        assert_eq!(diagnostics.len(), 2, "{diagnostics:#?}");
+        let fill = &diagnostics[0];
+        assert!(
+            fill.payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "cassette" && v == "test_source.m1_guideline_b"),
+            "{fill:#?}"
+        );
+        assert!(
+            fill.payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "processing_stage" && v == "model_fill"),
+            "{fill:#?}"
+        );
+        let compile = &diagnostics[1];
+        assert!(
+            compile
+                .payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "group" && v == "group.m1_conflict"),
+            "{compile:#?}"
+        );
+        assert!(
+            compile
+                .payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "processing_stage" && v == "compile"),
+            "{compile:#?}"
+        );
+        assert!(
+            compile
+                .payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "reason" && v.contains("landed no ir_bundle artifact")),
+            "{compile:#?}"
+        );
+
+        // The compile short rides its §4.6 event too: one Invalid `compile` event
+        // carrying exactly that diagnostic and landing no artifact. The only Invalid
+        // compile event is the member-short group's (m1_no_conflict compiles clean; the
+        // direct route runs no compile processing_stage).
+        let compile_event = events
+            .iter()
+            .find(|e| e.processing_stage == static_id("compile") && e.outcome == Outcome::Invalid)
+            .expect("the member-short group emits its compile event");
+        assert_eq!(compile_event.diagnostics.len(), 1);
+        assert!(compile_event.output_hashes.is_empty());
+        assert!(
+            compile_event.diagnostics[0]
+                .payload
+                .iter()
+                .any(|(k, v)| k.as_str() == "group" && v == "group.m1_conflict"),
+            "{compile_event:#?}"
+        );
+    }
+
+    // A route set mixing the layered M1 pipeline with a model route has no defined
+    // joint execution: execute()'s dispatch fails it closed with one command diagnostic
+    // and lands nothing (only the shell's logs/). Craft the mix off the committed
+    // exp.m2_multihop binding — swap the direct route for the layered M1 pipeline in the
+    // set and re-point the baseline to the surviving in-set model route, so the binding
+    // stays valid (baseline ∈ set) and resolution reaches the shape dispatch.
+    #[test]
+    fn m2_mixed_shape_route_set_fails_closed_landing_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        let experiments = root.path().join("registry/experiments.yaml");
+        let mixed = std::fs::read_to_string(&experiments)
+            .unwrap()
+            .replace(
+                "pipe.m2_direct_smt, pipe.m2_single_ir",
+                "pipe.layered_ckcir_to_smt, pipe.m2_single_ir",
+            )
+            .replace(
+                "baseline_pipeline: pipe.m2_direct_smt",
+                "baseline_pipeline: pipe.m2_single_ir",
+            );
+        std::fs::write(&experiments, mixed).unwrap();
+
+        let (result, _events, diagnostics, out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("mixes the layered M1 pipeline with model routes")),
+            "{diagnostics:#?}"
+        );
+        assert_only_logs(&out);
+    }
+
+    // Both routes must attest one evaluator identity: a second, disagreeing model
+    // identity fails the run closed with one command diagnostic. Re-bless guideline_a's
+    // single_ir cassette with a divergent synthetic identity (the crafted-fixture rule —
+    // no real engine/quant/format token). The direct route runs first and establishes
+    // the agreed identity from its four golden cassettes, so single_ir's guideline_a fill
+    // is the divergent second attestation, tripping the fail-closed return.
+    #[test]
+    fn m2_model_identity_disagreement_fails_the_run_closed() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        let store = CassetteStore::new(root.path());
+        let key = CassetteKey {
+            route: static_id("route.single_ir"),
+            source: static_id("test_source.m1_guideline_a"),
+            seed: 42,
+        };
+        // Keep the recorded output (still accepts + grounds); swap only the identity, so
+        // the fill succeeds and the disagreement — not a fill failure — is the sole event.
+        let mut payload = store.replay(&key).unwrap().payload;
+        payload.model_identity = ModelIdentity {
+            model_id: static_id("model.other"),
+            quant: "fixture_quant".to_owned(),
+            runtime_version: "1.0.0".to_owned(),
+        };
+        let wrapper = store
+            .build_wrapper(&key, payload, producer(&single_ir_resolved(), 2))
+            .unwrap();
+        store.persist(&key, wrapper).unwrap();
+
+        let (result, _events, diagnostics, _out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        assert_eq!(result.outcome, Outcome::Invalid);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert!(
+            diagnostics[0]
+                .payload
+                .iter()
+                .any(|(_, v)| v.contains("model routes disagree on the model identity")),
+            "{diagnostics:#?}"
+        );
+    }
+
     // The lexicon is load-bearing for the whole run: an unreadable file is
     // one command-scope diagnostic and no document runs.
     #[test]

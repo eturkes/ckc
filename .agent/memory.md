@@ -388,9 +388,17 @@ aggressively; full pre-consolidation text in git history.
   groups mint claims; direct mints none). RESPEC banked-fact ERROR corrected (verify-against-code
   rule): the gate test DID carry `assert_eq!(listing(&out), ["logs","routes"])` — the respec's
   do-not-read note claimed it did NOT — so it now pins the 8-entry root set + a
-  `strict_at::<TraceBundle>` claims assertion. Error-path diagnostics → .1d5a-2b; two-run
-  determinism + event census (tails contribute 0 events) → .1d5b; §9 report sections (passed `None`
-  here) → .1e.
+  `strict_at::<TraceBundle>` claims assertion. Error-path diagnostics LANDED .1d5a-2b (3 run-binary
+  tests over `write_m2_root` variants: drop guideline_b's single_ir cassette → fill + partial-group
+  compile diagnostics co-occur, diag order fill<compile since the fill loop precedes the group loop;
+  swap direct→layered in experiments.yaml `pipelines` + re-point baseline in-set → mixed-shape command
+  diagnostic + `assert_only_logs`; re-bless one single_ir cassette with a divergent synthetic identity
+  → fail-closed command diagnostic). Reusable: divergent-identity re-bless = `store.replay(key).payload`
+  clone + swap `model_identity` + `build_wrapper`/`persist` (CassettePayload all-public → no head
+  re-run); a fully-bundle-less doc does NOT break the tails (`assemble_trace` Option-guards bundle
+  nodes, mints claims/lineage only from compiled groups, and a member-short group `continue`s before
+  its GroupTrace push → untraced). Two-run determinism + event census (tails contribute 0 events) →
+  .1d5b; §9 report sections (passed `None` here) → .1e.
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
