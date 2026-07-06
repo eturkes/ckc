@@ -823,17 +823,19 @@ conclusions the committed code + units rely on:
 - Grammar constraint (the direct route's BNF SMT surface) verified LIVE (run-m2.2b): the env wrapper
   translates the committed grammar to the engine's constraint dialect at invocation time (machine-local
   transform → `runtime.local.md`) → the committed repo stays dialect-free; the constraint compiled and
-  the live device produced grammar-conforming output.
+  a separate PROBE prompt produced a complete grammar-conforming output on the live device (the
+  recorded run's route outputs still fail the acceptor — the honest weak-baseline census).
 - Instrument-truncation diagnostic (run-m2.2b lesson, engine-agnostic): a runtime holding a FIXED total
   sequence budget can silently truncate generation mid-token → surfaces as §7.4 fill failures that
   poison the weak-baseline census. Tell apart: output length INVERSELY tracks prompt length + outputs
   end mid-token ⇒ instrument fault (fix env, wipe cassettes, re-record); genuine weak-model
   degeneration loops then truncates at the LOGICAL token cap (length ≈ cap, prompt-independent). Apply
   before trusting any failure census from a new runtime/env.
-- Re-record after ANY env/wrapper change starts from an EMPTY cassette store: record mode byte-verifies
-  live output against an existing cassette (mismatch → CassetteError abort), and a changed env changes
-  attempt counts → stale files abort the run or leave orphan derived-seed cassettes in the committed
-  census.
+- Re-record after ANY env/wrapper change starts from an EMPTY cassette store: record mode OVERWRITES a
+  same-key cassette without comparing (the 2a "record byte-verify" = the pre-write template/schema-hash
+  drift guard + constraint-drift re-read, NOT an existing-cassette compare) → stale files from the
+  superseded env survive as ORPHAN keys (attempts the fixed run no longer makes, e.g. derived-seed
+  repairs) = wrong committed census. Wipe, re-record, commit the fresh tree.
 - `derive_seed` exact splitmix64 draws (engine-agnostic, replay-load-bearing) are pinned in the
   `derive_seed_is_deterministic_and_distinct` test (model.rs, `.2a`) — read the test, not a memory copy;
   the `.2b` `model_live` test re-asserts them live through `invoke_samples`.

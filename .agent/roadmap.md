@@ -329,8 +329,8 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   runs/m2.2b-r3 (gitignored) + committed /cassettes/** (REAL identity, audit-exempt; deny-Read +
   Serena-ignored + Read-test pair verified; memory exclude-list extended): 10 cassettes = 5 fill
   points × base+repair (direct `<gid>.overlap` ×2 groups; single_ir ×3 sources; direct deontic never
-  reached — upstream terminal fill failure skips it), repair bytes == base size (greedy seed-inertness
-  live again). Weak-baseline census (2c input): every fill failed honestly — ai_schema_violation ×10
+  reached — upstream terminal fill failure skips it), repair output hash == base output hash on all 5
+  pairs (greedy seed-inertness live again). Weak-baseline census (2c input): every fill failed honestly — ai_schema_violation ×10
   → repair_limit_exceeded ×5 + schema_invalid ×2 (group compile: member landed no ir_bundle
   artifact); outputs logical-cap degenerate, prompt-length-INDEPENDENT sizes (grammar-prefix-valid
   missing the mandatory tail → 'expected a (check-sat) command'; JSON unterminated → 'expected "').
@@ -338,7 +338,8 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   routes' artifacts/ ×3 sources; groups/ absent (terminal fill failures land no group artifacts).
   `ckc run` exit=2 = §4.4 outcome-mapped Invalid, NOT an abort. Replay (CLI takes a POSITIONAL run
   path — the `--run` flag this line once named does not exist) runtime-absent → `replay run m2.2b-r3
-  matched`, exit 0, 8 accepted artifacts. Gate: cargo test -p ckc-cli 291 pass/7 ignored (unit
+  matched`, exit 0, 8 accepted artifacts; precondition: replay writes scratch `<run>.replay` and
+  fail-closes on it non-empty → clean the scratch before re-running. Gate: cargo test -p ckc-cli 291 pass/7 ignored (unit
   touched zero committed code); touched-file engine-token audit clean (memory rule-doc + dev-tool
   hits = standing exemptions). 88% 177K/200K.
 - [ ] run-m2.2c: recorded-run pin battery + replay coverage (deterministic, runtime-absent; gate:
