@@ -769,15 +769,21 @@ aggressively; full pre-consolidation text in git history.
   not a copy): `select_record_{schema,prompt}` key by `id.as_str()` (SingleIr→clinical_ir/single_ir,
   DirectSmt→smt_query/direct_smt, M1Layered→None — DEFENSIVE vs `manifest_inputs`' Err on M1Layered).
   `single_ir_prompt(template, doc_id, graph, segments, lexicon)` emits document / per-segment
-  `segment: <id> kind=<k> regions=<r,..>` / `regions:` / `system:` / `concept: <id>[ var=<v>]` /
-  `action:` scaffold lines in artifact/file order (deterministic upstream §4.3 — no re-sort), then
+  `segment: <id> kind=<k> regions=<r,..>` / `regions:` / `system:` / `concept: <id>[ var=<v>
+  ge=/gt=/le=/lt= present canonical bounds]` / `action:` scaffold lines in artifact/file order
+  (deterministic upstream §4.3 — no re-sort), then
   reading_order-sorted spans (shared `reading_order_text`); regions read from `graph.regions`, NOT a
   separate param — the exact set the accept closure grounds against (single source of truth).
   `direct_smt_prompt` composes NO label list — the role-sensitive `:named` scheme is TEMPLATE TEXT
-  (M2-plan respec sub-bullet holds scheme + rationale). Vocabulary consistent BY CONSTRUCTION:
-  committed `clinical_ir.schema.json` bakes the lexicon-derived enums (concept codes / action kinds /
-  interval vars / terminology system + closed enums) → scaffold informs, schema ENFORCES; a lexicon
-  edit re-exports the schema via the existing bless+drift guard. Record assembly: adapter-FREE
+  (M2-plan respec sub-bullet holds scheme + rationale). Vocabulary consistency = THREE layers (2a +
+  its codex follow-up): committed `clinical_ir.schema.json` bakes the lexicon-derived enums (concept
+  codes / action kinds / interval vars / terminology system + closed enums) → scaffold INFORMS (incl.
+  canonical bounds), schema ENFORCES at generation (constrained decoding), and `off_lexicon_ids`
+  behind `single_ir_accept` enforces membership at REPLAY — binding system/code/alternatives,
+  concept/negated/interval-var atoms, action kind/target, exception atoms → repairable
+  `FillReject::Schema` naming the off ids, ahead of grounding; interval BOUNDS stay free
+  (schema-mirroring — the text may state its own numbers). A lexicon edit re-exports the schema via
+  the existing bless+drift guard. Record assembly: adapter-FREE
   `build_record_parts(root, schemas, prompts, resolved) → RecordParts{template, constraint, ctx}` =
   select → require `model_ms_per_call` (record-only) → load template (inline|path) → pre-write
   byte-verify → ctx; `build_route_record` = thin parts+`&setup.adapter` zip (`ModelAdapter::new()`

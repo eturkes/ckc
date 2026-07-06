@@ -297,8 +297,8 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   schema-enum carve-out; direct role-sensitive `ctx.`/`a.` label scheme replacing the label-list
   promise); prompts.yaml re-pinned. FOUND: the committed ClinicalIR schema already bakes the
   lexicon-derived enums (ConceptCode/ActionKind/IntervalVar/TerminologySystem + BindingStatus/
-  Direction/Strength/Certainty) → the prompt vocabulary block informs, the schema enforces, both from
-  one committed lexicon — consistent by construction. `model_ms_per_call: 600000` in exp.m2_multihop
+  Direction/Strength/Certainty) → the prompt vocabulary block informs, the schema enforces at
+  generation, both from one committed lexicon — consistent by construction. `model_ms_per_call: 600000` in exp.m2_multihop
   + `Resolved.model_ms_per_call: Option<u64>` unconditional read; NEW adapter-free
   `RecordParts`/`build_record_parts` split out of `build_route_record` (selection / template load /
   byte-verify / budget testable runtime-absent) — requires the budget key (None→Err naming it), swaps
@@ -308,8 +308,17 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   `build_record_parts_*` (committed-bytes happy path both routes / budget-absent / template-drift /
   schema-drift); resolve pins (4-entry budget vector, `Some(600_000)` per view, M1 `None`); §9
   `prompt_template_hash` re-blessed from observed (other 3 hashes unchanged — cross-consistent). Gate:
-  290+174 pass/7 ignored, fmt/clippy clean, rustdoc 17 (baseline), touched-file engine-neutral grep
-  CLEAN. 86% 171K/200K (compacted at close-out bookkeeping; close finished 38% post-compact)
+  290+174 pass/7 ignored, fmt/clippy clean, rustdoc 17 (baseline), touched-file engine-neutral scan:
+  code/registry files clean, memory.md hits = its own rule-doc examples + dev-tool names (standing
+  exemptions). 86% 171K/200K (compacted at close-out bookkeeping; close finished 38% post-compact).
+  Codex follow-up (accepted 2 major + 1 info): accept-side lexicon-vocabulary gate — new
+  `off_lexicon_ids` behind `single_ir_accept` (binding system/code/alternatives, concept/negated/
+  interval-var atoms, action kind/target, exception atoms → repairable `Schema` naming the off ids,
+  ahead of grounding), so replay enforces the enumerations the schema bakes for record-time
+  constrained decoding, + 9-mutation rejection battery; scaffold interval-bound marks —
+  `concept:` lines carry `ge=`/`gt=`/`le=`/`lt=` canonical bounds (template rules copy marked bounds,
+  text-stated numbers from text; two-bound fixture pins mark order), template + prompts.yaml + §9
+  literal re-pinned; audit-claim wording de-overclaimed (this gate line). 525 pass.
 - [ ] run-m2.2b: LIVE record + committed experiment cassettes (gate: run-m2.2a landed). Env wrapper
   first (machine-local, outside git): translate the committed grammar to the engine's constraint
   dialect and wire that slot, staying fail-closed on anything else; verify live against

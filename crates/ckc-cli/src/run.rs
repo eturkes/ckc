@@ -46,12 +46,13 @@ use std::time::Duration;
 
 use ckc_core::{
     ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, ClinicalSegment,
-    CorpusEntry, DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle,
-    ModelIdentity, Normalization, Origin, Outcome, PipelineEntry, Producer, PromptEntry, RunPlan,
-    SchemaEntry, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
-    canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
-    hash_bytes, parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
-    parse_schemas, read_strict_canonical, validate_model_registry,
+    ContextAtom, CorpusEntry, DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash,
+    Id, IrBundle, ModelIdentity, Normalization, Origin, Outcome, PipelineEntry, Producer,
+    PromptEntry, RunPlan, SchemaEntry, SegmentIr, SolverIdentity, SourceDocumentGraph,
+    TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
+    canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
+    parse_experiments, parse_prompts, parse_reference, parse_schemas, read_strict_canonical,
+    validate_model_registry,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
@@ -1403,24 +1404,99 @@ fn route_document_head(
     })
 }
 
-/// The `route.single_ir` §4 acceptance closure over one model output: strict-read
-/// the bytes as a [`ClinicalIr`] — a parse failure is a repairable
-/// [`FillReject::Schema`] carrying the reason — then ground every cited upstream
-/// id against the document's region and segment id-universes (the
-/// [`IrBundle::validate`] reference checks, run here before assembly). A binding
-/// or exception `region_id` outside `regions`, or a statement `source_segment_id`
-/// outside `segments`, is a terminal [`FillReject::Grounding`] carrying the absent
-/// ids; an empty absent set accepts and yields the parsed `ClinicalIr`. Closing
-/// over pre-built id sets lets a route step (and its tests) classify a model
-/// output with no live pipeline. [`single_ir_fill`] wires it into the route.
+/// The lexicon-vocabulary check behind [`single_ir_accept`]: every id-valued
+/// field the ClinicalIR schema constrains to a lexicon-derived enumeration —
+/// binding `system`/`code`/`alternatives`, statement concept atoms (plain and
+/// negated), interval `var`s, action `kind` and `target` — must name a lexicon
+/// entry. Returns the off-lexicon ids, sorted and deduped (empty = conformant).
+/// Interval bounds stay unchecked, mirroring the schema (integer-pattern
+/// strings, values free — the guideline text may state its own numbers).
+fn off_lexicon_ids(clinical: &ClinicalIr, lexicon: &Lexicon) -> Vec<Id> {
+    let concepts: HashSet<&Id> = lexicon.concepts.iter().map(|c| &c.concept_id).collect();
+    let actions: HashSet<&Id> = lexicon.actions.iter().map(|a| &a.action_id).collect();
+    let vars: HashSet<&Id> = lexicon
+        .concepts
+        .iter()
+        .filter_map(|c| c.interval.as_ref().map(|i| &i.var))
+        .collect();
+    let mut off: Vec<Id> = Vec::new();
+    let check_atoms = |atoms: &[ContextAtom], off: &mut Vec<Id>| {
+        for atom in atoms {
+            match atom {
+                ContextAtom::Concept(c) | ContextAtom::ConceptNegated(c) => {
+                    if !concepts.contains(c) {
+                        off.push(c.clone());
+                    }
+                }
+                ContextAtom::Interval(q) => {
+                    if !vars.contains(&q.var) {
+                        off.push(q.var.clone());
+                    }
+                }
+            }
+        }
+    };
+    for binding in &clinical.bindings {
+        if binding.system != lexicon.system {
+            off.push(binding.system.clone());
+        }
+        if !concepts.contains(&binding.code) {
+            off.push(binding.code.clone());
+        }
+        for alternative in &binding.alternatives {
+            if !concepts.contains(alternative) {
+                off.push(alternative.clone());
+            }
+        }
+    }
+    for statement in &clinical.statements {
+        check_atoms(&statement.population, &mut off);
+        check_atoms(&statement.condition, &mut off);
+        if !actions.contains(&statement.action.kind) {
+            off.push(statement.action.kind.clone());
+        }
+        if !concepts.contains(&statement.action.target) {
+            off.push(statement.action.target.clone());
+        }
+        for exception in &statement.exceptions {
+            check_atoms(&exception.atoms, &mut off);
+        }
+    }
+    off.sort();
+    off.dedup();
+    off
+}
+
+/// The `route.single_ir` §4 acceptance closure over one model output, three
+/// checks in order: strict-read the bytes as a [`ClinicalIr`] — a parse failure
+/// is a repairable [`FillReject::Schema`] carrying the reason; check every
+/// lexicon-enumerated vocabulary field ([`off_lexicon_ids`]) — off-lexicon ids
+/// are a repairable [`FillReject::Schema`] naming them, so replay enforces the
+/// enumerations the ClinicalIR schema bakes for record-time constrained
+/// decoding; then ground every cited upstream id against the document's region
+/// and segment id-universes (the [`IrBundle::validate`] reference checks, run
+/// here before assembly). A binding or exception `region_id` outside `regions`,
+/// or a statement `source_segment_id` outside `segments`, is a terminal
+/// [`FillReject::Grounding`] carrying the absent ids; an empty absent set
+/// accepts and yields the parsed `ClinicalIr`. Closing over pre-built id sets
+/// lets a route step (and its tests) classify a model output with no live
+/// pipeline. [`single_ir_fill`] wires it into the route.
 #[allow(dead_code)]
 fn single_ir_accept<'a>(
     regions: &'a HashSet<&'a Id>,
     segments: &'a HashSet<&'a Id>,
+    lexicon: &'a Lexicon,
 ) -> impl Fn(&[u8]) -> Result<ClinicalIr, FillReject> + 'a {
     move |bytes| {
         let clinical: ClinicalIr =
             read_strict_canonical(bytes).map_err(|e| FillReject::Schema(e.to_string()))?;
+        let off = off_lexicon_ids(&clinical, lexicon);
+        if !off.is_empty() {
+            let list = off.iter().map(Id::to_string).collect::<Vec<_>>().join(",");
+            return Err(FillReject::Schema(format!(
+                "off-lexicon vocabulary: {list}"
+            )));
+        }
         let mut absent: Vec<Id> = Vec::new();
         for binding in &clinical.bindings {
             for region_id in &binding.region_ids {
@@ -1502,7 +1578,7 @@ fn single_ir_fill(
         .iter()
         .map(|s| &s.segment_id)
         .collect();
-    let accept = single_ir_accept(&regions, &segment_ids);
+    let accept = single_ir_accept(&regions, &segment_ids, lexicon);
     let key = CassetteKey {
         route: static_id("route.single_ir"),
         source: doc_id.clone(),
@@ -2465,7 +2541,8 @@ fn reading_order_text(graph: &SourceDocumentGraph) -> Vec<String> {
 /// (id, kind, covered region ids), a `regions:` line naming every evidence
 /// region id (read from `graph.regions`, the same set the accept closure
 /// grounds against), and the lexicon vocabulary block (`system:` /
-/// `concept:` with `var=` interval-variable marks / `action:` lines) — then
+/// `concept:` with `var=` interval-variable and `ge=`/`gt=`/`le=`/`lt=`
+/// canonical-bound marks / `action:` lines) — then
 /// the document's guideline text in `reading_order`, newline-joined. The
 /// supplied lines are exactly the template's promised inputs
 /// (`registry/prompts/single_ir.txt`); the enumerated fields the template
@@ -2495,7 +2572,21 @@ fn single_ir_prompt(
     lines.push(format!("system: {}", lexicon.system));
     for concept in &lexicon.concepts {
         lines.push(match &concept.interval {
-            Some(interval) => format!("concept: {} var={}", concept.concept_id, interval.var),
+            Some(interval) => {
+                let mut line = format!("concept: {} var={}", concept.concept_id, interval.var);
+                let bounds = [
+                    ("ge", interval.ge),
+                    ("gt", interval.gt),
+                    ("le", interval.le),
+                    ("lt", interval.lt),
+                ];
+                for (mark, bound) in bounds {
+                    if let Some(value) = bound {
+                        line.push_str(&format!(" {mark}={value}"));
+                    }
+                }
+                line
+            }
             None => format!("concept: {}", concept.concept_id),
         });
     }
@@ -3320,11 +3411,12 @@ mod tests {
 
     /// [`single_ir_prompt`] emits the template, a document line, the grounding
     /// scaffold (segment lines with kind and covered regions, the graph's
-    /// region-id line, the lexicon vocabulary block with `var=` marks only on
-    /// interval concepts), then the document's spans in `reading_order` — the
-    /// spans supplied out of order to prove the composer sorts, the regions
-    /// supplied in non-sorted array order to pin that scaffold lines ride
-    /// artifact order untouched.
+    /// region-id line, the lexicon vocabulary block with `var=` and
+    /// present-bound `ge=`/`gt=`/`le=`/`lt=` marks only on interval concepts),
+    /// then the document's spans in `reading_order` — the spans supplied out of
+    /// order to prove the composer sorts, the regions supplied in non-sorted
+    /// array order to pin that scaffold lines ride artifact order untouched,
+    /// and a two-bound interval to pin the bound-mark order.
     #[test]
     fn single_ir_prompt_composes_grounding_scaffold_and_orders_spans() {
         let mut graph = prompt_graph("doc.a", &[(1, "second line"), (0, "first line")]);
@@ -3360,7 +3452,7 @@ mod tests {
                         ge: Some(18),
                         gt: None,
                         le: None,
-                        lt: None,
+                        lt: Some(65),
                     }),
                 },
                 LexiconConcept {
@@ -3385,7 +3477,7 @@ mod tests {
              segment: seg.s1 kind=exception regions=region.r0,region.r1\n\
              regions: region.r1,region.r0\n\
              system: lex.test\n\
-             concept: pop.adult var=q.age_years\n\
+             concept: pop.adult var=q.age_years ge=18 lt=65\n\
              concept: drug.x\n\
              action: act.administer\n\
              first line\n\
@@ -3510,6 +3602,45 @@ mod tests {
         assert!(err.contains("file bytes hash"), "{err}");
     }
 
+    /// A test lexicon holding exactly the accept fixtures' vocabulary (system
+    /// `ckc.lex`, the cited concepts/action, one interval variable), so the
+    /// [`single_ir_accept`] tests vary grounding and vocabulary independently.
+    fn accept_lexicon() -> Lexicon {
+        Lexicon {
+            system: static_id("ckc.lex"),
+            content_hash: prompt_hash('f'),
+            concepts: vec![
+                LexiconConcept {
+                    concept_id: static_id("cond.sepsis"),
+                    surfaces: vec![],
+                    interval: None,
+                },
+                LexiconConcept {
+                    concept_id: static_id("drug.x"),
+                    surfaces: vec![],
+                    interval: None,
+                },
+                LexiconConcept {
+                    concept_id: static_id("pop.adult"),
+                    surfaces: vec![],
+                    interval: Some(QuantityInterval {
+                        var: static_id("q.age_years"),
+                        ge: Some(18),
+                        gt: None,
+                        le: None,
+                        lt: None,
+                    }),
+                },
+            ],
+            actions: vec![LexiconAction {
+                action_id: static_id("act.start"),
+                surfaces: vec![],
+            }],
+            modality: vec![],
+            certainty: vec![],
+        }
+    }
+
     /// [`single_ir_accept`] classifies a model output with no live pipeline:
     /// malformed bytes are a repairable [`FillReject::Schema`]; an empty
     /// [`ClinicalIr`] cites no ids and accepts; an output citing ids absent
@@ -3518,11 +3649,14 @@ mod tests {
     /// exercises every grounded site together — a binding `region_id`, an
     /// exception `region_id`, and a statement `source_segment_id` — in both
     /// directions; the no-false-reject half is the property route-single-ir.2b's
-    /// reproduce-M1 gate leans on.
+    /// reproduce-M1 gate leans on. The fixture's vocabulary sits in
+    /// [`accept_lexicon`], so only grounding varies here;
+    /// [`single_ir_accept_rejects_off_lexicon_vocabulary`] varies the vocabulary.
     #[test]
     fn single_ir_accept_classifies() {
+        let lexicon = accept_lexicon();
         let none: HashSet<&Id> = HashSet::new();
-        let accept = single_ir_accept(&none, &none);
+        let accept = single_ir_accept(&none, &none, &lexicon);
 
         // (1) bytes that are not canonical `ClinicalIr` → repairable schema reject.
         assert!(matches!(
@@ -3586,7 +3720,132 @@ mod tests {
         // (4) universes holding exactly those ids → the same output accepts.
         let regions: HashSet<&Id> = HashSet::from([&region_b, &region_e]);
         let segments: HashSet<&Id> = HashSet::from([&segment_s]);
-        assert!(single_ir_accept(&regions, &segments)(&cited_bytes).is_ok());
+        assert!(single_ir_accept(&regions, &segments, &lexicon)(&cited_bytes).is_ok());
+    }
+
+    /// [`single_ir_accept`] rejects off-lexicon vocabulary as a repairable
+    /// [`FillReject::Schema`] naming the off ids — the replay-side mirror of
+    /// the enumerations the ClinicalIR schema bakes — across every checked
+    /// site: binding system/code/alternatives, population and condition atoms
+    /// (concept, negated concept, interval `var`), action kind and target, and
+    /// exception atoms. A fully grounded base accepts (vocabulary is the only
+    /// axis varied), and an output that is BOTH off-lexicon and hallucinating
+    /// a source id classifies as the schema reject — vocabulary runs with the
+    /// parse phase, ahead of grounding.
+    #[test]
+    fn single_ir_accept_rejects_off_lexicon_vocabulary() {
+        let lexicon = accept_lexicon();
+        let region = static_id("region.r0");
+        let segment = static_id("seg.s0");
+        let base = ClinicalIr {
+            bindings: vec![TerminologyBinding {
+                binding_id: static_id("bind.0"),
+                system: static_id("ckc.lex"),
+                code: static_id("cond.sepsis"),
+                status: BindingStatus::Exact,
+                alternatives: vec![static_id("drug.x")],
+                region_ids: vec![region.clone()],
+            }],
+            statements: vec![ClinicalStatement {
+                statement_id: static_id("stmt.0"),
+                population: vec![ContextAtom::Concept(static_id("pop.adult"))],
+                condition: vec![ContextAtom::Interval(QuantityInterval {
+                    var: static_id("q.age_years"),
+                    ge: Some(18),
+                    gt: None,
+                    le: None,
+                    lt: None,
+                })],
+                action: Action::new(static_id("act.start"), static_id("drug.x")),
+                modality: Direction::Require,
+                strength: Strength::Strong,
+                certainty: None,
+                exceptions: vec![ExceptionClause {
+                    exception_id: static_id("exc.0"),
+                    atoms: vec![ContextAtom::ConceptNegated(static_id("cond.sepsis"))],
+                    region_ids: vec![region.clone()],
+                }],
+                source_segment_ids: vec![segment.clone()],
+            }],
+        };
+        let regions: HashSet<&Id> = HashSet::from([&region]);
+        let segments: HashSet<&Id> = HashSet::from([&segment]);
+        let accept = single_ir_accept(&regions, &segments, &lexicon);
+        let classify = |ir: &ClinicalIr| accept(&canonical_payload_bytes(ir).unwrap());
+
+        // Grounded + in-vocabulary base accepts: mutations below fail on
+        // vocabulary alone.
+        assert!(classify(&base).is_ok());
+
+        // Each lexicon-enumerated site, mutated to an unknown id, rejects as a
+        // repairable schema violation naming that id.
+        let mutations: Vec<(&str, ClinicalIr)> = vec![
+            ("lex.other", {
+                let mut ir = base.clone();
+                ir.bindings[0].system = static_id("lex.other");
+                ir
+            }),
+            ("cond.unknown", {
+                let mut ir = base.clone();
+                ir.bindings[0].code = static_id("cond.unknown");
+                ir
+            }),
+            ("cond.alt_unknown", {
+                let mut ir = base.clone();
+                ir.bindings[0].alternatives = vec![static_id("cond.alt_unknown")];
+                ir
+            }),
+            ("pop.unknown", {
+                let mut ir = base.clone();
+                ir.statements[0].population = vec![ContextAtom::Concept(static_id("pop.unknown"))];
+                ir
+            }),
+            ("q.unknown", {
+                let mut ir = base.clone();
+                ir.statements[0].condition = vec![ContextAtom::Interval(QuantityInterval {
+                    var: static_id("q.unknown"),
+                    ge: Some(18),
+                    gt: None,
+                    le: None,
+                    lt: None,
+                })];
+                ir
+            }),
+            ("act.unknown", {
+                let mut ir = base.clone();
+                ir.statements[0].action =
+                    Action::new(static_id("act.unknown"), static_id("drug.x"));
+                ir
+            }),
+            ("drug.unknown", {
+                let mut ir = base.clone();
+                ir.statements[0].action =
+                    Action::new(static_id("act.start"), static_id("drug.unknown"));
+                ir
+            }),
+            ("cond.neg_unknown", {
+                let mut ir = base.clone();
+                ir.statements[0].exceptions[0].atoms =
+                    vec![ContextAtom::ConceptNegated(static_id("cond.neg_unknown"))];
+                ir
+            }),
+        ];
+        for (off_id, ir) in &mutations {
+            match classify(ir) {
+                Err(FillReject::Schema(reason)) => assert!(
+                    reason.contains(&format!("off-lexicon vocabulary: {off_id}")),
+                    "expected reason naming {off_id}, got {reason}"
+                ),
+                other => panic!("expected Schema naming {off_id}, got {other:?}"),
+            }
+        }
+
+        // Precedence: off-vocabulary + a hallucinated source id → the schema
+        // reject fires first (grounding would be terminal; vocabulary repairs).
+        let mut both = base.clone();
+        both.bindings[0].code = static_id("cond.unknown");
+        both.bindings[0].region_ids = vec![static_id("region.absent")];
+        assert!(matches!(classify(&both), Err(FillReject::Schema(_))));
     }
 
     /// Repository root: two levels above the ckc-cli manifest, where the §3
@@ -4863,7 +5122,7 @@ processing_stages:
                 Some("sha256:52023a235277950b672288f1c196550139e2c1a8c32a1c559509ad35aba0d7f8"),
                 Some("sha256:7192125b87593d1731795a1757c8f37f417061dc15603595f4a9178aeefee82f"),
                 Some("sha256:c814fdbdef45361a17fba8e924190b57eda8a4bab91f58e61a215d9a201497c6"),
-                Some("sha256:ad888a9c11b9b65094a5d2ff8c501cbe6345ca2f28b0ea323dfb9bb09614511f"),
+                Some("sha256:98148a65544a88fac3b013e16fd42a29bbcbb7e361f62657bd5ef9d8c30b54af"),
             ],
             "run manifest §9 measurement hashes (test_source / reference / schema / prompt_template)"
         );
@@ -6594,7 +6853,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             &key(99),
             FillSource::Replay,
             2,
-            single_ir_accept(&regions, &segment_ids),
+            single_ir_accept(&regions, &segment_ids, &lexicon),
         )
         .unwrap();
         assert!(fill.target.is_none());
@@ -6622,7 +6881,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             &key(98),
             FillSource::Replay,
             1,
-            single_ir_accept(&regions, &segment_ids),
+            single_ir_accept(&regions, &segment_ids, &lexicon),
         )
         .unwrap();
         assert_eq!(fill.repairs, 1);
@@ -6694,7 +6953,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             &key(97),
             FillSource::Replay,
             1,
-            single_ir_accept(&regions, &segment_ids),
+            single_ir_accept(&regions, &segment_ids, &lexicon),
         )
         .unwrap();
         assert!(fill.target.is_none());
@@ -8111,7 +8370,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
                     },
                     FillSource::Replay,
                     1,
-                    single_ir_accept(&regions, &segment_ids),
+                    single_ir_accept(&regions, &segment_ids, &lexicon),
                 )
                 .unwrap();
                 FillObservation::from_fill(&fill)

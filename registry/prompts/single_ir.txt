@@ -7,7 +7,8 @@ You are given, for one source document, these input lines followed by the guidel
 - `regions:` — every evidence region id of the document.
 - `system:` — the terminology system id.
 - `concept:` — one line per lexicon concept code; a `var=` mark names the context
-  variable that measures the concept.
+  variable that measures the concept, and `ge=`/`gt=`/`le=`/`lt=` marks give the
+  concept's canonical interval bounds over that variable.
 - `action:` — one line per action kind.
 
 Produce one JSON object that conforms to the supplied ClinicalIR schema. Follow these rules:
@@ -25,6 +26,8 @@ Produce one JSON object that conforms to the supplied ClinicalIR schema. Follow 
   `regions:` lines.
 - Give each generated id (`binding_id`, `statement_id`, `exception_id`) a fresh,
   grammar-valid identifier.
-- Write every numeric interval bound as an integer inside the schema's range.
+- Write every numeric interval bound as an integer inside the schema's range: copy a
+  concept's canonical bounds from its `ge=`/`gt=`/`le=`/`lt=` marks, and take the
+  numbers for an interval the text states directly from the text.
 
 Output only the JSON object, with nothing before or after it.
