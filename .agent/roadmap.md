@@ -230,13 +230,92 @@ all live in run.rs (used by the fills); `budget_ms` is the §8.4 `solver_ms_per_
   STRUCTURAL (the `if record` gate → a replay run never constructs `ModelAdapter`), proven by threading
   `false` through the green `m2_route_loop_lands_both_routes_namespaced` (memory records the rule). Gate
   green: 286 pass/7 ignored, fmt/clippy clean, rustdoc 17 (baseline unchanged). 87% 175K/200K
-- [ ] run-m2.2: live-pin battery over the run binary. Record the full experiment cassette via the env
-  runtime command (LIVE, runtime indirection over deny-Read sources), commit the recorded model I/O as
-  tracked test-source artifacts (origin `ai_generated`); live pins on `report.json` sections + manifest
-  evaluator-identity hashes; `ckc replay` byte-matches with the runtime command ABSENT. Reading:
-  run-m2.1 wiring; replay/cassette modules; SPEC §9 recorded-bytes, §7.2. Gate (LIVE): the command
-  lands all artifacts; live pins hold; `ckc replay` byte-matches the recorded run. [Live-pin-over-run-
-  binary = its own unit; cassette stored as tracked test-source artifacts, NOT under gitignored `runs/`.]
+run-m2.2 RESPEC (SIZE-CHECK fired pre-code: the committed templates PROMISE instrument-supplied
+inputs — segment/region ids, lexicon vocabulary, `:named` label ids — that the f1 composers never
+compose; honest recording REQUIRES that grounding scaffold in the prompt BEFORE any cassette is cut
+(§9: route failures attribute to translation, not the instrument; cassettes embed prompt bytes →
+wording changes after recording force a full re-record), and scaffold + env-wrapper grammar wiring +
+live record + pin battery ≫ one window; seam-confirmation reads spent the margin → respec commit
+closes the session per land-or-revert). NEW PLAN RULE (re-audited: acceptance-m2 + the three lines
+below pass): a unit touching prompt templates must enumerate the supply MECHANISM for every input the
+template promises — "wording refinement" hiding a composer redesign = plan bug. DECISIONS: direct
+`:named` labels = NAMING-SCHEME supply, template wording ONLY (reference cores are
+`a.<test_source_id>.rule.<n>` → template instructs `a.<document-id>.rule.<n>`, rules numbered 0,1,…
+in document order per document; exact label LISTS would import IR-layer rule counts into the no-IR
+route — rejected); single_ir composer supplies per-segment lines (segment_id, kind, region_ids) + a
+regions line + the lexicon vocabulary (system + concept_ids w/ interval var ids + action_ids;
+enforcement stays compile-side — the schema constrains ids by grammar, wrong codes surface as compile
+diagnostics = measured translation failure); model budget = NEW budget-map key `model_ms_per_call`
+(600000; map is open `BTreeMap<Id,u64>` registry.rs:127 → yaml-only), `Resolved.model_ms_per_call:
+Option<u64>` read unconditionally, REQUIRED at record only (`build_route_record` None→Err→command
+diagnostic; replay never invokes → zero fixture churn). BANKED APPLY-ANCHORS (implement WITHOUT
+re-reading normalize.rs/source_linkage.rs/ir.rs/cassette.rs — shapes verbatim here): composers
+run.rs:2429-2465 — `single_ir_prompt(template,doc_id,graph)` = `[template, "document: {doc_id}"]` ++
+`reading_order_text(graph)` (sort spans by `reading_order`, map `raw_text`), join`\n`;
+`direct_smt_prompt(template,gid,role,members:&[(&Id,&SourceDocumentGraph)])` inserts `group:`/`role:`
+lines then per-member `document:` + spans; `single_ir_fill` ALREADY takes `lexicon:&Lexicon` (:1455)
+and `execute_routes` loads `(lexicon,lexicon_hash)` (:351) → new composer params flow from in-scope
+values (verify segments/graph in scope at single_ir_fill's Record arm :1453-1520; if absent, thread
+from the route loop which holds DocHead); `Lexicon{system,content_hash,concepts,actions,modality,
+certainty}` (normalize.rs:67), `LexiconConcept{concept_id,surfaces,interval:Option<QuantityInterval>}`,
+`LexiconAction{action_id,surfaces}`; `SourceDocumentGraph.regions:Vec<EvidenceRegion>`
+(source_linkage.rs:575; `region_id` :421); `ClinicalSegment{segment_id,kind,region_ids}` (ir.rs:566);
+`build_route_record` (run.rs:2535-2570) already holds the template String + `schema.path` → pre-write
+BYTE-verify slots there (`hash_bytes(template.as_bytes())==prompt.template_hash`;
+`hash_bytes(&read(root.join(&schema.path)))==schema.schema_hash`; mismatch→Err→command diagnostic),
+closing the deferred f2 codex item; `RecordContext{producer,prompt_template_hash,budget}`
+(cassette.rs:49); `store.record` already seals constraint bytes across the call (cassette.rs:109-121);
+resolve() budget reads: SOLVER_BUDGET_KEY :800 required, MODEL_REPAIR_LIMIT_KEY :810
+model-route-gated (mirror the Option read); f1 composer EXACT-bytes pin tests run.rs:3192+ (update
+from the new composition); template edits re-pin ONLY the two prompts.yaml template_hash values
+(sha256sum; committed_model_surface_checks_ok validates declared-vs-file, no const edit). Cassette
+landing (2b): CassetteStore roots at `<root>/cassettes/` (run.rs:372) → recording from the repo root
+lands tracked `/cassettes/**` (payload EMBEDS the rendered prompt = deny-Read source text → close 2b
+by syncing the do-not-read set: `.claude/settings.json` deny Read() + `.serena/project.yml`
+ignored_paths + a block/allow Read-test pair; committed cassettes carry REAL model identity — extend
+memory's audit-exclude list). Runtime facts (2b): the engine exposes an EBNF `grammar=` constraint
+slot (introspected live; wiring + NPU verification = 2b's exploratory env work, machine specifics →
+runtime.local.md); the wrapper today fail-closes non-JSON constraints; identity probe re-confirmed
+live this session.
+- [ ] run-m2.2a: prompt-scaffold completion + record-mode byte-verify (deterministic, runtime-absent).
+  Composers supply what the templates promise: `single_ir_prompt` gains `segments:&[ClinicalSegment]`
+  + `regions:&[EvidenceRegion]` + `lexicon:&Lexicon` → emit per-segment `segment: <id> kind=<kind>
+  regions=<ids>` lines, a `regions: <ids>` line, and the lexicon vocabulary block (system +
+  concept_ids w/ interval var ids + action_ids) between the document line and the spans; both
+  TEMPLATES resynced to promise exactly the supplied inputs (direct_smt.txt adds the
+  `a.<document-id>.rule.<n>` labeling scheme and drops "label ids supplied"; single_ir.txt names the
+  supplied lines); prompts.yaml re-pins the two template_hash values; `model_ms_per_call: 600000`
+  lands in exp.m2_multihop budget + `Resolved.model_ms_per_call` + `build_route_record` requires it
+  and swaps `ctx.budget` off the solver key; pre-write byte-verify in build_route_record (banked
+  above). Tests: updated composer pins (fixtures keep array-order≠reading_order); budget-key
+  present/absent; byte-verify mismatch→Err. Gate: fmt/clippy/tests/doc-lint; touched-file
+  engine-neutral grep.
+- [ ] run-m2.2b: LIVE record + committed experiment cassettes (gate: run-m2.2a landed). Env wrapper
+  first (machine-local, outside git): translate the committed BNF → engine EBNF (strip `;` comment
+  lines, `<name>`→bare names, start rule → `root`, escape the in-quote literal newline, verify
+  empty-literal alternatives against the engine), hand it the grammar constraint slot, stay
+  fail-closed otherwise; verify on NPU against schemas/smt_query.grammar; size CKC_MAX_NEW_TOKENS
+  (~4096) — specifics → runtime.local.md. Then LIVE `ckc run --experiment exp.m2_multihop --out
+  runs/<id> --record` from the repo root (runtime indirection: sources open inside the pipeline;
+  their paths stay out of Read/Bash args); commit landed `/cassettes/**` verbatim (origin
+  `ai_generated`, REAL identity — audit-exempt path, extend memory's exclude list);
+  `CKC_MODEL_COMMAND=<absent-name>` `ckc replay --run <out>` matches; sync the do-not-read set for
+  `/cassettes/` (banked above) + Read-test pair. Gate (LIVE): the run lands the 8-entry root layout +
+  both routes' artifacts; every fill attempt persists a cassette (weak-model failures land as §7.4
+  codes; a CassetteError abort = instrument fault → fix env/wrapper, re-record); replay CLI reports
+  match.
+- [ ] run-m2.2c: recorded-run pin battery + replay coverage (deterministic, runtime-absent; gate:
+  run-m2.2b landed). New tests/ integration file: temp root = committed registry+corpus+schemas+
+  prompts (write_m2_root pattern) + repo `/cassettes/**` copied in; `execute()` exp.m2_multihop →
+  bless-from-observed pins: report.json M2 sections (typed strict_at structure per the C2 split —
+  taxonomy route maps, metrics emission_order + k_sample NA, agreed identity == the cassettes'
+  recorded identity by EQUALITY, never a literal), RunManifest+ReplayManifest §9 7-tuple (4 hashes
+  blessed; reference_hash cross-checked == raw sha256 of expected_outcomes), rendered bodies via a
+  run_oracle-style re-render compare (NO const body pin: solver version env-dependent, identity
+  literals banned from test code); replay::execute over the run → matched() (closes the deferred
+  replay.rs model-artifact coverage). Reading capped: the m2 loop test + write_m2_root helpers +
+  replay.rs:105-180; report.rs/metrics.rs/manifests.rs EXCLUDED (pins bless from observed bytes).
+  Gate: full battery + doc-lint green.
 - [ ] acceptance-m2: §9 acceptance. Verify the §9 themes against the recorded run — both routes
   execute over identical locked inputs (`exp.m2_multihop`); recorded model I/O replays byte-stably
   (runtime absent); raw rows before the baseline-delta table; expected conflict/no-conflict per

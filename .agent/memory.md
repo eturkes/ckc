@@ -88,7 +88,10 @@ aggressively; full pre-consolidation text in git history.
   unit's new wiring → its OWN unit, not folded in: run-m2.1d5a-2 split unified-tails wiring from the
   partial-group/mixed-shape/identity-disagreement tests pinning .1d5a-1's branches); spec-byte
   amendment (re-pin + reference/test mirror sweep) + new feature code = 2 (an open decision that amends
-  pinned bytes is a deliverable, not a preamble); crate foundations pair only with a small type surface (one payload module each); deterministic code + a
+  pinned bytes is a deliverable, not a preamble); a prompt-TEMPLATE refinement must enumerate the supply
+  mechanism for every input the template promises at plan time — a template promising
+  instrument-supplied inputs (ids/vocabulary) the composer never composes hides a composer redesign, and
+  scaffold-completion / live-record / pin-battery = 3 units (run-m2.2 respec); crate foundations pair only with a small type surface (one payload module each); deterministic code + a
   SLOW/exploratory live confirm over an external runtime = 2 (code stub-gated + mechanical; the live
   confirm its own unit) → apply to EVERY live-runtime-gated unit at plan time, not only the obviously-slow,
   and on recovery discharge the one-time exploration into memory `## Runtime` + persist any
@@ -243,8 +246,8 @@ aggressively; full pre-consolidation text in git history.
   `RecordSetup` (adapter probe + `validate_model_registry`) ONCE `if record` else `None`, then per-view
   `build_route_record` (f1 select→template/constraint/`RecordContext`) feeds both fills' new
   `Option<&RouteRecord>` → `FillSource::Record` (type-enforced; Record arm live-capable via `CassetteStore::record`→`adapter.invoke`, not live-exercised in f2); §9 manifest fields landed
-  e-B. DEFERRED to run-m2.2 (LIVE, via `FillSource`): live record exercise + replay.rs model-artifact
-  coverage + pre-write BYTE-verify (before a cassette is written, confirm the selected template/schema bytes hash to the registry-declared `template_hash`/`schema_hash`; the run path TRUSTS declared hashes, `registry check` = today's sole byte-verifier, and `build_route_record` already HAS the bytes → the natural gate; codex-review f2 low-sev, deferred). f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
+  e-B. DEFERRED (respec'd into run-m2.2a/b/c): pre-write BYTE-verify → 2a, live record exercise → 2b,
+  replay.rs model-artifact coverage → 2c (byte-verify detail: before a cassette is written, confirm the selected template/schema bytes hash to the registry-declared `template_hash`/`schema_hash`; the run path TRUSTS declared hashes, `registry check` = today's sole byte-verifier, and `build_route_record` already HAS the bytes → the natural gate; codex-review f2 low-sev, deferred). f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
   void under `#![forbid(unsafe_code)]` (set_var forbidden, above) → the no-probe property is STRUCTURAL
   (record_setup built only `if record`, else `None` → a replay run never constructs `ModelAdapter`),
   proven by threading `false` through the green `m2_route_loop_lands_both_routes_namespaced`; the flag
@@ -624,6 +627,12 @@ aggressively; full pre-consolidation text in git history.
     is environment-supplied outside git. Committed `schemas/` use neutral formats —
     JSON-Schema (standard) for ClinicalIR, BNF grammar (ABNF-style `;` comments) for the SMT surface (no engine
     constraint-dialect name); the env wrapper compiles them to the runtime's constraint format.
+  - run-m2.2 respec decisions: direct `:named` labels are supplied as a NAMING SCHEME in the template
+    (`a.<document-id>.rule.<n>`, per-document 0-based rule order per the reference's core ids) — exact
+    label LISTS would import IR-layer rule counts into the no-IR route; the model-invocation time cap
+    is registry budget key `model_ms_per_call` (open budget map, yaml-only), read into
+    `Resolved.model_ms_per_call: Option<u64>` unconditionally, REQUIRED only at record time in
+    `build_route_record` (replay never invokes → zero fixture churn).
   - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
     seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9
     minimal pair over widening §9; the gradient is the experiment §10 ("vary and layer existing IR
@@ -752,8 +761,8 @@ aggressively; full pre-consolidation text in git history.
 - Record-mode prompt composition (run-m2.1f1, run.rs above `manifest_inputs`, `#[allow(dead_code)]`
   until f2 consumes): `select_record_{schema,prompt}` key by `id.as_str()`
   (SingleIr→clinical_ir/single_ir, DirectSmt→smt_query/direct_smt, M1Layered→None — DEFENSIVE vs
-  `manifest_inputs`' Err on M1Layered). Prompt FORMAT (f2 threads verbatim, run-m2.2 refines
-  wording): `single_ir_prompt` = template ++ `document: <doc_id>` ++ spans; `direct_smt_prompt` =
+  `manifest_inputs`' Err on M1Layered). Prompt FORMAT (f2 threads verbatim; run-m2.2a completes the
+  grounding scaffold — segments/regions/lexicon supply + the direct labeling-scheme wording): `single_ir_prompt` = template ++ `document: <doc_id>` ++ spans; `direct_smt_prompt` =
   template ++ `group: <gid>` ++ `role: <role>` ++ per-member(`document: <doc_id>` ++ spans); spans
   sorted by `reading_order` (shared `reading_order_text` helper), `\n`-joined.
 - RESPEC-COMPLETENESS: when a unit must CONSTRUCT a type, bank its CONSTRUCTOR + a mirror call site,
