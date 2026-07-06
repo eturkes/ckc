@@ -4049,6 +4049,70 @@ processing_stages:
             "manifest output_hashes cover the direct deontic smt_query"
         );
 
+        // run-m2.1e-B2b — the model-route manifest carries the §9 measurement record: the
+        // agreed evaluator identity (the golden cassettes' synthetic `model.baseline`), the
+        // four input hashes over THIS run's actual inputs — the aggregated test sources, the
+        // route-relevant schema and prompt entries, and the raw reference bytes — and
+        // model_hash/runtime_hash left None, since the runtime is an environment bare-name
+        // command committing no bytes (identity rides `model_identity`). Values blessed from
+        // the observed run.
+        assert_eq!(
+            manifest.model_identity,
+            Some(ModelIdentity {
+                model_id: static_id("model.baseline"),
+                quant: "fixture_quant".to_owned(),
+                runtime_version: "1.0.0".to_owned(),
+            }),
+            "run manifest §9 evaluator identity"
+        );
+        assert!(
+            manifest.model_hash.is_none() && manifest.runtime_hash.is_none(),
+            "the env bare-name runtime commits no model/runtime bytes"
+        );
+        assert_eq!(
+            [
+                manifest.test_source_hash.as_ref().map(|h| h.as_str()),
+                manifest.reference_hash.as_ref().map(|h| h.as_str()),
+                manifest.schema_hash.as_ref().map(|h| h.as_str()),
+                manifest.prompt_template_hash.as_ref().map(|h| h.as_str()),
+            ],
+            [
+                Some("sha256:52023a235277950b672288f1c196550139e2c1a8c32a1c559509ad35aba0d7f8"),
+                Some("sha256:7192125b87593d1731795a1757c8f37f417061dc15603595f4a9178aeefee82f"),
+                Some("sha256:c814fdbdef45361a17fba8e924190b57eda8a4bab91f58e61a215d9a201497c6"),
+                Some("sha256:87a436f90cbc70b1f2e5b5e115767ed1b2c3dc01e83f3e4c08b30c97e25b4323"),
+            ],
+            "run manifest §9 measurement hashes (test_source / reference / schema / prompt_template)"
+        );
+
+        // run-m2.1e-B2b — the replay manifest carries the identical §9 record: pin the full
+        // seven-tuple equality so both records stay in lockstep without recomputing each hash.
+        use ckc_core::ReplayManifest;
+        let replay_manifest: ReplayManifest =
+            read_strict_canonical(&std::fs::read(out.join("replay_manifest.json")).unwrap())
+                .unwrap();
+        assert_eq!(
+            (
+                &replay_manifest.model_identity,
+                &replay_manifest.test_source_hash,
+                &replay_manifest.reference_hash,
+                &replay_manifest.schema_hash,
+                &replay_manifest.prompt_template_hash,
+                &replay_manifest.model_hash,
+                &replay_manifest.runtime_hash,
+            ),
+            (
+                &manifest.model_identity,
+                &manifest.test_source_hash,
+                &manifest.reference_hash,
+                &manifest.schema_hash,
+                &manifest.prompt_template_hash,
+                &manifest.model_hash,
+                &manifest.runtime_hash,
+            ),
+            "replay manifest §9 record matches the run manifest"
+        );
+
         // run-m2.1e-A — the run-level trace/report tails carry a synthetic producer: the
         // baseline route's `pipeline_id` (`pipe.m2_direct_smt`, kept deliberately — the tails
         // span both routes) paired with a run-level step id, NOT the route's inert

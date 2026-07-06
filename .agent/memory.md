@@ -538,8 +538,13 @@ aggressively; full pre-consolidation text in git history.
     experiment's `expected_outcomes` (`reference_hash`); `model_hash`/`runtime_hash` STAY None (env
     bare-name commands, no committed bytes; identity rides `model_identity`). Fixture:
     `copy_committed_registry` gained schemas.yaml + prompts.yaml → `write_m2_root` (calls it)
-    provisions the model-route test; reference file already copied. B2b value-pins (bless-from-observed)
-    both records' 7-tuple parity.
+    provisions the model-route test; reference file already copied. B2b DONE — value-pinned
+    (bless-from-observed) the RunManifest §9 record + ReplayManifest 7-tuple parity in
+    `m2_route_loop_lands_both_routes_namespaced`. GUARD: a multi-field observed-bless of
+    same-typed fields (the 4 `Option<Hash>`) can silently slot-swap two aggregates → anchor
+    ordering by cross-checking the one INDEPENDENTLY-verifiable field (`reference_hash` ==
+    `sha256sum` of the expected_outcomes file, a raw-byte hash) before pinning; recurs at
+    run-m2.2's live manifest/report value-pins.
   - Registry `check` is referential (finder-confirmed `validate_registries`): FAILS on dangling
     experiment→pipeline / pipeline→stage refs + §8.4 ChainBreak → seed an experiment entry ONLY after
     its pipelines + stages exist (real `exp.m2_multihop` seeds in run-m2.1, not the type-extension
