@@ -416,7 +416,7 @@ aggressively; full pre-consolidation text in git history.
   groups mint claims; direct mints none). RESPEC banked-fact ERROR corrected (verify-against-code
   rule): the gate test DID carry `assert_eq!(listing(&out), ["logs","routes"])` — the respec's
   do-not-read note claimed it did NOT — so it now pins the 8-entry root set + a
-  `strict_at::<TraceBundle>` claims assertion. Error-path diagnostics LANDED .1d5a-2b (3 run-binary
+  `strict_at::<TraceBundle>` claims assertion. RECURRED M2.1e-C1 (codex): C1 claimed no M1 success test pins an exhaustive root listing — FALSE (tests/cli_shell.rs + tests/run_oracle.rs both do); the respec swept run.rs's in-module M1 tests (`.exists()`/`strict_at`, non-exhaustive) but not the tests/*.rs integration files → verify-against-code must grep the WHOLE crate test surface (`sorted_entries`/`files_under`/`expected_files`/`read_dir` over tests/ AND src), not just the edited module. Additive-safety split: a rendered view landed via `shell.write_under` (report_en/ja.md) is NOT lineage/manifest-tracked (the manifest derives from the report wrapper, not a dir scan) → byte-safe for report.json/manifest/lineage pins, perturbs only exhaustive file-SET listings; `land`/`wrapper`/`land_record` DO track. Error-path diagnostics LANDED .1d5a-2b (3 run-binary
   tests over `write_m2_root` variants: drop guideline_b's single_ir cassette → fill + partial-group
   compile diagnostics co-occur, diag order fill<compile since the fill loop precedes the group loop;
   swap direct→layered in experiments.yaml `pipelines` + re-point baseline in-set → mixed-shape command
