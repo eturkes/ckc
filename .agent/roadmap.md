@@ -198,22 +198,16 @@ before any `root.join(path)`. Slot const `MODEL_FILL` + `producer(resolved, idx)
 all live in run.rs (used by the fills); `budget_ms` is the §8.4 `solver_ms_per_query` SOLVER budget
 (run.rs:687) → DECISION: f2 reuses it as the `RecordContext.budget` model-invocation placeholder
 (first-draft), a dedicated model budget = run-m2.2 (record ships type-plumbing only, no live call).
-- [ ] run-m2.1f1: pure record-prompt selection + composition (ckc-cli, new fns in run.rs or a
-  `record_prompt` section; `#[allow(dead_code)]` pre-consumers; NO I/O, NO adapter, NO dispatch —
-  crate green). Deliver 4 pure fns + inline-fixture tests: `select_record_schema(&[SchemaEntry],
-  RouteShape) -> Option<&SchemaEntry>` (by `id`: SingleIr→`schema.clinical_ir`,
-  DirectSmt→`schema.smt_query`, M1Layered→None); `select_record_prompt(&[PromptEntry], RouteShape) -> Option<&PromptEntry>` (by
-  entry id prompt.single_ir/prompt.direct_smt, mirror manifest_inputs; M1Layered→None);
-  `single_ir_prompt(template:&str, doc_id:&Id, graph:&SourceDocumentGraph) -> String` (template ++
-  doc-id line ++ `graph.spans` `raw_text` joined by `reading_order`); `direct_smt_prompt(template:&str,
-  gid:&Id, role:&str, members:&[(&Id, &SourceDocumentGraph)]) -> String` (template ++ `role: <role>`
-  line ++ per-member doc-id + spans). Deterministic composition (order by `reading_order`; `\n` join —
-  first-draft, run-m2.2 refines wording). Tests: each selector hit + miss (+ M1Layered None); each
-  composer over a 2-span inline graph pins the EXACT composed string (order + doc-id + role line).
-  Reading: SchemaEntry/PromptEntry/RouteShape + SourceDocumentGraph/SourceTextSpan shapes BANKED in
-  the RESPEC note (do NOT re-read registry.rs/run.rs/source_linkage.rs). Gate: `cargo test -p
-  ckc-cli`; fmt/clippy `--lib -D warnings`; `RUSTDOCFLAGS='-D warnings' cargo doc -p ckc-cli --no-deps`
-  on the new doc comments.
+- [x] run-m2.1f1: pure record-prompt selection+composition (ckc-cli run.rs, above `manifest_inputs`;
+  `#[allow(dead_code)]` f2 pre-consumers, NO I/O/adapter/dispatch, crate green) —
+  `select_record_{schema,prompt}(&[Entry], RouteShape)` key by `id.as_str()`
+  (SingleIr→clinical_ir/single_ir, DirectSmt→smt_query/direct_smt, M1Layered→None, mirrors
+  `manifest_inputs` want-set); `single_ir_prompt` = template ++ `document: <doc_id>` ++ spans,
+  `direct_smt_prompt` = template ++ `group: <gid>` ++ `role: <role>` ++ per-member(doc-id ++ spans),
+  spans by `reading_order` (shared `reading_order_text`), `\n`-joined (first-draft; f2 threads
+  verbatim, run-m2.2 refines). Tests: selector hit/miss/M1Layered-None + each composer pins the EXACT
+  string over a 2-span array-order≠reading_order graph (`SourceTextSpan::derive`); SchemaEntry/
+  PromptEntry first literal builders in-crate. 84% 168K/200K
 - [ ] run-m2.1f2: dispatch `--record` + record-mode threading (consumes f1; B2a-style
   compute-then-green; Record arm type-enforced, live exercise = run-m2.2). (1) dispatch.rs: `--record`
   optional boolean — pre-partition it out of `rest` BEFORE `take_flags(OP_RUN,["--experiment","--out"],

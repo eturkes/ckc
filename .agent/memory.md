@@ -737,6 +737,17 @@ aggressively; full pre-consolidation text in git history.
   ledger codes per route (§4.3-sorted both levels); the M2-member expected values in tests tie to
   the .1c byte-pinned populated_report fixture (`m2_route_metrics()`/`baseline_model_identity()`
   shared helpers).
+- Record-mode prompt composition (run-m2.1f1, run.rs above `manifest_inputs`, `#[allow(dead_code)]`
+  until f2 consumes): `select_record_{schema,prompt}` key by `id.as_str()`
+  (SingleIr→clinical_ir/single_ir, DirectSmt→smt_query/direct_smt, M1Layered→None — DEFENSIVE vs
+  `manifest_inputs`' Err on M1Layered). Prompt FORMAT (f2 threads verbatim, run-m2.2 refines
+  wording): `single_ir_prompt` = template ++ `document: <doc_id>` ++ spans; `direct_smt_prompt` =
+  template ++ `group: <gid>` ++ `role: <role>` ++ per-member(`document: <doc_id>` ++ spans); spans
+  sorted by `reading_order` (shared `reading_order_text` helper), `\n`-joined.
+- RESPEC-COMPLETENESS: when a unit must CONSTRUCT a type, bank its CONSTRUCTOR + a mirror call site,
+  not just a field list — the f-respec banked `SourceTextSpan`'s fields but not `::derive` /
+  report.rs `graph` helper → cost a targeted source_linkage.rs read at f1 impl. Fixtures build
+  array-order ≠ `reading_order` to prove the sort.
 
 ## Runtime
 

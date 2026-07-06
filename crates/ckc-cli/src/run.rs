@@ -47,10 +47,11 @@ use std::time::Duration;
 use ckc_core::{
     ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry,
     DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, ModelIdentity,
-    Normalization, Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
-    SourceDocumentGraph, TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
-    canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
-    parse_experiments, parse_prompts, parse_reference, parse_schemas, read_strict_canonical,
+    Normalization, Origin, Outcome, PipelineEntry, Producer, PromptEntry, RunPlan, SchemaEntry,
+    SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
+    canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
+    hash_bytes, parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
+    parse_schemas, read_strict_canonical,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
@@ -2319,6 +2320,86 @@ fn select_route_hashes<'a>(
     Ok(aggregate_hashes(hashes))
 }
 
+// ── record-mode prompt composition (run-m2.1f) ──────────────────────────────
+// Pure record-mode helpers: pick the committed schema and prompt entry a model
+// route records against (keyed by entry `id`, mirroring [`manifest_inputs`]'
+// want-set), and compose the first-draft prompt a route sends the runtime from
+// its template plus the source graph's guideline text. run-m2.1f2 threads these
+// into `execute_routes`; run-m2.2 refines the composed wording against a live
+// recording. Pre-consumers here, hence `#[allow(dead_code)]`.
+
+/// The `registry/schemas.yaml` entry a model route records against, keyed by
+/// entry `id` like [`manifest_inputs`]' want-set: single_ir constrains against
+/// `schema.clinical_ir`, direct_smt against `schema.smt_query`. The layered M1
+/// shape records no model fill, so it selects nothing.
+#[allow(dead_code)]
+fn select_record_schema(schemas: &[SchemaEntry], shape: RouteShape) -> Option<&SchemaEntry> {
+    let want = match shape {
+        RouteShape::SingleIr => "schema.clinical_ir",
+        RouteShape::DirectSmt => "schema.smt_query",
+        RouteShape::M1Layered => return None,
+    };
+    schemas.iter().find(|s| s.id.as_str() == want)
+}
+
+/// The `registry/prompts.yaml` entry a model route records against, keyed by
+/// entry `id` like [`manifest_inputs`]' want-set: single_ir sends
+/// `prompt.single_ir`, direct_smt sends `prompt.direct_smt`. The layered M1
+/// shape records no model fill, so it selects nothing.
+#[allow(dead_code)]
+fn select_record_prompt(prompts: &[PromptEntry], shape: RouteShape) -> Option<&PromptEntry> {
+    let want = match shape {
+        RouteShape::SingleIr => "prompt.single_ir",
+        RouteShape::DirectSmt => "prompt.direct_smt",
+        RouteShape::M1Layered => return None,
+    };
+    prompts.iter().find(|p| p.id.as_str() == want)
+}
+
+/// One source graph's guideline text: its span `raw_text`s in `reading_order`,
+/// one line each. The §4.5 graph already stores spans in reading order, but the
+/// composer sorts explicitly so a partial or reordered graph still yields a
+/// deterministic prompt.
+#[allow(dead_code)]
+fn reading_order_text(graph: &SourceDocumentGraph) -> Vec<String> {
+    let mut spans: Vec<_> = graph.spans.iter().collect();
+    spans.sort_by_key(|s| s.reading_order);
+    spans.into_iter().map(|s| s.raw_text.clone()).collect()
+}
+
+/// Compose the first-draft single_ir record prompt: the route `template`, a
+/// document-id line, then the document's guideline text in `reading_order`,
+/// newline-joined. run-m2.2 refines the wording against a live recording.
+#[allow(dead_code)]
+fn single_ir_prompt(template: &str, doc_id: &Id, graph: &SourceDocumentGraph) -> String {
+    let mut lines = vec![template.to_owned(), format!("document: {doc_id}")];
+    lines.extend(reading_order_text(graph));
+    lines.join("\n")
+}
+
+/// Compose the first-draft direct_smt record prompt for one verifier `role`
+/// (`overlap`/`deontic`) of group `gid`: the route `template`, group and role
+/// lines, then each member's document-id line followed by its guideline text in
+/// `reading_order`, newline-joined. run-m2.2 refines the wording.
+#[allow(dead_code)]
+fn direct_smt_prompt(
+    template: &str,
+    gid: &Id,
+    role: &str,
+    members: &[(&Id, &SourceDocumentGraph)],
+) -> String {
+    let mut lines = vec![
+        template.to_owned(),
+        format!("group: {gid}"),
+        format!("role: {role}"),
+    ];
+    for &(doc_id, graph) in members {
+        lines.push(format!("document: {doc_id}"));
+        lines.extend(reading_order_text(graph));
+    }
+    lines.join("\n")
+}
+
 /// Gather the run state the §5/§4.6 manifests attest, one value per
 /// [`ManifestInputs`] fact (failures name their reason; the report processing_stage
 /// scopes them): the resolved §5 plan and toolchain hash; the §4.6 replay
@@ -2828,11 +2909,141 @@ mod tests {
 
     use ckc_core::{
         Action, BindingStatus, CassettePayload, ClinicalStatement, Direction, EventRecord,
-        ExceptionClause, ModelIdentity, Strength, TerminologyBinding, TotalOperationResult,
-        parse_reference, read_jsonl,
+        ExceptionClause, ModelIdentity, Provenance, SourceDocument, SourceTextSpan, Strength,
+        TerminologyBinding, TotalOperationResult, parse_reference, read_jsonl,
     };
 
     use crate::normalize::clinical_ir;
+
+    /// A test [`Hash`] over a repeated seed character (value is arbitrary — the
+    /// record-prompt helpers key on ids and span text, never on these hashes).
+    fn prompt_hash(seed: char) -> Hash {
+        Hash::new(format!("sha256:{}", seed.to_string().repeat(64))).unwrap()
+    }
+
+    /// A `registry/schemas.yaml` entry with the given id; `target_kind` is
+    /// distinct from `id` so a selection-by-id test cannot pass by accident.
+    fn schema_entry(id: &str, target_kind: &str) -> SchemaEntry {
+        SchemaEntry {
+            id: static_id(id),
+            path: format!("schemas/{id}.json"),
+            schema_hash: prompt_hash('c'),
+            target_kind: static_id(target_kind),
+        }
+    }
+
+    /// A `registry/prompts.yaml` entry with the given id and route.
+    fn prompt_entry(id: &str, route: &str) -> PromptEntry {
+        PromptEntry {
+            id: static_id(id),
+            path: Some(format!("registry/prompts/{id}.txt")),
+            inline: None,
+            template_hash: prompt_hash('d'),
+            route: static_id(route),
+        }
+    }
+
+    /// A minimal [`SourceDocumentGraph`] for prompt-composition tests: `spans`
+    /// carry `(reading_order, raw_text)` in the given (possibly unsorted) array
+    /// order, so a composer's `reading_order` sort is observable; the node,
+    /// anchor, and region pools stay empty (a composer reads only `spans`).
+    fn prompt_graph(doc: &str, spans: &[(u64, &str)]) -> SourceDocumentGraph {
+        SourceDocumentGraph {
+            document: SourceDocument {
+                document_id: static_id(doc),
+                source_family: static_id("family.test_source_html"),
+                provenance: Provenance::Synthetic,
+                raw_hash: prompt_hash('a'),
+                content_hash: prompt_hash('b'),
+                data_class: DataClass::None,
+            },
+            nodes: vec![],
+            spans: spans
+                .iter()
+                .enumerate()
+                .map(|(k, (order, text))| {
+                    SourceTextSpan::derive(
+                        static_id(&format!("span.{k}")),
+                        static_id("node.0"),
+                        0,
+                        (*text).to_owned(),
+                        *order,
+                    )
+                })
+                .collect(),
+            anchors: vec![],
+            regions: vec![],
+        }
+    }
+
+    /// [`select_record_schema`] keys the committed schema entry off the route
+    /// shape by `id`: single_ir → `schema.clinical_ir`, direct_smt →
+    /// `schema.smt_query`; the layered M1 shape and an absent id both miss.
+    #[test]
+    fn select_record_schema_by_route_shape() {
+        let schemas = [
+            schema_entry("schema.clinical_ir", "clinical_ir"),
+            schema_entry("schema.smt_query", "smt_query"),
+        ];
+        assert_eq!(
+            select_record_schema(&schemas, RouteShape::SingleIr).map(|s| s.id.as_str()),
+            Some("schema.clinical_ir")
+        );
+        assert_eq!(
+            select_record_schema(&schemas, RouteShape::DirectSmt).map(|s| s.id.as_str()),
+            Some("schema.smt_query")
+        );
+        assert!(select_record_schema(&schemas, RouteShape::M1Layered).is_none());
+        // Miss: the wanted id absent from the registry selects nothing.
+        assert!(select_record_schema(&schemas[..1], RouteShape::DirectSmt).is_none());
+    }
+
+    /// [`select_record_prompt`] keys the committed prompt entry off the route
+    /// shape by `id`: single_ir → `prompt.single_ir`, direct_smt →
+    /// `prompt.direct_smt`; the layered M1 shape and an absent id both miss.
+    #[test]
+    fn select_record_prompt_by_route_shape() {
+        let prompts = [
+            prompt_entry("prompt.single_ir", "route.single_ir"),
+            prompt_entry("prompt.direct_smt", "route.direct_smt"),
+        ];
+        assert_eq!(
+            select_record_prompt(&prompts, RouteShape::SingleIr).map(|p| p.id.as_str()),
+            Some("prompt.single_ir")
+        );
+        assert_eq!(
+            select_record_prompt(&prompts, RouteShape::DirectSmt).map(|p| p.id.as_str()),
+            Some("prompt.direct_smt")
+        );
+        assert!(select_record_prompt(&prompts, RouteShape::M1Layered).is_none());
+        // Miss: the wanted id absent from the registry selects nothing.
+        assert!(select_record_prompt(&prompts[..1], RouteShape::DirectSmt).is_none());
+    }
+
+    /// [`single_ir_prompt`] emits the template, a document line, then the
+    /// document's spans in `reading_order` — here supplied out of order to
+    /// prove the composer sorts.
+    #[test]
+    fn single_ir_prompt_orders_spans_by_reading_order() {
+        let graph = prompt_graph("doc.a", &[(1, "second line"), (0, "first line")]);
+        let prompt = single_ir_prompt("TEMPLATE", &static_id("doc.a"), &graph);
+        assert_eq!(prompt, "TEMPLATE\ndocument: doc.a\nfirst line\nsecond line");
+    }
+
+    /// [`direct_smt_prompt`] emits the template, group and role lines, then each
+    /// member's document line followed by its spans in `reading_order`.
+    #[test]
+    fn direct_smt_prompt_lays_out_role_and_members() {
+        let a = prompt_graph("doc.a", &[(0, "a1"), (1, "a2")]);
+        let b = prompt_graph("doc.b", &[(0, "b1")]);
+        let members: Vec<(&Id, &SourceDocumentGraph)> =
+            vec![(&a.document.document_id, &a), (&b.document.document_id, &b)];
+        let prompt = direct_smt_prompt("TEMPLATE", &static_id("group.g0"), "overlap", &members);
+        assert_eq!(
+            prompt,
+            "TEMPLATE\ngroup: group.g0\nrole: overlap\ndocument: doc.a\na1\na2\ndocument: doc.b\nb1"
+        );
+    }
 
     /// [`single_ir_accept`] classifies a model output with no live pipeline:
     /// malformed bytes are a repairable [`FillReject::Schema`]; an empty
