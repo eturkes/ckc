@@ -159,19 +159,76 @@ run-m2.1e RESPEC (seam confirmation read run.rs+manifests.rs+report.rs+trace.rs 
 - [x] run-m2.1e-B2b: model-route §9 value pins (tests-only, bless-from-observed) — extend `m2_route_loop_lands_both_routes_namespaced` with RunManifest §9 asserts (agreed identity `model.baseline`/`fixture_quant`/`1.0.0`; model_hash+runtime_hash None; 4 hashes test_source/reference/schema/prompt_template blessed from the observed run, reference_hash cross-checked == raw sha256 of m1_expected.yaml) + ReplayManifest 7-tuple parity; M1 §9-None live-asserted in run_oracle.rs (codex follow-up — the manifests.rs `all_none_measurement_record_pins_both_manifests` byte-pin proves only the encoder, not the M1 mode-gate end-to-end; also added a `select_route_hashes` drop-case locking route-relevance vs whole-registry hashing). 53% 107K/200K
 - [x] run-m2.1e-C1: report ModelRunSections wiring — model_route_metrics→assemble_report Some(sections) on a model route, None (no panic) on M1 or a no-identity degraded route; report_ja.md lands both paths in the shared stage; 3 file-set listing pins updated (M2 run.rs + 2 M1 tests); M1 5-file bytes byte-identical, M2 values deferred C2. 74% 149K/200K
 - [x] run-m2.1e-C2: model-route report value pins (tests-only, bless-from-observed) — extend `m2_route_loop_lands_both_routes_namespaced` with report.json M2-section asserts (failure_taxonomy = both routes named with empty §7.4 code maps; metrics emission_order = raw rows for both routes before the lone single_ir delta + k_sample_convergence NA; agreed identity `model.baseline`/`fixture_quant`/`1.0.0`) + full report_en.md/report_ja.md body consts; the live z3 `--version` token normalized to `Z3_VERSION` under a once-per-body occurrence guard (env-independent). 77% 154K/200K
-- [ ] run-m2.1f: `ckc run --record`. Dispatch: optional `--record` flag → `Run{record: bool}`
-  (default false = replay, the committed acceptance path); record mode: one `ModelAdapter::new()`
-  probe → identity into manifests/report verbatim; per route `FillSource::Record{adapter, prompt,
-  constraint, ctx}` — constraint file = the route target-kind's SchemaEntry path (clinical_ir /
-  smt_query), prompt = its PromptEntry file by route id (SingleIr↔route.single_ir,
-  DirectSmt↔route.direct_smt), composed as template bytes + (single_ir: the doc's id line + segment
-  texts in segment order; direct: a `role: overlap|deontic` line + both members' id lines + segment
-  texts) — first-draft composition, run-m2.2's live recording refines wording; RecordContext per
-  cassette.rs's shape (read at implementation). Replay stays the default everywhere (replay.rs
-  re-executes via run::execute → never records). Reading: dispatch.rs, model.rs adapter surface,
-  cassette.rs RecordContext, registry prompt/schema loaders. Gate: cargo test; default-replay
-  acceptance test (record=false constructs no adapter); the Record arm stays type-enforced thin
-  delegation (memory stage-model-fill) — live exercise = run-m2.2.
+run-m2.1f RESPEC (SIZE-CHECK at f start: 57% context after a read-only seam scan spanning run.rs
+execute_routes/single_ir_fill/direct_smt_fill/route_document_head/manifest_inputs + cassette.rs +
+model.rs + model_fill.rs + dispatch.rs — margin spent, ZERO code, so this session closes at the
+respec per land-or-revert): `ckc run --record` is a COMPUTATION+THREADING over the 7643-line run
+binary (thread `record` dispatch→execute→execute_routes→both fills + build `FillSource::Record` from
+registry-loaded prompt/constraint + adapter probe + all call-site updates) — the exact shape memory
+flags overflow-prone (B2 overflowed it with the design LOCKED). Split at the confirmed
+pure-composition/integration seam (standing "pure-computation core + integration = 2" axiom → no new
+rule → no re-audit of run-m2.2/acceptance-m2): f1 = pure record-prompt selectors+composers
+(inline-fixture tests, `#[allow(dead_code)]`, crate green) → f2 = dispatch `--record` + record-mode
+threading consuming f1 (B2a-style compute-then-green; live exercise = run-m2.2). BANKED FACTS
+(source-read this session — implement WITHOUT re-reading these sources; ≈lines drift, anchor on
+NAMES): `FillSource::Record{adapter:&ModelAdapter, prompt:&str, constraint:&Path, ctx:&RecordContext}`
++ model_fill's Record arm ALREADY wired (model_fill.rs:55/157 → delegates to `store.record`) → the
+units only BUILD the Record value at the fills. `RecordContext{producer:Producer,
+prompt_template_hash:Hash, budget:Duration}` (cassette.rs:49). `CassetteStore::record(adapter, key,
+prompt, constraint, ctx)` = subprocess + constraint re-read seal + persist (cassette.rs:101; committed
+static schema files pass the seal). `ModelAdapter::new()->Result<Self,_>` probes identity on PATH /
+`CKC_MODEL_COMMAND` (model.rs:105), `.identity()` (:163) — build ONCE in execute_routes like
+`Z3Adapter::new` (~369). GUIDELINE-TEXT source = `SourceDocumentGraph.spans[].raw_text` ordered by
+`reading_order` (source_linkage.rs `SourceTextSpan{span_id,node_id,raw_text,reading_order,…}`);
+`ClinicalSegment`(segment_id/kind/region_ids) + `EvidenceRegion`(region_id/node_ids/span_ids/anchor_ids)
+carry NO text → DECISION: the first-draft prompt joins spans' `raw_text` in `reading_order`
+(full-document text); the segment→region_ids→span_ids→spans "segment order" mapping is a run-m2.2
+wording refinement. Registry select mirrors `manifest_inputs` want-set (run.rs:2334-2450):
+SingleIr→schema target_kind `clinical_ir` / prompt entry-id `prompt.single_ir`; DirectSmt→`smt_query`
+/ `prompt.direct_smt`. `SchemaEntry{id,path,schema_hash,target_kind}` (core registry.rs:206);
+`PromptEntry{id,path:Option,inline:Option,template_hash,route}` path-XOR-inline (:225); consts
+`SCHEMAS_FILE`/`PROMPTS_FILE` run.rs:95/99; `parse_schemas`/`parse_prompts` (core). Slot const
+`MODEL_FILL` + `producer(resolved, idx)` + `Resolved.budget_ms` all live in run.rs (used by the fills).
+- [ ] run-m2.1f1: pure record-prompt selection + composition (ckc-cli, new fns in run.rs or a
+  `record_prompt` section; `#[allow(dead_code)]` pre-consumers; NO I/O, NO adapter, NO dispatch —
+  crate green). Deliver 4 pure fns + inline-fixture tests: `select_record_schema(&[SchemaEntry],
+  RouteShape) -> Option<&SchemaEntry>` (by `target_kind`: SingleIr→clinical_ir, DirectSmt→smt_query,
+  M1Layered→None); `select_record_prompt(&[PromptEntry], RouteShape) -> Option<&PromptEntry>` (by
+  entry id prompt.single_ir/prompt.direct_smt, mirror manifest_inputs; M1Layered→None);
+  `single_ir_prompt(template:&str, doc_id:&Id, graph:&SourceDocumentGraph) -> String` (template ++
+  doc-id line ++ `graph.spans` `raw_text` joined by `reading_order`); `direct_smt_prompt(template:&str,
+  gid:&Id, role:&str, members:&[(&Id, &SourceDocumentGraph)]) -> String` (template ++ `role: <role>`
+  line ++ per-member doc-id + spans). Deterministic composition (order by `reading_order`; `\n` join —
+  first-draft, run-m2.2 refines wording). Tests: each selector hit + miss (+ M1Layered None); each
+  composer over a 2-span inline graph pins the EXACT composed string (order + doc-id + role line).
+  Reading: SchemaEntry/PromptEntry/RouteShape + SourceDocumentGraph/SourceTextSpan shapes BANKED in
+  the RESPEC note (do NOT re-read registry.rs/run.rs/source_linkage.rs). Gate: `cargo test -p
+  ckc-cli`; fmt/clippy `--lib -D warnings`; `RUSTDOCFLAGS='-D warnings' cargo doc -p ckc-cli --no-deps`
+  on the new doc comments.
+- [ ] run-m2.1f2: dispatch `--record` + record-mode threading (consumes f1; B2a-style
+  compute-then-green; Record arm type-enforced, live exercise = run-m2.2). (1) dispatch.rs: `--record`
+  optional boolean — pre-partition it out of `rest` BEFORE `take_flags(OP_RUN,["--experiment","--out"],
+  …)` (:124, fixed-arity value-flags), thread through `RawCommand::Run{experiment,out,record}` +
+  `validate` (:201) + `Command::Run{…,record}` + `execute` (:309) → `crate::run::execute(Path::new("."),
+  experiment, record, shell)`. (2) run.rs `execute` (:190): add `record:bool`, pass to execute_routes
+  (M1-only inline path ignores it). (3) `execute_routes` (:346): when `record`, `ModelAdapter::new()`
+  ONCE (Err→command diagnostic + return, mirror the Z3Adapter arm ~369), load schemas.yaml+prompts.yaml
+  (mirror manifest_inputs read+parse; read/parse err→command diagnostic + return), build per-view
+  `RouteRecord{adapter:&ModelAdapter, template:String (f1 select_record_prompt → `entry.inline` else
+  read `root.join(entry.path)`), constraint:PathBuf (`root.join(`f1 select_record_schema`.path)`),
+  ctx:RecordContext{producer(resolved,MODEL_FILL), `entry.template_hash`, budget:Duration from
+  resolved.budget_ms}}`; pass `Option<&RouteRecord>` to `single_ir_fill` (:1415, call ~420) +
+  `direct_smt_fill` (:1649, call ~544; map heads→`(&h.trace.document_id, &h.source.payload)`). (4)
+  fills: add `record:Option<&RouteRecord>`; None→`FillSource::Replay` (unchanged), Some→build the
+  prompt via f1 (single_ir: `single_ir_prompt(&r.template,&doc_id,&source.payload)` at the model_fill
+  call :1456; direct: per-role `direct_smt_prompt(&r.template,gid,role,&members)` inside the role loop
+  at model_fill call ~1704) + `FillSource::Record{r.adapter,&prompt,&r.constraint,&r.ctx}`. (5) update
+  ALL execute/execute_routes callers to thread `record` (M1 callers pass false). (6) default-replay
+  acceptance test: record=false builds NO adapter — set `CKC_MODEL_COMMAND` to a bogus command, assert
+  a record=false model-route run still lands (no probe fires); thread false into
+  `m2_route_loop_lands_both_routes_namespaced` (stays green). Reading: f1 fns (this crate); all
+  run.rs/dispatch.rs/cassette.rs/model.rs facts BANKED in the RESPEC note (do NOT re-read). Gate:
+  `cargo test -p ckc-cli`; fmt/clippy; doc-lint; type-enforced Record arm (live exercise = run-m2.2).
 - [ ] run-m2.2: live-pin battery over the run binary. Record the full experiment cassette via the env
   runtime command (LIVE, runtime indirection over deny-Read sources), commit the recorded model I/O as
   tracked test-source artifacts (origin `ai_generated`); live pins on `report.json` sections + manifest
