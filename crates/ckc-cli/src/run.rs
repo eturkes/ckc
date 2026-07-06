@@ -3813,6 +3813,184 @@ processing_stages:
         );
     }
 
+    // run-m2.1d5b — two-run determinism over the model-route run. The same
+    // locked inputs (`exp.m2_multihop`, the replayed golden cassettes) execute
+    // twice into two out dirs: every landed artifact is byte-equal across the
+    // runs, the §5/§4.6 provenance manifests agree once the one run-specific
+    // `--out` path token is normalized (`land_record` writes plain canonical
+    // records — no self-hash — so `manifest_inputs.command`'s embedded
+    // `out_dir.display()` is their sole non-deterministic bytes), and the event
+    // stream agrees on its non-timing projection (only the §4.6 wall-clock
+    // fields started_at/ended_at/duration_ms may differ run to run).
+    #[test]
+    fn m2_route_run_is_deterministic_across_two_runs() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        let (_, events_a, diag_a, out_a, _tmp_a) = executed(root.path(), "exp.m2_multihop");
+        let (_, events_b, diag_b, out_b, _tmp_b) = executed(root.path(), "exp.m2_multihop");
+        assert!(
+            diag_a.is_empty() && diag_b.is_empty(),
+            "clean run both times"
+        );
+
+        // Both runs land the identical run-relative file set.
+        fn walk(base: &Path, dir: &Path, acc: &mut Vec<String>) {
+            let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .collect();
+            entries.sort();
+            for p in entries {
+                if p.is_dir() {
+                    walk(base, &p, acc);
+                } else {
+                    acc.push(p.strip_prefix(base).unwrap().to_string_lossy().into_owned());
+                }
+            }
+        }
+        let files = |out: &Path| {
+            let mut acc = Vec::new();
+            walk(out, out, &mut acc);
+            acc.sort();
+            acc
+        };
+        let paths = files(&out_a);
+        assert_eq!(paths, files(&out_b), "both runs land the same file set");
+
+        // The walk reached the run-level tails and both route subtrees, so the
+        // byte-equal / manifest-normalize / events arms below run non-vacuously.
+        for want in ["trace_bundle.json", "manifest.json", "logs/events.jsonl"] {
+            assert!(paths.iter().any(|p| p == want), "walk covers {want}");
+        }
+        for route in ["routes/pipe.m2_single_ir/", "routes/pipe.m2_direct_smt/"] {
+            assert!(
+                paths.iter().any(|p| p.starts_with(route)),
+                "walk covers {route}"
+            );
+        }
+
+        // Normalize the one `--out` token before comparing the two manifests.
+        let norm = |bytes: Vec<u8>, out: &Path| -> Vec<u8> {
+            String::from_utf8(bytes)
+                .unwrap()
+                .replace(&out.display().to_string(), "<OUT>")
+                .into_bytes()
+        };
+        for rel in &paths {
+            let a = std::fs::read(out_a.join(rel)).unwrap();
+            let b = std::fs::read(out_b.join(rel)).unwrap();
+            match rel.as_str() {
+                // The §4.6 wall-clock fields ride here; compared as a projection below.
+                "logs/events.jsonl" => {}
+                "manifest.json" | "replay_manifest.json" => {
+                    assert_eq!(norm(a, &out_a), norm(b, &out_b), "{rel} modulo --out");
+                }
+                _ => assert_eq!(a, b, "{rel} byte-equal across runs"),
+            }
+        }
+
+        // Events agree on every field but the three §4.6 wall-clock fields
+        // (event_id/event_sequence_number are slot-derived, so deterministic).
+        let untimed = |e: &EventRecord| -> EventRecord {
+            let mut e = e.clone();
+            e.started_at.clear();
+            e.ended_at.clear();
+            e.duration_ms = 0;
+            e
+        };
+        let proj_a: Vec<EventRecord> = events_a.iter().map(untimed).collect();
+        let proj_b: Vec<EventRecord> = events_b.iter().map(untimed).collect();
+        assert_eq!(
+            proj_a, proj_b,
+            "events agree on their non-timing projection"
+        );
+    }
+
+    // run-m2.1d5b — the model-route run's §4.6 event census. Both routes execute
+    // under one shared run out: single_ir heads three documents through four
+    // processing_stages each (extract/segment/model_fill/assemble) and
+    // compiles+verifies two groups (3×4 + 2×2 = 16); direct heads three documents
+    // through two (extract/segment) and fills+verifies two groups (3×2 + 2×2 = 10);
+    // the run command closes with one event. The run-level trace/report tails run
+    // with `emit_event` false, so they contribute no census event — 27 total. The
+    // M1 baseline is a separate single-route run with its own 19-event census.
+    #[test]
+    fn m2_route_run_event_census() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        let (_, events, diagnostics, _out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        assert!(diagnostics.is_empty(), "clean run");
+
+        assert_eq!(events.len(), 27, "M2 two-route census");
+        let by_pipeline = |pid: &str| {
+            events
+                .iter()
+                .filter(|e| e.pipeline_id == static_id(pid))
+                .count()
+        };
+        assert_eq!(by_pipeline("pipe.m2_single_ir"), 16, "single_ir 3×4 + 2×2");
+        assert_eq!(by_pipeline("pipe.m2_direct_smt"), 10, "direct 3×2 + 2×2");
+        assert_eq!(by_pipeline("cli"), 1, "one run command event");
+
+        // The run-level tails declare no census event under the route pipelines'
+        // padded UNUSED_STAGE slots.
+        assert_eq!(
+            events
+                .iter()
+                .filter(
+                    |e| e.processing_stage == static_id(PROCESSING_STAGE_KINDS[TRACE])
+                        || e.processing_stage == static_id(PROCESSING_STAGE_KINDS[REPORT])
+                )
+                .count(),
+            0,
+            "run-level tails emit no census event",
+        );
+
+        // model_fill counters: single_ir draws one sample per document (1/0); direct
+        // draws two per group, one per overlap/deontic role summed onto the one
+        // group event (2/0).
+        let fills = |pid: &str, step: &str| -> Vec<&EventRecord> {
+            events
+                .iter()
+                .filter(|e| {
+                    e.pipeline_id == static_id(pid) && e.pipeline_step_id == static_id(step)
+                })
+                .collect()
+        };
+        let single_fills = fills("pipe.m2_single_ir", "processing_stage.m2.model_fill");
+        assert_eq!(
+            single_fills.len(),
+            3,
+            "one single_ir model_fill per document"
+        );
+        for e in single_fills {
+            assert_eq!(
+                e.resource_counters,
+                vec![
+                    (static_id(RECORDED_CALLS_COUNTER), 1),
+                    (static_id(REPAIRS_COUNTER), 0)
+                ],
+            );
+        }
+        let direct_fills = fills("pipe.m2_direct_smt", "processing_stage.m2.model_fill_smt");
+        assert_eq!(direct_fills.len(), 2, "one direct model_fill per group");
+        for e in direct_fills {
+            assert_eq!(
+                e.resource_counters,
+                vec![
+                    (static_id(RECORDED_CALLS_COUNTER), 2),
+                    (static_id(REPAIRS_COUNTER), 0)
+                ],
+            );
+        }
+
+        // The M1 baseline is a separate single-route run whose 19-event census
+        // stands unchanged: its execute() body emits every stage event, the
+        // trace/report tails included, unlike the suppressed M2 tails.
+        let (_, m1_events, _, _, _m1_tmp) = executed(&repo_root(), "exp.m1_scaffold");
+        assert_eq!(m1_events.len(), 19, "M1 baseline census unchanged");
+    }
+
     // run-m2.1d5a-2b — error-path battery over the .1d5a-1 model-route loop's
     // already-landed branches (independent of .1d5a-2's tails wiring).
 

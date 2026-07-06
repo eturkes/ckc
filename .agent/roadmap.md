@@ -151,14 +151,7 @@ doc-lint bullet).
 - [x] run-m2.1d5a-1: model-route loop in execute() — 3-way dispatch + execute_routes over both routes + cross-route group namespacing (routes/{pid}/groups/{gid}) + per-route landing gate; RouteRun banked for .1d5a-2 tails/.1e metrics. 88% 177K/200K
 - [x] run-m2.1d5a-2: unified run-level tails over both routes (run-root trace/lineage/report + EN render + manifests); `emit_event: bool` gates the §4.6 event (M1 `true`, M2 tails `false`, fail-closed via direct `shell.diagnostic`); all_graphs seen-set dedup + all_docs bundle-first sort; landing gate pins the 8-entry root layout + `claims.len()==3`. 80% 160K/200K
 - [x] run-m2.1d5a-2b: 3 run-binary error-path pins over write_m2_root variants — single_ir member-short group (dropped guideline_b cassette → fill + partial-group compile diagnostics co-occur, order fill<compile), mixed-shape [M1Layered, single_ir] → command diagnostic + assert_only_logs, model-identity disagreement → fail-closed command diagnostic. 81% 161K/200K
-- [ ] run-m2.1d5b: two-run determinism + event census over .1d5a-1's write_m2_root mirror, after
-  .1d5a-2's tails land (split from .1d5 — the pin-battery half). Execute twice into two out dirs: landed artifacts byte-equal
-  across runs; manifests byte-equal after normalizing the one `--out` token (manifest_inputs ≈1589
-  embeds out_dir.display()); events compared on a non-timing projection; event census = 27
-  (single_ir 3×4+2×2=16 + direct 3×2+2×2=10 + 1 command, tails none; separate M1 baseline run
-  stays 19) with model_fill counters (single_ir per doc 1/0; direct per group 2/0). Census +
-  counters pinned from OBSERVED output sanity-checked against the .1d3a/.1d4a contracts. M1
-  executed() pins unchanged. Gate: cargo test.
+- [x] run-m2.1d5b: two determinism/census pins over write_m2_root's replayed model-route run — landed artifacts byte-equal across two runs, both manifests equal modulo the one `--out` token (land_record = plain canonical, no self-hash), events equal on their non-timing projection (only started_at/ended_at/duration_ms differ; event_id/seq slot-derived); §4.6 census 27 (single_ir 16 + direct 10 + 1 command; run-level tails emit_event=false → 0) + model_fill counters (single_ir 1/0 per doc, direct 2/0 per group), M1 baseline 19. 62% 123K/200K
 - [ ] run-m2.1e: §9 measurement record — report sections + manifests. report_processing_stage builds
   `ModelRunSections{route_diagnostics (per-route ledgers, clean route = empty slice), route_metrics
   (metrics::route_metrics per route — samples = the k=1 battery → convergence NA), baseline_pipeline_
