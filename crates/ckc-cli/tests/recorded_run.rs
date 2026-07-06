@@ -1,8 +1,10 @@
 //! run-m2.2c — recorded-run pin battery + replay coverage (deterministic,
 //! runtime-absent). Executes `exp.m2_multihop` in a temp invocation root
 //! built from the committed registry + corpus + schemas + prompts plus the
-//! repo's live-recorded `/cassettes/**` (run-m2.2b), then pins the §9
-//! measurement surface from the observed run: the honest weak-baseline
+//! repo's live-recorded `/cassettes/**` (run-m2.2b) — gated by `registry
+//! check` over that root (§8.5 item 2), the drift pin tying the committed
+//! schema/prompt payload bytes to their declared registry hashes — then
+//! pins the §9 measurement surface from the observed run: the honest weak-baseline
 //! failure census (report.json failure_taxonomy + metrics emission order),
 //! both manifests' §9 seven-tuple, the rendered bodies re-rendered from the
 //! landed report.json (no const body pin — the solver version is
@@ -58,7 +60,8 @@ fn copy_tree(from: &Path, to: &Path) {
     }
 }
 
-/// Temp invocation root = the committed registry + locked corpus inputs
+/// Temp invocation root = the committed registry (index files + the
+/// schema/prompt payload files they declare) + locked corpus inputs
 /// (`write_m2_root` pattern) + the repo's recorded experiment cassettes.
 fn write_recorded_root(root: &Path) {
     let repo = repo_root();
@@ -68,6 +71,10 @@ fn write_recorded_root(root: &Path) {
         "registry/experiments.yaml",
         "registry/schemas.yaml",
         "registry/prompts.yaml",
+        "registry/prompts/direct_smt.txt",
+        "registry/prompts/single_ir.txt",
+        "schemas/clinical_ir.schema.json",
+        "schemas/smt_query.grammar",
         "rust-toolchain.toml",
         "Cargo.lock",
         "corpus/lexicon/ja_core.yaml",
@@ -109,6 +116,24 @@ fn recorded_run_pins_m2_sections_manifests_renders_and_replays() {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().join("root");
     write_recorded_root(&root);
+
+    // §8.5 item 2 over the committed registry: `registry check` re-hashes
+    // each schema payload file and prompt template against its declared
+    // registry hash — the standing drift pin for the payload files the
+    // replay-mode run below never opens (only their DECLARED hashes ride
+    // the §9 manifest slots).
+    let registry_out = Command::new(env!("CARGO_BIN_EXE_ckc"))
+        .args(["registry", "check"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(
+        registry_out.status.code(),
+        Some(0),
+        "committed registry + payload bytes self-consistent; stderr: {}",
+        String::from_utf8_lossy(&registry_out.stderr)
+    );
+
     let run_dir = tmp.path().join("run");
     let out = Command::new(env!("CARGO_BIN_EXE_ckc"))
         .args([
@@ -176,6 +201,8 @@ fn recorded_run_pins_m2_sections_manifests_renders_and_replays() {
     // a structural classification; the text distinctions ride the graph,
     // whose three hashes are distinct). Consumed by the replay-census pin.
     let mut head_hashes: std::collections::BTreeSet<Hash> = std::collections::BTreeSet::new();
+    let mut seg_hashes = std::collections::BTreeMap::new();
+    let mut graph_hashes = std::collections::BTreeMap::new();
     for doc in DOC_IDS {
         let head = |route: &str, file: &str| {
             run_dir.join(format!("routes/{route}/artifacts/{doc}/{file}"))
@@ -187,6 +214,7 @@ fn recorded_run_pins_m2_sections_manifests_renders_and_replays() {
             "{doc}: cross-route segments parity"
         );
         head_hashes.insert(segments[0].content_hash.clone());
+        seg_hashes.insert(doc, segments[0].content_hash.clone());
         let graphs: [ArtifactWrapper<SourceDocumentGraph>; 2] =
             ["pipe.m2_direct_smt", "pipe.m2_single_ir"]
                 .map(|route| strict_read(&head(route, "source_document_graph.json")));
@@ -195,19 +223,52 @@ fn recorded_run_pins_m2_sections_manifests_renders_and_replays() {
             "{doc}: cross-route graph parity"
         );
         head_hashes.insert(graphs[0].content_hash.clone());
+        graph_hashes.insert(doc, graphs[0].content_hash.clone());
     }
+    // The collision pinned PAIRWISE: control ≡ guideline_b segments is the
+    // one duplicate; the remaining five payloads (both segment classes, all
+    // three graphs) are pairwise distinct, so the six inserts dedup to
+    // exactly that five-set.
     assert_eq!(
-        head_hashes.len(),
-        5,
-        "five unique head payloads (control ≡ guideline_b segments)"
+        seg_hashes["test_source.m1_control"], seg_hashes["test_source.m1_guideline_b"],
+        "control ≡ guideline_b segments payload"
     );
+    let distinct: std::collections::BTreeSet<Hash> = [
+        &seg_hashes["test_source.m1_control"],
+        &seg_hashes["test_source.m1_guideline_a"],
+        &graph_hashes["test_source.m1_control"],
+        &graph_hashes["test_source.m1_guideline_a"],
+        &graph_hashes["test_source.m1_guideline_b"],
+    ]
+    .into_iter()
+    .cloned()
+    .collect();
+    assert_eq!(
+        distinct.len(),
+        5,
+        "remaining head payloads pairwise distinct"
+    );
+    assert_eq!(head_hashes, distinct, "head census = exactly those five");
 
     // §7.4 ledger census: 10 ai_schema_violation (5 fill points × base +
     // repair attempt) → 5 repair_limit_exceeded + 2 schema_invalid
     // (single_ir's member-short group compiles).
     let diagnostics: Vec<DiagnosticRecord> =
         read_jsonl(&std::fs::read(run_dir.join("logs/diagnostics.jsonl")).unwrap()).unwrap();
-    assert_eq!(diagnostics.len(), 17, "recorded-run diagnostic ledger");
+    let mut code_census: std::collections::BTreeMap<&str, usize> =
+        std::collections::BTreeMap::new();
+    for d in &diagnostics {
+        *code_census.entry(d.code.as_str()).or_default() += 1;
+    }
+    assert_eq!(
+        code_census,
+        std::collections::BTreeMap::from([
+            ("ai_schema_violation", 10),
+            ("repair_limit_exceeded", 5),
+            ("schema_invalid", 2),
+        ]),
+        "recorded-run ledger code census (17 records, no other code)"
+    );
 
     // The run trace still spans BOTH routes (their landed heads chain into
     // the one run bundle) while minting no claim — nothing compiled.
@@ -431,14 +492,23 @@ fn recorded_run_pins_m2_sections_manifests_renders_and_replays() {
     attested.insert(lineage.content_hash.clone());
     attested.insert(report.content_hash.clone());
     assert_eq!(attested.len(), 8, "attested accepted-artifact census");
-    assert_eq!(
-        check
-            .expected
-            .iter()
-            .cloned()
-            .collect::<std::collections::BTreeSet<Hash>>(),
-        attested,
-        "attestation = deduped heads + run-level tail wrappers, exactly"
-    );
+    // All four carriers hold the same sorted set: the prior run's manifest,
+    // the replay manifest it mirrors, and the replay check's expected +
+    // re-run actual sides.
+    let sorted: Vec<Hash> = attested.iter().cloned().collect();
+    for (carrier, hashes) in [
+        ("run manifest output_hashes", &manifest.output_hashes),
+        (
+            "replay manifest expected_output_hashes",
+            &replay_manifest.expected_output_hashes,
+        ),
+        ("replay expected", &check.expected),
+        ("replay re-run actual", &check.actual),
+    ] {
+        assert_eq!(
+            hashes, &sorted,
+            "{carrier} = deduped heads + run-level tail wrappers, exactly"
+        );
+    }
     assert_eq!(check.rerun_outcome, Outcome::Invalid, "re-run §4.4 outcome");
 }

@@ -809,7 +809,10 @@ aggressively; full pre-consolidation text in git history.
   (trace/lineage/report) = 8. Census pins must derive from landed wrappers (set equality), never
   doc-count arithmetic. Identity EQUALITY pattern: anchor = one committed cassette strict-read
   from the copied root at runtime (deny-Read honored; identity-agreement gate makes any one
-  representative); report/manifest identities assert equal to it — no literal.
+  representative); report/manifest identities assert equal to it — no literal. Payload files
+  (`schemas/*`, `registry/prompts/*.txt`) are opened by `registry check` ONLY — replay-mode
+  `ckc run` reads just their DECLARED registry hashes (§9 slots) → the battery copies them in +
+  gates on a `registry check` invocation over its root, the payload-byte drift pin (codex M2.2c).
 
 ## Runtime
 
