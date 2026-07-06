@@ -413,10 +413,12 @@ aggressively; full pre-consolidation text in git history.
   order) = the `executed()`-returned `diagnostics` vec (all scopes) → pin command-scope by
   `events.last().diagnostics` carrying it, not by absence from events.
 - run-m2.1e-A LANDED run-level landing completeness + honest producer, closing the .1d5a-2 replay
-  hole. NEW `GroupTrace.smt_queries: Vec<ArtifactWrapper<QueryBody>>` (single_ir empty, direct
-  `[overlap,deontic]`); both routes push GroupTrace on ARTIFACT LANDING (`Some(compiled)` /
-  `Some(pair)`), NOT verify-success `(Some,Some)` — only GroupObservation (report group-row) still
-  gates on `results` → a landed-but-unverified compiled/pair stays replay-covered; `manifest_inputs`
+  hole. NEW `GroupTrace.smt_queries: Vec<ArtifactWrapper<QueryBody>>` (single_ir empty; direct = a
+  `[overlap,deontic]` PREFIX — `[]`/`[overlap]`/full, roles land sequentially + break on fail);
+  single_ir pushes GroupTrace on `Some(compiled)`, direct on `df.smt_queries` NONEMPTY (new
+  `DirectFill.smt_queries` retains every landed role; verify only on the complete `pair`), NOT
+  verify-success — only GroupObservation (report group-row) gates on `results`; a landed-but-
+  unverified compiled/lone-role/pair stays replay-covered; `manifest_inputs`
   walks `group.smt_queries` into output_hashes. DURABLE: replay coverage (replay.rs diffs manifest
   output_hashes) ≠ trace-DAG membership — the pair hashes live ONLY in the manifest (`TraceNodeKind`
   has no smt_query variant → `assemble_trace` UNCHANGED), so the manifest hash is DAG-orphaned unless
@@ -424,9 +426,21 @@ aggressively; full pre-consolidation text in git history.
   (clean path). Honest producer: `tail_producer(resolved, idx, emit_event)` — false (M2 run-level
   tail) → `static_id("processing_stage.run.{trace,report}")` (consts RUN_TRACE_STEP/RUN_REPORT_STEP),
   true → early-returns `producer(resolved, idx)` (M1 byte-identical); fixes M2 tails formerly minting
-  the route's inert `UNUSED_STAGE` step-id. Pin (m2_route_loop_lands_both_routes_namespaced): direct
-  overlap+deontic content_hashes in write_m2_root manifest.json (substring=membership — a landed hash
-  reaches manifest only via output_hashes).
+  the route's inert `UNUSED_STAGE` step-id. Pins (m2_route_loop_lands_both_routes_namespaced): TYPED
+  `RunManifest.output_hashes.contains` (not substring) over direct overlap+deontic content_hashes, +
+  full synthetic-producer pins (tails' `producer.pipeline_id` == baseline `pipe.m2_direct_smt` AND
+  `producer.pipeline_step_id` == RUN_TRACE_STEP/RUN_REPORT_STEP). NEW
+  full-run pin `m2_direct_partial_landing_is_replay_covered`: delete the deontic cassette → §4.4
+  valid-remainder (CassetteError rides its §4.6 event, group skips remaining stages) still lands a
+  manifest covering the lone overlap. Codex (xhigh) follow-up, DURABLE: (1) the initial .1e-A carried
+  only the complete `pair`, discarding a PARTIAL `[overlap]` landing (already pinned by
+  `..._still_emits_event`) pre-execute_routes → replay-uncovered; fixed via the `DirectFill.smt_queries`
+  prefix vec, ADDITIVE (kept `pair` as the type-safe complete-verify input) to avoid churning ~8
+  `.pair` test sites. (2) content_hash-EXCLUDED provenance (producer.pipeline_step_id) needs an
+  EXPLICIT regression pin — hash/layout/census/determinism pins ALL pass through a producer
+  regression, so a revert to `UNUSED_STAGE` stays green without one. (3) the run-level producer is
+  SYNTHETIC non-registry: `pipeline_id` stays baseline `pipe.m2_direct_smt` + the step id is undeclared
+  in candidates.yaml — documented as synthetic, not registered.
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters

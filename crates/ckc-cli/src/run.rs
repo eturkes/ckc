@@ -4,7 +4,7 @@
 //! `artifacts/<doc-id>/{source_document_graph,segments,normalization,ir_bundle}.json`,
 //! drive each test_source group through compile → verify into
 //! `groups/<gid>/{compiled.json,verifier_results.json,smt/<query-id>.smt2}`,
-//! assemble the run-scoped §7.1 trace pair over every landed artifact
+//! assemble the run-scoped §7.1 trace pair over the landed trace-DAG artifacts
 //! into `trace_bundle.json` + `lineage_index.json` at the run root, then
 //! close with the §8.3 report processing_stage: `report.json` (§7.2), its rendered
 //! `report_en.md` view, and the §5/§4.6 provenance pair `manifest.json` +
@@ -33,11 +33,12 @@
 //! group declares would document a no-conflict result the test_sources never earned.
 //! Producer values are runner-owned: pipeline_id = the experiment's pipeline,
 //! pipeline_step_id = the registry processing_stage entry (the model-route run-level
-//! tails are no route pipeline's declared stage, so they carry the baseline route's
-//! padded [`UNUSED_STAGE`] slot until run-m2.1e settles a run-level producer; this
-//! step id is write-only provenance, never read back for logic), toolchain manifest hash = the
-//! §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at resolution and
-//! shared verbatim with the §5/§4.6 manifests.
+//! tails span both routes, so they carry the baseline route's pipeline_id paired with a
+//! synthetic run-level step id — `RUN_TRACE_STEP`/`RUN_REPORT_STEP`, neither a route
+//! pipeline's declared stage nor the padded [`UNUSED_STAGE`] slot the tails used before
+//! run-m2.1e-A; this step id is write-only provenance, never read back for logic),
+//! toolchain manifest hash = the §4.4 raw-byte hash of [`TOOLCHAIN_FILE`], read once at
+//! resolution and shared verbatim with the §5/§4.6 manifests.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
@@ -529,11 +530,16 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                             return;
                         }
                     }
-                    if let Some((overlap, deontic)) = df.pair {
+                    if !df.smt_queries.is_empty() {
                         let dir = route_group_dir(resolved, &gid);
-                        let results = direct_smt_verify_group(
-                            &gid, &dir, &overlap, &deontic, resolved, &adapter, shell,
-                        );
+                        // Verify only a complete pair; a lone landed role (a partial fill)
+                        // still lands its smt_query, which the GroupTrace carries into the
+                        // manifest so replay covers the group even without a verdict.
+                        let results = df.pair.as_ref().and_then(|(overlap, deontic)| {
+                            direct_smt_verify_group(
+                                &gid, &dir, overlap, deontic, resolved, &adapter, shell,
+                            )
+                        });
                         // A verified group feeds the run report's group row.
                         if let Some(results) = &results {
                             groups.push(GroupObservation {
@@ -547,7 +553,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         }
                         // The direct route compiles no IR, so the group trace carries no
                         // member bundles and no compiled artifact — the landed smt_query
-                        // pair keeps replay covering the group even when verification did
+                        // wrappers keep replay covering the group even when verification did
                         // not land, and the verifier results (when present) feed the run
                         // report's group row.
                         all_group_traces.push(GroupTrace {
@@ -555,7 +561,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                             test_sources: group.test_sources.clone(),
                             member_bundles: Vec::new(),
                             dir,
-                            smt_queries: vec![overlap, deontic],
+                            smt_queries: df.smt_queries,
                             compiled: None,
                             verifier_results: results,
                         });
@@ -1584,10 +1590,15 @@ fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
 /// The pair fill's outcome for one direct_smt group: `pair` is `Some` only when both
 /// roles accepted and landed, while `fills` and `identities` survive a terminal role
 /// reject so the run-m2.1d5a orchestrator can fold their §7.3 telemetry and check
-/// cross-route model-identity agreement.
+/// cross-route model-identity agreement. `smt_queries` carries every landed role — a
+/// prefix of `[overlap, deontic]` (`[]`, `[overlap]`, or the full pair, since a role
+/// reject breaks the loop before the next) — so a lone landed role that cannot verify
+/// still reaches the run manifest's `output_hashes` and stays replay-covered (run-m2.1e-A);
+/// `pair` is that prefix's two-element case, cloned as a type-safe verify input.
 #[allow(dead_code)]
 struct DirectFill {
     pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>,
+    smt_queries: Vec<ArtifactWrapper<QueryBody>>,
     fills: Vec<FillObservation>,
     identities: Vec<ModelIdentity>,
 }
@@ -1636,6 +1647,7 @@ fn direct_smt_fill(
         ]));
         return DirectFill {
             pair: None,
+            smt_queries: Vec::new(),
             fills: Vec::new(),
             identities: Vec::new(),
         };
@@ -1689,6 +1701,7 @@ fn direct_smt_fill(
                     shell.diagnostic(cassette_diag);
                     return DirectFill {
                         pair: None,
+                        smt_queries: Vec::new(),
                         fills,
                         identities,
                     };
@@ -1779,17 +1792,16 @@ fn direct_smt_fill(
             (static_id(REPAIRS_COUNTER), repairs),
         ],
     });
-    let pair = if landed.len() == 2 {
-        let mut landed = landed.into_iter();
-        Some((
-            landed.next().expect("overlap query wrapped"),
-            landed.next().expect("deontic query wrapped"),
-        ))
-    } else {
-        None
+    // `pair` is the two-element case of `landed` (a prefix of [overlap, deontic]); clone
+    // it as the type-safe verify input while `smt_queries` keeps every landed role for
+    // manifest replay coverage, so a lone landed role survives though it cannot verify.
+    let pair = match landed.as_slice() {
+        [overlap, deontic] => Some((overlap.clone(), deontic.clone())),
+        _ => None,
     };
     DirectFill {
         pair,
+        smt_queries: landed,
         fills,
         identities,
     }
@@ -3858,12 +3870,10 @@ processing_stages:
         );
 
         // run-m2.1e-A — the direct route's landed smt_query pair is replay-covered:
-        // both wrapper content hashes appear among the run manifest's output hashes.
-        // A landed-artifact hash reaches manifest.json only through `output_hashes`
-        // (the top-level `input_hashes` are test-source hashes), so this substring
-        // check is exactly a membership check, and replay diffs a divergent re-run of
-        // the pair. The pair lands whether or not verification does; the clean run
-        // here verifies both.
+        // both wrapper content hashes sit in the run manifest's `output_hashes`, the
+        // exact set replay re-derives and diffs. The pair lands whether or not
+        // verification does; the clean run here verifies both.
+        use ckc_core::RunManifest;
         let overlap = strict_at::<QueryBody>(
             &out,
             "routes/pipe.m2_direct_smt/groups/group.m1_conflict/overlap.smt_query.json",
@@ -3872,15 +3882,101 @@ processing_stages:
             &out,
             "routes/pipe.m2_direct_smt/groups/group.m1_conflict/deontic.smt_query.json",
         );
-        let manifest =
-            String::from_utf8(std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        let manifest: RunManifest =
+            read_strict_canonical(&std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
         assert!(
-            manifest.contains(overlap.content_hash.as_str()),
+            manifest.output_hashes.contains(&overlap.content_hash),
             "manifest output_hashes cover the direct overlap smt_query"
         );
         assert!(
-            manifest.contains(deontic.content_hash.as_str()),
+            manifest.output_hashes.contains(&deontic.content_hash),
             "manifest output_hashes cover the direct deontic smt_query"
+        );
+
+        // run-m2.1e-A — the run-level trace/report tails carry a synthetic producer: the
+        // baseline route's `pipeline_id` (`pipe.m2_direct_smt`, kept deliberately — the tails
+        // span both routes) paired with a run-level step id, NOT the route's inert
+        // UNUSED_STAGE slot. Both producer fields are content_hash-excluded, so a regression
+        // back to UNUSED_STAGE (or drift in the carried pipeline_id) keeps every hash and the
+        // layout stable and slips past the other pins — pin the full synthetic producer here.
+        assert_eq!(
+            bundle.producer.pipeline_id,
+            static_id("pipe.m2_direct_smt"),
+            "run trace tail carries the baseline route's pipeline_id"
+        );
+        assert_eq!(
+            bundle.producer.pipeline_step_id,
+            static_id(RUN_TRACE_STEP),
+            "run trace tail mints the run-level trace step"
+        );
+        let lineage = strict_at::<LineageIndex>(&out, "lineage_index.json");
+        assert_eq!(
+            lineage.producer.pipeline_id,
+            static_id("pipe.m2_direct_smt"),
+            "run lineage tail carries the baseline route's pipeline_id"
+        );
+        assert_eq!(
+            lineage.producer.pipeline_step_id,
+            static_id(RUN_TRACE_STEP),
+            "run lineage tail shares the run-level trace step"
+        );
+        let report = strict_at::<crate::report::Report>(&out, "report.json");
+        assert_eq!(
+            report.producer.pipeline_id,
+            static_id("pipe.m2_direct_smt"),
+            "run report tail carries the baseline route's pipeline_id"
+        );
+        assert_eq!(
+            report.producer.pipeline_step_id,
+            static_id(RUN_REPORT_STEP),
+            "run report tail mints the run-level report step"
+        );
+    }
+
+    // run-m2.1e-A — a partial direct fill (one role lands, the other role's cassette is
+    // absent) still reaches the run manifest, so replay covers the lone landed role.
+    // Dropping `group.m1_conflict.deontic` lands its overlap, then the absent deontic
+    // raises a mid-pair CassetteError; the §4.4 valid-remainder run lands its provenance
+    // pair over the recorded state despite that event-scoped failure.
+    #[test]
+    fn m2_direct_partial_landing_is_replay_covered() {
+        let root = tempfile::tempdir().unwrap();
+        write_m2_root(root.path());
+        std::fs::remove_file(
+            root.path()
+                .join("cassettes/route.direct_smt/group.m1_conflict.deontic/seed-42.json"),
+        )
+        .unwrap();
+
+        let (_result, _events, _diagnostics, out, _tmp) = executed(root.path(), "exp.m2_multihop");
+
+        // The partial group landed its overlap alone: no deontic role, no verdict.
+        let gdir = out.join("routes/pipe.m2_direct_smt/groups/group.m1_conflict");
+        assert!(
+            gdir.join("overlap.smt_query.json").exists(),
+            "the overlap role landed"
+        );
+        assert!(
+            !gdir.join("deontic.smt_query.json").exists(),
+            "the deontic role never landed"
+        );
+        assert!(
+            !gdir.join("verifier_results.json").exists(),
+            "a lone role cannot verify"
+        );
+
+        // The lone landed overlap's content hash sits in the manifest's output_hashes,
+        // the set replay re-derives — so a partial landing stays replay-covered.
+        use ckc_core::RunManifest;
+        let overlap = strict_at::<QueryBody>(
+            &out,
+            "routes/pipe.m2_direct_smt/groups/group.m1_conflict/overlap.smt_query.json",
+        );
+        let manifest: RunManifest =
+            read_strict_canonical(&std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        assert!(
+            manifest.output_hashes.contains(&overlap.content_hash),
+            "manifest output_hashes cover the lone landed overlap"
         );
     }
 
@@ -5950,6 +6046,14 @@ processing_stages:
         assert!(
             got.pair.is_none(),
             "a missing deontic cassette yields no pair"
+        );
+        // run-m2.1e-A — the landed overlap is retained (not discarded with the absent
+        // pair), so execute_routes carries it into the run manifest's output_hashes and
+        // a lone landed role stays replay-covered.
+        assert_eq!(
+            got.smt_queries.len(),
+            1,
+            "the lone landed overlap survives for manifest coverage"
         );
         assert_eq!(
             got.fills.len(),

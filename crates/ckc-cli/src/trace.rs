@@ -570,11 +570,11 @@ pub struct GroupTrace {
     /// Run-relative dir the group nodes' paths cite (M1 `groups/<group_id>`;
     /// a route stage passes its own landing dir).
     pub dir: String,
-    /// Raw-AI `smt_query` bodies the direct route landed for this group
-    /// (`[overlap, deontic]`; single_ir compiles an IR and mints none, so
-    /// empty). Not trace-DAG nodes — [`assemble_trace`] ignores them — but the
-    /// run manifest lists their content hashes so replay covers a landed pair
-    /// even when verification did not land.
+    /// Raw-AI `smt_query` bodies the direct route landed for this group — a prefix
+    /// of `[overlap, deontic]` (single_ir compiles an IR and mints none, so empty;
+    /// a partial fill lands only `[overlap]`). Not trace-DAG nodes —
+    /// [`assemble_trace`] ignores them — but the run manifest lists their content
+    /// hashes so replay covers each landed role even when it cannot verify.
     pub smt_queries: Vec<ArtifactWrapper<QueryBody>>,
     pub compiled: Option<ArtifactWrapper<CompiledArtifact>>,
     pub verifier_results: Option<ArtifactWrapper<VerifierResults>>,
