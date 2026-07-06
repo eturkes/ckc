@@ -5,7 +5,7 @@
       "Read(./LICENSE)",
       "Read(./Cargo.lock)",
       "Read(./target/**)",
-      "Read(./runs/**)",
+      "Read(./runs/**)","Read(./cassettes/**)",
       "Read(./corpus/raw/**)",
       "Read(./corpus/test_sources/**)",
       "Read(./.serena/cache/**)",

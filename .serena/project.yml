@@ -121,6 +121,7 @@ ignored_paths:
   - LICENSE
   - Cargo.lock
   - corpus/test_sources
+  - cassettes
 
 # list of additional workspace folder paths for cross-package reference support (e.g. in monorepos).
 # Paths can be absolute or relative to the project root.

@@ -319,19 +319,28 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
   `concept:` lines carry `ge=`/`gt=`/`le=`/`lt=` canonical bounds (template rules copy marked bounds,
   text-stated numbers from text; two-bound fixture pins mark order), template + prompts.yaml + §9
   literal re-pinned; audit-claim wording de-overclaimed (this gate line). 525 pass.
-- [ ] run-m2.2b: LIVE record + committed experiment cassettes (gate: run-m2.2a landed). Env wrapper
-  first (machine-local, outside git): translate the committed grammar to the engine's constraint
-  dialect and wire that slot, staying fail-closed on anything else; verify live against
-  schemas/smt_query.grammar on the target device; size the runtime's output-token cap (~4096) —
-  transform recipe + device + cap specifics banked in runtime.local.md. Then LIVE `ckc run --experiment exp.m2_multihop --out
-  runs/<id> --record` from the repo root (runtime indirection: sources open inside the pipeline;
-  their paths stay out of Read/Bash args); commit landed `/cassettes/**` verbatim (origin
-  `ai_generated`, REAL identity — audit-exempt path, extend memory's exclude list);
-  `CKC_MODEL_COMMAND=<absent-name>` `ckc replay --run <out>` matches; sync the do-not-read set for
-  `/cassettes/` (banked above) + Read-test pair. Gate (LIVE): the run lands the 8-entry root layout +
-  both routes' artifacts; every fill attempt persists a cassette (weak-model failures land as §7.4
-  codes; a CassetteError abort = instrument fault → fix env/wrapper, re-record); replay CLI reports
-  match.
+- [x] run-m2.2b: LIVE record + committed experiment cassettes. LANDED: env wrapper (machine-local)
+  wired the grammar-constraint slot — committed BNF → engine dialect at invocation, fail-closed
+  otherwise — verified live against schemas/smt_query.grammar on the target device; output-token cap
+  sized 4096 (correct outputs ≤~950B; recipe/device/cap/timings → runtime.local.md). Record attempt
+  #1 exposed an INSTRUMENT fault: the runtime holds a fixed total-sequence budget that silently
+  truncated generation mid-token (output length inversely tracked prompt length) → env fixed, stale
+  cassettes wiped, re-recorded (diagnostic + wipe-before-re-record rule → memory Runtime). Landed
+  runs/m2.2b-r3 (gitignored) + committed /cassettes/** (REAL identity, audit-exempt; deny-Read +
+  Serena-ignored + Read-test pair verified; memory exclude-list extended): 10 cassettes = 5 fill
+  points × base+repair (direct `<gid>.overlap` ×2 groups; single_ir ×3 sources; direct deontic never
+  reached — upstream terminal fill failure skips it), repair bytes == base size (greedy seed-inertness
+  live again). Weak-baseline census (2c input): every fill failed honestly — ai_schema_violation ×10
+  → repair_limit_exceeded ×5 + schema_invalid ×2 (group compile: member landed no ir_bundle
+  artifact); outputs logical-cap degenerate, prompt-length-INDEPENDENT sizes (grammar-prefix-valid
+  missing the mandatory tail → 'expected a (check-sat) command'; JSON unterminated → 'expected "').
+  Root = 9 entries (the '8-entry' gate wording was stale — report_ja.md exists since C1) + both
+  routes' artifacts/ ×3 sources; groups/ absent (terminal fill failures land no group artifacts).
+  `ckc run` exit=2 = §4.4 outcome-mapped Invalid, NOT an abort. Replay (CLI takes a POSITIONAL run
+  path — the `--run` flag this line once named does not exist) runtime-absent → `replay run m2.2b-r3
+  matched`, exit 0, 8 accepted artifacts. Gate: cargo test -p ckc-cli 291 pass/7 ignored (unit
+  touched zero committed code); touched-file engine-token audit clean (memory rule-doc + dev-tool
+  hits = standing exemptions). 88% 177K/200K.
 - [ ] run-m2.2c: recorded-run pin battery + replay coverage (deterministic, runtime-absent; gate:
   run-m2.2b landed). New tests/ integration file: temp root = committed registry+corpus+schemas+
   prompts (write_m2_root pattern) + repo `/cassettes/**` copied in; `execute()` exp.m2_multihop →
