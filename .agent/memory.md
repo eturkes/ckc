@@ -39,7 +39,17 @@ aggressively; full pre-consolidation text in git history.
   (inline-literal tests) then format-completion + integration; nontrivial algorithm + a 2nd authored
   artifact = 2; multi-invariant validator + full rejection coverage = 2; pure-computation module (full
   §-semantics + unit tests) + its recorded-run integration test = 2; canonical-emit layer over an
-  existing type family (one module) + a byte-pinned record-shape extension consuming it (a second module) = 2, split at the module seam; a record-shape extension's PLUMBING (fields + assembly wiring + fixtures/byte-pins in the record module + a trivial None-stub at each cross-module construction site, no signature change) vs its cross-module COMPUTATION+THREADING (populate the fields from a gated source + thread a new param through the caller chain + a run-binary integration test, a second module) = 2 at the module seam EVEN WITH THE DESIGN LOCKED (run-m2.1e-B overflowed read+write with the full design locked in-session, ZERO code — a locked design removes REASONING but not the read-to-place-edits over a large caller + byte-pin-test authoring, which alone overflow; the plumbing half leaves the crate green fields-plumbed-but-None so omit-None keeps bytes byte-identical); record-shape
+  existing type family (one module) + a byte-pinned record-shape extension consuming it (a second module) = 2, split at the module seam; a record-shape extension's PLUMBING (fields + assembly wiring + fixtures/byte-pins in the record module + a trivial None-stub at each cross-module construction site, no signature change) vs its cross-module COMPUTATION+THREADING (populate the fields from a gated source + thread a new param through the caller chain + a run-binary integration test, a second module) = 2 at the module seam EVEN WITH THE DESIGN LOCKED (run-m2.1e-B overflowed read+write with the full design locked in-session, ZERO code — a locked design removes REASONING but not the read-to-place-edits over a large caller + byte-pin-test authoring, which alone overflow; the plumbing half leaves the crate green fields-plumbed-but-None so omit-None keeps bytes byte-identical)
+  — RECURSES: that COMPUTATION+THREADING+run-binary-test half (B2) overflowed TOO (wrote all the
+  code, then an un-banked debug loop discovering the fixture gap tipped it at ~99%), so split ONCE
+  MORE at the SAME seam — cross-module COMPUTATION+THREADING+FIXTURE (leaves the crate GREEN on
+  existing tests, which exercise the new path → prove it computes without erroring, the new VALUES
+  unasserted) vs VALUE-PIN-TEST authoring. FIXTURE-PROVISION COROLLARY: a fixture-replayed
+  producer (`manifest_inputs`) that gains a registry-file READ needs its fixture BUILDER
+  (`copy_committed_registry`) to copy that file too — an un-banked provision gap surfaces only at
+  test-run time as a debug loop reading the builder + its callers + the whole write-fixture chain,
+  and THAT is what overflowed B2; bank the provision (which builder, which files, callers-
+  harmless) at respec time; record-shape
   extension + fresh-designed member type + validator + per-variant rejections vs its populated fixture +
   byte-pin capture = 2; derivation fn + its test-source-pinned battery + an attachment sub-feature = 2;
   type family + assembly + validation = 3;
