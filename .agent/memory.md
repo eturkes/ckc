@@ -242,9 +242,9 @@ aggressively; full pre-consolidation text in git history.
   out of `rest` BEFORE `take_flags`)→validate→execute→execute_routes threading; `execute_routes` builds
   `RecordSetup` (adapter probe + `validate_model_registry`) ONCE `if record` else `None`, then per-view
   `build_route_record` (f1 select→template/constraint/`RecordContext`) feeds both fills' new
-  `Option<&RouteRecord>` → `FillSource::Record` (type-enforced, NO live call); §9 manifest fields landed
+  `Option<&RouteRecord>` → `FillSource::Record` (type-enforced; Record arm live-capable via `CassetteStore::record`→`adapter.invoke`, not live-exercised in f2); §9 manifest fields landed
   e-B. DEFERRED to run-m2.2 (LIVE, via `FillSource`): live record exercise + replay.rs model-artifact
-  coverage. f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
+  coverage + pre-write BYTE-verify (before a cassette is written, confirm the selected template/schema bytes hash to the registry-declared `template_hash`/`schema_hash`; the run path TRUSTS declared hashes, `registry check` = today's sole byte-verifier, and `build_route_record` already HAS the bytes → the natural gate; codex-review f2 low-sev, deferred). f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
   void under `#![forbid(unsafe_code)]` (set_var forbidden, above) → the no-probe property is STRUCTURAL
   (record_setup built only `if record`, else `None` → a replay run never constructs `ModelAdapter`),
   proven by threading `false` through the green `m2_route_loop_lands_both_routes_namespaced`; the flag

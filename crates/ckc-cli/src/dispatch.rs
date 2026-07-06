@@ -170,8 +170,8 @@ fn parse(args: &[String]) -> Result<RawCommand, Fail> {
 
 /// Pull an optional bare boolean flag out of `args`, returning whether it was
 /// present and the remaining tokens for the value-flag pass. A repeat is a
-/// duplicate error; a value-bearing form (`--flag=x`) does not match the bare
-/// name, so it stays in `rest` and the value-flag pass rejects it as unexpected.
+/// duplicate error; a value-bearing form (`--flag=x`) is rejected here as
+/// taking no value, so the outcome is the same wherever the flag sits.
 fn take_bool_flag(op: &str, name: &str, args: &[String]) -> Result<(bool, Vec<String>), Fail> {
     let mut present = false;
     let mut rest = Vec::with_capacity(args.len());
@@ -181,6 +181,15 @@ fn take_bool_flag(op: &str, name: &str, args: &[String]) -> Result<(bool, Vec<St
                 return Err(Fail::new(static_id(op), format!("duplicate {name}")));
             }
             present = true;
+        } else if token
+            .strip_prefix(name)
+            .is_some_and(|tail| tail.starts_with('='))
+        {
+            // A bare boolean takes no value: reject `--flag=x` here so the
+            // outcome is position-independent, rather than leaking it to the
+            // value-flag pass (where a leading token errors "unexpected" but a
+            // token in value position is swallowed as some flag's value).
+            return Err(Fail::new(static_id(op), format!("{name} takes no value")));
         } else {
             rest.push(token.clone());
         }
@@ -618,17 +627,19 @@ mod tests {
         .unwrap_err();
         assert!(err.reason.contains("duplicate --record"), "{}", err.reason);
 
-        // Value-bearing `--record=x` → unexpected argument (left for the value pass).
-        let err = parse(&args(&[
-            "run",
-            "--record=x",
-            "--experiment",
-            "e",
-            "--out",
-            "o",
-        ]))
-        .unwrap_err();
-        assert!(err.reason.contains("unexpected argument"), "{}", err.reason);
+        // Value-bearing `--record=x` → rejected as taking no value, position
+        // independent (whether it leads or sits where a value would).
+        for argv in [
+            args(&["run", "--record=x", "--experiment", "e", "--out", "o"]),
+            args(&["run", "--experiment", "e", "--record=x", "--out", "o"]),
+        ] {
+            let err = parse(&argv).unwrap_err();
+            assert!(
+                err.reason.contains("--record takes no value"),
+                "{argv:?} -> {}",
+                err.reason
+            );
+        }
     }
 
     #[test]

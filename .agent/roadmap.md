@@ -210,8 +210,8 @@ all live in run.rs (used by the fills); `budget_ms` is the §8.4 `solver_ms_per_
   PromptEntry first literal builders in-crate. 84% 168K/200K
 - [x] run-m2.1f2: dispatch `--record` + record-mode threading (consumes f1; B2a-style compute-then-green,
   Record arm type-enforced, live exercise = run-m2.2). dispatch.rs `take_bool_flag(op,name,args)`
-  pre-partitions `--record` out of `rest` BEFORE `take_flags` (dup→`duplicate --record`; `--record=x`
-  stays in rest → `take_flags` rejects unexpected-argument) → `RawCommand`/`Command::Run{…,record}` →
+  pre-partitions `--record` out of `rest` BEFORE `take_flags` (dup→`duplicate --record`; value-bearing `--record=x`→`--record takes no
+  value`, rejected in `take_bool_flag` so the outcome is position-independent) → `RawCommand`/`Command::Run{…,record}` →
   `crate::run::execute(…, *record, shell)`; replay re-exec + both M1 callers thread `false`. run.rs
   threads `record` `execute`→`execute_routes`, which builds `RecordSetup{adapter,schemas,prompts}` ONCE
   `if record` else `None` (`build_record_setup`: `ModelAdapter::new()` Err→command-scope
