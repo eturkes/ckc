@@ -521,10 +521,20 @@ aggressively; full pre-consolidation text in git history.
     (`exp.m2_multihop`)"; M3's separate `exp.*` ids are a different shape, do not back-apply here.
   - Manifest identity (§9 vs code, finder-confirmed): §9 SEPARATES model identity from prompt hashes
     → `ModelIdentity` = `{model_id, quant, runtime_version}` ONLY (mirrors `SolverIdentity`'s
-    identity-only shape; no prompt hash inside). `RunManifest`/`ReplayManifest` carry only
-    `corpus_hash`/`lexicon_hash` today — M2 ADDS the §9 set (test-source/reference/schema/prompt-
-    template/model/runtime hashes) as OMITTABLE fields so M1 manifest bytes + pins stay unchanged
-    (omit-None), M2 populates.
+    identity-only shape; no prompt hash inside). Both manifests carry the §9 set (model_identity +
+    test-source/reference/schema/prompt-template/model/runtime hashes) as OMITTABLE fields: B1 plumbed
+    all-None (M1 bytes + pins byte-identical via omit-None), B2a computes them in `manifest_inputs`
+    (run.rs) gated on the run MODE — new `model_routes: &[RouteShape]` empty (M1) → 7×None, non-empty
+    (model route) → `model_identity = agreed.cloned()` (honest None if no fill identity, ≠ M1 all-None)
+    + the 4 hashes over THIS run's ACTUAL inputs (not registry-wide): `aggregate_hashes`
+    (sort+dedup+join`\n`+hash_bytes) over the run's docs (`test_source_hash`) / the ROUTE-RELEVANT
+    Schema+Prompt entries (`schema_hash`/`prompt_template_hash`, want-sets by RouteShape→static_id,
+    single_ir↔clinical_ir/single_ir, direct_smt↔smt_query/direct_smt), raw-byte hash of the
+    experiment's `expected_outcomes` (`reference_hash`); `model_hash`/`runtime_hash` STAY None (env
+    bare-name commands, no committed bytes; identity rides `model_identity`). Fixture:
+    `copy_committed_registry` gained schemas.yaml + prompts.yaml → `write_m2_root` (calls it)
+    provisions the model-route test; reference file already copied. B2b value-pins (bless-from-observed)
+    both records' 7-tuple parity.
   - Registry `check` is referential (finder-confirmed `validate_registries`): FAILS on dangling
     experiment→pipeline / pipeline→stage refs + §8.4 ChainBreak → seed an experiment entry ONLY after
     its pipelines + stages exist (real `exp.m2_multihop` seeds in run-m2.1, not the type-extension

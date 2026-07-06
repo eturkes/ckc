@@ -187,14 +187,20 @@ pub struct RunManifest {
     pub test_source_hash: Option<Hash>,
     /// Content hash of the locked reference (expected outcomes).
     pub reference_hash: Option<Hash>,
-    /// Content hash of the committed `schemas/` export in force.
+    /// Content hash of the route-relevant committed schema(s) — each model
+    /// route locks only the `schemas/` export its target kind consumes.
     pub schema_hash: Option<Hash>,
-    /// Content hash of the prompt-template registry in force.
+    /// Content hash of the route-relevant prompt template(s) — each model
+    /// route locks only the prompt its target kind is filled from.
     pub prompt_template_hash: Option<Hash>,
     /// Raw-byte hash of the model artifact (§4.4 `_hash` raw-byte rule — a
-    /// file, not an accepted artifact).
+    /// file, not an accepted artifact); `None` while the model is an
+    /// environment bare-name command with no committed bytes (identity rides
+    /// `model_identity`).
     pub model_hash: Option<Hash>,
-    /// Raw-byte hash of the model runtime in force (§4.4 raw-byte rule).
+    /// Raw-byte hash of the model runtime in force (§4.4 raw-byte rule);
+    /// `None` while the runtime is an environment bare-name command with no
+    /// committed bytes.
     pub runtime_hash: Option<Hash>,
 }
 

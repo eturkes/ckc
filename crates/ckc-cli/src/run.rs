@@ -50,7 +50,7 @@ use ckc_core::{
     Normalization, Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
     SourceDocumentGraph, TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
     canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
-    parse_experiments, read_strict_canonical,
+    parse_experiments, parse_prompts, parse_schemas, read_strict_canonical,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
@@ -83,6 +83,18 @@ const TOOLCHAIN_FILE: &str = "rust-toolchain.toml";
 /// §8.4 corpus registry; its raw bytes hash into the manifests'
 /// `corpus_hash` (the §5 "content hash versioning the corpus in force").
 const CORPORA_FILE: &str = "registry/corpora.yaml";
+
+/// §8.4 experiment registry; resolved for the experiment binding and, on a
+/// model-route run, raw-byte read for the §9 `reference_hash` lookup.
+const EXPERIMENTS_FILE: &str = "registry/experiments.yaml";
+
+/// §14 schema registry; a model-route run reads it for the §9 `schema_hash`
+/// over the route-relevant `schemas/` entries.
+const SCHEMAS_FILE: &str = "registry/schemas.yaml";
+
+/// §14 prompt registry; a model-route run reads it for the §9
+/// `prompt_template_hash` over the route-relevant prompt entries.
+const PROMPTS_FILE: &str = "registry/prompts.yaml";
 
 /// The workspace lockfile, raw-byte hashed under the manifests'
 /// `lockfile_hashes` key `cargo.lock`.
@@ -264,6 +276,8 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         &resolved,
         shell,
         true,
+        None,
+        &[],
     );
 }
 
@@ -370,6 +384,9 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
     // One agreed model identity across every route's fills (see [`agree_model_identity`]).
     let mut agreed: Option<ModelIdentity> = None;
     let mut route_runs: Vec<RouteRun> = Vec::with_capacity(views.len());
+    // The realized shape of each route, handed to the run-level manifest for its
+    // §9 route-relevant schema/prompt selection.
+    let mut model_routes: Vec<RouteShape> = Vec::with_capacity(views.len());
 
     // The run-level trace/report tails run once over every route's docs, source
     // graphs, and group traces; both routes chain in parallel under the one run
@@ -587,6 +604,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
             samples: vec![groups.clone()],
             groups,
         });
+        model_routes.push(resolved.shape);
     }
 
     // run-m2.1e's §7.3 metrics consume the collected per-route runs.
@@ -631,6 +649,8 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
         baseline_resolved,
         shell,
         false,
+        agreed,
+        &model_routes,
     );
 }
 
@@ -695,7 +715,7 @@ struct Resolved {
 fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Resolved>> {
     let corpora = load(root, CORPORA_FILE, parse_corpora, shell);
     let candidates = load(root, "registry/candidates.yaml", parse_candidates, shell);
-    let experiments = load(root, "registry/experiments.yaml", parse_experiments, shell);
+    let experiments = load(root, EXPERIMENTS_FILE, parse_experiments, shell);
     let (Some(corpora), Some(candidates), Some(experiments)) = (corpora, candidates, experiments)
     else {
         return None;
@@ -2041,6 +2061,8 @@ fn report_processing_stage(
     resolved: &Resolved,
     shell: &mut Shell,
     emit_event: bool,
+    agreed: Option<ModelIdentity>,
+    model_routes: &[RouteShape],
 ) {
     let clock = processing_stage_clock();
     let ledger = shell.ledger().to_vec();
@@ -2115,6 +2137,8 @@ fn report_processing_stage(
             solver_identity,
             resolved,
             shell,
+            agreed.as_ref(),
+            model_routes,
         )
         .map_err(&fail)?;
         let (manifest, replay) =
@@ -2156,6 +2180,15 @@ fn report_processing_stage(
     }
 }
 
+/// Combine a set of hash strings into one §4.4 raw-byte hash — sort and
+/// dedup first (so route order and per-route duplicates never move the
+/// result), join under newlines, then hash the bytes.
+fn aggregate_hashes(mut v: Vec<String>) -> Hash {
+    v.sort();
+    v.dedup();
+    hash_bytes(v.join("\n").as_bytes())
+}
+
 /// Gather the run state the §5/§4.6 manifests attest, one value per
 /// [`ManifestInputs`] fact (failures name their reason; the report processing_stage
 /// scopes them): the resolved §5 plan and toolchain hash; the §4.6 replay
@@ -2179,6 +2212,8 @@ fn manifest_inputs(
     solver_identity: &SolverIdentity,
     resolved: &Resolved,
     shell: &Shell,
+    agreed: Option<&ModelIdentity>,
+    model_routes: &[RouteShape],
 ) -> Result<ManifestInputs, String> {
     let Some(out_dir) = shell.out_dir() else {
         return Err("manifests: run shell has no output directory".to_owned());
@@ -2215,6 +2250,83 @@ fn manifest_inputs(
         );
     }
 
+    // §9 M2 measurement record. A model-route run locks its outputs against
+    // the run's actual inputs (not the whole registry): the identity the
+    // route fills agreed on, the route-expanded test-source hashes, the
+    // reference, and the route-relevant schema + prompt-template hashes. The
+    // deterministic M1 baseline runs no model route (`model_routes` empty), so
+    // every field is omitted (None) and its manifest bytes stay unchanged. The
+    // model and runtime are environment bare-name commands with no committed
+    // bytes, so their raw-byte hashes stay None (identity rides `model_identity`).
+    let (model_identity, test_source_hash, reference_hash, schema_hash, prompt_template_hash) =
+        if model_routes.is_empty() {
+            (None, None, None, None, None)
+        } else {
+            let experiments = parse_experiments(
+                &std::fs::read_to_string(root.join(EXPERIMENTS_FILE))
+                    .map_err(|e| format!("manifests: read {EXPERIMENTS_FILE}: {e}"))?,
+            )
+            .map_err(|e| format!("manifests: parse {EXPERIMENTS_FILE}: {e}"))?;
+            let exp = experiments
+                .into_iter()
+                .find(|e| e.id == resolved.plan.experiment_id)
+                .ok_or_else(|| "manifests: experiment absent from registry".to_owned())?;
+            let reference = std::fs::read(root.join(&exp.expected_outcomes))
+                .map_err(|e| format!("manifests: read reference {}: {e}", exp.expected_outcomes))?;
+
+            // Each model route locks only the schema and prompt its target kind
+            // consumes (single_ir → ClinicalIR, direct_smt → SMT query); the
+            // prompt registry is 1:1 with the route.
+            let mut want_schema: BTreeSet<Id> = BTreeSet::new();
+            let mut want_prompt: BTreeSet<Id> = BTreeSet::new();
+            for shape in model_routes {
+                match shape {
+                    RouteShape::SingleIr => {
+                        want_schema.insert(static_id("schema.clinical_ir"));
+                        want_prompt.insert(static_id("prompt.single_ir"));
+                    }
+                    RouteShape::DirectSmt => {
+                        want_schema.insert(static_id("schema.smt_query"));
+                        want_prompt.insert(static_id("prompt.direct_smt"));
+                    }
+                    RouteShape::M1Layered => continue,
+                }
+            }
+            let schemas = parse_schemas(
+                &std::fs::read_to_string(root.join(SCHEMAS_FILE))
+                    .map_err(|e| format!("manifests: read {SCHEMAS_FILE}: {e}"))?,
+            )
+            .map_err(|e| format!("manifests: parse {SCHEMAS_FILE}: {e}"))?;
+            let prompts = parse_prompts(
+                &std::fs::read_to_string(root.join(PROMPTS_FILE))
+                    .map_err(|e| format!("manifests: read {PROMPTS_FILE}: {e}"))?,
+            )
+            .map_err(|e| format!("manifests: parse {PROMPTS_FILE}: {e}"))?;
+            (
+                agreed.cloned(),
+                Some(aggregate_hashes(
+                    docs.iter()
+                        .map(|d| d.source_hash.as_str().to_owned())
+                        .collect(),
+                )),
+                Some(hash_bytes(&reference)),
+                Some(aggregate_hashes(
+                    schemas
+                        .iter()
+                        .filter(|s| want_schema.contains(&s.id))
+                        .map(|s| s.schema_hash.as_str().to_owned())
+                        .collect(),
+                )),
+                Some(aggregate_hashes(
+                    prompts
+                        .iter()
+                        .filter(|p| want_prompt.contains(&p.id))
+                        .map(|p| p.template_hash.as_str().to_owned())
+                        .collect(),
+                )),
+            )
+        };
+
     Ok(ManifestInputs {
         plan: resolved.plan.clone(),
         command,
@@ -2230,13 +2342,13 @@ fn manifest_inputs(
         solver_identity: solver_identity.clone(),
         input_hashes: docs.iter().map(|d| d.source_hash.clone()).collect(),
         output_hashes,
-        // §9 M2 measurement record: stubbed None on every run; the
-        // model-route computation lands in run-m2.1e-B2.
-        model_identity: None,
-        test_source_hash: None,
-        reference_hash: None,
-        schema_hash: None,
-        prompt_template_hash: None,
+        // §9 M2 measurement record (computed above): populated on a
+        // model-route run, omitted (None) on the deterministic M1 baseline.
+        model_identity,
+        test_source_hash,
+        reference_hash,
+        schema_hash,
+        prompt_template_hash,
         model_hash: None,
         runtime_hash: None,
     })
@@ -3213,7 +3325,9 @@ processing_stages:
         for rel in [
             CORPORA_FILE,
             "registry/candidates.yaml",
-            "registry/experiments.yaml",
+            EXPERIMENTS_FILE,
+            SCHEMAS_FILE,
+            PROMPTS_FILE,
             TOOLCHAIN_FILE,
         ] {
             let target = root.join(rel);
