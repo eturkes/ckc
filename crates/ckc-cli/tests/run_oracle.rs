@@ -204,6 +204,7 @@ fn run_oracle_strict_reads_artifacts_and_matches_reference() {
         "replay_manifest.json".into(),
         "report.json".into(),
         "report_en.md".into(),
+        "report_ja.md".into(),
         "trace_bundle.json".into(),
     ];
 

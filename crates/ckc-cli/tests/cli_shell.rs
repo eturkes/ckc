@@ -111,6 +111,7 @@ fn run_writes_only_under_its_out_dir() {
             "replay_manifest.json",
             "report.json",
             "report_en.md",
+            "report_ja.md",
             "trace_bundle.json"
         ]
     );

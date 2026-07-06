@@ -469,6 +469,24 @@ aggressively; full pre-consolidation text in git history.
   regression, so a revert to `UNUSED_STAGE` stays green without one. (3) the run-level producer is
   SYNTHETIC non-registry: `pipeline_id` stays baseline `pipe.m2_direct_smt` + the step id is undeclared
   in candidates.yaml — documented as synthetic, not registered.
+- run-m2.1e-C1 LANDED the report ModelRunSections wiring + report_ja.md landing (B2a compute-then-green
+  half; C2 pins the values). `report_processing_stage` gained a `route_runs: &[RouteRun]` param and now
+  builds `route_diagnostics` (per-route ledger slices) + calls new private `model_route_metrics(root,
+  resolved, route_runs, model_routes) -> Result<Option<Vec<RouteMetrics>>, String>` (empty
+  `model_routes` → `Ok(None)`; else mirrors `manifest_inputs`' experiment lookup but parses the reference
+  via `parse_reference` since `route_metrics` needs `&[ReferenceEntry]`, not raw bytes). The chain head
+  swapped the hardcoded `assemble_report(…, None)` for a `match (route_metrics, agreed.as_ref())` →
+  `Some(ModelRunSections{route_diagnostics, route_metrics, baseline_pipeline_id, model_identity})` ONLY
+  when metrics present AND a `Some` agreed identity; either absent → `None` (a degraded model route that
+  attested no identity degrades to None, NOT a panic — mirrors the manifest's graceful omit). report_ja.md
+  lands beside report_en.md in the SHARED stage (BOTH M1 + M2) via `shell.write_under` → lineage/manifest-
+  UNtracked, so every M1 byte-pin (report.json/manifest.json/replay_manifest.json/lineage_index.json/
+  report_en.md) stays byte-identical; only the exhaustive file-SET listings moved (3 updated: run.rs M2
+  `m2_route_loop_...` + tests/cli_shell.rs M1 + tests/run_oracle.rs M1 `expected_files`). GREEN with M2
+  values UNasserted BECAUSE the m2 loop test `strict_at`-reads report.json (typed-validity, not exact-byte)
+  → wiring the sections in (M2 report.json now section-bearing) exercises the path proving it computes
+  without erroring, leaving the new VALUES for C2's observed-output pin battery. No new doc-lint error
+  (private→private intra-doc link to `manifest_inputs` doesn't trip `private_intra_doc_links`).
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters

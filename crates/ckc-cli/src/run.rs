@@ -50,7 +50,7 @@ use ckc_core::{
     Normalization, Origin, Outcome, PipelineEntry, Producer, RunPlan, SegmentIr, SolverIdentity,
     SourceDocumentGraph, TestSourceGroup, assemble, canonical_payload_bytes, canonical_sort_key,
     canonicalization_policy_hash, content_hash, hash_bytes, parse_candidates, parse_corpora,
-    parse_experiments, parse_prompts, parse_schemas, read_strict_canonical,
+    parse_experiments, parse_prompts, parse_reference, parse_schemas, read_strict_canonical,
 };
 use ckc_smt::{
     QueryBody, SmtLogic, VerifierResults, Z3Adapter, compile, verify, verify_query_pairs,
@@ -59,13 +59,15 @@ use ckc_smt::{
 use crate::cassette::{CassetteKey, CassetteStore};
 use crate::extract::{ExtractConfig, extract};
 use crate::manifests::{ManifestInputs, assemble_manifests};
-use crate::metrics::{FillObservation, GroupObservation};
+use crate::metrics::{FillObservation, GroupObservation, RouteMetrics, route_metrics};
 use crate::model_fill::{
     FillReject, FillSource, ModelFill, RECORDED_CALLS_COUNTER, REPAIRS_COUNTER, model_fill,
 };
 use crate::normalize::{Lexicon, load_lexicon, normalize};
 use crate::registry_check::{invalid_diagnostic, load};
-use crate::report::{Report, assemble_report, render_markdown};
+use crate::report::{
+    ModelRunSections, Report, assemble_report, render_markdown, render_markdown_ja,
+};
 use crate::segment::segment;
 use crate::shell::{
     ProcessingStageClock, ProcessingStageEvent, Shell, processing_stage_clock, static_id,
@@ -277,6 +279,7 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, shell: &mut Shell) {
         shell,
         true,
         None,
+        &[],
         &[],
     );
 }
@@ -607,9 +610,6 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
         model_routes.push(resolved.shape);
     }
 
-    // run-m2.1e's §7.3 metrics consume the collected per-route runs.
-    let _ = &route_runs;
-
     // The run-level tails run once over both routes. Every route builds the same
     // source graph per document (payload-identical, so equal content hashes), so keep
     // one per document for the report; the run trace instead keeps every route's
@@ -651,6 +651,7 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
         false,
         agreed,
         &model_routes,
+        &route_runs,
     );
 }
 
@@ -2032,6 +2033,53 @@ fn trace_processing_stage(
     pair
 }
 
+/// (run-m2.1e-C1) Per-route §7.3 metrics for the run-level report's model
+/// sections, or `None` on an M1 baseline run (empty `model_routes`). Mirrors
+/// [`manifest_inputs`]' experiment lookup — resolve the run's experiment, parse its
+/// `expected_outcomes` reference, and score each route's collected fills, groups, and
+/// k-sample battery against it via [`route_metrics`].
+fn model_route_metrics(
+    root: &Path,
+    resolved: &Resolved,
+    route_runs: &[RouteRun],
+    model_routes: &[RouteShape],
+) -> Result<Option<Vec<RouteMetrics>>, String> {
+    if model_routes.is_empty() {
+        return Ok(None);
+    }
+    let experiments = parse_experiments(
+        &std::fs::read_to_string(root.join(EXPERIMENTS_FILE)).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    let exp = experiments
+        .into_iter()
+        .find(|e| e.id == resolved.plan.experiment_id)
+        .ok_or_else(|| {
+            format!(
+                "experiment {} absent from registry",
+                resolved.plan.experiment_id
+            )
+        })?;
+    let reference = parse_reference(
+        &std::fs::read_to_string(root.join(&exp.expected_outcomes)).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(Some(
+        route_runs
+            .iter()
+            .map(|rr| {
+                route_metrics(
+                    &rr.pipeline_id,
+                    &rr.fills,
+                    &rr.groups,
+                    &rr.samples,
+                    &reference,
+                )
+            })
+            .collect(),
+    ))
+}
+
 /// The §8.3 report processing_stage, the run-scoped chain's tail: snapshot the
 /// shell's diagnostic ledger (every §7.4 record the run raised before this
 /// processing_stage; the report cannot count records that do not yet exist), assemble
@@ -2063,6 +2111,7 @@ fn report_processing_stage(
     emit_event: bool,
     agreed: Option<ModelIdentity>,
     model_routes: &[RouteShape],
+    route_runs: &[RouteRun],
 ) {
     let clock = processing_stage_clock();
     let ledger = shell.ledger().to_vec();
@@ -2079,74 +2128,112 @@ fn report_processing_stage(
     input_hashes.sort();
     input_hashes.dedup();
 
-    let landed = assemble_report(
-        &bundle.payload,
-        &lineage.payload,
-        &graphs.iter().map(|g| &g.payload).collect::<Vec<_>>(),
-        &results.iter().map(|r| &r.payload).collect::<Vec<_>>(),
-        lexicon_hash,
-        solver_identity,
-        &ledger,
-        // No recorded model run: an M1 baseline run has none, and the model-route
-        // run-level tail defers its two-route ModelRunSections to run-m2.1e.
-        None,
-    )
-    .map_err(|e| fail(format!("report assembly: {e}")))
-    .and_then(|report| {
-        report
-            .validate()
-            .map_err(|e| fail(format!("report invariant: {e}")))?;
-        wrapper(
-            "report".to_owned(),
-            "report",
-            tail_producer(resolved, REPORT, emit_event),
-            input_hashes.clone(),
-            Origin::DeterministicCompiler,
-            EvidenceStatus::MechanicalEvidenceStatus,
-            vec![],
-            report,
-        )
-        .map_err(|e| fail(e.to_string()))
-    })
-    .and_then(|report| land(shell, "report.json", report))
-    .and_then(|report| {
-        // §7.2 derived view: rendered from the read-back payload (disk
-        // truth), landed beside the canonical record.
-        let body = render_markdown(&report.payload);
-        let path = shell
-            .write_under("report_en.md", body.as_bytes())
-            .map_err(|e| fail(format!("report_en.md: {e}")))?;
-        let read_back =
-            std::fs::read(&path).map_err(|e| fail(format!("report_en.md: read back: {e}")))?;
-        if read_back != body.as_bytes() {
-            return Err(fail(
-                "report_en.md: read back diverges from the rendering".to_owned(),
-            ));
-        }
-        Ok(report)
-    })
-    .and_then(|report| {
-        let inputs = manifest_inputs(
-            root,
-            docs,
-            groups,
-            bundle,
-            lineage,
-            &report,
-            lexicon_hash,
-            solver_identity,
-            resolved,
-            shell,
-            agreed.as_ref(),
-            model_routes,
-        )
-        .map_err(&fail)?;
-        let (manifest, replay) =
-            assemble_manifests(&inputs).map_err(|e| fail(format!("manifest assembly: {e}")))?;
-        land_record(shell, "manifest.json", &manifest)?;
-        land_record(shell, "replay_manifest.json", &replay)?;
-        Ok(report)
-    });
+    // The run-level report's model sections (§7.4 taxonomy + §7.3 metrics) exist only
+    // on a model route; an M1 baseline run passes `None` and stays byte-identical.
+    // `route_diagnostics` lends each route's ledger slice to the per-route taxonomy.
+    let route_diagnostics: Vec<(Id, &[DiagnosticRecord])> = route_runs
+        .iter()
+        .map(|rr| (rr.pipeline_id.clone(), rr.ledger.as_slice()))
+        .collect();
+
+    let landed = model_route_metrics(root, resolved, route_runs, model_routes)
+        .map_err(|reason| fail(format!("report model sections: {reason}")))
+        .and_then(|route_metrics| {
+            // Model sections are all-or-nothing: metrics present AND the routes
+            // attested one identity. A degraded model route (no agreed identity)
+            // degrades to `None`, mirroring the manifest's graceful omit.
+            let model_run = match (route_metrics, agreed.as_ref()) {
+                (Some(metrics), Some(model_identity)) => Some(ModelRunSections {
+                    route_diagnostics: &route_diagnostics,
+                    route_metrics: metrics,
+                    baseline_pipeline_id: &resolved.pipeline_id,
+                    model_identity,
+                }),
+                _ => None,
+            };
+            assemble_report(
+                &bundle.payload,
+                &lineage.payload,
+                &graphs.iter().map(|g| &g.payload).collect::<Vec<_>>(),
+                &results.iter().map(|r| &r.payload).collect::<Vec<_>>(),
+                lexicon_hash,
+                solver_identity,
+                &ledger,
+                model_run,
+            )
+            .map_err(|e| fail(format!("report assembly: {e}")))
+        })
+        .and_then(|report| {
+            report
+                .validate()
+                .map_err(|e| fail(format!("report invariant: {e}")))?;
+            wrapper(
+                "report".to_owned(),
+                "report",
+                tail_producer(resolved, REPORT, emit_event),
+                input_hashes.clone(),
+                Origin::DeterministicCompiler,
+                EvidenceStatus::MechanicalEvidenceStatus,
+                vec![],
+                report,
+            )
+            .map_err(|e| fail(e.to_string()))
+        })
+        .and_then(|report| land(shell, "report.json", report))
+        .and_then(|report| {
+            // §7.2 derived view: rendered from the read-back payload (disk
+            // truth), landed beside the canonical record.
+            let body = render_markdown(&report.payload);
+            let path = shell
+                .write_under("report_en.md", body.as_bytes())
+                .map_err(|e| fail(format!("report_en.md: {e}")))?;
+            let read_back =
+                std::fs::read(&path).map_err(|e| fail(format!("report_en.md: read back: {e}")))?;
+            if read_back != body.as_bytes() {
+                return Err(fail(
+                    "report_en.md: read back diverges from the rendering".to_owned(),
+                ));
+            }
+            Ok(report)
+        })
+        .and_then(|report| {
+            // §7.2 derived view: the JA rendering of the same read-back payload,
+            // landed beside report_en.md in the shared stage (both routes).
+            let body = render_markdown_ja(&report.payload);
+            let path = shell
+                .write_under("report_ja.md", body.as_bytes())
+                .map_err(|e| fail(format!("report_ja.md: {e}")))?;
+            let read_back =
+                std::fs::read(&path).map_err(|e| fail(format!("report_ja.md: read back: {e}")))?;
+            if read_back != body.as_bytes() {
+                return Err(fail(
+                    "report_ja.md: read back diverges from the rendering".to_owned(),
+                ));
+            }
+            Ok(report)
+        })
+        .and_then(|report| {
+            let inputs = manifest_inputs(
+                root,
+                docs,
+                groups,
+                bundle,
+                lineage,
+                &report,
+                lexicon_hash,
+                solver_identity,
+                resolved,
+                shell,
+                agreed.as_ref(),
+                model_routes,
+            )
+            .map_err(&fail)?;
+            let (manifest, replay) =
+                assemble_manifests(&inputs).map_err(|e| fail(format!("manifest assembly: {e}")))?;
+            land_record(shell, "manifest.json", &manifest)?;
+            land_record(shell, "replay_manifest.json", &replay)?;
+            Ok(report)
+        });
 
     let (started_at, ended_at, duration_ms) = clock.stop();
     let (outcome, diagnostics, output_hashes) = match landed {
@@ -3928,6 +4015,7 @@ processing_stages:
                 "replay_manifest.json",
                 "report.json",
                 "report_en.md",
+                "report_ja.md",
                 "routes",
                 "trace_bundle.json"
             ]
