@@ -8,8 +8,8 @@
 //! and assembly: [`assemble_trace`] builds both payloads over the run's
 //! landed processing_stage artifacts, handed off per document as [`DocTrace`] and per
 //! test_source group as [`GroupTrace`] by the §8.3 trace processing_stage in
-//! [`crate::run`]. The [`command`] submodule is the pair's consumer:
-//! `ckc trace` (§8.5 item 7).
+//! the private `run` module. The private `command` submodule is the pair's
+//! consumer: `ckc trace` (§8.5 item 7).
 
 pub(crate) mod command;
 

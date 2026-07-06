@@ -4,9 +4,9 @@
 //! timestamps, the JSONL logs — never enters the comparison: content
 //! hashes cover canonical payload bytes only, so the exclusion holds by
 //! construction. No shell contact: [`execute`] takes paths and returns
-//! values; [`command`] owns the `ckc replay` CLI surface. The
-//! re-execution itself drives the full §8.3 pipeline through
-//! [`crate::run::execute`] under a replay-owned internal shell, so the
+//! values; the private `command` submodule owns the `ckc replay` CLI
+//! surface. The re-execution itself drives the full §8.3 pipeline through
+//! the run command's `execute` under a replay-owned internal shell, so the
 //! scratch directory ends up a complete run layout, inspectable after any
 //! verdict.
 //!

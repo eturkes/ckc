@@ -298,7 +298,6 @@ pub(crate) fn execute(root: &Path, experiment_id: &Id, record: bool, shell: &mut
 /// (run-m2.1e): the route's pipeline id, its slice of the run ledger, the per-fill
 /// observations, the per-group verdict observations, and the k-sample battery — one
 /// recorded draw here, so `samples` holds a single `groups` snapshot.
-#[allow(dead_code)]
 struct RouteRun {
     pipeline_id: Id,
     ledger: Vec<DiagnosticRecord>,
@@ -733,7 +732,6 @@ struct Resolved {
     /// §9 `model_repair_limit` budget value: `Some` on the model routes
     /// (resolution fails without it) and `None` on the M1 layered shape,
     /// which spends no repairs. run-m2.1d3/.1d4 read it in the route loop.
-    #[allow(dead_code)]
     repair_limit: Option<u32>,
     /// §9 `model_ms_per_call` budget value, read unconditionally from the
     /// experiment budget map (`None` when undeclared). Required only at
@@ -744,7 +742,6 @@ struct Resolved {
     /// Whether this view's pipeline is the experiment's §7.3 delta baseline
     /// (the M1 legacy binding's single view is its own baseline).
     /// run-m2.1d5's tails read it.
-    #[allow(dead_code)]
     is_baseline: bool,
     /// §5 run plan built from the experiment entry; its content hash is
     /// the manifest's `run_plan_hash`.
@@ -1304,7 +1301,6 @@ fn compile_verify_group(
 /// Built by [`route_document_head`]; consumed by [`single_ir_fill`]
 /// (run-m2.1d4a feeds the direct route's per-group fill from the same
 /// heads).
-#[allow(dead_code)]
 struct DocHead {
     trace: DocTrace,
     source: ArtifactWrapper<SourceDocumentGraph>,
@@ -1318,7 +1314,6 @@ struct DocHead {
 /// [`FillObservation`]'s contract), `identity` the last attempt's cassette
 /// [`ModelIdentity`] (run-m2.1d5a checks cross-route identity agreement
 /// against it).
-#[allow(dead_code)]
 struct RouteDoc {
     trace: DocTrace,
     graph: ArtifactWrapper<SourceDocumentGraph>,
@@ -1329,7 +1324,6 @@ struct RouteDoc {
 /// Re-mint a wrapper's artifact id under the route's [`route_id_prefix`].
 /// `content_hash` is payload-only, so re-minting never disturbs byte pins;
 /// the M1 shape's empty prefix re-mints the id to itself.
-#[allow(dead_code)]
 fn route_minted<P>(mut wrapper: ArtifactWrapper<P>, prefix: &str) -> ArtifactWrapper<P> {
     wrapper.artifact_id = Id::new(format!("{prefix}{}", wrapper.artifact_id))
         .expect("a grammatical artifact id stays grammatical under a pipeline-id prefix");
@@ -1343,7 +1337,6 @@ fn route_minted<P>(mut wrapper: ArtifactWrapper<P>, prefix: &str) -> ArtifactWra
 /// unreadable corpus file is the same command-scope diagnostic + `None`; a
 /// failed stage records its event and yields `None` (the fill stage needs
 /// both wrappers). run-m2.1d5a drives it once per unique document.
-#[allow(dead_code)]
 fn route_document_head(
     root: &Path,
     entry: &CorpusEntry,
@@ -1481,7 +1474,6 @@ fn off_lexicon_ids(clinical: &ClinicalIr, lexicon: &Lexicon) -> Vec<Id> {
 /// accepts and yields the parsed `ClinicalIr`. Closing over pre-built id sets
 /// lets a route step (and its tests) classify a model output with no live
 /// pipeline. [`single_ir_fill`] wires it into the route.
-#[allow(dead_code)]
 fn single_ir_accept<'a>(
     regions: &'a HashSet<&'a Id>,
     segments: &'a HashSet<&'a Id>,
@@ -1544,7 +1536,6 @@ fn single_ir_accept<'a>(
 /// A cassette IO/contract failure is a command-scope diagnostic with no
 /// event (infrastructure, not a stage outcome). Returns the document's
 /// [`RouteDoc`]; run-m2.1d5a drives it per document.
-#[allow(dead_code)]
 #[allow(clippy::too_many_arguments)]
 fn single_ir_fill(
     head: DocHead,
@@ -1745,7 +1736,6 @@ fn single_ir_fill(
 /// guideline text and carries no source linkage, so the solver is the syntactic
 /// authority — a marker-passing but unparseable query surfaces as `target_syntax_failure`
 /// at verify (route-direct-smt.5), never here.
-#[allow(dead_code)]
 fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
     |bytes| {
         let text = std::str::from_utf8(bytes)
@@ -1772,7 +1762,6 @@ fn direct_smt_accept() -> impl Fn(&[u8]) -> Result<String, FillReject> {
 /// reject breaks the loop before the next) — so a lone landed role that cannot verify
 /// still reaches the run manifest's `output_hashes` and stays replay-covered (run-m2.1e-A);
 /// `pair` is that prefix's two-element case, cloned as a type-safe verify input.
-#[allow(dead_code)]
 struct DirectFill {
     pair: Option<(ArtifactWrapper<QueryBody>, ArtifactWrapper<QueryBody>)>,
     smt_queries: Vec<ArtifactWrapper<QueryBody>>,
@@ -1800,7 +1789,6 @@ struct DirectFill {
 /// counters are not dropped. The returned [`DirectFill`] carries the pair (`Some` only when
 /// both roles landed) beside the `fills`/`identities` that survive a reject; wired into the
 /// experiment run by run-m2.1.
-#[allow(dead_code)]
 #[allow(clippy::too_many_arguments)]
 fn direct_smt_fill(
     gid: &Id,
@@ -1841,13 +1829,17 @@ fn direct_smt_fill(
         input_hashes.push(head.source.content_hash.clone());
         input_hashes.push(head.segments.content_hash.clone());
     }
-    // Member (doc-id, source graph) pairs for the record prompt, gathered once
-    // (both roles share them) and only when recording; a replay run gathers none.
-    let record_members: Option<Vec<(&Id, &SourceDocumentGraph)>> = record.map(|_| {
-        heads
+    // Both roles' record prompts, composed before the clock (the M2.7 clock
+    // boundary [`single_ir_fill`] follows: pure setup stays out of the fill's
+    // measured span; the deontic prompt may go unused when the overlap
+    // exhausts first — a record-mode-only, two-element cost). A replay run
+    // composes none and sends `FillSource::Replay`.
+    let record_prompts: Option<[String; 2]> = record.map(|r| {
+        let members: Vec<(&Id, &SourceDocumentGraph)> = heads
             .iter()
             .map(|h| (&h.trace.document_id, &h.source.payload))
-            .collect()
+            .collect();
+        ["overlap", "deontic"].map(|role| direct_smt_prompt(&r.template, gid, role, &members))
     });
     let clock = processing_stage_clock();
     let mut fills: Vec<FillObservation> = Vec::new();
@@ -1858,22 +1850,22 @@ fn direct_smt_fill(
     let mut landed: Vec<ArtifactWrapper<QueryBody>> = Vec::new();
     // Replay the pair's two role-namespaced cassettes at the base seed, wrapping and
     // landing each shallow-accepted body as a raw-AI `smt_query` the verdict tail consumes.
-    for (role, logic) in [("overlap", SmtLogic::QfLra), ("deontic", SmtLogic::QfUf)] {
+    for (i, (role, logic)) in [("overlap", SmtLogic::QfLra), ("deontic", SmtLogic::QfUf)]
+        .into_iter()
+        .enumerate()
+    {
         let source = static_id(&format!("{gid}.{role}"));
         let key = CassetteKey {
             route: static_id("route.direct_smt"),
             source: source.clone(),
             seed,
         };
-        // Per-role record prompt (both roles share the members); a replay run
-        // composes none and sends `FillSource::Replay`.
-        let record_prompt = record
-            .zip(record_members.as_deref())
-            .map(|(r, members)| direct_smt_prompt(&r.template, gid, role, members));
-        let role_fill = match record.zip(record_prompt.as_deref()) {
-            Some((r, prompt)) => FillSource::Record {
+        // The role's pre-composed record prompt; a replay run sends
+        // `FillSource::Replay`.
+        let role_fill = match record.zip(record_prompts.as_ref()) {
+            Some((r, prompts)) => FillSource::Record {
                 adapter: r.adapter,
-                prompt,
+                prompt: &prompts[i],
                 constraint: &r.constraint,
                 ctx: &r.ctx,
             },
@@ -2016,7 +2008,6 @@ fn direct_smt_fill(
 /// fixture) — this stamps the `verify` kind, the slot-3 `m2.verify_smt` step id
 /// ([`producer`] uses the same), and the solver budget counter unconditionally. Wired
 /// into the experiment run by run-m2.1.
-#[allow(dead_code)]
 fn direct_smt_verify_group(
     gid: &Id,
     dir: &str,

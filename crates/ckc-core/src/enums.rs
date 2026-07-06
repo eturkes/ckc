@@ -47,7 +47,8 @@ macro_rules! fieldless_enum {
             }
 
             /// Inverse of [`as_str`](Self::as_str); any other token fails with
-            /// [`ValidationError::Enum`].
+            /// `ValidationError::Enum` (plain ticks: the expansion site's scope
+            /// cannot be assumed to resolve the link).
             pub fn parse(token: &str) -> Result<Self, $crate::ValidationError> {
                 match token {
                     $($text => Ok($name::$variant),)+

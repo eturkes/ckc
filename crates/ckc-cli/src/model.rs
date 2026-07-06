@@ -88,7 +88,7 @@ const DRAIN_GRACE: Duration = Duration::from_secs(1);
 const SPAWN_BUSY_GRACE: Duration = Duration::from_millis(250);
 
 /// SPEC §9 model-runtime adapter: one runtime command plus the
-/// [`ModelIdentity`] parsed live from its [`IDENTITY_PROBE_FLAG`] reply at
+/// [`ModelIdentity`] parsed live from its `IDENTITY_PROBE_FLAG` reply at
 /// construction. Generations run via [`ModelAdapter::invoke`], one
 /// subprocess per call (the prompt on stdin, constraint path and seed as
 /// args), each under its own wall-clock budget.
@@ -100,16 +100,16 @@ pub struct ModelAdapter {
 
 impl ModelAdapter {
     /// Adapter over the environment's model-runtime command: the
-    /// [`MODEL_COMMAND_ENV`] override, else the neutral
-    /// [`DEFAULT_MODEL_COMMAND`], resolved on PATH like the §6 `z3` default.
+    /// `MODEL_COMMAND_ENV` override, else the neutral
+    /// `DEFAULT_MODEL_COMMAND`, resolved on PATH like the §6 `z3` default.
     pub fn new() -> Result<Self, ModelAdapterError> {
         Self::with_command(command_name())
     }
 
     /// Adapter over an explicit runtime command. A bare name (no path
     /// separator) is resolved on PATH by [`Command`]; a path is used
-    /// directly. The command must answer [`IDENTITY_PROBE_FLAG`] with the
-    /// three labeled identity fields (see [`parse_identity`]); construction
+    /// directly. The command must answer `IDENTITY_PROBE_FLAG` with the
+    /// three labeled identity fields (see `parse_identity`); construction
     /// fails otherwise, so a held adapter always carries a live-parsed
     /// identity.
     pub fn with_command(command: impl Into<PathBuf>) -> Result<Self, ModelAdapterError> {
@@ -188,7 +188,7 @@ impl ModelAdapter {
 
     /// Draw `k` recorded samples for one prompt under one constraint (the §9
     /// k-sample convergence mechanism). Sample `i` runs
-    /// [`invoke`](Self::invoke) under [`derive_seed`]`(base_seed, i)`, so the
+    /// [`invoke`](Self::invoke) under `derive_seed(base_seed, i)`, so the
     /// whole draw is reproducible from `(base_seed, k)` and each sample
     /// carries the seed the cassette keys it by. The recorded-call count is
     /// the returned length (`k`; `k == 0` yields an empty draw). Whether the
@@ -217,7 +217,7 @@ impl ModelAdapter {
 }
 
 /// One model-runtime subprocess, raw. `stdout_bytes` holds the stdout
-/// drained within the run's budget plus the post-fate [`DRAIN_GRACE`] —
+/// drained within the run's budget plus the post-fate `DRAIN_GRACE` —
 /// kept as bytes (never lossy-decoded) because the generated output is
 /// recorded byte-for-byte for the cassette and its determinism is
 /// byte-stability. It is the full output exactly when the outcome is
@@ -239,7 +239,7 @@ pub struct ModelRun {
 }
 
 /// One draw of a [`ModelAdapter::invoke_samples`] k-sample set: the
-/// [`derive_seed`]-derived seed and the run it produced. The cassette keys
+/// `derive_seed`-derived seed and the run it produced. The cassette keys
 /// recorded calls by seed, so each sample carries its own rather than
 /// leaving the caller to re-derive it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -251,7 +251,7 @@ pub struct ModelSample {
 /// Process fate of one model invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelOutcome {
-    /// Exit status zero AND stdout reached EOF within [`DRAIN_GRACE`], so the
+    /// Exit status zero AND stdout reached EOF within `DRAIN_GRACE`, so the
     /// capture is complete (every write end of the pipe closed, leaving
     /// `bytes` the whole output). This is the only recordable success: a
     /// clean exit whose stdout stayed open past the grace is
@@ -261,11 +261,11 @@ pub enum ModelOutcome {
     /// is the model-fill stage's job), so a completed run's "result" is
     /// simply its output bytes, also in [`ModelRun::stdout_bytes`].
     Completed { bytes: Vec<u8> },
-    /// Exit status zero, but stdout did not reach EOF within [`DRAIN_GRACE`]
+    /// Exit status zero, but stdout did not reach EOF within `DRAIN_GRACE`
     /// of the exit, so the capture's completeness is UNPROVEN: the recorded
     /// `bytes` may be the whole output or only a prefix, and nothing here
     /// distinguishes the two. The usual cause is a descendant that outlived
-    /// the clean exit still holding the write end open. The [`DRAIN_GRACE`]
+    /// the clean exit still holding the write end open. The `DRAIN_GRACE`
     /// assumption is that an un-held pipe drains to EOF within the grace —
     /// true for output that clears the OS pipe buffer in that window, but a
     /// genuinely slow or very large (yet finite) drain can false-negative
@@ -314,8 +314,8 @@ impl std::fmt::Display for ModelAdapterError {
 
 impl std::error::Error for ModelAdapterError {}
 
-/// The effective model-runtime command: the [`MODEL_COMMAND_ENV`] value when
-/// set and non-empty, else [`DEFAULT_MODEL_COMMAND`].
+/// The effective model-runtime command: the `MODEL_COMMAND_ENV` value when
+/// set and non-empty, else `DEFAULT_MODEL_COMMAND`.
 pub fn command_name() -> String {
     resolve_command(std::env::var(MODEL_COMMAND_ENV).ok())
 }

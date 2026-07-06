@@ -190,12 +190,12 @@ aggressively; full pre-consolidation text in git history.
   likewise). Call-boundary overhead is inherent + below ms/normalization resolution — only named setup is
   worth hoisting.
 - Doc-lint gate (Rust): the per-unit test+fmt+clippy gate MISSES rustdoc → run `RUSTDOCFLAGS='-D
-  warnings' cargo doc -p <crate> --no-deps` whenever a unit touches doc comments. Two failure shapes:
-  a public item's ``[`priv`]`` intra-doc link to a PRIVATE item (`private_intra_doc_links`) → plain
-  ticks `` `priv` ``; a link to a type not `use`d in the module (unresolved) → qualified-path
-  `` [`T`](crate::T) `` (a docs-only `use` trips `unused_imports`). Counting gotcha: `grep -c "^error"` on the doc output includes the trailing ``error: could not
-  document `ckc-cli` `` summary line → real standing count = matches − 1 (17 link errors read as 18);
-  diff the error LIST against the standing set (model.rs/replay.rs/trace.rs/cassette.rs), not counts.
+  warnings' cargo doc --workspace --no-deps` whenever a unit touches doc comments; baseline = 0
+  errors (the M2-review fix cleared the standing 17+17 debt). Fix shapes: a public item's doc link
+  to a PRIVATE item (`private_intra_doc_links`) → plain ticks; a link to a type not `use`d in the
+  module (unresolved) → qualified-path `` [`T`](crate::T) `` (a docs-only `use` trips
+  `unused_imports`); a doc comment INSIDE an exported macro body cannot assume any link resolves at
+  its expansion sites → plain ticks only (`fieldless_enum!`'s `ValidationError::Enum`).
 - Contract-tense docs (codex flagged twice): a doc claim about pending wiring must be unit-attributed —
   "report-m2.1b embeds X in `report.json`" holds before + after the unit lands; present-state phrasing
   ("carriers today: report.json bytes agree") overreaches until the wiring commit. House pattern:
@@ -379,181 +379,73 @@ aggressively; full pre-consolidation text in git history.
   revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
+- M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b; full-body read of the ~19K-line milestone diff,
+  all six §9 acceptance themes re-confirmed green, full-repo engine-token triage clean). Fixes:
+  rustdoc debt cleared (17 ckc-cli private-link + 17 ckc-core macro-doc errors → workspace 0),
+  stale lib.rs metrics doc re-tensed, direct_smt_fill record-prompt composition hoisted out of the
+  timed fill interval (M2.7 clock discipline, matching single_ir_fill), 13 obsolete
+  `#[allow(dead_code)]`s removed (all consumers landed). OPEN user items unchanged: SPEC §8.4
+  "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
+  `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
+  enhancement, still preferred); shared cross-crate subprocess runner + registry symlink guard
+  (deferred scoped units).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
   orphans the already-landed artifact + drops its counters. Event-less abort is safe ONLY before the
   first land; after, ride the event like the wrap/land-error break paths (`direct_smt_fill` deontic
   cassette-fails-after-overlap-lands; codex .1d4a).
-- run-m2.1d5a-1 LANDED the model-route loop in `execute()` + the cross-route group-namespacing
-  collision fix (the sizing bullet's CROSS-ROUTE LANDING problem). `execute()` dispatch is 3-way: a
-  lone `[M1Layered]` view runs the M1 body inline verbatim; any set MIXING M1Layered + model routes →
-  ONE command diagnostic + zero artifacts; all-model → `execute_routes(root, &views, shell)`. BOTH
-  routes' group artifacts now land under `out/routes/{pid}/groups/{gid}/` (mirrors head namespacing
-  `routes/{pid}/artifacts/{doc}`): `direct_smt_fill` mints that dir internally (it holds `resolved`);
-  the M1-shared `compile_verify_group`/`direct_smt_verify_group` stay param-driven, so `execute_routes`
-  passes the namespaced `dir` while the M1 layered path keeps bare `groups/{gid}`. OBSERVED landed
-  layout (the .1d5a-1 gate's literals — pin .1d5a-2/.1e from these, don't recompute): `out/routes/` =
-  `[pipe.m2_direct_smt, pipe.m2_single_ir]`; single_ir artifacts `[ir_bundle.json, segments.json,
-  source_document_graph.json]` + group `[compiled.json, smt, verifier_results.json]` (compile lands
-  SMT bodies under an `smt/` subdir); direct artifacts `[segments.json, source_document_graph.json]`
-  (NO ir_bundle — mints no IR) + group `[deontic.smt_query.json, overlap.smt_query.json,
-  verifier_results.json]`; NO bare `out/groups/`. `RouteRun{pipeline_id, ledger slice
-  (shell.ledger()[start..]), fills, groups, samples: vec![groups.clone()]}` collected
-  `#[allow(dead_code)]` (`let _ = &route_runs`) → .1e metrics consume (the .1d5a-2 tails use the
-  separate `all_*` vecs, NOT RouteRun). Identity
-  agreement folds each Some ModelIdentity into `agreed`; a differing Some → one command diagnostic +
-  fail-closed return (goldens agree → the clean gate never trips it). Codex .1d5a-1 follow-up:
-  single_ir's group loop emits the COMPILE partial-group diagnostic+event (mirrors `group_pipeline`,
-  the module header's documented partial-group rule) on a member-short group; direct's loop keeps a
-  bare skip — it mints no compiled artifact, so that compile-stage rule does not apply, and the member
-  head already failed+diagnosed upstream. Neither skip is ever fully silent (the short member's own
-  head/fill stage always diagnosed first) → the dedicated error-path TESTS defer to .1d5a-2b (single_ir
-  partial-group event; mixed-shape→command-diagnostic; identity-disagreement→fail-closed). Helper
-  `route_group_dir(resolved,gid)` now centralizes the `routes/{pid}/groups/{gid}` dir (was 6 duplicated
-  format strings across both loops + `direct_smt_fill` + 3 direct-verify test sites — a split-dir class
-  Codex flagged where the fill landed route-namespaced but the paired verify landed bare).
-- run-m2.1d5a-2 LANDED the unified run-level tails. `execute_routes` collects
-  `all_docs`/`all_graphs`/`all_group_traces` across the view loop, then runs
-  `trace_processing_stage`/`report_processing_stage` ONCE over both routes at the BARE run root
-  (trace_bundle.json/lineage_index.json/report.json/report_en.md/manifest.json/replay_manifest.json
-  beside `routes/`+`logs/`). NEW `emit_event: bool` on both tail fns gates the §4.6 census EVENT
-  only: M1 execute() callers pass `true` (M1 byte-identical); the M2 tails pass `false` (route
-  pipelines declare no trace/report step, run under the baseline route's padded `UNUSED_STAGE`
-  slots) → M2 tails emit NO event yet stay fail-CLOSED by raising the failure diagnostic DIRECTLY
-  (`shell.diagnostic(diagnostic.clone())` on the Err arm when `!emit_event`; the diagnostic
-  otherwise reaches the shell ONLY through the un-emitted event). Cross-route correctness (in-code,
-  commented): all_graphs deduped keep-FIRST-per-`payload.document.document_id` via a seen-set
-  `retain` — NOT `dedup_by_key`, since all_graphs = direct's BTreeMap-sorted heads ++ single_ir's
-  first-appearance graphs → dupes are non-adjacent and consecutive dedup misses them; all_docs
-  STABLE-sorted bundle-bearing-first (`sort_by_key(|d| d.bundle.is_none())`) so assemble_trace's
-  first-by-id lineage lookup resolves the single_ir bundle-doc, not direct's bundle-less head (views
-  run direct-first per `pipelines:[direct,single_ir]`), else assemble_report rejects `MissingLineage`.
-  The trace keeps BOTH routes' parallel chains (route-prefixed artifact_ids → distinct chain nodes;
-  the shared source node dedups whole-node) → `TraceBundle.claims.len()==3` (single_ir's 2 compiled
-  groups mint claims; direct mints none). RESPEC banked-fact ERROR corrected (verify-against-code
-  rule): the gate test DID carry `assert_eq!(listing(&out), ["logs","routes"])` — the respec's
-  do-not-read note claimed it did NOT — so it now pins the 8-entry root set + a
-  `strict_at::<TraceBundle>` claims assertion. RECURRED M2.1e-C1 (codex): C1 claimed no M1 success test pins an exhaustive root listing — FALSE (tests/cli_shell.rs + tests/run_oracle.rs both do); the respec swept run.rs's in-module M1 tests (`.exists()`/`strict_at`, non-exhaustive) but not the tests/*.rs integration files → verify-against-code must grep the WHOLE crate test surface (`sorted_entries`/`files_under`/`expected_files`/`read_dir` over tests/ AND src), not just the edited module. Additive-safety split: a rendered view landed via `shell.write_under` (report_en/ja.md) is NOT lineage/manifest-tracked (the manifest derives from the report wrapper, not a dir scan) → byte-safe for report.json/manifest/lineage pins, perturbs only exhaustive file-SET listings; `land`/`wrapper`/`land_record` DO track. Error-path diagnostics LANDED .1d5a-2b (3 run-binary
-  tests over `write_m2_root` variants: drop guideline_b's single_ir cassette → fill + partial-group
-  compile diagnostics co-occur, diag order fill<compile since the fill loop precedes the group loop;
-  swap direct→layered in experiments.yaml `pipelines` + re-point baseline in-set → mixed-shape command
-  diagnostic + `assert_only_logs`; re-bless one single_ir cassette with a divergent synthetic identity
-  → fail-closed command diagnostic). Reusable: divergent-identity re-bless = `store.replay(key).payload`
-  clone + swap `model_identity` + `build_wrapper`/`persist` (CassettePayload all-public → no head
-  re-run); a fully-bundle-less doc does NOT break the tails (`assemble_trace` Option-guards bundle
-  nodes, mints claims/lineage only from compiled groups, and a member-short group `continue`s before
-  its GroupTrace push → untraced). Two-run determinism + event census (tails contribute 0 events) →
-  .1d5b; §9 report sections (passed `None` here) → .1e.
-- run-m2.1d5a-2b codex-review (xhigh): 4 findings, all under-constrained-assertion gaps (production
-  sound, tests passed). Strengthened: identity-disagreement now pins fail-closed via ABSENT run-level
-  tails — `read_dir(out).sorted()==["logs","routes"]` (the `agree_model_identity` false→`return`
-  precedes the post-loop tails, so no `trace_bundle`/`report`/manifest lands) + direct-first order via
-  `routes/pipe.m2_direct_smt/groups/group.m1_no_conflict/verifier_results.json` exists (empirically
-  confirms the `pipelines:[direct,single_ir]` resolve order the comment claimed, else direct never
-  runs); member-short now pins tails-COMPLETE via `trace_bundle.json`+`report.json` exist, and
-  exactly-one-short via Invalid-`compile`-event `.count()==1`. CORRECTED event-scope model (I had it
-  wrong first pass): command-scope diagnostics (`shell.diagnostic`) ride the CLOSING command event =
-  `events.last()` (`processing_stage`==operation_id `"m1"`), NOT "no event"; stage-scope diagnostics
-  ride their processing_stage event; BOTH land in `logs/diagnostics.jsonl` (=`self.ledger`, append
-  order) = the `executed()`-returned `diagnostics` vec (all scopes) → pin command-scope by
-  `events.last().diagnostics` carrying it, not by absence from events.
-- run-m2.1e-A LANDED run-level landing completeness + honest producer, closing the .1d5a-2 replay
-  hole. NEW `GroupTrace.smt_queries: Vec<ArtifactWrapper<QueryBody>>` (single_ir empty; direct = a
-  `[overlap,deontic]` PREFIX — `[]`/`[overlap]`/full, roles land sequentially + break on fail);
-  single_ir pushes GroupTrace on `Some(compiled)`, direct on `df.smt_queries` NONEMPTY (new
-  `DirectFill.smt_queries` retains every landed role; verify only on the complete `pair`), NOT
-  verify-success — only GroupObservation (report group-row) gates on `results`; a landed-but-
-  unverified compiled/lone-role/pair stays replay-covered; `manifest_inputs`
-  walks `group.smt_queries` into output_hashes. DURABLE: replay coverage (replay.rs diffs manifest
-  output_hashes) ≠ trace-DAG membership — the pair hashes live ONLY in the manifest (`TraceNodeKind`
-  has no smt_query variant → `assemble_trace` UNCHANGED), so the manifest hash is DAG-orphaned unless
-  `direct_smt_verify_group`'s `verifier_results.input_hashes=[overlap,deontic]` provenance-links it
-  (clean path). Honest producer: `tail_producer(resolved, idx, emit_event)` — false (M2 run-level
-  tail) → `static_id("processing_stage.run.{trace,report}")` (consts RUN_TRACE_STEP/RUN_REPORT_STEP),
-  true → early-returns `producer(resolved, idx)` (M1 byte-identical); fixes M2 tails formerly minting
-  the route's inert `UNUSED_STAGE` step-id. Pins (m2_route_loop_lands_both_routes_namespaced): TYPED
-  `RunManifest.output_hashes.contains` (not substring) over direct overlap+deontic content_hashes, +
-  full synthetic-producer pins (tails' `producer.pipeline_id` == baseline `pipe.m2_direct_smt` AND
-  `producer.pipeline_step_id` == RUN_TRACE_STEP/RUN_REPORT_STEP). NEW
-  full-run pin `m2_direct_partial_landing_is_replay_covered`: delete the deontic cassette → §4.4
-  valid-remainder (CassetteError rides its §4.6 event, group skips remaining stages) still lands a
-  manifest covering the lone overlap. Codex (xhigh) follow-up, DURABLE: (1) the initial .1e-A carried
-  only the complete `pair`, discarding a PARTIAL `[overlap]` landing (already pinned by
-  `..._still_emits_event`) pre-execute_routes → replay-uncovered; fixed via the `DirectFill.smt_queries`
-  prefix vec, ADDITIVE (kept `pair` as the type-safe complete-verify input) to avoid churning ~8
-  `.pair` test sites. (2) content_hash-EXCLUDED provenance (producer.pipeline_step_id) needs an
-  EXPLICIT regression pin — hash/layout/census/determinism pins ALL pass through a producer
-  regression, so a revert to `UNUSED_STAGE` stays green without one. (3) the run-level producer is
-  SYNTHETIC non-registry: `pipeline_id` stays baseline `pipe.m2_direct_smt` + the step id is undeclared
-  in candidates.yaml — documented as synthetic, not registered.
-- run-m2.1e-C1 LANDED the report ModelRunSections wiring + report_ja.md landing (B2a compute-then-green
-  half; C2 pins the values). `report_processing_stage` gained a `route_runs: &[RouteRun]` param and now
-  builds `route_diagnostics` (per-route ledger slices) + calls new private `model_route_metrics(root,
-  resolved, route_runs, model_routes) -> Result<Option<Vec<RouteMetrics>>, String>` (empty
-  `model_routes` → `Ok(None)`; else mirrors `manifest_inputs`' experiment lookup but parses the reference
-  via `parse_reference` since `route_metrics` needs `&[ReferenceEntry]`, not raw bytes). The chain head
-  swapped the hardcoded `assemble_report(…, None)` for a `match (route_metrics, agreed.as_ref())` →
-  `Some(ModelRunSections{route_diagnostics, route_metrics, baseline_pipeline_id, model_identity})` ONLY
-  when metrics present AND a `Some` agreed identity; either absent → `None`, no panic. CODEX-C1 CORRECTION:
-  a degraded model route (`model_routes` non-empty, `agreed`=None) does NOT mirror the manifest — the §9
-  manifest still emits that run's setup hashes (test_source/reference/schema/prompt) with `model_identity`=None
-  (gates only on `model_routes.is_empty()`), while the report drops ALL sections (`ModelRunSections` requires
-  a non-optional identity) → report vs manifest DIFFER on a degraded route BY DESIGN, a §7.x view declining to
-  attribute results to an unknown evaluator (flag for M2 review: is an identity-less report representation
-  wanted?). Fix: gate `model_route_metrics` on `agreed.is_some()` at the call site — a degraded route now
-  SKIPS the reference parse whose result the `None` arm discards (pre-fix a malformed-but-readable
-  `expected_outcomes` sank a degraded run that `assemble_report(None)` completes; `manifest_inputs` only
-  raw-reads+hashes that file, never parses). LOW-SEV DEFERRED: `model_route_metrics` + `manifest_inputs`
-  independently re-read experiments+reference on an identity route (benign TOCTOU on static committed files
-  in one synchronous stage; threading one read couples the two fns → future factoring). report_ja.md
-  lands beside report_en.md in the SHARED stage (BOTH M1 + M2) via `shell.write_under` → lineage/manifest-
-  UNtracked, so every M1 byte-pin (report.json/manifest.json/replay_manifest.json/lineage_index.json/
-  report_en.md) stays byte-identical; only the exhaustive file-SET listings moved (3 updated: run.rs M2
-  `m2_route_loop_...` + tests/cli_shell.rs M1 + tests/run_oracle.rs M1 `expected_files`). GREEN with M2
-  values UNasserted BECAUSE the m2 loop test `strict_at`-reads report.json (typed-validity, not exact-byte)
-  → wiring the sections in (M2 report.json now section-bearing) exercises the path proving it computes
-  without erroring, leaving the new VALUES for C2's observed-output pin battery. No new doc-lint error
-  (private→private intra-doc link to `manifest_inputs` doesn't trip `private_intra_doc_links`).
-- run-m2.1e-C2 LANDED the model-route report VALUE pins (extended
-  `m2_route_loop_lands_both_routes_namespaced`, no new test fn → suite count unchanged). DURABLE
-  (recurs run-m2.2 live pins + acceptance-m2): a full-body `report_en.md`/`report_ja.md` const-pin
-  over a REAL run must NORMALIZE the solver version — z3's `--version` is live-parsed at Z3Adapter
-  construction, so it's env-dependent (WHY no LIVE-run body is const-pinned — report.rs const-pins SYNTHETIC bodies freely,
-  their version a hand-set fixture; a live body cannot: run_oracle.rs
-  re-renders the landed report.json and compares instead of pinning bytes). Pattern: read
-  `solver_identity.version`, assert it appears EXACTLY ONCE per body (a future version colliding with
-  another rendered token — the fixture model `runtime_version` `1.0.0`, an integer fraction — then
-  fails LOUD, never silently rewrites the collided token), `.replace(version, "Z3_VERSION")`, pin the
-  normalized body against a const (blessed by dumping the landed bytes from a scratch `write_m2_root`
-  run, `4.13.3`→`Z3_VERSION`, embedded via a Python splice so the Japanese stays byte-exact). Other
-  observed facts on a CLEAN model run: each route's `failure_taxonomy` code map is EMPTY but the route
-  is still NAMED (Report::validate rule 5 — a present empty-map route = a clean route); `metrics`
-  baseline = the direct route, `emission_order` = raw rows for both routes (direct, single_ir) before
-  the lone single_ir baseline-delta table, `k_sample_convergence` NA on every route (single k=1
-  draw). Pin split: part (a) asserts report.json STRUCTURE (emission_order + k_sample NA + agreed
-  identity + taxonomy shape) via the typed `strict_at` Report; the raw metric VALUES
-  (`recorded_call_count` 4/1 direct, 3/1 single_ir; delta -1/1; all others 1/1 or 0/1) ride the
-  rendered-body const pins. The halves OVERLAP at the render surface (route names, empty
-  taxonomy, baseline id, k_sample NA, model identity appear in both); (a) uniquely pins the
-  TYPED shape (enum order, integer map counts, typed identity fields), the bodies uniquely pin
-  the numeric metric cells + full prose — neither half is dead.
-- run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
-  `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
-  `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
-  `pipelines.contains` → exactly one is_baseline view). DURABLE analysis: trace determinism does NOT
-  rest on the all_docs/all_graphs merge order — `assemble_trace` `sort_canonical`s nodes/edges/
-  claims/rows before returning, so merge order is MOOT for the trace bytes; the bundle-first sort
-  matters ONLY for the pre-sort first-by-id lineage lookup (`find(document_id).and_then(bundle)`
-  skips a bundle-less doc that sorts first). `producer.pipeline_step_id` is write-only provenance
-  (lives only in wrapper.rs emit/read, never consumed by replay/manifest, payload-excluded from
-  `content_hash`) → the `UNUSED_STAGE` tail producer is inert + deterministic. DEFERRED to .1e
-  (accepted, roadmap broadened): GroupTrace omits accepted landed artifacts on non-full-success
-  paths (direct smt_query pair always; single_ir compiled + direct pair when verify fails — both
-  arms push only on `(Some,Some)`) + the run-level producer. Fixed this follow-up: stale module doc
-  ("later unit" → tails land here); gate now asserts both routes' route-prefixed nodes reach the run
-  trace (`claims.len()==3` alone is single_ir-satisfiable, so it did not prove the tail ran over the
-  direct route).
+- M2 route loop (run-m2.1d5a-1, code+tests hold the detail): `execute()` dispatches 3-way (lone
+  M1Layered inline / mixed set fail-closed / all-model → `execute_routes`); both routes land
+  route-namespaced under `routes/{pid}/{artifacts,groups}/` (`route_group_dir` centralizes the dir).
+  Partial-group asymmetry is principled: single_ir emits the COMPILE partial-group diagnostic+event
+  on a member-short group (module partial-group rule); direct keeps a bare skip — it mints no
+  compiled artifact and the short member's own head/fill stage already diagnosed upstream.
+- M2 run-level tails (run-m2.1d5a-2/.1e, code holds the mechanics: emit_event gating, all_graphs
+  seen-set dedup, all_docs bundle-first sort). Durable beyond code: trace DETERMINISM rests on
+  `assemble_trace`'s `sort_canonical`, so doc/graph merge order is moot for trace bytes — the
+  bundle-first sort matters only for the pre-sort first-by-id lineage lookup;
+  `producer.pipeline_step_id` is write-only provenance (never read back for logic). RECURRED rule:
+  verify-against-code must grep the WHOLE crate test surface (`sorted_entries`/`files_under`/
+  `expected_files`/`read_dir` over tests/ AND src), not just the edited module. Additive-safety
+  split: `shell.write_under` output (report_en/ja.md) is lineage/manifest-UNtracked (manifest
+  derives from the report wrapper, not a dir scan) → byte-safe for report/manifest/lineage pins,
+  perturbs only exhaustive file-SET listings; `land`/`wrapper`/`land_record` DO track. Reusable
+  fixture recipe: divergent-identity re-bless = `store.replay(key).payload` clone + swap
+  `model_identity` + `build_wrapper`/`persist`. A fully-bundle-less doc never breaks the tails
+  (`assemble_trace` Option-guards bundle nodes; a member-short group `continue`s before its
+  GroupTrace push).
+- Event-scope model (corrected twice — pin it): command-scope diagnostics (`shell.diagnostic`) ride
+  the CLOSING command event = `events.last()`, NOT "no event"; stage-scope diagnostics ride their
+  processing_stage event; BOTH land in `logs/diagnostics.jsonl` (append order) = `executed()`'s
+  diagnostics vec. Fail-closed pinning patterns: identity-disagreement pins the ABSENT run-level
+  tail set (`read_dir(out)==[logs,routes]`); member-short pins tails-COMPLETE (trace_bundle.json +
+  report.json exist) + exactly-one-Invalid-compile-event.
+- Replay coverage ≠ trace-DAG membership (run-m2.1e-A): replay.rs diffs manifest `output_hashes`;
+  the direct pair hashes live ONLY in the manifest (no smt_query `TraceNodeKind`), DAG-orphaned
+  unless `verifier_results.input_hashes` provenance-links them. Both routes push GroupTrace on
+  artifact LANDING (direct: `DirectFill.smt_queries` = a `[overlap, deontic]` prefix), not
+  verify-success — only GroupObservation gates on `results`. A content_hash-EXCLUDED field
+  (producer step ids) needs an EXPLICIT regression pin — hash/layout/census/determinism pins all
+  pass through a producer regression. The run-level tail producer is SYNTHETIC non-registry:
+  baseline `pipeline_id` + `processing_stage.run.{trace,report}` step ids, documented not registered.
+- Report-vs-manifest degraded-route asymmetry (run-m2.1e-C1; M2-review RULING: keep by design). A
+  model route that attests no agreed identity yields a section-less report (`ModelRunSections`
+  requires a non-optional identity — a §7.x view declines to attribute results to an unknown
+  evaluator) while the §9 manifest still records the run's setup hashes with `model_identity`=None
+  (gates only on `model_routes` non-empty); the ledger + §4.4 outcome still document the
+  degradation. `model_route_metrics` gates on `agreed.is_some()` so a degraded route skips the
+  reference parse. LOW-SEV DEFERRED: `model_route_metrics` + `manifest_inputs` independently
+  re-read experiments+reference (benign TOCTOU on static committed files; threading one read
+  couples the fns → future factoring).
+- Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
+  `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is
+  live-parsed, env-dependent — report.rs const-pins SYNTHETIC bodies freely; run_oracle.rs
+  re-renders instead of pinning). Pattern: read `solver_identity.version`, assert it appears
+  EXACTLY ONCE per body (a colliding future version fails loud), `.replace(version, "Z3_VERSION")`,
+  pin the normalized body (bless by dumping observed bytes; splice so Japanese stays byte-exact).
+  Typed-shape asserts and rendered-body pins OVERLAP at the render surface by design — (a) uniquely
+  pins typed structure, the bodies uniquely pin numeric cells + prose; neither half is dead.
 - Engine-agnostic DELIVERABLE (user directive): the committed SPEC/code/registry/roadmap/`schemas/`
   name NO specific LLM inference engine, grammar dialect, or model-file format. M2 elaboration picks the
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema
@@ -630,51 +522,30 @@ aggressively; full pre-consolidation text in git history.
     is environment-supplied outside git. Committed `schemas/` use neutral formats —
     JSON-Schema (standard) for ClinicalIR, BNF grammar (ABNF-style `;` comments) for the SMT surface (no engine
     constraint-dialect name); the env wrapper compiles them to the runtime's constraint format.
-  - run-m2.2 respec decisions (codex-corrected): direct `:named` labels are supplied as a NAMING
-    SCHEME in the template, ROLE-SENSITIVE — overlap `ctx.<document-id>.rule.<n>`, deontic
-    `a.<document-id>.rule.<n>` (per-document 0-based rule order; §8.6 reference queries + the
-    artifact contract + trace.rs's fallback split the prefix by role → a single-prefix scheme would
-    mis-prefix the overlap query against the instrument) — exact label LISTS would import IR-layer
-    rule counts into the no-IR route; the model-invocation time cap is registry budget key
-    `model_ms_per_call` (open budget map, yaml-only), read into `Resolved.model_ms_per_call:
-    Option<u64>` unconditionally, REQUIRED only at record time in `build_route_record` (replay never
-    invokes → zero CASSETTE churn; the resolve budget-vector pin + both test `Resolved` literals DO
-    churn — the roadmap banks the sites).
+  - run-m2.2 settled decisions: direct `:named` labels are a NAMING SCHEME in template text,
+    ROLE-SENSITIVE — overlap `ctx.<document-id>.rule.<n>`, deontic `a.<document-id>.rule.<n>`
+    (per-document 0-based rule order; §8.6 reference queries + trace.rs split the prefix by role,
+    and label LISTS would import IR-layer rule counts into the no-IR route). `model_ms_per_call` =
+    the model-invocation cap (registry budget key, `Resolved.model_ms_per_call: Option<u64>` read
+    unconditionally, REQUIRED only at record time in `build_record_parts`).
   - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
     seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9
     minimal pair over widening §9; the gradient is the experiment §10 ("vary and layer existing IR
     forms") was written to be.
-  - Recon mechanics that right-size the units: a processing-stage `kind` is a free-form Id (no enum)
-    → adding `model_fill` is registry data, not an enum change; the middle-layer derive fns live in
-    ckc-cli (`segment.rs`, `normalize.rs`, `rules.rs` `derive_norm_ir`), only `DocIr::from_graph` +
-    `FormalIr::derive`/`FormalConstraint::from_rule` sit on the ckc-core types → `run-refactor`
-    extracted ONLY the per-group compile→verify back end (per-doc derive fns already pub → route units
-    compose them directly; full spec in respec commit `93953c4`). PLAN LESSON (this respec recovered an
-    overflow): a unit framed "extract a tail/chain X→Y→Z" must share ONE iteration granularity —
-    `derive_norm_ir`/`assemble` are per-document (N×), `compile`/`verify` per-group (1× fan-in), so they
-    cannot be one linear fn; conflating granularities forced a full-session design re-derivation. Check
-    stage granularity at plan time. Route→tail wiring (agent-confirmed): a route feeds the M1
-    `compile_verify_group` back end by HAND-BUILDING a minimal `Resolved` (that fn reads only
-    `pipeline_id` + `pipeline_step_ids[4=compile]`/`[5=verify]` + `toolchain_manifest_hash` +
-    `budget_ms` + `shape` (via `route_id_prefix`, .1d3a); `documents`/`groups`/`plan` are unread stubs); `resolve()` NOW resolves route
-    pipelines too (run-m2.1a: per-route views, `[Id; 8]` = declared ids padded with `UNUSED_STAGE`,
-    `shape: RouteShape`); the route fn lives in
-    `run.rs` (`Resolved` + `compile_verify_group` private to `mod run`). The single_ir route's
-    accept-closure (`single_ir_accept`) + per-doc fill + golden-cassette wiring LANDED in `run.rs`
-    (route-single-ir.2/.2b; reshaped .1d3a: `route_document_head` lands the extract→segment head as
-    a `DocHead`, `single_ir_fill(head, …)` replays + direct-emits the model_fill §4.6 event —
-    diagnostics ride the event ONLY, `processing_stage_event` ledgers them — and returns a
-    `RouteDoc{trace, graph, fill, identity}`; tail lands via slot-3 `close_processing_stage`);
-    run-m2.1d5a consumes `resolve()`'s per-route views for the in-`execute` loop; the hand-built minimal-`Resolved` stays a test-fixture pattern (both route fixtures carry
-    `shape` + `UNUSED_STAGE` padding now). Scoring/rejection test shapes (route-single-ir.3/.4,
-    consumers DONE; the tests hold mechanics + derived-seed constants) — durable lessons only: a
-    route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a partial
-    mirror passes vacuously) and resolves groups + reference from the registry, never hardcoded
-    membership; `repair_limit=0` proves only the zero-budget boundary, NOT
-    multi-attempt exhaustion — faithful route-level exhaustion needs malformed cassettes at the base
-    AND each derived seed through the budget; pin rejection payload SHAPE (key
-    `reason`, non-empty, empty refs) symmetric across codes. Rejection cassettes: single_ir seeds
-    99/98/97 (+derived) = hallucinated / recover / exhaust, under
+  - Route mechanics (M3 reuses when adding routes): a processing-stage `kind` is a free-form Id →
+    a new stage kind is registry data, not an enum change. A route feeds the M1
+    `compile_verify_group` back end by hand-building a minimal `Resolved` (reads only pipeline_id
+    + step slots + toolchain hash + budget_ms + shape; documents/groups/plan unread stubs) — the
+    test-fixture pattern; `resolve()` resolves route pipelines to per-route views (`[Id; 8]` =
+    declared ids padded with `UNUSED_STAGE`, `shape: RouteShape`). PLAN LESSON: a unit framed
+    "extract a tail/chain" must share ONE iteration granularity (per-document derive vs per-group
+    compile/verify cannot be one linear fn) — check stage granularity at plan time. Scoring-test
+    shape: a route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a
+    partial mirror passes vacuously) and resolves groups + reference from the registry, never
+    hardcoded membership; `repair_limit=0` proves only the zero-budget boundary — faithful
+    exhaustion needs malformed cassettes at the base AND each derived seed; pin rejection payload
+    SHAPE (key `reason`, non-empty, empty refs) symmetric across codes. Rejection cassettes:
+    single_ir seeds 99/98/97 (+derived) = hallucinated / recover / exhaust under
     `route.single_ir/test_source.m1_guideline_a`.
   - route.direct_smt residue (units .1-.5 DONE; git + run.rs hold the build story — only
     forward-load-bearing facts here): the route verifies raw model SMT via pub ckc-smt
