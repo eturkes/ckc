@@ -177,23 +177,32 @@ units only BUILD the Record value at the fills. `RecordContext{producer:Producer
 prompt_template_hash:Hash, budget:Duration}` (cassette.rs:49). `CassetteStore::record(adapter, key,
 prompt, constraint, ctx)` = subprocess + constraint re-read seal + persist (cassette.rs:101; committed
 static schema files pass the seal). `ModelAdapter::new()->Result<Self,_>` probes identity on PATH /
-`CKC_MODEL_COMMAND` (model.rs:105), `.identity()` (:163) — build ONCE in execute_routes like
-`Z3Adapter::new` (~369). GUIDELINE-TEXT source = `SourceDocumentGraph.spans[].raw_text` ordered by
+`CKC_MODEL_COMMAND` (model.rs:105), `.identity()` (:163) — build ONCE in execute_routes mirroring
+`Z3Adapter::new`'s build-once placement (~369), BUT the Err arm = command-scope `invalid_diagnostic`
+(`reason` = `model adapter: {e}`), NOT `SolverExecutionFailure` (solver-specific; no model-runtime
+DiagnosticCode exists → a dedicated code = later/spec concern). GUIDELINE-TEXT source = `SourceDocumentGraph.spans[].raw_text` ordered by
 `reading_order` (source_linkage.rs `SourceTextSpan{span_id,node_id,raw_text,reading_order,…}`);
 `ClinicalSegment`(segment_id/kind/region_ids) + `EvidenceRegion`(region_id/node_ids/span_ids/anchor_ids)
 carry NO text → DECISION: the first-draft prompt joins spans' `raw_text` in `reading_order`
 (full-document text); the segment→region_ids→span_ids→spans "segment order" mapping is a run-m2.2
-wording refinement. Registry select mirrors `manifest_inputs` want-set (run.rs:2334-2450):
-SingleIr→schema target_kind `clinical_ir` / prompt entry-id `prompt.single_ir`; DirectSmt→`smt_query`
-/ `prompt.direct_smt`. `SchemaEntry{id,path,schema_hash,target_kind}` (core registry.rs:206);
-`PromptEntry{id,path:Option,inline:Option,template_hash,route}` path-XOR-inline (:225); consts
-`SCHEMAS_FILE`/`PROMPTS_FILE` run.rs:95/99; `parse_schemas`/`parse_prompts` (core). Slot const
-`MODEL_FILL` + `producer(resolved, idx)` + `Resolved.budget_ms` all live in run.rs (used by the fills).
+wording refinement. Registry select mirrors `manifest_inputs` want-set (run.rs:2334-2450, selects by `s.id`/`p.id` — NOT
+`target_kind`): SingleIr→schema id `schema.clinical_ir` / prompt id `prompt.single_ir`;
+DirectSmt→`schema.smt_query` / `prompt.direct_smt`; M1Layered→None (manifest_inputs errs on it as a
+caller-contract violation → f1 selectors return None defensively). `SchemaEntry{id,path,schema_hash,
+target_kind}` (core registry.rs:206) — `target_kind` (`clinical_ir`/`smt_query`) is an OPEN classifier,
+`id` is the select key; `PromptEntry{id,path:Option,inline:Option,template_hash,route}` path-XOR-inline
+(:225); consts `SCHEMAS_FILE`/`PROMPTS_FILE` run.rs:95/99; `parse_schemas`/`parse_prompts` (core) do NO
+validation → `validate_model_registry(&schemas,&prompts)` (core registry.rs:665; returns findings,
+empty=valid; only `registry check` calls it today) enforces path-XOR + safe paths → f2 MUST call it
+before any `root.join(path)`. Slot const `MODEL_FILL` + `producer(resolved, idx)` + `Resolved.budget_ms`
+all live in run.rs (used by the fills); `budget_ms` is the §8.4 `solver_ms_per_query` SOLVER budget
+(run.rs:687) → DECISION: f2 reuses it as the `RecordContext.budget` model-invocation placeholder
+(first-draft), a dedicated model budget = run-m2.2 (record ships type-plumbing only, no live call).
 - [ ] run-m2.1f1: pure record-prompt selection + composition (ckc-cli, new fns in run.rs or a
   `record_prompt` section; `#[allow(dead_code)]` pre-consumers; NO I/O, NO adapter, NO dispatch —
   crate green). Deliver 4 pure fns + inline-fixture tests: `select_record_schema(&[SchemaEntry],
-  RouteShape) -> Option<&SchemaEntry>` (by `target_kind`: SingleIr→clinical_ir, DirectSmt→smt_query,
-  M1Layered→None); `select_record_prompt(&[PromptEntry], RouteShape) -> Option<&PromptEntry>` (by
+  RouteShape) -> Option<&SchemaEntry>` (by `id`: SingleIr→`schema.clinical_ir`,
+  DirectSmt→`schema.smt_query`, M1Layered→None); `select_record_prompt(&[PromptEntry], RouteShape) -> Option<&PromptEntry>` (by
   entry id prompt.single_ir/prompt.direct_smt, mirror manifest_inputs; M1Layered→None);
   `single_ir_prompt(template:&str, doc_id:&Id, graph:&SourceDocumentGraph) -> String` (template ++
   doc-id line ++ `graph.spans` `raw_text` joined by `reading_order`); `direct_smt_prompt(template:&str,
@@ -212,21 +221,25 @@ SingleIr→schema target_kind `clinical_ir` / prompt entry-id `prompt.single_ir`
   `validate` (:201) + `Command::Run{…,record}` + `execute` (:309) → `crate::run::execute(Path::new("."),
   experiment, record, shell)`. (2) run.rs `execute` (:190): add `record:bool`, pass to execute_routes
   (M1-only inline path ignores it). (3) `execute_routes` (:346): when `record`, `ModelAdapter::new()`
-  ONCE (Err→command diagnostic + return, mirror the Z3Adapter arm ~369), load schemas.yaml+prompts.yaml
-  (mirror manifest_inputs read+parse; read/parse err→command diagnostic + return), build per-view
+  ONCE (Err→command-scope `invalid_diagnostic` `reason`=`model adapter: {e}` + return, NOT
+  `SolverExecutionFailure`), load schemas.yaml+prompts.yaml (mirror manifest_inputs read+parse) THEN
+  `validate_model_registry(&schemas,&prompts)` (read/parse/non-empty-findings→`invalid_diagnostic` +
+  return — guards path-XOR + safe paths before the joins), build per-view
   `RouteRecord{adapter:&ModelAdapter, template:String (f1 select_record_prompt → `entry.inline` else
   read `root.join(entry.path)`), constraint:PathBuf (`root.join(`f1 select_record_schema`.path)`),
   ctx:RecordContext{producer(resolved,MODEL_FILL), `entry.template_hash`, budget:Duration from
-  resolved.budget_ms}}`; pass `Option<&RouteRecord>` to `single_ir_fill` (:1415, call ~420) +
+  resolved.budget_ms (SOLVER budget reused first-draft; dedicated model budget = run-m2.2)}}`; pass `Option<&RouteRecord>` to `single_ir_fill` (:1415, call ~420) +
   `direct_smt_fill` (:1649, call ~544; map heads→`(&h.trace.document_id, &h.source.payload)`). (4)
   fills: add `record:Option<&RouteRecord>`; None→`FillSource::Replay` (unchanged), Some→build the
   prompt via f1 (single_ir: `single_ir_prompt(&r.template,&doc_id,&source.payload)` at the model_fill
   call :1456; direct: per-role `direct_smt_prompt(&r.template,gid,role,&members)` inside the role loop
   at model_fill call ~1704) + `FillSource::Record{r.adapter,&prompt,&r.constraint,&r.ctx}`. (5) update
-  ALL execute/execute_routes callers to thread `record` (M1 callers pass false). (6) default-replay
-  acceptance test: record=false builds NO adapter — set `CKC_MODEL_COMMAND` to a bogus command, assert
-  a record=false model-route run still lands (no probe fires); thread false into
-  `m2_route_loop_lands_both_routes_namespaced` (stays green). Reading: f1 fns (this crate); all
+  ALL execute/execute_routes callers to thread `record` (M1 callers pass false). (6) tests: (a) default-replay
+  acceptance — record=false builds NO adapter — set `CKC_MODEL_COMMAND` to a bogus command, assert
+  a record=false model-route run still lands (no probe fires), thread false into
+  `m2_route_loop_lands_both_routes_namespaced` (stays green); (b) dispatch parse-level (mirror existing
+  dispatch tests): no flag→record=false, bare `--record`→record=true, dup `--record`→reject,
+  value-bearing `--record=x`→reject. Reading: f1 fns (this crate); all
   run.rs/dispatch.rs/cassette.rs/model.rs facts BANKED in the RESPEC note (do NOT re-read). Gate:
   `cargo test -p ckc-cli`; fmt/clippy; doc-lint; type-enforced Record arm (live exercise = run-m2.2).
 - [ ] run-m2.2: live-pin battery over the run binary. Record the full experiment cassette via the env
