@@ -379,8 +379,11 @@ aggressively; full pre-consolidation text in git history.
   revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
-- M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b; full-body read of the ~19K-line milestone diff,
-  all six §9 acceptance themes re-confirmed green, full-repo engine-token triage clean). Fixes:
+- M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; full-body read of the ~19K-line
+  milestone diff; committed standing evidence re-confirmed green — full gates + the recorded_run
+  battery; the six §9 theme verdicts rest on acceptance-m2's LOCAL driver run, independently
+  codex-re-verified there, per the evidence-runs-local acceptance design; full-repo engine-token
+  triage clean). Fixes:
   rustdoc debt cleared (17 ckc-cli private-link + 17 ckc-core macro-doc errors → workspace 0),
   stale lib.rs metrics doc re-tensed, direct_smt_fill record-prompt composition hoisted out of the
   timed fill interval (M2.7 clock discipline, matching single_ir_fill), 13 obsolete
