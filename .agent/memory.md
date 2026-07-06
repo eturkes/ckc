@@ -477,8 +477,18 @@ aggressively; full pre-consolidation text in git history.
   via `parse_reference` since `route_metrics` needs `&[ReferenceEntry]`, not raw bytes). The chain head
   swapped the hardcoded `assemble_report(…, None)` for a `match (route_metrics, agreed.as_ref())` →
   `Some(ModelRunSections{route_diagnostics, route_metrics, baseline_pipeline_id, model_identity})` ONLY
-  when metrics present AND a `Some` agreed identity; either absent → `None` (a degraded model route that
-  attested no identity degrades to None, NOT a panic — mirrors the manifest's graceful omit). report_ja.md
+  when metrics present AND a `Some` agreed identity; either absent → `None`, no panic. CODEX-C1 CORRECTION:
+  a degraded model route (`model_routes` non-empty, `agreed`=None) does NOT mirror the manifest — the §9
+  manifest still emits that run's setup hashes (test_source/reference/schema/prompt) with `model_identity`=None
+  (gates only on `model_routes.is_empty()`), while the report drops ALL sections (`ModelRunSections` requires
+  a non-optional identity) → report vs manifest DIFFER on a degraded route BY DESIGN, a §7.x view declining to
+  attribute results to an unknown evaluator (flag for M2 review: is an identity-less report representation
+  wanted?). Fix: gate `model_route_metrics` on `agreed.is_some()` at the call site — a degraded route now
+  SKIPS the reference parse whose result the `None` arm discards (pre-fix a malformed-but-readable
+  `expected_outcomes` sank a degraded run that `assemble_report(None)` completes; `manifest_inputs` only
+  raw-reads+hashes that file, never parses). LOW-SEV DEFERRED: `model_route_metrics` + `manifest_inputs`
+  independently re-read experiments+reference on an identity route (benign TOCTOU on static committed files
+  in one synchronous stage; threading one read couples the two fns → future factoring). report_ja.md
   lands beside report_en.md in the SHARED stage (BOTH M1 + M2) via `shell.write_under` → lineage/manifest-
   UNtracked, so every M1 byte-pin (report.json/manifest.json/replay_manifest.json/lineage_index.json/
   report_en.md) stays byte-identical; only the exhaustive file-SET listings moved (3 updated: run.rs M2

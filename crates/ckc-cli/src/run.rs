@@ -2136,12 +2136,25 @@ fn report_processing_stage(
         .map(|rr| (rr.pipeline_id.clone(), rr.ledger.as_slice()))
         .collect();
 
-    let landed = model_route_metrics(root, resolved, route_runs, model_routes)
+    // Report model sections need an attested identity — `ModelRunSections` carries a
+    // non-optional one — so score the per-route §7.3 metrics only when the routes
+    // agreed on an identity. A model route that attested none yields a section-less
+    // report, whereas the §9 manifest still records that run's setup hashes with a
+    // null identity (it gates only on `model_routes` non-empty): the two views differ
+    // on a degraded route by design, a §7.x view declining to attribute results to an
+    // unknown evaluator. Gating on `agreed` here also skips a reference parse the
+    // `None` arm would discard — whose failure would otherwise sink a run that
+    // `assemble_report(None)` completes.
+    let route_metrics = match agreed.as_ref() {
+        Some(_) => model_route_metrics(root, resolved, route_runs, model_routes),
+        None => Ok(None),
+    };
+
+    let landed = route_metrics
         .map_err(|reason| fail(format!("report model sections: {reason}")))
         .and_then(|route_metrics| {
-            // Model sections are all-or-nothing: metrics present AND the routes
-            // attested one identity. A degraded model route (no agreed identity)
-            // degrades to `None`, mirroring the manifest's graceful omit.
+            // Sections are all-or-nothing: built only when the metrics and the agreed
+            // identity are both present (the gate above pairs them).
             let model_run = match (route_metrics, agreed.as_ref()) {
                 (Some(metrics), Some(model_identity)) => Some(ModelRunSections {
                     route_diagnostics: &route_diagnostics,
