@@ -21,7 +21,7 @@ standing rule); retired wip artifacts remain in git history as provenance only.
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
-## M2 multi-hop PoC — plan 2a4f03d
+## M2 multi-hop PoC — plan 2a4f03d — accept m2
 
 Scope = SPEC §9: experiment 1's minimal pair on this laptop. A weak local model translates the
 M1 test sources two ways — `route.direct_smt` (model emits SMT-LIB directly, the baseline) versus
@@ -345,11 +345,7 @@ fail-closes non-JSON constraints; identity probe re-confirmed live this session.
 - [x] run-m2.2c: recorded-run battery tests/recorded_run.rs — census/§9/re-render/replay-matched
   pins over committed cassettes (identity by equality; attestation = exact 5-head+3-tail set).
   88% 176K/200K
-- [ ] acceptance-m2: §9 acceptance. Verify the §9 themes against the recorded run — both routes
-  execute over identical locked inputs (`exp.m2_multihop`); recorded model I/O replays byte-stably
-  (runtime absent); raw rows before the baseline-delta table; expected conflict/no-conflict per
-  reference for accepted translations; the bilingual report renders deterministically from
-  report.json; §0 vocabulary holds. Tag `accept/m2`. [§9 scopes acceptance to faithful measurement,
-  NOT a required result sign — a null/negative delta is a valid PoC outcome.] Reading: all M2 artifacts
-  + the §9 acceptance themes. Gate: all six themes pass on the recorded run; `ckc replay` byte-matches;
-  tag `accept/m2`.
+- [x] acceptance-m2: all six §9 themes pass against recorded run m2accept (evidence runs local;
+  zero accepted translations = honest weak-baseline census, theme 4 vacuous there + non-vacuous via
+  golden-cassette scoring tests; wording slot faithfully empty); replay matched; tag accept/m2.
+  77% 153K/200K

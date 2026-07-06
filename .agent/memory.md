@@ -813,6 +813,17 @@ aggressively; full pre-consolidation text in git history.
   (`schemas/*`, `registry/prompts/*.txt`) are opened by `registry check` ONLY — replay-mode
   `ckc run` reads just their DECLARED registry hashes (§9 slots) → the battery copies them in +
   gates on a `registry check` invocation over its root, the payload-byte drift pin (codex M2.2c).
+- Acceptance-driver pattern (acceptance-m2; reuse at M3+ acceptance): one scratchpad Python driver
+  runs the evidence runs + every deny-Read artifact check (paths baked into the script, never on
+  the command line). Facts it settled: two runs differing only in `--out` differ EXACTLY in
+  {manifests: the `--out` token; events.jsonl: timing fields + `run_id` = the `--out` basename},
+  all other landed bytes byte-equal — that A/B twin + `ckc replay` (exit 0, `matched`) = the
+  byte-stability theme; running one twin under a bogus `CKC_MODEL_COMMAND` override functionally
+  proves replay never invokes the runtime (completes identically). A §0-vocabulary check keys on
+  closed-set conformance + §15-gated-claim ABSENCE + the prose metrics lead, never on label
+  presence: `wording` is row-derived (findings/no-conflict rows), so a zero-accepted-translation
+  run renders `wording: none.` faithfully — asserting the label there would demand fabricated
+  findings.
 
 ## Runtime
 
