@@ -3815,13 +3815,16 @@ processing_stages:
 
     // run-m2.1d5b — two-run determinism over the model-route run. The same
     // locked inputs (`exp.m2_multihop`, the replayed golden cassettes) execute
-    // twice into two out dirs: every landed artifact is byte-equal across the
-    // runs, the §5/§4.6 provenance manifests agree once the one run-specific
-    // `--out` path token is normalized (`land_record` writes plain canonical
-    // records — no self-hash — so `manifest_inputs.command`'s embedded
-    // `out_dir.display()` is their sole non-deterministic bytes), and the event
-    // stream agrees on its non-timing projection (only the §4.6 wall-clock
-    // fields started_at/ended_at/duration_ms may differ run to run).
+    // twice into two out dirs — `executed` fixes run_id, so the two runs differ
+    // only in their out-path prefix: every landed artifact is byte-equal across
+    // the runs, the §5/§4.6 provenance manifests agree once the run-specific out
+    // path is normalized wherever it appears (`land_record` writes plain
+    // canonical records — no self-hash — so `manifest_inputs.command`'s embedded
+    // `out_dir.display()` is the manifests' sole non-deterministic bytes; the
+    // tempdir path holds no char the canonical string encoder escapes, so a raw
+    // substring replace matches its on-disk bytes), and the event stream agrees
+    // on its non-timing projection (only the §4.6 wall-clock fields
+    // started_at/ended_at/duration_ms may differ run to run).
     #[test]
     fn m2_route_run_is_deterministic_across_two_runs() {
         let root = tempfile::tempdir().unwrap();
@@ -3859,7 +3862,12 @@ processing_stages:
 
         // The walk reached the run-level tails and both route subtrees, so the
         // byte-equal / manifest-normalize / events arms below run non-vacuously.
-        for want in ["trace_bundle.json", "manifest.json", "logs/events.jsonl"] {
+        for want in [
+            "trace_bundle.json",
+            "manifest.json",
+            "replay_manifest.json",
+            "logs/events.jsonl",
+        ] {
             assert!(paths.iter().any(|p| p == want), "walk covers {want}");
         }
         for route in ["routes/pipe.m2_single_ir/", "routes/pipe.m2_direct_smt/"] {
@@ -3869,7 +3877,8 @@ processing_stages:
             );
         }
 
-        // Normalize the one `--out` token before comparing the two manifests.
+        // Normalize the run-specific out path (wherever it appears) before
+        // comparing the two manifests.
         let norm = |bytes: Vec<u8>, out: &Path| -> Vec<u8> {
             String::from_utf8(bytes)
                 .unwrap()
@@ -3946,9 +3955,6 @@ processing_stages:
             "run-level tails emit no census event",
         );
 
-        // model_fill counters: single_ir draws one sample per document (1/0); direct
-        // draws two per group, one per overlap/deontic role summed onto the one
-        // group event (2/0).
         let fills = |pid: &str, step: &str| -> Vec<&EventRecord> {
             events
                 .iter()
@@ -3957,13 +3963,43 @@ processing_stages:
                 })
                 .collect()
         };
-        let single_fills = fills("pipe.m2_single_ir", "processing_stage.m2.model_fill");
-        assert_eq!(
-            single_fills.len(),
-            3,
-            "one single_ir model_fill per document"
-        );
-        for e in single_fills {
+
+        // Per-stage census decomposition: each declared stage emits one event per
+        // unit it heads — documents for extract/segment/model_fill(_smt), groups
+        // for assemble/compile/verify(_smt). The 16 and 10 pipeline products above
+        // hold only if these per-stage factors do; a regression trading one stage's
+        // events for another's could preserve a pipeline total but not this table.
+        for (step, n) in [
+            ("processing_stage.m1.extract", 3),
+            ("processing_stage.m1.segment", 3),
+            ("processing_stage.m2.model_fill", 3),
+            ("processing_stage.m2.assemble", 3),
+            ("processing_stage.m1.compile", 2),
+            ("processing_stage.m1.verify", 2),
+        ] {
+            assert_eq!(
+                fills("pipe.m2_single_ir", step).len(),
+                n,
+                "single_ir stage {step}"
+            );
+        }
+        for (step, n) in [
+            ("processing_stage.m1.extract", 3),
+            ("processing_stage.m1.segment", 3),
+            ("processing_stage.m2.model_fill_smt", 2),
+            ("processing_stage.m2.verify_smt", 2),
+        ] {
+            assert_eq!(
+                fills("pipe.m2_direct_smt", step).len(),
+                n,
+                "direct stage {step}"
+            );
+        }
+
+        // model_fill resource_counters (the .1d3a/.1d4a contract): single_ir draws
+        // one sample per document (1/0); direct draws two per group, one per
+        // overlap/deontic role summed onto the one group event (2/0).
+        for e in fills("pipe.m2_single_ir", "processing_stage.m2.model_fill") {
             assert_eq!(
                 e.resource_counters,
                 vec![
@@ -3972,9 +4008,7 @@ processing_stages:
                 ],
             );
         }
-        let direct_fills = fills("pipe.m2_direct_smt", "processing_stage.m2.model_fill_smt");
-        assert_eq!(direct_fills.len(), 2, "one direct model_fill per group");
-        for e in direct_fills {
+        for e in fills("pipe.m2_direct_smt", "processing_stage.m2.model_fill_smt") {
             assert_eq!(
                 e.resource_counters,
                 vec![
@@ -3987,7 +4021,8 @@ processing_stages:
         // The M1 baseline is a separate single-route run whose 19-event census
         // stands unchanged: its execute() body emits every stage event, the
         // trace/report tails included, unlike the suppressed M2 tails.
-        let (_, m1_events, _, _, _m1_tmp) = executed(&repo_root(), "exp.m1_scaffold");
+        let (_, m1_events, m1_diag, _, _m1_tmp) = executed(&repo_root(), "exp.m1_scaffold");
+        assert!(m1_diag.is_empty(), "M1 baseline runs clean");
         assert_eq!(m1_events.len(), 19, "M1 baseline census unchanged");
     }
 
