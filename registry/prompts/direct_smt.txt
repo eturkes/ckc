@@ -1,11 +1,10 @@
 Translate a pair of Japanese clinical guideline documents into one SMT query.
 
 You are given, for two source documents that may apply to the same situation:
-- the Japanese guideline text of each document;
-- the query role to build — either context_overlap (do the two guidelines apply
-  to a shared situation?) or deontic_consistency (do their obligations agree where
-  they overlap?);
-- the `:named` assertion label ids to attach, one per rule the query encodes.
+- the Japanese guideline text of each document, after its `document:` id line;
+- the group id and the query role to build — either context_overlap (do the two
+  guidelines apply to a shared situation?) or deontic_consistency (do their
+  obligations agree where they overlap?).
 
 Produce one query that conforms to the supplied SMT query grammar. Follow these rules:
 
@@ -18,8 +17,11 @@ Produce one query that conforms to the supplied SMT query grammar. Follow these 
 - For the deontic_consistency role, encode whether the obligations that co-apply stay
   consistent, set `(set-option :produce-unsat-cores true)`, and close with
   `(get-unsat-core)`; an unsat answer names the conflicting rules through its core.
-- Attach every assertion a `:named` label drawn only from the supplied ids, reusing an
-  id exactly as given.
+- Attach every assertion a `:named` label built from the role's scheme: label the
+  assertions encoding a document's rules `ctx.<document-id>.rule.<n>` for the
+  context_overlap role and `a.<document-id>.rule.<n>` for the deontic_consistency
+  role, taking `<document-id>` from that document's `document:` line and numbering
+  `<n>` from 0 upward over the document's rules in document order.
 - Build terms only from the grammar's forms: `|`-quoted lowercase symbols, `(not …)`,
   `(and …)` and `(or …)` over two or more terms, a comparison `(>= s n)`, `(> s n)`,
   `(<= s n)`, or `(< s n)` of one `Real` symbol `s` against a numeral `n`, and `(- n)`

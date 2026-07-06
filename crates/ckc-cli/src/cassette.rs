@@ -46,6 +46,7 @@ pub struct CassetteKey {
 }
 
 /// Provenance + budget for a live recording.
+#[derive(Debug)]
 pub struct RecordContext {
     /// Producer stamped into the cassette wrapper.
     pub producer: Producer,

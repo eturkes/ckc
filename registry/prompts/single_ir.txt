@@ -1,22 +1,28 @@
 Translate one Japanese clinical guideline document into a single ClinicalIR record.
 
-You are given, for one source document:
-- the Japanese guideline text;
-- the segment ids and region ids that the deterministic upstream produced for it;
-- the controlled lexicon: the only terminology systems, concept codes, action kinds,
-  action targets, and context variables you may name.
+You are given, for one source document, these input lines followed by the guideline text:
+- `document:` — the document id.
+- `segment:` — one line per upstream segment: its id, its kind, and the region ids it
+  covers.
+- `regions:` — every evidence region id of the document.
+- `system:` — the terminology system id.
+- `concept:` — one line per lexicon concept code; a `var=` mark names the context
+  variable that measures the concept.
+- `action:` — one line per action kind.
 
 Produce one JSON object that conforms to the supplied ClinicalIR schema. Follow these rules:
 
-- Fill every closed-vocabulary field (binding `system` and `code`, each `alternatives`
-  entry, action `kind` and `target`, statement concept, context `var`) with a value drawn
-  only from the supplied lexicon. Always keep every code, action, and variable you name
-  within that supplied vocabulary.
+- Draw every closed-vocabulary value from the lines above: binding `system` from the
+  `system:` line; binding `code`, each `alternatives` entry, statement concepts, and
+  action `target` values from the `concept:` lines; action `kind` values from the
+  `action:` lines; context `var` values from the `var=` marks. The remaining enumerated
+  fields — binding status, modality, strength, certainty — take their values from the
+  schema's own enumerations.
 - Record each terminology binding, clinical statement, action, context atom, quantity
   interval, and exception clause the guideline expresses.
 - Cite evidence only by the supplied ids: place segment ids in `source_segment_ids` and
-  region ids in `region_ids`, and use only ids that appear in the supplied lists. Always
-  cite an id that already appears in those lists.
+  region ids in `region_ids`, using only ids that appear in the `segment:` and
+  `regions:` lines.
 - Give each generated id (`binding_id`, `statement_id`, `exception_id`) a fresh,
   grammar-valid identifier.
 - Write every numeric interval bound as an integer inside the schema's range.

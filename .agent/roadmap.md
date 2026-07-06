@@ -286,24 +286,30 @@ dialect near the committed one (introspected live; wiring + on-device verificati
 exploratory env work — the dialect transform recipe, device notes, and output-token-cap sizing are
 banked in runtime.local.md, keeping this committed file engine-neutral); the wrapper today
 fail-closes non-JSON constraints; identity probe re-confirmed live this session.
-- [ ] run-m2.2a: prompt-scaffold completion + record-mode byte-verify (deterministic, runtime-absent).
-  Composers supply what the templates promise: `single_ir_prompt` gains `segments:&[ClinicalSegment]`
-  + `regions:&[EvidenceRegion]` + `lexicon:&Lexicon` → emit per-segment `segment: <id> kind=<kind>
-  regions=<ids>` lines, a `regions: <ids>` line, and the lexicon vocabulary block (system +
-  concept_ids w/ interval var ids + action_ids) between the document line and the spans; both
-  TEMPLATES resynced to promise exactly the supplied inputs (direct_smt.txt adds the ROLE-SENSITIVE
-  labeling scheme — overlap `ctx.<document-id>.rule.<n>`, deontic `a.<document-id>.rule.<n>` — and
-  drops "label ids supplied"; single_ir.txt names the supplied lines with the promise↔supply map
-  explicit: action targets = concept ids, context variables = the interval vars, and the
-  modality/certainty/strength/status enums ride the schema constraint — deliberately NOT
-  prompt-supplied, so the template promises no vocabulary beyond the composed block); prompts.yaml
-  re-pins the two template_hash values; `model_ms_per_call: 600000` lands in exp.m2_multihop budget
-  + `Resolved.model_ms_per_call` + `build_route_record` requires it and swaps `ctx.budget` off the
-  solver key; pre-write byte-verify in build_route_record (banked above). Tests: updated composer
-  pins (fixtures keep array-order≠reading_order); budget-key present/absent; byte-verify
-  mismatch→Err; churn sites banked above — re-bless the m2 loop test's §9 `prompt_template_hash`
-  literal + the resolve budget-vector pin, add the field to both test `Resolved` literals. Gate:
-  fmt/clippy/tests/doc-lint; touched-file engine-neutral grep.
+- [x] run-m2.2a: prompt-scaffold completion + record-mode byte-verify (deterministic, runtime-absent).
+  LANDED: `single_ir_prompt(template, doc_id, graph, segments: &[ClinicalSegment], lexicon: &Lexicon)`
+  emits document line → per-segment `segment: <id> kind=<kind> regions=<ids>` → `regions: <ids>` →
+  `system:` / `concept:` (`var=<interval var>` marks) / `action:` lexicon block → reading_order spans;
+  DEVIATION from the banked signature: region ids read from `graph.regions`, no separate
+  `regions:&[EvidenceRegion]` param — the graph carries the exact set the accept closure grounds
+  against, a separate param = supply-vs-grounding divergence risk; direct composer unchanged (the
+  `:named` scheme is template TEXT). Templates resynced (single_ir promise↔supply map with the
+  schema-enum carve-out; direct role-sensitive `ctx.`/`a.` label scheme replacing the label-list
+  promise); prompts.yaml re-pinned. FOUND: the committed ClinicalIR schema already bakes the
+  lexicon-derived enums (ConceptCode/ActionKind/IntervalVar/TerminologySystem + BindingStatus/
+  Direction/Strength/Certainty) → the prompt vocabulary block informs, the schema enforces, both from
+  one committed lexicon — consistent by construction. `model_ms_per_call: 600000` in exp.m2_multihop
+  + `Resolved.model_ms_per_call: Option<u64>` unconditional read; NEW adapter-free
+  `RecordParts`/`build_record_parts` split out of `build_route_record` (selection / template load /
+  byte-verify / budget testable runtime-absent) — requires the budget key (None→Err naming it), swaps
+  `ctx.budget` off the solver key, and byte-verifies template bytes vs `template_hash` (inline arm
+  included) + constraint file bytes vs `schema_hash`, closing f2's deferred codex item. Tests:
+  scaffold composer pin (spans sorted, scaffold lines pinned pass-through order); 4×
+  `build_record_parts_*` (committed-bytes happy path both routes / budget-absent / template-drift /
+  schema-drift); resolve pins (4-entry budget vector, `Some(600_000)` per view, M1 `None`); §9
+  `prompt_template_hash` re-blessed from observed (other 3 hashes unchanged — cross-consistent). Gate:
+  290+174 pass/7 ignored, fmt/clippy clean, rustdoc 17 (baseline), touched-file engine-neutral grep
+  CLEAN. 86% 171K/200K (compacted at close-out bookkeeping; close finished 38% post-compact)
 - [ ] run-m2.2b: LIVE record + committed experiment cassettes (gate: run-m2.2a landed). Env wrapper
   first (machine-local, outside git): translate the committed grammar to the engine's constraint
   dialect and wire that slot, staying fail-closed on anything else; verify live against

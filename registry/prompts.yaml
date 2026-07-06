@@ -1,8 +1,8 @@
 - id: prompt.single_ir
   path: registry/prompts/single_ir.txt
-  template_hash: sha256:fbbea8a68addcc430003ad95bfd7e1ca5b39a532641ccb76b812fc196a5c7fd9
+  template_hash: sha256:1077fd3d5ab9f4a35819b36c88a783b09d829cf94ba76d75498e3e70ccba06cd
   route: route.single_ir
 - id: prompt.direct_smt
   path: registry/prompts/direct_smt.txt
-  template_hash: sha256:296063f9750b64ecdba47e07669f5a90ef938794de5803c0813cf3cdc3aae07d
+  template_hash: sha256:8e1fbbed89f60889ef6188e48d73cc86a22fe589e11d6f699528ecd25a666393
   route: route.direct_smt

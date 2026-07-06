@@ -246,8 +246,10 @@ aggressively; full pre-consolidation text in git history.
   `RecordSetup` (adapter probe + `validate_model_registry`) ONCE `if record` else `None`, then per-view
   `build_route_record` (f1 select→template/constraint/`RecordContext`) feeds both fills' new
   `Option<&RouteRecord>` → `FillSource::Record` (type-enforced; Record arm live-capable via `CassetteStore::record`→`adapter.invoke`, not live-exercised in f2); §9 manifest fields landed
-  e-B. DEFERRED (respec'd into run-m2.2a/b/c): pre-write BYTE-verify → 2a, live record exercise → 2b,
-  replay.rs model-artifact coverage → 2c (byte-verify detail: before a cassette is written, confirm the selected template/schema bytes hash to the registry-declared `template_hash`/`schema_hash`; the run path TRUSTS declared hashes, `registry check` = today's sole byte-verifier, and `build_route_record` already HAS the bytes → the natural gate; codex-review f2 low-sev, deferred). f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
+  e-B. Pre-write BYTE-verify LANDED 2a — `build_record_parts` hashes the SELECTED template/schema bytes
+  against the registry-declared `template_hash`/`schema_hash` before any record (the record path no
+  longer trusts declared hashes; `registry check` remains the replay-path verifier). DEFERRED
+  (respec'd into run-m2.2b/c): live record exercise → 2b, replay.rs model-artifact coverage → 2c. f2 RULING: the respec's test-(6a) `set_var(CKC_MODEL_COMMAND, bogus)` no-probe assert is
   void under `#![forbid(unsafe_code)]` (set_var forbidden, above) → the no-probe property is STRUCTURAL
   (record_setup built only `if record`, else `None` → a replay run never constructs `ModelAdapter`),
   proven by threading `false` through the green `m2_route_loop_lands_both_routes_namespaced`; the flag
@@ -762,13 +764,27 @@ aggressively; full pre-consolidation text in git history.
   ledger codes per route (§4.3-sorted both levels); the M2-member expected values in tests tie to
   the .1c byte-pinned populated_report fixture (`m2_route_metrics()`/`baseline_model_identity()`
   shared helpers).
-- Record-mode prompt composition (run-m2.1f1, run.rs above `manifest_inputs`, `#[allow(dead_code)]`
-  until f2 consumes): `select_record_{schema,prompt}` key by `id.as_str()`
-  (SingleIr→clinical_ir/single_ir, DirectSmt→smt_query/direct_smt, M1Layered→None — DEFENSIVE vs
-  `manifest_inputs`' Err on M1Layered). Prompt FORMAT (f2 threads verbatim; run-m2.2a completes the
-  grounding scaffold — segments/regions/lexicon supply + the direct labeling-scheme wording): `single_ir_prompt` = template ++ `document: <doc_id>` ++ spans; `direct_smt_prompt` =
-  template ++ `group: <gid>` ++ `role: <role>` ++ per-member(`document: <doc_id>` ++ spans); spans
-  sorted by `reading_order` (shared `reading_order_text` helper), `\n`-joined.
+- Record-mode prompt composition (run-m2.1f1 selectors; run-m2.2a completed the grounding scaffold —
+  format byte-pinned in `single_ir_prompt_composes_grounding_scaffold_and_orders_spans`, read the test
+  not a copy): `select_record_{schema,prompt}` key by `id.as_str()` (SingleIr→clinical_ir/single_ir,
+  DirectSmt→smt_query/direct_smt, M1Layered→None — DEFENSIVE vs `manifest_inputs`' Err on M1Layered).
+  `single_ir_prompt(template, doc_id, graph, segments, lexicon)` emits document / per-segment
+  `segment: <id> kind=<k> regions=<r,..>` / `regions:` / `system:` / `concept: <id>[ var=<v>]` /
+  `action:` scaffold lines in artifact/file order (deterministic upstream §4.3 — no re-sort), then
+  reading_order-sorted spans (shared `reading_order_text`); regions read from `graph.regions`, NOT a
+  separate param — the exact set the accept closure grounds against (single source of truth).
+  `direct_smt_prompt` composes NO label list — the role-sensitive `:named` scheme is TEMPLATE TEXT
+  (M2-plan respec sub-bullet holds scheme + rationale). Vocabulary consistent BY CONSTRUCTION:
+  committed `clinical_ir.schema.json` bakes the lexicon-derived enums (concept codes / action kinds /
+  interval vars / terminology system + closed enums) → scaffold informs, schema ENFORCES; a lexicon
+  edit re-exports the schema via the existing bless+drift guard. Record assembly: adapter-FREE
+  `build_record_parts(root, schemas, prompts, resolved) → RecordParts{template, constraint, ctx}` =
+  select → require `model_ms_per_call` (record-only) → load template (inline|path) → pre-write
+  byte-verify → ctx; `build_route_record` = thin parts+`&setup.adapter` zip (`ModelAdapter::new()`
+  probes a subprocess → keep it OUT of the testable fn). Template⇄composer CONTRACT: a template's
+  given-list enumerates exactly what its composer supplies → ANY template edit re-pins prompts.yaml
+  AND the §9 blessed `prompt_template_hash` literal (the m2 loop test catches it; verify the other 3
+  §9 hashes stay put as the cross-consistency check).
 - RESPEC-COMPLETENESS: when a unit must CONSTRUCT a type, bank its CONSTRUCTOR + a mirror call site,
   not just a field list — the f-respec banked `SourceTextSpan`'s fields but not `::derive` /
   report.rs `graph` helper → cost a targeted source_linkage.rs read at f1 impl. Fixtures build

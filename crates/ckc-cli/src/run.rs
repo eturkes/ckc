@@ -45,10 +45,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ckc_core::{
-    ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, CorpusEntry,
-    DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle, ModelIdentity,
-    Normalization, Origin, Outcome, PipelineEntry, Producer, PromptEntry, RunPlan, SchemaEntry,
-    SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
+    ArtifactWrapper, Candidates, CanonError, CanonRead, Canonical, ClinicalIr, ClinicalSegment,
+    CorpusEntry, DataClass, DiagnosticCode, DiagnosticRecord, EvidenceStatus, Hash, Id, IrBundle,
+    ModelIdentity, Normalization, Origin, Outcome, PipelineEntry, Producer, PromptEntry, RunPlan,
+    SchemaEntry, SegmentIr, SolverIdentity, SourceDocumentGraph, TestSourceGroup, assemble,
     canonical_payload_bytes, canonical_sort_key, canonicalization_policy_hash, content_hash,
     hash_bytes, parse_candidates, parse_corpora, parse_experiments, parse_prompts, parse_reference,
     parse_schemas, read_strict_canonical, validate_model_registry,
@@ -185,6 +185,13 @@ const MODEL_REPAIR_LIMIT_KEY: &str = "model_repair_limit";
 /// promise samples the recorded run never draws (k-sample convergence waits
 /// on a sampling config, a downstream decision).
 const MODEL_SAMPLE_COUNT_KEY: &str = "model_sample_count";
+
+/// §9 budget key naming the per-invocation model wall-clock cap in
+/// milliseconds — the recording counterpart of [`SOLVER_BUDGET_KEY`].
+/// [`resolve`] reads it unconditionally into an `Option`; only a `--record`
+/// run requires it ([`build_record_parts`] fails loudly without it), since
+/// replay never invokes the runtime.
+const MODEL_MS_PER_CALL_KEY: &str = "model_ms_per_call";
 
 /// Run `ckc run` rooted at `root` (the invocation working directory: §3
 /// anchors `registry/` and corpus paths at the repository root). Evidence,
@@ -727,6 +734,12 @@ struct Resolved {
     /// which spends no repairs. run-m2.1d3/.1d4 read it in the route loop.
     #[allow(dead_code)]
     repair_limit: Option<u32>,
+    /// §9 `model_ms_per_call` budget value, read unconditionally from the
+    /// experiment budget map (`None` when undeclared). Required only at
+    /// record time — [`build_record_parts`] turns `None` into a loud
+    /// command-scope failure; a replay run never invokes the runtime, so
+    /// M1 and replay bindings run without the key.
+    model_ms_per_call: Option<u64>,
     /// Whether this view's pipeline is the experiment's §7.3 delta baseline
     /// (the M1 legacy binding's single view is its own baseline).
     /// run-m2.1d5's tails read it.
@@ -804,6 +817,12 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
         )]));
         return None;
     };
+    // §9 model-invocation cap: read unconditionally (any binding may declare
+    // it); only `--record` requires it, at `build_record_parts`.
+    let model_ms_per_call = experiment
+        .budget
+        .get(&static_id(MODEL_MS_PER_CALL_KEY))
+        .copied();
     // §9 model-route budget: a binding that resolves a model route must cap
     // the repair loop explicitly, and a declared sample count other than 1
     // would promise draws single-draw replay never makes.
@@ -909,6 +928,7 @@ fn resolve(root: &Path, experiment_id: &Id, shell: &mut Shell) -> Option<Vec<Res
                     RouteShape::M1Layered => None,
                     RouteShape::SingleIr | RouteShape::DirectSmt => model_repair_limit,
                 },
+                model_ms_per_call,
                 plan: plan.clone(),
                 toolchain_manifest_hash: toolchain_manifest_hash.clone(),
             })
@@ -1494,7 +1514,15 @@ fn single_ir_fill(
     // Compose the record prompt outside the timed interval (the M2.7 clock
     // boundary): pure setup stays out of the fill's measured span. A replay run
     // composes nothing and sends `FillSource::Replay`.
-    let record_prompt = record.map(|r| single_ir_prompt(&r.template, &doc_id, &source.payload));
+    let record_prompt = record.map(|r| {
+        single_ir_prompt(
+            &r.template,
+            &doc_id,
+            &source.payload,
+            &segments.payload.segments,
+            lexicon,
+        )
+    });
     let clock = processing_stage_clock();
     let source_fill = match record.zip(record_prompt.as_deref()) {
         Some((r, prompt)) => FillSource::Record {
@@ -2432,19 +2460,59 @@ fn reading_order_text(graph: &SourceDocumentGraph) -> Vec<String> {
     spans.into_iter().map(|s| s.raw_text.clone()).collect()
 }
 
-/// Compose the first-draft single_ir record prompt: the route `template`, a
-/// document-id line, then the document's guideline text in `reading_order`,
-/// newline-joined. run-m2.2 refines the wording against a live recording.
-fn single_ir_prompt(template: &str, doc_id: &Id, graph: &SourceDocumentGraph) -> String {
+/// Compose the single_ir record prompt: the route `template`, a document-id
+/// line, the grounding scaffold — one `segment:` line per upstream segment
+/// (id, kind, covered region ids), a `regions:` line naming every evidence
+/// region id (read from `graph.regions`, the same set the accept closure
+/// grounds against), and the lexicon vocabulary block (`system:` /
+/// `concept:` with `var=` interval-variable marks / `action:` lines) — then
+/// the document's guideline text in `reading_order`, newline-joined. The
+/// supplied lines are exactly the template's promised inputs
+/// (`registry/prompts/single_ir.txt`); the enumerated fields the template
+/// leaves to the schema (binding status, modality, strength, certainty)
+/// stay unsupplied. Deterministic: every block rides committed-artifact
+/// order (segments/regions as landed, lexicon in file order, spans sorted
+/// by `reading_order`).
+fn single_ir_prompt(
+    template: &str,
+    doc_id: &Id,
+    graph: &SourceDocumentGraph,
+    segments: &[ClinicalSegment],
+    lexicon: &Lexicon,
+) -> String {
+    let joined = |ids: &[Id]| ids.iter().map(Id::to_string).collect::<Vec<_>>().join(",");
     let mut lines = vec![template.to_owned(), format!("document: {doc_id}")];
+    for segment in segments {
+        lines.push(format!(
+            "segment: {} kind={} regions={}",
+            segment.segment_id,
+            segment.kind.as_str(),
+            joined(&segment.region_ids)
+        ));
+    }
+    let region_ids: Vec<Id> = graph.regions.iter().map(|r| r.region_id.clone()).collect();
+    lines.push(format!("regions: {}", joined(&region_ids)));
+    lines.push(format!("system: {}", lexicon.system));
+    for concept in &lexicon.concepts {
+        lines.push(match &concept.interval {
+            Some(interval) => format!("concept: {} var={}", concept.concept_id, interval.var),
+            None => format!("concept: {}", concept.concept_id),
+        });
+    }
+    for action in &lexicon.actions {
+        lines.push(format!("action: {}", action.action_id));
+    }
     lines.extend(reading_order_text(graph));
     lines.join("\n")
 }
 
-/// Compose the first-draft direct_smt record prompt for one verifier `role`
+/// Compose the direct_smt record prompt for one verifier `role`
 /// (`overlap`/`deontic`) of group `gid`: the route `template`, group and role
-/// lines, then each member's document-id line followed by its guideline text in
-/// `reading_order`, newline-joined. run-m2.2 refines the wording.
+/// lines, then each member's document-id line followed by its guideline text
+/// in `reading_order`, newline-joined. The template supplies the rest
+/// in-text: the role-sensitive `:named` label scheme derives every label
+/// from a member's `document:` id plus a rule number, so the composer sends
+/// no label list.
 fn direct_smt_prompt(
     template: &str,
     gid: &Id,
@@ -2524,24 +2592,51 @@ fn build_record_setup(root: &Path, shell: &mut Shell) -> Option<RecordSetup> {
     })
 }
 
-/// Assemble one view's [`RouteRecord`] from the shared record setup: the
-/// route-relevant schema and prompt entry ([`select_record_schema`] /
-/// [`select_record_prompt`], mirroring the §9 manifest want-set), the prompt
-/// template (its `inline` text or the read `path` file), the constraint path,
-/// and the recording context. A missing wanted entry — a layered M1 shape
-/// reaching here, or a registry gap [`validate_model_registry`] did not catch —
-/// fails loudly (`Err`), never a silent replay. The `path` joins are safe:
-/// [`build_record_setup`] validated every path before this.
-fn build_route_record<'a>(
+/// The adapter-free slice of one view's record-mode inputs: what
+/// [`build_record_parts`] assembles and [`build_route_record`] pairs with the
+/// shared adapter borrow. Split out so the deterministic assembly —
+/// selection, template load, byte-verification, budget requirement — is
+/// testable without probing a live runtime.
+#[derive(Debug)]
+struct RecordParts {
+    template: String,
+    constraint: PathBuf,
+    ctx: RecordContext,
+}
+
+/// Assemble one view's adapter-free record inputs: the route-relevant schema
+/// and prompt entry ([`select_record_schema`] / [`select_record_prompt`],
+/// mirroring the §9 manifest want-set), the prompt template (its `inline`
+/// text or the read `path` file), the constraint path, and the recording
+/// context. Failures are loud (`Err`), never a silent replay: a missing
+/// wanted entry — a layered M1 shape reaching here, or a registry gap
+/// [`validate_model_registry`] did not catch; a missing `model_ms_per_call`
+/// budget (recording invokes the runtime, so the cap is required here even
+/// though replay ignores it); or a byte-verification miss. The
+/// byte-verification closes the declared-hash trust gap before any cassette
+/// records against those hashes: the selected template bytes must hash to
+/// the entry's `template_hash` and the constraint file bytes to the entry's
+/// `schema_hash` — `registry check` is otherwise the sole byte-verifier, and
+/// a recording made against drifted bytes would stamp a hash its inputs
+/// never had. The `path` joins are safe: [`build_record_setup`] validated
+/// every path before this.
+fn build_record_parts(
     root: &Path,
-    setup: &'a RecordSetup,
+    schemas: &[SchemaEntry],
+    prompts: &[PromptEntry],
     resolved: &Resolved,
-) -> Result<RouteRecord<'a>, String> {
+) -> Result<RecordParts, String> {
     let shape = resolved.shape;
-    let schema = select_record_schema(&setup.schemas, shape)
+    let schema = select_record_schema(schemas, shape)
         .ok_or_else(|| format!("record: no committed schema for route shape {shape:?}"))?;
-    let prompt = select_record_prompt(&setup.prompts, shape)
+    let prompt = select_record_prompt(prompts, shape)
         .ok_or_else(|| format!("record: no committed prompt for route shape {shape:?}"))?;
+    let budget_ms = resolved.model_ms_per_call.ok_or_else(|| {
+        format!(
+            "record: experiment {} declares no {MODEL_MS_PER_CALL_KEY} budget",
+            resolved.plan.experiment_id
+        )
+    })?;
     let template = match (&prompt.inline, &prompt.path) {
         (Some(inline), _) => inline.clone(),
         (None, Some(path)) => std::fs::read_to_string(root.join(path))
@@ -2553,15 +2648,51 @@ fn build_route_record<'a>(
             ));
         }
     };
-    Ok(RouteRecord {
-        adapter: &setup.adapter,
+    let template_hash = hash_bytes(template.as_bytes());
+    if template_hash != prompt.template_hash {
+        return Err(format!(
+            "record: prompt {} template bytes hash {template_hash}, declared template_hash {}",
+            prompt.id, prompt.template_hash
+        ));
+    }
+    let constraint = root.join(&schema.path);
+    let schema_bytes = std::fs::read(&constraint)
+        .map_err(|e| format!("record: read schema {}: {e}", schema.path))?;
+    let schema_hash = hash_bytes(&schema_bytes);
+    if schema_hash != schema.schema_hash {
+        return Err(format!(
+            "record: schema {} file bytes hash {schema_hash}, declared schema_hash {}",
+            schema.id, schema.schema_hash
+        ));
+    }
+    Ok(RecordParts {
         template,
-        constraint: root.join(&schema.path),
+        constraint,
         ctx: RecordContext {
             producer: producer(resolved, MODEL_FILL),
             prompt_template_hash: prompt.template_hash.clone(),
-            budget: Duration::from_millis(resolved.budget_ms),
+            budget: Duration::from_millis(budget_ms),
         },
+    })
+}
+
+/// Assemble one view's [`RouteRecord`]: [`build_record_parts`] plus a borrow
+/// of the shared live adapter.
+fn build_route_record<'a>(
+    root: &Path,
+    setup: &'a RecordSetup,
+    resolved: &Resolved,
+) -> Result<RouteRecord<'a>, String> {
+    let RecordParts {
+        template,
+        constraint,
+        ctx,
+    } = build_record_parts(root, &setup.schemas, &setup.prompts, resolved)?;
+    Ok(RouteRecord {
+        adapter: &setup.adapter,
+        template,
+        constraint,
+        ctx,
     })
 }
 
@@ -3074,11 +3205,12 @@ mod tests {
 
     use ckc_core::{
         Action, BindingStatus, CassettePayload, ClinicalStatement, Direction, EventRecord,
-        ExceptionClause, ModelIdentity, Provenance, SourceDocument, SourceTextSpan, Strength,
-        TerminologyBinding, TotalOperationResult, parse_reference, read_jsonl,
+        EvidenceRegion, ExceptionClause, ModelIdentity, Provenance, QuantityInterval, SegmentKind,
+        SourceDocument, SourceTextSpan, Strength, TerminologyBinding, TotalOperationResult,
+        parse_reference, read_jsonl,
     };
 
-    use crate::normalize::clinical_ir;
+    use crate::normalize::{LexiconAction, LexiconConcept, clinical_ir};
 
     /// A test [`Hash`] over a repeated seed character (value is arbitrary — the
     /// record-prompt helpers key on ids and span text, never on these hashes).
@@ -3111,7 +3243,8 @@ mod tests {
     /// A minimal [`SourceDocumentGraph`] for prompt-composition tests: `spans`
     /// carry `(reading_order, raw_text)` in the given (possibly unsorted) array
     /// order, so a composer's `reading_order` sort is observable; the node,
-    /// anchor, and region pools stay empty (a composer reads only `spans`).
+    /// anchor, and region pools start empty (the single_ir scaffold test pushes
+    /// its own regions).
     fn prompt_graph(doc: &str, spans: &[(u64, &str)]) -> SourceDocumentGraph {
         SourceDocumentGraph {
             document: SourceDocument {
@@ -3185,14 +3318,79 @@ mod tests {
         assert!(select_record_prompt(&prompts[..1], RouteShape::DirectSmt).is_none());
     }
 
-    /// [`single_ir_prompt`] emits the template, a document line, then the
-    /// document's spans in `reading_order` — here supplied out of order to
-    /// prove the composer sorts.
+    /// [`single_ir_prompt`] emits the template, a document line, the grounding
+    /// scaffold (segment lines with kind and covered regions, the graph's
+    /// region-id line, the lexicon vocabulary block with `var=` marks only on
+    /// interval concepts), then the document's spans in `reading_order` — the
+    /// spans supplied out of order to prove the composer sorts, the regions
+    /// supplied in non-sorted array order to pin that scaffold lines ride
+    /// artifact order untouched.
     #[test]
-    fn single_ir_prompt_orders_spans_by_reading_order() {
-        let graph = prompt_graph("doc.a", &[(1, "second line"), (0, "first line")]);
-        let prompt = single_ir_prompt("TEMPLATE", &static_id("doc.a"), &graph);
-        assert_eq!(prompt, "TEMPLATE\ndocument: doc.a\nfirst line\nsecond line");
+    fn single_ir_prompt_composes_grounding_scaffold_and_orders_spans() {
+        let mut graph = prompt_graph("doc.a", &[(1, "second line"), (0, "first line")]);
+        graph.regions = ["region.r1", "region.r0"]
+            .map(|r| EvidenceRegion {
+                region_id: static_id(r),
+                node_ids: vec![],
+                span_ids: vec![],
+                anchor_ids: vec![],
+            })
+            .to_vec();
+        let segments = [
+            ClinicalSegment {
+                segment_id: static_id("seg.s0"),
+                kind: SegmentKind::Recommendation,
+                region_ids: vec![static_id("region.r1")],
+            },
+            ClinicalSegment {
+                segment_id: static_id("seg.s1"),
+                kind: SegmentKind::Exception,
+                region_ids: vec![static_id("region.r0"), static_id("region.r1")],
+            },
+        ];
+        let lexicon = Lexicon {
+            system: static_id("lex.test"),
+            content_hash: prompt_hash('c'),
+            concepts: vec![
+                LexiconConcept {
+                    concept_id: static_id("pop.adult"),
+                    surfaces: vec![],
+                    interval: Some(QuantityInterval {
+                        var: static_id("q.age_years"),
+                        ge: Some(18),
+                        gt: None,
+                        le: None,
+                        lt: None,
+                    }),
+                },
+                LexiconConcept {
+                    concept_id: static_id("drug.x"),
+                    surfaces: vec![],
+                    interval: None,
+                },
+            ],
+            actions: vec![LexiconAction {
+                action_id: static_id("act.administer"),
+                surfaces: vec![],
+            }],
+            modality: vec![],
+            certainty: vec![],
+        };
+        let prompt = single_ir_prompt("TEMPLATE", &static_id("doc.a"), &graph, &segments, &lexicon);
+        assert_eq!(
+            prompt,
+            "TEMPLATE\n\
+             document: doc.a\n\
+             segment: seg.s0 kind=recommendation regions=region.r1\n\
+             segment: seg.s1 kind=exception regions=region.r0,region.r1\n\
+             regions: region.r1,region.r0\n\
+             system: lex.test\n\
+             concept: pop.adult var=q.age_years\n\
+             concept: drug.x\n\
+             action: act.administer\n\
+             first line\n\
+             second line"
+        );
     }
 
     /// [`direct_smt_prompt`] emits the template, group and role lines, then each
@@ -3209,6 +3407,107 @@ mod tests {
             prompt,
             "TEMPLATE\ngroup: group.g0\nrole: overlap\ndocument: doc.a\na1\na2\ndocument: doc.b\nb1"
         );
+    }
+
+    /// The committed model registry parsed from the repository root, for
+    /// [`build_record_parts`] tests (the run path loads the same files).
+    fn committed_model_registry() -> (Vec<SchemaEntry>, Vec<PromptEntry>) {
+        let root = repo_root();
+        let schemas =
+            parse_schemas(&std::fs::read_to_string(root.join(SCHEMAS_FILE)).unwrap()).unwrap();
+        let prompts =
+            parse_prompts(&std::fs::read_to_string(root.join(PROMPTS_FILE)).unwrap()).unwrap();
+        (schemas, prompts)
+    }
+
+    /// [`build_record_parts`] over the committed registry byte-verifies clean
+    /// on both model routes: each selected template survives the
+    /// `template_hash` check (so the committed prompt files and
+    /// `registry/prompts.yaml` declare matching bytes), each constraint file
+    /// survives the `schema_hash` check, and the recording context carries
+    /// the declared template hash, the route's model_fill producer, and the
+    /// §9 `model_ms_per_call` budget — not the solver cap.
+    #[test]
+    fn build_record_parts_verifies_committed_bytes_and_budget() {
+        let root = repo_root();
+        let (schemas, prompts) = committed_model_registry();
+
+        let single = build_record_parts(&root, &schemas, &prompts, &single_ir_resolved())
+            .expect("committed single_ir registry bytes verify");
+        let template = std::fs::read_to_string(root.join("registry/prompts/single_ir.txt"))
+            .expect("committed single_ir template");
+        assert_eq!(single.template, template);
+        assert_eq!(
+            single.constraint,
+            root.join("schemas/clinical_ir.schema.json")
+        );
+        assert_eq!(
+            single.ctx.prompt_template_hash,
+            hash_bytes(template.as_bytes())
+        );
+        assert_eq!(single.ctx.budget, Duration::from_millis(600_000));
+        assert_eq!(
+            single.ctx.producer.pipeline_id,
+            static_id("pipe.m2_single_ir")
+        );
+        assert_eq!(
+            single.ctx.producer.pipeline_step_id,
+            static_id("processing_stage.m2.model_fill")
+        );
+
+        let direct = build_record_parts(&root, &schemas, &prompts, &direct_smt_resolved())
+            .expect("committed direct_smt registry bytes verify");
+        assert_eq!(direct.constraint, root.join("schemas/smt_query.grammar"));
+        assert_eq!(direct.ctx.budget, Duration::from_millis(600_000));
+    }
+
+    /// A model-route view without the §9 `model_ms_per_call` budget fails
+    /// [`build_record_parts`] loudly, naming the key — recording invokes the
+    /// runtime, so the cap is required even though replay ignores it.
+    #[test]
+    fn build_record_parts_requires_model_ms_per_call() {
+        let (schemas, prompts) = committed_model_registry();
+        let mut resolved = single_ir_resolved();
+        resolved.model_ms_per_call = None;
+        let err = build_record_parts(&repo_root(), &schemas, &prompts, &resolved)
+            .expect_err("a record view without the model budget is rejected");
+        assert!(
+            err.contains("declares no model_ms_per_call budget"),
+            "{err}"
+        );
+    }
+
+    /// Template bytes that hash away from the entry's declared
+    /// `template_hash` fail the pre-record byte-verification (here via the
+    /// `inline` template arm, which the check covers like a `path` read).
+    #[test]
+    fn build_record_parts_rejects_template_hash_drift() {
+        let (schemas, _) = committed_model_registry();
+        let prompts = [PromptEntry {
+            id: static_id("prompt.single_ir"),
+            path: None,
+            inline: Some("TEMPLATE".to_owned()),
+            template_hash: prompt_hash('d'),
+            route: static_id("route.single_ir"),
+        }];
+        let err = build_record_parts(&repo_root(), &schemas, &prompts, &single_ir_resolved())
+            .expect_err("drifted template bytes are rejected");
+        assert!(err.contains("template bytes hash"), "{err}");
+    }
+
+    /// A constraint file that hashes away from the entry's declared
+    /// `schema_hash` fails the pre-record byte-verification.
+    #[test]
+    fn build_record_parts_rejects_schema_hash_drift() {
+        let (mut schemas, prompts) = committed_model_registry();
+        schemas
+            .iter_mut()
+            .find(|s| s.id.as_str() == "schema.clinical_ir")
+            .expect("committed registry declares schema.clinical_ir")
+            .schema_hash = prompt_hash('e');
+        let err = build_record_parts(&repo_root(), &schemas, &prompts, &single_ir_resolved())
+            .expect_err("drifted schema bytes are rejected");
+        assert!(err.contains("file bytes hash"), "{err}");
     }
 
     /// [`single_ir_accept`] classifies a model output with no live pipeline:
@@ -4198,6 +4497,7 @@ processing_stages:
         );
         for view in &views {
             assert_eq!(view.budget_ms, 10_000);
+            assert_eq!(view.model_ms_per_call, Some(600_000));
             assert_eq!(
                 view.documents
                     .iter()
@@ -4227,6 +4527,7 @@ processing_stages:
             assert_eq!(
                 view.plan.budget,
                 [
+                    (static_id("model_ms_per_call"), 600_000),
                     (static_id("model_repair_limit"), 1),
                     (static_id("model_sample_count"), 1),
                     (static_id("solver_ms_per_query"), 10_000),
@@ -4249,6 +4550,9 @@ processing_stages:
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].shape, RouteShape::M1Layered);
         assert_eq!(views[0].repair_limit, None);
+        // No `model_ms_per_call` key in the binding → honest `None` (the
+        // record path, not resolution, requires the key).
+        assert_eq!(views[0].model_ms_per_call, None);
         assert!(views[0].is_baseline);
         assert_eq!(route_id_prefix(&views[0]), "");
     }
@@ -4559,7 +4863,7 @@ processing_stages:
                 Some("sha256:52023a235277950b672288f1c196550139e2c1a8c32a1c559509ad35aba0d7f8"),
                 Some("sha256:7192125b87593d1731795a1757c8f37f417061dc15603595f4a9178aeefee82f"),
                 Some("sha256:c814fdbdef45361a17fba8e924190b57eda8a4bab91f58e61a215d9a201497c6"),
-                Some("sha256:87a436f90cbc70b1f2e5b5e115767ed1b2c3dc01e83f3e4c08b30c97e25b4323"),
+                Some("sha256:ad888a9c11b9b65094a5d2ff8c501cbe6345ca2f28b0ea323dfb9bb09614511f"),
             ],
             "run manifest §9 measurement hashes (test_source / reference / schema / prompt_template)"
         );
@@ -5559,6 +5863,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             groups: vec![],
             budget_ms: 10_000,
             repair_limit: Some(1),
+            model_ms_per_call: Some(600_000),
             is_baseline: false,
             plan: RunPlan {
                 experiment_id: static_id("exp.m2_multihop"),
@@ -6470,6 +6775,7 @@ raw benchmark output(locked measurement)。生の指標行はすべてのベー�
             groups: vec![],
             budget_ms: 10_000,
             repair_limit: Some(1),
+            model_ms_per_call: Some(600_000),
             is_baseline: true,
             plan: RunPlan {
                 experiment_id: static_id("exp.m2_multihop"),
