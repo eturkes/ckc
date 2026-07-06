@@ -154,7 +154,13 @@ aggressively; full pre-consolidation text in git history.
   misplaced optional misreads. Pin BOTH an all-None fixture (locks old bytes) AND a fully-populated one
   (locks new members' slots) — once per extended record type, not one exemplar per family (a populated
   round-trip proves read/write inverse but only a byte-pin locks canonical order/content → each record,
-  RunManifest AND ReplayManifest, needs its own populated pin; codex caught the missing replay pin).
+  RunManifest AND ReplayManifest, needs its own populated pin; codex caught the missing replay pin). Pin
+  the all-None case in the RECORD module's OWN test too — a downstream run/integration byte-pin is NOT a
+  substitute (doesn't self-guard the assembly seam's omit-None; B1 shipped only the populated pin → codex
+  re-caught). Populated-fixture seeds = GLOBALLY unique across the WHOLE fixture, not merely distinct
+  within the new field group: a new field mis-wired to an existing same-seeded field emits identical
+  bytes → slips the pin (B1 §9 seeds a–f collided toolchain/lockfile/corpus/lexicon → fixed to unused
+  0,3,4,5,6,8).
   `content_hash` = the generic `content_hash<T: Canonical>` free fn → every Canonical type gets it with
   zero per-type code (a roadmap "content_hash for the new types" clause needs no impl).
 - Behavior-locked extraction past a timed interval (M2.7 run-refactor): a `ProcessingStageClock` opens in

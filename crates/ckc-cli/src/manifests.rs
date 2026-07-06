@@ -43,8 +43,8 @@ pub struct ManifestInputs {
     /// Content hashes of the run's accepted artifacts — the §5 output
     /// hashes and, verbatim, the §4.6 expected output hashes.
     pub output_hashes: Vec<Hash>,
-    /// §9 measurement record: model evaluator identity, omitted on
-    /// deterministic runs and populated by the model-route run path.
+    /// §9 measurement record: model evaluator identity — `None` on
+    /// deterministic runs, carrying the identity a model route supplies.
     pub model_identity: Option<ModelIdentity>,
     /// §9 aggregate hash of the run's test-source bytes.
     pub test_source_hash: Option<Hash>,
@@ -95,8 +95,8 @@ pub fn assemble_manifests(
         environment_profile: environment_profile.clone(),
         solver_identity: inputs.solver_identity.clone(),
         output_hashes: output_hashes.clone(),
-        // §9 M2 measurement record: omitted on deterministic runs, populated
-        // by the model-route run path.
+        // §9 measurement record: mirrors the inputs' §9 slots (`None` on
+        // deterministic runs, set when a model route supplies them).
         model_identity: inputs.model_identity.clone(),
         test_source_hash: inputs.test_source_hash.clone(),
         reference_hash: inputs.reference_hash.clone(),
@@ -115,7 +115,8 @@ pub fn assemble_manifests(
         lockfile_hashes,
         solver_identity: inputs.solver_identity.clone(),
         expected_output_hashes: output_hashes,
-        // §9 M2 measurement record: omitted on deterministic runs.
+        // §9 measurement record: mirrors the inputs' §9 slots (`None` on
+        // deterministic runs, set when a model route supplies them).
         model_identity: inputs.model_identity.clone(),
         test_source_hash: inputs.test_source_hash.clone(),
         reference_hash: inputs.reference_hash.clone(),
@@ -357,25 +358,49 @@ mod tests {
         }
     }
 
-    /// Populated §9: both records carry the measurement slots. The all-`None`
-    /// path stays byte-identical (the run-level M1 manifest pins guard those
-    /// bytes); these pins lock the new slots' canonical position and content
-    /// on both the run manifest and the replay manifest.
-    #[test]
-    fn populated_measurement_record_pins_both_manifests() {
+    /// Inputs whose six §9 hashes are seeded distinctly from every other
+    /// fixture field (globally unique, not merely unique within §9), so a
+    /// pin miss localizes to the exact slot and a swap with any field — §9
+    /// or not — changes the bytes and fails the pin.
+    fn populated_inputs() -> ManifestInputs {
         let mut ins = inputs();
         ins.model_identity = Some(ModelIdentity {
             model_id: id("model.baseline"),
             quant: "fixture_quant".to_owned(),
             runtime_version: "1.0.0".to_owned(),
         });
-        ins.test_source_hash = Some(hash('a'));
-        ins.reference_hash = Some(hash('b'));
-        ins.schema_hash = Some(hash('c'));
-        ins.prompt_template_hash = Some(hash('d'));
-        ins.model_hash = Some(hash('e'));
-        ins.runtime_hash = Some(hash('f'));
-        let (manifest, replay) = assemble_manifests(&ins).unwrap();
+        ins.test_source_hash = Some(hash('0'));
+        ins.reference_hash = Some(hash('3'));
+        ins.schema_hash = Some(hash('4'));
+        ins.prompt_template_hash = Some(hash('5'));
+        ins.model_hash = Some(hash('6'));
+        ins.runtime_hash = Some(hash('8'));
+        ins
+    }
+
+    /// All-`None` §9: the seven measurement members are omitted (§4.3
+    /// omit-`None`), so both records stay byte-identical to their pre-§9
+    /// shape. These pins lock that omission at the assembly seam — an
+    /// accidental `Some(_)` default would break them immediately.
+    #[test]
+    fn all_none_measurement_record_pins_both_manifests() {
+        let (manifest, replay) = assemble_manifests(&inputs()).unwrap();
+        assert_eq!(
+            String::from_utf8(canonical_payload_bytes(&manifest).unwrap()).unwrap(),
+            PINNED_ALL_NONE_RUN_MANIFEST
+        );
+        assert_eq!(
+            String::from_utf8(canonical_payload_bytes(&replay).unwrap()).unwrap(),
+            PINNED_ALL_NONE_REPLAY_MANIFEST
+        );
+    }
+
+    /// Populated §9: both records carry the seven measurement slots in
+    /// canonical key order with their supplied values, on the run manifest
+    /// and the replay manifest alike.
+    #[test]
+    fn populated_measurement_record_pins_both_manifests() {
+        let (manifest, replay) = assemble_manifests(&populated_inputs()).unwrap();
         assert_eq!(
             String::from_utf8(canonical_payload_bytes(&manifest).unwrap()).unwrap(),
             PINNED_POPULATED_RUN_MANIFEST
@@ -386,7 +411,10 @@ mod tests {
         );
     }
 
-    const PINNED_POPULATED_RUN_MANIFEST: &str = r#"{"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"git_commit":"79bc570fffffffffffffffffffffffffffffffff","lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"prompt_template_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reference_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","run_plan_hash":"sha256:892701b5e60ecd33c09bda189eff2b952b5c6589844cb73b9a841b065faebe0d","runtime_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","schema_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+    const PINNED_ALL_NONE_RUN_MANIFEST: &str = r#"{"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"git_commit":"79bc570fffffffffffffffffffffffffffffffff","lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"run_plan_hash":"sha256:892701b5e60ecd33c09bda189eff2b952b5c6589844cb73b9a841b065faebe0d","solver_identity":{"solver_id":"z3","version":"4.13.4"},"toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+    const PINNED_ALL_NONE_REPLAY_MANIFEST: &str = r#"{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"expected_output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"input_hashes":["sha256:1111111111111111111111111111111111111111111111111111111111111111","sha256:9999999999999999999999999999999999999999999999999999999999999999"],"lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"solver_identity":{"solver_id":"z3","version":"4.13.4"},"toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
 
-    const PINNED_POPULATED_REPLAY_MANIFEST: &str = r#"{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"expected_output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"input_hashes":["sha256:1111111111111111111111111111111111111111111111111111111111111111","sha256:9999999999999999999999999999999999999999999999999999999999999999"],"lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"prompt_template_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reference_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","runtime_hash":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","schema_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+    const PINNED_POPULATED_RUN_MANIFEST: &str = r#"{"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"git_commit":"79bc570fffffffffffffffffffffffffffffffff","lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:6666666666666666666666666666666666666666666666666666666666666666","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"prompt_template_hash":"sha256:5555555555555555555555555555555555555555555555555555555555555555","reference_hash":"sha256:3333333333333333333333333333333333333333333333333333333333333333","run_plan_hash":"sha256:892701b5e60ecd33c09bda189eff2b952b5c6589844cb73b9a841b065faebe0d","runtime_hash":"sha256:8888888888888888888888888888888888888888888888888888888888888888","schema_hash":"sha256:4444444444444444444444444444444444444444444444444444444444444444","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000000","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+
+    const PINNED_POPULATED_REPLAY_MANIFEST: &str = r#"{"command":["ckc","run","--experiment","exp.m1_scaffold","--out","runs/m1"],"corpus_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","environment_profile":{"arch":"x86_64","os":"linux"},"expected_output_hashes":["sha256:2222222222222222222222222222222222222222222222222222222222222222","sha256:7777777777777777777777777777777777777777777777777777777777777777"],"input_hashes":["sha256:1111111111111111111111111111111111111111111111111111111111111111","sha256:9999999999999999999999999999999999999999999999999999999999999999"],"lexicon_hash":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","lockfile_hashes":{"cargo.lock":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","rust-toolchain.lock":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"model_hash":"sha256:6666666666666666666666666666666666666666666666666666666666666666","model_identity":{"model_id":"model.baseline","quant":"fixture_quant","runtime_version":"1.0.0"},"prompt_template_hash":"sha256:5555555555555555555555555555555555555555555555555555555555555555","reference_hash":"sha256:3333333333333333333333333333333333333333333333333333333333333333","runtime_hash":"sha256:8888888888888888888888888888888888888888888888888888888888888888","schema_hash":"sha256:4444444444444444444444444444444444444444444444444444444444444444","solver_identity":{"solver_id":"z3","version":"4.13.4"},"test_source_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000000","toolchain_manifest_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
 }
