@@ -21,7 +21,7 @@ standing rule); retired wip artifacts remain in git history as provenance only.
 
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
-## M2 multi-hop PoC — plan 2a4f03d — accept m2
+## M2 multi-hop PoC — plan 2a4f03d — accept m2 — review 5ec33f7
 
 Scope = SPEC §9: experiment 1's minimal pair on this laptop. A weak local model translates the
 M1 test sources two ways — `route.direct_smt` (model emits SMT-LIB directly, the baseline) versus
