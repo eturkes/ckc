@@ -4253,7 +4253,344 @@ processing_stages:
             static_id(RUN_REPORT_STEP),
             "run report tail mints the run-level report step"
         );
+
+        // run-m2.1e-C2 — the model route populates report.json's three M2 sections
+        // (failure_taxonomy, metrics, model_identity) and both rendered bodies;
+        // C1's `strict_at` typed-validity read left their VALUES unpinned.
+        let payload = &report.payload;
+        // (a) report.json section values. A clean replay raises no §7.4 rejection,
+        // so each route's taxonomy code map is empty; both routes are still named
+        // (a clean route is a present, empty-map route, Report::validate rule 5).
+        let taxonomy_shape: Vec<(&str, usize)> = payload
+            .failure_taxonomy
+            .as_ref()
+            .expect("model run populates failure_taxonomy")
+            .routes
+            .iter()
+            .map(|(pid, codes)| (pid.as_str(), codes.len()))
+            .collect();
+        assert_eq!(
+            taxonomy_shape,
+            vec![("pipe.m2_direct_smt", 0), ("pipe.m2_single_ir", 0)],
+            "clean run: both routes named with empty §7.4 code maps"
+        );
+        // metrics walk raw rows for both routes before the single baseline-delta
+        // table (ExperimentMetrics::emission_order), baselined on the direct route.
+        let metrics = payload
+            .metrics
+            .as_ref()
+            .expect("model run populates metrics");
+        assert_eq!(
+            metrics.baseline_pipeline_id.as_str(),
+            "pipe.m2_direct_smt",
+            "direct route is the §7.3 delta baseline"
+        );
+        let order: Vec<(&str, bool)> = metrics
+            .emission_order()
+            .iter()
+            .map(|section| match section {
+                crate::metrics::MetricsSection::RawRows(r) => (r.pipeline_id.as_str(), false),
+                crate::metrics::MetricsSection::DeltaTable(d) => (d.pipeline_id.as_str(), true),
+            })
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                ("pipe.m2_direct_smt", false),
+                ("pipe.m2_single_ir", false),
+                ("pipe.m2_single_ir", true),
+            ],
+            "raw rows for both routes precede the lone baseline-delta table"
+        );
+        // A single k=1 draw cannot converge, so every route reports
+        // k_sample_convergence as not_applicable.
+        for route in &metrics.routes {
+            let k = route
+                .rows
+                .iter()
+                .find(|row| row.metric.as_str() == crate::metrics::K_SAMPLE_CONVERGENCE)
+                .expect("k_sample_convergence row present");
+            assert_eq!(
+                k.value,
+                crate::metrics::MetricValue::NotApplicable,
+                "single k=1 draw: k_sample_convergence not_applicable on {}",
+                route.pipeline_id.as_str()
+            );
+        }
+        // §9 evaluator identity is the golden cassettes' agreed synthetic identity.
+        assert_eq!(
+            payload.model_identity.as_ref().map(|m| (
+                m.model_id.as_str(),
+                m.quant.as_str(),
+                m.runtime_version.as_str()
+            )),
+            Some(("model.baseline", "fixture_quant", "1.0.0")),
+            "report §9 identity is the agreed evaluator identity"
+        );
+
+        // (b)/(c) full rendered bodies. The solver version is live-parsed from the
+        // z3 binary's `--version` (env-dependent, so M1 never const-pins a body) —
+        // normalize that one token to `Z3_VERSION` and pin every other rendered
+        // byte, guarding the M2 sections' rendering over this run's actual values.
+        // Each body must carry the version exactly once, so the normalization is
+        // unambiguous: a future version colliding with another rendered token (the
+        // fixture model runtime_version `1.0.0`, a fraction) fails here, loud, not
+        // by silently rewriting the collided token.
+        assert_eq!(payload.solver_identity.solver_id, static_id("z3"));
+        assert!(!payload.solver_identity.version.is_empty());
+        let z3_version = payload.solver_identity.version.as_str();
+        let report_en = std::fs::read_to_string(out.join("report_en.md")).unwrap();
+        let report_ja = std::fs::read_to_string(out.join("report_ja.md")).unwrap();
+        assert_eq!(
+            report_en.matches(z3_version).count(),
+            1,
+            "solver version appears once in report_en.md"
+        );
+        assert_eq!(
+            report_ja.matches(z3_version).count(),
+            1,
+            "solver version appears once in report_ja.md"
+        );
+        assert_eq!(
+            report_en.replace(z3_version, "Z3_VERSION"),
+            RUN_M2_REPORT_EN,
+            "report_en.md renders the run's M2 sections"
+        );
+        assert_eq!(
+            report_ja.replace(z3_version, "Z3_VERSION"),
+            RUN_M2_REPORT_JA,
+            "report_ja.md renders the run's M2 sections under JA labels"
+        );
     }
+
+    // run-m2.1e-C2 — the model route's two rendered bodies, blessed from an
+    // observed `write_m2_root` run; the live z3 `--version` token is normalized
+    // to `Z3_VERSION` (see the pin asserts) so the pins stay env-independent.
+    const RUN_M2_REPORT_EN: &str = r#"# CKC report
+
+wording: documented no-conflict result, synthetic test source measurement
+
+## Corpus
+
+| document | source hash |
+| --- | --- |
+| `test_source.m1_control` | `sha256:860dcd4a77c4412a251126e1097d1936ca11fe6b7ca8a72b67b1ac73a693b320` |
+| `test_source.m1_guideline_a` | `sha256:dd6018d8daced58ab0ca55c313836ab9be15f572baac44f85d5ef2592cbd1ee8` |
+| `test_source.m1_guideline_b` | `sha256:8789f89e86d6eb61612a6e113b3b02d351af5ea13f4ef7aa83c2527b9bed79ec` |
+
+lexicon hash: `sha256:cc6b482aa3a1516ae9fc46d68e40a9a950799b184da4547e4bdf42f1f1da0159`
+
+## Findings
+
+### `finding.group.m1_conflict.1`
+
+synthetic test source measurement; claim tier `s1_accepted`.
+
+- conflict kind: `deontic_direction_conflict`
+- query: `q.m1_conflict.pair1.deontic`, verdict `unsat`
+- rules: `test_source.m1_guideline_a.rule.0`, `test_source.m1_guideline_b.rule.0`
+- regions: `r.2`, `r.3`
+- assertions: `a.test_source.m1_guideline_a.rule.0`, `a.test_source.m1_guideline_b.rule.0`
+- core: `a.test_source.m1_guideline_a.rule.0`, `a.test_source.m1_guideline_b.rule.0`
+- quoted spans:
+  - `test_source.m1_guideline_a` `r.2` `s.2`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)。
+  - `test_source.m1_guideline_a` `r.3` `s.3`: ただし、重度腎機能障害のある患者を除く。
+  - `test_source.m1_guideline_b` `r.2` `s.2`: 成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)。
+
+## Documented no-conflict results
+
+### `finding.group.m1_no_conflict.0`
+
+documented no-conflict result; claim tier `s1_accepted`.
+
+- query: `q.m1_no_conflict.pair1.overlap`, verdict `unsat`
+- rules: `test_source.m1_control.rule.0`, `test_source.m1_guideline_a.rule.0`
+- regions: `r.2`, `r.3`
+- assertions: `ctx.test_source.m1_control.rule.0`, `ctx.test_source.m1_guideline_a.rule.0`
+- quoted spans:
+  - `test_source.m1_control` `r.2` `s.2`: 小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である。
+  - `test_source.m1_guideline_a` `r.2` `s.2`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)。
+  - `test_source.m1_guideline_a` `r.3` `s.3`: ただし、重度腎機能障害のある患者を除く。
+
+## Diagnostics summary
+
+none.
+
+## Failure taxonomy
+
+### `pipe.m2_direct_smt`
+
+none.
+
+### `pipe.m2_single_ir`
+
+none.
+
+## Metrics
+
+raw benchmark output (locked measurement); raw rows precede every baseline-delta table. baseline: `pipe.m2_direct_smt`.
+
+### Raw rows: `pipe.m2_direct_smt`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | 1/1 |
+| `conflict_verdict_accuracy` | 1/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | 4/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 1/1 |
+| `target_syntactic_validity` | 1/1 |
+
+### Raw rows: `pipe.m2_single_ir`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | 1/1 |
+| `conflict_verdict_accuracy` | 1/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | 3/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 1/1 |
+| `target_syntactic_validity` | 1/1 |
+
+### Baseline delta: `pipe.m2_single_ir` - `pipe.m2_direct_smt`
+
+| metric | value |
+| --- | --- |
+| `acceptance_rate` | 0/1 |
+| `conflict_verdict_accuracy` | 0/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | -1/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 0/1 |
+| `target_syntactic_validity` | 0/1 |
+
+## Solver identity
+
+`z3` version `Z3_VERSION`
+
+## Model identity
+
+`model.baseline` quant `fixture_quant` runtime version `1.0.0`
+
+## Replay status
+
+`not_replayed`
+"#;
+
+    const RUN_M2_REPORT_JA: &str = r#"# CKC レポート
+
+語彙: documented no-conflict result、synthetic test source measurement
+
+## コーパス
+
+| 文書 | ソースハッシュ |
+| --- | --- |
+| `test_source.m1_control` | `sha256:860dcd4a77c4412a251126e1097d1936ca11fe6b7ca8a72b67b1ac73a693b320` |
+| `test_source.m1_guideline_a` | `sha256:dd6018d8daced58ab0ca55c313836ab9be15f572baac44f85d5ef2592cbd1ee8` |
+| `test_source.m1_guideline_b` | `sha256:8789f89e86d6eb61612a6e113b3b02d351af5ea13f4ef7aa83c2527b9bed79ec` |
+
+レキシコンハッシュ: `sha256:cc6b482aa3a1516ae9fc46d68e40a9a950799b184da4547e4bdf42f1f1da0159`
+
+## 所見
+
+### `finding.group.m1_conflict.1`
+
+synthetic test source measurement。主張階層 `s1_accepted`。
+
+- 矛盾種別: `deontic_direction_conflict`
+- クエリ: `q.m1_conflict.pair1.deontic`、判定 `unsat`
+- 規則: `test_source.m1_guideline_a.rule.0`、`test_source.m1_guideline_b.rule.0`
+- 領域: `r.2`、`r.3`
+- アサーション: `a.test_source.m1_guideline_a.rule.0`、`a.test_source.m1_guideline_b.rule.0`
+- コア: `a.test_source.m1_guideline_a.rule.0`、`a.test_source.m1_guideline_b.rule.0`
+- 引用スパン:
+  - `test_source.m1_guideline_a` `r.2` `s.2`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)。
+  - `test_source.m1_guideline_a` `r.3` `s.3`: ただし、重度腎機能障害のある患者を除く。
+  - `test_source.m1_guideline_b` `r.2` `s.2`: 成人の敗血症患者のうち、妊娠中の患者には抗菌薬Aを投与しないこと(禁忌)。
+
+## 文書化された無矛盾結果
+
+### `finding.group.m1_no_conflict.0`
+
+documented no-conflict result。主張階層 `s1_accepted`。
+
+- クエリ: `q.m1_no_conflict.pair1.overlap`、判定 `unsat`
+- 規則: `test_source.m1_control.rule.0`、`test_source.m1_guideline_a.rule.0`
+- 領域: `r.2`、`r.3`
+- アサーション: `ctx.test_source.m1_control.rule.0`、`ctx.test_source.m1_guideline_a.rule.0`
+- 引用スパン:
+  - `test_source.m1_control` `r.2` `s.2`: 小児(18歳未満)の敗血症患者には抗菌薬Aは禁忌である。
+  - `test_source.m1_guideline_a` `r.2` `s.2`: 成人(18歳以上)の敗血症患者には抗菌薬Aを投与することを推奨する(強い推奨)。
+  - `test_source.m1_guideline_a` `r.3` `s.3`: ただし、重度腎機能障害のある患者を除く。
+
+## 診断サマリ
+
+なし。
+
+## 失敗分類
+
+### `pipe.m2_direct_smt`
+
+なし。
+
+### `pipe.m2_single_ir`
+
+なし。
+
+## 指標
+
+raw benchmark output(locked measurement)。生の指標行はすべてのベースライン差分表に先行する。ベースライン: `pipe.m2_direct_smt`。
+
+### 生の指標行: `pipe.m2_direct_smt`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | 1/1 |
+| `conflict_verdict_accuracy` | 1/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | 4/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 1/1 |
+| `target_syntactic_validity` | 1/1 |
+
+### 生の指標行: `pipe.m2_single_ir`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | 1/1 |
+| `conflict_verdict_accuracy` | 1/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | 3/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 1/1 |
+| `target_syntactic_validity` | 1/1 |
+
+### ベースライン差分: `pipe.m2_single_ir` - `pipe.m2_direct_smt`
+
+| 指標 | 値 |
+| --- | --- |
+| `acceptance_rate` | 0/1 |
+| `conflict_verdict_accuracy` | 0/1 |
+| `k_sample_convergence` | not_applicable |
+| `recorded_call_count` | -1/1 |
+| `repair_count` | 0/1 |
+| `schema_valid_rate` | 0/1 |
+| `target_syntactic_validity` | 0/1 |
+
+## ソルバー識別情報
+
+`z3` バージョン `Z3_VERSION`
+
+## モデル識別情報
+
+`model.baseline` 量子化 `fixture_quant` ランタイムバージョン `1.0.0`
+
+## リプレイ状態
+
+`not_replayed`
+"#;
 
     // run-m2.1e-A — a partial direct fill (one role lands, the other role's cassette is
     // absent) still reaches the run manifest, so replay covers the lone landed role.

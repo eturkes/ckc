@@ -497,6 +497,25 @@ aggressively; full pre-consolidation text in git history.
   → wiring the sections in (M2 report.json now section-bearing) exercises the path proving it computes
   without erroring, leaving the new VALUES for C2's observed-output pin battery. No new doc-lint error
   (private→private intra-doc link to `manifest_inputs` doesn't trip `private_intra_doc_links`).
+- run-m2.1e-C2 LANDED the model-route report VALUE pins (extended
+  `m2_route_loop_lands_both_routes_namespaced`, no new test fn → suite count unchanged). DURABLE
+  (recurs run-m2.2 live pins + acceptance-m2): a full-body `report_en.md`/`report_ja.md` const-pin
+  over a REAL run must NORMALIZE the solver version — z3's `--version` is live-parsed at Z3Adapter
+  construction, so it's env-dependent (this is WHY M1 never const-pins a body: run_oracle.rs
+  re-renders the landed report.json and compares instead of pinning bytes). Pattern: read
+  `solver_identity.version`, assert it appears EXACTLY ONCE per body (a future version colliding with
+  another rendered token — the fixture model `runtime_version` `1.0.0`, an integer fraction — then
+  fails LOUD, never silently rewrites the collided token), `.replace(version, "Z3_VERSION")`, pin the
+  normalized body against a const (blessed by dumping the landed bytes from a scratch `write_m2_root`
+  run, `4.13.3`→`Z3_VERSION`, embedded via a Python splice so the Japanese stays byte-exact). Other
+  observed facts on a CLEAN model run: each route's `failure_taxonomy` code map is EMPTY but the route
+  is still NAMED (Report::validate rule 5 — a present empty-map route = a clean route); `metrics`
+  baseline = the direct route, `emission_order` = raw rows for both routes (direct, single_ir) before
+  the lone single_ir baseline-delta table, `k_sample_convergence` NA on every route (single k=1
+  draw). Pin split: part (a) asserts report.json STRUCTURE (emission_order + k_sample NA + agreed
+  identity + taxonomy shape) via the typed `strict_at` Report; the raw metric VALUES
+  (`recorded_call_count` 4/1 direct, 3/1 single_ir; delta -1/1; all others 1/1 or 0/1) ride the
+  rendered-body const pins, so the two halves together pin every M2-section value with no overlap.
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
