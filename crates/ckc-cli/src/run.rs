@@ -144,6 +144,14 @@ const DIRECT_SMT_STAGE_KINDS: [&str; 4] = ["extract", "segment", "model_fill", "
 /// an obviously wrong producer instead of a real stage id.
 const UNUSED_STAGE: &str = "processing_stage.unused";
 
+/// Run-level tail step ids: a model-route run's trace/report tails run once
+/// over every route, owned by no single route pipeline (their per-route
+/// `pipeline_step_ids[TRACE|REPORT]` slot is the inert [`UNUSED_STAGE`]
+/// sentinel), so the landed wrappers carry a run-scoped step id instead. The
+/// M1 baseline keeps its real per-pipeline trace/report step.
+const RUN_TRACE_STEP: &str = "processing_stage.run.trace";
+const RUN_REPORT_STEP: &str = "processing_stage.run.report";
+
 /// §8.4 budget counter naming the per-query solver wall-clock cap in
 /// milliseconds — the one budget key the M1 vocabulary defines.
 const SOLVER_BUDGET_KEY: &str = "solver_ms_per_query";
@@ -448,31 +456,36 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                         &adapter,
                         shell,
                     );
-                    if let (Some(compiled), Some(results)) = (compiled, results) {
-                        groups.push(GroupObservation {
-                            group_id: group.group_id.clone(),
-                            query_pairs: compiled
-                                .payload
-                                .solver_query_plan
-                                .iter()
-                                .map(|p| {
-                                    (
-                                        p.context_overlap_query_id.clone(),
-                                        p.deontic_consistency_query_id.clone(),
-                                    )
-                                })
-                                .collect(),
-                            results: results.payload.results.clone(),
-                        });
-                        // The compiled group chains into the run trace: its member IR
-                        // bundles, the compiled artifact, and the landed verifier results.
+                    if let Some(compiled) = compiled {
+                        // A verified group feeds the run report's group row.
+                        if let Some(results) = &results {
+                            groups.push(GroupObservation {
+                                group_id: group.group_id.clone(),
+                                query_pairs: compiled
+                                    .payload
+                                    .solver_query_plan
+                                    .iter()
+                                    .map(|p| {
+                                        (
+                                            p.context_overlap_query_id.clone(),
+                                            p.deontic_consistency_query_id.clone(),
+                                        )
+                                    })
+                                    .collect(),
+                                results: results.payload.results.clone(),
+                            });
+                        }
+                        // The compiled group chains into the run trace whenever the
+                        // compiled artifact landed, so a landed-but-unverified group
+                        // stays replay-covered (single_ir mints no smt_query pair).
                         all_group_traces.push(GroupTrace {
                             group_id: group.group_id.clone(),
                             test_sources: group.test_sources.clone(),
                             member_bundles,
                             dir,
+                            smt_queries: Vec::new(),
                             compiled: Some(compiled),
-                            verifier_results: Some(results),
+                            verifier_results: results,
                         });
                     }
                 }
@@ -518,9 +531,11 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                     }
                     if let Some((overlap, deontic)) = df.pair {
                         let dir = route_group_dir(resolved, &gid);
-                        if let Some(results) = direct_smt_verify_group(
+                        let results = direct_smt_verify_group(
                             &gid, &dir, &overlap, &deontic, resolved, &adapter, shell,
-                        ) {
+                        );
+                        // A verified group feeds the run report's group row.
+                        if let Some(results) = &results {
                             groups.push(GroupObservation {
                                 group_id: gid.clone(),
                                 query_pairs: vec![(
@@ -529,18 +544,21 @@ fn execute_routes(root: &Path, views: &[Resolved], shell: &mut Shell) {
                                 )],
                                 results: results.payload.results.clone(),
                             });
-                            // The direct route compiles no IR, so the group trace carries
-                            // no member bundles and no compiled artifact — only the landed
-                            // verifier results for the run report's group row.
-                            all_group_traces.push(GroupTrace {
-                                group_id: gid.clone(),
-                                test_sources: group.test_sources.clone(),
-                                member_bundles: Vec::new(),
-                                dir,
-                                compiled: None,
-                                verifier_results: Some(results),
-                            });
                         }
+                        // The direct route compiles no IR, so the group trace carries no
+                        // member bundles and no compiled artifact — the landed smt_query
+                        // pair keeps replay covering the group even when verification did
+                        // not land, and the verifier results (when present) feed the run
+                        // report's group row.
+                        all_group_traces.push(GroupTrace {
+                            group_id: gid.clone(),
+                            test_sources: group.test_sources.clone(),
+                            member_bundles: Vec::new(),
+                            dir,
+                            smt_queries: vec![overlap, deontic],
+                            compiled: None,
+                            verifier_results: results,
+                        });
                     }
                 }
                 // Each unique document's head chains into the run trace as a parallel
@@ -1052,6 +1070,7 @@ fn group_pipeline(
         test_sources: group.test_sources.clone(),
         member_bundles: Vec::new(),
         dir: dir.clone(),
+        smt_queries: Vec::new(),
         compiled: None,
         verifier_results: None,
     };
@@ -1916,7 +1935,7 @@ fn trace_processing_stage(
             let bundle = wrapper(
                 "trace_bundle".to_owned(),
                 "trace_bundle",
-                producer(resolved, TRACE),
+                tail_producer(resolved, TRACE, emit_event),
                 input_hashes.clone(),
                 Origin::DeterministicCompiler,
                 EvidenceStatus::MechanicalEvidenceStatus,
@@ -1927,7 +1946,7 @@ fn trace_processing_stage(
             let lineage = wrapper(
                 "lineage_index".to_owned(),
                 "lineage_index",
-                producer(resolved, TRACE),
+                tail_producer(resolved, TRACE, emit_event),
                 input_hashes.clone(),
                 Origin::DeterministicCompiler,
                 EvidenceStatus::MechanicalEvidenceStatus,
@@ -2046,7 +2065,7 @@ fn report_processing_stage(
         wrapper(
             "report".to_owned(),
             "report",
-            producer(resolved, REPORT),
+            tail_producer(resolved, REPORT, emit_event),
             input_hashes.clone(),
             Origin::DeterministicCompiler,
             EvidenceStatus::MechanicalEvidenceStatus,
@@ -2174,6 +2193,7 @@ fn manifest_inputs(
         output_hashes.extend(doc.bundle.iter().map(|b| b.content_hash.clone()));
     }
     for group in groups {
+        output_hashes.extend(group.smt_queries.iter().map(|q| q.content_hash.clone()));
         output_hashes.extend(group.compiled.iter().map(|c| c.content_hash.clone()));
         output_hashes.extend(
             group
@@ -2506,6 +2526,31 @@ fn producer(resolved: &Resolved, processing_stage_index: usize) -> Producer {
     Producer {
         pipeline_id: resolved.pipeline_id.clone(),
         pipeline_step_id: resolved.pipeline_step_ids[processing_stage_index].clone(),
+        toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
+    }
+}
+
+/// §4.4 producer for a run-level tail wrapper. The M1 baseline (`emit_event`
+/// true) owns real trace/report pipeline steps, so it keeps [`producer`]'s
+/// route step. A model-route run (`emit_event` false) runs the tail once over
+/// every route with no owning pipeline step — the route's
+/// `pipeline_step_ids[idx]` slot is the inert [`UNUSED_STAGE`] sentinel — so it
+/// carries a run-level step id (`processing_stage.run.{trace,report}`) instead.
+/// This id rides the wrapper's content-hash-excluded [`Producer`], so it
+/// re-blesses only the emitted trace_bundle/lineage_index/report.json wrapper
+/// bytes, never a payload hash, layout, census, or determinism.
+fn tail_producer(resolved: &Resolved, processing_stage_index: usize, emit_event: bool) -> Producer {
+    if emit_event {
+        return producer(resolved, processing_stage_index);
+    }
+    let step = match processing_stage_index {
+        TRACE => RUN_TRACE_STEP,
+        REPORT => RUN_REPORT_STEP,
+        _ => unreachable!("run-level tail producer runs only the trace and report stages"),
+    };
+    Producer {
+        pipeline_id: resolved.pipeline_id.clone(),
+        pipeline_step_id: static_id(step),
         toolchain_manifest_hash: resolved.toolchain_manifest_hash.clone(),
     }
 }
@@ -3810,6 +3855,32 @@ processing_stages:
         assert!(
             !out.join("groups").exists(),
             "no bare out/groups/ under the shared run out"
+        );
+
+        // run-m2.1e-A — the direct route's landed smt_query pair is replay-covered:
+        // both wrapper content hashes appear among the run manifest's output hashes.
+        // A landed-artifact hash reaches manifest.json only through `output_hashes`
+        // (the top-level `input_hashes` are test-source hashes), so this substring
+        // check is exactly a membership check, and replay diffs a divergent re-run of
+        // the pair. The pair lands whether or not verification does; the clean run
+        // here verifies both.
+        let overlap = strict_at::<QueryBody>(
+            &out,
+            "routes/pipe.m2_direct_smt/groups/group.m1_conflict/overlap.smt_query.json",
+        );
+        let deontic = strict_at::<QueryBody>(
+            &out,
+            "routes/pipe.m2_direct_smt/groups/group.m1_conflict/deontic.smt_query.json",
+        );
+        let manifest =
+            String::from_utf8(std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        assert!(
+            manifest.contains(overlap.content_hash.as_str()),
+            "manifest output_hashes cover the direct overlap smt_query"
+        );
+        assert!(
+            manifest.contains(deontic.content_hash.as_str()),
+            "manifest output_hashes cover the direct deontic smt_query"
         );
     }
 

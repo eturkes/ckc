@@ -20,7 +20,7 @@ use ckc_core::{
     ObjectEmitter, ObjectReader, Reader, canonical_sort_key, emit_set, emit_string, fieldless_enum,
     read_set, read_string,
 };
-use ckc_smt::{CompiledArtifact, SolverVerdict, VerifierCategory, VerifierResults};
+use ckc_smt::{CompiledArtifact, QueryBody, SolverVerdict, VerifierCategory, VerifierResults};
 
 use crate::shell::static_id;
 
@@ -570,6 +570,12 @@ pub struct GroupTrace {
     /// Run-relative dir the group nodes' paths cite (M1 `groups/<group_id>`;
     /// a route stage passes its own landing dir).
     pub dir: String,
+    /// Raw-AI `smt_query` bodies the direct route landed for this group
+    /// (`[overlap, deontic]`; single_ir compiles an IR and mints none, so
+    /// empty). Not trace-DAG nodes — [`assemble_trace`] ignores them — but the
+    /// run manifest lists their content hashes so replay covers a landed pair
+    /// even when verification did not land.
+    pub smt_queries: Vec<ArtifactWrapper<QueryBody>>,
     pub compiled: Option<ArtifactWrapper<CompiledArtifact>>,
     pub verifier_results: Option<ArtifactWrapper<VerifierResults>>,
 }
@@ -1771,6 +1777,7 @@ mod tests {
             test_sources: vec![id("doc.a"), id("doc.b")],
             member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
+            smt_queries: vec![],
             compiled: Some(wrapper(
                 "group.g1.compiled",
                 "compiled",
@@ -1885,6 +1892,7 @@ mod tests {
             test_sources: vec![id("doc.a")],
             member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
+            smt_queries: vec![],
             compiled: None,
             verifier_results: None,
         };
@@ -1905,6 +1913,7 @@ mod tests {
             test_sources: vec![],
             member_bundles: vec![],
             dir: "groups/group.g1".to_owned(),
+            smt_queries: vec![],
             compiled: None,
             verifier_results: Some(wrapper(
                 "group.g1.verifier_results",
@@ -2035,6 +2044,7 @@ mod tests {
             test_sources: vec![id("doc.a")],
             member_bundles: vec![id("doc.a.ir_bundle"), id("pipe.r.doc.a.ir_bundle")],
             dir: "groups/group.g1".to_owned(),
+            smt_queries: vec![],
             compiled: Some(compiled),
             verifier_results: None,
         };
@@ -2084,6 +2094,7 @@ mod tests {
             test_sources: vec![id("doc.a")],
             member_bundles: vec![id("doc.a.ir_bundle")],
             dir: "groups/group.g1".to_owned(),
+            smt_queries: vec![],
             compiled: Some(compiled),
             verifier_results: None,
         };
@@ -2366,6 +2377,7 @@ mod tests {
                 .map(|d| d.bundle.as_ref().unwrap().artifact_id.clone())
                 .collect(),
             dir: format!("groups/{gid}"),
+            smt_queries: vec![],
             compiled: Some(compiled),
             verifier_results: Some(live_wrapper(
                 &format!("{gid}.verifier_results"),

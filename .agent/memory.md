@@ -412,6 +412,21 @@ aggressively; full pre-consolidation text in git history.
   ride their processing_stage event; BOTH land in `logs/diagnostics.jsonl` (=`self.ledger`, append
   order) = the `executed()`-returned `diagnostics` vec (all scopes) → pin command-scope by
   `events.last().diagnostics` carrying it, not by absence from events.
+- run-m2.1e-A LANDED run-level landing completeness + honest producer, closing the .1d5a-2 replay
+  hole. NEW `GroupTrace.smt_queries: Vec<ArtifactWrapper<QueryBody>>` (single_ir empty, direct
+  `[overlap,deontic]`); both routes push GroupTrace on ARTIFACT LANDING (`Some(compiled)` /
+  `Some(pair)`), NOT verify-success `(Some,Some)` — only GroupObservation (report group-row) still
+  gates on `results` → a landed-but-unverified compiled/pair stays replay-covered; `manifest_inputs`
+  walks `group.smt_queries` into output_hashes. DURABLE: replay coverage (replay.rs diffs manifest
+  output_hashes) ≠ trace-DAG membership — the pair hashes live ONLY in the manifest (`TraceNodeKind`
+  has no smt_query variant → `assemble_trace` UNCHANGED), so the manifest hash is DAG-orphaned unless
+  `direct_smt_verify_group`'s `verifier_results.input_hashes=[overlap,deontic]` provenance-links it
+  (clean path). Honest producer: `tail_producer(resolved, idx, emit_event)` — false (M2 run-level
+  tail) → `static_id("processing_stage.run.{trace,report}")` (consts RUN_TRACE_STEP/RUN_REPORT_STEP),
+  true → early-returns `producer(resolved, idx)` (M1 byte-identical); fixes M2 tails formerly minting
+  the route's inert `UNUSED_STAGE` step-id. Pin (m2_route_loop_lands_both_routes_namespaced): direct
+  overlap+deontic content_hashes in write_m2_root manifest.json (substring=membership — a landed hash
+  reaches manifest only via output_hashes).
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
