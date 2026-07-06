@@ -3031,10 +3031,11 @@ mod tests {
     }
 
     /// [`direct_smt_prompt`] emits the template, group and role lines, then each
-    /// member's document line followed by its spans in `reading_order`.
+    /// member's document line followed by its spans in `reading_order` — `doc.a`
+    /// supplied out of order to prove the composer sorts each member.
     #[test]
     fn direct_smt_prompt_lays_out_role_and_members() {
-        let a = prompt_graph("doc.a", &[(0, "a1"), (1, "a2")]);
+        let a = prompt_graph("doc.a", &[(1, "a2"), (0, "a1")]);
         let b = prompt_graph("doc.b", &[(0, "b1")]);
         let members: Vec<(&Id, &SourceDocumentGraph)> =
             vec![(&a.document.document_id, &a), (&b.document.document_id, &b)];

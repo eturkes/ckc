@@ -747,7 +747,10 @@ aggressively; full pre-consolidation text in git history.
 - RESPEC-COMPLETENESS: when a unit must CONSTRUCT a type, bank its CONSTRUCTOR + a mirror call site,
   not just a field list — the f-respec banked `SourceTextSpan`'s fields but not `::derive` /
   report.rs `graph` helper → cost a targeted source_linkage.rs read at f1 impl. Fixtures build
-  array-order ≠ `reading_order` to prove the sort.
+  array-order ≠ `reading_order` to prove the sort — verify EVERY parameterized case exercises the
+  property: codex caught f1's direct_smt fixture accidentally pre-sorted (an identity no-op sort
+  would've passed the pin; single_ir alone proved it) → a test that only half-proves its claim is a
+  fake success criterion.
 
 ## Runtime
 
