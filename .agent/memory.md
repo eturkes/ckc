@@ -72,7 +72,12 @@ aggressively; full pre-consolidation text in git history.
   field honestly; a provenance/measurement hash must cover the run's ACTUAL inputs not the whole registry
   even when equal today, else later registry-growth silently rewrites an unrelated run's golden + breaks
   the SPEC per-run locked-measurement semantic → adversarial-verify a banked DESIGN against SPEC intent +
-  reachability, not only its apply-anchors.
+  reachability, not only its apply-anchors. Selecting those actual inputs via a one-directional
+  `filter(want.contains(id))` is asymmetric — it drops unwanted registry entries but never checks every
+  WANTED id resolved; a drifted hardcoded route→id map (typo/rename independent of the fill path) then
+  silently locks `aggregate([])`'s empty-set hash into an attestation record under an `ok` run (.1e-B2a
+  codex) → coverage-check want⊆found, fail loud naming the gap; a normally-unreachable non-model shape
+  in the model-route set is a caller-contract Err, not a silent skip (would zero the want-set).
   The tails hold further cross-route uncertainty
   (source-node dedup vs route-prefixed ids, GroupTrace-from-route) → the read-cost that overflows a
   combined unit lives in the tails, so land the loop first (run-m2.1d5a respec: overflowed the combined

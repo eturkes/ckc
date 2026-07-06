@@ -2189,6 +2189,36 @@ fn aggregate_hashes(mut v: Vec<String>) -> Hash {
     hash_bytes(v.join("\n").as_bytes())
 }
 
+/// Aggregate the §9 route hash over exactly the registry entries a run's
+/// routes consume: gather the wanted entries' hashes, then require every
+/// wanted id to have resolved. A drifted registry — a route id matching no
+/// entry — fails the run rather than silently locking [`aggregate_hashes`]'s
+/// empty-set hash into a measurement record whose whole purpose is
+/// attestation. `want` is non-empty by construction (a model route drove it),
+/// so a full miss surfaces as a missing id, never a silent empty lock.
+fn select_route_hashes<'a>(
+    want: &BTreeSet<Id>,
+    entries: impl Iterator<Item = (&'a Id, &'a Hash)>,
+    kind: &str,
+) -> Result<Hash, String> {
+    let mut found: BTreeSet<Id> = BTreeSet::new();
+    let mut hashes: Vec<String> = Vec::new();
+    for (id, hash) in entries {
+        if want.contains(id) {
+            found.insert(id.clone());
+            hashes.push(hash.as_str().to_owned());
+        }
+    }
+    if &found != want {
+        let missing: Vec<&str> = want.difference(&found).map(Id::as_str).collect();
+        return Err(format!(
+            "manifests: {kind} registry missing route id(s): {}",
+            missing.join(", ")
+        ));
+    }
+    Ok(aggregate_hashes(hashes))
+}
+
 /// Gather the run state the §5/§4.6 manifests attest, one value per
 /// [`ManifestInputs`] fact (failures name their reason; the report processing_stage
 /// scopes them): the resolved §5 plan and toolchain hash; the §4.6 replay
@@ -2276,7 +2306,10 @@ fn manifest_inputs(
 
             // Each model route locks only the schema and prompt its target kind
             // consumes (single_ir → ClinicalIR, direct_smt → SMT query); the
-            // prompt registry is 1:1 with the route.
+            // prompt registry is 1:1 with the route. A layered route carries no
+            // model-fill schema/prompt, so its presence in the model-route set
+            // is a caller contract violation — fail loudly rather than lock an
+            // empty selection.
             let mut want_schema: BTreeSet<Id> = BTreeSet::new();
             let mut want_prompt: BTreeSet<Id> = BTreeSet::new();
             for shape in model_routes {
@@ -2289,7 +2322,11 @@ fn manifest_inputs(
                         want_schema.insert(static_id("schema.smt_query"));
                         want_prompt.insert(static_id("prompt.direct_smt"));
                     }
-                    RouteShape::M1Layered => continue,
+                    RouteShape::M1Layered => {
+                        return Err(
+                            "manifests: layered route carries no §9 model schema/prompt".to_owned()
+                        );
+                    }
                 }
             }
             let schemas = parse_schemas(
@@ -2310,20 +2347,16 @@ fn manifest_inputs(
                         .collect(),
                 )),
                 Some(hash_bytes(&reference)),
-                Some(aggregate_hashes(
-                    schemas
-                        .iter()
-                        .filter(|s| want_schema.contains(&s.id))
-                        .map(|s| s.schema_hash.as_str().to_owned())
-                        .collect(),
-                )),
-                Some(aggregate_hashes(
-                    prompts
-                        .iter()
-                        .filter(|p| want_prompt.contains(&p.id))
-                        .map(|p| p.template_hash.as_str().to_owned())
-                        .collect(),
-                )),
+                Some(select_route_hashes(
+                    &want_schema,
+                    schemas.iter().map(|s| (&s.id, &s.schema_hash)),
+                    "schema",
+                )?),
+                Some(select_route_hashes(
+                    &want_prompt,
+                    prompts.iter().map(|p| (&p.id, &p.template_hash)),
+                    "prompt",
+                )?),
             )
         };
 
@@ -4469,6 +4502,36 @@ processing_stages:
             "{diagnostics:#?}"
         );
         assert_only_logs(&out);
+    }
+
+    // run-m2.1e-B2a codex follow-up — the §9 route-hash selection is coverage-checked:
+    // a wanted registry id resolving to no entry fails loudly (naming the gap) rather
+    // than silently locking `aggregate_hashes(Vec::new())`'s empty-set hash into an
+    // attestation record. Guards run.rs's hardcoded route→id map drifting from the
+    // committed registry independently of the fill path — a registry rename breaks the
+    // fill first, but a hardcoded-id typo would not, so the manifest needs its own guard.
+    #[test]
+    fn select_route_hashes_fails_on_unresolved_want_id() {
+        let clinical = static_id("schema.clinical_ir");
+        let smt = static_id("schema.smt_query");
+        let h1 = hash_bytes(b"clinical-schema-bytes");
+        let entries = [(clinical.clone(), h1.clone())];
+
+        // A fully covered want-set aggregates over exactly the wanted hash.
+        let covered: BTreeSet<Id> = [clinical.clone()].into_iter().collect();
+        assert_eq!(
+            select_route_hashes(&covered, entries.iter().map(|(i, h)| (i, h)), "schema").unwrap(),
+            aggregate_hashes(vec![h1.as_str().to_owned()]),
+        );
+
+        // A wanted id no entry supplies fails, naming the gap — never the empty-set lock.
+        let short: BTreeSet<Id> = [clinical, smt.clone()].into_iter().collect();
+        let err =
+            select_route_hashes(&short, entries.iter().map(|(i, h)| (i, h)), "schema").unwrap_err();
+        assert!(
+            err.contains("missing route id(s)") && err.contains(smt.as_str()),
+            "unexpected error: {err}"
+        );
     }
 
     // Both routes must attest one evaluator identity: a second, disagreeing model
