@@ -4329,7 +4329,7 @@ processing_stages:
         );
 
         // (b)/(c) full rendered bodies. The solver version is live-parsed from the
-        // z3 binary's `--version` (env-dependent, so M1 never const-pins a body) —
+        // z3 binary's `--version` (env-dependent, so no live-run body is const-pinned) —
         // normalize that one token to `Z3_VERSION` and pin every other rendered
         // byte, guarding the M2 sections' rendering over this run's actual values.
         // Each body must carry the version exactly once, so the normalization is

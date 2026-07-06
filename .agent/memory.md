@@ -501,7 +501,8 @@ aggressively; full pre-consolidation text in git history.
   `m2_route_loop_lands_both_routes_namespaced`, no new test fn → suite count unchanged). DURABLE
   (recurs run-m2.2 live pins + acceptance-m2): a full-body `report_en.md`/`report_ja.md` const-pin
   over a REAL run must NORMALIZE the solver version — z3's `--version` is live-parsed at Z3Adapter
-  construction, so it's env-dependent (this is WHY M1 never const-pins a body: run_oracle.rs
+  construction, so it's env-dependent (WHY no LIVE-run body is const-pinned — report.rs const-pins SYNTHETIC bodies freely,
+  their version a hand-set fixture; a live body cannot: run_oracle.rs
   re-renders the landed report.json and compares instead of pinning bytes). Pattern: read
   `solver_identity.version`, assert it appears EXACTLY ONCE per body (a future version colliding with
   another rendered token — the fixture model `runtime_version` `1.0.0`, an integer fraction — then
@@ -515,7 +516,10 @@ aggressively; full pre-consolidation text in git history.
   draw). Pin split: part (a) asserts report.json STRUCTURE (emission_order + k_sample NA + agreed
   identity + taxonomy shape) via the typed `strict_at` Report; the raw metric VALUES
   (`recorded_call_count` 4/1 direct, 3/1 single_ir; delta -1/1; all others 1/1 or 0/1) ride the
-  rendered-body const pins, so the two halves together pin every M2-section value with no overlap.
+  rendered-body const pins. The halves OVERLAP at the render surface (route names, empty
+  taxonomy, baseline id, k_sample NA, model identity appear in both); (a) uniquely pins the
+  TYPED shape (enum order, integer map counts, typed identity fields), the bodies uniquely pin
+  the numeric metric cells + full prose — neither half is dead.
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters
