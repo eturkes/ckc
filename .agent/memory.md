@@ -399,6 +399,19 @@ aggressively; full pre-consolidation text in git history.
   nodes, mints claims/lineage only from compiled groups, and a member-short group `continue`s before
   its GroupTrace push → untraced). Two-run determinism + event census (tails contribute 0 events) →
   .1d5b; §9 report sections (passed `None` here) → .1e.
+- run-m2.1d5a-2b codex-review (xhigh): 4 findings, all under-constrained-assertion gaps (production
+  sound, tests passed). Strengthened: identity-disagreement now pins fail-closed via ABSENT run-level
+  tails — `read_dir(out).sorted()==["logs","routes"]` (the `agree_model_identity` false→`return`
+  precedes the post-loop tails, so no `trace_bundle`/`report`/manifest lands) + direct-first order via
+  `routes/pipe.m2_direct_smt/groups/group.m1_no_conflict/verifier_results.json` exists (empirically
+  confirms the `pipelines:[direct,single_ir]` resolve order the comment claimed, else direct never
+  runs); member-short now pins tails-COMPLETE via `trace_bundle.json`+`report.json` exist, and
+  exactly-one-short via Invalid-`compile`-event `.count()==1`. CORRECTED event-scope model (I had it
+  wrong first pass): command-scope diagnostics (`shell.diagnostic`) ride the CLOSING command event =
+  `events.last()` (`processing_stage`==operation_id `"m1"`), NOT "no event"; stage-scope diagnostics
+  ride their processing_stage event; BOTH land in `logs/diagnostics.jsonl` (=`self.ledger`, append
+  order) = the `executed()`-returned `diagnostics` vec (all scopes) → pin command-scope by
+  `events.last().diagnostics` carrying it, not by absence from events.
 - run-m2.1d5a-2 codex-review (xhigh): core soundness CONFIRMED — fail-closed (each tail = one
   `landed` Result-funnel, every failure → the single Err arm that raises `shell.diagnostic` when
   `!emit_event`), M1 byte-identical, `.expect(baseline)` unreachable (`baseline()` set-form filters

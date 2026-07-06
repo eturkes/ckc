@@ -3834,7 +3834,7 @@ processing_stages:
         )
         .unwrap();
 
-        let (result, events, diagnostics, _out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        let (result, events, diagnostics, out, _tmp) = executed(root.path(), "exp.m2_multihop");
         assert_eq!(result.outcome, Outcome::Invalid);
 
         // The fill loop runs before the group loop, so the member's model_fill read
@@ -3876,14 +3876,37 @@ processing_stages:
             "{compile:#?}"
         );
 
-        // The compile short rides its §4.6 event too: one Invalid `compile` event
-        // carrying exactly that diagnostic and landing no artifact. The only Invalid
-        // compile event is the member-short group's (m1_no_conflict compiles clean; the
-        // direct route runs no compile processing_stage).
-        let compile_event = events
+        // The fill failure is command-scope: guideline_b's cassette-read diagnostic rides
+        // the closing command event (the last event `finish` appends, which carries the
+        // command-scope diagnostics), not a model_fill stage event — single_ir_fill raises
+        // it directly and returns before the fill event. A regression turning it into a
+        // stage outcome would move it off the command event onto the fill's own event.
+        let command_event = events
+            .last()
+            .expect("the run appends a closing command event");
+        assert!(
+            command_event.diagnostics.iter().any(|d| {
+                d.payload
+                    .iter()
+                    .any(|(k, v)| k.as_str() == "cassette" && v == "test_source.m1_guideline_b")
+            }),
+            "the cassette-read failure rides the command event"
+        );
+
+        // The compile short rides its §4.6 event too: exactly one Invalid `compile`
+        // event — the member-short group's — carrying exactly that diagnostic and landing
+        // no artifact (m1_no_conflict compiles clean; the direct route runs no compile
+        // processing_stage), so a second shorted group would break this count.
+        let invalid_compiles: Vec<_> = events
             .iter()
-            .find(|e| e.processing_stage == static_id("compile") && e.outcome == Outcome::Invalid)
-            .expect("the member-short group emits its compile event");
+            .filter(|e| e.processing_stage == static_id("compile") && e.outcome == Outcome::Invalid)
+            .collect();
+        assert_eq!(
+            invalid_compiles.len(),
+            1,
+            "exactly one group shorts its compile"
+        );
+        let compile_event = invalid_compiles[0];
         assert_eq!(compile_event.diagnostics.len(), 1);
         assert!(compile_event.output_hashes.is_empty());
         assert!(
@@ -3892,6 +3915,20 @@ processing_stages:
                 .iter()
                 .any(|(k, v)| k.as_str() == "group" && v == "group.m1_conflict"),
             "{compile_event:#?}"
+        );
+
+        // The run recovers past the short group: the run-level tails run to completion
+        // over what landed (the clean m1_no_conflict group + both routes' docs, the
+        // bundle-less guideline_b doc included), landing the run-root trace + report. A
+        // regression returning on the short instead of continuing would leave these
+        // absent.
+        assert!(
+            out.join("trace_bundle.json").exists(),
+            "the tails land the run trace"
+        );
+        assert!(
+            out.join("report.json").exists(),
+            "the tails land the run report"
         );
     }
 
@@ -3960,7 +3997,7 @@ processing_stages:
             .unwrap();
         store.persist(&key, wrapper).unwrap();
 
-        let (result, _events, diagnostics, _out, _tmp) = executed(root.path(), "exp.m2_multihop");
+        let (result, _events, diagnostics, out, _tmp) = executed(root.path(), "exp.m2_multihop");
         assert_eq!(result.outcome, Outcome::Invalid);
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert!(
@@ -3969,6 +4006,26 @@ processing_stages:
                 .iter()
                 .any(|(_, v)| v.contains("model routes disagree on the model identity")),
             "{diagnostics:#?}"
+        );
+
+        // Fail-closed: the disagreement returns from the route loop before the run-level
+        // tails, so no run-root tail artifact lands — the run out holds only `logs` and
+        // `routes`. Asserting outcome + message alone would pass even if execution
+        // wrongly continued into the tails; the absent tail set pins the stop.
+        let mut root_entries: Vec<String> = std::fs::read_dir(&out)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        root_entries.sort();
+        assert_eq!(root_entries, ["logs", "routes"], "no run-level tail landed");
+        // The direct route (first in the set) had already run to completion, establishing
+        // the agreed identity, so its subtree is fully landed; single_ir's guideline_a
+        // fill is the divergent second attestation. A flipped set order would run
+        // single_ir first and leave the direct subtree absent, breaking this.
+        assert!(
+            out.join("routes/pipe.m2_direct_smt/groups/group.m1_no_conflict/verifier_results.json")
+                .exists(),
+            "the direct route attests first, landing its subtree before the stop"
         );
     }
 
