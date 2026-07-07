@@ -451,6 +451,22 @@ aggressively; full pre-consolidation text in git history.
   growth → lexicon_hash value pins (lexicon-cnl.1); report CNL population → M1/M2 report +
   rendered-body pins (report-cnl.2/.3). Surface-quality metric rows gate on observations
   carrying the new FillObservation fields → M2 replay rows byte-unchanged (metrics-cnl proves).
+  Archive-mined additions (user-directed 1M dig, 2026-07-07; measured priors distilled into
+  docs/poc-archive.md — SPEC §10/§11/§7.3 cite it, sessions read the SPEC text not the doc):
+  §7.3 gains the translation-faithfulness family + M3 unit metrics-faithful
+  (ir_faithfulness_rate = accepted IR content-hash == in-run deterministic reference
+  recompute; verdict metrics saturate + round-trip certifies only the surface, so an
+  accepted-but-mistranslated doc is otherwise invisible until M4); record-cnl.1 probes grammar
+  repetition points for degeneration loops (archived prior: verbose grammar-masked forms loop
+  + truncate); §11 seeded with route.reason_ir (free-reasoning stage → constrained commit —
+  the constraint-placement axis; sole archived form to beat single-IR faithfulness) +
+  indirect-rendering test-source variants (semantic indirection dents faithfulness where
+  surface-metamorphic variants leave verdicts intact). Census lens for record-cnl.3/
+  acceptance-m3: the archived conflict-killer signature = stable same-direction misses on
+  conflict groups (well-formed wrong deontic token) — check the M3 recorded census against it
+  before attributing verdict deltas to the CNL surface. Archives live at
+  ~/Projects/scratch/ckc-archive{,2} (poc-m2-3-4 branch = the PoC; archive2 = pre-restart spec
+  lineages, mined empty for CNL/DSL content).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)

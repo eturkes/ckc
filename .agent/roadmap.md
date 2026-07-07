@@ -192,6 +192,18 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   accepted_rules) + round_trip_identity_rate + surface_tokens_per_accepted_rule rows (§7.3
   surface-quality family; rows emitted only when observations carry the fields — prove M2
   replay rows byte-unchanged) + delta/NA wiring + tests.
+- [ ] metrics-faithful: FillObservation optional ir_match bool + ir_faithfulness_rate row
+  (§7.3 translation-faithfulness family, §10) — run.rs fill-tail computes it for IR-landing
+  model routes: landed clinical_ir wrapper content_hash == content_hash of the deterministic
+  reference derivation, the M1 normalize+derive chain recomputed in-run over the route's own
+  head values already in hand (single_ir: accepted fill; single_cnl: bridged IR; direct_smt
+  lands no IR → field None, row not_applicable). Strict content-hash equality (bridge ids
+  mirror rules.rs §8.6 conventions, so the golden path byte-matches — M2 precedent: golden
+  route bundle hash == M1's). Rows gate on observations carrying the field (M2 replay rows
+  byte-unchanged, omit-None); deltas ride the existing route-delta loop. Tests: match /
+  mismatch / None-NA + golden-path 1.0 + M2-replay byte-pin. Read scope: normalize/derive fn
+  signatures, run.rs fill-tail region, metrics.rs row assembly — the §7.3 family text names
+  the rationale (docs/poc-archive.md stays out of the implement window).
 - [ ] report-cnl.1: Report shape — cnl_documents (per-doc {ja,en} text hashes) + cnl_rules
   (per-rule {ja,en} strings) omit-empty members + validate rules (sorted ids, line-break-free
   strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing
@@ -209,7 +221,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   clinical_cnl_ja.grammar; probe one constrained emission (scratch, uncommitted); verify
   multibyte whole-surface terminals + the open escape-content production survive the runtime
   constraint mechanism (§9 truncation +
-  UTF-8 boundary lessons); template refinement from observation + RecordParts byte-verify
+  UTF-8 boundary lessons); probe repetition points (DNF connectives / exception sentences /
+  rule+) for degeneration loops under the token budget — archived-PoC prior: grammar-masked
+  verbose forms loop at unbounded repetition and truncate mid-structure (§10 emission-posture
+  paragraph carries the mitigation frame); template refinement from observation + RecordParts byte-verify
   green + model_ms_per_call budget entry. Machine specifics → runtime.local.md, committed
   bytes stay engine-agnostic.
 - [ ] record-cnl.2 (gated: model runtime, LIVE): record exp.m3_cnl in a scratch root; copy
@@ -221,6 +236,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   audit-file pins over the committed cassettes (recorded_run.rs pattern, own test file — M2
   battery untouched).
 - [ ] acceptance-m3: §10 acceptance themes against the recorded run (3-route raw-before-delta,
-  determinism laws green, round-trip rate 1.0 on accepted docs, audit views every route incl.
+  determinism laws green, round-trip rate 1.0 on accepted docs, faithfulness rows emitted
+  beside surface rows — measured never gated, golden path 1.0, audit views every route incl.
   M1, golden-cassette reproduce-M1 gate, replay byte-stability, grammar/lexicon drift guards,
   §0 vocabulary) via the acceptance-driver pattern; tag accept/m3.

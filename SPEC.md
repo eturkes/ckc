@@ -614,7 +614,10 @@ completeness, determinism (hash stability), baseline delta (per-metric route-ver
 identical test sources: model routes from M2, layered-minus-direct from M4), route quality
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
 from M2), surface quality (round-trip identity rate, surface tokens per accepted rule; from
-M3), model-free coverage (share of fresh-document semantics produced deterministically from
+M3), translation faithfulness (share of a route's accepted documents whose IR content equals
+the deterministic reference derivation over identical inputs — conflict-quality verdicts
+saturate while faithfulness still separates routes, `docs/poc-archive.md`; from M3),
+model-free coverage (share of fresh-document semantics produced deterministically from
 accepted mappings, with zero application phase model calls; from M4), claim completeness (share
 of normative-candidate source regions claimed by an accepted rule or covered by a typed
 residual, §11; from M4), and loop outcomes (from M5).
@@ -865,7 +868,12 @@ deterministic CNL parse ⇄ verbalize ⇄ executable formal target, no determini
 Japanese-parsing CNL exists, and no published system wires a CNL grammar into LLM constrained
 decoding — the gaps this milestone occupies. Direct evidence for the architecture: constrained
 decoding into a canonical CNL then deterministically mapping to logic beats decoding formal
-syntax directly (Shin et al. 2021, in cnl-landscape.md). Mined patterns: ACE
+syntax directly (Shin et al. 2021, in cnl-landscape.md). Measured priors from the archived
+throwaway PoC (`docs/poc-archive.md` — 9-route field, weak local model, real solver): one
+constrained hop with the source sentence and full vocabulary in view beat every constrained-hop
+stack; a hand-written grammar mask closed the validity→acceptance gap wholesale; and invented
+ASCII record DSLs under that mask stably emitted the WRONG deontic direction token while
+verdicts stayed well-formed — the failure classes this CNL's design answers. Mined patterns: ACE
 interpretation-rules-by-decree + verbalize-the-canonical-form; FRET/BRIDGE-Wiz slotted prose;
 PENG single bidirectional grammar; 産業日本語/Miyata JA sentence patterns; PROLEG separate
 labeled exceptions; AceWiki/Codeco depth-bounded enumeration testing. PENS target: P5 E3 N4 S4
@@ -966,7 +974,16 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   hypothesis: a Japanese-capable weak model emits grammar-constrained Japanese CNL more
   reliably than JSON — controlled prose sits near its pretraining distribution and the grammar
   only keeps it on the rails (Shin et al. 2021; the KGQA CNL result; the cnl-landscape.md
-  evidence table). If a §11 ablation (compact record DSL) wins emission instead, the CNL stays
+  evidence table). The archived PoC pins the two risks this bet must clear
+  (docs/poc-archive.md): grammar-masked ASCII record DSLs saturated validity yet stably
+  emitted the wrong direction token — every conflict pair missed as same-direction — and
+  verbose forms degenerately looped at grammar repetition points until the token budget
+  truncated them. ClinicalCNL answers the first by carrying direction as the source register's
+  own deontic phrases (lexicon modality surfaces, not abstract tokens) — the §11 ablation
+  measures whether that works — and the second is watched directly: the record-time constraint
+  audit probes DNF/exception repetition points for degeneration, and
+  `surface_tokens_per_accepted_rule` plus the §9 truncation diagnostic expose it in recorded
+  runs. If a §11 ablation (compact record DSL) wins emission instead, the CNL stays
   the audit surface via render-from-accepted-IR and the probabilistic step retargets — the
   architecture is invariant to that outcome.
 - §7.4 M3 codes: `cnl_parse_error` (repairable; reason in payload, empty refs — mirrors
@@ -975,7 +992,16 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   drift, never a model failure), `cnl_unregistered_concept` (terminal; the escape-production
   reject — payload = the lexicon-entry proposal, quoted surface + atom position).
 - §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
-  `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows.
+  `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows; and the
+  translation-faithfulness family — `ir_faithfulness_rate`: the share of a route's accepted
+  documents whose ClinicalIR content-hash equals the deterministic M1 derivation recomputed
+  over the run's own landed extract/segment artifacts (single_ir compares its accepted fill,
+  single_cnl its bridged IR; direct_smt lands no IR → not_applicable). Exact-reproduction rate,
+  strict by design (§11 may grade partial faithfulness); rationale: verdict-level conflict
+  metrics saturate while faithfulness still separates routes, and round-trip identity alone
+  certifies the SURFACE, never the translation (docs/poc-archive.md — grammar-masked routes
+  held 100% round-trip-stable emission over 50% wrong verdicts). The golden-cassette
+  reproduce-M1 path pins this rate at 1.0.
 - Validation program (sophistication over example count): depth-bounded AST enumeration →
   render → parse == identity with a single-parse assertion (the Codeco method);
   malformed-input battery (bare off-lexicon surface = parse error vs escaped = accept-time
@@ -1006,7 +1032,9 @@ contraindication tail: 「…抗菌薬Aの投与は禁忌である。」
 
 Acceptance themes (finalized at M3 planning): `exp.m3_cnl` executes all three routes over the
 locked M1 inputs with raw rows before deltas; the determinism laws hold as property tests;
-every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric); audit
+every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric);
+faithfulness rows emit beside the surface rows (measured, never gated — the weak baseline may
+honestly read low or not_applicable; the golden path reads 1.0); audit
 views render deterministically for every route including M1's; the golden-cassette
 reproduce-M1 gate passes; recorded model I/O replays byte-stably; grammar/lexicon exports carry
 drift guards; §0 vocabulary holds.
@@ -1033,6 +1061,17 @@ Committed direction:
 | `route.ckc_layered` | Model fills CKC layers stage by stage (segment → statement → rule), each grammar-constrained; the §6 compiler takes over. |
 | `route.ckc_rec_dsl` | Model emits a compact line-oriented record DSL (id-forward, minimal terminal set; `docs/cnl-design-codex.md` carries the sketch); deterministic parse → IR. The CNL's token-compactness ablation. |
 | `route.slot_cnl` | Labeled-slot CNL variant (BRIDGE-Wiz/FRET-style explicit slot lines) — the readability-versus-emission midpoint between `single_cnl` and `ckc_rec_dsl`. |
+| `route.reason_ir` | Unconstrained free-text reasoning stage → constrained single-IR commit; only the commit is accepted/bridged. The constraint-placement axis: reasoning room BEFORE the grammar, versus more constrained hops. Archived-PoC prior: the sole form to beat single-IR faithfulness, on indirect surfaces (0.70→0.90 exact-IR match, verdicts saturated at 1.0 for both), at a sampling-variance cost on the free stage. |
+
+Archived-PoC priors for this field (docs/poc-archive.md; throwaway harness, so priors, not
+locked measurements): constrained-hop stacking hurt weak-model verdict accuracy (every
+multi-stage failure at the final typing stage); the grammar mask closed the validity→acceptance
+gap that JSON-Schema constraint cannot (var/op/value coupling); compact beat verbose under
+token budgets (verbose forms loop at repetition points and truncate); a JSON-IR landing beat
+the invented-DSL landing on the final typing hop; and the invented-DSL conflict miss was a
+stable direction-polarity collapse — assess every candidate against BOTH §7.3 families (route
+quality AND conflict quality) before any beats/does-not-beat claim, since grammar-driven
+stability without faithfulness is the stability of a wrong answer.
 
 - Every route registers its schemas/grammars and a deterministic bridge into the §6 profile,
   keeping conflict-task scoring identical across routes; all §9–§11 routes run `exp.m4_routes`
@@ -1040,7 +1079,8 @@ Committed direction:
   accuracy, k-sample convergence, and §10 surface-quality metrics emit as raw rows before
   ranking. Invented candidates run singular and layered — stacked and hop-chain compositions
   over invented and existing dialects — with design dimensions recorded per candidate: token
-  compactness, grammar constraint strength, semantic distance per hop, layer composability
+  compactness, grammar constraint strength, semantic distance per hop, constraint placement
+  (free-reasoning versus constrained stages), layer composability
   (the §12 search-space seed coordinates). Baseline deltas measure against both
   `route.direct_smt` and the best existing-IR route.
 - `pipe.direct_rule_to_smt` (`exp.m4_compare`, the deterministic architecture-ablation
@@ -1050,7 +1090,11 @@ Committed direction:
 - Test source growth: 4–6 additional synthetic documents sharing populations/actions/conditions
   across documents (reuse pressure), plus deterministic metamorphic variants of M1 documents
   (punctuation, kana/kanji, section order) committed as test-source variants with declared
-  provenance, plus threshold-conflict and factual-conflict cases for the M4 conflict kinds.
+  provenance, plus indirect-rendering variants — semantic indirection with unchanged reference
+  semantics: registered-concept synonyms, oblique deontic phrasing, convention terms whose
+  numeric semantics live in the lexicon, negated phrasing — the axis that dents faithfulness
+  while surface-metamorphic variants leave verdicts intact (docs/poc-archive.md), plus
+  threshold-conflict and factual-conflict cases for the M4 conflict kinds.
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
   `compactness_front.json` join the trace exports — the front doubles as the
