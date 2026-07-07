@@ -409,6 +409,32 @@ aggressively; full pre-consolidation text in git history.
   `schemas/clinical_cnl_{ja,en}.grammar`, registry schema id `clinical_cnl`; `route.single_cnl`
   stays (parallel to single_ir). GF adoption deferred until JA parse of
   non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
+- M3 plan (ClinicalCNL v1; gate MET at planning — runtime identity probe clean, contract-
+  conformant). Durable decisions beyond the roadmap lines (which collapse at M3 review):
+  module home = ckc-cli FRESH modules (cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/
+  cnl_bridge.rs) — Lexicon lives in ckc-cli::normalize, Canonical-outside-core proven by
+  report.rs; ckc-core + committed clinical_ir.schema.json untouched (ClinicalStatement already
+  carries certainty/exceptions/source refs). CNL AST = own family, NOT ClinicalIr (CnlAtom
+  Concept|ConceptNegated|Interval|Unregistered — escape is a variant; CnlContext flat two-level
+  DNF; CnlDocument payload = AST only, canonical TEXT derived by render, text hashes ride
+  report.json); parser mints NO ids — bridge derives them (`<doc>.rule.<k>` document order;
+  one ClinicalStatement per context-disjunct; population partition by `pop.*` id namespace;
+  exception disjunct → one ExceptionClause; one Exact TerminologyBinding per referenced
+  concept, system = lexicon.system; basis = region ids, source_segment_ids derived
+  region→segment via graph). Grammar terminals = whole-surface string literals ONLY (no char
+  classes/ranges; ASCII-digit alternation) — LLM-constraint-portable + bnf-atomic; bnf 0.6
+  verified unicode-capable (byte-offset whole-terminal matching); its Earley oracle proves
+  language MEMBERSHIP (superset — explores all segmentations) → lexer segmentation determinism
+  guarded by the lexicon same-category proper-prefix lint instead; single-parse asserts =
+  `parse_input().take(2)`, never full counts (ambiguous blowup). FillReject grows Parse
+  (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
+  = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
+  spends no repair). Record strategy: scratch-root record, copy route.single_cnl/** into
+  committed /cassettes (keys disjoint from M2's); identity drift ⇒ full re-record + M2
+  recorded_run re-bless fallback. Deliberate re-bless costs scheduled in units: ja_core.yaml
+  growth → lexicon_hash value pins (lexicon-cnl.1); report CNL population → M1/M2 report +
+  rendered-body pins (report-cnl.2/.3). Surface-quality metric rows gate on observations
+  carrying the new FillObservation fields → M2 replay rows byte-unchanged (metrics-cnl proves).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
