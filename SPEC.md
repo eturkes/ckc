@@ -615,7 +615,9 @@ identical test sources: model routes from M2, layered-minus-direct from M4), rou
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
 from M2), surface quality (round-trip identity rate, surface tokens per accepted rule; from
 M3), model-free coverage (share of fresh-document semantics produced deterministically from
-accepted mappings, with zero application phase model calls; from M4), and loop outcomes (from M5).
+accepted mappings, with zero application phase model calls; from M4), claim completeness (share
+of normative-candidate source regions claimed by an accepted rule or covered by a typed
+residual, §11; from M4), and loop outcomes (from M5).
 
 ### §7.4 Diagnostics
 
@@ -634,7 +636,8 @@ false_positive_conflict false_negative_conflict metamorphic_instability
 M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
 `repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`,
 `cnl_unregistered_concept`);
-M4 adds invented-DSL route codes; M5 adds loop/budget/surface codes
+M4 adds invented-DSL route codes and the claim-completeness code
+(`normative_region_unclaimed`, §11); M5 adds loop/budget/surface codes
 (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
 is defined in its milestone section at elaboration time.
 
@@ -1079,6 +1082,16 @@ Committed direction:
   `G-RULE-EVAL` boundary per §6.
 - Informalization round-trip metamorphic, concrete via the CNL: accepted IR → canonical CNL →
   route re-parse → normalized-hash compare, reported as a route-stability metric.
+- Claim-completeness instrument (route-independent; the recall converse of §9 grounding, which
+  checks emitted→source only): a recorded classifier pass enumerates the SourceDocumentGraph's
+  regions deterministically and labels each normative-candidate or non-normative; every
+  normative-candidate region ends claimed — referenced from an accepted rule's basis — or
+  covered by a typed residual; unclaimed candidates emit `normative_region_unclaimed`
+  (residual-class, §7.4). This narrows the silent-loss surface from "model skipped a
+  recommendation" to "classifier mislabeled a region" — a simpler, independently k-sampled
+  judgment riding the same recorded model boundary. Calibrated here against set A/B references
+  (flag rate versus known reference misses — measured false-flag and miss rates); load-bearing
+  from M6, where real documents carry no reference (§13.1). Metric: claim completeness (§7.3).
 - `registry/methods.yaml` seeded from the `docs/` compendium (§14).
 - Wording: route results are locked measurements (s0/s1 raw rows); runtime reference fidelity
   claims sit behind `G-RUNTIME-REFERENCE`.
@@ -1091,7 +1104,8 @@ component hashes across metamorphic variants for the layered pipeline; recorded 
 replays byte-stably; path and reuse visualizations emit with deterministic bytes; expected
 conflict/no-conflict outcomes hold per reference; LP-lane fixture queries replay with verdicts
 lane-labeled; replay holds for both pipelines; `candidate_diff.json` is complete; the coverage
-report emits with raw rows first.
+report emits with raw rows first; the claim-completeness instrument calibrates against set A/B
+references (false-flag and miss rates reported).
 
 ## §12 M5 — Autonomous optimization PoC (requirements; elaborate at M4 acceptance)
 
@@ -1181,6 +1195,10 @@ Stage III CDS-backend target visible behind gates.
   UCUM-compatible conversion tables; raw Japanese unit strings preserved; threshold conflicts
   compare unit-normalized values only); reference segment/statement labels for at least one real
   test source; extractor promotion claims trigger `G-EXTRACTOR-ADAPTER`.
+- Completeness: the §11 claim-completeness instrument is load-bearing here — real corpus slices
+  carry reference labels for at most a few sources, so every normative-candidate region must
+  end claimed or typed-residual (`normative_region_unclaimed`); a skipped recommendation is a
+  visible diagnostic, never a silent loss.
 - Terminology: MEDIS standard code tables (病名/HOT) as the first external systems behind the
   TerminologyBinding requirements; version-pinned snapshots; JLAC10/11 laboratory codes registered
   next; license-encumbered vocabularies (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until
@@ -1191,7 +1209,8 @@ Stage III CDS-backend target visible behind gates.
 
 M6 acceptance themes (finalized at elaboration): the M1–M5 experiment set re-runs end-to-end
 over at least one real Minds-family corpus slice plus its e-PI counterpart with live permission
-records, redaction, and drift checks; the cross-source flagship experiment registers.
+records, redaction, drift checks, and claim-completeness reporting; the cross-source flagship
+experiment registers.
 
 ### §13.2 Expansion principles (elaborate per candidate)
 
