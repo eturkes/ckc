@@ -1,13 +1,20 @@
 # Archived PoC — measured route/DSL priors (throwaway harness, 2026-06)
 
-Provenance: `~/Projects/scratch/ckc-archive` branch `poc-m2-3-4` (`poc/DESIGN.md` = contract,
-`poc/README.md` = recorded results, `.agent/memory.md` M5 section = distilled lessons,
-`poc/runs/` on disk holds `report.json` per run). `ckc-archive2` = the two earlier spec
-lineages (branches `archive/spec01..03`; original charters `SPEC_A/B/C.md`) — no CNL/DSL
-content beyond what the current SPEC already distilled. This file carries the PoC's
-inspiration-bearing measurements into the committed compendium; §10/§11 cite it as PRIORS —
-a throwaway spec-deviating harness (Python stdlib + llama-server HTTP + z3 subprocess), NOT
-locked measurements of this pipeline.
+Provenance, all in-repo: branch `archive/poc-m2-3-4` + tag `accept/m2-3-4-poc` hold the PoC
+(`poc/DESIGN.md` = contract, `poc/README.md` = recorded results verified cell-for-cell at PoC
+acceptance, `.agent/memory.md` M5 section = distilled lessons, `poc/dataset.json` = fixture);
+matrix5/matrix9 raw per-sample rows were gitignored run artifacts, never committed — the
+branch README tables are the record. The never-doc-synced M5 oblique evidence is committed
+beside this file: `docs/poc-archive/oblique_demo.report.json` +
+`docs/poc-archive/oblique_k3.report.json` (canonical report bytes of those runs). Branches
+`archive/spec01..03` = the two earlier spec lineages, mined empty for CNL/DSL content beyond
+what the current SPEC already distilled; `docs/charters/` = the genesis documents
+(`cds_prompt.md` = the origin prompt; `SPEC_A/B/C.md` = its three charter executions, C the
+post-M1 auditor-first synthesis — mine it at M4/M7 elaboration for MCS revision-candidate +
+formal-portfolio ideas). This file carries the PoC's inspiration-bearing measurements into
+the committed compendium; §10/§11 cite it as PRIORS — a throwaway spec-deviating harness
+(Python stdlib + llama-server HTTP + z3 subprocess), NOT locked measurements of this
+pipeline.
 
 Harness: 20 synthetic JA rules (require/forbid drug under conjunctive conditions), 10 gold
 conflict/no-conflict pairs, 5 surface families re-expressing the same rules (directive /

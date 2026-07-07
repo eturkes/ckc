@@ -464,9 +464,11 @@ aggressively; full pre-consolidation text in git history.
   surface-metamorphic variants leave verdicts intact). Census lens for record-cnl.3/
   acceptance-m3: the archived conflict-killer signature = stable same-direction misses on
   conflict groups (well-formed wrong deontic token) — check the M3 recorded census against it
-  before attributing verdict deltas to the CNL surface. Archives live at
-  ~/Projects/scratch/ckc-archive{,2} (poc-m2-3-4 branch = the PoC; archive2 = pre-restart spec
-  lineages, mined empty for CNL/DSL content).
+  before attributing verdict deltas to the CNL surface. Archived lineages live IN-REPO:
+  branch archive/poc-m2-3-4 + tag accept/m2-3-4-poc (the PoC), branches archive/spec01..03
+  (pre-restart spec lineages, mined empty for CNL/DSL), docs/charters/ (genesis prompt + its
+  three charter executions), docs/poc-archive/*.json (M5 oblique canonical reports, the
+  never-doc-synced evidence) — scratch copies outside the repo are dispensable.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
