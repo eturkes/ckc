@@ -9,10 +9,9 @@ aggressively; full pre-consolidation text in git history.
 
 - Context hygiene (user directive; bg `git show 531f586`): keep every session lean + phrased in project
   vocabulary (processing stages, units, gates, artifacts) — plain operational words over research jargon
-  in memory/roadmap/commits/code. Consult `docs/` via read-only subagents so its vocabulary stays out of
-  the main window. Root `.rgignore` keeps ripgrep sweeps (subagent Grep, `rtk proxy rg`) out of `docs/`;
-  Bash `grep -r` still enters it → scope Bash greps by path; deliberate docs searches use `git grep <pat>
-  -- docs/`, `rg --no-ignore`, or explicit paths. Implement sessions match patterns from the latest
+  in memory/roadmap/commits/code. `docs/` (research compendium) is git-history-resident — SPEC §14
+  holds the retrieval recipe (`git show e8b5cf6:docs/<file>`); consult via read-only subagents so its
+  vocabulary stays out of the main window. Implement sessions match patterns from the latest
   unit-scoped commit (`git log --oneline`), not bare HEAD, when HEAD is hygiene/memory work.
 - AI-written specs may carry mistakes (user, 2026-07-03): apparent incorrectness is likely unintended —
   verify against SPEC.md + code, rule with best judgment, record the ruling where its implementer reads it
@@ -105,15 +104,14 @@ aggressively; full pre-consolidation text in git history.
   files its half leaves untouched; land a compiling skeleton before the full test battery — `cargo check`
   after the production edits, an end-loaded uncompiled battery leaves nothing landable; pin expected
   shapes from observed output, never hand-computed; spec code references = fn/test NAMES, ≈line =
-  secondary hint only (drifts under edits above it); cite only untagged checked roadmap lines as anchors
-  (`[S]` = salvage-assisted, usage understated). At plan/re-scope time audit any spec a unit must
+  secondary hint only (drifts under edits above it). At plan/re-scope time audit any spec a unit must
   byte-reproduce — readability listings (alignment padding, inline result comments, illustrative
   declaration/conjunct order) contradict deterministic-emission rules and need a scheduled re-pin
   deliverable (smt-emit.3a: §8.6 smt2 vs §6 sorted-declaration). SALVAGE RETIRED (user directive,
   2026-07-02): banking applyable wip artifacts (`.agent/wip-*`
   patches / byte-exact code copies / transcription blueprints a redo line points at) cheats the unit — the
-  redo's recorded context-usage measures artifact application, not the unit as specced, so sizing
-  anchors come from untagged stubs only. Overflow recovery is LAND-OR-REVERT: either the proven half closes
+  redo's recorded context-usage measures artifact application, not the unit as
+  specced. Overflow recovery is LAND-OR-REVERT: either the proven half closes
   as its OWN completed unit (own gate, own honest usage figure, artifacts committed at their final paths)
   within the session's remaining margin, or the tree reverts CLEAN and the recovery respec-splits into
   fresh SELF-CONTAINED units. A respec line may resolve decisions, confirmed facts, and reading pointers
@@ -379,15 +377,9 @@ aggressively; full pre-consolidation text in git history.
   revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
-- M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; full-body read of the ~19K-line
-  milestone diff; committed standing evidence re-confirmed green — full gates + the recorded_run
-  battery; the six §9 theme verdicts rest on acceptance-m2's LOCAL driver run, independently
-  codex-re-verified there, per the evidence-runs-local acceptance design; full-repo engine-token
-  triage clean). Fixes:
-  rustdoc debt cleared (17 ckc-cli private-link + 17 ckc-core macro-doc errors → workspace 0),
-  stale lib.rs metrics doc re-tensed, direct_smt_fill record-prompt composition hoisted out of the
-  timed fill interval (M2.7 clock discipline, matching single_ir_fill), 13 obsolete
-  `#[allow(dead_code)]`s removed (all consumers landed). OPEN user items unchanged: SPEC §8.4
+- M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; fixes in 5ec33f7). Durable: the six
+  §9 theme verdicts rest on acceptance-m2's LOCAL driver run (evidence-runs-local design,
+  independently codex-re-verified). OPEN user items: SPEC §8.4
   "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
   `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
   enhancement, still preferred); shared cross-crate subprocess runner + registry symlink guard
@@ -464,11 +456,12 @@ aggressively; full pre-consolidation text in git history.
   surface-metamorphic variants leave verdicts intact). Census lens for record-cnl.3/
   acceptance-m3: the archived conflict-killer signature = stable same-direction misses on
   conflict groups (well-formed wrong deontic token) — check the M3 recorded census against it
-  before attributing verdict deltas to the CNL surface. Archived lineages live IN-REPO:
-  branch archive/poc-m2-3-4 + tag accept/m2-3-4-poc (the PoC), branches archive/spec01..03
-  (pre-restart spec lineages, mined empty for CNL/DSL), docs/charters/ (genesis prompt + its
-  three charter executions), docs/poc-archive/*.json (M5 oblique canonical reports, the
-  never-doc-synced evidence) — scratch copies outside the repo are dispensable.
+  before attributing verdict deltas to the CNL surface. Archived lineages live IN-REPO
+  (history refs, zero working-tree presence): branch archive/poc-m2-3-4 + tag
+  accept/m2-3-4-poc (the PoC), branches archive/spec01..03 (pre-restart spec lineages, mined
+  empty for CNL/DSL), and at `e8b5cf6` docs/charters/ (genesis prompt + its three charter
+  executions) + docs/poc-archive/*.json (M5 oblique canonical reports, the never-doc-synced
+  evidence) — scratch copies outside the repo are dispensable.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -531,12 +524,12 @@ aggressively; full pre-consolidation text in git history.
   engine at build time behind the generic harness contract (greedy + fixed seed, grammar/JSON-Schema
   constraint fed by the exported `schemas/`, recorded subprocess, identity/quant/runtime-version in
   manifests); match §3's engine-neutral phrasing `the M2 local-model runtime`. The CONCRETE runtime/model
-  actually used is a machine-specific environment detail recorded in `## Runtime (machine-specific)` below,
-  NOT in the agnostic deliverable (the contract is the artifact; the pick is config). `docs/` research
-  corpus (model-routes.md etc.) may name engines as landscape — out of scope. Fixtures/test
+  actually used is a machine-specific environment detail recorded in `## Runtime` below,
+  NOT in the agnostic deliverable (the contract is the artifact; the pick is config). The
+  history-resident `docs/` corpus names engines as landscape — outside the tree audit. Fixtures/test
   values obey this too — use unmistakably-synthetic tokens (`model.baseline`/`fixture_quant`/`1.0.0`),
   since a realistic generic quant/format token still names a real scheme (M2.1 codex follow-up: a
-  real bit-width token had slipped into a fixture whose comment asserted it named none; RECURRED M2.9 r3 — `q4` slipped into a model-adapter test fixture, the dialect-only de-leak grep missed it). Audit = word-boundary `git grep -niP` (names `\b`-bracketed) over EVERY forbidden category (engines + grammar dialects + quant/model-format tokens `q4`/`gguf`/…), not just one, and not a bare substring grep (false-matches a Cargo.lock dependency name). Catch the bare quant token with a case-SENSITIVE lowercase `\bq[2-8](_[0-9km])?\b` (drop the global `-i`, wrap the engine/dialect/format names in `(?i:...)`): it matches `q4`/`q4_0` yet skips the uppercase `Q1`/`Q2` SMT labels (a case-INSENSITIVE `q[2-8]` false-hits them — the prior skip-bare-`q[2-8]` rule left bare `q4` UNAUDITED; codex M2.17). The repo-wide grep OVER-matches by design (AGENTS.md: a filtered finding beats a dropped bug) → triage each hit vs the standing exempt/false-positive set: `docs/` landscape (out of scope), this bullet's own rule-doc (the `q4`/`gguf` examples), the route.fixture cassette (real identity, exempt), and the lowercase `q2`/`q3` SMT-pair variables in `verdict.rs` (M1 query indices, not quants), the English word `guidance` in prose (false-match on the constrained-decoding library token), and dev/review-tool names (`Codex`, `Claude Code`) in process/provenance notes — the rule targets the route's INFERENCE engine (what fills the schema), not dev tooling, and the mandated `Codex-Review:` commit trailer sanctions `Codex`, so triage these EXEMPT, never remove (codex M2.18 re-flagged a roadmap `Codex follow-up` note; rejected — dev-tool, not a route-engine leak). So the per-UNIT close gate = the unit's TOUCHED files carry no token (scope the grep to them) — respec/planning closes INCLUDED, their roadmap/memory edits are committed files (the M2.2 respec banked dialect/device/env-var tokens into the roadmap; codex caught it — bank machine specifics in `runtime.local.md`, point the roadmap at them); the milestone review runs the full-repo triage. Hand codex-review prompts THIS full exempt set verbatim, not a condensed invariant — else codex re-flags the rule-doc's own quant/format examples (codex M2.20). Reconstruct the command from this bullet — no banked wip (consumed at .2b close). EXCEPTION (user decision, model-cassette.2): committed RECORDED cassettes (under `crates/ckc-cli/tests/fixtures/cassettes/` now, run-m2.2's experiment-cassette roots later) carry the runtime's REAL `model_identity` (model/quant/engine strings) — machine-specific MEASUREMENT data with honest provenance, NOT engine-neutral contract/fixture artifacts → EXEMPT from the synthetic-token rule + this audit. Audit FAIL-CLOSED: exclude only the SPECIFIC live-recorded path(s) whose cassettes carry the runtime's REAL `model_identity` (model/quant/engine strings) — today `route.fixture/` (its recorded `seed-42.json`) + the run-m2.2b live-recorded experiment roots = repo-root `/cassettes/**` (whole tree recorded, real identity): `git grep -niP … -- . ':(exclude)crates/ckc-cli/tests/fixtures/cassettes/route.fixture/' ':(exclude)cassettes/'` — the fixture-tree exclude stays NARROW (`route.fixture/` only), so CRAFTED synthetic cassettes (route-single-ir golden + bad, SYNTHETIC identity) stay AUDITED + pass; the repo-root `cassettes/` tree is all-recorded, hence excluded whole (it is also deny-Read + Serena-ignored — census via runtime indirection only). Replay pins output/provenance/content-hash + the full recording envelope (producer + empty diagnostics/trace/runtime), never an identity VALUE BY NAME → the host runtime swaps with no test-code edit, but the identity rides the pinned content-hash (it changes only via a deliberate re-bless + re-pin).
+  real bit-width token had slipped into a fixture whose comment asserted it named none; RECURRED M2.9 r3 — `q4` slipped into a model-adapter test fixture, the dialect-only de-leak grep missed it). Audit = word-boundary `git grep -niP` (names `\b`-bracketed) over EVERY forbidden category (engines + grammar dialects + quant/model-format tokens `q4`/`gguf`/…), not just one, and not a bare substring grep (false-matches a Cargo.lock dependency name). Catch the bare quant token with a case-SENSITIVE lowercase `\bq[2-8](_[0-9km])?\b` (drop the global `-i`, wrap the engine/dialect/format names in `(?i:...)`): it matches `q4`/`q4_0` yet skips the uppercase `Q1`/`Q2` SMT labels (a case-INSENSITIVE `q[2-8]` false-hits them — the prior skip-bare-`q[2-8]` rule left bare `q4` UNAUDITED; codex M2.17). The repo-wide grep OVER-matches by design (AGENTS.md: a filtered finding beats a dropped bug) → triage each hit vs the standing exempt/false-positive set: this bullet's own rule-doc (the `q4`/`gguf` examples), the route.fixture cassette (real identity, exempt), and the lowercase `q2`/`q3` SMT-pair variables in `verdict.rs` (M1 query indices, not quants), the English word `guidance` in prose (false-match on the constrained-decoding library token), and dev/review-tool names (`Codex`, `Claude Code`) in process/provenance notes — the rule targets the route's INFERENCE engine (what fills the schema), not dev tooling, and the mandated `Codex-Review:` commit trailer sanctions `Codex`, so triage these EXEMPT, never remove (codex M2.18 re-flagged a roadmap `Codex follow-up` note; rejected — dev-tool, not a route-engine leak). So the per-UNIT close gate = the unit's TOUCHED files carry no token (scope the grep to them) — respec/planning closes INCLUDED, their roadmap/memory edits are committed files (the M2.2 respec banked dialect/device/env-var tokens into the roadmap; codex caught it — bank machine specifics in `runtime.local.md`, point the roadmap at them); the milestone review runs the full-repo triage. Hand codex-review prompts THIS full exempt set verbatim, not a condensed invariant — else codex re-flags the rule-doc's own quant/format examples (codex M2.20). Reconstruct the command from this bullet — no banked wip (consumed at .2b close). EXCEPTION (user decision, model-cassette.2): committed RECORDED cassettes (under `crates/ckc-cli/tests/fixtures/cassettes/` now, run-m2.2's experiment-cassette roots later) carry the runtime's REAL `model_identity` (model/quant/engine strings) — machine-specific MEASUREMENT data with honest provenance, NOT engine-neutral contract/fixture artifacts → EXEMPT from the synthetic-token rule + this audit. Audit FAIL-CLOSED: exclude only the SPECIFIC live-recorded path(s) whose cassettes carry the runtime's REAL `model_identity` (model/quant/engine strings) — today `route.fixture/` (its recorded `seed-42.json`) + the run-m2.2b live-recorded experiment roots = repo-root `/cassettes/**` (whole tree recorded, real identity): `git grep -niP … -- . ':(exclude)crates/ckc-cli/tests/fixtures/cassettes/route.fixture/' ':(exclude)cassettes/'` — the fixture-tree exclude stays NARROW (`route.fixture/` only), so CRAFTED synthetic cassettes (route-single-ir golden + bad, SYNTHETIC identity) stay AUDITED + pass; the repo-root `cassettes/` tree is all-recorded, hence excluded whole (it is also deny-Read + Serena-ignored — census via runtime indirection only). Replay pins output/provenance/content-hash + the full recording envelope (producer + empty diagnostics/trace/runtime), never an identity VALUE BY NAME → the host runtime swaps with no test-code edit, but the identity rides the pinned content-hash (it changes only via a deliberate re-bless + re-pin).
 - M2 plan (minimal pair; gate MET = model runtime,
   NOT a §15 gate — locked measurements stand alone). Durable decisions beyond the roadmap lines
   (which collapse at M2 review):

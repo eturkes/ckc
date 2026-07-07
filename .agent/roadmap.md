@@ -10,15 +10,6 @@ then persists as a bare header; git history retains all removed text. The active
 `plan <hash>` shows `PENDING` until its first unit's closing commit fills it — the planning
 commit is then known (M1's `89c4cba` was filled retroactively too).
 
-Salvage caveat: stubs tagged `[S]` (tag precedes the usage figure) closed by consuming banked
-`.agent/wip-*` salvage/blueprint artifacts — proven code/patches/transcription blueprints committed
-by an earlier overflowed session — so their recorded context-usage measures the apply/redo session
-only and materially UNDERSTATES the unit as specced; sizing anchors come from untagged stubs only.
-M1's collapsed stubs cli-runner.3a.2a / cli-runner.4.1a.2 / cli-runner.4.1b.2b.1 carry the same
-caveat. Pattern RETIRED (user directive): banking applyable artifacts cheats the unit — overflow
-recovery = revert + respec into fresh self-contained units (memory's sizing bullet holds the
-standing rule); retired wip artifacts remain in git history as provenance only.
-
 ## M1 scaffold — plan 89c4cba — accept m1 — review f6d68a0
 
 ## M2 multi-hop PoC — plan 2a4f03d — accept m2 — review 5ec33f7
@@ -203,7 +194,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   byte-unchanged, omit-None); deltas ride the existing route-delta loop. Tests: match /
   mismatch / None-NA + golden-path 1.0 + M2-replay byte-pin. Read scope: normalize/derive fn
   signatures, run.rs fill-tail region, metrics.rs row assembly — the §7.3 family text names
-  the rationale (docs/poc-archive.md stays out of the implement window).
+  the rationale.
 - [ ] report-cnl.1: Report shape — cnl_documents (per-doc {ja,en} text hashes) + cnl_rules
   (per-rule {ja,en} strings) omit-empty members + validate rules (sorted ids, line-break-free
   strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing

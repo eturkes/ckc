@@ -218,7 +218,6 @@ Repository layout (target state; built up by the M1 units):
 ├── corpus/{test_sources,lexicon,reference}/        # committed, license-clean
 ├── registry/                              # corpora.yaml candidates.yaml experiments.yaml at M1;
 │                                          # grows per milestone (§14)
-├── docs/                                  # research compendium (§14), mined via subagents
 ├── runs/                                  # gitignored run outputs
 ├── .agent/{context.sh,memory.md,roadmap.md}
 └── .claude/
@@ -1340,9 +1339,13 @@ and extends `schemas|prompts` with invented-DSL entries; M5 adds `evaluators|gat
 evidence objects); M6 adds `source_processors|policies` and `indexes` with retrieval; M7 adds
 `human_review` and `views` (content-hashed `report.html` viewer assets).
 
-`docs/` is the committed research compendium — method-category deep-research
-reports plus the agent-language catalogue, scope-pruned to the build plan (pruned surveys live
-in git history). Registry-seeding and elaboration units mine it through read-only subagents and
+`docs/` is the research compendium — method-category deep-research reports, the CNL research
+base, charters, and PoC-archive evidence — resident in git history, not the working tree: a
+research artifact is committed under `docs/`, then retired once distilled into this spec.
+Every `docs/…` citation in this spec resolves at commit `e8b5cf6` (the M3-planning state;
+census `git ls-tree e8b5cf6 docs/`, read `git show e8b5cf6:docs/<file>`, search
+`git grep <pat> e8b5cf6 -- docs/`); a future retirement records its own commit here.
+Registry-seeding and elaboration units mine it through read-only subagents and
 cite `file §section` in registry notes; main sessions keep their own context lean.
 
 ## §15 Gates
