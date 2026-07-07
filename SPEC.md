@@ -9,15 +9,20 @@ one place, sections sized for selective loading.
 
 CKC is a clinical knowledge compiler: a headless research harness that translates clinical text
 in any language (public Japanese guideline corpora through M7) into compact, reusable,
-source-grounded IR components; compiles them deterministically to machine-evaluable mathematical
-targets (SMT-LIB first; proof assistants such as Lean 4 join per §13); and surfaces
+source-grounded IR components, surfaced as a clinician-auditable controlled natural language
+(the CNL, §10 — prose a clinician reads and audits; parse and render are mutual inverses over
+the IR, so a reviewed, accepted CNL document is the locked knowledge base); compiles them
+deterministically to machine-evaluable targets (SMT-LIB first; a Prolog-family
+execution/explanation lane joins per §11, proof assistants such as Lean 4 per §13); and surfaces
 contradictions and documented no-conflict results with end-to-end machine-checkable evidence.
+The probabilistic step is confined to one boundary — source text into a route's constrained
+emission surface; every layer below an accepted artifact is a deterministic compiler.
 
 Thesis under test, as three initial experiments, ordered by dependency — each consumes its
 predecessors' machinery. §2 schedules them, §7.3 defines the metrics. The layered component IR
 is the instrument, not a hypothesis: layering is a route variable inside experiment 1, reuse
 generalization is what experiment 2's coverage measures, and the layered-versus-direct payoff
-lands as M3's architecture ablation (§10):
+lands as M4's architecture ablation (§11):
 
 1. Multi-hop translation (models in the loop): does translation through multiple small model
    calls between specific intermediate representations beat direct one-leap emission into a
@@ -25,13 +30,14 @@ lands as M3's architecture ablation (§10):
    hypothesized to depend on the IR configuration the route targets: staged,
    grammar-constrained, short-hop routes — layered and hop-chain forms included — tame model
    non-determinism on the §7.3 route-quality and conflict-quality families. Tested at M2
-   (minimal pair); the configuration ranking widens over existing and invented forms at M3–M4;
-   experiment 2's protocol extends the configuration search at M5.
+   (minimal pair); the clinician CNL (§10) lands as the flagship invented form at M3; the
+   configuration ranking widens over existing and invented forms at M4; experiment 2's protocol
+   extends the configuration search at M5.
 2. Deterministic mapping by optimization (models at development time only): an optimization
    protocol designs and maintains a deterministic mapping — a compact accepted expert system
    with minimized surface area, authored by AI agents where hand-encoding once made expert
    systems prohibitive — that covers fresh documents with zero runtime model calls. The
-   objective: maximize coverage and reuse, minimize mapping-set size. Coverage tested at M3;
+   objective: maximize coverage and reuse, minimize mapping-set size. Coverage tested at M4;
    the bounded autonomous protocol — declared surfaces, immutable evaluator, every attempt
    ledgered and replayable, from lexicon repair up to search over the IR-combination space —
    lands at M5.
@@ -139,8 +145,8 @@ assembling the full harness before the first end-to-end result.
 | --- | --- | --- |
 | M1 scaffold | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 test sources via `route.direct_smt` versus one IR-mediated route; scored on validity/acceptance/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
-| M3 variation + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered); direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment (experiment 1 across the route axis; experiment 2 via the coverage experiment and compactness front; layered-versus-direct as architecture ablation). | `ckc run --experiment exp.m3_compare` / `exp.m3_routes` / `exp.m3_coverage` + §10 |
-| M4 invented DSLs | Project-born IR/DSL candidates designed for translation reliability: grammar-constrained concrete syntax, deterministic parse → IR → compile; singular and layered configurations ranked against the M3 route field on the fixed evaluator (experiment 1, extended to invented forms). | `ckc run --experiment exp.m4_dsl` + §11 |
+| M3 clinician CNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual clinician CNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from any accepted IR, round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
+| M4 route field + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered) plus invented ablations (compact record DSL, labeled-slot CNL) versus `single_cnl`; direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment; LP explanation lane (Prolog/s(CASP) fixture queries, CNL-verbalized proofs). | `ckc run --experiment exp.m4_routes` / `exp.m4_compare` / `exp.m4_coverage` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora (experiment 3): finding classification (severity, bilingual review questions), weighted minimal-correction-set revision targeting, cvc5 cross-check on blocking/major findings, Lean per-finding proof anchor, human review records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
@@ -183,7 +189,7 @@ Crates:
 | `ckc-smt` | FormalIR → SMT-LIB emission, solver-query planning, assertion-to-source maps, solver invocation, solver-result parsing. |
 | `ckc-cli` | `ckc` binary: pipeline processing stages, runner, trace/report/replay, registry check. |
 
-Pipeline shape (M1–M3; later processing stages splice in without reshaping):
+Pipeline shape (M1–M4; later processing stages splice in without reshaping):
 
 ```text
 corpus test_source -> extract -> segment -> normalize -> assemble(IR) -> compile(SMT) -> verify -> trace -> report
@@ -198,6 +204,8 @@ Every processing stage reads declared inputs, validates them by strict canonical
 its run directory.
 Runtime metadata stays outside content hashes.
 Accepted artifacts carry wrappers (§4.4); streams (events, diagnostics) are runtime evidence.
+Model calls run only inside recorded route stages; every derivation below an accepted artifact
+— parse, bridge, compile, verify, render — is deterministic.
 ```
 
 Repository layout (target state; built up by the M1 units):
@@ -398,19 +406,20 @@ unit of the thesis.
 | `ClinicalSegment` | CQ, recommendation, evidence, exception, definition, table-row, or metadata segment with region refs. |
 | `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs. |
 | `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at M1. |
-| `Action` | Action kind + target concept + distinguishing fields (M3) + normalized target key. |
-| `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M3 adds slot equality and temporal interval (difference-logic) atoms. |
+| `Action` | Action kind + target concept + distinguishing fields (M4) + normalized target key. |
+| `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M4 adds slot equality and temporal interval (difference-logic) atoms. |
 | `NormativeRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile to negated context conjuncts, their regions joining `source_region_ids`. |
-| `FactualRule` (M3) | Context → factual consequent, strictness. |
+| `FactualRule` (M4) | Context → factual consequent, strictness. |
 | `DecisionTable` (M6) | Input variables, units, rows, guards, outputs, source rows; DMN-style overlap semantics. |
 | `IRBundle` | The five layers below + reusable component records + assumptions + diagnostics + per-layer and whole-bundle structural hashes. |
 | `CompiledArtifact` | Target id, logic, query plan, query bodies, named-assertion records (assertion id → rule ids → region ids), diagnostics. |
 | `VerifierResult` | Per-query status (§6 categories), model or unsat core, solver identity, diagnostics. |
-| `TraceBundle` | Derivation DAG + claim-evidence rows; M3 adds reuse/compactness graphs. |
+| `TraceBundle` | Derivation DAG + claim-evidence rows; M4 adds reuse/compactness graphs. |
 | `LineageIndex` | Query index: artifact/finding ↔ source text spans ↔ rules ↔ assertions ↔ verdicts ↔ report. |
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
+| `CnlDocument` (M3) | Canonical clinician-CNL text (JA primary, EN mirror) over an IRBundle's ClinicalIR content: grammar id + hash, per-rule canonical text, text hash; §10 parse/render mutual inverses. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
 
 IR layers in one `IRBundle` per document:
 
@@ -419,7 +428,7 @@ IR layers in one `IRBundle` per document:
 | `DocIR` | Layout-preserving text/table view over SourceDocumentGraph refs with extraction diagnostics. |
 | `SegmentIR` | ClinicalSegments. |
 | `ClinicalIR` | ClinicalStatements + TerminologyBindings (+ CQ/PICO/EtD slots, optional M1). |
-| `NormIR` | NormativeRules (+ FactualRules M3, DecisionTables M6). |
+| `NormIR` | NormativeRules (+ FactualRules M4, DecisionTables M6). |
 | `FormalIR` | Target-independent constraints, normalized actions/contexts, contradiction-query plan. |
 
 IR invariants:
@@ -429,7 +438,7 @@ Every reusable action, condition, population, concept, rule, and constraint has 
 normalized structural hash; component records list use sites.
 IRBundle validates (source linkage, references, policy completeness) before compilation.
 Assumptions and uncertainty are explicit payload fields.
-Layered pipelines expose component reuse metadata; M3 metrics consume it.
+Layered pipelines expose component reuse metadata; M4 metrics consume it.
 ```
 
 Lexicon: `corpus/lexicon/ja_core.yaml` is the M1 terminology and modality reference file
@@ -447,7 +456,7 @@ join at M6 as additional systems behind the same TerminologyBinding requirements
 Semantic policy invariants:
 
 ```text
-Action sameness = same action kind + terminology-representative target + (M3) distinguishing
+Action sameness = same action kind + terminology-representative target + (M4) distinguishing
 fields, via normalized target keys.
 Strength and certainty are proof-visible annotations; conflict logic consumes direction and
 normalized action/context.
@@ -479,9 +488,9 @@ Q1 context_overlap: assert both rules' conditioned contexts (exceptions as negat
   (no shared context).
 Q2 deontic_consistency: for pairs with a sat Q1, assert each rule's direction as a polarity
   literal on the shared action, each as a :named assertion; unsat -> semantic_contradiction with
-  unsat core naming the contributing assertions; sat -> documented no-conflict result. M3 conflict
+  unsat core naming the contributing assertions; sat -> documented no-conflict result. M4 conflict
   kinds extend Q2 with threshold, slot, and factual constraints.
-M3 adds a per-rule Q0 self-check (own conditioned context satisfiability; unsat ->
+M4 adds a per-rule Q0 self-check (own conditioned context satisfiability; unsat ->
   condition_unsatisfiable) and a raw Q1 view with exception conjuncts stripped: raw sat with
   the conditioned view unsat closes the pair as documented no-conflict result carrying an
   exception_resolved_conflict finding.
@@ -494,11 +503,11 @@ Conflict kinds (stage = first milestone that detects them):
 | `context_compatibility` | M1 | Finite context overlap over concept and interval atoms. |
 | `normalized_action_sameness` | M1 | Eligibility via normalized action keys. |
 | `deontic_direction_conflict` | M1 | Opposed direction groups under satisfiable shared context. |
-| `numeric_threshold_empty_intersection` | M3 | Same action+direction, disjoint quantity/temporal intervals. |
-| `strict_factual_contradiction` | M3 | Strict factual consequents jointly inconsistent. |
-| `terminology_incoherence` | M3 | Functional key collision or mutually exclusive mapping. |
-| `condition_unsatisfiable` | M3 | A rule's own context unsatisfiable (Q0): extraction or normalization defect, or genuine source defect. |
-| `exception_resolved_conflict` | M3 | Raw overlap sat, conditioned overlap unsat: the exception averts a live conflict; informational finding on the closed pair. |
+| `numeric_threshold_empty_intersection` | M4 | Same action+direction, disjoint quantity/temporal intervals. |
+| `strict_factual_contradiction` | M4 | Strict factual consequents jointly inconsistent. |
+| `terminology_incoherence` | M4 | Functional key collision or mutually exclusive mapping. |
+| `condition_unsatisfiable` | M4 | A rule's own context unsatisfiable (Q0): extraction or normalization defect, or genuine source defect. |
+| `exception_resolved_conflict` | M4 | Raw overlap sat, conditioned overlap unsat: the exception averts a live conflict; informational finding on the closed pair. |
 | `table_value_disagreement` | M6 | Overlapping table guards, incompatible outputs. |
 | `source_metadata_disagreement` | M6 | Singleton metadata values disagree after normalization. |
 | `gloss_drift` | M6 | Rendered view diverges from semantic payload. |
@@ -513,7 +522,7 @@ SMT profile:
 Target: SMT-LIB 2 text artifacts, embedded in CompiledArtifact payloads and materialized
 byte-identically under groups/<gid>/smt/ for solver consumption.
 Logic: narrowest sufficient logic, recorded per query; M1 default QF_LRA (Bool constants +
-linear-real interval atoms). M3 adds difference-logic temporal atoms; declared target profiles
+linear-real interval atoms). M4 adds difference-logic temporal atoms; declared target profiles
 gate anything richer, which otherwise returns unsupported_fragment.
 Symbols: SMT symbols are |-quoted canonical Ids, so assertions remain self-identifying.
 Every assertion that can influence a query is :named and mapped in the assertion map to IR rule
@@ -538,6 +547,25 @@ solver_execution_failure semantic_no_conflict semantic_contradiction unknown
 unsupported_fragment` — with `sat/unsat/unknown/timeout` and solver diagnostics preserved
 distinctly.
 
+LP profile (M4; a second target lane — execution and explanation over unchanged semantics):
+
+```text
+Target: Prolog-family logic program emitted deterministically from NormIR — rules-as-data
+facts (rule, population, condition, action, direction, strength, certainty, exception,
+source) over a small fixed committed kernel deriving applicability and advice, with
+negation-as-failure guarding labeled exception predicates (the PROLEG pattern; §5
+exceptions stay separate labeled payloads: the SMT lane expands them to negated context
+conjuncts, the LP lane keeps them as NAF guards).
+Engines: SWI-Prolog and s(CASP) join as recorded subprocess adapters (the Z3 pattern);
+s(CASP) proof trees verbalize through CNL lexicon templates so justifications read as §10
+audit prose.
+Lane separation: the SMT lane remains the conflict oracle — LP verdicts never replace §6
+SMT verdicts absent an explicit §13.2 richer-rule-semantics adoption; differential tests
+cover only shared fragments (context satisfaction over finite fixture contexts, exception
+expansion equivalence). Fixture contexts are synthetic; patient-context rule-evaluation
+semantics in any shipped output stays behind G-RULE-EVAL (§15).
+```
+
 ## §7 Evidence: traces, reports, metrics, diagnostics
 
 Intent: every claim is a path through artifacts; every miss is a typed data.
@@ -547,7 +575,7 @@ Intent: every claim is a path through artifacts; every miss is a typed data.
 `trace_bundle.json` holds the derivation DAG (source → extraction → segment → normalization → IR
 → compile → verify → report nodes with operation-labeled edges) and claim-evidence rows (finding
 → region ids → rule ids → assertion ids → verdict → report ref). `lineage_index.json` is its
-query index; `ckc trace` resolves a finding to the full chain in both directions. M3 adds
+query index; `ckc trace` resolves a finding to the full chain in both directions. M4 adds
 component-reuse and compactness exports plus deterministic path visualizations: `trace_graph.dot`
 (sorted nodes/edges) and per-finding Mermaid blocks in `report_en.md`, rendering the chain from
 Japanese source text span to solver verdict and the convergence of documents onto shared mapping
@@ -563,8 +591,9 @@ joins it as a deterministic Japanese rendering of the same canonical content. Co
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
-weighted ranking; from M3, ablations; from M5, attempt-ledger summaries; from M6, matrix
-coverage.
+weighted ranking; from M3, per-document CNL audit views and per-rule CNL text (§10 — findings
+quote their rules as CNL beside the quoted source spans); from M4, ablations; from M5,
+attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
 From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
 publication-designated runs export a manuscript bundle — figure-ready CSV/JSON metric tables,
@@ -582,15 +611,16 @@ mapping-set size versus coverage, reuse degree, MDL proxies), convergence (norma
 agreement across variants), compilation (schema/compile/parse/solver pass rates), conflict
 quality (precision/recall and conflict-task accuracy over test source expectations), trace
 completeness, determinism (hash stability), baseline delta (per-metric route-versus-baseline deltas over
-identical test sources: model routes from M2, layered-minus-direct from M3), route quality
+identical test sources: model routes from M2, layered-minus-direct from M4), route quality
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
-from M2), model-free coverage (share of fresh-document semantics produced deterministically from
-accepted mappings, with zero application phase model calls; from M3), and loop outcomes (from M5).
+from M2), surface quality (round-trip identity rate, surface tokens per accepted rule; from
+M3), model-free coverage (share of fresh-document semantics produced deterministically from
+accepted mappings, with zero application phase model calls; from M4), and loop outcomes (from M5).
 
 ### §7.4 Diagnostics
 
 Every diagnostic carries a stable code, a structured payload, region/artifact refs, and maps to
-exactly one Outcome. Base code set (some codes first emit with the M3 comparison):
+exactly one Outcome. Base code set (some codes first emit with the M4 comparison):
 
 ```text
 extraction_uncertain table_structure_uncertain span_source_linkage_missing segmentation_boundary_error
@@ -602,7 +632,8 @@ false_positive_conflict false_negative_conflict metamorphic_instability
 ```
 
 M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
-`repair_limit_exceeded`); M4 adds invented-DSL route codes; M5 adds loop/budget/surface codes
+`repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`);
+M4 adds invented-DSL route codes; M5 adds loop/budget/surface codes
 (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
 is defined in its milestone section at elaboration time.
 
@@ -784,7 +815,7 @@ Committed direction:
   experiment. Model I/O records as test source artifacts (origin `ai_generated`, evidence status
   `evidence_discovery_only`, prompt-template hashes in manifests); recorded bytes replay
   deterministically; live calls run only under an explicit experiment flag with full recording.
-- Exactly two routes — the minimal pair (further routes are §10 scope):
+- Exactly two routes — the minimal pair (further routes are §10/§11 scope):
 
 | Route | Shape |
 | --- | --- |
@@ -793,7 +824,7 @@ Committed direction:
 
 - Inputs: the M1 test sources, lexicon, and reference, locked under a minimal measurement record —
   test source/reference/schema/prompt/model/runtime hashes in the run manifest (the evaluator identity
-  that §10 formalizes and §12 locks).
+  that §11 formalizes and §12 locks).
 - Scoring (§7.3 route-quality and baseline-delta metrics, raw rows before any ranking): target syntactic
   validity (solver parse), acceptance rate — model output passes the same §4 acceptance checks as
   any artifact — conflict-verdict accuracy against reference over the §8 conflict and no-conflict groups,
@@ -804,7 +835,7 @@ Committed direction:
   Japanese spans and named assertions, failure-taxonomy summary, model and solver identities,
   replay status; wording per §0 (locked measurement, synthetic test source measurement; no clinical
   claims).
-- Deliberately out of scope, landing in §10: additional routes, metamorphic test sources, the
+- Deliberately out of scope, landing in §10/§11: additional routes, metamorphic test sources, the
   component store, the deterministic direct pipeline, model-free coverage, ablations.
 
 Acceptance themes (finalized at elaboration): both routes execute over identical locked inputs
@@ -812,35 +843,188 @@ Acceptance themes (finalized at elaboration): both routes execute over identical
 baseline-delta table; expected conflict/no-conflict outcomes hold per reference for accepted translations;
 the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
-## §10 M3 — IR variation and comparison (requirements; elaborate at M2 acceptance)
+## §10 M3 — Clinician CNL v1 (elaborated 2026-07-07; M3 planning seeds units from this section)
 
-Intent: widen experiment 1 across the route axis — vary and layer existing IR forms — and take
-experiment 2's measurements with the full evaluator; the layered-versus-direct architecture
-ablation quantifies reuse and convergence on a corpus designed to exercise them.
+Intent: land the clinician-auditable controlled natural language — the §0 knowledge surface —
+as experiment 1's flagship invented form. One content layer, two concrete syntaxes: ClinicalIR
+serializes as canonical JSON (§4.3) for machines and as the CNL for clinicians, with parse and
+render mutual inverses between text and IR. A clinician audits controlled prose beside quoted
+source spans — never JSON, IR slots, SMT, or Prolog — and an accepted, reviewed CNL document is
+the locked knowledge base from which every target regenerates. This section is the design
+authority for M3 planning; once landed, the committed grammar files and renderer are the byte
+authority (worked text here is illustrative, the §8.6 rule).
+
+Research base (`docs/cnl-attempto.md`, `docs/cnl-multilingual-ja.md`, `docs/cnl-landscape.md`,
+`docs/cnl-design-codex.md` — the second-opinion design): no surveyed system offers
+deterministic CNL parse ⇄ verbalize ⇄ executable formal target, no deterministic
+Japanese-parsing CNL exists, and no published system wires a CNL grammar into LLM constrained
+decoding — the gaps this milestone occupies. Direct evidence for the architecture: constrained
+decoding into a canonical CNL then deterministically mapping to logic beats decoding formal
+syntax directly (Shin et al. 2021, in cnl-landscape.md). Mined patterns: ACE
+interpretation-rules-by-decree + verbalize-the-canonical-form; FRET/BRIDGE-Wiz slotted prose;
+PENG single bidirectional grammar; 産業日本語/Miyata JA sentence patterns; PROLEG separate
+labeled exceptions; AceWiki/Codeco depth-bounded enumeration testing. PENS target: P5 E3 N4 S4
+D (v1 realizes the M1/M2 semantic subset; E3 completes as §11 conflict kinds land).
 
 Committed direction:
 
-- Routes extending the §9 pair (concrete existing-IR schemas picked at elaboration from
-  `docs/`, registered as §8.4 candidate entries):
+- Surfaces: Japanese primary, English mirror — two concrete syntaxes over one AST (ClinicalIR
+  statement content). Both parse and both render; the canonical renders of one AST in the two
+  languages parse back to the same AST. Japanese is the corpus and clinician language; its
+  generation is deterministic by construction (no agreement morphology; 以上/以下/未満/超 are
+  lexically exact interval-endpoint markers), and its parse stays tractable because CKC parses
+  only its own controlled surface — grammar-constrained emission and canonical rendering both
+  land inside the grammar language, so open-Japanese parsing (research-grade: zero anaphora,
+  attachment, scope) is designed out rather than solved.
+- Sentence model: one rule = one sentence group — recommendation sentence + zero or more
+  exception sentences + a basis bracket. Fixed clause order, closed connective set, no
+  pronouns, no anaphora, no definite references, no ellipsis (overt subject every sentence);
+  out-of-lexicon or unresolvable text is a parse error, never a guess (fail-closed — the
+  anti-ACE lesson). Multiword concepts are single lexicon terminals, never parsed compounds.
+
+| Slot | JA canonical shape | EN canonical shape | AST target |
+| --- | --- | --- | --- |
+| context | `<dnf>患者には、` | `for patients <dnf>,` | population/condition DNF |
+| action | `<target>の<action-noun>` (例 `抗菌薬Aの投与`) | `<action-noun> of <target>` | Action kind + target |
+| deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
+| certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
+| exception | `ただし、<dnf>患者を除く。` per entry | `exception: patients <dnf>.` per entry | exception ContextExpr — separate labeled payload (PROLEG pattern) |
+| basis | `[根拠 <id> …]`, sorted | `[basis <id> …]`, sorted | source segment/region refs |
+
+- DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
+  precedence by decree (`かつ` binds tighter), no nesting beyond the flat two-level DNF
+  ClinicalIR already carries. Atoms: concept (lexicon adnominal surface), negated concept
+  (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
+  ASCII digits). Punctuation: `、` `。` plus ASCII brackets/parens — width-folding ambiguity is
+  kept out of the surface by construction.
+- Ids: the parser assigns rule/statement/exception ids deterministically from document order
+  (the §8.6 `<document_id>.rule.<k>` scheme) — the model mints no ids; basis refs are the only
+  generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
+  removes the §9 generated-Id instability class from the emission surface.
+- Grammar and lexicon: `schemas/cnl_ja.grammar` + `schemas/cnl_en.grammar`, emitter-backed from
+  the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern), registered in
+  `registry/schemas.yaml`; constrained decoding consumes them exactly as §9 consumes the IR
+  schema. Every linguistic form lives in lexicon DATA and the grammar stays purely
+  concatenative: concept entries gain adnominal / negated-adnominal / EN-gloss surfaces; action
+  kinds gain JA/EN noun forms; the existing modality table IS the deontic-tail set (parse
+  accepts every listed synonym, render emits the pair's canonical first-listed surface);
+  certainty phrases as committed. Lexicon lint at load: reserved-token collisions (a surface
+  containing a connective/punctuation terminal), missing surface fields.
+- Canonical text: render emits exactly one text per AST per language (stored ContextExpr order
+  preserved — §4.3 ordered arrays; canonicalization never reorders semantics). Parse accepts
+  declared bounded variation (modality synonyms, basis-ref order, whitespace); accept
+  re-renders, so every accepted `CnlDocument` is canonical bytes, hash-locked beside its AST
+  content hash.
+- Determinism laws (the M3 contract, property-tested):
+
+```text
+Single parse: every string in the grammar language yields exactly one AST.
+Round trip: parse(render(ast)) == ast for every valid AST, both languages.
+Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
+Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
+Audit honesty: audit views render only from accepted artifacts, never from raw model output.
+```
+
+- `route.single_cnl` — the flagship route, mirroring `route.single_ir`'s stage shape: scaffold
+  assemble → model fill (CNL text under the JA grammar constraint) → accept = parse + lexicon
+  membership + grounding → bridge (AST → ClinicalIR + derived exact-status
+  TerminologyBindings) → the unchanged M1 compile/verify tail. Repair loop per §9 mechanics:
+  `cnl_parse_error` repairable under derived seeds, `ai_hallucinated_source` terminal,
+  `repair_limit_exceeded` on exhaustion. `exp.m3_cnl` binds `[direct_smt (baseline), single_ir,
+  single_cnl]` over the locked M1 inputs — the §9 measurement record extended by one route,
+  scored by the same reference.
+- Audit artifacts, route-independent: any accepted ClinicalIR — the M1 deterministic pipeline's
+  included — renders to `audit/<doc-id>.cnl.{ja,en}.txt`; `report.json` carries the CNL text
+  hashes and per-rule CNL strings; report_{en,ja}.md quote each finding's rules as CNL beside
+  the quoted source spans (§7.2). The clinician-facing layer of every report is CNL from M3 on.
+- Emission-target posture (honest framing): the CNL is the committed audit surface by design;
+  WHICH surface the weak model emits most reliably is the §11 measured question. Recorded
+  hypothesis: a Japanese-capable weak model emits grammar-constrained Japanese CNL more
+  reliably than JSON — controlled prose sits near its pretraining distribution and the grammar
+  only keeps it on the rails (Shin et al. 2021; the KGQA CNL result; the cnl-landscape.md
+  evidence table). If a §11 ablation (compact record DSL) wins emission instead, the CNL stays
+  the audit surface via render-from-accepted-IR and the probabilistic step retargets — the
+  architecture is invariant to that outcome.
+- §7.4 M3 codes: `cnl_parse_error` (repairable; reason in payload, empty refs — mirrors
+  `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code:
+  an accepted AST whose canonical render fails to re-parse identically — grammar/lexicon
+  drift, never a model failure).
+- §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
+  `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows.
+- Validation program (sophistication over example count): depth-bounded AST enumeration →
+  render → parse == identity with a single-parse assertion (the Codeco method);
+  malformed-input battery (off-lexicon surface, dangling refs, duplicate slots, bad bounds,
+  connective misuse); tokenizer audit of every grammar terminal against the runtime constraint
+  mechanism (§9 truncation lesson); canonical-render byte pins for the three M1 documents;
+  reproduce-M1 gate — golden CNL cassettes for the M1 sources parse, bridge, and reproduce the
+  M1 verdicts through the locked tail; lexicon lint gates.
+
+Worked example (illustrative; the committed grammar pins the bytes).
+`test_source.m1_guideline_a` accepted content renders canonically as:
+
+```text
+成人かつ敗血症のある患者には、抗菌薬Aの投与を強く推奨する。ただし、重度腎機能障害のある患者を除く。[根拠 r.2 r.3]
+```
+
+```text
+for patients who are adult and have sepsis, administration of antibiotic-a is strongly
+recommended. exception: patients with severe renal impairment. [basis r.2 r.3]
+```
+
+Both parse to the §8.6 rule content — atoms `pop.adult` (lexicon interval semantics
+`age >= 18`) and `cond.sepsis`, action `act.administer`/`drug.abx_a`, direction `for`, strength
+`strong`, certainty absent (parenthetical omitted), one labeled exception
+(`cond.renal_severe`), basis refs `r.2 r.3` — and the bridge feeds the unchanged §6/§8
+compile → verify chain to the same verdicts. `test_source.m1_guideline_b` renders the
+contraindication tail: 「…抗菌薬Aの投与は禁忌である。」
+
+Acceptance themes (finalized at M3 planning): `exp.m3_cnl` executes all three routes over the
+locked M1 inputs with raw rows before deltas; the determinism laws hold as property tests;
+every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric); audit
+views render deterministically for every route including M1's; the golden-cassette
+reproduce-M1 gate passes; recorded model I/O replays byte-stably; grammar/lexicon exports carry
+drift guards; §0 vocabulary holds.
+
+## §11 M4 — Route field: variation and comparison (requirements; elaborate at M3 acceptance)
+
+Intent: widen experiment 1 across the full route axis — existing IR forms, the §10 CNL, and
+further invented forms — and take experiment 2's measurements with the full evaluator; the
+layered-versus-direct architecture ablation quantifies reuse and convergence on a corpus
+designed to exercise them. The §10 emission-surface question settles here: prose CNL versus
+compact record DSL versus JSON-IR as the weak model's target, over identical locked inputs. A
+documented no-conflict result — no invented form beats the existing-IR field — stays a
+first-class outcome.
+
+Committed direction:
+
+- Routes extending §9/§10 (concrete existing-IR schemas picked at elaboration from `docs/`,
+  registered as §8.4 candidate entries):
 
 | Route | Shape |
 | --- | --- |
 | `route.stacked_ir` | Model fills a stack of existing IR forms (e.g. PICO framework → rule rows); deterministic compile. |
 | `route.ir_hop_chain` | Model translates across a chain of adjacent, deliberately similar IR dialects — several small constrained hops, each a minimal semantic delta — testing whether short hops tame model non-determinism better than one long jump. |
 | `route.ckc_layered` | Model fills CKC layers stage by stage (segment → statement → rule), each grammar-constrained; the §6 compiler takes over. |
+| `route.ckc_rec_dsl` | Model emits a compact line-oriented record DSL (id-forward, minimal terminal set; `docs/cnl-design-codex.md` carries the sketch); deterministic parse → IR. The CNL's token-compactness ablation. |
+| `route.slot_cnl` | Labeled-slot CNL variant (BRIDGE-Wiz/FRET-style explicit slot lines) — the readability-versus-emission midpoint between `single_cnl` and `ckc_rec_dsl`. |
 
 - Every route registers its schemas/grammars and a deterministic bridge into the §6 profile,
-  keeping conflict-task scoring identical across routes; all §9 and §10 routes run
-  `exp.m3_routes` under one locked-measurement identity, and §7.3 route-quality, baseline-delta,
-  conflict-task accuracy, and k-sample convergence metrics emit as raw rows before ranking.
-- `pipe.direct_rule_to_smt` (`exp.m3_compare`, the deterministic architecture-ablation
+  keeping conflict-task scoring identical across routes; all §9–§11 routes run `exp.m4_routes`
+  under one locked-measurement identity, and §7.3 route-quality, baseline-delta, conflict-task
+  accuracy, k-sample convergence, and §10 surface-quality metrics emit as raw rows before
+  ranking. Invented candidates run singular and layered — stacked and hop-chain compositions
+  over invented and existing dialects — with design dimensions recorded per candidate: token
+  compactness, grammar constraint strength, semantic distance per hop, layer composability
+  (the §12 search-space seed coordinates). Baseline deltas measure against both
+  `route.direct_smt` and the best existing-IR route.
+- `pipe.direct_rule_to_smt` (`exp.m4_compare`, the deterministic architecture-ablation
   baseline): extract → segment → direct phrase-normalization → FormalIR → SMT, bypassing shared
   ClinicalIR/NormIR component reuse; unused processing stages emit pass-through artifacts (outcome `ok`,
   payload marker `not_applicable`) under the same artifact wrapper rules.
 - Test source growth: 4–6 additional synthetic documents sharing populations/actions/conditions
   across documents (reuse pressure), plus deterministic metamorphic variants of M1 documents
   (punctuation, kana/kanji, section order) committed as test-source variants with declared
-  provenance, plus threshold-conflict and factual-conflict cases for the M3 conflict kinds.
+  provenance, plus threshold-conflict and factual-conflict cases for the M4 conflict kinds.
 - Component store: run-scoped index of reusable components keyed by normalized structural hash;
   layered pipeline records hits/misses; `component_reuse_graph.json` and
   `compactness_front.json` join the trace exports — the front doubles as the
@@ -851,63 +1035,39 @@ Committed direction:
   deltas are the staged pipeline's §7.3 baseline-delta measurement; `candidate_diff.json` compares segment,
   binding, rule, assertion, verdict, and metric levels; `ranking.csv` + `score_breakdown.json`
   with raw rows.
-- Locked-measurement record: the run manifest freezes the M3 evaluator identity — test source,
+- Locked-measurement record: the run manifest freezes the M4 evaluator identity — test source,
   reference, lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
   semantics in M5).
-- M3 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
+- M4 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
   `strict_factual_contradiction`, `terminology_incoherence`, `condition_unsatisfiable`,
   `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by test sources.
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_source_linkage_off`.
-- Model-free coverage experiment (`exp.m3_coverage`, experiment 2): test source set A builds mappings
+- Model-free coverage experiment (`exp.m4_coverage`, experiment 2): test source set A builds mappings
   and accepted entries join the lexicon/component store; test source set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus reference, mapping-set size versus coverage on the compactness front, and
   application phase model-call count (zero) against a model-per-document baseline. Application phase path
   graphs (§7.1) contain zero model nodes — the runtime removal made visible.
+- LP explanation lane per the §6 LP profile: NormIR → Prolog-family emission, SWI-Prolog and
+  s(CASP) as recorded subprocess adapters, fixture-context queries, proof trees verbalized
+  through the CNL lexicon so explanations speak the audit language; lane separation and
+  `G-RULE-EVAL` boundary per §6.
+- Informalization round-trip metamorphic, concrete via the CNL: accepted IR → canonical CNL →
+  route re-parse → normalized-hash compare, reported as a route-stability metric.
 - `registry/methods.yaml` seeded from the `docs/` compendium (§14).
 - Wording: route results are locked measurements (s0/s1 raw rows); runtime reference fidelity
   claims sit behind `G-RUNTIME-REFERENCE`.
 
-Acceptance overview (finalized when M3's roadmap units are authored): all registered routes and
-both deterministic pipelines run over all test source groups; metrics emit exact-fraction raw rows;
-hash-convergence asserts identical component hashes across metamorphic variants for the layered
-pipeline; the comparison report ranks pipelines and routes with raw rows visible; recorded model
-I/O replays byte-stably; path and reuse visualizations emit with deterministic bytes; expected
-conflict/no-conflict outcomes hold per reference; replay holds for both pipelines; `candidate_diff.json` is
-complete; the coverage report emits with raw rows first.
-
-## §11 M4 — Invented IR/DSLs (requirements; elaborate at M3 acceptance)
-
-Intent: experiment 1 extended to invented forms — project-born IR/DSLs designed for weak-model
-translation reliability and deterministic compilation, evaluated with the same instrument as
-every existing IR form, in singular and layered configurations. A documented no-conflict result — no
-invented form beats the §10 field — is a first-class outcome.
-
-Committed direction:
-
-- DSL program: candidate DSLs authored at development time (§0 posture — anything proposes,
-  acceptance decides): compact concrete syntax under grammar constraints, deterministic
-  parse → IR bridge → §6 compile; schemas, grammars, parsers, and prompt templates registered
-  per candidate (§14). `route.ckc_dsl` — model emits a compact project-born DSL under grammar
-  constraints; deterministic parse → IR → compile — is the first entry.
-- Configurations: each candidate runs singular and layered — stacked and hop-chain compositions
-  over invented and existing dialects — extending the §10 route axis under the same
-  locked-measurement identity (`exp.m4_dsl`).
-- Design dimensions recorded per candidate: token compactness, grammar constraint strength,
-  semantic distance per hop, layer composability — the seed coordinates of the §12 search
-  space.
-- Scoring and reporting identical to §10; baseline deltas measured against both `route.direct_smt` and the
-  best §10 route; §7.4 M4 invented-DSL route codes land at elaboration.
-- Deeper DSL capabilities (typed-placeholder writing, proof export, full kernel — the CKC-GEN
-  direction) stay §13 candidates behind evidence from this milestone.
-- Elaboration MAY add an informalization round-trip metamorphic — accepted IR rendered to a
-  deterministic informal summary, re-formalized through a route, compared by normalized hash —
-  as a route-stability check.
-
-Acceptance themes (finalized at elaboration): at least two invented candidates execute singular
-and layered over identical locked inputs; ranked against the §10 field with raw rows first;
-recorded model I/O replays byte-stably; §0 vocabulary holds.
+Acceptance overview (finalized when M4's roadmap units are authored): all registered routes and
+both deterministic pipelines run over all test source groups; at least two invented candidates
+(§10 `single_cnl` plus one of `ckc_rec_dsl`/`slot_cnl`) rank against the existing-IR field with
+raw rows visible; metrics emit exact-fraction raw rows; hash-convergence asserts identical
+component hashes across metamorphic variants for the layered pipeline; recorded model I/O
+replays byte-stably; path and reuse visualizations emit with deterministic bytes; expected
+conflict/no-conflict outcomes hold per reference; LP-lane fixture queries replay with verdicts
+lane-labeled; replay holds for both pipelines; `candidate_diff.json` is complete; the coverage
+report emits with raw rows first.
 
 ## §12 M5 — Autonomous optimization PoC (requirements; elaborate at M4 acceptance)
 
@@ -918,7 +1078,7 @@ laptop budgets; the loop requirements are built to outgrow them.
 
 Committed direction:
 
-- `EvaluatorLock` (`evaluator_lock.json`, extending the §10 M3 identity) materialized before
+- `EvaluatorLock` (`evaluator_lock.json`, extending the §11 M4 identity) materialized before
   attempts: test source/reference/schema/metric/evaluator-code/toolchain/seed/budget hashes, immutable
   per experiment; per-attempt `attempt_run_lock` records evaluator-lock, candidate-graph (the
   resolved §8.4 pipeline+config identity hash), and patch/workspace hashes.
@@ -952,7 +1112,7 @@ Committed direction:
   registered, exercised on user request. Long-horizon loops run on the agent driver when scale
   demands; evaluator locks, acceptance, and ledgers stay identical across drivers.
 - Standing long-run objectives: route/IR-combination search over the `registry/methods.yaml`
-  universe (§14) — existing formalisms and the §11 invented-DSL program; the experiment-1
+  universe (§14) — existing formalisms and the §10/§11 invented-form program; the experiment-1
   configuration space is combinatorial — and mapping-set minimization toward the §0 asymptotic
   ideal, under `G-MDL` for any calibrated minimality claim.
 - Scale-out — `ExperimentPlan` matrices with compatibility filters, pairwise/fractional designs,
@@ -1018,7 +1178,7 @@ records, redaction, and drift checks; the cross-source flagship experiment regis
 | Additional targets: cvc5 certificates → Lean/Isabelle replay; DMN table semantics; Alloy/TLA+ pipeline properties; e-graph canonicalization | Verifier-portfolio, table-semantics, or convergence evidence demands them. |
 | Corpus-scale sweeps; experiment-matrix expansion, long-horizon agent-driver loops, IR-combination search (§12) | Candidate spaces outgrow the PoC. |
 | `package_insert_vs_guideline_conflict` flagship | §13.1 e-PI test sources registered. |
-| DSL/CKC-GEN beyond the M4 program: typed-placeholder writing, proof export, full kernel | §11/§12 evidence favors deeper invented-IR investment. |
+| DSL/CKC-GEN beyond the M3–M4 program: typed-placeholder writing, proof export, full kernel | §10–§12 evidence favors deeper invented-IR investment. |
 
 The §2 conservation rule keeps this table in sync with `registry/methods.yaml`.
 
@@ -1054,7 +1214,8 @@ Committed direction:
   statistics in reports; human-reviewed-corpus claims trigger `G-REFERENCE-CORPUS`.
 - `report.html`: one self-contained deterministic bilingual review artifact per run — embedded
   canonical report/trace data plus committed content-hashed viewer assets; Japanese spans
-  primary, English glosses linked per span; corpus overview, rule browser, finding list with
+  primary, English glosses linked per span; corpus overview, rule browser (rules quoted as §10
+  CNL, Japanese primary), finding list with
   filters, finding detail with formal evidence and revision candidates, metrics; renderer
   identity recorded; zero servers, zero network, zero external toolchain in the build path.
 - Auditor manuscript bundle: extends the §7.2 bundle with finding/human review tables and
@@ -1083,10 +1244,12 @@ Registry files are data, validated by `ckc registry check`, growing per mileston
 `corpora|candidates|experiments`; M2 adds `prompts|schemas` (the schema export feeds M2's
 grammar constraints) and generalizes the `experiments` binding from a single pipeline to a
 pipeline set with a `baseline_pipeline` (the §7.3 delta baseline), so one experiment binds both
-route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3 adds `methods`, the method-universe catalogue seeded from the
+route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3
+extends `schemas|prompts` with CNL grammar and prompt entries (§10); M4 adds `methods`, the
+method-universe catalogue seeded from the
 compendium (families, aliases, candidate roles, adapter status
-`v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata);
-M4 extends `schemas|prompts` with invented-DSL entries; M5 adds `evaluators|gates` (gate
+`v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata),
+and extends `schemas|prompts` with invented-DSL entries; M5 adds `evaluators|gates` (gate
 evidence objects); M6 adds `source_processors|policies` and `indexes` with retrieval; M7 adds
 `human_review` and `views` (content-hashed `report.html` viewer assets).
 

@@ -313,7 +313,7 @@ aggressively; full pre-consolidation text in git history.
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —
-  `schema_accepts_canonical_clinical_ir` is that guard (M3 ClinicalStatement additions must extend both).
+  `schema_accepts_canonical_clinical_ir` is that guard (later-milestone ClinicalStatement additions — M3 CNL bridge fields, M4 distinguishing/temporal — must extend both).
   Non-obvious anchor: canonical integers are STRING-quoted (`emit_int`→`emit_string`), so interval bounds
   are schema `string`+INT_PATTERN (a bare JSON number is rejected), not `number`.
 - Registry model surface (§14): `schemas.yaml` (`SchemaEntry`=id/path/schema_hash/target_kind) +
@@ -392,6 +392,21 @@ aggressively; full pre-consolidation text in git history.
   `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
   enhancement, still preferred); shared cross-crate subprocess runner + registry symlink guard
   (deferred scoped units).
+- CNL-first architecture (user directive 2026-07-07, set in the Codex-continued cnl-ir-research
+  session — rollout `~/../debian/.codex/sessions/2026/07/07/rollout-2026-07-07T11-09-50-*.jsonl`;
+  SPEC amended same day = design authority, read SPEC not this bullet for semantics): clinician-
+  auditable CNL = the product's knowledge surface; probabilistic step confined to source→emission
+  surface; accepted+reviewed CNL doc = locked KB; audit views render from accepted IR only, any
+  route. MILESTONE RENUMBER M3↔M4: §10 = M3 clinician CNL v1 (full design, elaboration-depth —
+  next session plans units from it), §11 = M4 route field + comparison (absorbs old-§10 content +
+  invented ablations + §6 LP profile lane); every old-M3 feature (M4 conflict kinds, FactualRule,
+  distinguishing fields, temporal atoms, component store, coverage, methods.yaml) renumbered M4 →
+  trust SPEC's current numbering over pre-2026-07-07 prose/git text. Research corpus:
+  `docs/cnl-{attempto,multilingual-ja,landscape,design-codex}.md` (Codex design = second opinion;
+  its dual-surface split — compact DSL emission + generation-only prose — was REJECTED for the
+  single-surface CNL bet, kept as §11 ablations). OPEN (user): human-facing language name for
+  manuscripts (ids stay plain `cnl`/`route.single_cnl`); GF adoption deferred until JA parse of
+  non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -487,7 +502,8 @@ aggressively; full pre-consolidation text in git history.
     each route is realized as one registry pipeline (`pipe.m2_*`); one `ckc run` → one `report.json`
     with per-route raw
     rows + the baseline-delta table. Faithful to §9 "both routes execute over identical locked inputs
-    (`exp.m2_multihop`)"; M3's separate `exp.*` ids are a different shape, do not back-apply here.
+    (`exp.m2_multihop`)"; §10's `exp.m3_cnl` reuses this set-form shape (three pipelines, direct
+    baseline); §11's `exp.m4_*` ids stay separate experiments.
   - Manifest identity (§9 vs code, finder-confirmed): §9 SEPARATES model identity from prompt hashes
     → `ModelIdentity` = `{model_id, quant, runtime_version}` ONLY (mirrors `SolverIdentity`'s
     identity-only shape; no prompt hash inside). Both manifests carry the §9 set (model_identity +
@@ -531,11 +547,11 @@ aggressively; full pre-consolidation text in git history.
     and label LISTS would import IR-layer rule counts into the no-IR route). `model_ms_per_call` =
     the model-invocation cap (registry budget key, `Resolved.model_ms_per_call: Option<u64>` read
     unconditionally, REQUIRED only at record time in `build_record_parts`).
-  - "test all layer configurations" (user directive) → deferred to M3 as the §10 route-axis gradient
-    seed: every meaningful single_ir IR layer + the DMN-style alt. The user chose keeping M2 the §9
-    minimal pair over widening §9; the gradient is the experiment §10 ("vary and layer existing IR
-    forms") was written to be.
-  - Route mechanics (M3 reuses when adding routes): a processing-stage `kind` is a free-form Id →
+  - "test all layer configurations" (user directive) → deferred to M4 as the §11 route-axis gradient
+    seed (was §10/M3 pre-renumber): every meaningful single_ir IR layer + the DMN-style alt. The user
+    chose keeping M2 the §9 minimal pair over widening §9; the gradient is the experiment §11 ("vary
+    and layer existing IR forms") was written to be.
+  - Route mechanics (M3 single_cnl + M4 routes reuse when adding routes): a processing-stage `kind` is a free-form Id →
     a new stage kind is registry data, not an enum change. A route feeds the M1
     `compile_verify_group` back end by hand-building a minimal `Resolved` (reads only pipeline_id
     + step slots + toolchain hash + budget_ms + shape; documents/groups/plan unread stubs) — the
