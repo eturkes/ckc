@@ -164,7 +164,7 @@ aggressively; full pre-consolidation text in git history.
   add fields to a byte-pinned §4.3 record without disturbing pins = make them `Option<T>`, emit
   `obj.optional(name, self.f.as_ref(), |b,v| v.emit_canonical(b))`, read `obj.optional(name, T::read)?`,
   each in the field's sorted-key slot. Omit-None emits nothing → prior pins stay byte-identical (the M1
-  unchanged-expected-bytes pin tests = the regression guard, never edit their literals). Emitter sorts on
+  unchanged-expected-bytes pin tests = the regression guard; their literals stay frozen). Emitter sorts on
   `finish` (emit-call order cosmetic) but the positional reader REQUIRES the `obj.optional` call in
   ascending-key position (peek next key: `<name`→UnknownField, `==`→consume, `>name`/absent→None) → a
   misplaced optional misreads. Pin BOTH an all-None fixture (locks old bytes) AND a fully-populated one
@@ -211,8 +211,8 @@ aggressively; full pre-consolidation text in git history.
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
-  reuses Z3's subprocess machinery — a shared cross-crate runner is a DEFERRED unit (don't
-  ad-hoc-dedup) that also absorbs the two codex-REJECTED fixes (`Instant+budget` overflow-panic +
+  reuses Z3's subprocess machinery — a shared cross-crate runner is a DEFERRED unit (the mirrors
+  stay duplicated until it lands) that also absorbs the two codex-REJECTED fixes (`Instant+budget` overflow-panic +
   ETXTBSY vacuous-window; rejected Z3-mirrored, non-realistic, fix-both-not-one) AND the cap/reap of the
   STILL-unbounded post-grace detached drain (a descendant holding stdout open appends to its Vec forever;
   accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep). `Completed{bytes}`
@@ -356,24 +356,23 @@ aggressively; full pre-consolidation text in git history.
   `exp.m2_multihop` SEEDED (registry check green). SPEC: §8.4
   stays M1-singular (faithful history); the M2 generalization went into §14's registry-evolution ledger
   (no §14 byte-pin → free prose).
-- Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). Never `cand.*`/`comp.*` — those echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
+- Test/example producer IDs: `pipe.<qual>` (`pipeline_id`) + `processing_stage.<qual>.<step>` (`pipeline_step_id`); shared `<qual>` links a pipeline to its steps. Generic unit fixtures use `qual=test`; scenario fixtures keep their own (`m1`/`t`/`base`). `cand.*`/`comp.*` stay retired — they echo the pre-rename `candidate`/`component` field names the terminology cleanup removed.
 - Component vs pipeline-step terminology: reserved now in identifiers AND comments (`b6e1177` + follow-up sweep) — `component` = the §5 IR `ComponentRecord`/`DocIR`/structural concept only; a registry `processing_stage` entry = a pipeline step. OPEN + deliberate (not a missed rename): SPEC §8.4 prose + `registry/candidates.yaml` still read "processing stage component(s)"; resolving it = a SPEC-level vocabulary call (route through the user), so skip auto-"fixing" it on a grep sweep.
 - "Oracle" naming: the epistemic-overclaim sense was renamed `runtime-oracle`→`runtime reference`
   (results = locked measurements, not a real-world-truth authority); the TEST-ORACLE sense (pass/fail
   vs the reference) deliberately PERSISTS in `run_oracle.rs` + `rules.rs`. A global retirement
-  (`run_oracle.rs`→`run_reference_check.rs`) is an OPEN user/style call → don't auto-rename on a sweep.
+  (`run_oracle.rs`→`run_reference_check.rs`) is an OPEN user/style call → sweeps leave it as-is.
 - ckc-smt's `serde` dep reads as unused (no `serde::`/`Serialize`/`Deserialize` in ckc-smt/src
   beyond the `fieldless_enum!` invocations) but is REQUIRED: that ckc-core macro expands to
   `::serde::Serialize`/`Deserialize` impls *in the caller's crate*, so every fieldless_enum! user
   must depend on serde — dropping it breaks the build (`E0433` unresolved `::serde`). Holds for any
   crate adopting the macro. Those serde impls go unused there (the canonical path is
-  Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; don't
-  "tidy" the dep away.
+  Canonical/CanonRead), an accepted KISS cost of one shared macro over per-call serde gating; the dep stays.
 - M1 reviewed (git/roadmap hold the detail). §4.4-vs-§8.3 tension RESOLVED by SPEC amendment: a
   processing stage's total operation result IS its §4.6 EventRecord (§8.3 has no
   per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
-  residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: do NOT
-  add per-stage TotalOperationResults — inert + redundant with EventRecords until then (M2+ may
+  residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: per-stage totals stay EventRecords
+  alone — a standalone TotalOperationResult there is inert + redundant until then (M2+ may
   revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
@@ -821,4 +820,4 @@ conclusions the committed code + units rely on:
   test, not a copy. Non-obvious: it does NOT assert cross-seed equality (greedy seed-inertness is
   environment-specific → `runtime.local.md`); its bounded enum+bool constraint fixture lives in
   `tests/fixtures/` NOT `schemas/` (test artifact, not a production route constraint; the plan-line
-  'schemas/ constraint' was shorthand — don't relocate).
+  'schemas/ constraint' was shorthand — the fixture stays put).

@@ -100,7 +100,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
   worked examples full-match both languages, trailing-garbage reject, per-production coverage
   incl. escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
-  bnf API pitfalls apply — copy its working pattern, don't re-derive from docs.
+  bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.2: committed schemas/clinical_cnl_{ja,en}.grammar (ignored bless +
   never-writes drift guard + hash-pin consts — schema.rs pattern) + schemas.yaml entry
   schema.clinical_cnl = the JA grammar, §10's singular registry id (the route's decoding
