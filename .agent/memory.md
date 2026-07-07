@@ -397,15 +397,17 @@ aggressively; full pre-consolidation text in git history.
   SPEC amended same day = design authority, read SPEC not this bullet for semantics): clinician-
   auditable CNL = the product's knowledge surface; probabilistic step confined to source→emission
   surface; accepted+reviewed CNL doc = locked KB; audit views render from accepted IR only, any
-  route. MILESTONE RENUMBER M3↔M4: §10 = M3 clinician CNL v1 (full design, elaboration-depth —
+  route. MILESTONE RENUMBER M3↔M4: §10 = M3 ClinicalCNL v1 (full design, elaboration-depth —
   next session plans units from it), §11 = M4 route field + comparison (absorbs old-§10 content +
   invented ablations + §6 LP profile lane); every old-M3 feature (M4 conflict kinds, FactualRule,
   distinguishing fields, temporal atoms, component store, coverage, methods.yaml) renumbered M4 →
   trust SPEC's current numbering over pre-2026-07-07 prose/git text. Research corpus:
   `docs/cnl-{attempto,multilingual-ja,landscape,design-codex}.md` (Codex design = second opinion;
   its dual-surface split — compact DSL emission + generation-only prose — was REJECTED for the
-  single-surface CNL bet, kept as §11 ablations). OPEN (user): human-facing language name for
-  manuscripts (ids stay plain `cnl`/`route.single_cnl`); GF adoption deferred until JA parse of
+  single-surface CNL bet, kept as §11 ablations). Name SETTLED (user, 2026-07-07): **ClinicalCNL**
+  (mirrors ClinicalIR); id forms follow the ClinicalIR↔clinical_ir precedent — grammar files
+  `schemas/clinical_cnl_{ja,en}.grammar`, registry schema id `clinical_cnl`; `route.single_cnl`
+  stays (parallel to single_ir). GF adoption deferred until JA parse of
   non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a

@@ -1,6 +1,6 @@
 # Multilingual CNL family + Japanese story — research report (verified 2026-07-07)
 
-Provenance: `cnl-ir-research` workflow harvest (Claude subagents, 2026-07-07). Companions: `cnl-attempto.md`, `cnl-landscape.md`. Consumer: SPEC §10 (clinician CNL — JA-primary design rests on §5 verdict here).
+Provenance: `cnl-ir-research` workflow harvest (Claude subagents, 2026-07-07). Companions: `cnl-attempto.md`, `cnl-landscape.md`. Consumer: SPEC §10 (ClinicalCNL — the JA-primary design rests on §5 verdict here).
 
 ## 1. System inventory
 

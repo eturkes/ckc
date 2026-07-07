@@ -10,8 +10,8 @@ one place, sections sized for selective loading.
 CKC is a clinical knowledge compiler: a headless research harness that translates clinical text
 in any language (public Japanese guideline corpora through M7) into compact, reusable,
 source-grounded IR components, surfaced as a clinician-auditable controlled natural language
-(the CNL, §10 — prose a clinician reads and audits; parse and render are mutual inverses over
-the IR, so a reviewed, accepted CNL document is the locked knowledge base); compiles them
+(ClinicalCNL, §10 — prose a clinician reads and audits; parse and render are mutual inverses
+over the IR, so a reviewed, accepted CNL document is the locked knowledge base); compiles them
 deterministically to machine-evaluable targets (SMT-LIB first; a Prolog-family
 execution/explanation lane joins per §11, proof assistants such as Lean 4 per §13); and surfaces
 contradictions and documented no-conflict results with end-to-end machine-checkable evidence.
@@ -30,7 +30,7 @@ lands as M4's architecture ablation (§11):
    hypothesized to depend on the IR configuration the route targets: staged,
    grammar-constrained, short-hop routes — layered and hop-chain forms included — tame model
    non-determinism on the §7.3 route-quality and conflict-quality families. Tested at M2
-   (minimal pair); the clinician CNL (§10) lands as the flagship invented form at M3; the
+   (minimal pair); ClinicalCNL (§10) lands as the flagship invented form at M3; the
    configuration ranking widens over existing and invented forms at M4; experiment 2's protocol
    extends the configuration search at M5.
 2. Deterministic mapping by optimization (models at development time only): an optimization
@@ -145,7 +145,7 @@ assembling the full harness before the first end-to-end result.
 | --- | --- | --- |
 | M1 scaffold | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 test sources via `route.direct_smt` versus one IR-mediated route; scored on validity/acceptance/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
-| M3 clinician CNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual clinician CNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from any accepted IR, round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
+| M3 ClinicalCNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual ClinicalCNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from any accepted IR, round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
 | M4 route field + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered) plus invented ablations (compact record DSL, labeled-slot CNL) versus `single_cnl`; direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment; LP explanation lane (Prolog/s(CASP) fixture queries, CNL-verbalized proofs). | `ckc run --experiment exp.m4_routes` / `exp.m4_compare` / `exp.m4_coverage` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
@@ -419,7 +419,7 @@ unit of the thesis.
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
-| `CnlDocument` (M3) | Canonical clinician-CNL text (JA primary, EN mirror) over an IRBundle's ClinicalIR content: grammar id + hash, per-rule canonical text, text hash; §10 parse/render mutual inverses. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
+| `CnlDocument` (M3) | Canonical ClinicalCNL text (JA primary, EN mirror) over an IRBundle's ClinicalIR content: grammar id + hash, per-rule canonical text, text hash; §10 parse/render mutual inverses. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
 
 IR layers in one `IRBundle` per document:
 
@@ -843,12 +843,13 @@ Acceptance themes (finalized at elaboration): both routes execute over identical
 baseline-delta table; expected conflict/no-conflict outcomes hold per reference for accepted translations;
 the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
-## §10 M3 — Clinician CNL v1 (elaborated 2026-07-07; M3 planning seeds units from this section)
+## §10 M3 — ClinicalCNL v1 (elaborated 2026-07-07; M3 planning seeds units from this section)
 
-Intent: land the clinician-auditable controlled natural language — the §0 knowledge surface —
-as experiment 1's flagship invented form. One content layer, two concrete syntaxes: ClinicalIR
-serializes as canonical JSON (§4.3) for machines and as the CNL for clinicians, with parse and
-render mutual inverses between text and IR. A clinician audits controlled prose beside quoted
+Intent: land ClinicalCNL — the clinician-auditable controlled natural language, the §0
+knowledge surface; named to mirror ClinicalIR, the layer it serializes — as experiment 1's
+flagship invented form. One content layer, two concrete syntaxes: ClinicalIR serializes as
+canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians, with parse and render
+mutual inverses between text and IR. A clinician audits controlled prose beside quoted
 source spans — never JSON, IR slots, SMT, or Prolog — and an accepted, reviewed CNL document is
 the locked knowledge base from which every target regenerates. This section is the design
 authority for M3 planning; once landed, the committed grammar files and renderer are the byte
@@ -901,7 +902,9 @@ Committed direction:
   (the §8.6 `<document_id>.rule.<k>` scheme) — the model mints no ids; basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
-- Grammar and lexicon: `schemas/cnl_ja.grammar` + `schemas/cnl_en.grammar`, emitter-backed from
+- Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
+  (id forms follow the `ClinicalIR ↔ clinical_ir` precedent; registry schema id
+  `clinical_cnl`), emitter-backed from
   the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern), registered in
   `registry/schemas.yaml`; constrained decoding consumes them exactly as §9 consumes the IR
   schema. Every linguistic form lives in lexicon DATA and the grammar stays purely

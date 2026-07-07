@@ -1,6 +1,6 @@
 # Attempto ecosystem — CNL family report for CKC
 
-Provenance: `cnl-ir-research` workflow harvest (Claude subagents, 2026-07-07); URLs/licenses verified at fetch time. Companions: `cnl-multilingual-ja.md`, `cnl-landscape.md`, `cnl-design-codex.md`. Consumer: SPEC §10 (clinician CNL).
+Provenance: `cnl-ir-research` workflow harvest (Claude subagents, 2026-07-07); URLs/licenses verified at fetch time. Companions: `cnl-multilingual-ja.md`, `cnl-landscape.md`, `cnl-design-codex.md`. Consumer: SPEC §10 (ClinicalCNL).
 
 ## 1. System inventory
 

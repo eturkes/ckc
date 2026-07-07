@@ -3,7 +3,7 @@
 Provenance: Codex second-opinion design proposal (2026-07-07), preserved verbatim below the
 line. Status: PARTIALLY SUPERSEDED — the adopted design (SPEC §10/§11, same date) diverges on
 the central split: this doc keeps audit prose generation-only and targets a compact record DSL
-for model emission; the adopted architecture makes the clinician CNL itself the primary
+for model emission; the adopted architecture makes ClinicalCNL itself the primary
 emission target and locked knowledge surface (user directive), demoting the compact DSL to a
 §11 ablation (`route.ckc_rec_dsl`). Its validation lists, LP program shape, PENS target, and
 risk table remain live inputs.
