@@ -632,7 +632,8 @@ false_positive_conflict false_negative_conflict metamorphic_instability
 ```
 
 M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
-`repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`);
+`repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`,
+`cnl_unregistered_concept`);
 M4 adds invented-DSL route codes; M5 adds loop/budget/surface codes
 (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
 is defined in its milestone section at elaboration time.
@@ -896,7 +897,8 @@ Committed direction:
   precedence by decree (`かつ` binds tighter), no nesting beyond the flat two-level DNF
   ClinicalIR already carries. Atoms: concept (lexicon adnominal surface), negated concept
   (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
-  ASCII digits). Punctuation: `、` `。` plus ASCII brackets/parens — width-folding ambiguity is
+  ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
+  plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
 - Ids: the parser assigns rule/statement/exception ids deterministically from document order
   (the §8.6 `<document_id>.rule.<k>` scheme) — the model mints no ids; basis refs are the only
@@ -913,6 +915,22 @@ Committed direction:
   accepts every listed synonym, render emits the pair's canonical first-listed surface);
   certainty phrases as committed. Lexicon lint at load: reserved-token collisions (a surface
   containing a connective/punctuation terminal), missing surface fields.
+- Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
+  concept surface (condition atom, action target; action kinds stay a small closed class —
+  extending them is lexicon review, not emission), one escape production is admitted — JA
+  `未登録概念「<surface>」`, EN `unregistered concept "<surface>"`, free quoted surface — so
+  constrained decoding is never forced to alias an off-lexicon source concept to the nearest
+  registered terminal (silent substitution — the exact failure class the fail-closed design
+  exists to prevent, and the one a fully closed grammar would otherwise manufacture). The
+  escape parses and round-trips like any atom and always fails accept with
+  `cnl_unregistered_concept`, terminal for the run: repair prompts never mint or steer concept
+  identity — resolving a gap is a lexicon-review decision, not a retry. Its payload (quoted
+  surface + atom position) is exactly the lexicon-entry proposal artifact: over the locked M1
+  inputs any occurrence is instrument signal (vocabulary covered by construction); from M4 the
+  §11 accretion loop consumes it — propose → lint → review → accepted entries join the
+  lexicon, grammar re-emitted under the drift guard — so vocabulary growth stays amortized,
+  ledgered data accretion inside the single probabilistic boundary, never a precomputed
+  corpus-wide lexicon.
 - Canonical text: render emits exactly one text per AST per language (stored ContextExpr order
   preserved — §4.3 ordered arrays; canonicalization never reorders semantics). Parse accepts
   declared bounded variation (modality synonyms, basis-ref order, whitespace); accept
@@ -932,8 +950,8 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   assemble → model fill (CNL text under the JA grammar constraint) → accept = parse + lexicon
   membership + grounding → bridge (AST → ClinicalIR + derived exact-status
   TerminologyBindings) → the unchanged M1 compile/verify tail. Repair loop per §9 mechanics:
-  `cnl_parse_error` repairable under derived seeds, `ai_hallucinated_source` terminal,
-  `repair_limit_exceeded` on exhaustion. `exp.m3_cnl` binds `[direct_smt (baseline), single_ir,
+  `cnl_parse_error` repairable under derived seeds, `ai_hallucinated_source` and
+  `cnl_unregistered_concept` terminal, `repair_limit_exceeded` on exhaustion. `exp.m3_cnl` binds `[direct_smt (baseline), single_ir,
   single_cnl]` over the locked M1 inputs — the §9 measurement record extended by one route,
   scored by the same reference.
 - Audit artifacts, route-independent: any accepted ClinicalIR — the M1 deterministic pipeline's
@@ -951,12 +969,14 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
 - §7.4 M3 codes: `cnl_parse_error` (repairable; reason in payload, empty refs — mirrors
   `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code:
   an accepted AST whose canonical render fails to re-parse identically — grammar/lexicon
-  drift, never a model failure).
+  drift, never a model failure), `cnl_unregistered_concept` (terminal; the escape-production
+  reject — payload = the lexicon-entry proposal, quoted surface + atom position).
 - §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
   `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows.
 - Validation program (sophistication over example count): depth-bounded AST enumeration →
   render → parse == identity with a single-parse assertion (the Codeco method);
-  malformed-input battery (off-lexicon surface, dangling refs, duplicate slots, bad bounds,
+  malformed-input battery (bare off-lexicon surface = parse error vs escaped = accept-time
+  reject, dangling refs, duplicate slots, bad bounds,
   connective misuse); tokenizer audit of every grammar terminal against the runtime constraint
   mechanism (§9 truncation lesson); canonical-render byte pins for the three M1 documents;
   reproduce-M1 gate — golden CNL cassettes for the M1 sources parse, bridge, and reproduce the
@@ -1047,7 +1067,8 @@ Committed direction:
 - Deterministic ablations reported alongside metrics: `exceptions_off`,
   `terminology_source_linkage_off`.
 - Model-free coverage experiment (`exp.m4_coverage`, experiment 2): test source set A builds mappings
-  and accepted entries join the lexicon/component store; test source set B (fresh documents sharing
+  and accepted entries join the lexicon/component store (`cnl_unregistered_concept` payloads =
+  the standing proposal stream, §10); test source set B (fresh documents sharing
   components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
   accuracy versus reference, mapping-set size versus coverage on the compactness front, and
   application phase model-call count (zero) against a model-per-document baseline. Application phase path
