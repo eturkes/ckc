@@ -413,16 +413,32 @@ aggressively; full pre-consolidation text in git history.
   conformant). Durable decisions beyond the roadmap lines (which collapse at M3 review):
   module home = ckc-cli FRESH modules (cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/
   cnl_bridge.rs) — Lexicon lives in ckc-cli::normalize, Canonical-outside-core proven by
-  report.rs; ckc-core + committed clinical_ir.schema.json untouched (ClinicalStatement already
-  carries certainty/exceptions/source refs). CNL AST = own family, NOT ClinicalIr (CnlAtom
-  Concept|ConceptNegated|Interval|Unregistered — escape is a variant; CnlContext flat two-level
-  DNF; CnlDocument payload = AST only, canonical TEXT derived by render, text hashes ride
-  report.json); parser mints NO ids — bridge derives them (`<doc>.rule.<k>` document order;
-  one ClinicalStatement per context-disjunct; population partition by `pop.*` id namespace;
-  exception disjunct → one ExceptionClause; one Exact TerminologyBinding per referenced
-  concept, system = lexicon.system; basis = region ids, source_segment_ids derived
-  region→segment via graph). Grammar terminals = whole-surface string literals ONLY (no char
-  classes/ranges; ASCII-digit alternation) — LLM-constraint-portable + bnf-atomic; bnf 0.6
+  report.rs; ckc-core IR shapes + committed clinical_ir.schema.json untouched (ClinicalStatement
+  already carries certainty/exceptions/source refs; sole core touch = DiagnosticCode
+  fieldless_enum append). CNL AST = own family, NOT ClinicalIr (CnlAtom
+  Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
+  {Registered|Unregistered} it reaches EVERY concept slot incl. action target, §10; CnlContext
+  flat two-level DNF; CnlDocument payload per §5 = document_id + grammar id/hash refs + rules
+  (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks
+  canonical bytes beside the AST, report.json cites those hashes); parser mints NO ids —
+  bridge derives them (`<doc>.rule.<k>` document order; one ClinicalStatement per
+  context-disjunct; population partition by `pop.*` id namespace; exception disjunct → one
+  ExceptionClause; one Exact TerminologyBinding per referenced concept, system =
+  lexicon.system, region_ids = citing rule's basis regions; binding/exception ids follow
+  rules.rs's §8.6 conventions, Action::new derives key; basis = region ids,
+  source_segment_ids derived region→segment via the SEGMENTS artifact — m3.bridge stage
+  inputs [cnl_document, segments]; round-trip laws: from_ir = single-disjunct projection ⇒
+  from_ir∘to_ir == disjunct-split normal form, to_ir∘from_ir == id on bridge-image IR).
+  Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
+  EN grammar committed + drift-guarded, no route binding). 7-stage pipe shifts positional
+  compile/verify indices (≠ COMPILE=4/VERIFY=5) + KINDS +bridge ⇒ pipeline_step_ids
+  [Id; 8]→[Id; 9] → parameterize compile_verify_group/producers per shape (DIRECT_VERIFY
+  precedent). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
+  §10 EN canon), JA under SemanticJa. Grammar terminals = whole-surface string literals
+  (ASCII-digit + basis-id-char alternation) + EXACTLY ONE open lexical production per
+  language — the escape's free quoted surface, inexpressible as finite literals; emitter
+  escape mode Committed(open) vs OracleBound(enumerated) since bnf parses literals only —
+  LLM-constraint-portable + bnf-atomic; bnf 0.6
   verified unicode-capable (byte-offset whole-terminal matching); its Earley oracle proves
   language MEMBERSHIP (superset — explores all segmentations) → lexer segmentation determinism
   guarded by the lexicon same-category proper-prefix lint instead; single-parse asserts =
