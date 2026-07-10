@@ -536,7 +536,7 @@ aggressively; full pre-consolidation text in git history.
   (gates only on `model_routes` non-empty); the ledger + §4.4 outcome still document the
   degradation. `model_route_metrics` gates on `agreed.is_some()` so a degraded route skips the
   reference parse. The re-read TOCTOU (`model_route_metrics` + `manifest_inputs`
-  independently re-read experiments+reference; resolve/corpus/lexicon/record-setup reads
+  independently re-read experiments+reference; resolve/corpus/record-setup reads
   reopen paths too) was LOW-SEV-deferred as benign on static committed files — the 2nd
   2026-07-10 external review reproduced the attestation flip (corpora.yaml mutated between
   resolution and manifest assembly ⇒ `ok` run whose manifest attests bytes the execution
@@ -640,9 +640,10 @@ aggressively; full pre-consolidation text in git history.
   - Route mechanics (M3 single_cnl + M4 routes reuse when adding routes): a processing-stage `kind` is a free-form Id →
     a new stage kind is registry data, not an enum change. A route feeds the M1
     `compile_verify_group` back end by hand-building a minimal `Resolved` (reads only pipeline_id
-    + step slots + toolchain hash + budget_ms + shape; documents/groups/plan unread stubs) — the
-    test-fixture pattern; `resolve()` resolves route pipelines to per-route views (`[Id; 8]` =
-    declared ids padded with `UNUSED_STAGE`, `shape: RouteShape`). PLAN LESSON: a unit framed
+    + stage handles + toolchain hash + budget_ms + shape; documents/groups/plan unread stubs) — the
+    test-fixture pattern (M2 built these positionally: `[Id; 8]` padded with `UNUSED_STAGE` +
+    `shape: RouteShape`; route-stage-handles RETIRES that form — post-refactor, hand-build the
+    named RouteStages variant and derive shape from it). PLAN LESSON: a unit framed
     "extract a tail/chain" must share ONE iteration granularity (per-document derive vs per-group
     compile/verify cannot be one linear fn) — check stage granularity at plan time. Scoring-test
     shape: a route-scoring test mirrors `run_oracle.rs::assert_group_matches_reference` IN FULL (a
@@ -659,7 +660,9 @@ aggressively; full pre-consolidation text in git history.
     artifact (the wall that forced the seam). Cassette keying: ROLE-namespaced sources
     `<gid>.overlap`/`<gid>.deontic` at the base seed — a shared `<gid>` source would ALIAS Q2 with Q1's
     first repair (`model_fill` reads attempt `i` under `derive_seed(base, i)` on the SAME source); keep
-    the namespacing. Slot-3 consequences for run-m2.1's route loop: the direct 4-stage pipeline has
+    the namespacing. Slot-3 consequences for run-m2.1's route loop (the index mechanics below are
+    the positional form route-stage-handles RETIRES — the durable fact is the direct-emission
+    pattern, not the indices): the direct 4-stage pipeline has
     `verify_smt` at slot 3, but `finish_processing_stage(idx)` stamps kind from
     `PROCESSING_STAGE_KINDS[idx]` + gates the solver-budget counter on `idx == VERIFY(5)` → the direct
     tail (`direct_smt_verify_group`, `DIRECT_VERIFY=3`, M1 `VERIFY`=5 inert padding in its `[Id; 8]`)

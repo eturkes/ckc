@@ -84,7 +84,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cnl-grammar.1b = early runtime probe, accept-total after cnl-render, subproc-runner.1/.2
   before route-single-cnl.3 (live wiring).
 - 2026-07-10 second external review (validation pass on fadc674) absorbed: reproduced the
-  input multi-read attestation defect — resolve, corpus/lexicon reads, record setup,
+  input multi-read attestation defect — resolve, corpus reads, record setup,
   model_route_metrics, and manifest_inputs each reopen registry-named paths, so mutating
   registry/corpora.yaml between resolution and manifest assembly yields an `ok` run whose
   manifest.json attests bytes the execution never used → units input-snapshot.1–.3 directly
@@ -107,33 +107,50 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   rejected — across registry check + run. Gate: full gates + registry check green on the
   committed tree.
 - [ ] input-snapshot.1: read-once input layer, fresh module
-  crates/ckc-cli/src/input_snapshot.rs. ResolvedFile<T> {canonical path, bytes, hash =
-  hash_bytes(bytes), value: T parsed FROM those bytes} + run-level InputSnapshot {corpora,
-  candidates, experiments, lockfile + toolchain (raw), lexicon, expected_outcomes, per-entry
-  corpus bytes, schemas? + prompts? (populated iff the resolved set contains model routes —
-  the §9 manifest gate signal, so the M1 read surface is unchanged)} + a builder in
-  resolution order (registries → experiment selection → selected slots; immutable once
-  resolution completes). Registry-data-controlled paths load through path-confine's
-  resolver; fixed-name files join as today; parse fns reused (ckc-core registry parse_*,
-  normalize load_lexicon). Per-doc corpus slots Option — a failed read carries today's
-  file+reason payload and the doc skips downstream. Unit tests: loader errors, hash =
-  the file bytes' sha256, confinement rejection through the resolver. No run.rs contact.
-- [ ] input-snapshot.2: resolution + execution consume the snapshot — resolve() takes the
-  built snapshot instead of load()ing CORPORA/candidates/EXPERIMENTS + TOOLCHAIN itself; the
-  two corpus entry.path head-fn reads, the two LEXICON_FILE reads, and build_record_setup's
-  SCHEMAS/PROMPTS loads become snapshot lookups (root stays for outputs;
-  build_record_parts' template/constraint payload reads stay put — record-gated, pre-write
-  byte-verified, path-confined). Same bytes on a stable tree ⇒ gate: full suites green with
-  M1/M2 byte-pins UNCHANGED; test edits confined to input-error paths whose diagnostics move
-  to snapshot-build time (file+reason shape preserved).
-- [ ] input-snapshot.3: metrics + manifest attest the snapshot — model_route_metrics (today
-  rereads EXPERIMENTS + expected_outcomes) and manifest_inputs (today rereads LOCKFILE/
-  CORPORA/EXPERIMENTS/expected_outcomes/SCHEMAS/PROMPTS) consume snapshot fields; manifest
-  hashes = the snapshot's byte hashes (stable tree ⇒ identical bytes, pins green).
-  Regression test: an explicit test-only barrier hook reachable from run.rs's in-crate tests
-  (NO sleeps) mutates registry/corpora.yaml between resolution and manifest assembly — the
-  run stays `ok` AND manifest.json attests the resolution-time bytes (today it attests the
-  mutated file while the artifacts used the original mapping — the review-reproduced flip).
+  crates/ckc-cli/src/input_snapshot.rs. ResolvedFile {canonical path, bytes, hash =
+  hash_bytes(bytes), value} — parse-at-capture ONLY where the run parses unconditionally
+  (corpora/candidates/experiments; parse fns reused: ckc-core registry parse_*, normalize
+  load_lexicon); expected_outcomes captures RAW bytes+hash, consumers parse on demand FROM
+  snapshot bytes (degraded identity-less routes skip reference parsing today — a
+  readable-but-malformed reference stays non-fatal). The run-level InputSnapshot builds in
+  two phases around resolve, then freezes: phase A (pre-resolve) = registry files + toolchain + lockfile + lexicon;
+  phase B (end of resolution, shapes fingerprinted) = selected per-entry corpus bytes, plus
+  expected_outcomes + schemas + prompts iff the resolved set contains model routes (M1
+  reads none of those three in-run; its stable test fixture ships NO reference file —
+  ungated capture breaks the M1 suite). Registry-data-controlled paths load through
+  path-confine's resolver; fixed-name files join as today (the two LEXICON_FILE sites are
+  exclusive dispatch arms — one read per run already; snapshotting it single-sources, not a
+  reread fix). Per-entry corpus slots hold bytes OR the read-failure payload;
+  duplicate-path entries capture per entry (slot-consistent attestation). Unit tests:
+  loader errors, hash = file bytes' sha256, confinement rejection, phase + model-route
+  gating. No run.rs contact.
+- [ ] input-snapshot.2: resolution + execution consume the snapshot — resolve() consumes
+  phase-A parsed registries + toolchain and triggers the phase-B capture at its tail; the
+  two corpus entry.path head-fn reads, both LEXICON_FILE sites, and build_record_setup's
+  SCHEMAS/PROMPTS loads become snapshot lookups (root stays for outputs). Missing-doc
+  behavior preserved: routes consume the slot's recorded failure and land TODAY's
+  diagnostic per-route inside their own ledger slice (only the READ moves — multiplicity,
+  attribution, and each site's payload shape unchanged). Record-path template/constraint
+  reads join the snapshot: bytes captured once at record setup; every later consumer that
+  reopens the constraint path (per-fill cassette calls) re-verifies the reopened bytes
+  against the snapshot hash and fails loud on mismatch — closes the per-fill reopen race
+  the pre-write byte-verify leaves open (declared hash attested while later fills could
+  read mutated bytes). Gate: full suites green, M1/M2 byte-pins UNCHANGED; test edits =
+  mechanical plumbing where tests call resolve()/head fns directly + input-error paths;
+  semantic assertions unchanged.
+- [ ] input-snapshot.3: metrics + manifest attest the snapshot — model_route_metrics parses
+  experiments/reference from snapshot bytes (identity gating preserved); manifest_inputs
+  (today rereads LOCKFILE/CORPORA/EXPERIMENTS/expected_outcomes/SCHEMAS/PROMPTS) consumes
+  snapshot fields with every §9 field keeping its CURRENT derivation: raw-byte hashes
+  (lockfile/corpora/reference/test sources) hash snapshot bytes; schema_hash +
+  prompt_template_hash stay aggregates over the want-set entries' DECLARED hashes read from
+  the snapshot's parsed schemas/prompts (raw registry-file hashes would break the pinned
+  manifests). Stable tree ⇒ identical bytes ⇒ pins green. Regression test: an explicit
+  test-only barrier hook reachable from run.rs's in-crate tests (NO sleeps) mutates
+  registry/corpora.yaml AND one selected corpus doc between resolution and manifest
+  assembly — the run stays `ok`, artifacts + manifest.json attest the resolution-time bytes
+  (today the manifest attests the mutated registry while the artifacts used the original
+  mapping — the review-reproduced flip).
 - [ ] spawn-retry: pre-M3 hardening — both spawn_piped_surfaces_persistent_etxtbsy tests
   (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
   observed: some filesystems yield ETXTBSY, others — overlayfs among them — let the spawn
@@ -150,7 +167,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   environment-dependent outcomes.
 - [ ] lexicon-extract: behavior-locked move — the Lexicon family (types, YAML row structs,
   load_lexicon, validation + their tests) leaves normalize.rs (2166L) for fresh
-  crates/ckc-cli/src/lexicon.rs, normalize re-imports; the neutral dependency point
+  crates/ckc-cli/src/lexicon.rs; normalize keeps the existing PUBLIC paths via pub use
+  re-exports (Lexicon/LexiconError/load_lexicon are pub through ckc_cli::normalize and no
+  suite would catch a silent path break); the neutral dependency point input_snapshot,
   lexicon-cnl.*, cnl_grammar, cnl_parse, cnl_render, cnl_bridge all consume. Zero public
   behavior change: existing suites the gate, assertion surface untouched (import edits only).
 - [ ] lexicon-cnl.1: CNL surface fields — LexiconConcept +adnominal_ja/negated_ja/gloss_en,
@@ -271,11 +290,18 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   index consts MODEL_FILL=2/DIRECT_VERIFY=3/COMPILE=4/VERIFY=5/TRACE=6/REPORT=7 over
   PROCESSING_STAGE_KINDS) for validated named handles: StageHandle {kind, step_id} +
   per-shape RouteStages enum with named stage fields (M1Layered/SingleIr/DirectSmt;
-  resolve_route validates the declared kind sequence and constructs it — no sentinel, no
-  resize); finish_processing_stage + emission/provenance sites take a handle (kind travels
-  WITH step_id, never re-derived from an index); compile_verify_group + producers
-  parameterized by handles. Zero behavior change: suites green, assertion surface untouched
-  (fixtures rebuild to named construction), M1/M2 pins unchanged.
+  resolve_route constructs it with its full fingerprinting kept verbatim, incl. the
+  model-fill output_artifact_kinds validation — no sentinel, no resize); RouteShape DERIVES
+  from the RouteStages variant (accessor, never stored independently — no shape/handle
+  mismatch); finish_processing_stage + emission/provenance sites take a handle (kind
+  travels WITH step_id, never re-derived from an index); run-scoped synthetic trace/report
+  (processing_stage.run.*) become a named run-level handle pair replacing their
+  index-derived kinds (producer pins stay byte-identical); diagnostic labels that
+  intentionally differ from the registry kind (model_fill_smt payloads) stay literal —
+  handles replace index-derived kinds only; compile_verify_group + producers parameterized
+  by handles. Zero behavior change: suites green, semantic pins preserved (tests asserting
+  the retired [Id; 8]/UNUSED_STAGE shapes rewrite mechanically to handle equality), M1/M2
+  pins unchanged.
 - [ ] route-single-cnl.1: registry data — processing_stage.m3.model_fill_cnl (model_fill,
   [sdg,segments]→[cnl_document]) + m3.bridge (bridge, [cnl_document,segments]→[clinical_ir]) +
   pipe.m3_single_cnl (7 stages; m2.assemble + m1.compile/m1.verify reused — a
