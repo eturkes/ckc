@@ -68,11 +68,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   its Earley oracle proves language MEMBERSHIP (superset — explores all segmentations), so
   lexer segmentation determinism is guarded by the lexicon prefix-overlap lint instead;
   single-parse asserts use `parse_input().take(2)`, never full counts.
-- Record strategy: record exp.m3_cnl into a scratch root, copy `route.single_cnl/**` into the
-  committed /cassettes (keys disjoint from M2's); identity-agreement vs the existing cassettes
-  decides — agree ⇒ done, drift ⇒ full re-record + M2 recorded_run re-bless (documented
-  fallback); store hygiene (EMPTY start, ledger census both directions, replace-not-merge,
-  copy only after identity + replay verify) = record-cnl.2 acceptance.
+- Record strategy: record exp.m3_cnl into a scratch root whose cassette store starts newly
+  created + EMPTY; census `route.single_cnl/**` vs the run's model-attempt ledger both
+  directions; identity-agreement vs the existing cassettes decides — agree ⇒ M2 cassettes
+  stand (no re-bless), drift ⇒ full re-record + M2 recorded_run re-bless (documented
+  fallback); after agreement + replay verify, copy into the committed /cassettes REPLACING
+  the route.single_cnl subtree, never merging (keys disjoint from M2's); this hygiene =
+  record-cnl.2 acceptance.
 - Known deliberate re-bless costs, scheduled in their units: ja_core.yaml growth →
   lexicon_hash-carrying value pins (lexicon-cnl-data); report CNL population → M1/M2 report
   byte-pins + rendered-body consts (report-cnl.2/.3).
@@ -433,12 +435,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cassette store is newly created + EMPTY (persist overwrites same-key without compare →
   stale keys survive as orphan attempts; memory's empty-store rule bound here as
   acceptance); census route.single_cnl/** vs the run's actual model-attempt ledger in BOTH
-  directions; identity-agreement vs existing cassettes — agree ⇒ done, drift ⇒ full
-  re-record + M2 recorded_run re-bless fallback; replay matched; copy into committed
-  /cassettes only after identity agreement + replay verification pass, REPLACING the
-  committed route.single_cnl subtree, never merging (base + derived-seed repairs, REAL
-  identity, audit-exempt); do-not-read sync verified (/cassettes already deny-Read — census
-  via runtime indirection).
+  directions; identity-agreement vs existing cassettes — agree ⇒ M2 cassettes stand (no
+  re-bless), drift ⇒ full re-record + M2 recorded_run re-bless fallback; replay matched;
+  copy into committed /cassettes only after identity agreement + replay verification pass,
+  REPLACING the committed route.single_cnl subtree, never merging (base + derived-seed
+  repairs, REAL identity, audit-exempt); do-not-read sync verified (/cassettes already
+  deny-Read — census via runtime indirection).
 - [ ] record-cnl.3: recorded-run battery — exp.m3_cnl census/§9/re-render/replay-matched/
   audit-file pins over the committed cassettes (recorded_run.rs pattern, own test file — M2
   battery untouched).
