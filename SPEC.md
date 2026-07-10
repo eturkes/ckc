@@ -929,9 +929,10 @@ Committed direction:
   the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern); the
   `registry/schemas.yaml` entry binds the JA grammar — the route's decoding constraint,
   consumed exactly as §9 consumes the IR schema — while the EN grammar stays committed,
-  drift-guarded, and hash-pinned with no route binding (an entry only if a later coverage
-  requirement demands one). Every linguistic form lives in lexicon DATA and the grammar stays purely
-  concatenative: concept entries gain adnominal / negated-adnominal / EN-gloss surfaces; action
+  drift-guarded, and hash-pinned with no route binding (its own non-route entry only if the
+  coverage check demands one — the route's singular id stays JA-bound). Every linguistic
+  form lives in lexicon DATA and the grammar stays purely concatenative: concept entries
+  gain adnominal / negated-adnominal / EN-gloss surfaces; action
   kinds gain JA/EN noun forms; the modality table gains canonical deontic-tail fields
   (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
   surfaces: 「を強く推奨する」 carries particle + strength adverb; rows carrying tails parse
@@ -951,12 +952,15 @@ Committed direction:
   terminal), missing surface fields, per-language exact-duplicate parse terminals across ALL
   CNL surface fields and lexer categories (concept adnominal/negated forms, action nouns,
   tails, certainty phrases, quantity surfaces/units), per-language proper-prefix overlaps
-  rejected across ALL those lexer-visible terminals — same- and cross-category, since
-  maximal-munch lexing could otherwise steal a longer token from another category
-  (segmentation determinism), `implies_action`
+  rejected across the finite longest-match token inventory — those lexicon surfaces plus the
+  fixed grammar terminals and digit tokens, same- and cross-category; escape payload =
+  delimiter-scanned free content, outside the inventory (a prefix-free inventory keeps
+  maximal-munch tokenization agreeing with the grammar's intended segmentation — the failure
+  mode is a longer token stolen from another category), `implies_action`
   resolving to an action entry, `tail_ja`/`tail_en` present together or absent together (a
-  row is tail-bearing iff both — a one-language tail would make bilingual canonical
-  rendering partial), every `(direction, strength)` pair present carrying ≥1
+  row is tail-bearing iff both — per-language tail-bearing would let canonical-row selection
+  diverge between languages or leave one language's pair coverage partial), every
+  `(direction, strength)` pair present carrying ≥1
   tail-bearing row, concept intervals CNL-representable (v1: one unsigned bound), and
   quantity-table integrity — unique `var_id`, exactly one
   quantity row per interval variable a concept uses, nonempty normalized surfaces and units in

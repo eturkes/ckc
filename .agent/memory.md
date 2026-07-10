@@ -442,8 +442,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   LLM-constraint-portable + bnf-atomic; bnf 0.6
   verified unicode-capable (byte-offset whole-terminal matching); its Earley oracle proves
   language MEMBERSHIP (superset — explores all segmentations) → lexer segmentation determinism
-  guarded by the lexicon proper-prefix lint (same- AND cross-category, all lexer-visible
-  terminals) instead; single-parse asserts =
+  guarded by the lexicon proper-prefix lint (same- AND cross-category over the finite token
+  inventory — lexicon surfaces + fixed terminals + digits; escape payload delimiter-scanned,
+  outside it) instead; single-parse asserts =
   `parse_input().take(2)`, never full counts (ambiguous blowup). FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
