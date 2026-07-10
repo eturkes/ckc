@@ -448,9 +448,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `parse_input().take(2)`, never full counts (ambiguous blowup). FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
-  spends no repair). Record strategy: scratch-root record, copy route.single_cnl/** into
-  committed /cassettes (keys disjoint from M2's); identity drift ⇒ full re-record + M2
-  recorded_run re-bless fallback. Deliberate re-bless costs scheduled in units: ja_core.yaml
+  spends no repair). Record strategy: scratch-root record from a newly created EMPTY cassette
+  store, census route.single_cnl/** vs the run's model-attempt ledger both directions, copy
+  into committed /cassettes only after identity agreement + replay verify, replacing the
+  route.single_cnl subtree never merging (keys disjoint from M2's); identity drift ⇒ full
+  re-record + M2 recorded_run re-bless fallback. Deliberate re-bless costs scheduled in units: ja_core.yaml
   growth → lexicon_hash value pins (lexicon-cnl-data); report CNL population → M1/M2 report +
   rendered-body pins (report-cnl.2/.3). Surface-quality metric rows gate on observations
   carrying the new FillObservation fields → M2 replay rows byte-unchanged (metrics-cnl proves).

@@ -71,7 +71,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - Record strategy: record exp.m3_cnl into a scratch root, copy `route.single_cnl/**` into the
   committed /cassettes (keys disjoint from M2's); identity-agreement vs the existing cassettes
   decides — agree ⇒ done, drift ⇒ full re-record + M2 recorded_run re-bless (documented
-  fallback).
+  fallback); store hygiene (EMPTY start, ledger census both directions, replace-not-merge,
+  copy only after identity + replay verify) = record-cnl.2 acceptance.
 - Known deliberate re-bless costs, scheduled in their units: ja_core.yaml growth →
   lexicon_hash-carrying value pins (lexicon-cnl-data); report CNL population → M1/M2 report
   byte-pins + rendered-body consts (report-cnl.2/.3).
@@ -428,11 +429,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   paragraph carries the mitigation frame); template refinement from observation + RecordParts byte-verify
   green + model_ms_per_call budget entry. Machine specifics → runtime.local.md, committed
   bytes stay engine-agnostic.
-- [ ] record-cnl.2 (gated: model runtime, LIVE): record exp.m3_cnl in a scratch root; copy
-  route.single_cnl/** into committed /cassettes (base + derived-seed repairs, REAL identity,
-  audit-exempt); identity-agreement vs existing cassettes — agree ⇒ done, drift ⇒ full
-  re-record + M2 recorded_run re-bless fallback; replay matched; do-not-read sync verified
-  (/cassettes already deny-Read — census via runtime indirection).
+- [ ] record-cnl.2 (gated: model runtime, LIVE): record exp.m3_cnl in a scratch root whose
+  cassette store is newly created + EMPTY (persist overwrites same-key without compare →
+  stale keys survive as orphan attempts; memory's empty-store rule bound here as
+  acceptance); census route.single_cnl/** vs the run's actual model-attempt ledger in BOTH
+  directions; identity-agreement vs existing cassettes — agree ⇒ done, drift ⇒ full
+  re-record + M2 recorded_run re-bless fallback; replay matched; copy into committed
+  /cassettes only after identity agreement + replay verification pass, REPLACING the
+  committed route.single_cnl subtree, never merging (base + derived-seed repairs, REAL
+  identity, audit-exempt); do-not-read sync verified (/cassettes already deny-Read — census
+  via runtime indirection).
 - [ ] record-cnl.3: recorded-run battery — exp.m3_cnl census/§9/re-render/replay-matched/
   audit-file pins over the committed cassettes (recorded_run.rs pattern, own test file — M2
   battery untouched).
