@@ -379,14 +379,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: per-stage totals stay EventRecords
   alone — a standalone TotalOperationResult there is inert + redundant until then (M2+ may
   revisit). Enhancement (AGENTS.md-preferred; since scheduled into M3: canon-props): tests are example/byte-pin only →
-  property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
-  idempotence.
+  property-based/fuzzing for the canon layer (round-trip identity, reject noncanonical
+  mutations) + StringPolicy idempotence.
 - M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; fixes in 5ec33f7). Durable: the six
   §9 theme verdicts rest on acceptance-m2's LOCAL driver run (evidence-runs-local design,
   independently codex-re-verified). OPEN user items: SPEC §8.4
   "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
-  `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
-  enhancement, since scheduled into M3: canon-props); shared cross-crate subprocess runner + registry symlink guard
+  `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (since
+  scheduled into M3: canon-props); shared cross-crate subprocess runner + registry symlink guard
   (both since scheduled into M3: subproc-runner.1/.2, path-confine).
 - CNL-first architecture (user directive 2026-07-07, set in the Codex-continued cnl-ir-research
   session — rollout `~/../debian/.codex/sessions/2026/07/07/rollout-2026-07-07T11-09-50-*.jsonl`;
@@ -411,8 +411,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   of the Lexicon family out of normalize.rs, the CNL modules' neutral dependency point —
   plus cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/cnl_bridge.rs) —
   Canonical-outside-core proven by report.rs; ckc-core IR shapes + committed clinical_ir.schema.json untouched (ClinicalStatement
-  already carries certainty/exceptions/source refs; sole core touch = DiagnosticCode
-  fieldless_enum append). CNL AST = own family, NOT ClinicalIr (CnlAtom
+  already carries certainty/exceptions/source refs; CNL's sole core touch = DiagnosticCode
+  fieldless_enum append — path-confine separately extends core's validate_registries). CNL AST = own family, NOT ClinicalIr (CnlAtom
   Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
   {Registered|Unregistered} it reaches EVERY concept slot incl. action target, §10; CnlContext
   flat two-level DNF; CnlDocument payload per §5 = document_id + grammar id/hash refs + rules
@@ -422,8 +422,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   mirroring normalize.rs's mints EXACTLY — §8.6 reserves `<doc>.rule.<k>` for norm-layer
   rule ids, rules.rs's mint; one ClinicalStatement per
   context-disjunct; population partition by `pop.*` id namespace; exception disjunct → one
-  ExceptionClause; one Exact TerminologyBinding per referenced concept, system =
-  lexicon.system, region_ids = citing rule's basis regions; Action::new derives key; basis = region ids,
+  ExceptionClause; one Exact TerminologyBinding per DISTINCT referenced concept
+  in first-reference document order, system = lexicon.system, region_ids = the citing
+  rules' basis regions; Action::new derives key; basis = region ids,
   source_segment_ids derived region→segment via the SEGMENTS artifact — m3.bridge stage
   inputs [cnl_document, segments]; round-trip laws: from_ir = single-disjunct projection ⇒
   from_ir∘to_ir == disjunct-split normal form, to_ir∘from_ir == id on bridge-image IR).
@@ -540,9 +541,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   run whose manifest attests bytes the execution never used) → SCHEDULED as M3
   input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot, every phase consumes the
   snapshot). Constraint-path variant: the runtime child reopens the pathname mid-call, so
-  NO parent-side reread (ConstraintDrift included) catches a transient A→B→A rewrite → M3
-  constraint-snapshot stages frozen bytes; reread-verify is never the fix for a path
-  another process reopens.
+  no parent-side reread (ConstraintDrift included) GUARANTEES catching a transient A→B→A
+  rewrite → M3 constraint-snapshot stages frozen bytes; reread-verify is never the fix for
+  a path another process reopens.
 - Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
   `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is
   live-parsed, env-dependent — report.rs const-pins SYNTHETIC bodies freely; run_oracle.rs
