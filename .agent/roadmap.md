@@ -35,7 +35,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - CNL AST ≠ ClinicalIr: CnlAtom {Concept|ConceptNegated|Interval|Unregistered(surface)}
   (escape = own variant), CnlConceptRef {Registered(Id)|Unregistered(surface)} — §10 admits
   the escape in EVERY concept slot incl. action target — CnlContext {any: Vec<Vec<CnlAtom>>}
-  flat two-level DNF, CnlException (DNF), CnlRule {context, action kind + target:
+  flat two-level DNF, CnlException {concept: CnlConceptRef} (§10 single-concept register —
+  a sentence list, disjunctive across entries; no DNF/negation/interval inside an entry),
+  CnlRule {context, action kind + target:
   CnlConceptRef, direction+strength, certainty?, exceptions, basis region refs}, CnlDocument
   = the landed model_fill artifact payload per §5's table: document_id + grammar id/hash refs
   + rules (AST + per-rule canonical text ja/en) + per-language text hashes — accept re-renders
@@ -45,8 +47,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   `bind.<k>` document-order counters mirroring normalize.rs's mints EXACTLY — §8.6 reserves
   `<doc>.rule.<k>` for norm-layer rule ids; disjunct split appends statements in document
   order); population-vs-condition partition by lexicon
-  id namespace (`pop.*` → population, else condition); each exception disjunct → one
-  ExceptionClause; bindings = one Exact-status TerminologyBinding per distinct referenced
+  id namespace (`pop.*` → population, else condition); each exception sentence → one
+  single-atom ExceptionClause (positive `Concept` — the §10 single-concept register; the
+  locked rules.rs lowering negates ONLY positive Concept atoms into the rule's single
+  conjunct, sound for single-atom clauses via ¬(E1∨…)=¬E1∧… and for nothing wider — a
+  conjunctive exception needs De Morgan ¬A∨¬B, and it ignores negated/interval exception
+  atoms); bindings = one Exact-status TerminologyBinding per distinct referenced
   concept, minted in first-reference document order (matches M1's first-mention scan order on
   the locked corpus; divergence = measured ir_match miss, never asserted), system =
   lexicon.system, code = concept id, region_ids = the citing rules' basis regions — a
@@ -239,7 +245,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
   BNF (smt_query.grammar dialect, `;` comments): document = rule+; rule = context 患者には、
-  action deontic-tail / optional certainty paren / ただし-exceptions / [根拠 …] basis; DNF
+  action deontic-tail / optional certainty paren / ただし-exceptions (each sentence = ONE
+  concept-or-escape slot, §10 single-concept register — no connectives/negation/interval
+  inside 除く) / [根拠 …] basis; DNF
   connectives かつ / 、または with precedence by production shape; atoms
   concept|negated|interval|escape (未登録概念「…」 / unregistered concept "…"; admitted in
   action-target position too — §10); EN mirror productions; terminals = lexicon whole-surface
@@ -275,9 +283,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
   errors, repairable).
 - [ ] cnl-parse.2: document parser — full slot order (context 患者には、 action deontic tail /
-  certainty paren / ただし exceptions / basis bracket), multi-rule documents, single
+  certainty paren / ただし exceptions (single concept-or-escape payload per sentence) /
+  basis bracket), multi-rule documents, single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
-  unterminated bracket, empty document); differential accept/reject agreement vs the Earley
+  unterminated bracket, empty document, connective/negated-concept/interval inside an
+  exception sentence); differential accept/reject agreement vs the Earley
   oracle over this unit's corpus.
 - [ ] cnl-render: cnl_render.rs — render_ja/render_en canonical text (modality pair → the
   pair's canonical tail — the first tail-bearing row per pair — per language, basis sorted,
@@ -293,13 +303,19 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   payload convention): (direction, strength) pair without a tail-bearing lexicon row; EMPTY
   statements array (run.rs's accept battery currently pins empty ClinicalIr = accepted);
   signed or two-sided quantity intervals (v1 register — the committed IR schema's
-  IntervalBound pattern admits negatives, IrBundle::validate admits two-sided) — closing §10
+  IntervalBound pattern admits negatives, IrBundle::validate admits two-sided); exception
+  clauses not exactly one positive Concept atom (§10 single-concept register — multi-atom /
+  ConceptNegated / Interval exception shapes are CNL-inexpressible yet schema-valid, so
+  model-reachable) — closing §10
   render-totality for the one IR-landing route without a grammar/derivation guard (M1 derives
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
   reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
   region + the lexicon modality table (lexicon.rs post-extract) only.
-- [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules +
+- [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
+  (from_ir = Err, fail-closed, on an ExceptionClause that is not exactly one positive
+  Concept atom — §10 render totality; unreachable from bridge-image, accept-total-guarded,
+  and locked-corpus IR) +
   both round-trip laws as pinned there (from_ir∘to_ir == disjunct-split normal form;
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
   (parse(§10 JA) bridges to the §8.6 rule content). Read scope: ir.rs shapes + rules.rs

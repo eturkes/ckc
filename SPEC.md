@@ -904,7 +904,7 @@ Committed direction:
 | action | `<target>の<action-noun>` (例 `抗菌薬Aの投与`) | `<action-noun> of <target>` | Action kind + target |
 | deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
 | certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
-| exception | `ただし、<dnf>患者を除く。` per entry | `exception: patients <dnf>.` per entry | exception ContextExpr — separate labeled payload (PROLEG pattern) |
+| exception | `ただし、<concept>患者を除く。` per entry | `exception: patients <concept>.` per entry | one single-concept ExceptionClause per entry — separate labeled payload (PROLEG pattern) |
 | basis | `[根拠 <id> …]`, sorted | `[basis <id> …]`, sorted | source segment/region refs |
 
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
@@ -916,6 +916,19 @@ Committed direction:
   ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
   plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
+- Exception register (v1, deliberately narrower than the context DNF): each exception sentence
+  carries exactly one concept slot — a positive registered concept (adnominal surface) or the
+  escape — no connectives, no negated-concept atoms, no quantity intervals. Multiple exception
+  sentences per rule remain available and read disjunctively (any listed exception exempts).
+  Soundness anchor: §5 compiles exceptions to negated context conjuncts inside the rule's one
+  conjunction, negating exactly the clause's positive concept atoms — sound because
+  ¬(E1 ∨ … ∨ En) = ¬E1 ∧ … ∧ ¬En when every Ei is a single atom, while a conjunctive
+  exception `A ∧ B` would need the De Morgan disjunction ¬A ∨ ¬B the locked tail never
+  builds, and negated/interval exception atoms sit outside its negation domain entirely. A
+  conjunctive, negated, or interval exemption is authored as context refinement instead (the
+  context DNF already admits negated concepts and intervals); widening the exception register
+  is an explicit lowering change (M4+ candidate), never a silent grammar widening over the
+  unchanged compile tail.
 - Ids: the parser and the model mint no ids — the bridge derives statement/exception/binding
   ids deterministically from document order as `stmt.<k>`/`exc.<k>`/`bind.<k>` document-local
   counters, mirroring the deterministic M1 derivation exactly (§8.6 reserves
@@ -945,7 +958,8 @@ Committed direction:
   single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects an
   off-lexicon `(direction, strength)` pair as a repairable schema violation, mirroring the
   off-lexicon id check; the same acceptance closure rejects the remaining CNL-inexpressible
-  shapes — empty statement sets, signed or two-sided quantity intervals, the v1 register), so
+  shapes — empty statement sets, signed or two-sided quantity intervals, exception clauses
+  that are not exactly one positive concept atom, the v1 register), so
   audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
@@ -966,8 +980,9 @@ Committed direction:
   quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
   both languages.
 - Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
-  concept surface (condition atom, action target; action kinds stay a small closed class —
-  extending them is lexicon review, not emission), one escape production is admitted — JA
+  concept surface (condition atom, exception concept, action target; action kinds stay a
+  small closed class — extending them is lexicon review, not emission), one escape
+  production is admitted — JA
   `未登録概念「<surface>」`, EN `unregistered concept "<surface>"`, free quoted surface — so
   constrained decoding is never forced to alias an off-lexicon source concept to the nearest
   registered terminal (silent substitution — the exact failure class the fail-closed design
@@ -1006,9 +1021,12 @@ Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) =
 Bridge round trip: from_ir(to_ir(ast)) == the disjunct-split normal form of ast (identity on
 already-split documents); to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain (tail-backed
-modality pairs, ≥1 statement, one-sided unsigned quantity intervals — v1) — so render is
-defined for every accepted ClinicalIR on every route: M1 by derivation + lexicon integrity,
-single_cnl by grammar, single_ir by the accept-total closure.
+modality pairs, ≥1 statement, one-sided unsigned quantity intervals, single-concept exception
+clauses — v1) — so render is defined for every accepted ClinicalIR on every route: M1 by
+derivation + lexicon integrity (exception shape: derivation mints only positive concept atoms
+and each locked-corpus exception segment matches exactly one — a multi-concept clause fails
+the audit render closed at from_ir), single_cnl by grammar, single_ir by the accept-total
+closure.
 Audit honesty: audit views render only from accepted artifacts, never from raw model output.
 ```
 

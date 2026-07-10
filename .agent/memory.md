@@ -421,8 +421,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters
   mirroring normalize.rs's mints EXACTLY — §8.6 reserves `<doc>.rule.<k>` for norm-layer
   rule ids, rules.rs's mint; one ClinicalStatement per
-  context-disjunct; population partition by `pop.*` id namespace; exception disjunct → one
-  ExceptionClause; one Exact TerminologyBinding per DISTINCT referenced concept
+  context-disjunct; population partition by `pop.*` id namespace; exception sentence → one
+  single-atom ExceptionClause (positive Concept — the §10 single-concept register); one
+  Exact TerminologyBinding per DISTINCT referenced concept
   in first-reference document order, system = lexicon.system, region_ids = the citing
   rules' basis regions; Action::new derives key; basis = region ids,
   source_segment_ids derived region→segment via the SEGMENTS artifact — m3.bridge stage
@@ -486,8 +487,20 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,
   so canonical selection needed explicit tail_ja/tail_en fields over first-listed file order);
   run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
-  negatives, IrBundle::validate admits two-sided intervals → accept-total closes every
-  CNL-inexpressible shape, census-flip-gated; §10 laws quantify over the parser-accepted
+  negatives, IrBundle::validate admits two-sided intervals, ExceptionClause admits arbitrary
+  atom vectors → accept-total closes every
+  CNL-inexpressible shape, census-flip-gated; exception register = single positive registered
+  concept per sentence, disjunctive across sentences, BECAUSE the locked rules.rs lowering
+  negates ONLY positive Concept atoms into the rule's one conjunct (ConceptNegated/Interval
+  exception atoms silently ignored — its hand-case test pins an exception Interval
+  contributing nothing): sound for single-atom clauses (¬(E1∨…)=¬E1∧…) and for nothing wider
+  (a conjunctive exception needs De Morgan ¬A∨¬B — a different, wider rule); full exception
+  DNF would demand its own pre-bridge exception-lowering unit (De Morgan + interval-bound
+  complementation + bounded DNF distribution + expansion guard) — deliberately NOT M3, and a
+  conjunctive/negated/interval exemption is expressible as context refinement (context DNF
+  admits negated concepts + intervals); normalize's attach_exception CAN conjoin >1 matched
+  concept into one clause (all positive; the locked corpus realizes exactly one) → from_ir
+  fails closed on wider clauses, accept-total rejects them on single_ir; §10 laws quantify over the parser-accepted
   language (runtime grammar = repairable superset — the open escape production admits payloads
   the parser rejects); audit views need (pipeline, document) keying because exp.m3_cnl accepts
   the same document on two routes. ETXTBSY fact behind spawn-retry: BOTH outcomes observed
