@@ -8,6 +8,10 @@
 # never committed; rebuild with `tokensave init`/`sync`.
 /.tokensave/
 
+# Headroom's wrap marker: live-session state (wrapper pid/port/env key),
+# written at session start, removed when the wrapped session exits.
+.claude/.headroom_wrap_marker.json
+
 # Rust build output (Cargo.lock is committed, not ignored)
 target/
 
