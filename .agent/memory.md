@@ -428,26 +428,33 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
   bundle-unique ids + (D1∨D2)∧¬E distribution; clause region_ids = its own sentence's basis
   bracket VERBATIM — §10 per-sentence basis brackets, one on the recommendation sentence +
-  one per exception sentence [7th 2026-07-11 review: the earlier single rule-global bracket
-  + exception-kind slice shared across clauses left multi-exception provenance
-  unreconstructible and falsified per-clause region_ids, breaking ir_faithfulness exact
-  equality — exception region_ids sit INSIDE the §10 projection; source-order mapping
-  rejected: ambiguous when a sentence expands to several clones or emission reorders]); one
+  one per exception sentence (a single rule-global bracket leaves multi-exception
+  provenance unreconstructible + falsifies per-clause region_ids, which sit INSIDE the §10
+  faithfulness projection; source-order mapping rejected — ambiguous under clone
+  expansion/reorder)); one
   Exact TerminologyBinding per DISTINCT referenced concept
-  in first-reference document order, system = lexicon.system, region_ids = the citing
+  at first reference in POST-SPLIT emission order (statement-major, emitted atom order — a
+  later-disjunct-only concept mints late), system = lexicon.system, region_ids = the citing
   rules' basis regions (union over brackets); Action::new derives key; basis = region ids
   per sentence,
   source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
   m3.bridge stage
-  inputs [cnl_document, segments]; round-trip laws (escape-free ASTs, to_ir Err on escapes):
+  inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
+  cited regions anchored in exactly one segment, derived segments' region sets unshared
+  (closure-functional), nonempty remainder (single_cnl_accept grounding); accept-total also
+  rejects region-less cited segments (segmenter-reachable: all-ungrounded table row) +
+  shared-region artifacts (bundle-valid only); round-trip laws (ACCEPTED escape-free ASTs,
+  to_ir Err on escapes):
   from_ir = single-disjunct projection — clause region_ids verbatim on its exception
   sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
-  exception-owned; Err fail-closed on empty clause regions or empty remainder,
-  accept-total-rejected shapes) ⇒
+  exception-owned — deterministic evidence cover, NOT authorial attribution, the IR keeps
+  no rule-level region set; Err fail-closed on empty clause regions or empty remainder,
+  acceptance-rejected both sides) ⇒
   from_ir∘to_ir == bridge normal form (disjunct split + atom canonicalization — population
-  before condition, set order, dedup — + exception-partitioned segment-closed basis),
+  before condition, set order, dedup — + exception-owned segment-closed basis split, a
+  labeled COVER: clauses may share a region),
   to_ir∘from_ir == id on
-  bridge-image IR).
+  bridge-image IR = to_ir's image over accepted ASTs).
   Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
   EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
   plumbing (pipeline_step_ids [Id; 8], MODEL_FILL/DIRECT_VERIFY/COMPILE=4/VERIFY=5/TRACE/

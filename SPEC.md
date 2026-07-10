@@ -894,8 +894,10 @@ Committed direction:
   attachment, scope) is designed out rather than solved.
 - Sentence model: one rule = one sentence group — recommendation sentence + its basis
   bracket + zero or more exception sentences, each carrying its own basis bracket
-  (per-sentence provenance: every sentence cites the regions backing it, and the bridge
-  reads each exception clause's region_ids off its own bracket — a single rule-global
+  (per-sentence provenance: the bridge reads each exception clause's region_ids off its own
+  bracket verbatim, while the rule bracket normalizes to the segment-closed remainder — a
+  deterministic evidence cover, not authorial attribution, since the IR keeps no rule-level
+  region set; a single rule-global
   bracket would leave multi-exception provenance unreconstructible). Fixed clause order,
   closed connective set, no
   pronouns, no anaphora, no definite references, no ellipsis (overt subject every sentence);
@@ -909,7 +911,7 @@ Committed direction:
 | deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
 | certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
 | exception | `ただし、<concept>患者を除く。[根拠 <id> …]` per entry | `exception: patients <concept>. [basis <id> …]` per entry | one single-concept ExceptionClause per entry per split statement (disjunct splits clone entries under fresh ids, each clone keeping its sentence's basis) — separate labeled payload (PROLEG pattern); the entry's own bracket = the clause's region_ids |
-| basis | `[根拠 <id> …]` after each sentence, sorted per bracket, ≥1 ref | `[basis <id> …]` after each sentence, sorted per bracket, ≥1 ref | rule bracket = the rule's own region refs; exception brackets = per-clause region refs; statement source segments derive from their union |
+| basis | `[根拠 <id> …]` after each sentence, sorted per bracket, ≥1 ref | `[basis <id> …]` after each sentence, sorted per bracket, ≥1 ref | rule bracket = the rule sentence's region refs (normal form: the segment-closed remainder); exception brackets = per-clause region refs; statement source segments derive from their union |
 
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
   precedence by decree (`かつ` binds tighter), no nesting beyond flat two-level DNF — each
@@ -951,10 +953,15 @@ Committed direction:
   mapping AST → ClinicalIR; a multi-disjunct rule splits into one statement per disjunct,
   each cloning every exception entry under a fresh id ((D1 ∨ D2) ∧ ¬E =
   (D1 ∧ ¬E) ∨ (D2 ∧ ¬E), and exception ids are bundle-unique) — `exc.<k>` counts emitted
-  clauses statement-major then sentence order, clause region_ids = its own sentence's basis
+  clauses statement-major then sentence order, `bind.<k>` at first reference in the same
+  post-split emission order (statement-major, emitted atom order — a concept exclusive to a
+  later disjunct mints after the earlier disjunct's atoms), clause region_ids = its own sentence's basis
   refs verbatim (per-sentence brackets; clones share their sentence's basis), and statement
   source_segment_ids derive region→segment (the segments artifact) over the union of the
-  rule's and its exceptions' basis refs; basis refs are the only
+  rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
+  cited region anchored in exactly one segment, the derived segments' region sets unshared
+  (closure-functional), exception-owned regions a proper subset of the closure (nonempty
+  remainder); basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
 - Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
@@ -982,9 +989,12 @@ Committed direction:
   shapes — empty statement sets, statements with empty population+condition, signed or
   two-sided quantity intervals, exception clauses that are not exactly one positive
   interval-free concept atom, negated-concept atoms over interval-carrying entries,
-  exception clauses with empty region_ids, and statements whose segment-closed source
-  regions are wholly exception-owned (an empty rule bracket under the exception partition —
-  covers empty source_segment_ids), the v1
+  exception clauses with empty region_ids, statements whose segment-closed source
+  regions are wholly exception-owned (an empty rule bracket under the exception-owned
+  split — covers empty source_segment_ids), and statements whose cited segments carry no
+  region or share a region with another segment (closure-nonfunctional — breaks segment
+  recovery from region-level basis; the empty-region segment is even segmenter-reachable via
+  an all-ungrounded table row), the v1
   register), so
   audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
@@ -1044,20 +1054,26 @@ Round trip: parse(render(ast)) == ast for every lexicon-valid AST (validity is l
 modality pairs tail-backed, concept/action refs resolved), both languages.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
-Bridge round trip (over escape-free ASTs; to_ir is Err on any escape occurrence — acceptance
+Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
+bridge preconditions: cited regions anchored, closure-functional segments, nonempty
+remainder; to_ir is Err on any escape occurrence — acceptance
 is already terminal there): from_ir(to_ir(ast)) == the bridge normal form of ast — disjunct
 split, per-statement atom canonicalization (population before condition, §4.3 set order,
 byte-identical duplicates collapsed; the partition + set emission are lossy exactly there),
-basis refs segment-closed and exception-partitioned (from_ir renders each clause's own
+basis refs segment-closed and exception-owned-split (a labeled cover, not a partition —
+clauses may share a region; from_ir renders each clause's own
 region_ids verbatim on its exception sentence and the segment-closed remainder — every cited
 segment's full region set minus the exception-owned regions — on the rule bracket; Err,
-fail-closed, when a clause's region set or that remainder is empty) — identity
-exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
+fail-closed, when a clause's region set or that remainder is empty — both edges
+acceptance-rejected on each side) — identity
+exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
+(the image of accepted ASTs).
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain (tail-backed
 modality pairs, ≥1 statement each with a nonempty context, one-sided unsigned quantity
 intervals, single-concept interval-free exception clauses each carrying nonempty region_ids,
 negated atoms over interval-free
-entries, a nonempty rule bracket under the exception partition — v1) — so render is defined
+entries, a nonempty rule bracket under the exception-owned split, cited segments
+region-bearing and unshared — v1) — so render is defined
 for every accepted ClinicalIR on every guarded route:
 single_cnl by grammar + acceptance, single_ir by the accept-total closure, M1 over its locked
 corpus by derivation + lexicon integrity + the corpus render audit (derivation mints positive
@@ -1250,7 +1266,8 @@ stability without faithfulness is the stability of a wrong answer.
 - Claim-completeness instrument (route-independent; the recall converse of §9 grounding, which
   checks emitted→source only): a recorded classifier pass enumerates the SourceDocumentGraph's
   regions deterministically and labels each normative-candidate or non-normative; every
-  normative-candidate region ends claimed — referenced from an accepted rule's basis — or
+  normative-candidate region ends claimed — referenced from an accepted rule's brackets
+  (rule or exception sentence) — or
   covered by a typed residual; unclaimed candidates emit `normative_region_unclaimed`
   (residual-class, §7.4). This narrows the silent-loss surface from "model skipped a
   recommendation" to "classifier mislabeled a region" — a simpler, independently k-sampled
