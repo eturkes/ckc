@@ -56,8 +56,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (multi-role deliberate); every quantity row exactly one context role — concept atoms
   land by row role, interval atoms by quantity role; ONE typed role view is the single
   source every CNL consumer reads — grammar slot alternations, cnl-ast validate, parser
-  slot legality, bridge partition, accept wrong-slot rejects — no prefix tests in CNL
-  modules; normalize.rs's frozen M1 prefix partition stays untouched, locked-corpus
+  slot legality, bridge partition (from_ir Err on wrong-slot IR — CNL-inexpressible,
+  re-parses into a different partition), accept wrong-slot rejects — no prefix tests in
+  CNL modules; normalize.rs's frozen M1 prefix partition stays untouched, locked-corpus
   agreement pinned by lexicon-cnl-integrity's M1 role data test; ruling: explicit roles
   FIELD over a prefix-derived index — multi-role is data and a future namespace never
   silently falls through to condition); each exception sentence → one
@@ -255,8 +256,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   lexicon-cnl.2 lint finding against the committed data = fix + re-bless there,
   deliberate).
 - [ ] lexicon-cnl-integrity: §10 integrity hard-errors NEW in load_lexicon —
-  implies_action resolves to an action entry, quantity var_ids unique, exactly one quantity
-  row per interval var any concept uses, slot-role integrity (every concept row a nonempty
+  implies_action resolves to an action entry, quantity var_ids unique, quantity var set ==
+  the set of interval vars concepts use (exactly one row per used var, orphan rows
+  hard-error — an orphan row is grammar-visible interval vocabulary outside the committed
+  schema's concept-derived enum + off_lexicon_ids' universe: parseable yet unacceptable),
+  slot-role integrity (every concept row a nonempty
   deduped set of known roles, population/condition mutually exclusive per row; every
   quantity row exactly one context role agreeing with each interval-carrying concept using
   its var; a test pins the committed M1 roles — pop.*→population, cond.*→condition,
@@ -269,7 +273,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   every (direction,strength) pair present carries ≥1 tail-bearing row —
   first tail-bearing row per pair = canonical render row, a test pins it against §10's
   worked tails — and concept intervals CNL-representable (v1 one unsigned bound); per-rule
-  rejection battery over bad-lexicon fixtures. Gate: committed tree green under every rule
+  rejection battery over bad-lexicon fixtures + a positive role-matrix control (a synthetic
+  lexicon covering all five legal concept role sets — {population}, {condition},
+  {action_target}, {population,action_target}, {condition,action_target} — plus both
+  quantity roles loads clean; committed rows are all singleton-role with a population-role
+  quantity, so without it an implementation rejecting legal multi-role rows or
+  condition-role quantities passes every committed-data fixture). Gate: committed tree
+  green under every rule
   (proves lexicon-cnl-data's authored rows satisfy them) + full gates.
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
   connective/punctuation grammar terminal), role-scoped missing-CNL-surface findings (a
@@ -292,9 +302,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
   SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed lexicon view
   (pairs/ids/roles): modality
-  pair tail-backed, concept/action refs resolved, slot roles admit every position (context
-  + exception concept refs context-role, action target action_target-role — §10 wrong-slot
-  bar, per-slot rejection cases), negated/exception concept refs
+  pair tail-backed, concept/action refs resolved, interval vars resolving to quantity rows
+  (+ dangling-var rejection case), slot roles admit every Registered ref's position
+  (context + exception concept refs context-role, action target action_target-role — §10
+  wrong-slot bar, per-slot rejection cases; the Unregistered escape is roleless and
+  admitted in every concept slot per §10 — per-slot escape-accept positives beside the
+  rejections), negated/exception concept refs
   interval-free (§10 negative-occurrence bar) — makes §10's lexicon-valid-AST quantifier
   well-defined) + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
@@ -316,7 +329,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   payload contract per §10, parser-enforced — the production stays open).
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
   worked examples full-match both languages, trailing-garbage reject, wrong-slot-surface
-  reject, per-production coverage
+  reject, a multi-role surface parsing in EACH of its slots (synthetic
+  {condition,action_target} lexicon — committed rows are singleton-role), per-production coverage
   incl. escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
@@ -385,15 +399,22 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   bundle-valid, CNL's DNF derives ≥1 atom); exception clauses with EMPTY region_ids
   (bundle-valid — validate only resolves cited regions); statements whose segment-closed
   source regions are wholly exception-owned — empty rule bracket under the §10
-  exception-owned split, covers EMPTY source_segment_ids (the closure computes over the
-  segments already
-  in the accept scope for grounding); statements whose cited segments carry no region or
+  exception-owned split, covers EMPTY source_segment_ids (closure input widens for the
+  topology checks: the segment id-set parameter becomes the segments artifact's
+  (segment_id, region_ids) view — the same artifact single_ir_fill already grounds
+  against, no new input; today's closure receives bare id sets, which cannot express
+  these checks); statements whose cited segments carry no region or
   share a region with another segment (closure-nonfunctional — breaks segment recovery from
   region-level basis, the to_ir∘from_ir law; the empty-region segment segmenter-REACHABLE
   via an all-ungrounded table row, the shared region bundle-valid only) — closing §10
   render-totality for the one IR-landing route without a grammar/derivation guard (M1 derives
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
-  reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
+  reject class + boundary accepts + repair recovery; BOTH existing positive fixtures
+  rebuilt role-valid + CNL-expressible with their former shapes re-pinned as named rejects
+  (classifies' cited output — empty context, empty exception atoms; vocabulary's base —
+  q.age_years interval under condition, ConceptNegated exception atom; both tail-less —
+  accept_lexicon() gains tail-bearing modality rows, roles, and a quantity row); M2
+  recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
   region + the lexicon modality table and role view (lexicon.rs post-extract) only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
@@ -402,7 +423,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   exactly one positive interval-free Concept atom, an ExceptionClause with empty region_ids,
   a negative occurrence of an
   interval-carrying entry, an empty statement context, an empty rule-bracket remainder
-  (wholly exception-owned segment-closed source regions — covers empty source_segment_ids)
+  (wholly exception-owned segment-closed source regions — covers empty source_segment_ids),
+  wrong-slot placement against the §10 role view (a context atom, action target, exception
+  concept, or interval bucket its role contradicts — any rendering re-parses into a
+  different partition, silently moving the atom)
   — §10 render totality; unreachable
   from bridge-image (= to_ir over ACCEPTED ASTs — single_cnl_accept rejects the CNL-side
   mirrors: orphan/shared cited regions, blanketing exception brackets),
@@ -410,8 +434,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   occurrence, law-harness-pinned) +
   both round-trip laws as pinned there (from_ir∘to_ir == bridge normal form;
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
-  (parse(§10 JA) bridges to the §8.6 rule content). Read scope: ir.rs shapes + rules.rs
-  derive_norm_ir contract only — run.rs stays closed.
+  (parse(§10 JA) bridges to the §8.6 rule content) + a synthetic-lexicon partition spot
+  test (a condition-role quantity's interval lands under condition, a multi-role concept
+  lands by its context role). Read scope: ir.rs shapes + the §10 lexicon role view
+  (lexicon.rs post-extract — BOTH directions consume it: to_ir partitions by it, from_ir
+  validates placement against it) + rules.rs
+  derive_norm_ir contract — run.rs stays closed.
 - [ ] cnl-laws: depth-bounded AST enumeration harness (all atom kinds × ≤2 disjuncts × ≤2
   conjuncts × all tail-backed modality pairs × certainty on/off × ≤2 exceptions × 1–2 basis
   refs per bracket (rule + per-exception); + one unbacked-pair render-Err assertion) →
@@ -419,7 +447,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
   two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin + a
   from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
-  bracket) + a segment-fixture axis pinning each §10 bridge-precondition breach + edge:
+  bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + a
+  segment-fixture axis pinning each §10 bridge-precondition breach + edge:
   orphan cited region (reject), region shared across two segments (reject), region-less
   cited segment (reject), rule∩exception bracket overlap with nonempty remainder (accepted —
   normal form moves the region to the exception sentence), one region shared by two

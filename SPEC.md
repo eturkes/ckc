@@ -901,8 +901,10 @@ Committed direction:
   bracket would leave multi-exception provenance unreconstructible). Fixed clause order,
   closed connective set, no
   pronouns, no anaphora, no definite references, no ellipsis (overt subject every sentence);
-  out-of-lexicon or unresolvable text is a parse error, never a guess (fail-closed — the
-  anti-ACE lesson). Multiword concepts are single lexicon terminals, never parsed compounds.
+  bare (unescaped) out-of-lexicon or unresolvable text is a parse error, never a guess
+  (fail-closed — the anti-ACE lesson; the sole registered exit is the unregistered-concept
+  escape below, which parses and fails at acceptance). Multiword concepts are single
+  lexicon terminals, never parsed compounds.
 
 | Slot | JA canonical shape | EN canonical shape | AST target |
 | --- | --- | --- | --- |
@@ -995,9 +997,14 @@ Committed direction:
   under the bridge partition. The loader exposes ONE typed role view that every CNL
   consumer reads — grammar emitter, AST validation, parser slot legality, bridge partition,
   acceptance wrong-slot checks — so no CNL module tests id prefixes: the M1 id namespaces
-  (`pop.`/`cond.`/`drug.`) demote to naming convention, pinned by a lexicon data test so
-  the frozen M1 normalize partition and the role-driven bridge agree over the locked
-  corpus, and a future concept namespace never silently falls through to `condition`. The
+  (`pop.`/`cond.`/`drug.`) demote to naming convention, pinned by a lexicon data test —
+  `pop.*` → population, `cond.*` → condition, `drug.abx_a` → action_target, `q.age_years`
+  → population — so the frozen M1 normalize partition and the role-driven bridge agree
+  over the locked corpus, and a future concept namespace never silently falls through to
+  `condition`. Roles live in lexicon data and the CNL layer only: the committed ClinicalIR
+  schema's enums stay role-agnostic and byte-frozen — slot legality belongs to the bridge
+  and the acceptance closures, and a per-slot schema re-derivation would re-bless
+  committed §9-pinned schema bytes. The
   grammar emitter derives slot-specific terminal alternations from the view — context
   concept and negated-concept atoms enumerate context-role (population|condition)
   surfaces, the action-target slot enumerates `action_target`-role surfaces,
@@ -1045,8 +1052,11 @@ Committed direction:
   integrity — every concept row a nonempty deduped set of known roles with
   `population`/`condition` mutually exclusive, every quantity row exactly one context role
   agreeing with the context role of each interval-carrying concept using its var — and
-  quantity-table integrity — unique `var_id`, exactly one
-  quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
+  quantity-table integrity — unique `var_id`, the quantity var set EQUAL to the set of
+  interval variables concepts use (exactly one row per used var, zero orphan rows: an
+  orphan quantity row would emit grammar-parseable interval vocabulary outside the
+  committed schema's concept-derived interval-var enum and `off_lexicon_ids`' universe —
+  parseable yet unacceptable by construction), nonempty normalized surfaces and units in
   both languages.
 - Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
   concept surface (context atom, exception concept, action target; action kinds stay a
@@ -1098,7 +1108,9 @@ basis refs segment-closed and exception-owned-split (a labeled cover, not a part
 clauses may share a region; from_ir renders each clause's own
 region_ids verbatim on its exception sentence and the segment-closed remainder — every cited
 segment's full region set minus the exception-owned regions — on the rule bracket; Err,
-fail-closed, when a clause's region set or that remainder is empty — both edges
+fail-closed, when a clause's region set or that remainder is empty, and when any atom,
+action-target, or interval placement contradicts the §10 role view — wrong-slot IR is
+CNL-inexpressible, any rendering re-parses into a different partition — all edges
 acceptance-rejected on each side) — identity
 exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
 (the image of accepted ASTs).

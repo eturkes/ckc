@@ -427,9 +427,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   (§10; ruling: explicit validated roles FIELD over a prefix-derived index — concept rows
   a nonempty role set over population|condition|action_target, population/condition
   mutually exclusive per row, action_target free to combine (multi-role deliberate);
-  quantity rows exactly one context role placing interval atoms; ONE typed role view
+  quantity rows exactly one context role placing interval atoms, quantity var set ==
+  concept-interval var set (orphan rows hard-error: grammar-visible vocabulary outside
+  the committed schema's concept-derived enum — parseable yet unacceptable); ONE typed role view
   consumed by every CNL module — grammar slot alternations, cnl-ast validate, parser slot
-  legality, bridge partition, accept wrong-slot rejects — no prefix tests in CNL modules,
+  legality, bridge partition (from_ir Err on wrong-slot IR — CNL-inexpressible, re-parses
+  into a different partition), accept wrong-slot rejects — no prefix tests in CNL modules,
   a future namespace never silently falls through to condition; normalize.rs's frozen M1
   prefix partition stays, locked-corpus agreement pinned by the M1 role data test —
   pop.*→population, cond.*→condition, drug.abx_a→action_target, q.age_years→population;
