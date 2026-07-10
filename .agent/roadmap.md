@@ -73,7 +73,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   decides — agree ⇒ done, drift ⇒ full re-record + M2 recorded_run re-bless (documented
   fallback).
 - Known deliberate re-bless costs, scheduled in their units: ja_core.yaml growth →
-  lexicon_hash-carrying value pins (lexicon-cnl.1); report CNL population → M1/M2 report
+  lexicon_hash-carrying value pins (lexicon-cnl-data); report CNL population → M1/M2 report
   byte-pins + rendered-body consts (report-cnl.2/.3).
 - 2026-07-10 external pre-M3 review absorbed, then codex follow-up hardened it; §10 (amended
   in the same two commits) is the authority for: text↔AST inverse laws quantified over the
@@ -92,7 +92,37 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   plan → unit route-stage-handles before route-single-cnl.1. lexicon-extract inserted before
   lexicon-cnl.1 (the CNL modules' neutral dependency point); spawn-retry gains the shared
   retry-policy-helper option; memory's stale bridge-id + ETXTBSY texts corrected.
+- 2026-07-10 third external review (validation pass on c30f295) absorbed: spawn-retry moved
+  to open the milestone — the fs-dependent ETXTBSY tests are red wherever the fs cannot
+  yield ETXTBSY, so the later units' full-suite gates bind only after it lands; the
+  constraint reread scheme's gap demonstrated (the runtime child reopens the constraint
+  PATHNAME mid-call, so a transient A→B→A rewrite passes every parent-side reread: record
+  `ok`, sealed hash names A, model decoded B) → unit constraint-snapshot after
+  input-snapshot.2 stages frozen bytes; lexicon-cnl.1 split per the sizing rules into
+  lexicon-cnl-shape / lexicon-cnl-data / lexicon-cnl-integrity — data BEFORE integrity
+  (deviates from the review's shape/integrity/data order: the integrity hard-errors bind
+  the committed lexicon the moment they land — tail-availability +
+  quantity-per-interval-var demand the authored rows — so the rules land after the rows
+  they must hold on); the standing canon-layer property-testing preference scheduled as
+  unit canon-props after cnl-laws (reuses its bounded deterministic enumeration; per the
+  review: worthwhile, not an entry gate).
 
+- [ ] spawn-retry: pre-M3 hardening, opens the milestone (3rd 2026-07-10 review: red
+  wherever the fs cannot yield ETXTBSY → every later unit's full-suite gate binds only
+  once this lands) — both spawn_piped_surfaces_persistent_etxtbsy tests
+  (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
+  observed: some filesystems yield ETXTBSY, others — overlayfs among them — let the spawn
+  succeed), and the retries_through twins pass vacuously
+  wherever the first spawn succeeds. Rework BOTH mirrored copies (full machinery extraction
+  stays subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op
+  (prod path = the real Command spawn); a small shared retry-policy helper — home ckc-smt,
+  ckc-cli already depends on it — MAY host the loop once so the injected seam isn't
+  implemented twice; deterministic tests drive ETXTBSY,ETXTBSY,success /
+  persistent-through-grace / immediate non-ETXTBSY error / immediate success; happy-path
+  process integration tests stay; ≤1 fs
+  integration test per crate, capability-probing the mount and skipping cleanly where the fs
+  cannot produce ETXTBSY. Gate: workspace strict suite green with zero
+  environment-dependent outcomes.
 - [ ] path-confine: pre-M3 hardening (review-reproduced: absolute corpus + expected_outcomes
   paths under /tmp pass `registry check` AND a full run — `Path::join` swallows the root on an
   absolute rhs and keeps `..`). Core: validate_registries extends the schemas/prompts
@@ -131,13 +161,29 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   behavior preserved: routes consume the slot's recorded failure and land TODAY's
   diagnostic per-route inside their own ledger slice (only the READ moves — multiplicity,
   attribution, and each site's payload shape unchanged). Record-path template/constraint
-  reads join the snapshot: bytes captured once at record setup; every later consumer that
-  reopens the constraint path (per-fill cassette calls) re-verifies the reopened bytes
-  against the snapshot hash and fails loud on mismatch — closes the per-fill reopen race
-  the pre-write byte-verify leaves open (declared hash attested while later fills could
-  read mutated bytes). Gate: full suites green, M1/M2 byte-pins UNCHANGED; test edits =
+  reads join the snapshot: bytes captured once at record setup; cassette.rs's existing
+  post-call ConstraintDrift re-read stays untouched this unit — constraint-snapshot (next)
+  retires the pathname-reopen scheme wholesale (a per-fill reread would still miss a
+  transient A→B→A rewrite). Gate: full suites green, M1/M2 byte-pins UNCHANGED; test edits =
   mechanical plumbing where tests call resolve()/head fns directly + input-error paths;
   semantic assertions unchanged.
+- [ ] constraint-snapshot: frozen constraint staging (3rd 2026-07-10 review, demonstrated
+  with a controlled runtime: the child reopens the constraint PATHNAME mid-call, so
+  cassette.rs's post-call ConstraintDrift re-read — and any per-fill reread — accepts a
+  transient A→B→A rewrite while the sealed hash names A). Record setup materializes the
+  snapshot's constraint bytes into a private per-run staging dir under the run's out root;
+  adapter.invoke receives ONLY the staged path; CKC writes the staged file once at
+  publication, never after; constraint_hash = the staged bytes' hash (== snapshot hash);
+  ConstraintDrift re-read + error variant retired. Docs narrow to what is proved: the
+  sealed hash attests the exact constraint bytes SUPPLIED to the runtime (byte-USE proof
+  needs wrapper-side digest attestation — out of scope). Staging is sound because committed
+  constraints are single-file self-contained — clinical_ir.schema.json's sole $ref is
+  fragment-only, grammars are literal-only — overturning cassette.rs's "snapshot copy would
+  break relative $refs" comment; a committed-schema guard test rejects non-fragment $ref
+  values so an external reference fails explicitly instead of silently breaking under
+  staging. Tests: staged-path invocation observed (override wrapper records argv); mutate +
+  transient modify/restore of the ORIGINAL registry path mid-run — record stays accepted,
+  sealed hash == staged bytes; suites green with the drift variant gone.
 - [ ] input-snapshot.3: metrics + manifest attest the snapshot — model_route_metrics parses
   experiments/reference from snapshot bytes (identity gating preserved); manifest_inputs
   (today rereads LOCKFILE/CORPORA/EXPERIMENTS/expected_outcomes/SCHEMAS/PROMPTS) consumes
@@ -151,20 +197,6 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   assembly — the run stays `ok`, artifacts + manifest.json attest the resolution-time bytes
   (today the manifest attests the mutated registry while the artifacts used the original
   mapping — the review-reproduced flip).
-- [ ] spawn-retry: pre-M3 hardening — both spawn_piped_surfaces_persistent_etxtbsy tests
-  (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
-  observed: some filesystems yield ETXTBSY, others — overlayfs among them — let the spawn
-  succeed), and the retries_through twins pass vacuously
-  wherever the first spawn succeeds. Rework BOTH mirrored copies (full machinery extraction
-  stays subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op
-  (prod path = the real Command spawn); a small shared retry-policy helper — home ckc-smt,
-  ckc-cli already depends on it — MAY host the loop once so the injected seam isn't
-  implemented twice; deterministic tests drive ETXTBSY,ETXTBSY,success /
-  persistent-through-grace / immediate non-ETXTBSY error / immediate success; happy-path
-  process integration tests stay; ≤1 fs
-  integration test per crate, capability-probing the mount and skipping cleanly where the fs
-  cannot produce ETXTBSY. Gate: workspace strict suite green with zero
-  environment-dependent outcomes.
 - [ ] lexicon-extract: behavior-locked move — the Lexicon family (types, YAML row structs,
   load_lexicon, validation + their tests) leaves normalize.rs (2166L) for fresh
   crates/ckc-cli/src/lexicon.rs; normalize keeps the existing PUBLIC paths via pub use
@@ -172,24 +204,33 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   suite would catch a silent path break); the neutral dependency point input_snapshot,
   lexicon-cnl.*, cnl_grammar, cnl_parse, cnl_render, cnl_bridge all consume. Zero public
   behavior change: existing suites the gate, assertion surface untouched (import edits only).
-- [ ] lexicon-cnl.1: CNL surface fields — LexiconConcept +adnominal_ja/negated_ja/gloss_en,
-  LexiconAction +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
+- [ ] lexicon-cnl-shape: CNL surface fields, shape only (3rd 2026-07-10 review split of
+  lexicon-cnl.1) — LexiconConcept +adnominal_ja/negated_ja/gloss_en, LexiconAction
+  +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
   source-match surfaces per §10 — optional per row, parse-accepted synonyms when present),
-  LexiconCertainty +surface_en,
-  NEW LexiconQuantity {var_id, surface_ja, unit_ja, surface_en, unit_en} table; load_lexicon
-  strict extension (deny_unknown_fields holds; JA surfaces through StringPolicy::SemanticJa,
-  EN surfaces through SemanticEn — §10 EN canonical text is ASCII-lowercase; §10 integrity
-  hard-errors NEW: implies_action resolves to an action entry, quantity var_ids unique,
-  exactly one quantity row per interval var any concept uses, nonempty normalized
-  surfaces+units both languages, per-language exact-duplicate parse terminals rejected across
-  ALL CNL surface fields + lexer categories, every (direction,strength) pair present carries
-  ≥1 tail-bearing row — first tail-bearing row per pair = canonical render row, a test pins it
-  against §10's worked tails (を強く推奨する / は禁忌である) — and concept intervals
-  CNL-representable, v1 one unsigned bound); ja_core.yaml
-  authored for the full M1 set (6 concepts,
-  act.administer, 7 modality rows, certainty rows, q.age_years). Gate: load/normalize tests
-  green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless literals) +
-  full gates.
+  LexiconCertainty +surface_en, NEW LexiconQuantity {var_id, surface_ja, unit_ja,
+  surface_en, unit_en} table; load_lexicon strict extension (deny_unknown_fields holds; JA
+  surfaces through StringPolicy::SemanticJa, EN surfaces through SemanticEn — §10 EN
+  canonical text is ASCII-lowercase); every new field/table optional at load so the
+  committed lexicon stays green. Loader fixtures + round-trip + unknown-field rejection
+  tests; committed bytes untouched, no re-bless.
+- [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts,
+  act.administer, 7 modality rows incl. §10's worked tails を強く推奨する / は禁忌である,
+  certainty rows, q.age_years) — written against lexicon-cnl-integrity's full rule list
+  (data lands FIRST: those hard-errors bind the committed lexicon the moment they land —
+  tail-availability + quantity-per-interval-var demand these rows). Gate: load/normalize
+  tests green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless
+  literals) + full gates; the re-bless lives ONLY here — shape/integrity leave committed
+  bytes untouched.
+- [ ] lexicon-cnl-integrity: §10 integrity hard-errors NEW in load_lexicon —
+  implies_action resolves to an action entry, quantity var_ids unique, exactly one quantity
+  row per interval var any concept uses, nonempty normalized surfaces+units both languages,
+  per-language exact-duplicate parse terminals rejected across ALL CNL surface fields +
+  lexer categories, every (direction,strength) pair present carries ≥1 tail-bearing row —
+  first tail-bearing row per pair = canonical render row, a test pins it against §10's
+  worked tails — and concept intervals CNL-representable (v1 one unsigned bound); per-rule
+  rejection battery over bad-lexicon fixtures. Gate: committed tree green under every rule
+  (proves lexicon-cnl-data's authored rows satisfy them) + full gates.
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
   connective/punctuation grammar terminal), missing-CNL-surface findings, same-category
   proper-prefix overlap (segmentation determinism — the Earley-superset caveat's guard) +
@@ -277,6 +318,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
   two bridge round-trip laws (plan-header form — split normal form, ≠ naive identity on
   multi-disjunct inputs). Codeco method; bound sizes to CI-sane runtime.
+- [ ] canon-props: canon-layer generated-case harness (M1-review OPEN enhancement,
+  scheduled by the 3rd 2026-07-10 review — hardening, never an M3 entry gate) — bounded
+  deterministic enumeration (cnl-laws' method, zero new deps) over the Canonical record
+  families incl. cnl.rs's: emit→strict-read preserves the value + re-emit is byte-identical
+  (canonical bytes = fixpoint); generated noncanonical mutations (key reorder, whitespace,
+  duplicate keys, unsorted sets) rejected; every StringPolicy idempotent over generated
+  Unicode inputs. Bounds CI-sane; existing byte-pins stay the canonical-order authority.
 - [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
   (fieldless_enum append) + FillReject +Parse(String) (repairable → cnl_parse_error) /
   +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the

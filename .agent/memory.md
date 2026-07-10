@@ -377,7 +377,7 @@ aggressively; full pre-consolidation text in git history.
   per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
   residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: per-stage totals stay EventRecords
   alone — a standalone TotalOperationResult there is inert + redundant until then (M2+ may
-  revisit). OPEN enhancement (unscheduled, AGENTS.md-preferred): tests are example/byte-pin only →
+  revisit). Enhancement (AGENTS.md-preferred; since scheduled into M3: canon-props): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject-any-mutation) + StringPolicy
   idempotence.
 - M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; fixes in 5ec33f7). Durable: the six
@@ -385,7 +385,7 @@ aggressively; full pre-consolidation text in git history.
   independently codex-re-verified). OPEN user items: SPEC §8.4
   "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
   `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
-  enhancement, still preferred); shared cross-crate subprocess runner + registry symlink guard
+  enhancement, since scheduled into M3: canon-props); shared cross-crate subprocess runner + registry symlink guard
   (both since scheduled into M3: subproc-runner.1/.2, path-confine).
 - CNL-first architecture (user directive 2026-07-07, set in the Codex-continued cnl-ir-research
   session — rollout `~/../debian/.codex/sessions/2026/07/07/rollout-2026-07-07T11-09-50-*.jsonl`;
@@ -447,7 +447,7 @@ aggressively; full pre-consolidation text in git history.
   spends no repair). Record strategy: scratch-root record, copy route.single_cnl/** into
   committed /cassettes (keys disjoint from M2's); identity drift ⇒ full re-record + M2
   recorded_run re-bless fallback. Deliberate re-bless costs scheduled in units: ja_core.yaml
-  growth → lexicon_hash value pins (lexicon-cnl.1); report CNL population → M1/M2 report +
+  growth → lexicon_hash value pins (lexicon-cnl-data); report CNL population → M1/M2 report +
   rendered-body pins (report-cnl.2/.3). Surface-quality metric rows gate on observations
   carrying the new FillObservation fields → M2 replay rows byte-unchanged (metrics-cnl proves).
   Archive-mined additions (user-directed 1M dig, 2026-07-07; measured priors distilled into
@@ -488,7 +488,15 @@ aggressively; full pre-consolidation text in git history.
   fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
   retry impl is not. A second same-day external review (2026-07-10, validation pass on fadc674)
   reproduced the input multi-read attestation defect → input-snapshot.1–.3 +
-  route-stage-handles + lexicon-extract inserted (roadmap holds the specs).
+  route-stage-handles + lexicon-extract inserted (roadmap holds the specs). A third
+  (validation pass on c30f295): spawn-retry moved first (fs-dependent red tests must not
+  gate the earlier units' full-suite conditions); constraint-snapshot inserted after
+  input-snapshot.2 — the child reopens the constraint pathname, transient A→B→A defeats
+  any reread → pass a frozen per-run staged copy (committed constraints verified
+  single-file self-contained: sole $ref fragment-only, grammars literal-only);
+  lexicon-cnl.1 split → lexicon-cnl-shape/-data/-integrity, data BEFORE integrity (the
+  hard-errors bind the committed lexicon on landing); canon-props scheduled after cnl-laws
+  (roadmap holds the specs).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -541,7 +549,11 @@ aggressively; full pre-consolidation text in git history.
   2026-07-10 external review reproduced the attestation flip (corpora.yaml mutated between
   resolution and manifest assembly ⇒ `ok` run whose manifest attests bytes the execution
   never used) → SCHEDULED as M3 input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot,
-  every phase consumes the snapshot).
+  every phase consumes the snapshot). The 3rd review demonstrated the CONSTRAINT variant:
+  the runtime child reopens the pathname mid-call, so a transient A→B→A rewrite defeats ANY
+  parent-side reread (cassette.rs's ConstraintDrift included) → M3 constraint-snapshot
+  passes the child a frozen per-run staged copy of the snapshot bytes; the sealed-hash
+  claim narrows to "the exact constraint bytes supplied to the runtime".
 - Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
   `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is
   live-parsed, env-dependent — report.rs const-pins SYNTHETIC bodies freely; run_oracle.rs
