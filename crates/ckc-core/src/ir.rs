@@ -908,7 +908,9 @@ impl Structural for TerminologyBinding {
 
 /// One exception clause of a [`ClinicalStatement`]: the exception's own
 /// (positive) condition atoms plus its source_linkage. stage-normalize.2 compiles
-/// each clause into negated conjuncts of the rule context, the clause regions
+/// each clause's positive `Concept` atoms into negated conjuncts of the rule
+/// context — per atom; SPEC §10's register keeps clauses single-concept, wider
+/// shapes sit outside the compile contract — the clause regions
 /// joining `source_region_ids` (§5); [`NormativeRule::exception_refs`] cite
 /// `exception_id`s for trace.
 #[derive(Debug, Clone, PartialEq, Eq)]

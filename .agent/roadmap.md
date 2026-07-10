@@ -48,9 +48,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   `<doc>.rule.<k>` for norm-layer rule ids; disjunct split appends statements in document
   order); population-vs-condition partition by lexicon
   id namespace (`pop.*` → population, else condition); each exception sentence → one
-  single-atom ExceptionClause (positive `Concept` — the §10 single-concept register; the
-  locked rules.rs lowering negates ONLY positive Concept atoms into the rule's single
-  conjunct, sound for single-atom clauses via ¬(E1∨…)=¬E1∧… and for nothing wider — a
+  single-atom ExceptionClause PER SPLIT STATEMENT — a multi-disjunct rule clones its
+  exception list into every emitted statement ((D1∨D2)∧¬E = (D1∧¬E)∨(D2∧¬E); bundle
+  validation demands globally unique exception ids), `exc.<k>` counting emitted clauses
+  statement-major then sentence order, clause region_ids = the exception-kind slice of the
+  rule's basis regions via the segments artifact, shared by the rule's clauses — (positive
+  interval-free `Concept` — the §10 register + negative-occurrence bar; the locked rules.rs
+  lowering negates ONLY positive Concept atoms into the rule's single conjunct and NEVER
+  interval-lowers a negative occurrence, context ConceptNegated included, so an
+  interval-carrying entry in any negative slot splits Bool/Real unlinked in emit — sound for
+  single-atom interval-free clauses via ¬(E1∨…)=¬E1∧… and for nothing wider — a
   conjunctive exception needs De Morgan ¬A∨¬B, and it ignores negated/interval exception
   atoms); bindings = one Exact-status TerminologyBinding per distinct referenced
   concept, minted in first-reference document order (matches M1's first-mention scan order on
@@ -60,9 +67,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   compares under the §10 projection excluding binding region_ids (Action::new derives
   key itself); basis refs = region ids; source_segment_ids derived region→segment via the
   segments artifact (ClinicalSegment.region_ids reverse map — m3.bridge stage inputs therefore
-  [cnl_document, segments]). Round-trip laws, precise: from_ir = one single-disjunct CNL rule
-  per statement (projection, no regrouping) ⇒ from_ir∘to_ir == disjunct-split normal form
-  (== id exactly on already-split docs); to_ir∘from_ir == id on bridge-image IR.
+  [cnl_document, segments]). Round-trip laws, precise (escape-free ASTs; to_ir = Err on any
+  escape occurrence): from_ir = one single-disjunct CNL rule per statement (projection, no
+  regrouping; basis renders each cited segment's FULL region set) ⇒ from_ir∘to_ir == bridge
+  normal form — disjunct split + per-statement atom canonicalization (population before
+  condition, §4.3 set order, byte-identical duplicates collapsed; the partition + set
+  emission are lossy exactly there) + segment-closed basis — (== id exactly on bridge-normal
+  docs); to_ir∘from_ir == id on bridge-image IR.
 - Grammar terminals = whole-surface string literals (ASCII digits + basis-id chars as literal
   alternation) — portable to LLM constraint mechanisms + atomic in bnf — with EXACTLY ONE open
   lexical production per language: the escape's free quoted surface (§10) is inexpressible as
@@ -240,7 +251,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   rules, Id grammar, interval bound coherence mirroring ir.rs, §10 escape payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
   SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed pair/id view: modality
-  pair tail-backed, concept/action refs resolved — makes §10's lexicon-valid-AST quantifier
+  pair tail-backed, concept/action refs resolved, negated/exception concept refs
+  interval-free (§10 negative-occurrence bar) — makes §10's lexicon-valid-AST quantifier
   well-defined) + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
@@ -304,19 +316,25 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   statements array (run.rs's accept battery currently pins empty ClinicalIr = accepted);
   signed or two-sided quantity intervals (v1 register — the committed IR schema's
   IntervalBound pattern admits negatives, IrBundle::validate admits two-sided); exception
-  clauses not exactly one positive Concept atom (§10 single-concept register — multi-atom /
-  ConceptNegated / Interval exception shapes are CNL-inexpressible yet schema-valid, so
-  model-reachable) — closing §10
+  clauses not exactly one positive interval-free Concept atom (§10 single-concept register —
+  multi-atom / ConceptNegated / Interval exception shapes are CNL-inexpressible yet
+  schema-valid, so model-reachable); negative occurrences of interval-carrying entries —
+  context ConceptNegated or the exception concept (§10 bar: the locked tail interval-lowers
+  positive occurrences only, a negative one sits as an unlinked Bool beside the Real
+  interval); statements with EMPTY population+condition (schema minItems-free +
+  bundle-valid, CNL's DNF derives ≥1 atom) — closing §10
   render-totality for the one IR-landing route without a grammar/derivation guard (M1 derives
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
   reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
   region + the lexicon modality table (lexicon.rs post-extract) only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
-  (from_ir = Err, fail-closed, on an ExceptionClause that is not exactly one positive
-  Concept atom — §10 render totality; unreachable from bridge-image, accept-total-guarded,
-  and locked-corpus IR) +
-  both round-trip laws as pinned there (from_ir∘to_ir == disjunct-split normal form;
+  (from_ir = Err, fail-closed, on any CNL-inexpressible shape — an ExceptionClause not
+  exactly one positive interval-free Concept atom, a negative occurrence of an
+  interval-carrying entry, an empty statement context — §10 render totality; unreachable
+  from bridge-image, accept-total-guarded, and locked-corpus IR; to_ir = Err on any escape
+  occurrence, law-harness-pinned) +
+  both round-trip laws as pinned there (from_ir∘to_ir == bridge normal form;
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
   (parse(§10 JA) bridges to the §8.6 rule content). Read scope: ir.rs shapes + rules.rs
   derive_norm_ir contract only — run.rs stays closed.
@@ -325,8 +343,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   refs; + one unbacked-pair render-Err assertion) →
   render→parse identity both languages + cross-language agreement + canonical fixpoint +
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
-  two bridge round-trip laws (plan-header form — split normal form, ≠ naive identity on
-  multi-disjunct inputs). Codeco method; bound sizes to CI-sane runtime.
+  two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin
+  (plan-header form — bridge normal form: split + atom canonicalization + segment-closed
+  basis, ≠ naive identity on multi-disjunct or atom-disordered inputs). Codeco method; bound
+  sizes to CI-sane runtime.
 - [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
   (fieldless_enum append) + FillReject +Parse(String) (repairable → cnl_parse_error) /
   +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the

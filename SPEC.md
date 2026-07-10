@@ -408,7 +408,7 @@ unit of the thesis.
 | `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at M1. |
 | `Action` | Action kind + target concept + distinguishing fields (M4) + normalized target key. |
 | `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M4 adds slot equality and temporal interval (difference-logic) atoms. |
-| `NormativeRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile to negated context conjuncts, their regions joining `source_region_ids`. |
+| `NormativeRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile per positive concept atom to negated context conjuncts (§10 keeps clauses single-concept; wider clause shapes sit outside the compile contract), their regions joining `source_region_ids`. |
 | `FactualRule` (M4) | Context → factual consequent, strictness. |
 | `DecisionTable` (M6) | Input variables, units, rows, guards, outputs, source rows; DMN-style overlap semantics. |
 | `IRBundle` | The five layers below + reusable component records + assumptions + diagnostics + per-layer and whole-bundle structural hashes. |
@@ -483,7 +483,7 @@ A rule pair is conflict-eligible when normalized actions are the same and one di
 Two-query check per eligible pair (the contradiction-query plan):
 
 ```text
-Q1 context_overlap: assert both rules' conditioned contexts (exceptions as negated conjuncts);
+Q1 context_overlap: assert both rules' conditioned contexts (exceptions as §5 negated conjuncts);
   sat -> overlap satisfying_example model recorded; unsat -> pair closed as documented no-conflict result
   (no shared context).
 Q2 deontic_consistency: for pairs with a sat Q1, assert each rule's direction as a polarity
@@ -904,7 +904,7 @@ Committed direction:
 | action | `<target>の<action-noun>` (例 `抗菌薬Aの投与`) | `<action-noun> of <target>` | Action kind + target |
 | deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
 | certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
-| exception | `ただし、<concept>患者を除く。` per entry | `exception: patients <concept>.` per entry | one single-concept ExceptionClause per entry — separate labeled payload (PROLEG pattern) |
+| exception | `ただし、<concept>患者を除く。` per entry | `exception: patients <concept>.` per entry | one single-concept ExceptionClause per entry per split statement (disjunct splits clone entries under fresh ids) — separate labeled payload (PROLEG pattern) |
 | basis | `[根拠 <id> …]`, sorted | `[basis <id> …]`, sorted | source segment/region refs |
 
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
@@ -924,16 +924,32 @@ Committed direction:
   conjunction, negating exactly the clause's positive concept atoms — sound because
   ¬(E1 ∨ … ∨ En) = ¬E1 ∧ … ∧ ¬En when every Ei is a single atom, while a conjunctive
   exception `A ∧ B` would need the De Morgan disjunction ¬A ∨ ¬B the locked tail never
-  builds, and negated/interval exception atoms sit outside its negation domain entirely. A
+  builds, and negated/interval exception atoms sit outside its negation domain entirely.
+  Negative-occurrence bar (same v1 register): interval-carrying lexicon entries (成人, 小児)
+  are excluded from the exception slot AND from context negated-concept atoms at acceptance
+  (repairable; the repair is the complement context interval — 「ただし、成人患者を除く。」 →
+  context 年齢が18歳未満): the locked tail interval-lowers positive Concept occurrences only,
+  every negative occurrence staying a bare Bool literal with no axiom linking it to the Real
+  interval variable, so a rule excluding 成人 would overlap-check as an unlinked Bool against
+  another rule's 年齢が18歳以上 — spurious overlaps, missed disjointness. A
   conjunctive, negated, or interval exemption is authored as context refinement instead (the
-  context DNF already admits negated concepts and intervals); widening the exception register
+  context DNF already admits negated concepts and intervals) — noting the provenance trade:
+  the locked tail joins exception regions into rule source_region_ids only through
+  ExceptionClause region_ids, so a context-authored exemption keeps statement-level segment
+  linkage but adds no rule-level regions, and transcribing a SOURCE exception segment
+  therefore uses the exception sentence; widening the exception register
   is an explicit lowering change (M4+ candidate), never a silent grammar widening over the
   unchanged compile tail.
 - Ids: the parser and the model mint no ids — the bridge derives statement/exception/binding
   ids deterministically from document order as `stmt.<k>`/`exc.<k>`/`bind.<k>` document-local
   counters, mirroring the deterministic M1 derivation exactly (§8.6 reserves
   `<document_id>.rule.<k>` for norm-layer rule ids) when
-  mapping AST → ClinicalIR; basis refs are the only
+  mapping AST → ClinicalIR; a multi-disjunct rule splits into one statement per disjunct,
+  each cloning every exception entry under a fresh id ((D1 ∨ D2) ∧ ¬E =
+  (D1 ∧ ¬E) ∨ (D2 ∧ ¬E), and exception ids are bundle-unique) — `exc.<k>` counts emitted
+  clauses statement-major then sentence order, clause region_ids = the exception-kind slice
+  of the rule's basis regions (region→segment kind via the segments artifact, shared by the
+  rule's clauses); basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
 - Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
@@ -958,8 +974,10 @@ Committed direction:
   single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects an
   off-lexicon `(direction, strength)` pair as a repairable schema violation, mirroring the
   off-lexicon id check; the same acceptance closure rejects the remaining CNL-inexpressible
-  shapes — empty statement sets, signed or two-sided quantity intervals, exception clauses
-  that are not exactly one positive concept atom, the v1 register), so
+  shapes — empty statement sets, statements with empty population+condition, signed or
+  two-sided quantity intervals, exception clauses that are not exactly one positive
+  interval-free concept atom, negated-concept atoms over interval-carrying entries, the v1
+  register), so
   audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
@@ -1018,15 +1036,21 @@ Round trip: parse(render(ast)) == ast for every lexicon-valid AST (validity is l
 modality pairs tail-backed, concept/action refs resolved), both languages.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
-Bridge round trip: from_ir(to_ir(ast)) == the disjunct-split normal form of ast (identity on
-already-split documents); to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
+Bridge round trip (over escape-free ASTs; to_ir is Err on any escape occurrence — acceptance
+is already terminal there): from_ir(to_ir(ast)) == the bridge normal form of ast — disjunct
+split, per-statement atom canonicalization (population before condition, §4.3 set order,
+byte-identical duplicates collapsed; the partition + set emission are lossy exactly there),
+basis refs segment-closed (from_ir renders each cited segment's full region set) — identity
+exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain (tail-backed
-modality pairs, ≥1 statement, one-sided unsigned quantity intervals, single-concept exception
-clauses — v1) — so render is defined for every accepted ClinicalIR on every route: M1 by
-derivation + lexicon integrity (exception shape: derivation mints only positive concept atoms
-and each locked-corpus exception segment matches exactly one — a multi-concept clause fails
-the audit render closed at from_ir), single_cnl by grammar, single_ir by the accept-total
-closure.
+modality pairs, ≥1 statement each with a nonempty context, one-sided unsigned quantity
+intervals, single-concept interval-free exception clauses, negated atoms over interval-free
+entries — v1) — so render is defined for every accepted ClinicalIR on every guarded route:
+single_cnl by grammar + acceptance, single_ir by the accept-total closure, M1 over its locked
+corpus by derivation + lexicon integrity + the corpus render audit (derivation mints positive
+concept atoms only and each locked exception segment matches exactly one concept; a document
+deriving a wider clause sits outside the locked M1 contract — arbitrary M1-route inputs carry
+no totality claim — and fails render closed at from_ir).
 Audit honesty: audit views render only from accepted artifacts, never from raw model output.
 ```
 
