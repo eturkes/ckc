@@ -465,27 +465,23 @@ aggressively; full pre-consolidation text in git history.
   empty for CNL/DSL), and at `e8b5cf6` docs/charters/ (genesis prompt + its three charter
   executions) + docs/poc-archive/*.json (M5 oblique canonical reports, the never-doc-synced
   evidence) — scratch copies outside the repo are dispensable.
-  2026-07-10 external pre-M3 review absorbed (plan-amendment commit; claims verified in-repo
-  before acting): §10 amended — parse/render inverse = canonical text ↔ CNL AST; the bridge
-  maps AST ↔ ClinicalIR projection + derives ids (parser/model mint none); bridge round-trip +
-  render-totality laws joined the §10 laws block. Escape quoted-surface contract v1 = ONE
-  payload shared by both languages (CnlAtom::Unregistered holds one surface): nonempty, ≤80
-  Unicode scalars, single line, control chars + 「」" excluded, SemanticJa-normalized,
-  parser-enforced — grammar production stays open; violations = plain cnl_parse_error, never
-  the unregistered terminal. Modality render-totality = ACCEPT-side rule: lexicon pairs stay
-  the corpus register (6 of the 12 §5 Direction×Strength pairs — artificial rows for the rest
-  rejected as audit-register pollution), single_ir gains an off-lexicon-pair Schema reject
-  (unit modality-total; M1 derives pairs FROM lexicon rows, single_cnl's grammar admits only
-  lexicon tails — so accepted IR is lexicon-backed on every route), render Err on a missing
-  pair = fail-closed instrument path. Lexicon integrity hard-errors (implies_action
-  resolution — load_lexicon carries it unvalidated today; quantity var_id uniqueness /
-  interval-var coverage / nonempty surfaces+units; per-language duplicate parse surfaces)
-  folded into lexicon-cnl.1. Units inserted: path-confine + spawn-retry (pre-M3 hardening,
-  open the milestone), cnl-grammar.1b (early runtime feasibility probe — the review could not
-  test the runtime, raising placement value), modality-total (after cnl-render),
-  subproc-runner.1/.2 (before route-single-cnl.3's live wiring). ETXTBSY fact behind
-  spawn-retry: both spawn_piped suites are green on this container's fs and fail on overlayfs
-  (the review sandbox) — the fs-dependence is the defect, the retry impl is not.
+  2026-07-10 external pre-M3 review absorbed, then a same-day codex follow-up corrected it —
+  §10 + the unit lines hold the normative text; memory keeps the evidence behind the calls:
+  bridge ids MUST mint stmt/exc/bind counters mirroring normalize.rs (§8.6's <doc>.rule.<k> =
+  norm-layer rule ids only); faithfulness = §10 projection excluding binding region_ids
+  because CNL carries rule-basis, never mention-region, provenance (M1 binds adult→r.2 only
+  while guideline A's statement basis = r.2 r.3 — exact-hash ir_match would zero on its own
+  goldens); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
+  adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,
+  so canonical selection needed explicit tail_ja/tail_en fields over first-listed file order);
+  run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
+  negatives, IrBundle::validate admits two-sided intervals → accept-total closes every
+  CNL-inexpressible shape, census-flip-gated; §10 laws quantify over the parser-accepted
+  language (runtime grammar = repairable superset — the open escape production admits payloads
+  the parser rejects); audit views need (pipeline, document) keying because exp.m3_cnl accepts
+  the same document on two routes. ETXTBSY fact behind spawn-retry: both spawn_piped suites
+  green on this container's fs, fail on overlayfs (the review sandbox) — fs-dependence is the
+  defect, the retry impl is not.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)

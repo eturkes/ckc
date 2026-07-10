@@ -11,7 +11,8 @@ CKC is a clinical knowledge compiler: a headless research harness that translate
 in any language (public Japanese guideline corpora through M7) into compact, reusable,
 source-grounded IR components, surfaced as a clinician-auditable controlled natural language
 (ClinicalCNL, §10 — prose a clinician reads and audits; parse and render are mutual inverses
-over the IR, so a reviewed, accepted CNL document is the locked knowledge base); compiles them
+over the CNL AST, a deterministic bridge maps it to and from the IR under §10's laws, so a
+reviewed, accepted CNL document is the locked knowledge base); compiles them
 deterministically to machine-evaluable targets (SMT-LIB first; a Prolog-family
 execution/explanation lane joins per §11, proof assistants such as Lean 4 per §13); and surfaces
 contradictions and documented no-conflict results with end-to-end machine-checkable evidence.
@@ -418,7 +419,7 @@ unit of the thesis.
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
-| `CnlDocument` (M3) | Canonical ClinicalCNL text (JA primary, EN mirror) over an IRBundle's ClinicalIR content: grammar id + hash, per-rule canonical text, text hash; §10 parse/render mutual inverses. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
+| `CnlDocument` (M3) | Canonical ClinicalCNL text (JA primary, EN mirror) + the CNL AST it parses to, over an IRBundle's ClinicalIR content: grammar id + hash, per-rule AST + canonical text, text hash; §10 text↔AST inverse laws, AST↔ClinicalIR bridge. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
 
 IR layers in one `IRBundle` per document:
 
@@ -614,7 +615,8 @@ identical test sources: model routes from M2, layered-minus-direct from M4), rou
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
 from M2), surface quality (round-trip identity rate, surface tokens per accepted rule; from
 M3), translation faithfulness (share of a route's accepted documents whose IR content equals
-the deterministic reference derivation over identical inputs — conflict-quality verdicts
+the deterministic reference derivation over identical inputs under the §10 faithfulness
+projection, binding region provenance excluded — conflict-quality verdicts
 saturate while faithfulness still separates routes, `docs/poc-archive.md`; from M3),
 model-free coverage (share of fresh-document semantics produced deterministically from
 accepted mappings, with zero application phase model calls; from M4), claim completeness (share
@@ -906,14 +908,18 @@ Committed direction:
 | basis | `[根拠 <id> …]`, sorted | `[basis <id> …]`, sorted | source segment/region refs |
 
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
-  precedence by decree (`かつ` binds tighter), no nesting beyond the flat two-level DNF
-  ClinicalIR already carries. Atoms: concept (lexicon adnominal surface), negated concept
+  precedence by decree (`かつ` binds tighter), no nesting beyond flat two-level DNF — each
+  disjunct maps to one ClinicalStatement's flat population/condition sets (multi-disjunct
+  rules split into statements, the bridge law; DNF `ContextExpr` is the §5 norm layer's).
+  Atoms: concept (lexicon adnominal surface), negated concept
   (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
   ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
   plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
 - Ids: the parser and the model mint no ids — the bridge derives statement/exception/binding
-  ids deterministically from document order (the §8.6 `<document_id>.rule.<k>` scheme) when
+  ids deterministically from document order as `stmt.<k>`/`exc.<k>`/`bind.<k>` document-local
+  counters, mirroring the deterministic M1 derivation exactly (§8.6 reserves
+  `<document_id>.rule.<k>` for norm-layer rule ids) when
   mapping AST → ClinicalIR; basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
@@ -924,19 +930,28 @@ Committed direction:
   `registry/schemas.yaml`; constrained decoding consumes them exactly as §9 consumes the IR
   schema. Every linguistic form lives in lexicon DATA and the grammar stays purely
   concatenative: concept entries gain adnominal / negated-adnominal / EN-gloss surfaces; action
-  kinds gain JA/EN noun forms; the existing modality table IS the deontic-tail set (parse
-  accepts every listed synonym; duplicate `(direction, strength)` rows are permitted synonyms,
-  render emits the pair's canonical first-listed surface); certainty phrases as committed.
+  kinds gain JA/EN noun forms; the modality table gains canonical deontic-tail fields
+  (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
+  surfaces: 「を強く推奨する」 carries particle + strength adverb; rows carrying tails parse
+  as tail synonyms, the first tail-bearing row per `(direction, strength)` pair is the
+  canonical render row — pinned against this section's worked renders — and tail-less rows
+  stay source-match-only); certainty phrases as committed.
   Modality totality: the lexicon pair set stays the corpus register — no artificial rows for
   the full §5 Direction × Strength domain; instead every IR-landing route guarantees
   lexicon-backed pairs at acceptance (M1 derives pairs from lexicon rows by construction;
   single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects an
   off-lexicon `(direction, strength)` pair as a repairable schema violation, mirroring the
-  off-lexicon id check), so audit rendering is total over accepted IR and a missing-row render
+  off-lexicon id check; the same acceptance closure rejects the remaining CNL-inexpressible
+  shapes — empty statement sets, signed or two-sided quantity intervals, the v1 register), so
+  audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
-  terminal), missing surface fields, per-language duplicate parse surfaces, `implies_action`
-  resolving to an action entry, and quantity-table integrity — unique `var_id`, exactly one
+  terminal), missing surface fields, per-language exact-duplicate parse terminals across ALL
+  CNL surface fields and lexer categories (concept adnominal/negated forms, action nouns,
+  tails, certainty phrases, quantity surfaces/units), `implies_action`
+  resolving to an action entry, every `(direction, strength)` pair present carrying ≥1
+  tail-bearing row, concept intervals CNL-representable (v1: one unsigned bound), and
+  quantity-table integrity — unique `var_id`, exactly one
   quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
   both languages.
 - Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
@@ -969,14 +984,20 @@ Committed direction:
 - Determinism laws (the M3 contract, property-tested):
 
 ```text
-Single parse: every string in the grammar language yields exactly one AST.
-Round trip: parse(render(ast)) == ast for every valid AST, both languages.
+Single parse: every parser-accepted string yields exactly one AST; the runtime grammar
+over-approximates the parser (open escape production, payload contract parser-enforced) —
+grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
+over the parser-accepted language.
+Round trip: parse(render(ast)) == ast for every lexicon-valid AST (validity is lexicon-scoped:
+modality pairs tail-backed, concept/action refs resolved), both languages.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
 Bridge round trip: from_ir(to_ir(ast)) == the disjunct-split normal form of ast (identity on
 already-split documents); to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
-Render totality: render is defined for every accepted ClinicalIR on every route — acceptance
-guarantees lexicon-backed modality pairs (grammar-and-lexicon bullet).
+Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain (tail-backed
+modality pairs, ≥1 statement, one-sided unsigned quantity intervals — v1) — so render is
+defined for every accepted ClinicalIR on every route: M1 by derivation + lexicon integrity,
+single_cnl by grammar, single_ir by the accept-total closure.
 Audit honesty: audit views render only from accepted artifacts, never from raw model output.
 ```
 
@@ -989,8 +1010,11 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   single_cnl]` over the locked M1 inputs — the §9 measurement record extended by one route,
   scored by the same reference.
 - Audit artifacts, route-independent: any accepted ClinicalIR — the M1 deterministic pipeline's
-  included — renders to `audit/<doc-id>.cnl.{ja,en}.txt`; `report.json` carries the CNL text
-  hashes and per-rule CNL strings; report_{en,ja}.md quote each finding's rules as CNL beside
+  included — renders to `audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt` (keyed by pipeline AND
+  document: a multi-route experiment accepts the same document several times, so views stay
+  separately auditable; non-IR routes land none); `report.json` carries the CNL text
+  hashes and per-rule CNL strings under the same (pipeline, document) key; report_{en,ja}.md
+  quote each finding's rules as CNL beside
   the quoted source spans (§7.2). The clinician-facing layer of every report is CNL from M3 on.
 - Emission-target posture (honest framing): the CNL is the committed audit surface by design;
   WHICH surface the weak model emits most reliably is the §11 measured question. Recorded
@@ -1017,8 +1041,11 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
 - §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
   `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows; and the
   translation-faithfulness family — `ir_faithfulness_rate`: the share of a route's accepted
-  documents whose ClinicalIR content-hash equals the deterministic M1 derivation recomputed
-  over the run's own landed extract/segment artifacts (single_ir compares its accepted fill,
+  documents whose ClinicalIR equals the deterministic M1 derivation recomputed over the run's
+  own landed extract/segment artifacts, under the faithfulness projection — binding
+  `region_ids` excluded, all else exact, ids included: CNL carries per-rule basis refs, never
+  mention-level regions, so binding region provenance is the one §5 field a faithful
+  translation cannot reconstruct (single_ir compares its accepted fill,
   single_cnl its bridged IR; direct_smt lands no IR → not_applicable). Exact-reproduction rate,
   strict by design (§11 may grade partial faithfulness); rationale: verdict-level conflict
   metrics saturate while faithfulness still separates routes, and round-trip identity alone
@@ -1046,8 +1073,7 @@ Worked example (illustrative; the committed grammar pins the bytes).
 ```
 
 ```text
-for patients who are adult and have sepsis, administration of antibiotic-a is strongly
-recommended. exception: patients with severe renal impairment. [basis r.2 r.3]
+for patients who are adult and have sepsis, administration of antibiotic-a is strongly recommended. exception: patients with severe renal impairment. [basis r.2 r.3]
 ```
 
 Both parse to the §8.6 rule content — atoms `pop.adult` (lexicon interval semantics
