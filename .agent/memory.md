@@ -484,10 +484,9 @@ aggressively; full pre-consolidation text in git history.
   language (runtime grammar = repairable superset — the open escape production admits payloads
   the parser rejects); audit views need (pipeline, document) keying because exp.m3_cnl accepts
   the same document on two routes. ETXTBSY fact behind spawn-retry: BOTH outcomes observed
-  across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY (a dev
-  host) and fail where it doesn't (overlayfs, both external review sandboxes); neither
-  outcome is intrinsic to one container — fs-dependence is the defect, the retry impl is
-  not. A second same-day external review (2026-07-10, validation pass on fadc674)
+  across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY and
+  fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
+  retry impl is not. A second same-day external review (2026-07-10, validation pass on fadc674)
   reproduced the input multi-read attestation defect → input-snapshot.1–.3 +
   route-stage-handles + lexicon-extract inserted (roadmap holds the specs).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit

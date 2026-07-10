@@ -91,8 +91,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   after path-confine. Named stage handles replace the positional [Id; 8]→[Id; 9] widening
   plan → unit route-stage-handles before route-single-cnl.1. lexicon-extract inserted before
   lexicon-cnl.1 (the CNL modules' neutral dependency point); spawn-retry gains the shared
-  retry-policy-helper option; memory's stale bridge-id + container-intrinsic-ETXTBSY texts
-  corrected.
+  retry-policy-helper option; memory's stale bridge-id + ETXTBSY texts corrected.
 
 - [ ] path-confine: pre-M3 hardening (review-reproduced: absolute corpus + expected_outcomes
   paths under /tmp pass `registry check` AND a full run — `Path::join` swallows the root on an
@@ -137,8 +136,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   mutated file while the artifacts used the original mapping — the review-reproduced flip).
 - [ ] spawn-retry: pre-M3 hardening — both spawn_piped_surfaces_persistent_etxtbsy tests
   (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
-  observed: green where the fs yields ETXTBSY — a dev host — and failing where it doesn't —
-  overlayfs, both external review sandboxes), and the retries_through twins pass vacuously
+  observed: some filesystems yield ETXTBSY, others — overlayfs among them — let the spawn
+  succeed), and the retries_through twins pass vacuously
   wherever the first spawn succeeds. Rework BOTH mirrored copies (full machinery extraction
   stays subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op
   (prod path = the real Command spawn); a small shared retry-policy helper — home ckc-smt,
