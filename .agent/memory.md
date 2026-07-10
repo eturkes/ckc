@@ -3,7 +3,8 @@
 Entries add value beyond spec / AGENTS.md / code / git / runtime env — project-independent tooling
 pitfalls (RTK, Headroom, Serena, Claude Code, web) live in each agent's global guidance, not here.
 Exception: high-value reminders derivable but easily forgotten under token pressure. Consolidated
-aggressively; full pre-consolidation text in git history.
+aggressively; full pre-consolidation text in git history. Review/absorption narration (Nth review,
+validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviving fact.
 
 ## Policy
 
@@ -334,9 +335,9 @@ aggressively; full pre-consolidation text in git history.
   hash/size → read the live hash from schemas.yaml/emit.rs, never that spec. Path safety =
   `is_safe_relative_path` (pub ckc-core), ONE predicate reused by the pure validator (`UnsafePath`) + the
   CLI read-guard — LEXICAL only (rejects absolute + `.`/`..`), so a committed repo-local SYMLINK pointing
-  outside the tree passes and `std::fs::read` follows it — and the 2026-07-10 external review
-  found corpus.path + expected_outcomes lack even the LEXICAL check (absolute /tmp paths pass
-  `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
+  outside the tree passes and `std::fs::read` follows it — and
+  corpus.path + expected_outcomes lack even the LEXICAL check (review-reproduced: absolute
+  /tmp paths pass `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
   core + ONE canonicalize/containment I/O resolver across every registry-data-controlled read. Core fixtures (SCHEMAS
   included) use SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents`.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
@@ -432,7 +433,7 @@ aggressively; full pre-consolidation text in git history.
   REPORT index consts, UNUSED_STAGE padding) is retired by route-stage-handles BEFORE route
   wiring — per-shape named StageHandle {kind, step_id} fields validated at resolve — so the
   7-stage pipe adds a RouteStages::SingleCnl variant, never an [Id; 9] widening (off-by-one +
-  provenance risk; 2nd 2026-07-10 review). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
+  provenance risk). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
   §10 EN canon), JA under SemanticJa. Grammar terminals = whole-surface string literals
   (ASCII-digit + basis-id-char alternation) + EXACTLY ONE open lexical production per
   language — the escape's free quoted surface, inexpressible as finite literals; emitter
@@ -469,8 +470,7 @@ aggressively; full pre-consolidation text in git history.
   empty for CNL/DSL), and at `e8b5cf6` docs/charters/ (genesis prompt + its three charter
   executions) + docs/poc-archive/*.json (M5 oblique canonical reports, the never-doc-synced
   evidence) — scratch copies outside the repo are dispensable.
-  2026-07-10 external pre-M3 review absorbed, then a same-day codex follow-up corrected it —
-  §10 + the unit lines hold the normative text; memory keeps the evidence behind the calls:
+  §10 + the unit lines hold the normative text; evidence behind the calls:
   bridge ids MUST mint stmt/exc/bind counters mirroring normalize.rs (§8.6's <doc>.rule.<k> =
   norm-layer rule ids only); faithfulness = §10 projection excluding binding region_ids
   because CNL carries rule-basis, never mention-region, provenance (M1 binds adult→r.2 only
@@ -486,17 +486,7 @@ aggressively; full pre-consolidation text in git history.
   the same document on two routes. ETXTBSY fact behind spawn-retry: BOTH outcomes observed
   across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY and
   fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
-  retry impl is not. A second same-day external review (2026-07-10, validation pass on fadc674)
-  reproduced the input multi-read attestation defect → input-snapshot.1–.3 +
-  route-stage-handles + lexicon-extract inserted (roadmap holds the specs). A third
-  (validation pass on c30f295): spawn-retry moved first (fs-dependent red tests must not
-  gate the earlier units' full-suite conditions); constraint-snapshot inserted after
-  input-snapshot.2 — the child reopens the constraint pathname, transient A→B→A defeats
-  any reread → pass a frozen per-run staged copy (committed constraints verified
-  single-file self-contained: sole $ref fragment-only, grammars literal-only);
-  lexicon-cnl.1 split → lexicon-cnl-shape/-data/-integrity, data BEFORE integrity (the
-  hard-errors bind the committed lexicon on landing); canon-props scheduled after cnl-laws
-  (roadmap holds the specs).
+  retry impl is not.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -545,15 +535,14 @@ aggressively; full pre-consolidation text in git history.
   degradation. `model_route_metrics` gates on `agreed.is_some()` so a degraded route skips the
   reference parse. The re-read TOCTOU (`model_route_metrics` + `manifest_inputs`
   independently re-read experiments+reference; resolve/corpus/record-setup reads
-  reopen paths too) was LOW-SEV-deferred as benign on static committed files — the 2nd
-  2026-07-10 external review reproduced the attestation flip (corpora.yaml mutated between
-  resolution and manifest assembly ⇒ `ok` run whose manifest attests bytes the execution
-  never used) → SCHEDULED as M3 input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot,
-  every phase consumes the snapshot). The 3rd review demonstrated the CONSTRAINT variant:
-  the runtime child reopens the pathname mid-call, so a transient A→B→A rewrite defeats ANY
-  parent-side reread (cassette.rs's ConstraintDrift included) → M3 constraint-snapshot
-  passes the child a frozen per-run staged copy of the snapshot bytes; the sealed-hash
-  claim narrows to "the exact constraint bytes supplied to the runtime".
+  reopen paths too) was LOW-SEV-deferred as benign on static committed files — WRONG,
+  review-reproduced (corpora.yaml mutated between resolution and manifest assembly ⇒ `ok`
+  run whose manifest attests bytes the execution never used) → SCHEDULED as M3
+  input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot, every phase consumes the
+  snapshot). Constraint-path variant: the runtime child reopens the pathname mid-call, so
+  NO parent-side reread (ConstraintDrift included) catches a transient A→B→A rewrite → M3
+  constraint-snapshot stages frozen bytes; reread-verify is never the fix for a path
+  another process reopens.
 - Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
   `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is
   live-parsed, env-dependent — report.rs const-pins SYNTHETIC bodies freely; run_oracle.rs

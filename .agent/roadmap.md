@@ -75,41 +75,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - Known deliberate re-bless costs, scheduled in their units: ja_core.yaml growth →
   lexicon_hash-carrying value pins (lexicon-cnl-data); report CNL population → M1/M2 report
   byte-pins + rendered-body consts (report-cnl.2/.3).
-- 2026-07-10 external pre-M3 review absorbed, then codex follow-up hardened it; §10 (amended
-  in the same two commits) is the authority for: text↔AST inverse laws quantified over the
-  parser-accepted language + AST↔ClinicalIR bridge (ids stmt/exc/bind mirroring normalize.rs;
-  faithfulness = projection match, binding region_ids excluded), escape payload contract,
-  accept-side renderability closure, lexicon tail fields + integrity set, audit views keyed
-  (pipeline, document). Units inserted: path-confine + spawn-retry open the milestone,
-  cnl-grammar.1b = early runtime probe, accept-total after cnl-render, subproc-runner.1/.2
-  before route-single-cnl.3 (live wiring).
-- 2026-07-10 second external review (validation pass on fadc674) absorbed: reproduced the
-  input multi-read attestation defect — resolve, corpus reads, record setup,
-  model_route_metrics, and manifest_inputs each reopen registry-named paths, so mutating
-  registry/corpora.yaml between resolution and manifest assembly yields an `ok` run whose
-  manifest.json attests bytes the execution never used → units input-snapshot.1–.3 directly
-  after path-confine. Named stage handles replace the positional [Id; 8]→[Id; 9] widening
-  plan → unit route-stage-handles before route-single-cnl.1. lexicon-extract inserted before
-  lexicon-cnl.1 (the CNL modules' neutral dependency point); spawn-retry gains the shared
-  retry-policy-helper option; memory's stale bridge-id + ETXTBSY texts corrected.
-- 2026-07-10 third external review (validation pass on c30f295) absorbed: spawn-retry moved
-  to open the milestone — the fs-dependent ETXTBSY tests are red wherever the fs cannot
-  yield ETXTBSY, so the later units' full-suite gates bind only after it lands; the
-  constraint reread scheme's gap demonstrated (the runtime child reopens the constraint
-  PATHNAME mid-call, so a transient A→B→A rewrite passes every parent-side reread: record
-  `ok`, sealed hash names A, model decoded B) → unit constraint-snapshot after
-  input-snapshot.2 stages frozen bytes; lexicon-cnl.1 split per the sizing rules into
-  lexicon-cnl-shape / lexicon-cnl-data / lexicon-cnl-integrity — data BEFORE integrity
-  (deviates from the review's shape/integrity/data order: the integrity hard-errors bind
-  the committed lexicon the moment they land — tail-availability +
-  quantity-per-interval-var demand the authored rows — so the rules land after the rows
-  they must hold on); the standing canon-layer property-testing preference scheduled as
-  unit canon-props after cnl-laws (reuses its bounded deterministic enumeration; per the
-  review: worthwhile, not an entry gate).
 
-- [ ] spawn-retry: pre-M3 hardening, opens the milestone (3rd 2026-07-10 review: red
-  wherever the fs cannot yield ETXTBSY → every later unit's full-suite gate binds only
-  once this lands) — both spawn_piped_surfaces_persistent_etxtbsy tests
+- [ ] spawn-retry: pre-M3 hardening, opens the milestone (red wherever the fs cannot
+  yield ETXTBSY → every later unit's full-suite gate binds only once this lands) —
+  both spawn_piped_surfaces_persistent_etxtbsy tests
   (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
   observed: some filesystems yield ETXTBSY, others — overlayfs among them — let the spawn
   succeed), and the retries_through twins pass vacuously
@@ -167,8 +136,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   transient A→B→A rewrite). Gate: full suites green, M1/M2 byte-pins UNCHANGED; test edits =
   mechanical plumbing where tests call resolve()/head fns directly + input-error paths;
   semantic assertions unchanged.
-- [ ] constraint-snapshot: frozen constraint staging (3rd 2026-07-10 review, demonstrated
-  with a controlled runtime: the child reopens the constraint PATHNAME mid-call, so
+- [ ] constraint-snapshot: frozen constraint staging (review-demonstrated: the child
+  reopens the constraint PATHNAME mid-call, so
   cassette.rs's post-call ConstraintDrift re-read — and any per-fill reread — accepts a
   transient A→B→A rewrite while the sealed hash names A). Record setup materializes the
   snapshot's constraint bytes into a private per-run staging dir under the run's out root;
@@ -204,8 +173,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   suite would catch a silent path break); the neutral dependency point input_snapshot,
   lexicon-cnl.*, cnl_grammar, cnl_parse, cnl_render, cnl_bridge all consume. Zero public
   behavior change: existing suites the gate, assertion surface untouched (import edits only).
-- [ ] lexicon-cnl-shape: CNL surface fields, shape only (3rd 2026-07-10 review split of
-  lexicon-cnl.1) — LexiconConcept +adnominal_ja/negated_ja/gloss_en, LexiconAction
+- [ ] lexicon-cnl-shape: CNL surface fields, shape only (split of lexicon-cnl.1) —
+  LexiconConcept +adnominal_ja/negated_ja/gloss_en, LexiconAction
   +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
   source-match surfaces per §10 — optional per row, parse-accepted synonyms when present),
   LexiconCertainty +surface_en, NEW LexiconQuantity {var_id, surface_ja, unit_ja,
@@ -318,8 +287,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
   two bridge round-trip laws (plan-header form — split normal form, ≠ naive identity on
   multi-disjunct inputs). Codeco method; bound sizes to CI-sane runtime.
-- [ ] canon-props: canon-layer generated-case harness (M1-review OPEN enhancement,
-  scheduled by the 3rd 2026-07-10 review — hardening, never an M3 entry gate) — bounded
+- [ ] canon-props: canon-layer generated-case harness (the standing M1-review
+  enhancement — hardening, never an M3 entry gate) — bounded
   deterministic enumeration (cnl-laws' method, zero new deps) over the Canonical record
   families incl. cnl.rs's: emit→strict-read preserves the value + re-emit is byte-identical
   (canonical bytes = fixpoint); generated noncanonical mutations (key reorder, whitespace,
@@ -332,7 +301,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cnl_round_trip_mismatch, spends no repair) + model_fill.rs mapping + stage tests (repair
   recovery / both terminals / instrument path). Codes carry payload, empty refs
   (DiagnosticRecord convention).
-- [ ] route-stage-handles: behavior-locked rework (2nd 2026-07-10 review: widening the
+- [ ] route-stage-handles: behavior-locked rework (widening the
   positional array for the bridge stage compounds off-by-one + provenance risk) — retire
   run.rs's positional stage plumbing (Resolved.pipeline_step_ids [Id; 8] UNUSED_STAGE-padded;
   index consts MODEL_FILL=2/DIRECT_VERIFY=3/COMPILE=4/VERIFY=5/TRACE=6/REPORT=7 over
