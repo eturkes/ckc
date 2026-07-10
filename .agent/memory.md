@@ -415,7 +415,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   fieldless_enum append — path-confine separately extends core's validate_registries). CNL AST = own family, NOT ClinicalIr (CnlAtom
   Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
   {Registered|Unregistered} it reaches EVERY concept slot incl. action target, §10; CnlContext
-  flat two-level DNF; CnlException {concept: CnlConceptRef} single-slot; CnlDocument payload
+  flat two-level DNF; CnlException {concept: CnlConceptRef, basis: nonempty region refs —
+  its sentence's own bracket} single-slot; CnlDocument payload
   per §5 = document_id + grammar id/hash refs + rules
   (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks
   canonical bytes beside the AST, report.json cites those hashes); parser mints NO ids —
@@ -425,16 +426,27 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   context-disjunct; population partition by `pop.*` id namespace; exception sentence → one
   single-atom ExceptionClause PER SPLIT STATEMENT (positive interval-free Concept — §10
   register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
-  bundle-unique ids + (D1∨D2)∧¬E distribution; clause region_ids = exception-kind slice of
-  the rule's basis regions); one
+  bundle-unique ids + (D1∨D2)∧¬E distribution; clause region_ids = its own sentence's basis
+  bracket VERBATIM — §10 per-sentence basis brackets, one on the recommendation sentence +
+  one per exception sentence [7th 2026-07-11 review: the earlier single rule-global bracket
+  + exception-kind slice shared across clauses left multi-exception provenance
+  unreconstructible and falsified per-clause region_ids, breaking ir_faithfulness exact
+  equality — exception region_ids sit INSIDE the §10 projection; source-order mapping
+  rejected: ambiguous when a sentence expands to several clones or emission reorders]); one
   Exact TerminologyBinding per DISTINCT referenced concept
   in first-reference document order, system = lexicon.system, region_ids = the citing
-  rules' basis regions; Action::new derives key; basis = region ids,
-  source_segment_ids derived region→segment via the SEGMENTS artifact — m3.bridge stage
+  rules' basis regions (union over brackets); Action::new derives key; basis = region ids
+  per sentence,
+  source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
+  m3.bridge stage
   inputs [cnl_document, segments]; round-trip laws (escape-free ASTs, to_ir Err on escapes):
-  from_ir = single-disjunct projection rendering cited segments' FULL region sets ⇒
+  from_ir = single-disjunct projection — clause region_ids verbatim on its exception
+  sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
+  exception-owned; Err fail-closed on empty clause regions or empty remainder,
+  accept-total-rejected shapes) ⇒
   from_ir∘to_ir == bridge normal form (disjunct split + atom canonicalization — population
-  before condition, set order, dedup — + segment-closed basis), to_ir∘from_ir == id on
+  before condition, set order, dedup — + exception-partitioned segment-closed basis),
+  to_ir∘from_ir == id on
   bridge-image IR).
   Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
   EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
@@ -488,7 +500,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   §10 + the unit lines hold the normative text; evidence behind the calls:
   bridge ids MUST mint stmt/exc/bind counters mirroring normalize.rs (§8.6's <doc>.rule.<k> =
   norm-layer rule ids only); faithfulness = §10 projection excluding binding region_ids
-  because CNL carries rule-basis, never mention-region, provenance (M1 binds adult→r.2 only
+  because CNL carries sentence-basis (rule + exception brackets — exception provenance DOES
+  reconstruct), never mention-region, provenance (M1 binds adult→r.2 only
   while guideline A's statement basis = r.2 r.3 — exact-hash ir_match would zero on its own
   goldens); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
   adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,

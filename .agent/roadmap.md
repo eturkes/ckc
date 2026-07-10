@@ -35,10 +35,14 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - CNL AST ≠ ClinicalIr: CnlAtom {Concept|ConceptNegated|Interval|Unregistered(surface)}
   (escape = own variant), CnlConceptRef {Registered(Id)|Unregistered(surface)} — §10 admits
   the escape in EVERY concept slot incl. action target — CnlContext {any: Vec<Vec<CnlAtom>>}
-  flat two-level DNF, CnlException {concept: CnlConceptRef} (§10 single-concept register —
-  a sentence list, disjunctive across entries; no DNF/negation/interval inside an entry),
+  flat two-level DNF, CnlException {concept: CnlConceptRef, basis: nonempty region refs —
+  the sentence's own bracket} (§10 single-concept register — a sentence list, disjunctive
+  across entries; no DNF/negation/interval inside an entry; per-sentence basis brackets keep
+  per-clause provenance reconstructible — a rule-global bracket cannot say which exception
+  clause owns which region),
   CnlRule {context, action kind + target:
-  CnlConceptRef, direction+strength, certainty?, exceptions, basis region refs}, CnlDocument
+  CnlConceptRef, direction+strength, certainty?, exceptions, basis region refs (the rule's
+  own bracket, nonempty)}, CnlDocument
   = the landed model_fill artifact payload per §5's table: document_id + grammar id/hash refs
   + rules (AST + per-rule canonical text ja/en) + per-language text hashes — accept re-renders
   and hash-locks canonical bytes beside the AST (§10); report.json cites the artifact's
@@ -51,8 +55,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-atom ExceptionClause PER SPLIT STATEMENT — a multi-disjunct rule clones its
   exception list into every emitted statement ((D1∨D2)∧¬E = (D1∧¬E)∨(D2∧¬E); bundle
   validation demands globally unique exception ids), `exc.<k>` counting emitted clauses
-  statement-major then sentence order, clause region_ids = the exception-kind slice of the
-  rule's basis regions via the segments artifact, shared by the rule's clauses — (positive
+  statement-major then sentence order, clause region_ids = its own sentence's basis bracket
+  verbatim (per-sentence brackets; clones share their sentence's basis) — (positive
   interval-free `Concept` — the §10 register + negative-occurrence bar; the locked rules.rs
   lowering negates ONLY positive Concept atoms into the rule's single conjunct and NEVER
   interval-lowers a negative occurrence, context ConceptNegated included, so an
@@ -62,17 +66,24 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   atoms); bindings = one Exact-status TerminologyBinding per distinct referenced
   concept, minted in first-reference document order (matches M1's first-mention scan order on
   the locked corpus; divergence = measured ir_match miss, never asserted), system =
-  lexicon.system, code = concept id, region_ids = the citing rules' basis regions — a
+  lexicon.system, code = concept id, region_ids = the citing rules' basis regions (union
+  over each citing rule's brackets) — a
   KNOWINGLY lossy reconstruction of M1's mention-based regions, hence metrics-faithful
   compares under the §10 projection excluding binding region_ids (Action::new derives
-  key itself); basis refs = region ids; source_segment_ids derived region→segment via the
+  key itself); basis refs = region ids per sentence (rule bracket + one per exception
+  sentence); source_segment_ids derived region→segment over their UNION via the
   segments artifact (ClinicalSegment.region_ids reverse map — m3.bridge stage inputs therefore
   [cnl_document, segments]). Round-trip laws, precise (escape-free ASTs; to_ir = Err on any
   escape occurrence): from_ir = one single-disjunct CNL rule per statement (projection, no
-  regrouping; basis renders each cited segment's FULL region set) ⇒ from_ir∘to_ir == bridge
+  regrouping; each clause's region_ids render verbatim on its exception sentence, the rule
+  bracket renders the segment-closed remainder — every cited segment's FULL region set minus
+  the exception-owned regions; Err, fail-closed, on an empty clause region set or empty
+  remainder — CNL-inexpressible, accept-total-rejected) ⇒ from_ir∘to_ir == bridge
   normal form — disjunct split + per-statement atom canonicalization (population before
   condition, §4.3 set order, byte-identical duplicates collapsed; the partition + set
-  emission are lossy exactly there) + segment-closed basis — (== id exactly on bridge-normal
+  emission are lossy exactly there) + exception-partitioned segment-closed basis
+  (exception-owned regions render only on their exception sentence; closure pulls each cited
+  segment's remaining regions into the rule bracket) — (== id exactly on bridge-normal
   docs); to_ir∘from_ir == id on bridge-image IR.
 - Grammar terminals = whole-surface string literals (ASCII digits + basis-id chars as literal
   alternation) — portable to LLM constraint mechanisms + atomic in bnf — with EXACTLY ONE open
@@ -248,7 +259,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] cnl-ast: cnl.rs type family — CnlAtom/CnlConceptRef/CnlContext/CnlException/CnlRule/
   CnlDocument (grammar refs + per-rule text + text-hash members per the plan header) +
   Canonical emit/read (sorted-key slots, optional members omit-None) + validate (nonempty
-  rules, Id grammar, interval bound coherence mirroring ir.rs, §10 escape payload contract —
+  rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance),
+  Id grammar, interval bound coherence mirroring ir.rs, §10 escape payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
   SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed pair/id view: modality
   pair tail-backed, concept/action refs resolved, negated/exception concept refs
@@ -257,9 +269,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
   BNF (smt_query.grammar dialect, `;` comments): document = rule+; rule = context 患者には、
-  action deontic-tail / optional certainty paren / ただし-exceptions (each sentence = ONE
-  concept-or-escape slot, §10 single-concept register — no connectives/negation/interval
-  inside 除く) / [根拠 …] basis; DNF
+  action deontic-tail / optional certainty paren / [根拠 …] rule basis / ただし-exceptions
+  (each sentence = ONE concept-or-escape slot + its OWN [根拠 …] bracket, §10 per-sentence
+  provenance; no connectives/negation/interval
+  inside 除く); DNF
   connectives かつ / 、または with precedence by production shape; atoms
   concept|negated|interval|escape (未登録概念「…」 / unregistered concept "…"; admitted in
   action-target position too — §10); EN mirror productions; terminals = lexicon whole-surface
@@ -295,14 +308,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
   errors, repairable).
 - [ ] cnl-parse.2: document parser — full slot order (context 患者には、 action deontic tail /
-  certainty paren / ただし exceptions (single concept-or-escape payload per sentence) /
-  basis bracket), multi-rule documents, single
+  certainty paren / rule basis bracket / ただし exceptions, each sentence a single
+  concept-or-escape payload + its own basis bracket), multi-rule documents, single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
-  unterminated bracket, empty document, connective/negated-concept/interval inside an
+  unterminated bracket, empty bracket, exception sentence missing its bracket, empty
+  document, connective/negated-concept/interval inside an
   exception sentence); differential accept/reject agreement vs the Earley
   oracle over this unit's corpus.
 - [ ] cnl-render: cnl_render.rs — render_ja/render_en canonical text (modality pair → the
-  pair's canonical tail — the first tail-bearing row per pair — per language, basis sorted,
+  pair's canonical tail — the first tail-bearing row per pair — per language, basis sorted
+  per bracket (rule + per-exception),
   certainty optional
   paren, stored DNF order preserved — canonicalization never reorders semantics; missing-pair
   lookup = Err, fail-closed — §10 totality + accept-total make it unreachable from accepted
@@ -322,7 +337,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   context ConceptNegated or the exception concept (§10 bar: the locked tail interval-lowers
   positive occurrences only, a negative one sits as an unlinked Bool beside the Real
   interval); statements with EMPTY population+condition (schema minItems-free +
-  bundle-valid, CNL's DNF derives ≥1 atom) — closing §10
+  bundle-valid, CNL's DNF derives ≥1 atom); exception clauses with EMPTY region_ids
+  (bundle-valid — validate only resolves cited regions); statements whose segment-closed
+  source regions are wholly exception-owned — empty rule bracket under the §10 exception
+  partition, covers EMPTY source_segment_ids (the closure computes over the segments already
+  in the accept scope for grounding) — closing §10
   render-totality for the one IR-landing route without a grammar/derivation guard (M1 derives
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
   reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
@@ -330,8 +349,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   region + the lexicon modality table (lexicon.rs post-extract) only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
   (from_ir = Err, fail-closed, on any CNL-inexpressible shape — an ExceptionClause not
-  exactly one positive interval-free Concept atom, a negative occurrence of an
-  interval-carrying entry, an empty statement context — §10 render totality; unreachable
+  exactly one positive interval-free Concept atom, an ExceptionClause with empty region_ids,
+  a negative occurrence of an
+  interval-carrying entry, an empty statement context, an empty rule-bracket remainder
+  (wholly exception-owned segment-closed source regions — covers empty source_segment_ids)
+  — §10 render totality; unreachable
   from bridge-image, accept-total-guarded, and locked-corpus IR; to_ir = Err on any escape
   occurrence, law-harness-pinned) +
   both round-trip laws as pinned there (from_ir∘to_ir == bridge normal form;
@@ -340,11 +362,14 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   derive_norm_ir contract only — run.rs stays closed.
 - [ ] cnl-laws: depth-bounded AST enumeration harness (all atom kinds × ≤2 disjuncts × ≤2
   conjuncts × all tail-backed modality pairs × certainty on/off × ≤2 exceptions × 1–2 basis
-  refs; + one unbacked-pair render-Err assertion) →
+  refs per bracket (rule + per-exception); + one unbacked-pair render-Err assertion) →
   render→parse identity both languages + cross-language agreement + canonical fixpoint +
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
-  two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin
-  (plan-header form — bridge normal form: split + atom canonicalization + segment-closed
+  two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin + a
+  from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
+  bracket)
+  (plan-header form — bridge normal form: split + atom canonicalization +
+  exception-partitioned segment-closed
   basis, ≠ naive identity on multi-disjunct or atom-disordered inputs). Codeco method; bound
   sizes to CI-sane runtime.
 - [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
@@ -387,7 +412,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   scope: resolve/consts + manifest want-set + prompt-composer regions only.
 - [ ] route-single-cnl.2: single_cnl_accept closure — parse (Parse reject, repairable) →
   escape scan over context + exception + action-target slots (Unregistered terminal) →
-  grounding (basis regions ⊆ regions, derived segments
+  grounding (every bracket's basis regions ⊆ regions — rule + per-exception, derived segments
   ⊆ segments; Grounding terminal) → re-render + re-parse round-trip (Instrument on mismatch)
   → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / both
   terminals / instrument / empty-grounding panic). run.rs read scope: accept-closure region +
