@@ -406,9 +406,10 @@ aggressively; full pre-consolidation text in git history.
   non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
 - M3 plan (ClinicalCNL v1; gate MET at planning — runtime identity probe clean, contract-
   conformant). Durable decisions beyond the roadmap lines (which collapse at M3 review):
-  module home = ckc-cli FRESH modules (cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/
-  cnl_bridge.rs) — Lexicon lives in ckc-cli::normalize, Canonical-outside-core proven by
-  report.rs; ckc-core IR shapes + committed clinical_ir.schema.json untouched (ClinicalStatement
+  module home = ckc-cli FRESH modules (lexicon.rs — lexicon-extract's behavior-locked move
+  of the Lexicon family out of normalize.rs, the CNL modules' neutral dependency point —
+  plus cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/cnl_bridge.rs) —
+  Canonical-outside-core proven by report.rs; ckc-core IR shapes + committed clinical_ir.schema.json untouched (ClinicalStatement
   already carries certainty/exceptions/source refs; sole core touch = DiagnosticCode
   fieldless_enum append). CNL AST = own family, NOT ClinicalIr (CnlAtom
   Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
@@ -416,19 +417,22 @@ aggressively; full pre-consolidation text in git history.
   flat two-level DNF; CnlDocument payload per §5 = document_id + grammar id/hash refs + rules
   (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks
   canonical bytes beside the AST, report.json cites those hashes); parser mints NO ids —
-  bridge derives them (`<doc>.rule.<k>` document order; one ClinicalStatement per
+  bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters
+  mirroring normalize.rs's mints EXACTLY — §8.6 reserves `<doc>.rule.<k>` for norm-layer
+  rule ids, rules.rs's mint; one ClinicalStatement per
   context-disjunct; population partition by `pop.*` id namespace; exception disjunct → one
   ExceptionClause; one Exact TerminologyBinding per referenced concept, system =
-  lexicon.system, region_ids = citing rule's basis regions; binding/exception ids follow
-  rules.rs's §8.6 conventions, Action::new derives key; basis = region ids,
+  lexicon.system, region_ids = citing rule's basis regions; Action::new derives key; basis = region ids,
   source_segment_ids derived region→segment via the SEGMENTS artifact — m3.bridge stage
   inputs [cnl_document, segments]; round-trip laws: from_ir = single-disjunct projection ⇒
   from_ir∘to_ir == disjunct-split normal form, to_ir∘from_ir == id on bridge-image IR).
   Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
-  EN grammar committed + drift-guarded, no route binding). 7-stage pipe shifts positional
-  compile/verify indices (≠ COMPILE=4/VERIFY=5) + KINDS +bridge ⇒ pipeline_step_ids
-  [Id; 8]→[Id; 9] → parameterize compile_verify_group/producers per shape (DIRECT_VERIFY
-  precedent). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
+  EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
+  plumbing (pipeline_step_ids [Id; 8], MODEL_FILL/DIRECT_VERIFY/COMPILE=4/VERIFY=5/TRACE/
+  REPORT index consts, UNUSED_STAGE padding) is retired by route-stage-handles BEFORE route
+  wiring — per-shape named StageHandle {kind, step_id} fields validated at resolve — so the
+  7-stage pipe adds a RouteStages::SingleCnl variant, never an [Id; 9] widening (off-by-one +
+  provenance risk; 2nd 2026-07-10 review). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
   §10 EN canon), JA under SemanticJa. Grammar terminals = whole-surface string literals
   (ASCII-digit + basis-id-char alternation) + EXACTLY ONE open lexical production per
   language — the escape's free quoted surface, inexpressible as finite literals; emitter
@@ -479,9 +483,13 @@ aggressively; full pre-consolidation text in git history.
   CNL-inexpressible shape, census-flip-gated; §10 laws quantify over the parser-accepted
   language (runtime grammar = repairable superset — the open escape production admits payloads
   the parser rejects); audit views need (pipeline, document) keying because exp.m3_cnl accepts
-  the same document on two routes. ETXTBSY fact behind spawn-retry: both spawn_piped suites
-  green on this container's fs, fail on overlayfs (the review sandbox) — fs-dependence is the
-  defect, the retry impl is not.
+  the same document on two routes. ETXTBSY fact behind spawn-retry: BOTH outcomes observed
+  across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY (a dev
+  host) and fail where it doesn't (overlayfs, both external review sandboxes); neither
+  outcome is intrinsic to one container — fs-dependence is the defect, the retry impl is
+  not. A second same-day external review (2026-07-10, validation pass on fadc674)
+  reproduced the input multi-read attestation defect → input-snapshot.1–.3 +
+  route-stage-handles + lexicon-extract inserted (roadmap holds the specs).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -528,9 +536,13 @@ aggressively; full pre-consolidation text in git history.
   evaluator) while the §9 manifest still records the run's setup hashes with `model_identity`=None
   (gates only on `model_routes` non-empty); the ledger + §4.4 outcome still document the
   degradation. `model_route_metrics` gates on `agreed.is_some()` so a degraded route skips the
-  reference parse. LOW-SEV DEFERRED: `model_route_metrics` + `manifest_inputs` independently
-  re-read experiments+reference (benign TOCTOU on static committed files; threading one read
-  couples the fns → future factoring).
+  reference parse. The re-read TOCTOU (`model_route_metrics` + `manifest_inputs`
+  independently re-read experiments+reference; resolve/corpus/lexicon/record-setup reads
+  reopen paths too) was LOW-SEV-deferred as benign on static committed files — the 2nd
+  2026-07-10 external review reproduced the attestation flip (corpora.yaml mutated between
+  resolution and manifest assembly ⇒ `ok` run whose manifest attests bytes the execution
+  never used) → SCHEDULED as M3 input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot,
+  every phase consumes the snapshot).
 - Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
   `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is
   live-parsed, env-dependent — report.rs const-pins SYNTHETIC bodies freely; run_oracle.rs

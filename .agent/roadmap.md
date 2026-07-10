@@ -25,9 +25,10 @@ pipe.m3_single_cnl] over the locked M1 inputs, scored by the same reference. Mil
 (model runtime) MET at planning — identity probe clean, contract-conformant; no §15 gate
 (locked measurements stand alone). Engine-agnostic rule applies to every committed byte.
 Cross-unit decisions (durable copy in memory's M3-plan bullet):
-- Module home = ckc-cli fresh modules (`cnl.rs`, `cnl_grammar.rs`, `cnl_parse.rs`,
-  `cnl_render.rs`, `cnl_bridge.rs`): Lexicon lives in ckc-cli::normalize (2166L), Canonical
-  impls outside core proven (report.rs), consumers all CLI-side. ckc-core IR shapes + committed
+- Module home = ckc-cli fresh modules (`lexicon.rs` — lexicon-extract moves the Lexicon
+  family out of ckc-cli::normalize (2166L) as the CNL modules' neutral dependency point —
+  plus `cnl.rs`, `cnl_grammar.rs`, `cnl_parse.rs`, `cnl_render.rs`, `cnl_bridge.rs`):
+  Canonical impls outside core proven (report.rs), consumers all CLI-side. ckc-core IR shapes + committed
   clinical_ir.schema.json UNTOUCHED (no IR field change — ClinicalStatement already carries
   certainty/exceptions/source refs); sole core touch = DiagnosticCode fieldless_enum append
   (codes-cnl).
@@ -82,6 +83,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (pipeline, document). Units inserted: path-confine + spawn-retry open the milestone,
   cnl-grammar.1b = early runtime probe, accept-total after cnl-render, subproc-runner.1/.2
   before route-single-cnl.3 (live wiring).
+- 2026-07-10 second external review (validation pass on fadc674) absorbed: reproduced the
+  input multi-read attestation defect — resolve, corpus/lexicon reads, record setup,
+  model_route_metrics, and manifest_inputs each reopen registry-named paths, so mutating
+  registry/corpora.yaml between resolution and manifest assembly yields an `ok` run whose
+  manifest.json attests bytes the execution never used → units input-snapshot.1–.3 directly
+  after path-confine. Named stage handles replace the positional [Id; 8]→[Id; 9] widening
+  plan → unit route-stage-handles before route-single-cnl.1. lexicon-extract inserted before
+  lexicon-cnl.1 (the CNL modules' neutral dependency point); spawn-retry gains the shared
+  retry-policy-helper option; memory's stale bridge-id + container-intrinsic-ETXTBSY texts
+  corrected.
 
 - [ ] path-confine: pre-M3 hardening (review-reproduced: absolute corpus + expected_outcomes
   paths under /tmp pass `registry check` AND a full run — `Path::join` swallows the root on an
@@ -96,16 +107,53 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   in-repo symlink→outside (`#[cfg(unix)]`) / valid nested file accepted / non-regular
   rejected — across registry check + run. Gate: full gates + registry check green on the
   committed tree.
+- [ ] input-snapshot.1: read-once input layer, fresh module
+  crates/ckc-cli/src/input_snapshot.rs. ResolvedFile<T> {canonical path, bytes, hash =
+  hash_bytes(bytes), value: T parsed FROM those bytes} + run-level InputSnapshot {corpora,
+  candidates, experiments, lockfile + toolchain (raw), lexicon, expected_outcomes, per-entry
+  corpus bytes, schemas? + prompts? (populated iff the resolved set contains model routes —
+  the §9 manifest gate signal, so the M1 read surface is unchanged)} + a builder in
+  resolution order (registries → experiment selection → selected slots; immutable once
+  resolution completes). Registry-data-controlled paths load through path-confine's
+  resolver; fixed-name files join as today; parse fns reused (ckc-core registry parse_*,
+  normalize load_lexicon). Per-doc corpus slots Option — a failed read carries today's
+  file+reason payload and the doc skips downstream. Unit tests: loader errors, hash =
+  the file bytes' sha256, confinement rejection through the resolver. No run.rs contact.
+- [ ] input-snapshot.2: resolution + execution consume the snapshot — resolve() takes the
+  built snapshot instead of load()ing CORPORA/candidates/EXPERIMENTS + TOOLCHAIN itself; the
+  two corpus entry.path head-fn reads, the two LEXICON_FILE reads, and build_record_setup's
+  SCHEMAS/PROMPTS loads become snapshot lookups (root stays for outputs;
+  build_record_parts' template/constraint payload reads stay put — record-gated, pre-write
+  byte-verified, path-confined). Same bytes on a stable tree ⇒ gate: full suites green with
+  M1/M2 byte-pins UNCHANGED; test edits confined to input-error paths whose diagnostics move
+  to snapshot-build time (file+reason shape preserved).
+- [ ] input-snapshot.3: metrics + manifest attest the snapshot — model_route_metrics (today
+  rereads EXPERIMENTS + expected_outcomes) and manifest_inputs (today rereads LOCKFILE/
+  CORPORA/EXPERIMENTS/expected_outcomes/SCHEMAS/PROMPTS) consume snapshot fields; manifest
+  hashes = the snapshot's byte hashes (stable tree ⇒ identical bytes, pins green).
+  Regression test: an explicit test-only barrier hook reachable from run.rs's in-crate tests
+  (NO sleeps) mutates registry/corpora.yaml between resolution and manifest assembly — the
+  run stays `ok` AND manifest.json attests the resolution-time bytes (today it attests the
+  mutated file while the artifacts used the original mapping — the review-reproduced flip).
 - [ ] spawn-retry: pre-M3 hardening — both spawn_piped_surfaces_persistent_etxtbsy tests
-  (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (green on this container,
-  fails on overlayfs — the review container), and the retries_through twins pass vacuously
-  wherever the first spawn succeeds. Rework BOTH mirrored copies in place (extraction stays
-  subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op (prod path =
-  the real Command spawn); deterministic tests drive ETXTBSY,ETXTBSY,success /
-  persistent-through-grace / immediate non-ETXTBSY error / immediate success; ≤1 fs
+  (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (fs-dependent, BOTH outcomes
+  observed: green where the fs yields ETXTBSY — a dev host — and failing where it doesn't —
+  overlayfs, both external review sandboxes), and the retries_through twins pass vacuously
+  wherever the first spawn succeeds. Rework BOTH mirrored copies (full machinery extraction
+  stays subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op
+  (prod path = the real Command spawn); a small shared retry-policy helper — home ckc-smt,
+  ckc-cli already depends on it — MAY host the loop once so the injected seam isn't
+  implemented twice; deterministic tests drive ETXTBSY,ETXTBSY,success /
+  persistent-through-grace / immediate non-ETXTBSY error / immediate success; happy-path
+  process integration tests stay; ≤1 fs
   integration test per crate, capability-probing the mount and skipping cleanly where the fs
   cannot produce ETXTBSY. Gate: workspace strict suite green with zero
   environment-dependent outcomes.
+- [ ] lexicon-extract: behavior-locked move — the Lexicon family (types, YAML row structs,
+  load_lexicon, validation + their tests) leaves normalize.rs (2166L) for fresh
+  crates/ckc-cli/src/lexicon.rs, normalize re-imports; the neutral dependency point
+  lexicon-cnl.*, cnl_grammar, cnl_parse, cnl_render, cnl_bridge all consume. Zero public
+  behavior change: existing suites the gate, assertion surface untouched (import edits only).
 - [ ] lexicon-cnl.1: CNL surface fields — LexiconConcept +adnominal_ja/negated_ja/gloss_en,
   LexiconAction +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
   source-match surfaces per §10 — optional per row, parse-accepted synonyms when present),
@@ -198,7 +246,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
   reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
-  region + normalize.rs modality table only.
+  region + the lexicon modality table (lexicon.rs post-extract) only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules +
   both round-trip laws as pinned there (from_ir∘to_ir == disjunct-split normal form;
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
@@ -218,13 +266,22 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cnl_round_trip_mismatch, spends no repair) + model_fill.rs mapping + stage tests (repair
   recovery / both terminals / instrument path). Codes carry payload, empty refs
   (DiagnosticRecord convention).
+- [ ] route-stage-handles: behavior-locked rework (2nd 2026-07-10 review: widening the
+  positional array for the bridge stage compounds off-by-one + provenance risk) — retire
+  run.rs's positional stage plumbing (Resolved.pipeline_step_ids [Id; 8] UNUSED_STAGE-padded;
+  index consts MODEL_FILL=2/DIRECT_VERIFY=3/COMPILE=4/VERIFY=5/TRACE=6/REPORT=7 over
+  PROCESSING_STAGE_KINDS) for validated named handles: StageHandle {kind, step_id} +
+  per-shape RouteStages enum with named stage fields (M1Layered/SingleIr/DirectSmt;
+  resolve_route validates the declared kind sequence and constructs it — no sentinel, no
+  resize); finish_processing_stage + emission/provenance sites take a handle (kind travels
+  WITH step_id, never re-derived from an index); compile_verify_group + producers
+  parameterized by handles. Zero behavior change: suites green, assertion surface untouched
+  (fixtures rebuild to named construction), M1/M2 pins unchanged.
 - [ ] route-single-cnl.1: registry data — processing_stage.m3.model_fill_cnl (model_fill,
   [sdg,segments]→[cnl_document]) + m3.bridge (bridge, [cnl_document,segments]→[clinical_ir]) +
-  pipe.m3_single_cnl (7 stages; m2.assemble + m1.compile/m1.verify reused — positional stage
-  indices SHIFT: compile=5/verify=6 ≠ COMPILE=4/VERIFY=5 consts → parameterize
-  compile_verify_group + producers over per-shape indices, DIRECT_VERIFY precedent; KINDS
-  +bridge ⇒ pipeline_step_ids [Id; 8]→[Id; 9] + TRACE/REPORT slot consts shift — audit every
-  positional use + resolve fixtures) + exp.m3_cnl set
+  pipe.m3_single_cnl (7 stages; m2.assemble + m1.compile/m1.verify reused — a
+  RouteStages::SingleCnl named-handle variant per route-stage-handles' representation, the
+  bridge stage a named field, never an index shift; resolve fixtures follow) + exp.m3_cnl set
   binding (direct baseline) + prompt.single_cnl entry + first-draft template +
   single_cnl_prompt composer (single_ir_prompt mirror + CNL vocabulary blocks: adnominal/
   negated surfaces, action nouns, modality tails, quantity surfaces+units, basis region ids;
@@ -249,8 +306,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   deadline arithmetic (Instant+budget overflow), post-grace detached-drain cap/reap;
   deterministic tests through the injectable seam; model + solver behavior stays consistent.
 - [ ] route-single-cnl.3: single_cnl_fill + execute_routes SingleCnl arm (head reuse → fill →
-  bridge + assemble tail into the per-group compile/verify loop at the shape's shifted
-  indices — .1's parameterization) + landing
+  bridge + assemble tail into the per-group compile/verify loop via the shape's named stage
+  handles — route-stage-handles' representation) + landing
   (cnl_document + clinical_ir + bundle wrappers route-namespaced; bundle input_hashes cite
   cnl_document + accepted cassette; check TraceNodeKind coverage at impl) + §4.6 events (fill
   + bridge; clock discipline — compose prompts outside timed intervals) + landing-gate test.
