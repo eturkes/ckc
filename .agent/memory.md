@@ -211,11 +211,14 @@ aggressively; full pre-consolidation text in git history.
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
-  reuses Z3's subprocess machinery — a shared cross-crate runner is a DEFERRED unit (the mirrors
-  stay duplicated until it lands) that also absorbs the two codex-REJECTED fixes (`Instant+budget` overflow-panic +
-  ETXTBSY vacuous-window; rejected Z3-mirrored, non-realistic, fix-both-not-one) AND the cap/reap of the
+  reuses Z3's subprocess machinery — the shared cross-crate runner is SCHEDULED (M3
+  subproc-runner.1 behavior-locked extraction + .2 hardening; the mirrors stay duplicated until it
+  lands): .2 absorbs the codex-REJECTED `Instant+budget` overflow-panic fix (rejected Z3-mirrored,
+  non-realistic, fix-both-not-one) AND the cap/reap of the
   STILL-unbounded post-grace detached drain (a descendant holding stdout open appends to its Vec forever;
-  accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep). `Completed{bytes}`
+  accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep); the ETXTBSY
+  vacuous-window half is discharged earlier by M3 spawn-retry (fs-dependent tests → injectable
+  deterministic retry tests). `Completed{bytes}`
   duplicates `stdout_bytes` on clean exit; PARTIAL capture on Timeout/ExitFailure/SpawnFailure diverges;
   stdout stays RAW, never lossy-decoded (byte-stability = cassette determinism). NO
   process-fate→DiagnosticCode here (§7.4 `ai_*` = output-parse, stage-model-fill's job). `set_var`
@@ -331,9 +334,10 @@ aggressively; full pre-consolidation text in git history.
   hash/size → read the live hash from schemas.yaml/emit.rs, never that spec. Path safety =
   `is_safe_relative_path` (pub ckc-core), ONE predicate reused by the pure validator (`UnsafePath`) + the
   CLI read-guard — LEXICAL only (rejects absolute + `.`/`..`), so a committed repo-local SYMLINK pointing
-  outside the tree passes and `std::fs::read` follows it → a real fix is an I/O-layer
-  symlink/canonicalize guard across BOTH read loops = its OWN scoped security unit (DEFERRED: low,
-  pre-existing, local repo-committed inputs only, not remotely exploitable). Core fixtures (SCHEMAS
+  outside the tree passes and `std::fs::read` follows it — and the 2026-07-10 external review
+  found corpus.path + expected_outcomes lack even the LEXICAL check (absolute /tmp paths pass
+  `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
+  core + ONE canonicalize/containment I/O resolver across every registry-data-controlled read. Core fixtures (SCHEMAS
   included) use SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents`.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
   forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
@@ -382,7 +386,7 @@ aggressively; full pre-consolidation text in git history.
   "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
   `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (M1 review
   enhancement, still preferred); shared cross-crate subprocess runner + registry symlink guard
-  (deferred scoped units).
+  (both since scheduled into M3: subproc-runner.1/.2, path-confine).
 - CNL-first architecture (user directive 2026-07-07, set in the Codex-continued cnl-ir-research
   session — rollout `~/../debian/.codex/sessions/2026/07/07/rollout-2026-07-07T11-09-50-*.jsonl`;
   SPEC amended same day = design authority, read SPEC not this bullet for semantics): clinician-
@@ -461,6 +465,27 @@ aggressively; full pre-consolidation text in git history.
   empty for CNL/DSL), and at `e8b5cf6` docs/charters/ (genesis prompt + its three charter
   executions) + docs/poc-archive/*.json (M5 oblique canonical reports, the never-doc-synced
   evidence) — scratch copies outside the repo are dispensable.
+  2026-07-10 external pre-M3 review absorbed (plan-amendment commit; claims verified in-repo
+  before acting): §10 amended — parse/render inverse = canonical text ↔ CNL AST; the bridge
+  maps AST ↔ ClinicalIR projection + derives ids (parser/model mint none); bridge round-trip +
+  render-totality laws joined the §10 laws block. Escape quoted-surface contract v1 = ONE
+  payload shared by both languages (CnlAtom::Unregistered holds one surface): nonempty, ≤80
+  Unicode scalars, single line, control chars + 「」" excluded, SemanticJa-normalized,
+  parser-enforced — grammar production stays open; violations = plain cnl_parse_error, never
+  the unregistered terminal. Modality render-totality = ACCEPT-side rule: lexicon pairs stay
+  the corpus register (6 of the 12 §5 Direction×Strength pairs — artificial rows for the rest
+  rejected as audit-register pollution), single_ir gains an off-lexicon-pair Schema reject
+  (unit modality-total; M1 derives pairs FROM lexicon rows, single_cnl's grammar admits only
+  lexicon tails — so accepted IR is lexicon-backed on every route), render Err on a missing
+  pair = fail-closed instrument path. Lexicon integrity hard-errors (implies_action
+  resolution — load_lexicon carries it unvalidated today; quantity var_id uniqueness /
+  interval-var coverage / nonempty surfaces+units; per-language duplicate parse surfaces)
+  folded into lexicon-cnl.1. Units inserted: path-confine + spawn-retry (pre-M3 hardening,
+  open the milestone), cnl-grammar.1b (early runtime feasibility probe — the review could not
+  test the runtime, raising placement value), modality-total (after cnl-render),
+  subproc-runner.1/.2 (before route-single-cnl.3's live wiring). ETXTBSY fact behind
+  spawn-retry: both spawn_piped suites are green on this container's fs and fail on overlayfs
+  (the review sandbox) — the fs-dependence is the defect, the retry impl is not.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)

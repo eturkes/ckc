@@ -854,10 +854,12 @@ the bilingual report renders deterministically from `report.json`; §0 vocabular
 Intent: land ClinicalCNL — the clinician-auditable controlled natural language, the §0
 knowledge surface; named to mirror ClinicalIR, the layer it serializes — as experiment 1's
 flagship invented form. One content layer, two concrete syntaxes: ClinicalIR serializes as
-canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians, with parse and render
-mutual inverses between text and IR. A clinician audits controlled prose beside quoted
-source spans — never JSON, IR slots, SMT, or Prolog — and an accepted, reviewed CNL document is
-the locked knowledge base from which every target regenerates. This section is the design
+canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians. Parse and render are
+mutual inverses between canonical text and the CNL AST; a deterministic bridge maps that AST
+to and from a ClinicalIR projection under the round-trip laws below. A clinician audits
+controlled prose beside quoted source spans — never JSON, IR slots, SMT, or Prolog — and an
+accepted, reviewed CNL document is the locked knowledge base from which every target
+regenerates. This section is the design
 authority for M3 planning; once landed, the committed grammar files and renderer are the byte
 authority (worked text here is illustrative, the §8.6 rule).
 
@@ -910,8 +912,9 @@ Committed direction:
   ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
   plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
-- Ids: the parser assigns rule/statement/exception ids deterministically from document order
-  (the §8.6 `<document_id>.rule.<k>` scheme) — the model mints no ids; basis refs are the only
+- Ids: the parser and the model mint no ids — the bridge derives statement/exception/binding
+  ids deterministically from document order (the §8.6 `<document_id>.rule.<k>` scheme) when
+  mapping AST → ClinicalIR; basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
 - Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
@@ -922,16 +925,33 @@ Committed direction:
   schema. Every linguistic form lives in lexicon DATA and the grammar stays purely
   concatenative: concept entries gain adnominal / negated-adnominal / EN-gloss surfaces; action
   kinds gain JA/EN noun forms; the existing modality table IS the deontic-tail set (parse
-  accepts every listed synonym, render emits the pair's canonical first-listed surface);
-  certainty phrases as committed. Lexicon lint at load: reserved-token collisions (a surface
-  containing a connective/punctuation terminal), missing surface fields.
+  accepts every listed synonym; duplicate `(direction, strength)` rows are permitted synonyms,
+  render emits the pair's canonical first-listed surface); certainty phrases as committed.
+  Modality totality: the lexicon pair set stays the corpus register — no artificial rows for
+  the full §5 Direction × Strength domain; instead every IR-landing route guarantees
+  lexicon-backed pairs at acceptance (M1 derives pairs from lexicon rows by construction;
+  single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects an
+  off-lexicon `(direction, strength)` pair as a repairable schema violation, mirroring the
+  off-lexicon id check), so audit rendering is total over accepted IR and a missing-row render
+  error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
+  integrity checks: reserved-token collisions (a surface containing a connective/punctuation
+  terminal), missing surface fields, per-language duplicate parse surfaces, `implies_action`
+  resolving to an action entry, and quantity-table integrity — unique `var_id`, exactly one
+  quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
+  both languages.
 - Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
   concept surface (condition atom, action target; action kinds stay a small closed class —
   extending them is lexicon review, not emission), one escape production is admitted — JA
   `未登録概念「<surface>」`, EN `unregistered concept "<surface>"`, free quoted surface — so
   constrained decoding is never forced to alias an off-lexicon source concept to the nearest
   registered terminal (silent substitution — the exact failure class the fail-closed design
-  exists to prevent, and the one a fully closed grammar would otherwise manufacture). The
+  exists to prevent, and the one a fully closed grammar would otherwise manufacture).
+  Quoted-surface contract (v1, one payload shared by both languages): nonempty, at most 80
+  Unicode scalar values, single line — control characters and the quote delimiters `「` `」`
+  `"` are excluded, and there is no escape mechanism (out-of-contract text is a plain parse
+  error, never an alias) — normalized under the §4.2 JA semantic policy, so canonical fixpoint
+  and cross-language agreement hold; the parser enforces the contract while the grammar keeps
+  one open production per language (notation decided at the grammar emitter). The
   escape parses and round-trips like any atom and always fails accept with
   `cnl_unregistered_concept`, terminal for the run: repair prompts never mint or steer concept
   identity — resolving a gap is a lexicon-review decision, not a retry. Its payload (quoted
@@ -953,6 +973,10 @@ Single parse: every string in the grammar language yields exactly one AST.
 Round trip: parse(render(ast)) == ast for every valid AST, both languages.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
+Bridge round trip: from_ir(to_ir(ast)) == the disjunct-split normal form of ast (identity on
+already-split documents); to_ir(from_ir(ir)) == ir exactly for bridge-image IR.
+Render totality: render is defined for every accepted ClinicalIR on every route — acceptance
+guarantees lexicon-backed modality pairs (grammar-and-lexicon bullet).
 Audit honesty: audit views render only from accepted artifacts, never from raw model output.
 ```
 
@@ -1005,8 +1029,12 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   render → parse == identity with a single-parse assertion (the Codeco method);
   malformed-input battery (bare off-lexicon surface = parse error vs escaped = accept-time
   reject, dangling refs, duplicate slots, bad bounds,
-  connective misuse); tokenizer audit of every grammar terminal against the runtime constraint
-  mechanism (§9 truncation lesson); canonical-render byte pins for the three M1 documents;
+  connective misuse); an early runtime feasibility probe — the constraint mechanism compiles
+  the emitted JA grammar and demonstrates one bounded constrained emission — immediately after
+  the grammar emitter, before parser/bridge investment (multibyte whole-surface terminals and
+  the open escape production are the risk it retires); tokenizer audit of every grammar
+  terminal against the runtime constraint mechanism (§9 truncation lesson); canonical-render
+  byte pins for the three M1 documents;
   reproduce-M1 gate — golden CNL cassettes for the M1 sources parse, bridge, and reproduce the
   M1 verdicts through the locked tail; lexicon lint gates.
 

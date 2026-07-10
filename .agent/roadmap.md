@@ -69,12 +69,51 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - Known deliberate re-bless costs, scheduled in their units: ja_core.yaml growth →
   lexicon_hash-carrying value pins (lexicon-cnl.1); report CNL population → M1/M2 report
   byte-pins + rendered-body consts (report-cnl.2/.3).
+- 2026-07-10 external pre-M3 review absorbed (claims verified in-repo; §10 amended in the same
+  commit): parse/render inverse = canonical text ↔ CNL AST, the bridge maps AST ↔ ClinicalIR
+  projection + derives ids, bridge round-trip + render-totality laws joined the §10 laws
+  block; escape quoted-surface contract v1 (ONE payload shared by both languages — nonempty,
+  ≤80 Unicode scalars, single line, control chars + `「` `」` `"` excluded,
+  SemanticJa-normalized, parser-enforced, the grammar production stays open); modality
+  render-totality = accept-side rule (lexicon pairs stay the corpus register — 6 of the 12 §5
+  Direction × Strength pairs; single_ir gains an off-lexicon-pair reject, unit modality-total;
+  render Err on a missing pair = fail-closed instrument path). Units inserted: path-confine +
+  spawn-retry open the milestone, cnl-grammar.1b = early runtime probe, modality-total after
+  cnl-render, subproc-runner.1/.2 before route-single-cnl.3 (live wiring).
 
+- [ ] path-confine: pre-M3 hardening (review-reproduced: absolute corpus + expected_outcomes
+  paths under /tmp pass `registry check` AND a full run — `Path::join` swallows the root on an
+  absolute rhs and keeps `..`). Core: validate_registries extends the schemas/prompts
+  is_safe_relative_path finding (UnsafePath) to corpus.path + experiment.expected_outcomes.
+  CLI: ONE I/O resolver (lexical check → canonicalize root + existing candidate → candidate
+  strictly under root → regular file; a failed resolve lands the diagnostic and the read is
+  skipped) applied to every registry-data-controlled read — registry_check.rs
+  expected_outcomes ref loads + schema/prompt byte reads, run.rs corpus entry.path (×2 call
+  sites), expected_outcomes (×2), record-path template/constraint reads; fixed-name reads
+  (CORPORA_FILE, LEXICON_FILE, …) are code constants, out of scope. Tests: absolute / `..` /
+  in-repo symlink→outside (`#[cfg(unix)]`) / valid nested file accepted / non-regular
+  rejected — across registry check + run. Gate: full gates + registry check green on the
+  committed tree.
+- [ ] spawn-retry: pre-M3 hardening — both spawn_piped_surfaces_persistent_etxtbsy tests
+  (model.rs, verify.rs) assert the FILESYSTEM produces ETXTBSY (green on this container,
+  fails on overlayfs — the review container), and the retries_through twins pass vacuously
+  wherever the first spawn succeeds. Rework BOTH mirrored copies in place (extraction stays
+  subproc-runner.1): retry loop parameterized over an injectable spawn-attempt op (prod path =
+  the real Command spawn); deterministic tests drive ETXTBSY,ETXTBSY,success /
+  persistent-through-grace / immediate non-ETXTBSY error / immediate success; ≤1 fs
+  integration test per crate, capability-probing the mount and skipping cleanly where the fs
+  cannot produce ETXTBSY. Gate: workspace strict suite green with zero
+  environment-dependent outcomes.
 - [ ] lexicon-cnl.1: CNL surface fields — LexiconConcept +adnominal_ja/negated_ja/gloss_en,
   LexiconAction +noun_ja/noun_en, LexiconModality +surface_en, LexiconCertainty +surface_en,
   NEW LexiconQuantity {var_id, surface_ja, unit_ja, surface_en, unit_en} table; load_lexicon
   strict extension (deny_unknown_fields holds; JA surfaces through StringPolicy::SemanticJa,
-  EN surfaces through SemanticEn — §10 EN canonical text is ASCII-lowercase); ja_core.yaml
+  EN surfaces through SemanticEn — §10 EN canonical text is ASCII-lowercase; §10 integrity
+  hard-errors NEW: implies_action resolves to an action entry, quantity var_ids unique,
+  exactly one quantity row per interval var any concept uses, nonempty normalized
+  surfaces+units both languages, per-language duplicate modality/certainty parse surfaces
+  rejected — duplicate (direction,strength) rows stay legal synonyms, a test pins first-listed
+  = canonical render row); ja_core.yaml
   authored for the full M1 set (6 concepts,
   act.administer, 7 modality rows, certainty rows, q.age_years). Gate: load/normalize tests
   green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless literals) +
@@ -87,7 +126,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] cnl-ast: cnl.rs type family — CnlAtom/CnlConceptRef/CnlContext/CnlException/CnlRule/
   CnlDocument (grammar refs + per-rule text + text-hash members per the plan header) +
   Canonical emit/read (sorted-key slots, optional members omit-None) + validate (nonempty
-  rules, Id grammar, interval bound coherence mirroring ir.rs) + all-None/populated byte pins
+  rules, Id grammar, interval bound coherence mirroring ir.rs, §10 escape payload contract —
+  nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
+  SemanticJa-normal fixpoint) + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
   BNF (smt_query.grammar dialect, `;` comments): document = rule+; rule = context 患者には、
@@ -96,11 +137,19 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   concept|negated|interval|escape (未登録概念「…」 / unregistered concept "…"; admitted in
   action-target position too — §10); EN mirror productions; terminals = lexicon whole-surface
   literals; interval numerals = ASCII-digit literal alternation; escape quoted-surface content
-  = the single open production (plan header — emitter escape mode Committed|OracleBound).
+  = the single open production (plan header — emitter escape mode Committed|OracleBound;
+  payload contract per §10, parser-enforced — the production stays open).
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
   worked examples full-match both languages, trailing-garbage reject, per-production coverage
   incl. escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
+- [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
+  compiles the emitter's JA grammar (scratch dump, uncommitted) + one bounded constrained
+  emission proves multibyte whole-surface terminals and the open escape production survive
+  the constraint mechanism (§10 validation-program probe). Feasibility only — full tokenizer
+  audit, repetition/degeneration stress, template refinement stay record-cnl.1. Machine
+  specifics → runtime.local.md; committed bytes engine-agnostic. A failure stops the line:
+  grammar/dialect redesign reaches the user BEFORE cnl-grammar.2 commits grammar bytes.
 - [ ] cnl-grammar.2: committed schemas/clinical_cnl_{ja,en}.grammar (ignored bless +
   never-writes drift guard + hash-pin consts — schema.rs pattern) + schemas.yaml entry
   schema.clinical_cnl = the JA grammar, §10's singular registry id (the route's decoding
@@ -111,7 +160,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   per-language token tables (lexicon surfaces + fixed terminals + digits; tables differ,
   parser shared), atoms concept/negated/interval/escape, かつ binds tighter than 、または;
   rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), malformed
-  interval bounds, connective misuse, mid-token truncation.
+  interval bounds, connective misuse, mid-token truncation, escape-payload contract
+  violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
+  errors, repairable).
 - [ ] cnl-parse.2: document parser — full slot order (context 患者には、 action deontic tail /
   certainty paren / ただし exceptions / basis bracket), multi-rule documents, single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
@@ -119,10 +170,20 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   oracle over this unit's corpus.
 - [ ] cnl-render: cnl_render.rs — render_ja/render_en canonical text (modality pair → the
   pair's canonical first-listed row surface per language, basis sorted, certainty optional
-  paren, stored DNF order preserved — canonicalization never reorders semantics) +
+  paren, stored DNF order preserved — canonicalization never reorders semantics; missing-pair
+  lookup = Err, fail-closed — §10 totality + modality-total make it unreachable from accepted
+  IR) +
   canonical-fixpoint spot tests (bounded-variation inputs re-render canonical) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
   control shape).
+- [ ] modality-total: single_ir_accept rejects a statement whose (direction, strength) pair
+  has no lexicon modality row — repairable FillReject::Schema naming the pair (mirrors
+  off_lexicon_ids, empty-refs payload convention) — closing §10 render-totality for the one
+  IR-landing route without a grammar/derivation guard (M1 derives pairs from lexicon rows;
+  single_cnl's grammar admits only lexicon tails). Tests: off-pair reject + lexicon-pair
+  accept + repair recovery; M2 recorded-run battery green proves no retroactive census flip
+  (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure region + normalize.rs
+  modality table only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules +
   both round-trip laws as pinned there (from_ir∘to_ir == disjunct-split normal form;
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
@@ -163,6 +224,14 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / both
   terminals / instrument / empty-grounding panic). run.rs read scope: accept-closure region +
   cnl modules.
+- [ ] subproc-runner.1: behavior-locked extraction — ONE shared subprocess runner (home
+  ckc-smt, ckc-cli already depends on it — confirm at impl) absorbing the mirrored
+  spawn/timeout/kill/drain machinery of model.rs + verify.rs behind spawn-retry's injectable
+  seam; zero behavior change, existing suites the gate (test edits = imports only).
+- [ ] subproc-runner.2: runner hardening (the M2-deferred codex-rejected fixes + drain cap,
+  once, shared): bounded stdout/stderr capture with an explicit truncation state, checked
+  deadline arithmetic (Instant+budget overflow), post-grace detached-drain cap/reap;
+  deterministic tests through the injectable seam; model + solver behavior stays consistent.
 - [ ] route-single-cnl.3: single_cnl_fill + execute_routes SingleCnl arm (head reuse → fill →
   bridge + assemble tail into the per-group compile/verify loop at the shape's shifted
   indices — .1's parameterization) + landing
@@ -208,10 +277,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] report-cnl.3: md renderers — findings quote rules as CNL beside quoted spans (JA body
   quotes JA CNL, EN body EN CNL; Labels) + rendered-body const re-bless (Z3_VERSION-normalize
   pattern) + emission-order/validate coupling tests.
-- [ ] record-cnl.1 (gated: model runtime): constraint/tokenizer audit — env wrapper compiles
-  clinical_cnl_ja.grammar; probe one constrained emission (scratch, uncommitted); verify
-  multibyte whole-surface terminals + the open escape-content production survive the runtime
-  constraint mechanism (§9 truncation +
+- [ ] record-cnl.1 (gated: model runtime): constraint/tokenizer audit (cnl-grammar.1b already
+  proved compile + one bounded emission — this unit is the full pass over the committed
+  grammar): tokenizer audit of every grammar terminal (§9 truncation +
   UTF-8 boundary lessons); probe repetition points (DNF connectives / exception sentences /
   rule+) for degeneration loops under the token budget — archived-PoC prior: grammar-masked
   verbose forms loop at unbounded repetition and truncate mid-structure (§10 emission-posture
