@@ -402,8 +402,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   its dual-surface split — compact DSL emission + generation-only prose — was REJECTED for the
   single-surface CNL bet, kept as §11 ablations). Name SETTLED (user, 2026-07-07): **ClinicalCNL**
   (mirrors ClinicalIR); id forms follow the ClinicalIR↔clinical_ir precedent — grammar files
-  `schemas/clinical_cnl_{ja,en}.grammar`, registry schema id `clinical_cnl`; `route.single_cnl`
-  stays (parallel to single_ir). GF adoption deferred until JA parse of
+  `schemas/clinical_cnl_{ja,en}.grammar`, registry schema id `schema.clinical_cnl`;
+  `route.single_cnl` stays (parallel to single_ir). GF adoption deferred until JA parse of
   non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
 - M3 plan (ClinicalCNL v1; gate MET at planning — runtime identity probe clean, contract-
   conformant). Durable decisions beyond the roadmap lines (which collapse at M3 review):
@@ -442,7 +442,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   LLM-constraint-portable + bnf-atomic; bnf 0.6
   verified unicode-capable (byte-offset whole-terminal matching); its Earley oracle proves
   language MEMBERSHIP (superset — explores all segmentations) → lexer segmentation determinism
-  guarded by the lexicon same-category proper-prefix lint instead; single-parse asserts =
+  guarded by the lexicon proper-prefix lint (same- AND cross-category, all lexer-visible
+  terminals) instead; single-parse asserts =
   `parse_input().take(2)`, never full counts (ambiguous blowup). FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,

@@ -924,11 +924,13 @@ Committed direction:
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
 - Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
-  (id forms follow the `ClinicalIR ↔ clinical_ir` precedent; registry schema id
-  `clinical_cnl`), emitter-backed from
-  the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern), registered in
-  `registry/schemas.yaml`; constrained decoding consumes them exactly as §9 consumes the IR
-  schema. Every linguistic form lives in lexicon DATA and the grammar stays purely
+  (id forms follow the `ClinicalIR ↔ clinical_ir` precedent; singular registry schema id
+  `schema.clinical_cnl`), emitter-backed from
+  the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern); the
+  `registry/schemas.yaml` entry binds the JA grammar — the route's decoding constraint,
+  consumed exactly as §9 consumes the IR schema — while the EN grammar stays committed,
+  drift-guarded, and hash-pinned with no route binding (an entry only if a later coverage
+  requirement demands one). Every linguistic form lives in lexicon DATA and the grammar stays purely
   concatenative: concept entries gain adnominal / negated-adnominal / EN-gloss surfaces; action
   kinds gain JA/EN noun forms; the modality table gains canonical deontic-tail fields
   (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
@@ -948,8 +950,13 @@ Committed direction:
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
   terminal), missing surface fields, per-language exact-duplicate parse terminals across ALL
   CNL surface fields and lexer categories (concept adnominal/negated forms, action nouns,
-  tails, certainty phrases, quantity surfaces/units), `implies_action`
-  resolving to an action entry, every `(direction, strength)` pair present carrying ≥1
+  tails, certainty phrases, quantity surfaces/units), per-language proper-prefix overlaps
+  rejected across ALL those lexer-visible terminals — same- and cross-category, since
+  maximal-munch lexing could otherwise steal a longer token from another category
+  (segmentation determinism), `implies_action`
+  resolving to an action entry, `tail_ja`/`tail_en` present together or absent together (a
+  row is tail-bearing iff both — a one-language tail would make bilingual canonical
+  rendering partial), every `(direction, strength)` pair present carrying ≥1
   tail-bearing row, concept intervals CNL-representable (v1: one unsigned bound), and
   quantity-table integrity — unique `var_id`, exactly one
   quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
