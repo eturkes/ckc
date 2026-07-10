@@ -50,8 +50,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - Bridge determinism: one ClinicalStatement per context-disjunct (ids `stmt.<k>`/`exc.<k>`/
   `bind.<k>` document-order counters mirroring normalize.rs's mints EXACTLY — §8.6 reserves
   `<doc>.rule.<k>` for norm-layer rule ids; disjunct split appends statements in document
-  order); population-vs-condition partition by lexicon
-  id namespace (`pop.*` → population, else condition); each exception sentence → one
+  order); population-vs-condition partition by the lexicon's typed slot roles (§10: every
+  concept row a validated nonempty role set over population|condition|action_target —
+  population/condition mutually exclusive per row, action_target free to combine
+  (multi-role deliberate); every quantity row exactly one context role — concept atoms
+  land by row role, interval atoms by quantity role; ONE typed role view is the single
+  source every CNL consumer reads — grammar slot alternations, cnl-ast validate, parser
+  slot legality, bridge partition, accept wrong-slot rejects — no prefix tests in CNL
+  modules; normalize.rs's frozen M1 prefix partition stays untouched, locked-corpus
+  agreement pinned by lexicon-cnl-integrity's M1 role data test; ruling: explicit roles
+  FIELD over a prefix-derived index — multi-role is data and a future namespace never
+  silently falls through to condition); each exception sentence → one
   single-atom ExceptionClause PER SPLIT STATEMENT — a multi-disjunct rule clones its
   exception list into every emitted statement ((D1∨D2)∧¬E = (D1∧¬E)∨(D2∧¬E); bundle
   validation demands globally unique exception ids), `exc.<k>` counting emitted clauses
@@ -219,11 +228,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   the lexicon-cnl units, cnl_grammar, cnl_parse, cnl_render, cnl_bridge all consume. Zero public
   behavior change: existing suites the gate, assertion surface untouched (import edits only).
 - [ ] lexicon-cnl-shape: CNL surface fields, shape only (split of lexicon-cnl.1) —
-  LexiconConcept +adnominal_ja/negated_ja/gloss_en, LexiconAction
+  LexiconConcept +adnominal_ja/negated_ja/gloss_en+roles (§10 slot-role set:
+  population|condition|action_target), LexiconAction
   +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
   source-match surfaces per §10 — optional per row, parse-accepted synonyms when present),
-  LexiconCertainty +surface_en, NEW LexiconQuantity {var_id, surface_ja, unit_ja,
-  surface_en, unit_en} table; load_lexicon strict extension (deny_unknown_fields holds; JA
+  LexiconCertainty +surface_en, NEW LexiconQuantity {var_id, role (context slot:
+  population|condition), surface_ja, unit_ja,
+  surface_en, unit_en} table, + the typed role VIEW accessors every CNL module consumes
+  (per-slot concept sets + quantity-role lookup — §10 single source, no prefix tests
+  downstream); load_lexicon strict extension (deny_unknown_fields holds; JA
   surfaces through StringPolicy::SemanticJa, EN surfaces through SemanticEn — §10 EN
   canonical text is ASCII-lowercase); every new field/table optional at load so the
   committed lexicon stays green. Loader fixtures + round-trip + unknown-field rejection
@@ -231,9 +244,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   deny_unknown_fields, parses the committed lexicon) gains the same optional fields +
   quantity table — it reddens at lexicon-cnl-data otherwise. Committed bytes untouched,
   no re-bless.
-- [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts,
+- [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts with §10
+  slot roles — pop.* population, cond.* condition, drug.abx_a action_target;
   act.administer, 7 modality rows incl. §10's worked tails を強く推奨する / は禁忌である,
-  certainty rows, q.age_years) — written against lexicon-cnl-integrity's full rule list
+  certainty rows, q.age_years role=population) — written against lexicon-cnl-integrity's full rule list
   (data lands FIRST: those hard-errors bind the committed lexicon the moment they land —
   tail-availability + quantity-per-interval-var demand these rows). Gate: load/normalize
   tests green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless
@@ -242,7 +256,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   deliberate).
 - [ ] lexicon-cnl-integrity: §10 integrity hard-errors NEW in load_lexicon —
   implies_action resolves to an action entry, quantity var_ids unique, exactly one quantity
-  row per interval var any concept uses, nonempty normalized surfaces+units both languages,
+  row per interval var any concept uses, slot-role integrity (every concept row a nonempty
+  deduped set of known roles, population/condition mutually exclusive per row; every
+  quantity row exactly one context role agreeing with each interval-carrying concept using
+  its var; a test pins the committed M1 roles — pop.*→population, cond.*→condition,
+  drug.abx_a→action_target, q.age_years→population — so the frozen normalize.rs prefix
+  partition and the role-driven bridge agree on the locked corpus by data),
+  nonempty normalized surfaces+units both languages,
   per-language exact-duplicate parse terminals rejected across ALL CNL surface fields +
   lexer categories, tail_ja/tail_en present together or absent together (a row is
   tail-bearing iff BOTH — one-language tails would leave the other renderer partial),
@@ -252,7 +272,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   rejection battery over bad-lexicon fixtures. Gate: committed tree green under every rule
   (proves lexicon-cnl-data's authored rows satisfy them) + full gates.
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
-  connective/punctuation grammar terminal), missing-CNL-surface findings (deliberately
+  connective/punctuation grammar terminal), role-scoped missing-CNL-surface findings (a
+  context-role concept lacking adnominal/negated/gloss forms, an action_target-role
+  concept lacking target citation forms; deliberately
   tail-less modality rows exempt — per-pair availability is integrity's rule), and
   proper-prefix overlap across ALL lexer-visible terminals, same- AND cross-category
   (maximal munch can steal across categories; segmentation determinism — the
@@ -268,8 +290,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance),
   Id grammar, interval bound coherence mirroring ir.rs, §10 escape payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
-  SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed pair/id view: modality
-  pair tail-backed, concept/action refs resolved, negated/exception concept refs
+  SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed lexicon view
+  (pairs/ids/roles): modality
+  pair tail-backed, concept/action refs resolved, slot roles admit every position (context
+  + exception concept refs context-role, action target action_target-role — §10 wrong-slot
+  bar, per-slot rejection cases), negated/exception concept refs
   interval-free (§10 negative-occurrence bar) — makes §10's lexicon-valid-AST quantifier
   well-defined) + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
@@ -282,12 +307,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   connectives かつ / 、または with precedence by production shape; atoms
   concept|negated|interval|escape (未登録概念「…」 / unregistered concept "…"; admitted in
   action-target position too — §10); EN mirror productions; terminals = lexicon whole-surface
-  literals + fixed terminals from lexicon-cnl.2's inventory module (emitter hard-errors on
+  literals in slot-specific alternations from the §10 role view (context + exception
+  concept slots = context-role surfaces, action target = action_target-role surfaces —
+  wrong-slot vocabulary unparseable)
+  + fixed terminals from lexicon-cnl.2's inventory module (emitter hard-errors on
   a lint-dirty lexicon); interval numerals = ASCII-digit literal alternation; escape quoted-surface content
   = the single open production (plan header — emitter escape mode Committed|OracleBound;
   payload contract per §10, parser-enforced — the production stays open).
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
-  worked examples full-match both languages, trailing-garbage reject, per-production coverage
+  worked examples full-match both languages, trailing-garbage reject, wrong-slot-surface
+  reject, per-production coverage
   incl. escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
@@ -308,8 +337,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   committed_model_surface_checks_ok drift-guard extension.
 - [ ] cnl-parse.1: cnl_parse.rs token layer + context-DNF parser — longest-match lexer over
   per-language token tables (lexicon surfaces + the inventory module's fixed terminals +
-  digits; tables differ, parser shared), atoms concept/negated/interval/escape, かつ binds tighter than 、または;
-  rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), malformed
+  digits; tables differ, parser shared), atoms concept/negated/interval/escape with slot
+  legality from the §10 role view (context/exception concept slots accept context-role
+  surfaces, action target action_target-role — mirroring the grammar's slot
+  alternations), かつ binds tighter than 、または;
+  rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), wrong-slot
+  registered surface (e.g. an action_target-only concept as a context atom), malformed
   interval bounds, connective misuse, mid-token truncation, escape-payload contract
   violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
   errors, repairable).
@@ -333,7 +366,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   control shape).
 - [ ] accept-total: single_ir_accept rejects CNL-inexpressible accepted-IR shapes as
   repairable FillReject::Schema naming the offense (mirrors off_lexicon_ids, empty-refs
-  payload convention): (direction, strength) pair without a tail-bearing lexicon row; EMPTY
+  payload convention): (direction, strength) pair without a tail-bearing lexicon row;
+  wrong-slot vocabulary (§10 role view — population atoms, concept or quantity var, not
+  population-role; condition atoms not condition-role; action targets not
+  action_target-role; exception concepts outside the context roles: lexicon-MEMBER ids in
+  slots no role admits — off_lexicon_ids checks membership only, and the committed IR
+  schema's enums stay role-agnostic — slot legality is acceptance's, a per-slot schema
+  re-derivation would re-bless committed schema bytes + §9 pins); EMPTY
   statements array (run.rs's accept battery currently pins empty ClinicalIr = accepted);
   signed or two-sided quantity intervals (v1 register — the committed IR schema's
   IntervalBound pattern admits negatives, IrBundle::validate admits two-sided); exception
@@ -356,9 +395,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
   reject class + boundary accepts + repair recovery; M2 recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
-  region + the lexicon modality table (lexicon.rs post-extract) only.
+  region + the lexicon modality table and role view (lexicon.rs post-extract) only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
-  (from_ir = Err, fail-closed, on any CNL-inexpressible shape — an ExceptionClause not
+  (to_ir partitions context atoms by the §10 role view;
+  from_ir = Err, fail-closed, on any CNL-inexpressible shape — an ExceptionClause not
   exactly one positive interval-free Concept atom, an ExceptionClause with empty region_ids,
   a negative occurrence of an
   interval-carrying entry, an empty statement context, an empty rule-bracket remainder
@@ -420,8 +460,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   RouteStages::SingleCnl named-handle variant per route-stage-handles' representation, the
   bridge stage a named field, never an index shift; resolve fixtures follow) + exp.m3_cnl set
   binding (direct baseline) + prompt.single_cnl entry + first-draft template +
-  single_cnl_prompt composer (single_ir_prompt mirror + CNL vocabulary blocks: adnominal/
-  negated surfaces, action nouns, modality tails, quantity surfaces+units, basis region ids;
+  single_cnl_prompt composer (single_ir_prompt mirror + per-slot CNL vocabulary blocks
+  from the §10 role view: context adnominal/
+  negated surfaces, action-target surfaces, action nouns, modality tails, quantity
+  surfaces+units, basis region ids;
   fixture proves ordering non-trivially — the f1 pre-sorted-fixture lesson); RouteShape::
   SingleCnl fingerprint (7-kind sequence + model_fill out [cnl_document]) + resolve +
   select_record_{schema,prompt} + manifest_inputs want-set arms (schema.clinical_cnl = the JA

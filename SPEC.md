@@ -916,7 +916,10 @@ Committed direction:
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
   precedence by decree (`かつ` binds tighter), no nesting beyond flat two-level DNF — each
   disjunct maps to one ClinicalStatement's flat population/condition sets (multi-disjunct
-  rules split into statements, the bridge law; DNF `ContextExpr` is the §5 norm layer's).
+  rules split into statements, the bridge law; DNF `ContextExpr` is the §5 norm layer's;
+  the bridge partitions a disjunct's atoms into those sets by the lexicon slot-role view —
+  a concept atom by its row's context role, an interval atom by its quantity row's context
+  role, never by id-namespace convention — the typed-slot-roles paragraph below).
   Atoms: concept (lexicon adnominal surface), negated concept
   (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
   ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
@@ -973,13 +976,34 @@ Committed direction:
   drift-guarded, and hash-pinned with no route binding (its own non-route entry only if the
   coverage check demands one — the route's singular id stays JA-bound). Every linguistic
   form lives in lexicon DATA and the grammar stays purely concatenative: concept entries
-  gain adnominal / negated-adnominal / EN-gloss surfaces; action
+  gain adnominal / negated-adnominal / EN-gloss surfaces plus a validated slot-role set
+  (typed slot roles, below); action
   kinds gain JA/EN noun forms; the modality table gains canonical deontic-tail fields
   (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
   surfaces: 「を強く推奨する」 carries particle + strength adverb; rows carrying tails parse
   as tail synonyms, the first tail-bearing row per `(direction, strength)` pair is the
   canonical render row — pinned against this section's worked renders — and tail-less rows
   stay source-match-only); certainty phrases as committed.
+  Typed slot roles (the CNL slot-legality classification — lexicon data like every other
+  linguistic form): every concept row carries a nonempty validated role set over
+  `population` / `condition` / `action_target` — `population` and `condition` mutually
+  exclusive per row (the bridge partition stays a function of the concept; a dual-use
+  classifier is a lexicon-review decision, never emission-time freedom), `action_target`
+  free to combine with either (multi-role is deliberate — e.g. a drug concept as action
+  target and, separately authored, as an on-drug condition atom) — and every quantity row
+  carries exactly one context role (`population` | `condition`) placing its interval atoms
+  under the bridge partition. The loader exposes ONE typed role view that every CNL
+  consumer reads — grammar emitter, AST validation, parser slot legality, bridge partition,
+  acceptance wrong-slot checks — so no CNL module tests id prefixes: the M1 id namespaces
+  (`pop.`/`cond.`/`drug.`) demote to naming convention, pinned by a lexicon data test so
+  the frozen M1 normalize partition and the role-driven bridge agree over the locked
+  corpus, and a future concept namespace never silently falls through to `condition`. The
+  grammar emitter derives slot-specific terminal alternations from the view — context
+  concept and negated-concept atoms enumerate context-role (population|condition)
+  surfaces, the action-target slot enumerates `action_target`-role surfaces,
+  exception-sentence concepts enumerate context-role surfaces — so wrong-slot vocabulary
+  is unparseable, not merely invalid; the escape stays admitted in every concept slot (it
+  names no lexicon row and carries no role).
   Modality totality: the lexicon pair set stays the corpus register — no artificial rows for
   the full §5 Direction × Strength domain; instead every IR-landing route guarantees
   lexicon-backed pairs at acceptance (M1 derives pairs from lexicon rows by construction;
@@ -991,15 +1015,21 @@ Committed direction:
   interval-free concept atom, negated-concept atoms over interval-carrying entries,
   exception clauses with empty region_ids, statements whose segment-closed source
   regions are wholly exception-owned (an empty rule bracket under the exception-owned
-  split — covers empty source_segment_ids), and statements whose cited segments carry no
+  split — covers empty source_segment_ids), statements whose cited segments carry no
   region or share a region with another segment (closure-nonfunctional — breaks segment
   recovery from region-level basis; the empty-region segment is even segmenter-reachable via
-  an all-ungrounded table row), the v1
+  an all-ungrounded table row), and wrong-slot vocabulary — population atoms whose concept
+  or quantity role is not `population`, condition atoms not `condition`-role, action
+  targets not `action_target`-role, exception concepts outside the context roles
+  (lexicon-MEMBER ids in slots no role admits pass the membership check yet sit outside
+  the bridge image — accepted IR stays partition-normal), the v1
   register), so
   audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
-  terminal), missing surface fields, per-language exact-duplicate parse terminals across ALL
+  terminal), missing surface fields (role-scoped: a context-role concept needs its
+  adnominal / negated-adnominal / EN-gloss forms, an `action_target`-role concept its
+  target citation forms), per-language exact-duplicate parse terminals across ALL
   CNL surface fields and lexer categories (concept adnominal/negated forms, action nouns,
   tails, certainty phrases, quantity surfaces/units), per-language proper-prefix overlaps
   rejected across the finite longest-match token inventory — those lexicon surfaces plus the
@@ -1011,12 +1041,15 @@ Committed direction:
   row is tail-bearing iff both — per-language tail-bearing would let canonical-row selection
   diverge between languages or leave one language's pair coverage partial), every
   `(direction, strength)` pair present carrying ≥1
-  tail-bearing row, concept intervals CNL-representable (v1: one unsigned bound), and
+  tail-bearing row, concept intervals CNL-representable (v1: one unsigned bound), slot-role
+  integrity — every concept row a nonempty deduped set of known roles with
+  `population`/`condition` mutually exclusive, every quantity row exactly one context role
+  agreeing with the context role of each interval-carrying concept using its var — and
   quantity-table integrity — unique `var_id`, exactly one
   quantity row per interval variable a concept uses, nonempty normalized surfaces and units in
   both languages.
 - Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
-  concept surface (condition atom, exception concept, action target; action kinds stay a
+  concept surface (context atom, exception concept, action target; action kinds stay a
   small closed class — extending them is lexicon review, not emission), one escape
   production is admitted — JA
   `未登録概念「<surface>」`, EN `unregistered concept "<surface>"`, free quoted surface — so
@@ -1051,7 +1084,8 @@ over-approximates the parser (open escape production, payload contract parser-en
 grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
 over the parser-accepted language.
 Round trip: parse(render(ast)) == ast for every lexicon-valid AST (validity is lexicon-scoped:
-modality pairs tail-backed, concept/action refs resolved), both languages.
+modality pairs tail-backed, concept/action refs resolved, slot roles admitting every atom
+and target position), both languages.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
 Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
@@ -1072,7 +1106,8 @@ Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain
 modality pairs, ≥1 statement each with a nonempty context, one-sided unsigned quantity
 intervals, single-concept interval-free exception clauses each carrying nonempty region_ids,
 negated atoms over interval-free
-entries, a nonempty rule bracket under the exception-owned split, cited segments
+entries, slot-role-conformant atom and target placement, a nonempty rule bracket under the
+exception-owned split, cited segments
 region-bearing and unshared — v1) — so render is defined
 for every accepted ClinicalIR on every guarded route:
 single_cnl by grammar + acceptance, single_ir by the accept-total closure, M1 over its locked
@@ -1138,7 +1173,7 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
 - Validation program (sophistication over example count): depth-bounded AST enumeration →
   render → parse == identity with a single-parse assertion (the Codeco method);
   malformed-input battery (bare off-lexicon surface = parse error vs escaped = accept-time
-  reject, dangling refs, duplicate slots, bad bounds,
+  reject, wrong-slot registered surfaces, dangling refs, duplicate slots, bad bounds,
   connective misuse); an early runtime feasibility probe — the constraint mechanism compiles
   the emitted JA grammar and demonstrates one bounded constrained emission — immediately after
   the grammar emitter, before parser/bridge investment (multibyte whole-surface terminals and

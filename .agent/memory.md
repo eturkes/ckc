@@ -423,7 +423,19 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters
   mirroring normalize.rs's mints EXACTLY — §8.6 reserves `<doc>.rule.<k>` for norm-layer
   rule ids, rules.rs's mint; one ClinicalStatement per
-  context-disjunct; population partition by `pop.*` id namespace; exception sentence → one
+  context-disjunct; population-vs-condition partition by the lexicon's typed slot roles
+  (§10; ruling: explicit validated roles FIELD over a prefix-derived index — concept rows
+  a nonempty role set over population|condition|action_target, population/condition
+  mutually exclusive per row, action_target free to combine (multi-role deliberate);
+  quantity rows exactly one context role placing interval atoms; ONE typed role view
+  consumed by every CNL module — grammar slot alternations, cnl-ast validate, parser slot
+  legality, bridge partition, accept wrong-slot rejects — no prefix tests in CNL modules,
+  a future namespace never silently falls through to condition; normalize.rs's frozen M1
+  prefix partition stays, locked-corpus agreement pinned by the M1 role data test —
+  pop.*→population, cond.*→condition, drug.abx_a→action_target, q.age_years→population;
+  the committed IR schema's enums stay role-agnostic — slot legality is acceptance's, a
+  per-slot schema re-derivation would re-bless committed schema bytes + §9 pins);
+  exception sentence → one
   single-atom ExceptionClause PER SPLIT STATEMENT (positive interval-free Concept — §10
   register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
   bundle-unique ids + (D1∨D2)∧¬E distribution; clause region_ids = its own sentence's basis
@@ -516,7 +528,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
   negatives, IrBundle::validate admits two-sided intervals + empty population+condition,
   ExceptionClause admits arbitrary
-  atom vectors → accept-total closes every
+  atom vectors, off_lexicon_ids checks lexicon MEMBERSHIP never slot placement (wrong-slot
+  lexicon-valid ids — a drug concept in population, a population concept as action
+  target — pass today) → accept-total closes every
   CNL-inexpressible shape, census-flip-gated; exception register = single positive
   INTERVAL-FREE registered concept per sentence (grammar also admits the escape there —
   accept rejects it terminal), disjunctive across sentences, BECAUSE the locked rules.rs
