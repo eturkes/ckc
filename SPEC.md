@@ -950,6 +950,43 @@ Committed direction:
   ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
   plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
+- Surface composition (concrete-syntax decree; the committed grammars pin the bytes, this
+  bullet pins shapes and wording): composition is plain concatenation of whole-surface
+  terminals — fluency is a lexicon-authoring concern, never a grammar property (the ACE
+  lesson: composition rules by decree). JA: adnominal and negated-adnominal surfaces
+  compose directly in every position — mid-chain (before かつ/、または) and
+  patient-adjacent (the last atom of the last disjunct, before 患者には、; the exception
+  concept slot, before 患者を除く。) — while interval and escape atoms take the fixed
+  linking terminal の exactly patient-adjacent (年齢が18歳未満の患者には、 /
+  ただし、未登録概念「…」の患者を除く。) and compose bare elsewhere
+  (成人かつ年齢が18歳以上、または…): the JA grammar carries mid vs patient-adjacent atom
+  alternations (two nonterminals), so a stray or missing の is a parse error like any
+  other byte. Interval bound markers: JA `以上`/`以下`/`未満`/`超` ↔ ge/le/lt/gt after the
+  unit (`18歳以上`); EN `at least`/`at most`/`less than`/`more than` ↔ ge/le/lt/gt before
+  the numeral (`at least 18 years`). EN atoms are position-invariant under one
+  prepositional frame — a positive concept atom and the exception concept slot render
+  `with <gloss_en>`, a negated atom `without <gloss_en>` (the fixed negator replaces
+  `with`, never stacks), an interval atom `with <quantity-surface> <bound> <n> <unit>`,
+  the escape atom `with unregistered concept "<payload>"`; the action target stays the
+  bare `gloss_en` (or bare escape) after `of` — one gloss serves every position because
+  the frame glue lives in fixed terminals, which is what keeps EN negation field-less.
+  `gloss_en` authoring contract: a lowercase-ASCII article-free noun phrase naming the
+  condition/entity (`sepsis`, `severe renal impairment`, `adult status`, `antibiotic-a`)
+  that reads after `with`/`without`/`of`; the reserved-token and prefix-overlap lints
+  already bar glosses containing connective/frame terminals (hyphenate:
+  `head-and-neck injury`) or prefixing one another. The adnominal contract mirrors it: a
+  prenominal form reading directly before 患者 and before かつ (成人, 敗血症のある).
+  Interval-carrying context concepts author negated forms too — the tokens must parse for
+  acceptance to reject their use repairably with the complement-interval repair (the
+  negative-occurrence bar is acceptance-enforced, never a token-table gap). Certainty
+  parenthetical = `(` + the certainty row's surface + `)` — the committed JA surfaces
+  already carry the label (`エビデンスの確実性:中`) and `surface_en` mirrors that form
+  (`certainty: moderate`) — placed between the deontic tail and the sentence terminator in
+  both languages. Spacing: JA rules carry no spaces — 。 abuts its basis bracket and the
+  next sentence; EN separates sentences, brackets, and the certainty paren with single
+  spaces, every space owned by a fixed terminal or an explicit joiner (lexicon surfaces
+  are edge-trimmed by policy, so productions insert the joining bytes); bracket internals
+  = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both languages.
 - Exception register (v1, deliberately narrower than the context DNF): each exception sentence
   carries exactly one concept slot — a positive registered concept (adnominal surface) or the
   escape — no connectives, no negated-concept atoms, no quantity intervals. Multiple exception
@@ -1056,10 +1093,10 @@ Committed direction:
   row's representative surface (`surfaces[0]`, JA) and its EN gloss (`gloss_en` — one EN
   form serves context and citation); synonym surfaces (`surfaces[1..]`) stay §8
   source-match vocabulary, never CNL terminals. EN negation mints no field either: the EN
-  negated atom is a fixed-negator composition over the same `gloss_en` (the negator is a
-  fixed inventory terminal; exact wording decided with the other EN fixed terminals at the
-  grammar emitter), while JA negation stays lexical (`negated_ja` — morphological, not
-  composable).
+  negated atom is a fixed-negator composition over the same `gloss_en` (the negator is the
+  fixed inventory terminal `without`, replacing the positive frame's `with` — the surface
+  composition decree above; the emitter stays the byte authority), while JA negation stays
+  lexical (`negated_ja` — morphological, not composable).
   Typed slot roles (the CNL slot-legality classification — lexicon data like every other
   linguistic form): every concept row carries a nonempty validated role set over
   `population` / `condition` / `action_target` — `population` and `condition` mutually
@@ -1428,7 +1465,7 @@ Worked example (illustrative; the committed grammar pins the bytes).
 ```
 
 ```text
-for patients who are adult and have sepsis, administration of antibiotic-a is strongly recommended. [basis r.2] exception: patients with severe renal impairment. [basis r.3]
+for patients with adult status and with sepsis, administration of antibiotic-a is strongly recommended. [basis r.2] exception: patients with severe renal impairment. [basis r.3]
 ```
 
 Both parse to the §8.6 rule content — atoms `pop.adult` (lexicon interval semantics

@@ -356,7 +356,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   LexiconConcept +adnominal_ja/negated_ja/gloss_en+roles (§10 slot-role set:
   population|condition|action_target; target citation form = existing surfaces[0] (JA) +
   gloss_en (EN) — no new field; EN negation likewise field-less, a fixed-negator
-  composition over gloss_en at the grammar (JA negation lexical: negated_ja); synonym
+  composition over gloss_en at the grammar (JA negation lexical: negated_ja); §10
+  composition-decree authoring contracts — gloss_en = lowercase article-free noun phrase
+  reading after with/without/of, adnominal = direct-prenominal (before 患者 AND before
+  かつ), interval-carrying context concepts author negated forms too (tokens parse;
+  acceptance rejects use with the complement-interval repair); synonym
   surfaces[1..] stay source-match-only, never CNL
   terminals), LexiconAction
   +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
@@ -377,7 +381,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   quantity table — it reddens at lexicon-cnl-data otherwise. Committed bytes untouched,
   no re-bless.
 - [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts with §10
-  slot roles — pop.* population, cond.* condition, drug.abx_a action_target;
+  slot roles — pop.* population, cond.* condition, drug.abx_a action_target — + decree
+  surfaces: adnominal/negated worked forms (成人 / 敗血症のある style), gloss_en noun
+  phrases (sepsis / adult status / antibiotic-a), certainty surface_en mirroring the
+  committed JA label form (certainty: moderate);
   act.administer +noun_ja/noun_en (§10 worked 投与 / administration), 7 modality rows incl.
   §10's worked tails を強く推奨する / は禁忌である,
   certainty rows +surface_en each, q.age_years role=population) — written against lexicon-cnl-integrity's full rule list
@@ -511,7 +518,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   inside 除く); DNF
   connectives かつ / 、または with precedence by production shape; atoms
   concept|negated|interval|escape (未登録概念「…」 / unregistered concept "…"; admitted in
-  action-target position too — §10); EN mirror productions; terminals = lexicon whole-surface
+  action-target position too — §10); EN mirror productions per the §10 composition decree — EN atoms
+  position-invariant, one prepositional frame: positive/exception atoms `with <gloss_en>`,
+  negated `without <gloss_en>` (fixed negator replaces `with`), interval `with <surface_en>
+  <bound-words> <n> <unit_en>` (at least/at most/less than/more than ↔ ge/le/lt/gt, marker
+  before numeral; JA 以上/以下/未満/超 after unit), escape-atom `with unregistered concept
+  "…"`, bare gloss/escape after `of`; JA mid vs patient-adjacent atom alternations —
+  interval + escape take the fixed の exactly before 患者 (two JA nonterminals;
+  stray/missing の = parse error); certainty paren `(` + certainty-row surface + `)`
+  between tail and terminator; spacing decree — JA spaceless, EN single-space separators
+  owned by fixed terminals/joiners, bracket internals space-separated sorted ids;
+  terminals = lexicon whole-surface
   literals in slot-specific alternations from the §10 role view (context + exception
   concept slots = context-role surfaces, action target = action_target-role surfaces —
   wrong-slot vocabulary unparseable)
@@ -538,7 +555,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   language equality): accept one-letter id + composite ids covering every rest-char
   category (digit/`_`/`.`/`:`/`-`), reject leading digit `1r` / leading punctuation
   `.r`/`:r`/`-r`/`_r` / uppercase / slash-bearing ids — per-production coverage BOTH
-  languages incl. negated/escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
+  languages incl. negated/escape/interval/multi-rule + JA patient-adjacent の (final
+  interval/escape accept; missing/stray の reject), take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
   compiles the emitter's JA grammar (scratch dump, uncommitted) + bounded constrained
@@ -564,7 +582,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   alternations), かつ binds tighter than 、または;
   rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), wrong-slot
   registered surface (e.g. an action_target-only concept as a context atom), malformed
-  interval bounds, wrong-unit-for-var interval (the QuantityVar row's pairing — mirrors
+  interval bounds, JA の-position violations (missing patient-adjacent の / stray
+  mid-chain の — §10 composition decree), wrong-unit-for-var interval (the QuantityVar row's pairing — mirrors
   the grammar's per-row productions), numeral overflow boundary (i64::MAX parses, i64::MAX+1 = repairable
   parse error — §10's second over-approximation class), connective misuse, mid-token
   truncation, escape-payload contract
@@ -581,7 +600,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   every-rest-char-category composite ids) embedded in well-formed sentences parse, ASTs
   carrying those ids — valid-id under-acceptance excluded (Id::new the
   id gate: parser basis-id language == the pinned production, differential agreement
-  total), exception sentence missing its bracket, empty
+  total), exception sentence missing its bracket, exception escape missing its
+  patient-adjacent の (§10 decree), empty
   document, missing terminal LF / stray blank line between rules / CRLF + lone-CR line
   breaks / stray whitespace (§10: whitespace variation NONE — parser language = grammar
   language, so differential agreement stays total; stray whitespace = repairable parse
@@ -611,7 +631,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   re-render canonical) + one should_panic pin (render on a shape-invalid hand-built AST —
   the assert fires before any lexicon lookup) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
-  control shape).
+  control shape) + 1 patient-adjacent-の byte pin (interval-atom-final context + escape
+  exception, both languages — §10 composition decree).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
   CnlExpressibilityError (one variant per class) + check_cnl_expressible(clinical, lexicon
   (role + tail view), segments (segment_id → (kind, region_ids) keyed view)) over grounded

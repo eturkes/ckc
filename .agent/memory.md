@@ -636,7 +636,24 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   whitespace variation NONE — parser language = grammar language (differential
   parser-vs-oracle agreement stays total), stray whitespace/CRLF/lone-CR = repairable parse
   errors; parse demands the exact frame (missing terminal LF =
-  repairable parse error). FillReject grows Parse
+  repairable parse error). §10 surface-composition decree (2026-07-12 elaboration; SPEC =
+  authority): JA interval/escape atoms take the fixed linking の exactly patient-adjacent
+  (last atom of last disjunct before 患者には、 + exception slot before 患者を除く。) and
+  compose bare mid-chain — mid vs patient-adjacent JA atom alternations, two nonterminals,
+  stray/missing の = parse error; EN atoms position-invariant under ONE prepositional
+  frame over gloss_en — `with` (positive + exception) / `without` (the fixed negator,
+  REPLACES with) / bare after `of` (action target + escape there); bound words at least/at
+  most/less than/more than ↔ ge/le/lt/gt marker-before-numeral (JA 以上/以下/未満/超 after
+  unit); certainty paren = `(` + row surface + `)` both languages (committed JA surfaces
+  carry the label; surface_en mirrors — certainty: moderate); JA spaceless, EN
+  single-space separators owned by fixed terminals/joiners, bracket internals
+  space-separated sorted ids; gloss_en = lowercase article-free noun phrase (lints already
+  bar connective-containing / prefix-overlapping glosses), adnominal = direct-prenominal
+  both positions; interval-carrying context concepts author negated forms (parse-reachable
+  so acceptance rejects use with the complement-interval repair — the §10 bar stays
+  acceptance-enforced, never a token-table gap); worked EN example re-pinned to the frame
+  (with adult status and with sepsis — old copula text was unproducible from one gloss).
+  FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
   spends no repair). Record strategy: scratch-root record from a newly created EMPTY cassette
