@@ -842,9 +842,10 @@ impl CanonRead for ContextExpr {
 
 /// SPEC §5 terminology binding: one mention bound to a concept of `system`
 /// (M1: `ckc.lex`). `alternatives` carries the competing codes of an
-/// `ambiguous` binding (§4.3 set); `region_ids` ground the mention (§4.3
-/// set). System, code, and alternatives are terminology vocabulary — verbatim
-/// in structural bytes.
+/// `ambiguous` binding (§4.3 set); `region_ids` carry provenance at the
+/// producer's grain (§4.3 set): normalize grounds the mention, §10's CNL
+/// bridge mints the citing statements' segment closures. System, code, and
+/// alternatives are terminology vocabulary — verbatim in structural bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TerminologyBinding {
     pub binding_id: Id,

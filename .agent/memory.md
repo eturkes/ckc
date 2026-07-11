@@ -475,10 +475,13 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   at first reference in POST-SPLIT emission order (statement-major; per statement population,
   condition, action target, exceptions in emitted order — a later-disjunct-only concept
   mints late), system = lexicon.system, region_ids = union of the citing emitted
-  statements' segment CLOSURES (source segments' full region sets — the closure from_ir's
-  rule bracket renders; invariant under bracket normal-form expansion, keeps to_ir∘from_ir
-  exact — an authored-bracket union re-bridges wider when a bracket cites part of a
-  multi-region segment, the pinned partial-segment law case); Action::new derives key;
+  statements' segment CLOSURES (source segments' full region sets — the closure the
+  rendered brackets jointly cover, rule bracket = it minus exception-owned; invariant under
+  bracket normalization, keeps to_ir∘from_ir exact — an authored-bracket union breaks the
+  law when the citing statements' brackets jointly under-cover the closure union; minimal
+  case = the pinned EXCEPTION-FREE partial-segment law case, re-bridges wider — §5 region
+  refs producer-graded: mention-grain M1, closure-grain bridge, SPEC §5 row + ir.rs
+  TerminologyBinding doc); Action::new derives key;
   basis = region ids per sentence,
   source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
   m3.bridge stage
@@ -580,7 +583,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   reconstruct) and bridge bindings mint segment CLOSURES, never mention-region
   provenance (M1 binds adult→r.2 only
   while guideline A's statement basis = r.2 r.3 — exact-hash ir_match would zero on its own
-  goldens); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
+  goldens; the one BY-CONSTRUCTION divergence — binding status/cardinality diverge only off
+  the locked corpus, bridge one canonical-label Exact per concept vs M1 per (segment,
+  candidate set) surface-derived = measured misses, golden 1.0 pin certifies the corpus
+  miss-free); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
   adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,
   so canonical selection needed explicit tail_ja/tail_en fields over first-listed file order);
   run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
@@ -591,8 +597,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   target — pass today; the committed schema carries zero minItems) → CNL expressibility =
   ONE executable predicate check_cnl_expressible(clinical, lexicon role+tail view, segments
   segment_id→region_ids keyed view) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
-  (cnl-expressible seeds it; ONE segment-closure helper serves the predicate, from_ir's rule
-  bracket, and to_ir's binding region_ids), defined over grounded
+  (cnl-expressible seeds it; ONE segment-closure helper serves the predicate, from_ir's
+  rule bracket (its exception-owned remainder), and to_ir's binding region_ids (whole
+  closure)), defined over grounded
   membership-valid IR (role/tail legality predicate-owned, variants in-domain-reachable) —
   ruling: one shared fn over two hand-maintained mirrored lists;
   single_ir_accept (accept-total wires each variant → repairable Schema naming the offense,

@@ -404,7 +404,7 @@ unit of the thesis.
 | Object | Requirements (M1 unless tagged) |
 | --- | --- |
 | `ClinicalSegment` | CQ, recommendation, evidence, exception, definition, table-row, or metadata segment with region refs. |
-| `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs. |
+| `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs — provenance at the producer's grain: M1 normalize grounds the mention, M3's CNL bridge mints citing statements' segment closures (§10). |
 | `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at M1. |
 | `Action` | Action kind + target concept + distinguishing fields (M4) + normalized target key. |
 | `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M4 adds slot equality and temporal interval (difference-logic) atoms. |
@@ -979,11 +979,14 @@ Committed direction:
   cited region anchored in exactly one segment, the derived segments' region sets unshared
   (closure-functional), exception-owned regions a proper subset of the closure (nonempty
   remainder). Binding region_ids = the union over the citing emitted statements of each
-  statement's segment closure (its source segments' full region sets — the same closure the
-  `from_ir` rule bracket renders), never the authored brackets: the closure is invariant
-  under the bracket's normal-form expansion, keeping `to_ir(from_ir(ir)) == ir` exact — a
-  bracket-union binding re-bridges wider whenever a bracket cites only part of a
-  multi-region segment. The bridge also derives the normative-rule origin map —
+  statement's segment closure (its source segments' full region sets — the closure the
+  statement's rendered brackets jointly cover: the rule bracket carries it minus the
+  exception-owned regions, exception sentences the rest), never the authored brackets —
+  statement-grain provenance, coarser than M1's §5 mention grounding (the §5 field is
+  producer-graded): the closure is invariant under bracket normalization, keeping
+  `to_ir(from_ir(ir)) == ir` exact — a bracket-union binding breaks the law whenever the
+  citing statements' brackets jointly under-cover the closure union (minimal case: an
+  exception-free rule citing one region of a two-region segment re-bridges wider). The bridge also derives the normative-rule origin map —
   `<document_id>.rule.<k>` → originating CNL rule index, a pure function of the document
   (rule k = the k-th post-split statement, mirroring the §8.6 derivation-order mint), so a
   multi-disjunct rule originates several rule ids that legitimately share its text —
@@ -1042,7 +1045,8 @@ Committed direction:
   `check_cnl_expressible(clinical, lexicon (role + tail view), segments (segment_id →
   region_ids map — id uniqueness by construction)) -> Result<(),
   CnlExpressibilityError>`, home the bridge module (it shares the segment-closure
-  computation `from_ir`'s rule bracket renders), defined over grounded, lexicon-valid
+  computation `from_ir`'s rule bracket takes its exception-owned remainder from and
+  `to_ir`'s binding region_ids consume whole), defined over grounded, lexicon-valid
   ClinicalIR (vocabulary membership + grounding are the acceptance stages ahead of it);
   its error taxonomy carries one variant per CNL-inexpressible class — a
   `(direction, strength)` pair without a tail-bearing lexicon row, empty statement sets,
@@ -1172,7 +1176,7 @@ fail-closed instrument bug (house panic style) — all edges
 acceptance-rejected on each side by the same predicate) — identity
 exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
 (the image of accepted ASTs; exact including binding region_ids — closure-derived, invariant
-under the rule bracket's normal-form expansion).
+under bracket normalization).
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain — the domain
 `check_cnl_expressible` accepts (tail-backed
 modality pairs, ≥1 statement each with a nonempty context, single-unsigned-bound quantity
@@ -1243,8 +1247,11 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   `region_ids` excluded, all else exact, ids included: CNL carries per-sentence basis refs
   (rule + exception brackets — exception provenance therefore reconstructs exactly), never
   mention-level regions — the bridge mints segment-closure binding regions, M1 mention-level
-  ones — so binding region provenance is the one §5 field a faithful
-  translation cannot reconstruct (single_ir compares its accepted fill,
+  ones — so binding region provenance is the §5 field divergent by construction, the sole
+  exclusion; the remaining binding fields can also diverge off the locked corpus
+  (canonical-label CNL mints one Exact binding per distinct concept, M1 one per (segment,
+  candidate set) with surface-derived status) — measured misses, never
+  asserted (single_ir compares its accepted fill,
   single_cnl its bridged IR; direct_smt lands no IR → not_applicable). Exact-reproduction rate,
   strict by design (§11 may grade partial faithfulness); rationale: verdict-level conflict
   metrics saturate while faithfulness still separates routes, and round-trip identity alone
