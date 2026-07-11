@@ -99,10 +99,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   lexicon.system, code = concept id, region_ids = the union of the citing emitted
   statements' segment CLOSURES (each citing statement's source segments' full region sets —
   the closure its rendered brackets jointly cover, rule bracket = closure minus
-  exception-owned; invariant under bracket normalization, keeping to_ir∘from_ir exact — an
+  exception-owned = the Recommendation-kind closure under the basis-ownership laws below;
+  invariant under bracket normalization, keeping to_ir∘from_ir exact — an
   authored-bracket union breaks the law whenever the citing statements' brackets jointly
   under-cover the closure union, minimal case an exception-free rule citing one region of a
-  two-region segment re-bridging WIDER) — a
+  two-region Recommendation segment re-bridging WIDER) — a
   KNOWINGLY lossy reconstruction of M1's mention-based regions (coarser: statement-grain
   closures; §5 region refs producer-graded),
   hence metrics-faithful
@@ -112,7 +113,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   segments artifact (ClinicalSegment.region_ids reverse map — m3.bridge stage inputs therefore
   [cnl_document, segments]; bridge preconditions, acceptance-enforced both sides: cited
   regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), nonempty remainder, exception regions closure-contained — CNL-side
+  (closure-functional), basis ownership kind-aware — writing R = cited Recommendation
+  segments' region union, E = cited Exception segments', X = exception brackets'/clauses'
+  union: every cited segment Recommendation|Exception-kind, R nonempty (== the nonempty
+  remainder), X == E — so full closure − X == R and every basis region is handled exactly
+  as the locked rules.rs tail handles it (Recommendation walk + per-clause append;
+  kind-blind citation would silently vanish/duplicate/drop provenance), exception regions
+  closure-contained — CNL-side
   by construction (derived segments span the bracket union), IR-side the predicate's
   containment class). Origin map: rule_origins(&CnlDocument) →
   `<doc>.rule.<k>` → originating rule index, pure fn (rule k = the k-th post-split
@@ -124,7 +131,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   escape occurrence): from_ir = one single-disjunct CNL rule per statement (projection, no
   regrouping; each clause's region_ids render verbatim on its exception sentence, the rule
   bracket renders the segment-closed remainder — every cited segment's FULL region set minus
-  the exception-owned regions; from_ir's sole Err source = check_cnl_expressible at entry
+  the exception-owned regions, == the Recommendation-kind closure under the basis-ownership
+  laws; from_ir's sole Err source = check_cnl_expressible at entry
   (the shared-predicate bullet below), projection Err-free past a passing check —
   CNL-inexpressible, accept-total-rejected by the same fn) ⇒ from_ir∘to_ir == bridge
   normal form — disjunct split + per-statement atom canonicalization (population before
@@ -161,7 +169,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   scope).
 - CNL expressibility = ONE executable predicate, never a hand-maintained rejection list per
   consumer: check_cnl_expressible(clinical, lexicon (role + tail view), segments
-  (segment_id → region_ids keyed view — id uniqueness by construction)) -> Result<(),
+  (segment_id → (kind, region_ids) keyed view — id uniqueness by construction; the §10
+  basis-ownership classes read the kind)) -> Result<(),
   CnlExpressibilityError>, home cnl_bridge.rs
   (unit cnl-expressible seeds the module; the segment-closure helper it lands is the one
   from_ir's rule bracket takes its exception-owned remainder from AND to_ir's binding
@@ -581,7 +590,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   control shape).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
   CnlExpressibilityError (one variant per class) + check_cnl_expressible(clinical, lexicon
-  (role + tail view), segments (segment_id → region_ids keyed view)) over grounded lexicon-valid
+  (role + tail view), segments (segment_id → (kind, region_ids) keyed view)) over grounded
+  lexicon-valid
   ClinicalIr. Classes: (direction, strength) pair without a tail-bearing lexicon row;
   wrong-slot vocabulary (§10 role view — population atoms, concept or quantity var, not
   population-role; condition atoms not condition-role; action targets not
@@ -604,22 +614,39 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   interval-lowers positive occurrences only, a negative one sits as an unlinked Bool beside
   the Real interval); statements with EMPTY population+condition (schema minItems-free +
   bundle-valid, CNL's DNF derives ≥1 atom); exception clauses with EMPTY region_ids
-  (bundle-valid — validate only resolves cited regions); statements whose segment-closed
-  source regions are wholly exception-owned — empty rule bracket under the §10
-  exception-owned split, covers EMPTY source_segment_ids (the segment-closure helper lands
+  (bundle-valid — validate only resolves cited regions); statements citing no
+  Recommendation segment — R empty ⇔ the wholly-exception-owned empty rule bracket under
+  the §10 basis-ownership laws (closure − X == R), covers EMPTY source_segment_ids (the
+  segment-closure helper lands
   here; cnl-bridge's from_ir rule bracket takes its exception-owned remainder, to_ir
-  binding region_ids the whole closure); exception regions outside the statement's
+  binding region_ids the whole closure); cited segments of non-normative kind — neither
+  Recommendation nor Exception (Evidence/Cq/Definition/TableRow/Metadata: the locked
+  rules.rs tail walks cited Recommendation segments' full region sets then appends clause
+  region_ids, so a non-normative segment's regions silently vanish from rule provenance);
+  exception regions Recommendation-owned — a clause citing a region a cited
+  Recommendation segment owns (X ∩ R ≠ ∅: the tail would emit it twice, recommendation
+  walk + clause append); cited Exception segments not clause-covered — a cited Exception
+  segment carrying a region absent from every clause (E ⊄ X: the normal form would widen
+  it into a rule bracket the tail never reads Exception segments into); exception regions outside the statement's
   segment closure — a clause citing a grounded region of an UNCITED segment
   (ExceptionRegionOutsideStatementClosure — every clause's region_ids ⊆ the cited
   segments' closure, i.e. each exception region in exactly ONE cited segment under
   closure-functionality; minimal breach: statement cites seg.0 = {r.1}, exception cites
-  seg.1's r.2 — membership + grounding + closure-functional + nonempty remainder ALL
-  pass, yet from_ir would render r.2 exception-sentence-only and the re-bridge would
+  seg.1's r.2 — membership + grounding + closure-functional + kind + R-nonempty + both
+  ownership classes ALL
+  pass (r.2's segment is uncited, so neither Recommendation-owned nor clause-uncovered
+  sees it — containment stays non-redundant under the ownership laws), yet from_ir would
+  render r.2 exception-sentence-only and the re-bridge would
   derive source segments WIDER — provenance-unfaithful, and bridge-image IR contains by
-  construction so the identity law never holds the shape; jointly with the wholly-owned
+  construction so the identity law never holds the shape; jointly with the R-empty
   class = the exception-owned ⊊ closure precondition, the pair co-occurring on a
-  blanketing union with uncited excess — wholly-owned checked FIRST, battery pins the
-  overlap naming wholly-owned); statements whose cited segments
+  blanketing union with uncited excess — R-empty checked FIRST, battery pins the
+  overlap naming it on an all-Exception-cited fixture (a cited Recommendation segment
+  would keep R nonempty and report Recommendation-owned instead); pinned
+  first-failing-check order over the topology classes: closure-functionality,
+  non-normative kind, R-empty, containment, Recommendation-owned, clause-uncovered —
+  containment ahead of the ownership pair, which checks the in-closure
+  residue); statements whose cited segments
   carry no region or share a region with another segment (closure-nonfunctional — breaks
   segment recovery from region-level basis — region→segment derivation needs
   functionality; the empty-region segment synthetic-only — segment.rs mints only from
@@ -629,7 +656,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   fail-closed over its raw view). Tests: per-class rejection battery naming the variant
   (interval class: the exhaustive 16-bound-presence-mask × per-bound {-1,0,1} truth table —
   valid iff exactly one bound present ∧ value ≥ 0; expectation table shared with cnl-ast's
-  AST-side battery, cross-side faithfulness by construction) + boundary accepts + a
+  AST-side battery, cross-side faithfulness by construction; ownership classes
+  discriminated: sole basis an Evidence segment → non-normative kind, a clause citing a
+  Recommendation-owned region → Recommendation-owned, a cited two-region Exception
+  segment with a one-region clause → clause-uncovered) + boundary accepts (incl. two
+  clauses distributing a cited two-region Exception segment — X == E by distribution) + a
   locked-corpus positive control (the 3 M1-derived ClinicalIr + their segments pass — the
   report-cnl.2 audit-render domain — derived in-test from the committed corpus; land ONE
   shared derivation helper, expressible-law reuses it). Fresh-module seed, no run.rs
@@ -640,8 +671,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   grounding stages — closing §10 render-totality for the one IR-landing route without a
   grammar/derivation guard (M1 derives from lexicon rows + integrity; single_cnl's grammar
   admits only lexicon tails): the closure's segment id-set parameter widens to the segments
-  artifact's segment_id → region_ids keyed view (the same artifact single_ir_fill already
-  grounds against, no new input; today's bare id sets cannot express the topology classes)
+  artifact's segment_id → (kind, region_ids) keyed view (the same artifact single_ir_fill
+  already grounds against, no new input; today's bare id sets cannot express the topology
+  or basis-ownership classes)
   + it takes the lexicon role/tail view; every CnlExpressibilityError → repairable
   FillReject::Schema naming the offense (mirrors off_lexicon_ids' empty-refs payload
   convention). Tests: each predicate class rejected THROUGH the acceptance surface (payload
@@ -662,12 +694,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   panic (instrument bug), never a fresh Err class
   — §10 render totality; predicate-Err unreachable
   from bridge-image (= to_ir over ACCEPTED ASTs — single_cnl_accept rejects the CNL-side
-  mirrors: orphan/shared cited regions, blanketing exception brackets),
+  mirrors: orphan/shared cited regions, non-normative cited kinds, Recommendation-owned
+  exception-bracket regions, clause-uncovered Exception segments, blanketing exception
+  brackets),
   accept-total-guarded, and locked-corpus IR; to_ir = Err on any escape
   occurrence, law-harness-pinned) +
   both round-trip laws as pinned there (from_ir∘to_ir == bridge normal form;
   to_ir∘from_ir == id on bridge-image IR) + a partial-segment-citation law case (an
-  EXCEPTION-FREE rule whose basis cites ONE region of a two-region segment — the uncited
+  EXCEPTION-FREE rule whose basis cites ONE region of a two-region Recommendation
+  segment — the uncited
   region in NO bracket: bridge mints closure-wide binding region_ids, from_ir widens the
   rule bracket to the closure, re-bridge == id — the exact case an
   authored-bracket-union binding fails) + worked-example content test
@@ -700,20 +735,29 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   two bridge round-trip laws over the escape-free slice under the segment-fixture axis
   (fixtures supply the §10 bridge preconditions — the SPEC's ACCEPTED-quantifier domain) +
   a to_ir-Err-on-escape pin + a
-  from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
-  bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + an
+  from_ir-Err pin (exception brackets blanketing every cited segment's closure, cited
+  segments Exception-kind → empty rule bracket, R empty) + a wrong-slot from_ir-Err pin
+  (an atom bucket its role contradicts) + an
   uncited-segment from_ir-Err pin (an exception clause citing a grounded region outside
   the statement's cited segments — the closure-containment class; shape: stmt.0 cites
   seg.0 = {r.rule, r.in} with clause 1 = {r.in} contained + clause 2 = {r.out} owned by
   stmt.1's cited seg.1, r.out grounded AND document-cited so first-clause-only or
   document-global-closure checkers pass it, offending-clause position permuted) + a
-  segment-fixture axis pinning each §10 bridge-precondition breach + edge:
+  segment-fixture axis pinning each §10 bridge-precondition breach + edge (fixture
+  segments carry kinds — the basis-ownership laws quantify over them):
   orphan cited region (reject), region shared across two segments (reject), region-less
-  cited segment (reject), rule∩exception bracket overlap with nonempty remainder (accepted —
+  cited segment (reject), a cited non-normative-kind segment (reject), an exception
+  bracket citing a Recommendation-owned region (reject), a cited multi-region Exception
+  segment with exception brackets covering only part of it (reject), a multi-region
+  Exception segment distributed across two exception sentences whose union covers it
+  (accepted — X == E by distribution, each sentence keeps its own bracket),
+  rule∩exception bracket overlap on an Exception-owned region, remainder nonempty
+  (accepted —
   normal form moves the region to the exception sentence), one region shared by two
   exception clauses (accepted — labeled cover, both render), a later-disjunct-only concept
   (bind.<k> mints in post-split emission order, not textual order), an exception-free
-  rule's bracket citing part of a multi-region segment — the rest bracket-absent (accepted
+  rule's bracket citing part of a multi-region Recommendation segment — the rest
+  bracket-absent (accepted
   — normal form widens the rule bracket to the closure, binding region_ids closure-stable
   across the re-bridge)
   (plan-header form — bridge normal form: split + atom canonicalization +
@@ -730,7 +774,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   in-domain (the predicate stays the deciding acceptance layer; the closure-containment
   mutation grounds a LATER clause's region in an UNCITED segment ANOTHER statement
   cites — membership + grounding stay green, first-clause-only + document-global-closure
-  checkers caught). Assert per
+  checkers caught; the basis-ownership mutations re-kind a cited segment Evidence,
+  retarget a clause region to a Recommendation-owned one, and drop an Exception segment's
+  second region from every clause — kind-blind checkers pass all three; positives inherit
+  cnl-laws' distributed-Exception-cover + partial-Recommendation-citation axis cases via
+  to_ir). Assert per
   case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
   from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
@@ -790,15 +838,26 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   escape scan over context + exception + action-target slots (Unregistered terminal) →
   grounding (every bracket's basis regions ⊆ regions — rule + per-exception — each cited
   region anchored in exactly ONE segment + derived segments' region sets unshared
-  (closure-functional; orphan/shared reject) + exception-owned ⊂ closure (nonempty
-  remainder — the §10 bridge preconditions land HERE; ⊆ holds by construction, derived
-  segments span the bracket union, the containment class bites IR-side only), derived
+  (closure-functional; orphan/shared reject) + the §10 basis-ownership laws over the
+  derived segments (land HERE with the other bridge preconditions: every derived segment
+  Recommendation|Exception-kind, ≥1 Recommendation-kind — R nonempty, the nonempty
+  remainder — and exception-bracket union == the Exception-kind closure, X == E: an
+  exception bracket citing a Recommendation-owned region rejects, a derived Exception
+  segment's region absent from every exception bracket rejects; exception-owned ⊆ closure
+  holds by construction, derived segments span the bracket union, the containment class
+  bites IR-side only), derived
   segments
   ⊆ segments; Grounding terminal) → re-render + re-parse round-trip (Instrument on mismatch)
   → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / a
   negative-occurrence reject — interval-carrying concept in an exception slot, the reject
   naming the complement-interval repair / both
-  terminals / instrument / empty-grounding panic). run.rs read scope: accept-closure region +
+  terminals / instrument / empty-grounding panic) + the basis-ownership five (rule basis
+  owned only by an Evidence segment → reject; an exception bracket citing a
+  Recommendation-owned region → reject; a cited multi-region Exception segment only
+  partially exception-bracket-covered → reject; a multi-region Exception segment
+  distributed across exception sentences whose union covers it → accept; partial citation
+  of a multi-region Recommendation segment → accept, the bridge later normalizing to the
+  full closure). run.rs read scope: accept-closure region +
   cnl modules.
 - [ ] subproc-runner.1: behavior-locked extraction — ONE shared subprocess runner (home
   ckc-smt, ckc-cli already depends on it — confirm at impl) absorbing the mirrored

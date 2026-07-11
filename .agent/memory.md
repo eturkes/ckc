@@ -496,7 +496,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rendered brackets jointly cover, rule bracket = it minus exception-owned; invariant under
   bracket normalization, keeps to_ir∘from_ir exact — an authored-bracket union breaks the
   law when the citing statements' brackets jointly under-cover the closure union; minimal
-  case = the pinned EXCEPTION-FREE partial-segment law case, re-bridges wider — §5 region
+  case = the pinned EXCEPTION-FREE partial-segment law case (two-region Recommendation
+  segment), re-bridges wider — §5 region
   refs producer-graded: mention-grain M1, closure-grain bridge, SPEC §5 row + ir.rs
   TerminologyBinding doc); Action::new derives key;
   basis = region ids per sentence,
@@ -504,12 +505,22 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   m3.bridge stage
   inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
   cited regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), nonempty remainder (single_cnl_accept grounding), exception regions
+  (closure-functional), basis ownership KIND-aware (17th-review correction — the shared
+  segment view = segment_id → (kind, region_ids); R/E = cited Recommendation/Exception
+  segments' region unions, X = exception brackets'/clauses' union; laws: cited kinds
+  Recommendation|Exception only, R nonempty == the nonempty remainder, X == E ⇒ closure −
+  X == R — the locked rules.rs tail walks cited Recommendation segments' full region sets
+  then appends clause region_ids, so kind-blind topology admitted silent provenance
+  corruption: Evidence-owned basis vanishing, Recommendation-owned exception region
+  doubled, partially-covered Exception segment's remainder dropped; RULE: a shared
+  view/normal form over a locked consumer's inputs must carry every field that consumer
+  branches on — derive laws from its actual filter, never topology alone), exception regions
   closure-contained (ExceptionRegionOutsideStatementClosure — CNL-side by construction,
   derived segments span the bracket union; IR-side a clause citing a grounded region of an
   UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER —
   provenance-unfaithful, predicate-rejected, the identity law's image domain never
-  holding the shape; overlap precedence wholly-owned before containment); accept-total also
+  holding the shape; pinned class order closure-functionality, non-normative kind, R-empty
+  (wholly-owned), containment, Recommendation-owned, clause-uncovered); accept-total also
   rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
   only + bundle validate rejects empty support — predicate owns it fail-closed) +
   shared-region artifacts (bundle-valid — validate never checks segment-region
@@ -665,7 +676,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   lexicon-valid ids — a drug concept in population, a population concept as action
   target — pass today; the committed schema carries zero minItems) → CNL expressibility =
   ONE executable predicate check_cnl_expressible(clinical, lexicon role+tail view, segments
-  segment_id→region_ids keyed view) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
+  segment_id→(kind, region_ids) keyed view) -> Result<(), CnlExpressibilityError>, home
+  cnl_bridge.rs
   (cnl-expressible seeds it; ONE segment-closure helper serves the predicate, from_ir's
   rule bracket (its exception-owned remainder), and to_ir's binding region_ids (whole
   closure)), defined over grounded
