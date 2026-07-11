@@ -457,14 +457,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
   cited regions anchored in exactly one segment, derived segments' region sets unshared
   (closure-functional), nonempty remainder (single_cnl_accept grounding); accept-total also
-  rejects region-less cited segments (segmenter-reachable: all-ungrounded table row) +
-  shared-region artifacts (bundle-valid only); round-trip laws (ACCEPTED escape-free ASTs,
+  rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
+  only + bundle validate rejects empty support — predicate owns it fail-closed) +
+  shared-region artifacts (bundle-valid — validate never checks segment-region
+  disjointness); round-trip laws (ACCEPTED escape-free ASTs,
   to_ir Err on escapes):
   from_ir = single-disjunct projection — clause region_ids verbatim on its exception
   sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
   exception-owned — deterministic evidence cover, NOT authorial attribution, the IR keeps
   no rule-level region set; from_ir's sole Err source = the shared expressibility predicate
-  at entry, projection total past it, acceptance-rejected both sides) ⇒
+  at entry, projection Err-free past it, acceptance-rejected both sides) ⇒
   from_ir∘to_ir == bridge normal form (disjunct split + atom canonicalization — population
   before condition, set order, dedup — + exception-owned segment-closed basis split, a
   labeled COVER: clauses may share a region),
@@ -535,12 +537,13 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   lexicon-valid ids — a drug concept in population, a population concept as action
   target — pass today; the committed schema carries zero minItems) → CNL expressibility =
   ONE executable predicate check_cnl_expressible(clinical, lexicon role+tail view, segments
-  (segment_id, region_ids) view) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
+  segment_id→region_ids keyed view) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
   (cnl-expressible seeds it; shares from_ir's segment-closure helper), defined over grounded
-  lexicon-valid IR — ruling: one shared fn over two hand-maintained mirrored lists;
+  membership-valid IR (role/tail legality predicate-owned, variants in-domain-reachable) —
+  ruling: one shared fn over two hand-maintained mirrored lists;
   single_ir_accept (accept-total wires each variant → repairable Schema naming the offense,
-  census-flip-gated) + from_ir (entry check = sole Err source, projection total past it —
-  residual failure = fail-closed panic) BOTH call it; §10 law acceptance ⇔ from_ir,
+  census-flip-gated) + from_ir (entry check = sole Err source, projection Err-free past it
+  — residual failure = fail-closed panic) BOTH call it; §10 law acceptance ⇔ from_ir,
   expressible-law harness (bridge-image + locked-corpus positives, per-class grounded
   mutations, Ok side renders both languages); exception register = single positive
   INTERVAL-FREE registered concept per sentence (grammar also admits the escape there —

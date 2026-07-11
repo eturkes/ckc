@@ -93,7 +93,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   regrouping; each clause's region_ids render verbatim on its exception sentence, the rule
   bracket renders the segment-closed remainder — every cited segment's FULL region set minus
   the exception-owned regions; from_ir's sole Err source = check_cnl_expressible at entry
-  (the shared-predicate bullet below), projection TOTAL past a passing check —
+  (the shared-predicate bullet below), projection Err-free past a passing check —
   CNL-inexpressible, accept-total-rejected by the same fn) ⇒ from_ir∘to_ir == bridge
   normal form — disjunct split + per-statement atom canonicalization (population before
   condition, §4.3 set order, byte-identical duplicates collapsed; the partition + set
@@ -104,16 +104,20 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   docs); to_ir∘from_ir == id on bridge-image IR (the image of accepted ASTs).
 - CNL expressibility = ONE executable predicate, never a hand-maintained rejection list per
   consumer: check_cnl_expressible(clinical, lexicon (role + tail view), segments
-  ((segment_id, region_ids) view)) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
+  (segment_id → region_ids keyed view — id uniqueness by construction)) -> Result<(),
+  CnlExpressibilityError>, home cnl_bridge.rs
   (unit cnl-expressible seeds the module; the segment-closure helper it lands is the one
   from_ir's rule bracket renders), defined over grounded lexicon-valid ClinicalIR
-  (vocabulary membership + grounding run ahead of it), one error variant per
+  (lexicon-valid = vocabulary MEMBERSHIP only, off_lexicon_ids' check — role/tail legality
+  stays predicate-owned, every variant in-domain-reachable; membership + grounding run
+  ahead of it), one error variant per
   CNL-inexpressible class (taxonomy enumerated at cnl-expressible). Consumers:
   single_ir_accept (accept-total wires each variant → repairable FillReject::Schema naming
-  the offense) + from_ir (entry check = its SOLE Err source; projection past it TOTAL — a
-  residual failure is a fail-closed panic, instrument bug). §10 law, property-tested at
-  expressible-law: over the domain, acceptance succeeds ⇔ from_ir succeeds — the two
-  domains one function apart, drift structurally excluded.
+  the offense) + from_ir (entry check = its SOLE Err source; projection past it constructs
+  no Err — a residual failure is a fail-closed panic, instrument bug). §10 law,
+  property-tested at expressible-law: over the domain — acceptance judged on the value's
+  canonical bytes — acceptance succeeds ⇔ from_ir succeeds; the two domains one function
+  apart, definitional drift structurally excluded, behavioral agreement law-tested.
 - Grammar terminals = whole-surface string literals (ASCII digits + basis-id chars as literal
   alternation) — portable to LLM constraint mechanisms + atomic in bnf — with EXACTLY ONE open
   lexical production per language: the escape's free quoted surface (§10) is inexpressible as
@@ -285,7 +289,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   tail-bearing iff BOTH — one-language tails would leave the other renderer partial),
   every (direction,strength) pair present carries ≥1 tail-bearing row —
   first tail-bearing row per pair = canonical render row, a test pins it against §10's
-  worked tails — and concept intervals CNL-representable (v1 one unsigned bound); per-rule
+  worked tails — certainty-table render totality (every §5 Certainty value carries a row,
+  first row per value = canonical render row — closed 4-value enum, a gap leaves from_ir's
+  certainty parenthetical surface-less on in-domain IR; committed table already total) —
+  and concept intervals CNL-representable (v1 one unsigned bound); per-rule
   rejection battery over bad-lexicon fixtures + a positive role-matrix control (a synthetic
   lexicon covering all five legal concept role sets — {population}, {condition},
   {action_target}, {population,action_target}, {condition,action_target} — plus both
@@ -393,7 +400,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   control shape).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
   CnlExpressibilityError (one variant per class) + check_cnl_expressible(clinical, lexicon
-  (role + tail view), segments ((segment_id, region_ids) view)) over grounded lexicon-valid
+  (role + tail view), segments (segment_id → region_ids keyed view)) over grounded lexicon-valid
   ClinicalIr. Classes: (direction, strength) pair without a tail-bearing lexicon row;
   wrong-slot vocabulary (§10 role view — population atoms, concept or quantity var, not
   population-role; condition atoms not condition-role; action targets not
@@ -402,14 +409,19 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   schema's enums stay role-agnostic — slot legality is this predicate's, a per-slot schema
   re-derivation would re-bless committed schema bytes + §9 pins); EMPTY
   statements array (run.rs's accept battery currently pins empty ClinicalIr = accepted);
-  signed or two-sided quantity intervals (v1 register — the committed IR schema's
-  IntervalBound pattern admits negatives, IrBundle::validate admits two-sided); exception
-  clauses not exactly one positive interval-free Concept atom (§10 single-concept register —
-  multi-atom / atomless / ConceptNegated / Interval exception shapes are CNL-inexpressible
-  yet schema-valid, so model-reachable); negative occurrences of interval-carrying entries —
-  context ConceptNegated or the exception concept (§10 bar: the locked tail interval-lowers
-  positive occurrences only, a negative one sits as an unlinked Bool beside the Real
-  interval); statements with EMPTY population+condition (schema minItems-free +
+  quantity intervals without exactly one unsigned bound — signed / two-sided / boundless /
+  same-side ge+gt or le+lt doubles (v1 one-unsigned-bound register; the committed schema
+  requires only var over four independent optional bound fields, IntervalBound admits
+  negatives; validate's §5 coherence rejects boundless + doubled shapes only TERMINALLY at
+  bundle time and admits two-sided + signed — the predicate rejects all four repairably at
+  acceptance); exception
+  clauses not exactly one positive Concept atom (structural class, §10 single-concept
+  register — multi-atom / atomless / ConceptNegated / Interval exception shapes are
+  CNL-inexpressible yet schema-valid, so model-reachable); negative occurrences of
+  interval-carrying entries — context ConceptNegated or the sole exception concept of a
+  structurally valid clause, disjoint from the structural class (§10 bar: the locked tail
+  interval-lowers positive occurrences only, a negative one sits as an unlinked Bool beside
+  the Real interval); statements with EMPTY population+condition (schema minItems-free +
   bundle-valid, CNL's DNF derives ≥1 atom); exception clauses with EMPTY region_ids
   (bundle-valid — validate only resolves cited regions); statements whose segment-closed
   source regions are wholly exception-owned — empty rule bracket under the §10
@@ -417,16 +429,23 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   here; cnl-bridge's from_ir renders the same closure); statements whose cited segments
   carry no region or share a region with another segment (closure-nonfunctional — breaks
   segment recovery from region-level basis, the to_ir∘from_ir law; the empty-region segment
-  segmenter-REACHABLE via an all-ungrounded table row, the shared region bundle-valid
-  only). Tests: per-class rejection battery naming the variant + boundary accepts + a
+  synthetic-only — segment.rs mints only from grounded spans, an all-ungrounded row leaves
+  boundary residuals, and IrBundle::validate rejects empty support — the shared region
+  bundle-valid, validate never checks cross-segment disjointness; the predicate owns both
+  fail-closed over its raw view). Tests: per-class rejection battery naming the variant
+  (interval class: one case per sub-shape — signed / two-sided / boundless / ge+gt /
+  le+lt) + boundary accepts + a
   locked-corpus positive control (the 3 M1-derived ClinicalIr + their segments pass — the
-  report-cnl.2 audit-render domain). Fresh-module seed, no run.rs contact. Read scope:
-  ir.rs shapes + the lexicon modality table and role view (lexicon.rs post-extract).
+  report-cnl.2 audit-render domain — derived in-test from the committed corpus; land ONE
+  shared derivation helper, expressible-law reuses it). Fresh-module seed, no run.rs
+  contact. Read scope:
+  ir.rs shapes + the lexicon modality table and role view (lexicon.rs post-extract) + the
+  normalize→segment→rules corpus-derivation entrypoints (the positive-control helper).
 - [ ] accept-total: single_ir_accept calls check_cnl_expressible after its vocabulary +
   grounding stages — closing §10 render-totality for the one IR-landing route without a
   grammar/derivation guard (M1 derives from lexicon rows + integrity; single_cnl's grammar
   admits only lexicon tails): the closure's segment id-set parameter widens to the segments
-  artifact's (segment_id, region_ids) view (the same artifact single_ir_fill already
+  artifact's segment_id → region_ids keyed view (the same artifact single_ir_fill already
   grounds against, no new input; today's bare id sets cannot express the topology classes)
   + it takes the lexicon role/tail view; every CnlExpressibilityError → repairable
   FillReject::Schema naming the offense (mirrors off_lexicon_ids' empty-refs payload
@@ -444,8 +463,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   from_ir = check_cnl_expressible at entry — its SOLE Err source, one class list shared
   with acceptance (cnl-expressible's taxonomy; wrong-slot IR is CNL-inexpressible because
   any rendering re-parses into a different partition, silently moving the atom); past a
-  passing check the projection is TOTAL — a residual failure is a fail-closed panic
-  (instrument bug), never a fresh Err class
+  passing check the projection constructs no Err — a residual failure is a fail-closed
+  panic (instrument bug), never a fresh Err class
   — §10 render totality; predicate-Err unreachable
   from bridge-image (= to_ir over ACCEPTED ASTs — single_cnl_accept rejects the CNL-side
   mirrors: orphan/shared cited regions, blanketing exception brackets),
@@ -478,14 +497,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   basis split, ≠ naive identity on multi-disjunct or atom-disordered inputs). Codeco method; bound
   sizes to CI-sane runtime.
 - [ ] expressible-law: the §10 expressibility-agreement harness — bounded enumeration of
-  grounded lexicon-valid ClinicalIr: positives = to_ir over enumerated accepted ASTs
-  (bridge-image, cnl-laws' method) + the 3 locked-corpus derived ClinicalIr; negatives =
+  the §10 law domain (canonical (ClinicalIr, lexicon, regions, segments) tuples passing
+  membership + grounding — role/tail legality predicate-owned): positives = to_ir over
+  enumerated accepted ASTs (bridge-image, cnl-laws' method) + the 3 locked-corpus derived
+  ClinicalIr (cnl-expressible's derivation helper); negatives =
   per-class mutations landing in EVERY CnlExpressibilityError variant while staying
-  grounded + lexicon-valid (the predicate stays the deciding acceptance layer). Assert per
+  in-domain (the predicate stays the deciding acceptance layer). Assert per
   case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
   from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
-  run.rs accept-closure call surface + cnl_bridge.rs + cnl-laws' enumeration harness.
+  run.rs accept-closure call surface + cnl_bridge.rs + cnl-laws' enumeration harness +
+  cnl_render.rs render entrypoints (the Ok-side bilingual assertion).
 - [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
   (fieldless_enum append) + FillReject +Parse(String) (repairable → cnl_parse_error) /
   +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the
