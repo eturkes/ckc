@@ -520,12 +520,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   segments' closure, i.e. each exception region in exactly ONE cited segment under
   closure-functionality; minimal breach: statement cites seg.0 = {r.1}, exception cites
   seg.1's r.2 — membership + grounding + closure-functional + nonempty remainder ALL
-  pass, yet from_ir renders r.2 exception-sentence-only and the re-bridge derives source
-  segments WIDER, a to_ir∘from_ir breach; jointly with the wholly-owned class = the
-  exception-owned ⊊ closure precondition); statements whose cited segments
+  pass, yet from_ir would render r.2 exception-sentence-only and the re-bridge would
+  derive source segments WIDER — provenance-unfaithful, and bridge-image IR contains by
+  construction so the identity law never holds the shape; jointly with the wholly-owned
+  class = the exception-owned ⊊ closure precondition, the pair co-occurring on a
+  blanketing union with uncited excess — wholly-owned checked FIRST, battery pins the
+  overlap naming wholly-owned); statements whose cited segments
   carry no region or share a region with another segment (closure-nonfunctional — breaks
-  segment recovery from region-level basis, the to_ir∘from_ir law; the empty-region segment
-  synthetic-only — segment.rs mints only from grounded spans, an all-ungrounded row leaves
+  segment recovery from region-level basis — region→segment derivation needs
+  functionality; the empty-region segment synthetic-only — segment.rs mints only from
+  grounded spans, an all-ungrounded row leaves
   boundary residuals, and IrBundle::validate rejects empty support — the shared region
   bundle-valid, validate never checks cross-segment disjointness; the predicate owns both
   fail-closed over its raw view). Tests: per-class rejection battery naming the variant
@@ -599,7 +603,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
   bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + an
   uncited-segment from_ir-Err pin (an exception clause citing a grounded region outside
-  the statement's cited segments — the closure-containment class) + a
+  the statement's cited segments — the closure-containment class; shape: stmt.0 cites
+  seg.0 = {r.rule, r.in} with clause 1 = {r.in} contained + clause 2 = {r.out} owned by
+  stmt.1's cited seg.1, r.out grounded AND document-cited so first-clause-only or
+  document-global-closure checkers pass it, offending-clause position permuted) + a
   segment-fixture axis pinning each §10 bridge-precondition breach + edge:
   orphan cited region (reject), region shared across two segments (reject), region-less
   cited segment (reject), rule∩exception bracket overlap with nonempty remainder (accepted —
@@ -621,8 +628,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   ClinicalIr (cnl-expressible's derivation helper); negatives =
   per-class mutations landing in EVERY CnlExpressibilityError variant while staying
   in-domain (the predicate stays the deciding acceptance layer; the closure-containment
-  mutation grounds its exception region in an UNCITED segment — membership + grounding
-  stay green). Assert per
+  mutation grounds a LATER clause's region in an UNCITED segment ANOTHER statement
+  cites — membership + grounding stay green, first-clause-only + document-global-closure
+  checkers caught). Assert per
   case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
   from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:

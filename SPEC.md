@@ -1066,10 +1066,14 @@ Committed direction:
   regions are wholly exception-owned (an empty rule bracket under the exception-owned
   split — covers empty source_segment_ids), statements with an exception region outside
   their segment closure (a clause citing a grounded region of an UNCITED segment —
-  membership, grounding, and the nonempty remainder all pass, yet from_ir renders the
-  region only on its exception sentence and the re-bridge derives a wider segment set,
-  breaking `to_ir(from_ir(ir)) == ir`; jointly with the wholly-owned class this enforces
-  exception-owned as a proper subset of the closure), statements whose cited segments carry
+  membership, grounding, and the nonempty remainder all pass, yet from_ir would render
+  the region only on its exception sentence and the re-bridge would derive a wider
+  segment set — a provenance-unfaithful render; bridge-image IR contains by construction,
+  so the identity law never holds the shape and the predicate rejects it at
+  acceptance/from_ir; jointly with the wholly-owned class this enforces exception-owned as
+  a proper subset of the closure — the pair co-occurs on an exception union blanketing the
+  closure with uncited excess, wholly-owned preceding containment as the predicate's
+  single reported variant), statements whose cited segments carry
   no region or share a region with another segment (closure-nonfunctional — breaks segment
   recovery from region-level basis; the empty-region segment is synthetic-only — the
   segmenter mints only from grounded spans and bundle validation rejects empty segment
@@ -1182,8 +1186,9 @@ re-bridge would derive wider), atom / action-target / interval placement contrad
 the §10 role view (wrong-slot IR is
 CNL-inexpressible, any rendering re-parses into a different partition), and the remaining
 classes — past a passing check the projection constructs no Err, a residual failure a
-fail-closed instrument bug (house panic style) — all edges
-acceptance-rejected on each side by the same predicate) — identity
+fail-closed instrument bug (house panic style) — the one predicate
+serves from_ir and single_ir_accept, single_cnl_accept's grounding rejecting each
+CNL-reachable mirror, containment CNL-unreachable by construction) — identity
 exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
 (the image of accepted ASTs; exact including binding region_ids — closure-derived, invariant
 under bracket normalization).

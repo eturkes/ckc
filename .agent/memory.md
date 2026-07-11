@@ -490,8 +490,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   (closure-functional), nonempty remainder (single_cnl_accept grounding), exception regions
   closure-contained (ExceptionRegionOutsideStatementClosure — CNL-side by construction,
   derived segments span the bracket union; IR-side a clause citing a grounded region of an
-  UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER,
-  to_ir∘from_ir breach); accept-total also
+  UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER —
+  provenance-unfaithful, predicate-rejected, the identity law's image domain never
+  holding the shape; overlap precedence wholly-owned before containment); accept-total also
   rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
   only + bundle validate rejects empty support — predicate owns it fail-closed) +
   shared-region artifacts (bundle-valid — validate never checks segment-region
