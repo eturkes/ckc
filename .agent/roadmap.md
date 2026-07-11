@@ -33,9 +33,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   certainty/exceptions/source refs); CNL's sole core touch = DiagnosticCode fieldless_enum
   append (codes-cnl; path-confine separately extends core's validate_registries).
 - CNL AST ≠ ClinicalIr: CnlAtom {Concept|ConceptNegated|Interval|Unregistered(surface)}
-  (escape = own variant), CnlConceptRef {Registered(Id)|Unregistered(surface)} — §10 admits
+  (escape = own variant; Interval = ir.rs QuantityInterval's SHAPE — var + four optional
+  signed bounds), CnlConceptRef {Registered(Id)|Unregistered(surface)} — §10 admits
   the escape in EVERY concept slot incl. action target — CnlContext {any: Vec<Vec<CnlAtom>>}
-  flat two-level DNF, CnlException {concept: CnlConceptRef, basis: nonempty region refs —
+  flat two-level DNF. AST validity two-layered, STRUCTURAL first (lexicon-free grammar-image
+  shapes — §10's law quantifier): outer DNF + every conjunction nonempty + interval atoms
+  exactly one unsigned bound among ge|gt|le|lt, value nonnegative — §5/ir.rs coherence
+  admits the signed + two-sided shapes the grammar cannot write, so ir.rs-mirrored validity
+  would bless unrenderable ASTs; cnl-ast enforces ahead of the lexicon-scoped layer,
+  cnl-render asserts fail-closed. CnlException {concept: CnlConceptRef, basis: nonempty region refs —
   the sentence's own bracket} (§10 single-concept register — a sentence list, disjunctive
   across entries; no DNF/negation/interval inside an entry; per-sentence basis brackets keep
   per-clause provenance reconstructible — a rule-global bracket cannot say which exception
@@ -385,13 +391,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   Pure findings layer beside load_lexicon's existing checks.
 - [ ] cnl-ast: cnl.rs type family — CnlAtom/CnlConceptRef/CnlContext/CnlException/CnlRule/
   CnlDocument (grammar refs + per-rule text + text-hash members per the plan header) +
-  Canonical emit/read (sorted-key slots, optional members omit-None) + validate (nonempty
+  Canonical emit/read (sorted-key slots, optional members omit-None) + STRUCTURAL validate,
+  lexicon-free + checked BEFORE the lexicon-scoped layer (nonempty
   rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance),
+  nonempty context DNF — outer any AND every conjunction,
   Id grammar, per-rule canonical-text members line-break-free — LF AND CR, matching
   report.rs's line-break validation (§10 document frame) — + per-language text-hash members
   RECOMPUTED equal from the stored per-rule texts under the frame assembly, hash ==
   hash_bytes(concat(rule_text + LF)) — the frame an executable invariant, never a
-  convention, interval bound coherence mirroring ir.rs, §10 escape
+  convention, interval atoms the §10 v1 register — exactly one bound among ge|gt|le|lt,
+  value nonnegative (plan-header ruling: NOT ir.rs coherence, which admits the signed +
+  two-sided shapes the grammar cannot write), §10 escape
   payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
   SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed lexicon view
@@ -402,8 +412,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   wrong-slot bar, per-slot rejection cases; the Unregistered escape is roleless and
   admitted in every concept slot per §10 — per-slot escape-accept positives beside the
   rejections), negated/exception concept refs
-  interval-free (§10 negative-occurrence bar) — makes §10's lexicon-valid-AST quantifier
-  well-defined) + all-None/populated byte pins
+  interval-free (§10 negative-occurrence bar) — makes §10's valid-AST quantifier
+  well-defined) + structural rejection battery, one hand-built direct case each — empty
+  outer DNF, empty conjunction, signed bound, two-sided interval, boundless, same-side
+  ge+gt / le+lt doubles — + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
   BNF (smt_query.grammar dialect, `;` comments): document = (rule <nl>)+ — §10 document
@@ -480,7 +492,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   assembly = each rule's rendered line + one LF, last included (§10 frame — the exact bytes
   the text hashes lock); missing-pair
   lookup = Err, fail-closed — §10 totality + accept-total make it unreachable from accepted
-  IR) +
+  IR; structural-validity breaches — empty DNF/conjunction, non-register interval — have
+  NO surface: render ASSERTS cnl-ast's structural layer, fail-closed house panic style
+  (render consumes validated ASTs — an unvalidated hand-built AST = instrument bug, never
+  silent bytes)) +
   canonical-fixpoint spot tests (bounded-variation inputs — synonym tails, unsorted basis —
   re-render canonical) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,

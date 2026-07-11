@@ -1164,9 +1164,15 @@ Single parse: every parser-accepted string yields exactly one AST; the runtime g
 over-approximates the parser (open escape production, payload contract parser-enforced) —
 grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
 over the parser-accepted language.
-Round trip: parse(render(ast)) == ast for every lexicon-valid AST (validity is lexicon-scoped:
-modality pairs tail-backed, concept/action refs resolved, slot roles admitting every atom
-and target position), both languages.
+Round trip: parse(render(ast)) == ast for every valid AST, both languages. AST validity is
+two-layered, structural first (lexicon-free, the grammar-image shape): nonempty rules and
+basis brackets, nonempty context DNF — the outer disjunction AND every conjunction (the
+grammar writes neither empty) — and interval atoms carrying exactly one unsigned bound
+(one of ge|gt|le|lt with a nonnegative value: the v1 register, deliberately narrower than
+§5 interval coherence, which admits the signed and two-sided shapes the grammar has no
+surface for); then lexicon-scoped: modality pairs tail-backed, concept/action refs
+resolved, slot roles admitting every atom and target position. A structurally invalid AST
+has no rendering, so render asserts the structural layer fail-closed.
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
 Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
