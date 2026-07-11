@@ -1014,12 +1014,20 @@ Committed direction:
   Modality totality: the lexicon pair set stays the corpus register — no artificial rows for
   the full §5 Direction × Strength domain; instead every IR-landing route guarantees
   lexicon-backed pairs at acceptance (M1 derives pairs from lexicon rows by construction;
-  single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects an
-  off-lexicon `(direction, strength)` pair as a repairable schema violation, mirroring the
-  off-lexicon id check; the same acceptance closure rejects the remaining CNL-inexpressible
-  shapes — empty statement sets, statements with empty population+condition, signed or
+  single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects every
+  CNL-inexpressible shape as a repairable schema violation naming the offense — one per
+  predicate class below — mirroring the off-lexicon id check). CNL expressibility is ONE
+  executable predicate, never a hand-maintained rejection list per consumer:
+  `check_cnl_expressible(clinical, lexicon (role + tail view), segments) -> Result<(),
+  CnlExpressibilityError>`, home the bridge module (it shares the segment-closure
+  computation `from_ir`'s rule bracket renders), defined over grounded, lexicon-valid
+  ClinicalIR (vocabulary membership + grounding are the acceptance stages ahead of it);
+  its error taxonomy carries one variant per CNL-inexpressible class — a
+  `(direction, strength)` pair without a tail-bearing lexicon row, empty statement sets,
+  statements with empty population+condition, signed or
   two-sided quantity intervals, exception clauses that are not exactly one positive
-  interval-free concept atom, negated-concept atoms over interval-carrying entries,
+  interval-free concept atom (atomless clauses included), negated-concept atoms over
+  interval-carrying entries,
   exception clauses with empty region_ids, statements whose segment-closed source
   regions are wholly exception-owned (an empty rule bracket under the exception-owned
   split — covers empty source_segment_ids), statements whose cited segments carry no
@@ -1029,8 +1037,9 @@ Committed direction:
   or quantity role is not `population`, condition atoms not `condition`-role, action
   targets not `action_target`-role, exception concepts outside the context roles
   (lexicon-MEMBER ids in slots no role admits pass the membership check yet sit outside
-  the bridge image — accepted IR stays partition-normal), the v1
-  register), so
+  the bridge image — accepted IR stays partition-normal), the v1 register.
+  `single_ir_accept` and `from_ir` both call the one predicate — the acceptance and
+  renderer domains sit one function apart and cannot drift — so
   audit rendering is total over accepted IR and a missing-row render
   error is a fail-closed instrument path, unreachable from accepted artifacts. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
@@ -1107,14 +1116,18 @@ byte-identical duplicates collapsed; the partition + set emission are lossy exac
 basis refs segment-closed and exception-owned-split (a labeled cover, not a partition —
 clauses may share a region; from_ir renders each clause's own
 region_ids verbatim on its exception sentence and the segment-closed remainder — every cited
-segment's full region set minus the exception-owned regions — on the rule bracket; Err,
-fail-closed, when a clause's region set or that remainder is empty, and when any atom,
-action-target, or interval placement contradicts the §10 role view — wrong-slot IR is
-CNL-inexpressible, any rendering re-parses into a different partition — all edges
-acceptance-rejected on each side) — identity
+segment's full region set minus the exception-owned regions — on the rule bracket; from_ir's
+sole Err source is `check_cnl_expressible` at entry — the shared taxonomy: empty clause
+region sets, an empty remainder, atom / action-target / interval placement contradicting
+the §10 role view (wrong-slot IR is
+CNL-inexpressible, any rendering re-parses into a different partition), and the remaining
+classes — past a passing check the projection is total, a residual failure a fail-closed
+instrument bug (house panic style) — all edges
+acceptance-rejected on each side by the same predicate) — identity
 exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
 (the image of accepted ASTs).
-Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain (tail-backed
+Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain — the domain
+`check_cnl_expressible` accepts (tail-backed
 modality pairs, ≥1 statement each with a nonempty context, one-sided unsigned quantity
 intervals, single-concept interval-free exception clauses each carrying nonempty region_ids,
 negated atoms over interval-free
@@ -1127,6 +1140,12 @@ corpus by derivation + lexicon integrity + the corpus render audit (derivation m
 concept atoms only and each locked exception segment matches exactly one concept; a document
 deriving a wider clause sits outside the locked M1 contract — arbitrary M1-route inputs carry
 no totality claim — and fails render closed at from_ir).
+Expressibility agreement (render totality, executable): over grounded, lexicon-valid
+ClinicalIR, single_ir acceptance succeeds ⇔ from_ir succeeds — both call the one predicate,
+from_ir total past it — property-tested over a bounded IR enumeration: bridge-image
+positives (to_ir over enumerated accepted ASTs) + the locked corpus's derived IR + per-class
+mutations landing in every `CnlExpressibilityError` variant while staying grounded and
+lexicon-valid; the Ok side must also render in both languages.
 Audit honesty: audit views render only from accepted artifacts, never from raw model output.
 ```
 

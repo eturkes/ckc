@@ -92,8 +92,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   escape occurrence): from_ir = one single-disjunct CNL rule per statement (projection, no
   regrouping; each clause's region_ids render verbatim on its exception sentence, the rule
   bracket renders the segment-closed remainder — every cited segment's FULL region set minus
-  the exception-owned regions; Err, fail-closed, on an empty clause region set or empty
-  remainder — CNL-inexpressible, accept-total-rejected) ⇒ from_ir∘to_ir == bridge
+  the exception-owned regions; from_ir's sole Err source = check_cnl_expressible at entry
+  (the shared-predicate bullet below), projection TOTAL past a passing check —
+  CNL-inexpressible, accept-total-rejected by the same fn) ⇒ from_ir∘to_ir == bridge
   normal form — disjunct split + per-statement atom canonicalization (population before
   condition, §4.3 set order, byte-identical duplicates collapsed; the partition + set
   emission are lossy exactly there) + exception-owned segment-closed basis split (a labeled
@@ -101,6 +102,18 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   exception-owned regions render only on exception sentences; closure pulls each cited
   segment's remaining regions into the rule bracket) — (== id exactly on bridge-normal
   docs); to_ir∘from_ir == id on bridge-image IR (the image of accepted ASTs).
+- CNL expressibility = ONE executable predicate, never a hand-maintained rejection list per
+  consumer: check_cnl_expressible(clinical, lexicon (role + tail view), segments
+  ((segment_id, region_ids) view)) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
+  (unit cnl-expressible seeds the module; the segment-closure helper it lands is the one
+  from_ir's rule bracket renders), defined over grounded lexicon-valid ClinicalIR
+  (vocabulary membership + grounding run ahead of it), one error variant per
+  CNL-inexpressible class (taxonomy enumerated at cnl-expressible). Consumers:
+  single_ir_accept (accept-total wires each variant → repairable FillReject::Schema naming
+  the offense) + from_ir (entry check = its SOLE Err source; projection past it TOTAL — a
+  residual failure is a fail-closed panic, instrument bug). §10 law, property-tested at
+  expressible-law: over the domain, acceptance succeeds ⇔ from_ir succeeds — the two
+  domains one function apart, drift structurally excluded.
 - Grammar terminals = whole-surface string literals (ASCII digits + basis-id chars as literal
   alternation) — portable to LLM constraint mechanisms + atomic in bnf — with EXACTLY ONE open
   lexical production per language: the escape's free quoted surface (§10) is inexpressible as
@@ -378,56 +391,62 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   canonical-fixpoint spot tests (bounded-variation inputs re-render canonical) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
   control shape).
-- [ ] accept-total: single_ir_accept rejects CNL-inexpressible accepted-IR shapes as
-  repairable FillReject::Schema naming the offense (mirrors off_lexicon_ids, empty-refs
-  payload convention): (direction, strength) pair without a tail-bearing lexicon row;
+- [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
+  CnlExpressibilityError (one variant per class) + check_cnl_expressible(clinical, lexicon
+  (role + tail view), segments ((segment_id, region_ids) view)) over grounded lexicon-valid
+  ClinicalIr. Classes: (direction, strength) pair without a tail-bearing lexicon row;
   wrong-slot vocabulary (§10 role view — population atoms, concept or quantity var, not
   population-role; condition atoms not condition-role; action targets not
   action_target-role; exception concepts outside the context roles: lexicon-MEMBER ids in
   slots no role admits — off_lexicon_ids checks membership only, and the committed IR
-  schema's enums stay role-agnostic — slot legality is acceptance's, a per-slot schema
+  schema's enums stay role-agnostic — slot legality is this predicate's, a per-slot schema
   re-derivation would re-bless committed schema bytes + §9 pins); EMPTY
   statements array (run.rs's accept battery currently pins empty ClinicalIr = accepted);
   signed or two-sided quantity intervals (v1 register — the committed IR schema's
   IntervalBound pattern admits negatives, IrBundle::validate admits two-sided); exception
   clauses not exactly one positive interval-free Concept atom (§10 single-concept register —
-  multi-atom / ConceptNegated / Interval exception shapes are CNL-inexpressible yet
-  schema-valid, so model-reachable); negative occurrences of interval-carrying entries —
+  multi-atom / atomless / ConceptNegated / Interval exception shapes are CNL-inexpressible
+  yet schema-valid, so model-reachable); negative occurrences of interval-carrying entries —
   context ConceptNegated or the exception concept (§10 bar: the locked tail interval-lowers
   positive occurrences only, a negative one sits as an unlinked Bool beside the Real
   interval); statements with EMPTY population+condition (schema minItems-free +
   bundle-valid, CNL's DNF derives ≥1 atom); exception clauses with EMPTY region_ids
   (bundle-valid — validate only resolves cited regions); statements whose segment-closed
   source regions are wholly exception-owned — empty rule bracket under the §10
-  exception-owned split, covers EMPTY source_segment_ids (closure input widens for the
-  topology checks: the segment id-set parameter becomes the segments artifact's
-  (segment_id, region_ids) view — the same artifact single_ir_fill already grounds
-  against, no new input; today's closure receives bare id sets, which cannot express
-  these checks); statements whose cited segments carry no region or
-  share a region with another segment (closure-nonfunctional — breaks segment recovery from
-  region-level basis, the to_ir∘from_ir law; the empty-region segment segmenter-REACHABLE
-  via an all-ungrounded table row, the shared region bundle-valid only) — closing §10
-  render-totality for the one IR-landing route without a grammar/derivation guard (M1 derives
-  from lexicon rows + integrity; single_cnl's grammar admits only lexicon tails). Tests: each
-  reject class + boundary accepts + repair recovery; BOTH existing positive fixtures
+  exception-owned split, covers EMPTY source_segment_ids (the segment-closure helper lands
+  here; cnl-bridge's from_ir renders the same closure); statements whose cited segments
+  carry no region or share a region with another segment (closure-nonfunctional — breaks
+  segment recovery from region-level basis, the to_ir∘from_ir law; the empty-region segment
+  segmenter-REACHABLE via an all-ungrounded table row, the shared region bundle-valid
+  only). Tests: per-class rejection battery naming the variant + boundary accepts + a
+  locked-corpus positive control (the 3 M1-derived ClinicalIr + their segments pass — the
+  report-cnl.2 audit-render domain). Fresh-module seed, no run.rs contact. Read scope:
+  ir.rs shapes + the lexicon modality table and role view (lexicon.rs post-extract).
+- [ ] accept-total: single_ir_accept calls check_cnl_expressible after its vocabulary +
+  grounding stages — closing §10 render-totality for the one IR-landing route without a
+  grammar/derivation guard (M1 derives from lexicon rows + integrity; single_cnl's grammar
+  admits only lexicon tails): the closure's segment id-set parameter widens to the segments
+  artifact's (segment_id, region_ids) view (the same artifact single_ir_fill already
+  grounds against, no new input; today's bare id sets cannot express the topology classes)
+  + it takes the lexicon role/tail view; every CnlExpressibilityError → repairable
+  FillReject::Schema naming the offense (mirrors off_lexicon_ids' empty-refs payload
+  convention). Tests: each predicate class rejected THROUGH the acceptance surface (payload
+  names the class) + boundary accepts + repair recovery; BOTH existing positive fixtures
   rebuilt role-valid + CNL-expressible with their former shapes re-pinned as named rejects
   (classifies' cited output — empty context, empty exception atoms; vocabulary's base —
   q.age_years interval under condition, ConceptNegated exception atom; both tail-less —
   accept_lexicon() gains tail-bearing modality rows, roles, and a quantity row); M2
   recorded-run battery green proves no
   retroactive census flip (a flip ⇒ stop, user decision). Read scope: run.rs accept-closure
-  region + the lexicon modality table and role view (lexicon.rs post-extract) only.
+  region + cnl_bridge.rs's predicate surface only.
 - [ ] cnl-bridge: cnl_bridge.rs — to_ir + from_ir per the plan-header determinism rules
   (to_ir partitions context atoms by the §10 role view;
-  from_ir = Err, fail-closed, on any CNL-inexpressible shape — an ExceptionClause not
-  exactly one positive interval-free Concept atom, an ExceptionClause with empty region_ids,
-  a negative occurrence of an
-  interval-carrying entry, an empty statement context, an empty rule-bracket remainder
-  (wholly exception-owned segment-closed source regions — covers empty source_segment_ids),
-  wrong-slot placement against the §10 role view (a context atom, action target, exception
-  concept, or interval bucket its role contradicts — any rendering re-parses into a
-  different partition, silently moving the atom)
-  — §10 render totality; unreachable
+  from_ir = check_cnl_expressible at entry — its SOLE Err source, one class list shared
+  with acceptance (cnl-expressible's taxonomy; wrong-slot IR is CNL-inexpressible because
+  any rendering re-parses into a different partition, silently moving the atom); past a
+  passing check the projection is TOTAL — a residual failure is a fail-closed panic
+  (instrument bug), never a fresh Err class
+  — §10 render totality; predicate-Err unreachable
   from bridge-image (= to_ir over ACCEPTED ASTs — single_cnl_accept rejects the CNL-side
   mirrors: orphan/shared cited regions, blanketing exception brackets),
   accept-total-guarded, and locked-corpus IR; to_ir = Err on any escape
@@ -458,6 +477,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   exception-owned segment-closed
   basis split, ≠ naive identity on multi-disjunct or atom-disordered inputs). Codeco method; bound
   sizes to CI-sane runtime.
+- [ ] expressible-law: the §10 expressibility-agreement harness — bounded enumeration of
+  grounded lexicon-valid ClinicalIr: positives = to_ir over enumerated accepted ASTs
+  (bridge-image, cnl-laws' method) + the 3 locked-corpus derived ClinicalIr; negatives =
+  per-class mutations landing in EVERY CnlExpressibilityError variant while staying
+  grounded + lexicon-valid (the predicate stays the deciding acceptance layer). Assert per
+  case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
+  from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
+  renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
+  run.rs accept-closure call surface + cnl_bridge.rs + cnl-laws' enumeration harness.
 - [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
   (fieldless_enum append) + FillReject +Parse(String) (repairable → cnl_parse_error) /
   +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the
