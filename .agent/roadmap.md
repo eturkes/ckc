@@ -845,15 +845,22 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] report-cnl.3: md renderers — finding/no-conflict bodies quote rules as CNL beside
   quoted spans (JA body quotes JA CNL, EN body EN CNL; Labels; lookup = finding rule_id → the
   findings_owner_pipeline_id pipeline's cnl_rules entry ALONE, owner-labeled —
-  deterministic over report.json alone (the owner id is a report field), at most one
-  quote per language (inner ids document-prefixed); non-owner entries NEVER render beside
-  findings — positional rule ids don't align routes (plan-header findings-owner bullet),
-  their views stay in audit surfaces; a rule id the owner's entry doesn't carry — or an
-  absent owner field — renders nothing, omit-empty md) + rendered-body const re-bless
+  deterministic over report.json alone (the owner id is a report field), at most one quote
+  per (row, rule_id, language) — result rows carry rule-id VECTORS, every carried id
+  considered, document-prefixed inner ids make each per-rule lookup unique; non-owner
+  entries NEVER render beside findings — positional rule ids don't align routes
+  (plan-header findings-owner bullet), their views stay in audit surfaces; a rule id the
+  owner's entry doesn't carry renders nothing, omit-empty md — the SPEC-stated fallback;
+  an absent owner field beside nonempty findings/no-conflict rows is a validate failure
+  (report-cnl.2's implication), never a renderer fallback) + rendered-body const re-bless
   (Z3_VERSION-normalize pattern) + emission-order/validate coupling tests + the
   misalignment discriminating test: a fixture whose non-owner route inserts a leading rule
-  — owner and non-owner both carry `<doc>.rule.0` with DIFFERENT text — must render the
-  owner text and never the non-owner text.
+  — owner and non-owner both carry `<doc>.rule.0` with DIFFERENT text — AND whose
+  non-owner pipeline id sorts FIRST in cnl_rules key order (a scan-all/first-match
+  renderer picks non-owner text and fails; only the owner-field lookup passes), unique
+  EN+JA marker text per route, exercised in a finding row AND a no-conflict row: owner
+  markers render in both md bodies, non-owner markers in neither, while staying present
+  in report.json cnl_rules and the audit views.
 - [ ] canon-props: canon-layer generated-case harness (standing AGENTS.md-preferred
   hardening, never an M3 entry gate; sits after M3's last canonical-shape change —
   codes-cnl, metrics, report) — bounded deterministic enumeration (cnl-laws' method, zero

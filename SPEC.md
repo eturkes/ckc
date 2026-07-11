@@ -1257,10 +1257,12 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   document: a multi-route experiment accepts the same document several times, so views stay
   separately auditable; non-IR routes land none); `report.json` carries the CNL text
   hashes and per-rule CNL strings under the same (pipeline, document) key; report_{en,ja}.md
-  quote each finding's rules as CNL beside the quoted source spans from the findings-owner
-  pipeline's entry alone (§7.2 `findings_owner_pipeline_id`; positional rule ids never
-  align routes — every route's views remain in the audit surfaces). The clinician-facing
-  layer of every report is CNL from M3 on.
+  quote each finding's and documented no-conflict result's rules as CNL beside the quoted
+  source spans from the findings-owner pipeline's entry alone (§7.2
+  `findings_owner_pipeline_id`; positional rule ids never align routes — every route's
+  views remain in the audit surfaces). The clinician-facing rule restatements are
+  owner-route CNL from M3 on wherever the owner's entry carries the rule; an owner-entry
+  miss omits the quote (§7.2).
 - Emission-target posture (honest framing): the CNL is the committed audit surface by design;
   WHICH surface the weak model emits most reliably is the §11 measured question. Recorded
   hypothesis: a Japanese-capable weak model emits grammar-constrained Japanese CNL more
@@ -1338,10 +1340,10 @@ Acceptance themes (finalized at M3 planning): `exp.m3_cnl` executes all three ro
 locked M1 inputs with raw rows before deltas; the determinism laws hold as property tests;
 every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric);
 faithfulness rows emit beside the surface rows (measured, never gated — the weak baseline may
-honestly read low or not_applicable; the golden path reads 1.0); audit
-views render deterministically for every route including M1's; the golden-cassette
-reproduce-M1 gate passes; recorded model I/O replays byte-stably; grammar/lexicon exports carry
-drift guards; §0 vocabulary holds.
+honestly read low or not_applicable; the golden path reads 1.0); audit views render
+deterministically for every route including M1's, and finding/no-conflict Markdown quotes
+owner-route CNL only; the golden-cassette reproduce-M1 gate passes; recorded model I/O
+replays byte-stably; grammar/lexicon exports carry drift guards; §0 vocabulary holds.
 
 ## §11 M4 — Route field: variation and comparison (requirements; elaborate at M3 acceptance)
 

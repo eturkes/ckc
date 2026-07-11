@@ -208,7 +208,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   first X". Design-side corollary: content-hash selection collapses where reproduction pins make byte-equal
   candidates the NORM (route bundle hash == M1's) → select by identity ids, keep the hash as a conjunct
   check (`GroupTrace.member_bundles` ∧ `input_hashes`); fixture axis = candidates differing in id while
-  EQUAL in content.
+  EQUAL in content. Ordering corollary (M3-plan codex): even DIFFERING candidates
+  under-discriminate when the contract's pick coincides with a plausible wrong strategy's pick — the
+  findings owner sorting first in cnl_rules key order lets a scan-all/first-match renderer pass without
+  reading findings_owner_pipeline_id → arrange the fixture so wrong strategies land a DIFFERENT
+  candidate (non-owner sorts first).
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
