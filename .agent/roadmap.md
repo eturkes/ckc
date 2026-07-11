@@ -358,8 +358,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   gloss_en (EN) — no new field; EN negation likewise field-less, a fixed-negator
   composition over gloss_en at the grammar (JA negation lexical: negated_ja); §10
   composition-decree authoring contracts — gloss_en = lowercase article-free noun phrase
-  reading after with/without/of, adnominal = direct-prenominal (before 患者 AND before
-  かつ), interval-carrying context concepts author negated forms too (tokens parse;
+  reading after with/without/of (shape lint-enforced at lexicon-cnl.2), adnominal =
+  direct-prenominal before 患者 (mid-chain decree-uniform, clause-form stiltedness
+  accepted), interval-carrying context concepts author negated forms too (tokens parse;
   acceptance rejects use with the complement-interval repair); synonym
   surfaces[1..] stay source-match-only, never CNL
   terminals), LexiconAction
@@ -457,7 +458,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   tail-less modality rows exempt — per-pair availability is integrity's rule), and
   proper-prefix overlap across ALL lexer-visible terminals, same- AND cross-category
   (maximal munch can steal across categories; segmentation determinism — the
-  Earley-superset caveat's guard) + per-variant rejection battery over bad-lexicon
+  Earley-superset caveat's guard), and EN-value shape (ASCII-only lowercase
+  word/digit/hyphen tokens single-space-separated, `:` for certainty labels; leading
+  article a/an/the rejected on gloss_en — SemanticEn lowercases, never rejects
+  non-ASCII) + per-variant rejection battery over bad-lexicon
   fixtures. The reserved-terminal + lexer-category inventory lands here as ONE typed
   module that lint, grammar emitter, and parser all consume (single source, no drift).
   Wiring — the lint gates, never floats: committed-lexicon zero-findings test; the §10
@@ -526,8 +530,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   "…"`, bare gloss/escape after `of`; JA mid vs patient-adjacent atom alternations —
   interval + escape take the fixed の exactly before 患者 (two JA nonterminals;
   stray/missing の = parse error); certainty paren `(` + certainty-row surface + `)`
-  between tail and terminator; spacing decree — JA spaceless, EN single-space separators
-  owned by fixed terminals/joiners, bracket internals space-separated sorted ids;
+  between tail and terminator; spacing decree — JA separator-free outside bracket
+  internals (surface/payload-internal spaces = data), EN single-space separators owned by
+  fixed terminals (no bare-space token — it would prefix every space-leading terminal),
+  bracket internals space-separated sorted ids;
   terminals = lexicon whole-surface
   literals in slot-specific alternations from the §10 role view (context + exception
   concept slots = context-role surfaces, action target = action_target-role surfaces —
@@ -583,7 +589,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), wrong-slot
   registered surface (e.g. an action_target-only concept as a context atom), malformed
   interval bounds, JA の-position violations (missing patient-adjacent の / stray
-  mid-chain の — §10 composition decree), wrong-unit-for-var interval (the QuantityVar row's pairing — mirrors
+  mid-chain の — §10 composition decree), hand-oracled four-bound fixture
+  (以上/以下/未満/超 + at least/at most/less than/more than ↔ ge/le/lt/gt, BOTH languages
+  — expected values hand-written, never derived from the mapping under test:
+  identity/differential laws pass a consistently swapped shared table),
+  wrong-unit-for-var interval (the QuantityVar row's pairing — mirrors
   the grammar's per-row productions), numeral overflow boundary (i64::MAX parses, i64::MAX+1 = repairable
   parse error — §10's second over-approximation class), connective misuse, mid-token
   truncation, escape-payload contract
@@ -632,7 +642,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   the assert fires before any lexicon lookup) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
   control shape) + 1 patient-adjacent-の byte pin (interval-atom-final context + escape
-  exception, both languages — §10 composition decree).
+  exception, both languages — §10 composition decree) + hand-oracled four-bound render
+  rows (literals hand-written — cnl-parse.1's fixture mirrored) + 1 certainty-present
+  bilingual byte pin (paren between tail and terminator — JA abutting, EN
+  space-before-paren).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
   CnlExpressibilityError (one variant per class) + check_cnl_expressible(clinical, lexicon
   (role + tail view), segments (segment_id → (kind, region_ids) keyed view)) over grounded
@@ -781,7 +794,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   derive_norm_ir contract — run.rs stays closed.
 - [ ] cnl-laws: depth-bounded AST enumeration harness (all atom kinds — interval atoms
   across all four bound kinds, register values — × 1–2 disjuncts × 1–2
-  conjuncts × all tail-backed modality pairs × certainty on/off × ≤2 exceptions × 1–2 basis
+  conjuncts (conjunct atom order permuted — clause-form adnominal mid-chain covered) ×
+  all tail-backed modality pairs × certainty on/off × ≤2 exceptions × 1–2 basis
   refs per bracket (rule + per-exception, emitted sorted) × 1–2 rules per document (§10 LF
   frame under the
   laws; documents built through the shared frame assembly, semantic-projection equality

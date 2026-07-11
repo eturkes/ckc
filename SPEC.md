@@ -935,7 +935,7 @@ Committed direction:
 | action | `<target>の<action-noun>` (例 `抗菌薬Aの投与`) | `<action-noun> of <target>` | Action kind + target |
 | deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
 | certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
-| exception | `ただし、<concept>患者を除く。[根拠 <id> …]` per entry | `exception: patients <concept>. [basis <id> …]` per entry | one single-concept ExceptionClause per entry per split statement (disjunct splits clone entries under fresh ids, each clone keeping its sentence's basis) — separate labeled payload (PROLEG pattern); the entry's own bracket = the clause's region_ids |
+| exception | `ただし、<exception-atom>患者を除く。[根拠 <id> …]` per entry | `exception: patients <exception-atom>. [basis <id> …]` per entry | one single-concept ExceptionClause per entry per split statement (disjunct splits clone entries under fresh ids, each clone keeping its sentence's basis) — separate labeled payload (PROLEG pattern); the entry's own bracket = the clause's region_ids; `<exception-atom>` = positive registered concept or escape incl. its composition glue (EN `with`, escape's patient-adjacent の) |
 | basis | `[根拠 <id> …]` after each sentence, sorted per bracket, ≥1 ref | `[basis <id> …]` after each sentence, sorted per bracket, ≥1 ref | rule bracket = the rule sentence's region refs (normal form: the segment-closed remainder); exception brackets = per-clause region refs; statement source segments derive from their union |
 
 - DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
@@ -959,11 +959,13 @@ Committed direction:
   concept slot, before 患者を除く。) — while interval and escape atoms take the fixed
   linking terminal の exactly patient-adjacent (年齢が18歳未満の患者には、 /
   ただし、未登録概念「…」の患者を除く。) and compose bare elsewhere
-  (成人かつ年齢が18歳以上、または…): the JA grammar carries mid vs patient-adjacent atom
-  alternations (two nonterminals), so a stray or missing の is a parse error like any
-  other byte. Interval bound markers: JA `以上`/`以下`/`未満`/`超` ↔ ge/le/lt/gt after the
+  (成人かつ年齢が18歳以上、または…): the JA grammar (cnl-grammar.1) carries mid vs
+  patient-adjacent atom alternations (two nonterminals), so a stray or missing の is a
+  parse error like any other byte. Interval bound markers: JA `以上`/`以下`/`未満`/`超` ↔ ge/le/lt/gt after the
   unit (`18歳以上`); EN `at least`/`at most`/`less than`/`more than` ↔ ge/le/lt/gt before
-  the numeral (`at least 18 years`). EN atoms are position-invariant under one
+  the numeral (`at least 18 years`); units render invariant (`years`), so `at least 1
+  years` is accepted mirror stiltedness — numeral agreement deliberately unhandled,
+  one-form determinism over fluency. EN atoms are position-invariant under one
   prepositional frame — a positive concept atom and the exception concept slot render
   `with <gloss_en>`, a negated atom `without <gloss_en>` (the fixed negator replaces
   `with`, never stacks), an interval atom `with <quantity-surface> <bound> <n> <unit>`,
@@ -973,20 +975,34 @@ Committed direction:
   `gloss_en` authoring contract: a lowercase-ASCII article-free noun phrase naming the
   condition/entity (`sepsis`, `severe renal impairment`, `adult status`, `antibiotic-a`)
   that reads after `with`/`without`/`of`; the reserved-token and prefix-overlap lints
-  already bar glosses containing connective/frame terminals (hyphenate:
-  `head-and-neck injury`) or prefixing one another. The adnominal contract mirrors it: a
-  prenominal form reading directly before 患者 and before かつ (成人, 敗血症のある).
+  (lexicon-cnl.2) bar glosses containing connective/punctuation terminals (hyphenate:
+  `head-and-neck injury`) or prefixing another lexer-visible token, and the EN-value
+  shape lint (same unit) enforces the normalized form — ASCII-only lowercase
+  word/digit/hyphen tokens, single-space-separated, `:` admitted for certainty labels,
+  leading article (a/an/the) rejected on `gloss_en` — because SemanticEn lowercases ASCII
+  yet never rejects non-ASCII, the shape needs its own lint. The adnominal contract: a
+  prenominal form reading directly before 患者 (成人, 敗血症のある); mid-chain
+  composition (before かつ/、または) is decree-uniform concatenation — unambiguous in
+  every atom order, and clause-form adnominals read stilted there (敗血症のあるかつ…, the
+  guideline_b golden shape), an accepted controlled-language cost: fluency stays
+  unclaimed off the patient-adjacent slot, and cnl-laws permutes conjunct atom order.
   Interval-carrying context concepts author negated forms too — the tokens must parse for
   acceptance to reject their use repairably with the complement-interval repair (the
   negative-occurrence bar is acceptance-enforced, never a token-table gap). Certainty
   parenthetical = `(` + the certainty row's surface + `)` — the committed JA surfaces
   already carry the label (`エビデンスの確実性:中`) and `surface_en` mirrors that form
   (`certainty: moderate`) — placed between the deontic tail and the sentence terminator in
-  both languages. Spacing: JA rules carry no spaces — 。 abuts its basis bracket and the
-  next sentence; EN separates sentences, brackets, and the certainty paren with single
-  spaces, every space owned by a fixed terminal or an explicit joiner (lexicon surfaces
-  are edge-trimmed by policy, so productions insert the joining bytes); bracket internals
-  = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both languages.
+  both languages. Spacing: JA composition inserts no separator bytes outside bracket
+  internals — 。 abuts its basis bracket and the next sentence (surface- and
+  payload-internal spaces stay data; SemanticJa and the escape contract admit internal
+  normalized spaces); EN inter-terminal separators are exactly one space, owned by the
+  fixed terminals — frame and connective terminals carry their delimiting spaces
+  (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory
+  emitter-pinned), which is also what keeps the fixed inventory prefix-free under its own
+  lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
+  terminals too) — while surface- and payload-internal spaces stay data (`adult status`);
+  bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both
+  languages.
 - Exception register (v1, deliberately narrower than the context DNF): each exception sentence
   carries exactly one concept slot — a positive registered concept (adnominal surface) or the
   escape — no connectives, no negated-concept atoms, no quantity intervals. Multiple exception
