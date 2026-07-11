@@ -988,7 +988,17 @@ Committed direction:
   unclaimed off the patient-adjacent slot, and cnl-laws permutes conjunct atom order.
   Interval-carrying context concepts author negated forms too — the tokens must parse for
   acceptance to reject their use repairably with the complement-interval repair (the
-  negative-occurrence bar is acceptance-enforced, never a token-table gap). Certainty
+  negative-occurrence bar is acceptance-enforced, never a token-table gap). The
+  negated-adnominal contract mirrors the adnominal one (a prenominal negation reading
+  directly before 患者), under one authoring law the prefix lint makes structural: no
+  lexer-visible surface may extend another as a proper prefix, so suffix negations of
+  bare-noun positives (成人 → 成人でない) are excluded by construction — bare-noun
+  positives negate by 非-prefix (非成人, 非小児), verb-form adnominals flip the verb
+  (敗血症のある → 敗血症のない), copula-state forms flip the copula (妊娠中である →
+  妊娠中でない); every authored positive/negated pair diverges before either string
+  ends. Adnominals also avoid a trailing の (妊娠中である, never 妊娠中の): a
+  surface-final の reads as the fixed linking terminal — visually ambiguous
+  patient-adjacent and dangling mid-chain (妊娠中のかつ…). Certainty
   parenthetical = `(` + the certainty row's surface + `)` — the committed JA surfaces
   already carry the label (`エビデンスの確実性:中`) and `surface_en` mirrors that form
   (`certainty: moderate`) — placed between the deontic tail and the sentence terminator in
@@ -1000,7 +1010,13 @@ Committed direction:
   (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory
   emitter-pinned), which is also what keeps the fixed inventory prefix-free under its own
   lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
-  terminals too) — while surface- and payload-internal spaces stay data (`adult status`);
+  terminals too); the two EN slots that follow a lexicon surface with no fixed terminal
+  of their own — the deontic tail after the bare target, the unit after the numeral —
+  take their single leading space by emitter composition: the emitted terminal is the
+  space plus the surface (` is strongly recommended`, ` years`), the lexicon field itself
+  stays space-free under the EN shape lint, and the token inventory, prefix lint, and
+  parser tables all carry the composed forms — while surface- and payload-internal
+  spaces stay data (`adult status`);
   bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both
   languages.
 - Exception register (v1, deliberately narrower than the context DNF): each exception sentence

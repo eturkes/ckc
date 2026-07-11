@@ -651,7 +651,23 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   shape lint at lexicon-cnl.2 (SemanticEn never rejects non-ASCII), hand-oracled
   four-bound fixtures parse + render sides (identity/differential laws pass a
   consistently swapped bound table), certainty-present byte pin at cnl-render, conjunct
-  atom-order permutation axis at cnl-laws. FillReject grows Parse
+  atom-order permutation axis at cnl-laws. Lexicon DATA pinned in the roadmap line (unit =
+  transcription + bless, zero in-session design; committed ja_core = 6 concepts, 7 modality
+  rows over SIX pairs, 4 certainty rows, corpus per §8.2 — guideline_b realizes
+  cond.pregnancy as a CONTEXT atom): negated-adnominal decree law — the prefix lint bars
+  suffix negations of bare-noun positives (成人でない extends 成人 → lint-reject), so
+  非-prefix (非成人/非小児) / verb flip (のある→のない) / copula flip (である→でない);
+  adnominals bar trailing の (妊娠中の ✗ — reads as the fixed linking terminal, hangs
+  mid-chain) → cond.pregnancy = 妊娠中である/妊娠中でない; (contraindicate,strong) tail
+  rides the 禁忌 row ONLY — 投与しないこと deliberately tail-less (surface embeds the
+  action verb; ActionNoun 投与 would prefix-collide with a 投与-led tail) so
+  first-tail-bearing = canonical meets the worked は禁忌である; spacing-decree hole
+  CLOSED: EN deontic tail (after bare target) + unit (after numeral) = the two slots
+  with no adjacent fixed terminal → emitter composes the single leading space into the
+  terminal (` is strongly recommended`, ` years`), raw fields space-free,
+  inventory/prefix-lint/parser tables all carry composed forms; projected full inventory
+  hand-audited pairwise prefix-free at plan time (re-verify mechanically at impl).
+  FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
   spends no repair). Record strategy: scratch-root record from a newly created EMPTY cassette

@@ -360,7 +360,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   composition-decree authoring contracts — gloss_en = lowercase article-free noun phrase
   reading after with/without/of (shape lint-enforced at lexicon-cnl.2), adnominal =
   direct-prenominal before 患者 (mid-chain decree-uniform, clause-form stiltedness
-  accepted), interval-carrying context concepts author negated forms too (tokens parse;
+  accepted; trailing の barred), negated_ja = prenominal negation prefix-clean against
+  its positive (§10 decree: 非-prefix bare nouns / verb flip / copula flip — suffix
+  extensions lint-barred), interval-carrying context concepts author negated forms too
+  (tokens parse;
   acceptance rejects use with the complement-interval repair); synonym
   surfaces[1..] stay source-match-only, never CNL
   terminals), LexiconAction
@@ -381,21 +384,45 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   deny_unknown_fields, parses the committed lexicon) gains the same optional fields +
   quantity table — it reddens at lexicon-cnl-data otherwise. Committed bytes untouched,
   no re-bless.
-- [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts with §10
-  slot roles — pop.* population, cond.* condition, drug.abx_a action_target — + decree
-  surfaces: adnominal/negated worked forms (成人 / 敗血症のある style), gloss_en noun
-  phrases (sepsis / adult status / antibiotic-a), certainty surface_en mirroring the
-  committed JA label form (certainty: moderate);
-  act.administer +noun_ja/noun_en (§10 worked 投与 / administration), 7 modality rows incl.
-  §10's worked tails を強く推奨する / は禁忌である,
-  certainty rows +surface_en each, q.age_years role=population) — written against lexicon-cnl-integrity's full rule list
+- [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set — the CNL surface table
+  pinned HERE in full (unit = transcription + bless, never in-session design; every value
+  below chosen against the §10 decree contracts + prefix law). Concepts, roles per the M1
+  pin, as adnominal_ja / negated_ja / gloss_en: pop.adult 成人 / 非成人 / adult status +
+  pop.child 小児 / 非小児 / pediatric status (both interval-carrying — negated forms
+  parse-only under the §10 negative-occurrence bar; 非-prefix per the decree, suffix forms
+  like 成人でない being prefix-lint-rejected); cond.sepsis 敗血症のある / 敗血症のない /
+  sepsis; cond.renal_severe 重度腎機能障害のある / 重度腎機能障害のない / severe renal
+  impairment; cond.pregnancy 妊娠中である / 妊娠中でない / pregnancy (copula pair — the
+  §10 trailing-の bar rejects 妊娠中の, and bare 妊娠中 would force a prefix-colliding
+  でない form); drug.abx_a action_target-only → no adnominal/negated (role-scoped surface
+  rules), gloss_en antibiotic-a, citation = existing surfaces[0] 抗菌薬A. Quantity table:
+  one row q.age_years {role population (both pop.* users population-role — integrity's
+  var-role agreement), surface_ja 年齢, unit_ja 歳, surface_en age, unit_en years}.
+  act.administer +noun_ja 投与 / noun_en administration (§10 worked). Modality: 7 rows
+  stay, six (direction,strength) pairs present, each pair's sole row tail-bearing EXCEPT
+  (contraindicate,strong): (for,strong) を強く推奨する / is strongly recommended;
+  (for,weak) を提案する / is suggested; (permit,weak) を考慮してもよい / may be
+  considered; (against,strong) を推奨しない / is not recommended; (against,weak)
+  を提案しない / is not suggested; (contraindicate,strong) tail on the 禁忌 row
+  は禁忌である / is contraindicated while 投与しないこと stays deliberately tail-less
+  (its surface embeds the action verb — a tail follows `<target>の<noun_ja>`, doubling
+  投与; ActionNoun 投与 would also prefix-collide with a 投与-led tail) → first
+  tail-bearing row = 禁忌, so integrity's canonical-row pin meets §10's worked
+  は禁忌である. Certainty surface_en per value: certainty: high / certainty: moderate /
+  certainty: low / certainty: very low (label form mirrors committed JA; `:` admitted by
+  the EN shape lint). Prefix-audit, banked (re-verify mechanically at impl over the
+  composed inventory): the projected JA+EN token set above + fixed terminals + digits is
+  pairwise proper-prefix-free — load-bearing choices: 非-prefix negations, ある/ない +
+  である/でない divergence inside clause forms, tails all を/は-led, EN tail/unit tokens
+  compared space-leading-composed (§10 spacing decree) within the space-leading fixed set.
+  Written against lexicon-cnl-integrity's full rule list
   (data lands FIRST: those hard-errors bind the committed lexicon the moment they land —
   tail-availability + quantity-per-interval-var + action-noun/certainty-surface totality
   demand these rows). Gate: load/normalize
   tests green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless
   literals) + full gates; shape/integrity leave committed bytes untouched (a later
   lexicon-cnl.2 lint finding against the committed data = fix + re-bless there,
-  deliberate).
+  deliberate — the table above is authored against those rules, so a finding = audit slip).
 - [ ] lexicon-cnl-integrity: §10 integrity hard-errors NEW in load_lexicon —
   implies_action resolves to an action entry, quantity var_ids unique, quantity var set ==
   the set of interval vars concepts use (exactly one row per used var, orphan rows
@@ -450,7 +477,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (proves lexicon-cnl-data's authored rows satisfy them) + full gates.
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
   connective/punctuation grammar terminal or a backtick — §7.2 renders rule strings in
-  single-backtick md code spans; escape payloads need no bar, terminal at accept + absent
+  single-backtick md code spans; barred class = connective terminals (かつ, 、または,
+  ` and `, `; or `) + punctuation/delimiters (、 。 「 」 the ASCII quote, parens,
+  brackets) + backtick, while linking/frame glue — の, が, `with `/`without `/` of `,
+  bound words — stays outside it (committed adnominals contain の by design);
+  escape payloads need no bar, terminal at accept + absent
   from accepted/report-rendered text (pre-accept escapes render + round-trip by design)), role-scoped missing-CNL-surface findings (a
   context-role concept lacking adnominal/negated/gloss forms, an action_target-role
   concept lacking gloss_en — citation = surfaces[0] + gloss_en, surfaces[0] row-required
@@ -458,7 +489,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   tail-less modality rows exempt — per-pair availability is integrity's rule), and
   proper-prefix overlap across ALL lexer-visible terminals, same- AND cross-category
   (maximal munch can steal across categories; segmentation determinism — the
-  Earley-superset caveat's guard), and EN-value shape (ASCII-only lowercase
+  Earley-superset caveat's guard; EN tail/unit tokens compared in their composed
+  space-leading form — §10 spacing decree), and EN-value shape (ASCII-only lowercase
   word/digit/hyphen tokens single-space-separated, `:` for certainty labels; leading
   article a/an/the rejected on gloss_en — SemanticEn lowercases, never rejects
   non-ASCII) + per-variant rejection battery over bad-lexicon
@@ -533,6 +565,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   between tail and terminator; spacing decree — JA separator-free outside bracket
   internals (surface/payload-internal spaces = data), EN single-space separators owned by
   fixed terminals (no bare-space token — it would prefix every space-leading terminal),
+  EN tail + unit terminals emitted space-leading — composed space+surface for the two
+  slots no fixed terminal precedes (§10 decree; inventory module, lint, and parser tables
+  share the composed forms),
   bracket internals space-separated sorted ids;
   terminals = lexicon whole-surface
   literals in slot-specific alternations from the §10 role view (context + exception
