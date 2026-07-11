@@ -512,9 +512,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   disjointness); origin map rule_origins(CnlDocument) → `<doc>.rule.<k>` → originating
   rule index, pure fn mirroring derive_norm_ir's statement-enumerate mint, non-core —
   report cnl_rules keys per-rule {ja,en} text by normative rule id via it (accepted doc:
-  a split duplicates one rule's text under several ids; from_ir doc: identity), findings
-  quote per carrying pipeline, pipeline-labeled (entry-less rule id renders NO CNL —
-  SPEC-stated fallback; validate pins inner-id/document-key agreement); round-trip laws (ACCEPTED escape-free ASTs,
+  a split duplicates one rule's text under several ids; from_ir doc: identity), finding/no-conflict
+  md quotes the findings_owner_pipeline_id pipeline's entry ALONE, owner-labeled (rule ids
+  route-local POSITIONAL, never cross-route alignment keys — a non-owner same-numbered id
+  may be different content; owner-entry-less rule id renders NO CNL — SPEC-stated fallback;
+  validate pins inner-id/document-key agreement + findings/no-conflict ⇒ owner-field
+  presence; all-route entries stay audit-only); round-trip laws (ACCEPTED escape-free ASTs,
   to_ir Err on escapes):
   from_ir = single-disjunct projection — clause region_ids verbatim on its exception
   sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
@@ -532,7 +535,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   lineage/claims rule); single_cnl's reused m1.compile mints query/finding ids byte-equal
   single_ir's ⇒ owner SELECTION (GroupTrace mark, is_baseline pattern, route-single-cnl.3)
   over route-qualified payload ids (those rewrite §7.2 id forms + re-bless M1/M2 pins);
-  non-owner groups stay trace-DAG nodes + RouteRun metrics only.
+  non-owner groups stay trace-DAG nodes + RouteRun metrics only. The report names the
+  owner canonically — findings_owner_pipeline_id (report-cnl.1 shape, .2 population riding
+  the deliberate re-bless, .3 owner-scoped md lookup); cross-route CNL side-by-side needs
+  an explicit alignment map (M4 ablation scope), never positional rule-id equality.
   Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
   EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
   plumbing (pipeline_step_ids [Id; 8], MODEL_FILL/DIRECT_VERIFY/COMPILE=4/VERIFY=5/TRACE/

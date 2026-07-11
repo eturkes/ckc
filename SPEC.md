@@ -591,16 +591,23 @@ joins it as a deterministic Japanese rendering of the same canonical content. Co
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
-weighted ranking; from M3, per-document CNL audit views and per-rule CNL text keyed by
-normative rule id via §10's origin map (findings quote their rules as CNL beside the quoted
-source spans, labeled per carrying pipeline; a rule id carried by no pipeline's entry —
-its document unaccepted or CNL-inexpressible under every route — renders without CNL); from
+weighted ranking; from M3, per-document CNL audit views, per-rule CNL text keyed by
+normative rule id via §10's origin map, and a `findings_owner_pipeline_id` field naming the
+findings-view owner (findings and documented no-conflict results quote their rules as CNL
+beside the quoted source spans from the owner pipeline's entry alone, owner-labeled —
+normative rule ids are route-local positional identities, never cross-route alignment keys:
+a same-numbered id under another route may hold different content, so cross-route CNL
+comparison requires an explicit alignment map, out of scope through M3, and non-owner
+entries feed audit views only; a rule id the owner's entry does not carry — the owner's
+view CNL-inexpressible — renders without CNL); from
 M4, ablations; from M5,
 attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
 A multi-route run keeps exactly one findings view: the first compiled (bundle-bearing) pipeline
 in experiment binding order feeds the findings body, the documented no-conflict results, and
-the report's verifier-result identity, keeping payload query and finding ids route-unprefixed;
+the report's verifier-result identity — `findings_owner_pipeline_id` records that pipeline
+canonically, present whenever the run lands a findings view — keeping payload query and
+finding ids route-unprefixed;
 every other compiled route lands route-namespaced artifacts feeding audit views, metrics, and
 ledgers only.
 From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
@@ -1250,8 +1257,10 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   document: a multi-route experiment accepts the same document several times, so views stay
   separately auditable; non-IR routes land none); `report.json` carries the CNL text
   hashes and per-rule CNL strings under the same (pipeline, document) key; report_{en,ja}.md
-  quote each finding's rules as CNL beside
-  the quoted source spans (§7.2). The clinician-facing layer of every report is CNL from M3 on.
+  quote each finding's rules as CNL beside the quoted source spans from the findings-owner
+  pipeline's entry alone (§7.2 `findings_owner_pipeline_id`; positional rule ids never
+  align routes — every route's views remain in the audit surfaces). The clinician-facing
+  layer of every report is CNL from M3 on.
 - Emission-target posture (honest framing): the CNL is the committed audit surface by design;
   WHICH surface the weak model emits most reliably is the §11 measured question. Recorded
   hypothesis: a Japanese-capable weak model emits grammar-constrained Japanese CNL more

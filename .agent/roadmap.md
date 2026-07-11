@@ -148,7 +148,14 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   untouched. Non-owner compiled routes' groups land route-namespaced in the trace DAG
   (census/replay/audit; per-route metrics via RouteRun) and stay OUT of the finding mint +
   report results (GroupTrace owner mark, is_baseline pattern; wired at route-single-cnl.3).
-  cnl_rules quoting unaffected — rule ids document-scoped, every pipeline's entry quotes.
+  cnl_rules stays all-route (audit surface) but finding/no-conflict md quotes the OWNER
+  pipeline's entry alone, keyed by the canonical optional report field
+  findings_owner_pipeline_id (report-cnl.1 shape, .2 population, .3 lookup): normative
+  rule ids are route-local POSITIONAL identities, never cross-route alignment keys — a
+  non-owner route that inserts/omits/differently splits an earlier statement makes its
+  same-numbered id different content, and quoting it beside an owner finding fabricates
+  support; cross-route side-by-side comparison needs an explicit alignment map (M4
+  ablation scope), never positional-id equality.
   Route-qualified payload ids REJECTED: rewrites the §7.2 finding-id form + re-blesses every
   M1/M2 report/trace pin for a per-route findings matrix no M3 consumer reads (M4 ablation
   scope).
@@ -813,10 +820,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   the rationale.
 - [ ] report-cnl.1: Report shape — cnl_documents keyed (pipeline, document) per §10 ({ja,en}
   text hashes) + cnl_rules (same key, inner map normative rule id → {ja,en} strings — §10
-  origin-map keying; a split legitimately duplicates one rule's text under several ids)
-  omit-empty members + validate rules (sorted ids, inner rule ids prefixed by their outer
-  document key — `<doc>.rule.` agreement, line-break-free strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing
-  half).
+  origin-map keying; a split legitimately duplicates one rule's text under several ids) +
+  optional findings_owner_pipeline_id (§7.2 owner field — plan-header findings-owner
+  bullet), omit-empty/omit-None members + validate rules (sorted ids, inner rule ids
+  prefixed by their outer document key — `<doc>.rule.` agreement, line-break-free strings,
+  code-span-inert; owner field when present a nonempty id-form pipeline key) + populated
+  fixture + byte pins; M1 bytes byte-identical (plumbing half).
 - [ ] report-cnl.2: population + audit views — assemble_report CNL inputs (single_cnl route:
   the accepted CnlDocument's own text/hashes — audit honesty; other routes incl. M1: from_ir
   + render over accepted ClinicalIr; cnl_rules per (pipeline, document) = rule_origins over
@@ -827,14 +836,24 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   the same document several times; body = the document's canonical bytes verbatim, §10
   LF-terminated frame; write_under + byte read-back whose re-hash must equal the
   stored/report text hash (independent frame check), report_en.md pattern; text
-  hashes into report.json) + M1/M2 report byte-pin re-bless sweep (deliberate,
-  bless-from-observed).
-- [ ] report-cnl.3: md renderers — findings quote rules as CNL beside quoted spans (JA body
-  quotes JA CNL, EN body EN CNL; Labels; lookup = finding rule_id → every cnl_rules entry
-  carrying it, quoted per carrying pipeline, pipeline-labeled — deterministic over
-  report.json alone, divergent surfaces render side by side; a rule id no entry carries
-  renders nothing, omit-empty md) + rendered-body const re-bless (Z3_VERSION-normalize
-  pattern) + emission-order/validate coupling tests.
+  hashes into report.json) + findings_owner_pipeline_id population = the §7.1 owner (the
+  first bundle-bearing pipeline in experiment binding order — the selection the report
+  tail already applies, every M1/M2/M3 experiment carries one) + validate tightened here
+  (findings or documented no-conflict results present ⇒ owner field present) + M1/M2
+  report byte-pin re-bless sweep (deliberate, bless-from-observed — the owner field rides
+  the same sweep).
+- [ ] report-cnl.3: md renderers — finding/no-conflict bodies quote rules as CNL beside
+  quoted spans (JA body quotes JA CNL, EN body EN CNL; Labels; lookup = finding rule_id → the
+  findings_owner_pipeline_id pipeline's cnl_rules entry ALONE, owner-labeled —
+  deterministic over report.json alone (the owner id is a report field), at most one
+  quote per language (inner ids document-prefixed); non-owner entries NEVER render beside
+  findings — positional rule ids don't align routes (plan-header findings-owner bullet),
+  their views stay in audit surfaces; a rule id the owner's entry doesn't carry — or an
+  absent owner field — renders nothing, omit-empty md) + rendered-body const re-bless
+  (Z3_VERSION-normalize pattern) + emission-order/validate coupling tests + the
+  misalignment discriminating test: a fixture whose non-owner route inserts a leading rule
+  — owner and non-owner both carry `<doc>.rule.0` with DIFFERENT text — must render the
+  owner text and never the non-owner text.
 - [ ] canon-props: canon-layer generated-case harness (standing AGENTS.md-preferred
   hardening, never an M3 entry gate; sits after M3's last canonical-shape change —
   codes-cnl, metrics, report) — bounded deterministic enumeration (cnl-laws' method, zero
@@ -872,5 +891,6 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] acceptance-m3: §10 acceptance themes against the recorded run (3-route raw-before-delta,
   determinism laws green, round-trip rate 1.0 on accepted docs, faithfulness rows emitted
   beside surface rows — measured never gated, golden path 1.0, audit views every route incl.
-  M1, golden-cassette reproduce-M1 gate, replay byte-stability, grammar/lexicon drift guards,
+  M1 + finding/no-conflict md quoting owner-route CNL only, golden-cassette reproduce-M1
+  gate, replay byte-stability, grammar/lexicon drift guards,
   §0 vocabulary) via the acceptance-driver pattern; tag accept/m3.
