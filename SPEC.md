@@ -592,7 +592,10 @@ lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans 
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
 weighted ranking; from M3, per-document CNL audit views, per-rule CNL text keyed by
-normative rule id via §10's origin map, and a `findings_owner_pipeline_id` field naming the
+normative rule id via §10's origin map (a (pipeline, document) whose accepted IR the §10
+predicate rejects at `from_ir` — a guard-less route, the M1 route off its locked corpus —
+carries no CNL entries: omitted under one typed `cnl_inexpressible_ir` diagnostic (§7.4),
+never an assembly failure), and a `findings_owner_pipeline_id` field naming the
 findings-view owner (findings and documented no-conflict results quote their rules as CNL
 beside the quoted source spans from the owner pipeline's entry alone, owner-labeled —
 normative rule ids are route-local positional identities, never cross-route alignment keys:
@@ -628,7 +631,10 @@ quality (precision/recall and conflict-task accuracy over test source expectatio
 completeness, determinism (hash stability), baseline delta (per-metric route-versus-baseline deltas over
 identical test sources: model routes from M2, layered-minus-direct from M4), route quality
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
-from M2), surface quality (round-trip identity rate, surface tokens per accepted rule; from
+from M2), surface quality (round-trip identity rate, surface tokens per accepted rule —
+surface tokens = the committed ClinicalCNL JA lexer's token count over the accepted
+document's stored canonical JA rule texts, deterministic and runtime-free: a model-runtime
+token count would pin a tokenizer identity and count into every cassette; from
 M3), translation faithfulness (share of a route's accepted documents whose IR content equals
 the deterministic reference derivation over identical inputs under the §10 faithfulness
 projection, binding region provenance excluded — conflict-quality verdicts
@@ -1014,12 +1020,19 @@ Committed direction:
   form lives in lexicon DATA and the grammar stays purely concatenative: concept entries
   gain adnominal / negated-adnominal / EN-gloss surfaces plus a validated slot-role set
   (typed slot roles, below); action
-  kinds gain JA/EN noun forms; the modality table gains canonical deontic-tail fields
+  kinds gain JA/EN noun forms (`noun_ja`/`noun_en` — a required nonempty pair on every
+  action row: integrity, never luck, keeps the `<target>の<noun_ja>` / `<noun_en> of
+  <target>` render surface total); the modality table gains canonical deontic-tail fields
   (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
   surfaces: 「を強く推奨する」 carries particle + strength adverb; rows carrying tails parse
   as tail synonyms, the first tail-bearing row per `(direction, strength)` pair is the
   canonical render row — pinned against this section's worked renders — and tail-less rows
-  stay source-match-only); certainty phrases as committed.
+  stay source-match-only); certainty phrases as committed, every row gaining a required
+  nonempty EN surface (`surface_en`; the first row per value stays the canonical render
+  row). Concept citation forms mint no new field: an action target renders as the concept
+  row's representative surface (`surfaces[0]`, JA) and its EN gloss (`gloss_en` — one EN
+  form serves context and citation); synonym surfaces (`surfaces[1..]`) stay §8
+  source-match vocabulary, never CNL terminals.
   Typed slot roles (the CNL slot-legality classification — lexicon data like every other
   linguistic form): every concept row carries a nonempty validated role set over
   `population` / `condition` / `action_target` — `population` and `condition` mutually
@@ -1094,15 +1107,31 @@ Committed direction:
   renderer domains sit one function apart — definitional drift structurally excluded,
   behavioral agreement law-tested below — so audit rendering is defined over accepted IR
   and a missing-row render error is a fail-closed instrument path, barred from accepted
-  artifacts by lexicon integrity (pair coverage, certainty totality) + the predicate. Lexicon
+  artifacts by lexicon integrity (pair coverage, render-surface totality) + the predicate. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
-  terminal), missing surface fields (role-scoped: a context-role concept needs its
+  terminal or a backtick — §7.2 validation renders rule text inside Markdown code spans, so
+  every surface stays code-span-inert; escape payloads never reach report surfaces — the
+  escape is terminal at acceptance and rendered rule text is registered vocabulary only),
+  missing surface fields (role-scoped: a context-role concept needs its
   adnominal / negated-adnominal / EN-gloss forms, an `action_target`-role concept its
-  target citation forms), per-language exact-duplicate parse terminals across ALL
-  CNL surface fields and lexer categories (concept adnominal/negated forms, action nouns,
-  tails, certainty phrases, quantity surfaces/units), per-language proper-prefix overlaps
-  rejected across the finite longest-match token inventory — those lexicon surfaces plus the
-  fixed grammar terminals and digit tokens, same- and cross-category; escape payload =
+  target citation forms — `surfaces[0]`, already row-required, plus `gloss_en`),
+  render-surface totality (every action row carries the nonempty `noun_ja`/`noun_en` pair,
+  every certainty row a nonempty `surface_en`: a membership-valid action kind or certainty
+  value never reaches `from_ir` without its bilingual render surface), per-language
+  duplicate-literal rejection by semantic token over the lexer-visible surfaces (concept
+  adnominal/negated forms and `action_target`-role citation forms, action nouns, tails,
+  certainty phrases, quantity surfaces/units): a literal is a hard error exactly when its
+  occurrences denote two distinct tokens — Concept(row) (one row's citation and adnominal
+  forms collapse; which slot admits which form is grammar/parser business),
+  NegatedConcept(row), ActionNoun(row), Tail(direction, strength), Certainty(value),
+  QuantityVar(var), Unit(literal) (deliberately var-free: the per-var interval production
+  pairs each var's surface with its own row's unit terminal, so rows sharing a unit
+  literal stay unambiguous) — same-token occurrences deduplicate into one token-table
+  entry (a multi-role concept's surface parses in every slot its roles admit; same-pair
+  tail synonyms and shared units collapse; cross-row, cross-value, and cross-category
+  duplicates reject), per-language proper-prefix overlaps
+  rejected across the finite longest-match token inventory — that deduplicated token table
+  plus the fixed grammar terminals and digit tokens, same- and cross-category; escape payload =
   delimiter-scanned free content, outside the inventory (a prefix-free inventory keeps
   maximal-munch tokenization agreeing with the grammar's intended segmentation — the failure
   mode is a longer token stolen from another category), `implies_action`
@@ -1232,7 +1261,8 @@ single_cnl by grammar + acceptance, single_ir by the accept-total closure, M1 ov
 corpus by derivation + lexicon integrity + the corpus render audit (derivation mints positive
 concept atoms only and each locked exception segment matches exactly one concept; a document
 deriving a wider clause sits outside the locked M1 contract — arbitrary M1-route inputs carry
-no totality claim — and fails render closed at from_ir).
+no totality claim — and surfaces as from_ir's typed Err: the report omits that
+(pipeline, document) CNL entry under cnl_inexpressible_ir (§7.4), never an assembly failure).
 Expressibility agreement (render totality, executable): over canonical (ClinicalIr, lexicon,
 regions, segments) tuples passing vocabulary membership and grounding — membership ONLY,
 role/tail legality stays inside the predicate, keeping every variant reachable in-domain —
@@ -1255,7 +1285,12 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
 - Audit artifacts, route-independent: any accepted ClinicalIR — the M1 deterministic pipeline's
   included — renders to `audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt` (keyed by pipeline AND
   document: a multi-route experiment accepts the same document several times, so views stay
-  separately auditable; non-IR routes land none); `report.json` carries the CNL text
+  separately auditable; non-IR routes land none; an accepted IR the predicate rejects at
+  `from_ir` — reachable only on a guard-less route, the M1 route off its locked corpus —
+  omits exactly that (pipeline, document) entry, audit `.txt` and report CNL members alike,
+  under one typed `cnl_inexpressible_ir` diagnostic (§7.4) — report assembly never fails on
+  it, and a finding rule id without an owner entry already follows §7.2's omit-the-quote
+  fallback); `report.json` carries the CNL text
   hashes and per-rule CNL strings under the same (pipeline, document) key; report_{en,ja}.md
   quote each finding's and documented no-conflict result's rules as CNL beside the quoted
   source spans from the findings-owner pipeline's entry alone (§7.2
@@ -1284,7 +1319,11 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code:
   an accepted AST whose canonical render fails to re-parse identically — grammar/lexicon
   drift, never a model failure), `cnl_unregistered_concept` (terminal; the escape-production
-  reject — payload = the lexicon-entry proposal, quoted surface + atom position).
+  reject — payload = the lexicon-entry proposal, quoted surface + atom position),
+  `cnl_inexpressible_ir` (report-stage: an accepted ClinicalIR the expressibility predicate
+  rejects at `from_ir` on a route without the acceptance guard — payload names the predicate
+  class and the (pipeline, document) key, refs empty; the audit-view omission fallback above
+  — an honest expressibility boundary, never a model failure, never an instrument bug).
 - §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
   `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows; and the
   translation-faithfulness family — `ir_faithfulness_rate`: the share of a route's accepted

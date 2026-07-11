@@ -550,7 +550,28 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   wiring — per-shape named StageHandle {kind, step_id} fields validated at resolve — so the
   7-stage pipe adds a RouteStages::SingleCnl variant, never an [Id; 9] widening (off-by-one +
   provenance risk). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
-  §10 EN canon), JA under SemanticJa. Grammar terminals = whole-surface string literals
+  §10 EN canon), JA under SemanticJa. Render-surface totality = integrity data rules
+  (every action row a required noun_ja/noun_en pair, every certainty row a required
+  surface_en — the stronger every-row form over canonical-row-only: JA certainty phrases
+  are all CNL-visible already, and same-value duplicate EN literals collapse under the
+  semantic-token rule); target citation form = the concept row's existing surfaces[0]
+  (JA) + gloss_en (EN), no new field — synonym surfaces[1..] source-match-only, never CNL
+  terminals. Duplicate terminals reject by SEMANTIC TOKEN, never literal equality (a
+  literal errs only when occurrences denote two distinct tokens; citation==adnominal on
+  one row, multi-role slot reuse, same-pair tail synonyms, cross-row unit literals all
+  deduplicate — units mint var-FREE tokens because the per-var interval production pairs
+  each var's surface with its own row's unit terminal; the prefix-overlap lint runs over
+  the deduplicated table; the old exact-duplicate rule would have rejected
+  cnl-grammar.1's own multi-role oracle lexicon). surface_tokens = committed JA lexer
+  count over stored canonical per-rule texts, Σtokens/Σrules per route (model-runtime
+  tokenizer REJECTED — would pin tokenizer identity+count into every cassette).
+  CNL-inexpressible accepted IR at report time (guard-less route = M1 off the locked
+  corpus) → omit that (pipeline, document)'s CNL entries + audit files under ONE typed
+  cnl_inexpressible_ir diagnostic (codes-cnl variant, report-stage only, no FillReject
+  arm), never assembly failure — locked corpus renders all routes (the positive
+  control). Backtick = reserved surface char (lint): §7.2 renders rule text in md code
+  spans; escape payloads need no bar — terminal at accept, rendered rule text
+  registered-only. Grammar terminals = whole-surface string literals
   (ASCII-digit + basis-id-char alternation) + EXACTLY ONE open lexical production per
   language — the escape's free quoted surface, inexpressible as finite literals; emitter
   escape mode Committed(open) vs OracleBound(enumerated) since bnf parses literals only —

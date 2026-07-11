@@ -336,13 +336,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   behavior change: existing suites the gate, assertion surface untouched (import edits only).
 - [ ] lexicon-cnl-shape: CNL surface fields, shape only (split of lexicon-cnl.1) —
   LexiconConcept +adnominal_ja/negated_ja/gloss_en+roles (§10 slot-role set:
-  population|condition|action_target), LexiconAction
+  population|condition|action_target; target citation form = existing surfaces[0] (JA) +
+  gloss_en (EN) — no new field; synonym surfaces[1..] stay source-match-only, never CNL
+  terminals), LexiconAction
   +noun_ja/noun_en, LexiconModality +tail_ja/tail_en (canonical deontic tails ≠
   source-match surfaces per §10 — optional per row, parse-accepted synonyms when present),
   LexiconCertainty +surface_en, NEW LexiconQuantity {var_id, role (context slot:
   population|condition), surface_ja, unit_ja,
   surface_en, unit_en} table, + the typed role VIEW accessors every CNL module consumes
-  (per-slot concept sets + quantity-role lookup — §10 single source, no prefix tests
+  (per-slot concept SURFACE sets — context/exception slots serve adnominal_ja/negated_ja +
+  gloss_en, the target slot the surfaces[0]/gloss_en citation pair — + quantity-role
+  lookup — §10 single source, no prefix tests
   downstream); load_lexicon strict extension (deny_unknown_fields holds; JA
   surfaces through StringPolicy::SemanticJa, EN surfaces through SemanticEn — §10 EN
   canonical text is ASCII-lowercase); every new field/table optional at load so the
@@ -353,10 +357,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   no re-bless.
 - [ ] lexicon-cnl-data: ja_core.yaml authored for the full M1 set (6 concepts with §10
   slot roles — pop.* population, cond.* condition, drug.abx_a action_target;
-  act.administer, 7 modality rows incl. §10's worked tails を強く推奨する / は禁忌である,
-  certainty rows, q.age_years role=population) — written against lexicon-cnl-integrity's full rule list
+  act.administer +noun_ja/noun_en (§10 worked 投与 / administration), 7 modality rows incl.
+  §10's worked tails を強く推奨する / は禁忌である,
+  certainty rows +surface_en each, q.age_years role=population) — written against lexicon-cnl-integrity's full rule list
   (data lands FIRST: those hard-errors bind the committed lexicon the moment they land —
-  tail-availability + quantity-per-interval-var demand these rows). Gate: load/normalize
+  tail-availability + quantity-per-interval-var + action-noun/certainty-surface totality
+  demand these rows). Gate: load/normalize
   tests green + lexicon_hash-carrying value pins re-blessed (grep the observed-bless
   literals) + full gates; shape/integrity leave committed bytes untouched (a later
   lexicon-cnl.2 lint finding against the committed data = fix + re-bless there,
@@ -373,8 +379,21 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   drug.abx_a→action_target, q.age_years→population — so the frozen normalize.rs prefix
   partition and the role-driven bridge agree on the locked corpus by data),
   nonempty normalized surfaces+units both languages,
-  per-language exact-duplicate parse terminals rejected across ALL CNL surface fields +
-  lexer categories, tail_ja/tail_en present together or absent together (a row is
+  render-surface totality (every action row paired nonempty noun_ja/noun_en + every
+  certainty row nonempty surface_en — a membership-valid action/certainty value never
+  reaches from_ir surface-less; action_target citation = surfaces[0] + gloss_en, gloss_en
+  presence lint-owned),
+  per-language duplicate-literal rejection by SEMANTIC TOKEN over lexer-visible surfaces
+  (adnominal/negated + action_target-role surfaces[0] citation forms, action nouns, tails,
+  certainty phrases, quantity surfaces/units): reject a literal exactly when its
+  occurrences denote two DISTINCT tokens — Concept(row) (citation+adnominal of one row
+  collapse; slot admissibility is grammar/parser business), NegatedConcept(row),
+  ActionNoun(row), Tail(dir,strength), Certainty(value), QuantityVar(var), Unit(literal)
+  var-free (the per-var interval production pairs each var's surface with its own row's
+  unit terminal — shared unit literals unambiguous) — same-token occurrences deduplicate
+  into one token-table entry (multi-role reuse, same-pair tail synonyms, shared units
+  accepted; cross-row/-value/-category reject),
+  tail_ja/tail_en present together or absent together (a row is
   tail-bearing iff BOTH — one-language tails would leave the other renderer partial),
   every (direction,strength) pair present carries ≥1 tail-bearing row —
   first tail-bearing row per pair = canonical render row, a test pins it against §10's
@@ -387,13 +406,21 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   {action_target}, {population,action_target}, {condition,action_target} — plus both
   quantity roles loads clean; committed rows are all singleton-role with a population-role
   quantity, so without it an implementation rejecting legal multi-role rows or
-  condition-role quantities passes every committed-data fixture). Gate: committed tree
+  condition-role quantities passes every committed-data fixture) + semantic-token controls
+  (accept: one multi-role surface across its slots, citation==adnominal on one row, one
+  unit literal on two quantity rows, a same-pair duplicate tail literal; reject: one
+  literal on two concept rows / two certainty values / cross-category — errors name the
+  colliding tokens) + render-totality rejects (noun-less + one-language-noun action row,
+  surface_en-less certainty row). Gate: committed tree
   green under every rule
   (proves lexicon-cnl-data's authored rows satisfy them) + full gates.
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
-  connective/punctuation grammar terminal), role-scoped missing-CNL-surface findings (a
+  connective/punctuation grammar terminal or a backtick — §7.2 places rule strings in md
+  code spans; escape payloads need no bar, terminal at accept + absent from rendered
+  text), role-scoped missing-CNL-surface findings (a
   context-role concept lacking adnominal/negated/gloss forms, an action_target-role
-  concept lacking target citation forms; deliberately
+  concept lacking gloss_en — citation = surfaces[0] + gloss_en, surfaces[0] row-required
+  already; deliberately
   tail-less modality rows exempt — per-pair availability is integrity's rule), and
   proper-prefix overlap across ALL lexer-visible terminals, same- AND cross-category
   (maximal munch can steal across categories; segmentation determinism — the
@@ -692,8 +719,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
   run.rs accept-closure call surface + cnl_bridge.rs + cnl-laws' enumeration harness +
   cnl_render.rs render entrypoints (the Ok-side bilingual assertion).
-- [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept
-  (fieldless_enum append) + FillReject +Parse(String) (repairable → cnl_parse_error) /
+- [ ] codes-cnl: DiagnosticCode +CnlParseError/CnlRoundTripMismatch/CnlUnregisteredConcept/
+  CnlInexpressibleIr (fieldless_enum append; CnlInexpressibleIr = report-stage only,
+  report-cnl.2 lands it on a guard-less route's from_ir reject — payload = predicate class
+  + (pipeline, document) key, NO FillReject arm) + FillReject +Parse(String) (repairable → cnl_parse_error) /
   +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the
   lexicon-entry proposal) / +Instrument(String) (terminal fail-closed →
   cnl_round_trip_mismatch, spends no repair) + model_fill.rs mapping + stage tests (repair
@@ -798,9 +827,16 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   unregistered-concept terminal / hallucinated-basis terminal / exhaustion) + §7.4 ledger pins
   + RouteTaxonomy cnl-code wiring + taxonomy pins.
 - [ ] metrics-cnl: FillObservation optional CNL fields (round_trip_ok, surface_tokens,
-  accepted_rules) + round_trip_identity_rate + surface_tokens_per_accepted_rule rows (§7.3
-  surface-quality family; rows emitted only when observations carry the fields — prove M2
-  replay rows byte-unchanged) + delta/NA wiring + tests.
+  accepted_rules; surface_tokens = the committed JA lexer's (cnl-parse.1 token layer)
+  token count summed over the accepted CnlDocument's stored canonical JA per-rule texts —
+  the hash-locked bytes, LF frame outside the count; deterministic + runtime-free per
+  §7.3 — a model-runtime tokenizer count REJECTED, it would pin tokenizer identity+count
+  into every cassette; accepted_rules = the document's rule count) +
+  round_trip_identity_rate + surface_tokens_per_accepted_rule rows (§7.3
+  surface-quality family; per-route Σ surface_tokens / Σ accepted_rules, exact fractions;
+  rows emitted only when observations carry the fields — prove M2
+  replay rows byte-unchanged) + delta/NA wiring + tests (incl. a worked-example
+  token-count pin from observed lexer output).
 - [ ] metrics-faithful: FillObservation optional ir_match bool + ir_faithfulness_rate row
   (§7.3 translation-faithfulness family, §10) — run.rs fill-tail computes it for IR-landing
   model routes: landed ClinicalIR == the deterministic
@@ -828,7 +864,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   fixture + byte pins; M1 bytes byte-identical (plumbing half).
 - [ ] report-cnl.2: population + audit views — assemble_report CNL inputs (single_cnl route:
   the accepted CnlDocument's own text/hashes — audit honesty; other routes incl. M1: from_ir
-  + render over accepted ClinicalIr; cnl_rules per (pipeline, document) = rule_origins over
+  + render over accepted ClinicalIr — a from_ir predicate reject (guard-less route,
+  arbitrary M1 inputs) omits that (pipeline, document)'s cnl_documents/cnl_rules entries
+  AND audit files, landing ONE cnl_inexpressible_ir diagnostic (payload = predicate class
+  + key, empty refs) on the report-stage event, assembly never fails (locked corpus
+  renders every route — cnl-expressible's positive control — so pins stay populated;
+  test: a synthetic inexpressible-IR fixture pins omission + diagnostic);
+  cnl_rules per (pipeline, document) = rule_origins over
   that route's CnlDocument → per-rule-id {ja,en} text, ONE lookup path — accepted doc: the
   split duplicates text under each derived rule id; from_ir doc: identity origins) + run.rs
   report-tail lands
