@@ -99,7 +99,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   segments artifact (ClinicalSegment.region_ids reverse map — m3.bridge stage inputs therefore
   [cnl_document, segments]; bridge preconditions, acceptance-enforced both sides: cited
   regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), nonempty remainder). Origin map: rule_origins(&CnlDocument) →
+  (closure-functional), nonempty remainder, exception regions closure-contained — CNL-side
+  by construction (derived segments span the bracket union), IR-side the predicate's
+  containment class). Origin map: rule_origins(&CnlDocument) →
   `<doc>.rule.<k>` → originating rule index, pure fn (rule k = the k-th post-split
   statement, mirrors rules.rs derive_norm_ir's statement-enumerate mint) — non-core, ONE
   helper over accepted docs AND from_ir output (single-disjunct → identity); the report's
@@ -512,7 +514,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   source regions are wholly exception-owned — empty rule bracket under the §10
   exception-owned split, covers EMPTY source_segment_ids (the segment-closure helper lands
   here; cnl-bridge's from_ir rule bracket takes its exception-owned remainder, to_ir
-  binding region_ids the whole closure); statements whose cited segments
+  binding region_ids the whole closure); exception regions outside the statement's
+  segment closure — a clause citing a grounded region of an UNCITED segment
+  (ExceptionRegionOutsideStatementClosure — every clause's region_ids ⊆ the cited
+  segments' closure, i.e. each exception region in exactly ONE cited segment under
+  closure-functionality; minimal breach: statement cites seg.0 = {r.1}, exception cites
+  seg.1's r.2 — membership + grounding + closure-functional + nonempty remainder ALL
+  pass, yet from_ir renders r.2 exception-sentence-only and the re-bridge derives source
+  segments WIDER, a to_ir∘from_ir breach; jointly with the wholly-owned class = the
+  exception-owned ⊊ closure precondition); statements whose cited segments
   carry no region or share a region with another segment (closure-nonfunctional — breaks
   segment recovery from region-level basis, the to_ir∘from_ir law; the empty-region segment
   synthetic-only — segment.rs mints only from grounded spans, an all-ungrounded row leaves
@@ -587,7 +597,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
   two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin + a
   from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
-  bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + a
+  bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + an
+  uncited-segment from_ir-Err pin (an exception clause citing a grounded region outside
+  the statement's cited segments — the closure-containment class) + a
   segment-fixture axis pinning each §10 bridge-precondition breach + edge:
   orphan cited region (reject), region shared across two segments (reject), region-less
   cited segment (reject), rule∩exception bracket overlap with nonempty remainder (accepted —
@@ -608,7 +620,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   enumerated accepted ASTs (bridge-image, cnl-laws' method) + the 3 locked-corpus derived
   ClinicalIr (cnl-expressible's derivation helper); negatives =
   per-class mutations landing in EVERY CnlExpressibilityError variant while staying
-  in-domain (the predicate stays the deciding acceptance layer). Assert per
+  in-domain (the predicate stays the deciding acceptance layer; the closure-containment
+  mutation grounds its exception region in an UNCITED segment — membership + grounding
+  stay green). Assert per
   case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
   from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
@@ -659,7 +673,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   grounding (every bracket's basis regions ⊆ regions — rule + per-exception — each cited
   region anchored in exactly ONE segment + derived segments' region sets unshared
   (closure-functional; orphan/shared reject) + exception-owned ⊂ closure (nonempty
-  remainder — the §10 bridge preconditions land HERE), derived segments
+  remainder — the §10 bridge preconditions land HERE; ⊆ holds by construction, derived
+  segments span the bracket union, the containment class bites IR-side only), derived
+  segments
   ⊆ segments; Grounding terminal) → re-render + re-parse round-trip (Instrument on mismatch)
   → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / both
   terminals / instrument / empty-grounding panic). run.rs read scope: accept-closure region +

@@ -487,7 +487,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   m3.bridge stage
   inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
   cited regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), nonempty remainder (single_cnl_accept grounding); accept-total also
+  (closure-functional), nonempty remainder (single_cnl_accept grounding), exception regions
+  closure-contained (ExceptionRegionOutsideStatementClosure — CNL-side by construction,
+  derived segments span the bracket union; IR-side a clause citing a grounded region of an
+  UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER,
+  to_ir∘from_ir breach); accept-total also
   rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
   only + bundle validate rejects empty support — predicate owns it fail-closed) +
   shared-region artifacts (bundle-valid — validate never checks segment-region

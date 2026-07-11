@@ -978,7 +978,10 @@ Committed direction:
   rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
   cited region anchored in exactly one segment, the derived segments' region sets unshared
   (closure-functional), exception-owned regions a proper subset of the closure (nonempty
-  remainder). Binding region_ids = the union over the citing emitted statements of each
+  remainder; containment holds by construction on this side — the closure derives from the
+  bracket union — and is the predicate's closure-containment class on the IR side, where
+  authored source_segment_ids can uncite an exception's segment). Binding region_ids = the
+  union over the citing emitted statements of each
   statement's segment closure (its source segments' full region sets — the closure the
   statement's rendered brackets jointly cover: the rule bracket carries it minus the
   exception-owned regions, exception sentences the rest), never the authored brackets —
@@ -1061,8 +1064,13 @@ Committed direction:
   concept of a structurally valid clause (disjoint from the structural class),
   exception clauses with empty region_ids, statements whose segment-closed source
   regions are wholly exception-owned (an empty rule bracket under the exception-owned
-  split — covers empty source_segment_ids), statements whose cited segments carry no
-  region or share a region with another segment (closure-nonfunctional — breaks segment
+  split — covers empty source_segment_ids), statements with an exception region outside
+  their segment closure (a clause citing a grounded region of an UNCITED segment —
+  membership, grounding, and the nonempty remainder all pass, yet from_ir renders the
+  region only on its exception sentence and the re-bridge derives a wider segment set,
+  breaking `to_ir(from_ir(ir)) == ir`; jointly with the wholly-owned class this enforces
+  exception-owned as a proper subset of the closure), statements whose cited segments carry
+  no region or share a region with another segment (closure-nonfunctional — breaks segment
   recovery from region-level basis; the empty-region segment is synthetic-only — the
   segmenter mints only from grounded spans and bundle validation rejects empty segment
   support — while the shared region is bundle-valid, no cross-segment disjointness check;
@@ -1159,7 +1167,8 @@ Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
 Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
 Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
 bridge preconditions: cited regions anchored, closure-functional segments, nonempty
-remainder; to_ir is Err on any escape occurrence — acceptance
+remainder — exception containment by construction, source segments derive from the bracket
+union; to_ir is Err on any escape occurrence — acceptance
 is already terminal there): from_ir(to_ir(ast)) == the bridge normal form of ast — disjunct
 split, per-statement atom canonicalization (population before condition, §4.3 set order,
 byte-identical duplicates collapsed; the partition + set emission are lossy exactly there),
@@ -1168,7 +1177,8 @@ clauses may share a region; from_ir renders each clause's own
 region_ids verbatim on its exception sentence and the segment-closed remainder — every cited
 segment's full region set minus the exception-owned regions — on the rule bracket; from_ir's
 sole Err source is `check_cnl_expressible` at entry — the shared taxonomy: empty clause
-region sets, an empty remainder, atom / action-target / interval placement contradicting
+region sets, an empty remainder, an exception region outside the statement closure (the
+re-bridge would derive wider), atom / action-target / interval placement contradicting
 the §10 role view (wrong-slot IR is
 CNL-inexpressible, any rendering re-parses into a different partition), and the remaining
 classes — past a passing check the projection constructs no Err, a residual failure a
@@ -1180,8 +1190,8 @@ under bracket normalization).
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain — the domain
 `check_cnl_expressible` accepts (tail-backed
 modality pairs, ≥1 statement each with a nonempty context, single-unsigned-bound quantity
-intervals, single-concept interval-free exception clauses each carrying nonempty region_ids,
-negated atoms over interval-free
+intervals, single-concept interval-free exception clauses each carrying nonempty
+region_ids inside the statement's segment closure, negated atoms over interval-free
 entries, slot-role-conformant atom and target placement, a nonempty rule bracket under the
 exception-owned split, cited segments
 region-bearing and unshared — v1) — so render is defined
