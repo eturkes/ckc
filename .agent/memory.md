@@ -474,9 +474,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   Exact TerminologyBinding per DISTINCT referenced concept
   at first reference in POST-SPLIT emission order (statement-major; per statement population,
   condition, action target, exceptions in emitted order — a later-disjunct-only concept
-  mints late), system = lexicon.system, region_ids = the citing
-  rules' basis regions (union over brackets); Action::new derives key; basis = region ids
-  per sentence,
+  mints late), system = lexicon.system, region_ids = union of the citing emitted
+  statements' segment CLOSURES (source segments' full region sets — the closure from_ir's
+  rule bracket renders; invariant under bracket normal-form expansion, keeps to_ir∘from_ir
+  exact — an authored-bracket union re-bridges wider when a bracket cites part of a
+  multi-region segment, the pinned partial-segment law case); Action::new derives key;
+  basis = region ids per sentence,
   source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
   m3.bridge stage
   inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
@@ -501,7 +504,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   before condition, set order, dedup — + exception-owned segment-closed basis split, a
   labeled COVER: clauses may share a region),
   to_ir∘from_ir == id on
-  bridge-image IR = to_ir's image over accepted ASTs).
+  bridge-image IR = to_ir's image over accepted ASTs — exact incl. closure-derived binding
+  region_ids).
   Findings owner: the §7.1 view (trace finding mint + report results, no-conflict included)
   = the FIRST bundle-bearing pipeline in experiment binding order (single_ir — the landed
   lineage/claims rule); single_cnl's reused m1.compile mints query/finding ids byte-equal
@@ -573,7 +577,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bridge ids MUST mint stmt/exc/bind counters mirroring normalize.rs (§8.6's <doc>.rule.<k> =
   norm-layer rule ids only); faithfulness = §10 projection excluding binding region_ids
   because CNL carries sentence-basis (rule + exception brackets — exception provenance DOES
-  reconstruct), never mention-region, provenance (M1 binds adult→r.2 only
+  reconstruct) and bridge bindings mint segment CLOSURES, never mention-region
+  provenance (M1 binds adult→r.2 only
   while guideline A's statement basis = r.2 r.3 — exact-hash ir_match would zero on its own
   goldens); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
   adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,
@@ -586,7 +591,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   target — pass today; the committed schema carries zero minItems) → CNL expressibility =
   ONE executable predicate check_cnl_expressible(clinical, lexicon role+tail view, segments
   segment_id→region_ids keyed view) -> Result<(), CnlExpressibilityError>, home cnl_bridge.rs
-  (cnl-expressible seeds it; shares from_ir's segment-closure helper), defined over grounded
+  (cnl-expressible seeds it; ONE segment-closure helper serves the predicate, from_ir's rule
+  bracket, and to_ir's binding region_ids), defined over grounded
   membership-valid IR (role/tail legality predicate-owned, variants in-domain-reachable) —
   ruling: one shared fn over two hand-maintained mirrored lists;
   single_ir_accept (accept-total wires each variant → repairable Schema naming the offense,

@@ -978,7 +978,12 @@ Committed direction:
   rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
   cited region anchored in exactly one segment, the derived segments' region sets unshared
   (closure-functional), exception-owned regions a proper subset of the closure (nonempty
-  remainder). The bridge also derives the normative-rule origin map —
+  remainder). Binding region_ids = the union over the citing emitted statements of each
+  statement's segment closure (its source segments' full region sets — the same closure the
+  `from_ir` rule bracket renders), never the authored brackets: the closure is invariant
+  under the bracket's normal-form expansion, keeping `to_ir(from_ir(ir)) == ir` exact — a
+  bracket-union binding re-bridges wider whenever a bracket cites only part of a
+  multi-region segment. The bridge also derives the normative-rule origin map —
   `<document_id>.rule.<k>` → originating CNL rule index, a pure function of the document
   (rule k = the k-th post-split statement, mirroring the §8.6 derivation-order mint), so a
   multi-disjunct rule originates several rule ids that legitimately share its text —
@@ -1166,7 +1171,8 @@ classes — past a passing check the projection constructs no Err, a residual fa
 fail-closed instrument bug (house panic style) — all edges
 acceptance-rejected on each side by the same predicate) — identity
 exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
-(the image of accepted ASTs).
+(the image of accepted ASTs; exact including binding region_ids — closure-derived, invariant
+under the rule bracket's normal-form expansion).
 Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain — the domain
 `check_cnl_expressible` accepts (tail-backed
 modality pairs, ≥1 statement each with a nonempty context, single-unsigned-bound quantity
@@ -1236,7 +1242,8 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   own landed extract/segment artifacts, under the faithfulness projection — binding
   `region_ids` excluded, all else exact, ids included: CNL carries per-sentence basis refs
   (rule + exception brackets — exception provenance therefore reconstructs exactly), never
-  mention-level regions, so binding region provenance is the one §5 field a faithful
+  mention-level regions — the bridge mints segment-closure binding regions, M1 mention-level
+  ones — so binding region provenance is the one §5 field a faithful
   translation cannot reconstruct (single_ir compares its accepted fill,
   single_cnl its bridged IR; direct_smt lands no IR → not_applicable). Exact-reproduction rate,
   strict by design (§11 may grade partial faithfulness); rationale: verdict-level conflict

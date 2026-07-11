@@ -83,9 +83,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   order; a concept exclusive to a later disjunct mints after the earlier disjunct's
   atoms (matches M1's first-mention scan order on
   the locked corpus; divergence = measured ir_match miss, never asserted), system =
-  lexicon.system, code = concept id, region_ids = the citing rules' basis regions (union
-  over each citing rule's brackets) — a
-  KNOWINGLY lossy reconstruction of M1's mention-based regions, hence metrics-faithful
+  lexicon.system, code = concept id, region_ids = the union of the citing emitted
+  statements' segment CLOSURES (each citing statement's source segments' full region sets —
+  the same closure from_ir's rule bracket renders; the closure is invariant under the
+  bracket's normal-form expansion, keeping to_ir∘from_ir exact — an authored-bracket union
+  re-bridges WIDER whenever a bracket cites only part of a multi-region segment) — a
+  KNOWINGLY lossy reconstruction of M1's mention-based regions (coarser: closure-level),
+  hence metrics-faithful
   compares under the §10 projection excluding binding region_ids (Action::new derives
   key itself); basis refs = region ids per sentence (rule bracket + one per exception
   sentence); source_segment_ids derived region→segment over their UNION via the
@@ -111,7 +115,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cover, not a partition — clauses may share a region;
   exception-owned regions render only on exception sentences; closure pulls each cited
   segment's remaining regions into the rule bracket) — (== id exactly on bridge-normal
-  docs); to_ir∘from_ir == id on bridge-image IR (the image of accepted ASTs).
+  docs); to_ir∘from_ir == id on bridge-image IR (the image of accepted ASTs; exact incl.
+  closure-derived binding region_ids).
 - Findings owner — M3 = the first run with TWO compiled routes, and the landed §7.1 identity
   scheme is structurally single-view: compile mints bare `q.<gsuf>.pair<n>.<kind>` query ids,
   trace mints `finding.<gid>.<seq>` from every compiled+results group, assemble_report errors
@@ -134,7 +139,7 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (segment_id → region_ids keyed view — id uniqueness by construction)) -> Result<(),
   CnlExpressibilityError>, home cnl_bridge.rs
   (unit cnl-expressible seeds the module; the segment-closure helper it lands is the one
-  from_ir's rule bracket renders), defined over grounded lexicon-valid ClinicalIR
+  from_ir's rule bracket renders AND to_ir's binding region_ids consume), defined over grounded lexicon-valid ClinicalIR
   (lexicon-valid = vocabulary MEMBERSHIP only, off_lexicon_ids' check — role/tail legality
   stays predicate-owned, every variant in-domain-reachable; membership + grounding run
   ahead of it), one error variant per
@@ -502,7 +507,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (bundle-valid — validate only resolves cited regions); statements whose segment-closed
   source regions are wholly exception-owned — empty rule bracket under the §10
   exception-owned split, covers EMPTY source_segment_ids (the segment-closure helper lands
-  here; cnl-bridge's from_ir renders the same closure); statements whose cited segments
+  here; cnl-bridge's from_ir rule bracket AND to_ir binding region_ids consume the same
+  closure); statements whose cited segments
   carry no region or share a region with another segment (closure-nonfunctional — breaks
   segment recovery from region-level basis, the to_ir∘from_ir law; the empty-region segment
   synthetic-only — segment.rs mints only from grounded spans, an all-ungrounded row leaves
@@ -547,7 +553,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   accept-total-guarded, and locked-corpus IR; to_ir = Err on any escape
   occurrence, law-harness-pinned) +
   both round-trip laws as pinned there (from_ir∘to_ir == bridge normal form;
-  to_ir∘from_ir == id on bridge-image IR) + worked-example content test
+  to_ir∘from_ir == id on bridge-image IR) + a partial-segment-citation law case (rule basis
+  cites ONE region of a two-region segment: bridge mints closure-wide binding region_ids,
+  from_ir widens the rule bracket to the closure, re-bridge == id — the exact case an
+  authored-bracket-union binding fails) + worked-example content test
   (parse(§10 JA) bridges to the §8.6 rule content) + a synthetic-lexicon partition spot
   test (a condition-role quantity's interval lands under condition, a multi-role concept
   lands by its context role) + rule_origins (plan-header origin map) + the pinned 2×2
@@ -579,10 +588,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cited segment (reject), rule∩exception bracket overlap with nonempty remainder (accepted —
   normal form moves the region to the exception sentence), one region shared by two
   exception clauses (accepted — labeled cover, both render), a later-disjunct-only concept
-  (bind.<k> mints in post-split emission order, not textual order)
+  (bind.<k> mints in post-split emission order, not textual order), a bracket citing part
+  of a multi-region segment (accepted — normal form widens the rule bracket to the closure,
+  binding region_ids closure-stable across the re-bridge)
   (plan-header form — bridge normal form: split + atom canonicalization +
   exception-owned segment-closed
-  basis split, ≠ naive identity on multi-disjunct or atom-disordered inputs). Codeco method; bound
+  basis split, ≠ naive identity on multi-disjunct / atom-disordered / partially-cited-segment
+  inputs). Codeco method; bound
   sizes to CI-sane runtime.
 - [ ] expressible-law: the §10 expressibility-agreement harness — bounded enumeration of
   the §10 law domain (canonical (ClinicalIr, lexicon, regions, segments) tuples passing
@@ -702,8 +714,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   model routes: landed ClinicalIR == the deterministic
   reference derivation, the M1 normalize+derive chain recomputed in-run over the route's own
   head values already in hand, compared under the §10 faithfulness projection — binding
-  region_ids excluded (CNL carries sentence-basis — rule + per-exception brackets — never
-  mention-region, provenance), all else
+  region_ids excluded (bridge bindings mint segment-closure regions off sentence-basis
+  brackets — rule + per-exception — never M1's mention regions, provenance), all else
   exact incl. stmt/bind/exc ids (single_ir: accepted fill; single_cnl: bridged IR; direct_smt
   lands no IR → field None, row not_applicable). Golden path pins projection-match 1.0. Rows gate on observations carrying the field (M2 replay rows
   byte-unchanged, omit-None); deltas ride the existing route-delta loop. Tests: match /
