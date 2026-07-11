@@ -998,7 +998,9 @@ Committed direction:
   妊娠中でない); every authored positive/negated pair diverges before either string
   ends. Adnominals also avoid a trailing の (妊娠中である, never 妊娠中の): a
   surface-final の reads as the fixed linking terminal — visually ambiguous
-  patient-adjacent and dangling mid-chain (妊娠中のかつ…). Certainty
+  patient-adjacent and dangling mid-chain (妊娠中のかつ…); the lexicon lint enforces this
+  as its own rule (surface-final の on adnominal/negated forms = finding), since neither
+  the prefix rule nor the reserved-token class catches it. Certainty
   parenthetical = `(` + the certainty row's surface + `)` — the committed JA surfaces
   already carry the label (`エビデンスの確実性:中`) and `surface_en` mirrors that form
   (`certainty: moderate`) — placed between the deontic tail and the sentence terminator in
@@ -1006,15 +1008,18 @@ Committed direction:
   internals — 。 abuts its basis bracket and the next sentence (surface- and
   payload-internal spaces stay data; SemanticJa and the escape contract admit internal
   normalized spaces); EN inter-terminal separators are exactly one space, owned by the
-  fixed terminals — frame and connective terminals carry their delimiting spaces
+  fixed terminals with exactly two composed lexicon-slot exceptions below — frame and
+  connective terminals carry their delimiting spaces
   (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory
   emitter-pinned), which is also what keeps the fixed inventory prefix-free under its own
   lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
-  terminals too); the two EN slots that follow a lexicon surface with no fixed terminal
-  of their own — the deontic tail after the bare target, the unit after the numeral —
-  take their single leading space by emitter composition: the emitted terminal is the
-  space plus the surface (` is strongly recommended`, ` years`), the lexicon field itself
-  stays space-free under the EN shape lint, and the token inventory, prefix lint, and
+  terminals too); two EN slots have no adjacent fixed terminal to supply their leading
+  separator — the deontic tail (after the bare target gloss or the escape's closing
+  quote) and the unit (after the numeral) — and carry it themselves by emitter
+  composition: the emitted terminal is the space plus the surface
+  (` is strongly recommended`, ` years`); the raw lexicon field carries no edge spaces
+  (the EN shape lint's token form enforces the edges; internal single spaces stay data),
+  and the token inventory, prefix lint, and
   parser tables all carry the composed forms — while surface- and payload-internal
   spaces stay data (`adult status`);
   bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both

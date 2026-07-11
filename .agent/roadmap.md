@@ -393,8 +393,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   like 成人でない being prefix-lint-rejected); cond.sepsis 敗血症のある / 敗血症のない /
   sepsis; cond.renal_severe 重度腎機能障害のある / 重度腎機能障害のない / severe renal
   impairment; cond.pregnancy 妊娠中である / 妊娠中でない / pregnancy (copula pair — the
-  §10 trailing-の bar rejects 妊娠中の, and bare 妊娠中 would force a prefix-colliding
-  でない form); drug.abx_a action_target-only → no adnominal/negated (role-scoped surface
+  §10 trailing-の bar rejects 妊娠中の, and bare 妊娠中's natural でない continuation
+  would prefix-collide; the copula positive sidesteps both while keeping the source noun
+  — chosen, not forced: other prefix-clean verb forms exist); drug.abx_a
+  action_target-only → no adnominal/negated (role-scoped surface
   rules), gloss_en antibiotic-a, citation = existing surfaces[0] 抗菌薬A. Quantity table:
   one row q.age_years {role population (both pop.* users population-role — integrity's
   var-role agreement), surface_ja 年齢, unit_ja 歳, surface_en age, unit_en years}.
@@ -478,9 +480,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] lexicon-cnl.2: CNL lexicon lint — reserved-token collisions (a surface containing a
   connective/punctuation grammar terminal or a backtick — §7.2 renders rule strings in
   single-backtick md code spans; barred class = connective terminals (かつ, 、または,
-  ` and `, `; or `) + punctuation/delimiters (、 。 「 」 the ASCII quote, parens,
+  ` and `, `; or `) + punctuation/delimiters (、 。 「 」 the ASCII quote, comma, period,
+  parens,
   brackets) + backtick, while linking/frame glue — の, が, `with `/`without `/` of `,
-  bound words — stays outside it (committed adnominals contain の by design);
+  bound words — stays outside it (committed adnominals contain の by design); trailing-の
+  check on adnominal_ja/negated_ja (surface-final の reads as the fixed linking terminal
+  — §10 bar; prefix + reserved-token rules both miss it; fixture: 妊娠中の);
   escape payloads need no bar, terminal at accept + absent
   from accepted/report-rendered text (pre-accept escapes render + round-trip by design)), role-scoped missing-CNL-surface findings (a
   context-role concept lacking adnominal/negated/gloss forms, an action_target-role
@@ -564,9 +569,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   stray/missing の = parse error); certainty paren `(` + certainty-row surface + `)`
   between tail and terminator; spacing decree — JA separator-free outside bracket
   internals (surface/payload-internal spaces = data), EN single-space separators owned by
-  fixed terminals (no bare-space token — it would prefix every space-leading terminal),
-  EN tail + unit terminals emitted space-leading — composed space+surface for the two
-  slots no fixed terminal precedes (§10 decree; inventory module, lint, and parser tables
+  fixed terminals (no bare-space token — it would prefix every space-leading terminal)
+  with exactly two composed exceptions: EN tail + unit terminals emitted space-leading —
+  composed space+surface for the two slots whose leading separator no fixed terminal
+  supplies (tail follows the bare target gloss or the escape's closing quote, unit the
+  numeral — §10 decree; inventory module, lint, and parser tables
   share the composed forms),
   bracket internals space-separated sorted ids;
   terminals = lexicon whole-surface

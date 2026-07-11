@@ -662,11 +662,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rides the 禁忌 row ONLY — 投与しないこと deliberately tail-less (surface embeds the
   action verb; ActionNoun 投与 would prefix-collide with a 投与-led tail) so
   first-tail-bearing = canonical meets the worked は禁忌である; spacing-decree hole
-  CLOSED: EN deontic tail (after bare target) + unit (after numeral) = the two slots
-  with no adjacent fixed terminal → emitter composes the single leading space into the
-  terminal (` is strongly recommended`, ` years`), raw fields space-free,
-  inventory/prefix-lint/parser tables all carry composed forms; projected full inventory
-  hand-audited pairwise prefix-free at plan time (re-verify mechanically at impl).
+  closed in the §10 decree (wiring lands with the cnl-grammar/parse/lint units): EN
+  deontic tail (after bare target gloss or escape close-quote) + unit (after numeral) =
+  the two slots whose leading separator no fixed terminal supplies → emitter composes
+  the single leading space into the terminal (` is strongly recommended`, ` years`) —
+  the sole exceptions to fixed-terminal space ownership; raw fields edge-space-free
+  (internal spaces = data),
+  inventory/prefix-lint/parser tables all to carry composed forms; trailing-の lint rule
+  on adnominal/negated forms (prefix + reserved rules both miss 妊娠中の); projected full
+  inventory hand-audited pairwise prefix-free at plan time (re-verify mechanically at
+  impl).
   FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
@@ -710,8 +715,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   the locked corpus, bridge one canonical-label Exact per concept vs M1 per (segment,
   candidate set) surface-derived = measured misses, golden 1.0 pin certifies the corpus
   miss-free); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
-  adverb; the worked contraindication tail 禁忌である is the SECOND ja_core row for its pair,
-  so canonical selection needed explicit tail_ja/tail_en fields over first-listed file order);
+  adverb; the worked contraindication tail は禁忌である rides the 禁忌 row — the SECOND
+  ja_core row for its pair — so canonical selection = first TAIL-BEARING row via explicit
+  tail_ja/tail_en fields, never first-listed file order);
   run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
   negatives, IrBundle::validate admits two-sided intervals + empty population+condition,
   ExceptionClause admits arbitrary
