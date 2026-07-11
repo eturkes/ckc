@@ -947,7 +947,8 @@ Committed direction:
   role, never by id-namespace convention — the typed-slot-roles paragraph below).
   Atoms: concept (lexicon adnominal surface), negated concept
   (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
-  ASCII digits), and the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
+  `<n>` an ASCII-digit leading-zero-free canonical decimal — token-inventory bullet), and
+  the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
   plus ASCII brackets/parens — width-folding ambiguity is
   kept out of the surface by construction.
 - Surface composition (concrete-syntax decree; the committed grammars pin the bytes, this
@@ -1010,8 +1011,9 @@ Committed direction:
   normalized spaces); EN inter-terminal separators are exactly one space, owned by the
   fixed terminals with exactly two composed lexicon-slot exceptions below — frame and
   connective terminals carry their delimiting spaces
-  (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory
-  emitter-pinned), which is also what keeps the fixed inventory prefix-free under its own
+  (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory pinned in the
+  token-inventory bullet below, committed grammar bytes the final authority), which is also
+  what keeps the fixed inventory prefix-free under its own
   lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
   terminals too); two EN slots have no adjacent fixed terminal to supply their leading
   separator — the deontic tail (after the bare target gloss or the escape's closing
@@ -1024,6 +1026,87 @@ Committed direction:
   spaces stay data (`adult status`);
   bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both
   languages.
+- Token inventory (the shared terminal layer; lexicon-cnl.2's typed inventory module
+  transcribes this bullet verbatim — lint, grammar emitter, and parser all consume that one
+  module, and the committed grammar bytes remain the final authority). Main-mode fixed
+  terminals, exact bytes including each side's owned space:
+
+| Role | JA | EN |
+| --- | --- | --- |
+| context opener | — (a rule starts at its first atom) | `for patients ` |
+| atom frame (positive concept, exception concept, interval, escape) | — (bare concatenation; の rows below) | `with ` |
+| negated atom frame | — (lexical `negated_ja`) | `without ` (replaces `with `) |
+| conjunction | `かつ` | ` and ` |
+| disjunction | `、または` | `; or ` |
+| context close | `患者には、` | `, ` |
+| patient-adjacent link (interval/escape atoms only) | `の` | — (the frame is position-invariant) |
+| action link (JA target-first, EN noun-first) | `の` (same token, second grammar position) | ` of ` |
+| bound markers ge / le / lt / gt | `以上` / `以下` / `未満` / `超` (after the unit) | ` at least ` / ` at most ` / ` less than ` / ` more than ` (before the numeral; leading + trailing spaces owned) |
+| certainty parens | `(` `)` (ASCII, abutting) | ` (` `)` (space-led open) |
+| sentence terminator | `。` | `.` |
+| basis open | `[根拠 ` | ` [basis ` |
+| basis close | `]` | `]` |
+| exception opener | `ただし、` | ` exception: patients ` |
+| exception close | `患者を除く。` | `.` (the terminator token) |
+| escape open | `未登録概念「` | `unregistered concept "` |
+| escape close | `」` | `"` |
+| rule terminator | LF | LF |
+
+  Digits `0`–`9` are single-char tokens in both languages under the leading-zero-free
+  numeral register: a numeral is `0` or a nonzero digit followed by any digits — canonical
+  decimal, so zero-led runs (`018`) sit outside BOTH languages (grammar production and
+  parser alike), the numeral's sole grammar-over-parser divergence stays the parser's
+  0..=i64::MAX value bound, no third over-approximation class arises, and no undeclared
+  parse-normalization variation joins the declared set (modality synonyms, basis-ref
+  order); render writes the value's decimal form, trivially fixpoint. Mode-scoped content
+  stays outside the main token table and the collision/prefix domain: the escape payload is
+  a free scan to the closing delimiter under the payload contract, and basis-bracket
+  internals are Id-grammar refs separated by single ASCII spaces — the bracket's own
+  separator, so the main tables keep no bare-space token. Lexicon-token categories join the
+  main mode from the typed role view — Concept (adnominal/negated/citation), ActionNoun,
+  Tail, Certainty, QuantityVar, Unit — and the VIEW serves the EN tail and unit forms
+  space-led-composed (` is strongly recommended`, ` years`): one composition point, with
+  emitter, lint, and parser consuming view output verbatim, never re-composing. Prefix
+  audit over this inventory (re-verified mechanically at impl with the lexicon tokens):
+  every near-pair diverges before either string ends — `以上`/`以下` (2nd scalar),
+  `未満`/`未登録概念「` (2nd), `患者には、`/`患者を除く。` (3rd), ` and `/` at least `
+  (3rd), ` at least `/` at most ` (5th), `with `/`without ` (5th) — and no committed
+  lexicon surface starts with a fixed terminal or a digit (the lint owns that thereafter).
+  Schematic grammar skeleton — factoring and slot order normative, bytes the committed
+  grammar's; `⟨…⟩` = lexicon alternations served by the role view, quoted strings = the
+  inventory above:
+
+```text
+JA:
+  <document>     ::= <rule> <nl> | <rule> <nl> <document>
+  <rule>         ::= <disjuncts> "患者には、" <target> "の" ⟨action-noun⟩ ⟨tail⟩
+                     <cert-opt> "。" <basis> <exceptions>
+  <disjuncts>    ::= <conjunct-mid> "、または" <disjuncts> | <conjunct-adj>
+  <conjunct-mid> ::= <atom-mid> "かつ" <conjunct-mid> | <atom-mid>
+  <conjunct-adj> ::= <atom-mid> "かつ" <conjunct-adj> | <atom-adj>
+  <atom-mid>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> | <escape>
+  <atom-adj>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> "の" | <escape> "の"
+  <interval>     ::= ⟨var-surface⟩ "が" <numeral> ⟨unit⟩ ("以上"|"以下"|"未満"|"超")
+  <numeral>      ::= "0" | <nonzero> <digit-rest>
+  <digit-rest>   ::= "" | <digit> <digit-rest>
+  <target>       ::= ⟨citation⟩ | <escape>
+  <escape>       ::= "未登録概念「" <payload> "」"        ; payload = the open production
+  <cert-opt>     ::= "" | "(" ⟨certainty⟩ ")"
+  <basis>        ::= "[根拠 " <id-list> "]"
+  <id-list>      ::= <basis-id> | <basis-id> " " <id-list>
+  <exceptions>   ::= "" | <exception> <exceptions>
+  <exception>    ::= "ただし、" <exc-atom> "患者を除く。" <basis>
+  <exc-atom>     ::= ⟨adnominal⟩ | <escape> "の"
+EN mirrors the frame with its own terminals and one position-invariant atom nonterminal:
+  <rule>         ::= "for patients " <disjuncts> ", " ⟨action-noun⟩ " of " <target> ⟨tail⟩
+                     <cert-opt> "." <basis> <exceptions>
+  <atom>         ::= "with " ⟨gloss⟩ | "without " ⟨gloss⟩ | "with " <interval> | "with " <escape>
+  <interval>     ::= ⟨var-surface⟩ (" at least "|" at most "|" less than "|" more than ")
+                     <numeral> ⟨unit⟩
+  <exception>    ::= " exception: patients " <exc-atom> "." <basis>
+  <exc-atom>     ::= "with " ⟨gloss⟩ | "with " <escape>
+```
+
 - Exception register (v1, deliberately narrower than the context DNF): each exception sentence
   carries exactly one concept slot — a positive registered concept (adnominal surface) or the
   escape — no connectives, no negated-concept atoms, no quantity intervals. Multiple exception
@@ -1328,8 +1411,8 @@ Committed direction:
 ```text
 Single parse: every parser-accepted string yields exactly one AST; the runtime grammar
 over-approximates the parser in exactly two classes — the open escape production (payload
-contract parser-enforced) and unbounded numerals (value bound 0..=i64::MAX
-parser-enforced) —
+contract parser-enforced) and unbounded leading-zero-free numerals (value bound 0..=i64::MAX
+parser-enforced; zero-led digit runs sit outside BOTH languages — never a third class) —
 grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
 over the parser-accepted language.
 Round trip: parse(render(ast)) == ast for every valid AST, both languages — equality over

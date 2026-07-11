@@ -374,7 +374,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   surface_en, unit_en} table, + the typed role VIEW accessors every CNL module consumes
   (per-slot concept SURFACE sets — context slots serve adnominal_ja/negated_ja + gloss_en,
   the exception slot adnominal-only (§10 positive-only register), the target slot the
-  surfaces[0]/gloss_en citation pair — + quantity-role lookup — §10 single source, no
+  surfaces[0]/gloss_en citation pair — + quantity-role lookup, EN tail/unit accessor
+  values space-led-composed (§10 composition point: emitter/lint/parser consume view
+  output verbatim, never re-compose) — §10 single source, no
   prefix tests downstream; view construction gains lexicon-cnl.2's zero-finding
   precondition when the lint lands); load_lexicon strict extension (deny_unknown_fields holds; JA
   surfaces through StringPolicy::SemanticJa, EN surfaces through SemanticEn — §10 EN
@@ -500,7 +502,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   article a/an/the rejected on gloss_en — SemanticEn lowercases, never rejects
   non-ASCII) + per-variant rejection battery over bad-lexicon
   fixtures. The reserved-terminal + lexer-category inventory lands here as ONE typed
-  module that lint, grammar emitter, and parser all consume (single source, no drift).
+  module that lint, grammar emitter, and parser all consume (single source, no drift;
+  transcribes §10's token-inventory bullet VERBATIM — fixed-terminal bytes with per-side
+  space ownership in both languages, digit class + leading-zero-free numeral register,
+  mode-scoped escape/basis delimiters — and takes the composed EN tail/unit forms from the
+  role view, §10's one composition point, never re-composing).
   Wiring — the lint gates, never floats: committed-lexicon zero-findings test; the §10
   typed role VIEW constructor hard-errors on ANY finding and every CNL module reaches the
   lexicon only through the view (grammar emitter, parser, bridge, predicate, renderer,
@@ -584,9 +590,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   a lint-dirty lexicon); interval productions PER QUANTITY ROW — each row's surface paired
   with its own unit terminal, both languages (the sole unit↔var binding, Unit tokens being
   var-free — a wrong-unit-for-var interval is unparseable);
-  interval numerals = ASCII-digit literal alternation (unbounded
-  repetition — value bound 0..=i64::MAX parser-enforced, the second grammar
-  over-approximation beside the open escape); basis-bracket id refs = the plan-header
+  interval numerals = the §10 leading-zero-free register — `<numeral> ::= "0" | <nonzero>
+  <digit-rest>`, right-recursive rest (length unbounded; value bound 0..=i64::MAX
+  parser-enforced stays the second grammar over-approximation beside the open escape;
+  zero-led runs out of the language BOTH sides — no third class, no undeclared
+  parse-normalization variation); productions transcribe §10's schematic skeleton
+  (factoring + slot order normative there; JA conjunct-mid/conjunct-adj thread the
+  patient-adjacent atom to the last atom of the last disjunct); basis-bracket id refs = the plan-header
   basis-id production (leading `<lower>`, rest `<lower>|<digit>|"_"|"."|":"|"-"` —
   smt_query.grammar's `<identifier>` shape), the grammar's basis-id language == Id::new's
   exact `[a-z][a-z0-9_.:-]*` — no undeclared third over-approximation class (a bare
@@ -598,7 +608,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   worked examples full-match both languages, trailing-garbage reject, wrong-slot-surface
   reject, a multi-role surface parsing in EACH of its slots (synthetic
   {condition,action_target} lexicon — committed rows are singleton-role), swapped-unit
-  reject + shared-unit-literal accept (two rows, one unit), basis-id production membership
+  reject + shared-unit-literal accept (two rows, one unit), numeral-register membership
+  (`0` accepts; `05`/`018` reject — grammar-side leading-zero bar, mirroring
+  cnl-parse.1's parser battery), basis-id production membership
   over the SHARED basis-id corpus (one fixture, this unit + cnl-parse.2 — both sides of
   language equality): accept one-letter id + composite ids covering every rest-char
   category (digit/`_`/`.`/`:`/`-`), reject leading digit `1r` / leading punctuation
@@ -637,7 +649,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   identity/differential laws pass a consistently swapped shared table),
   wrong-unit-for-var interval (the QuantityVar row's pairing — mirrors
   the grammar's per-row productions), numeral overflow boundary (i64::MAX parses, i64::MAX+1 = repairable
-  parse error — §10's second over-approximation class), connective misuse, mid-token
+  parse error — §10's second over-approximation class), leading-zero numerals (`05`/`00` =
+  repairable parse errors, outside BOTH languages per the §10 register — no third class;
+  bare `0` parses to value 0), connective misuse, mid-token
   truncation, escape-payload contract
   violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
   errors, repairable).

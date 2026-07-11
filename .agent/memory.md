@@ -671,7 +671,22 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   inventory/prefix-lint/parser tables all to carry composed forms; trailing-の lint rule
   on adnominal/negated forms (prefix + reserved rules both miss 妊娠中の); projected full
   inventory hand-audited pairwise prefix-free at plan time (re-verify mechanically at
-  impl).
+  impl). Terminal layer pinned (2026-07-12; §10 token-inventory bullet = authority, do not
+  re-derive): full fixed-terminal byte table both languages with per-side space ownership
+  (context/exception openers + closers, connectives, links, bound markers, parens,
+  terminators, basis/escape delimiters — every worked junction re-derived against §8.6 +
+  committed lexicon bytes: ASCII `:` certainty labels, ASCII parens both languages);
+  digits = single-char tokens under a LEADING-ZERO-FREE numeral register (`0` | nonzero-led
+  run — zero-led runs outside BOTH languages, so grammar-over-parser classes stay exactly
+  the declared two and parse-normalization variation stays the declared set; grammar oracle
+  `0`/`05` cases at cnl-grammar.1, parser battery at cnl-parse.1); mode-scoped content
+  (escape payload scan, basis-bracket single-space id separators) outside the main token
+  table — no bare-space main-mode token; composition point = the typed role view serves EN
+  tail/unit space-led-composed, every consumer takes view output verbatim
+  (lexicon-cnl-shape accessors); schematic grammar skeleton in §10 — factoring + slot
+  order normative (JA two-atom-nonterminal DNF threading pins patient-adjacency to the
+  last atom of the last disjunct; EN one position-invariant atom), committed grammar bytes
+  final; lexicon-cnl.2's typed module transcribes the table verbatim.
   FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
