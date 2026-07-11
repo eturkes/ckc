@@ -1119,10 +1119,18 @@ Committed direction:
   ledgered data accretion inside the single probabilistic boundary, never a precomputed
   corpus-wide lexicon.
 - Canonical text: render emits exactly one text per AST per language (stored ContextExpr order
-  preserved — §4.3 ordered arrays; canonicalization never reorders semantics). Parse accepts
-  declared bounded variation (modality synonyms, basis-ref order, whitespace); accept
-  re-renders, so every accepted `CnlDocument` is canonical bytes, hash-locked beside its AST
-  content hash.
+  preserved — §4.3 ordered arrays; canonicalization never reorders semantics). Document bytes
+  are pinned past rule cardinality: each rule renders as one line terminated by exactly one
+  LF — the uniform rule terminator, the last rule included, no other inter-rule bytes — so
+  the grammars carry document = (rule <nl>)+ (the smt_query.grammar literal-LF `<nl>`
+  convention), document text = the stored per-rule texts each plus one LF, and the
+  per-language text hashes and the audit `.txt` views cover exactly those assembled bytes.
+  LF cannot occur inside a rule: lexicon surfaces are whitespace-folded (§4.2), fixed
+  terminals carry none, and the escape payload contract bars control characters. Parse
+  accepts declared bounded variation inside a rule (modality synonyms, basis-ref order,
+  whitespace); the document frame is exact — a missing terminal LF is a repairable parse
+  error; accept re-renders, so every accepted `CnlDocument` is canonical bytes, hash-locked
+  beside its AST content hash.
 - Determinism laws (the M3 contract, property-tested):
 
 ```text

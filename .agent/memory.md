@@ -217,9 +217,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   lands): .2 absorbs the codex-REJECTED `Instant+budget` overflow-panic fix (rejected Z3-mirrored,
   non-realistic, fix-both-not-one) AND the cap/reap of the
   STILL-unbounded post-grace detached drain (a descendant holding stdout open appends to its Vec forever;
-  accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep); the ETXTBSY
+  accepted meanwhile for the local trusted runtime, no-unsafe/no-extra-dep) AND the ruled
+  compatibility decision — solver FAILS CLOSED on incomplete stdout: model.rs gates a clean
+  exit's `Completed` on its stdout-EOF flag (else `CaptureIncomplete`) while verify.rs has NO
+  EOF state and mints `Completed{verdict}` from whatever snapshot exists at drain-grace
+  expiry (leading_verdict over truncated bytes = phantom verdict); .1 preserves the asymmetry
+  through adapters (behavior-locked), .2 closes it solver-side — a deliberate change, never
+  "stays consistent"; the ETXTBSY
   vacuous-window half is discharged earlier by M3 spawn-retry (fs-dependent tests → injectable
-  deterministic retry tests). `Completed{bytes}`
+  spawn op + injectable clock/sleeper, wall-clock-free deterministic retry tests — no real
+  SPAWN_BUSY_GRACE consumed). `Completed{bytes}`
   duplicates `stdout_bytes` on clean exit; PARTIAL capture on Timeout/ExitFailure/SpawnFailure diverges;
   stdout stays RAW, never lossy-decoded (byte-stability = cassette determinism). NO
   process-fate→DiagnosticCode here (§7.4 `ai_*` = output-parse, stage-model-fill's job). `set_var`
@@ -338,7 +345,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   outside the tree passes and `std::fs::read` follows it — and
   corpus.path + expected_outcomes lack even the LEXICAL check (review-reproduced: absolute
   /tmp paths pass `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
-  core + ONE canonicalize/containment I/O resolver across every registry-data-controlled read. Core fixtures (SCHEMAS
+  core + ONE single-open BYTE-RETURNING canonicalize/containment resolver across every
+  registry-data-controlled read (success = captured bytes off the once-opened handle — no
+  checked-pathname reopen; residual canonicalize→open window = same-UID replacement, ruled
+  outside the threat model, constraint-snapshot's stance). Core fixtures (SCHEMAS
   included) use SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents`.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
   forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
@@ -506,7 +516,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   guarded by the lexicon proper-prefix lint (same- AND cross-category over the finite token
   inventory — lexicon surfaces + fixed terminals + digits; escape payload delimiter-scanned,
   outside it) instead; single-parse asserts =
-  `parse_input().take(2)`, never full counts (ambiguous blowup). FillReject grows Parse
+  `parse_input().take(2)`, never full counts (ambiguous blowup). Document frame pinned past
+  bare rule cardinality (§10 canonical-text bullet): canonical document bytes = one
+  LF-terminated line per rule — LF the uniform terminator, last rule included, no other
+  inter-rule bytes; grammar document = (rule <nl>)+ both languages (smt_query.grammar
+  literal-LF `<nl>` convention); stored per-rule texts LF-free (surfaces whitespace-folded
+  §4.2, fixed terminals none, escape payload control-barred); text hashes + audit .txt views
+  = exactly the assembled bytes; parse demands the exact frame (missing terminal LF =
+  repairable parse error). FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
   spends no repair). Record strategy: scratch-root record from a newly created EMPTY cassette
