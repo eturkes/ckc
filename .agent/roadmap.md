@@ -186,8 +186,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   property-tested at expressible-law: over the domain — acceptance judged on the value's
   canonical bytes — acceptance succeeds ⇔ from_ir succeeds; the two domains one function
   apart, definitional drift structurally excluded, behavioral agreement law-tested.
-- Grammar terminals = whole-surface string literals (ASCII digits + basis-id chars as literal
-  alternation) — portable to LLM constraint mechanisms + atomic in bnf — with EXACTLY ONE open
+- Grammar terminals = whole-surface string literals (ASCII digits as literal alternation;
+  basis-id refs = Id's exact §4.1 grammar `[a-z][a-z0-9_.:-]*`, pinned to the
+  smt_query.grammar <identifier> production: <basis-id> ::= <lower> <basis-id-rest>,
+  <basis-id-rest> ::= "" | <basis-id-char> <basis-id-rest>, <basis-id-char> ::= <lower> |
+  <digit> | "_" | "." | ":" | "-" — NEVER a bare one-or-more-basis-chars production, which
+  additionally admits `1r`/`.r`/`:r`/`-r`/`_r` that Id::new rejects (an undeclared THIRD
+  grammar-over-approximation class beside §10's declared two), and NEVER the broader
+  identifier_ascii policy, which admits `/`) — portable to LLM constraint mechanisms +
+  atomic in bnf — with EXACTLY ONE open
   lexical production per language: the escape's free quoted surface (§10) is inexpressible as
   finite literals → dialect open-content notation decided at cnl-grammar.1, portability risk
   contained there; emitter takes an escape mode — Committed(open) vs
@@ -513,14 +520,22 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   var-free — a wrong-unit-for-var interval is unparseable);
   interval numerals = ASCII-digit literal alternation (unbounded
   repetition — value bound 0..=i64::MAX parser-enforced, the second grammar
-  over-approximation beside the open escape); escape quoted-surface content
+  over-approximation beside the open escape); basis-bracket id refs = the plan-header
+  basis-id production (leading <lower>, rest <lower>|<digit>|"_"|"."|":"|"-" —
+  smt_query.grammar's <identifier> shape), the grammar's basis-id language == Id::new's
+  exact `[a-z][a-z0-9_.:-]*` — no undeclared third over-approximation class (a bare
+  one-or-more-basis-chars production would admit `1r`/`.r`/`:r`/`-r`/`_r`,
+  Id::new-rejected); escape quoted-surface content
   = the single open production (plan header — emitter escape mode Committed|OracleBound;
   payload contract per §10, parser-enforced — the production stays open).
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
   worked examples full-match both languages, trailing-garbage reject, wrong-slot-surface
   reject, a multi-role surface parsing in EACH of its slots (synthetic
   {condition,action_target} lexicon — committed rows are singleton-role), swapped-unit
-  reject + shared-unit-literal accept (two rows, one unit), per-production coverage BOTH
+  reject + shared-unit-literal accept (two rows, one unit), basis-id production membership —
+  one-letter id + representative composite ids (digits/`_`/`.`/`:`/`-` in rest position)
+  accept, leading digit `1r` / leading punctuation `.r`/`:r`/`-r`/`_r` / uppercase /
+  slash-bearing ids reject — per-production coverage BOTH
   languages incl. negated/escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
@@ -558,7 +573,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   concept-or-escape payload + its own basis bracket), multi-rule documents under the §10
   document frame (exactly one LF terminates each rule, the last included), single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
-  unterminated bracket, empty bracket, exception sentence missing its bracket, empty
+  unterminated bracket, empty bracket, out-of-grammar basis id — leading digit/punctuation
+  `1r`/`.r`/`:r`/`-r`/`_r`, uppercase, slash-bearing — repairable parse errors (Id::new the
+  id gate: parser basis-id language == the pinned production, differential agreement
+  total), exception sentence missing its bracket, empty
   document, missing terminal LF / stray blank line between rules / CRLF + lone-CR line
   breaks / stray whitespace (§10: whitespace variation NONE — parser language = grammar
   language, so differential agreement stays total; stray whitespace = repairable parse
