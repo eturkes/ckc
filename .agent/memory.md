@@ -221,7 +221,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   compatibility decision — solver FAILS CLOSED on incomplete stdout: model.rs gates a clean
   exit's `Completed` on its stdout-EOF flag (else `CaptureIncomplete`) while verify.rs has NO
   EOF state and mints `Completed{verdict}` from whatever snapshot exists at drain-grace
-  expiry (leading_verdict over truncated bytes = phantom verdict); .1 preserves the asymmetry
+  expiry (leading_verdict over truncated bytes = phantom verdict) — and verdict parsing
+  spans EXIT FATES: z3 prints the verdict then a retrieval error and exits 1 (verdict.rs
+  pins exit-1 unsat as the documented no-conflict path), so .2's completeness gate covers
+  Completed AND ExitFailure, complete = EOF && un-truncated once the drain cap lands, with
+  a consumer-level assemble_result test (verdict None + execution-failure diagnostic + no
+  Q2); .1 preserves the asymmetry
   through adapters (behavior-locked), .2 closes it solver-side — a deliberate change, never
   "stays consistent"; the ETXTBSY
   vacuous-window half is discharged earlier by M3 spawn-retry (fs-dependent tests → injectable
@@ -346,9 +351,13 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   corpus.path + expected_outcomes lack even the LEXICAL check (review-reproduced: absolute
   /tmp paths pass `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
   core + ONE single-open BYTE-RETURNING canonicalize/containment resolver across every
-  registry-data-controlled read (success = captured bytes off the once-opened handle — no
-  checked-pathname reopen; residual canonicalize→open window = same-UID replacement, ruled
-  outside the threat model, constraint-snapshot's stance). Core fixtures (SCHEMAS
+  registry-data-controlled read (pre-open stat filter + `O_NONBLOCK` open + fstat re-check —
+  a contained FIFO must not block the open; success = typed {canonical path + bytes}, no
+  RESOLVER consumer reopens a checked pathname — the constraint reread/child reopen persist
+  until constraint-staging/-snapshot; residual canonicalize→open window = concurrent
+  repo-tree replacement mid-resolve by any rename-capable principal, ruled outside the
+  threat model — operator's own working copy, a weaker invariant than constraint-staging's
+  owned dir). Core fixtures (SCHEMAS
   included) use SYNTHETIC hashes; editing SCHEMAS also breaks `strict_loading_rejects_bad_documents`.
 - Experiment pipeline-set binding (§14, M2.6): `ExperimentEntry` carries TWO mutually-exclusive
   forms — legacy `pipeline: Option<Id>` (M1) and the set `pipelines: Vec<Id>` + `baseline_pipeline:
@@ -520,9 +529,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bare rule cardinality (§10 canonical-text bullet): canonical document bytes = one
   LF-terminated line per rule — LF the uniform terminator, last rule included, no other
   inter-rule bytes; grammar document = (rule <nl>)+ both languages (smt_query.grammar
-  literal-LF `<nl>` convention); stored per-rule texts LF-free (surfaces whitespace-folded
-  §4.2, fixed terminals none, escape payload control-barred); text hashes + audit .txt views
-  = exactly the assembled bytes; parse demands the exact frame (missing terminal LF =
+  literal-LF `<nl>` convention; bnf 0.6 lacks postfix repetition → right-recursive lowering,
+  <assertions> pattern); stored per-rule texts line-break-free — LF AND CR (surfaces
+  whitespace-folded §4.2, fixed terminals none, escape payload control-barred); text hashes
+  + audit .txt views = exactly the assembled bytes, cnl-ast validate RECOMPUTES the hashes
+  from the stored texts + report-cnl.2 re-hashes its audit read-back (executable invariant);
+  whitespace variation NONE — parser language = grammar language (differential
+  parser-vs-oracle agreement stays total), stray whitespace/CRLF/lone-CR = repairable parse
+  errors; parse demands the exact frame (missing terminal LF =
   repairable parse error). FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,

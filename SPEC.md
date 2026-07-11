@@ -1123,14 +1123,19 @@ Committed direction:
   are pinned past rule cardinality: each rule renders as one line terminated by exactly one
   LF — the uniform rule terminator, the last rule included, no other inter-rule bytes — so
   the grammars carry document = (rule <nl>)+ (the smt_query.grammar literal-LF `<nl>`
-  convention), document text = the stored per-rule texts each plus one LF, and the
-  per-language text hashes and the audit `.txt` views cover exactly those assembled bytes.
-  LF cannot occur inside a rule: lexicon surfaces are whitespace-folded (§4.2), fixed
-  terminals carry none, and the escape payload contract bars control characters. Parse
-  accepts declared bounded variation inside a rule (modality synonyms, basis-ref order,
-  whitespace); the document frame is exact — a missing terminal LF is a repairable parse
-  error; accept re-renders, so every accepted `CnlDocument` is canonical bytes, hash-locked
-  beside its AST content hash.
+  convention; the bnf dialect lacks postfix repetition, so the committed form is the
+  right-recursive lowering — smt_query.grammar's <assertions> pattern), document text = the
+  stored per-rule texts each plus one LF, and the per-language text hashes and the audit
+  `.txt` views cover exactly those assembled bytes — an executable invariant: validate
+  recomputes the hashes from the stored texts under the frame, and the audit writer
+  re-hashes its read-back against them. Line breaks (LF and CR both) cannot occur inside a
+  rule: lexicon surfaces are whitespace-folded (§4.2), fixed terminals carry none, and the
+  escape payload contract bars control characters. Parse accepts declared bounded variation
+  inside a rule (modality synonyms, basis-ref order — whitespace variation: none; the
+  parser's language equals the grammar's, keeping differential parser-vs-oracle agreement
+  total, and stray whitespace is a repairable parse error); the document frame is exact — a
+  missing terminal LF is a repairable parse error; accept re-renders, so every accepted
+  `CnlDocument` is canonical bytes, hash-locked beside its AST content hash.
 - Determinism laws (the M3 contract, property-tested):
 
 ```text

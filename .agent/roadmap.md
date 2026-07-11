@@ -159,11 +159,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   past bare `rule+` cardinality (§10 canonical-text bullet): canonical document bytes = one
   LF-terminated line per rule — LF the uniform rule terminator, last rule included, no other
   inter-rule bytes; grammar production document = (rule <nl>)+ in BOTH languages (the
-  smt_query.grammar literal-LF `<nl>` convention); render assembles exactly those bytes;
-  parse demands the exact frame (missing terminal LF = repairable parse error); stored
-  per-rule texts LF-free (lexicon surfaces whitespace-folded §4.2, fixed terminals carry
-  none, escape payload bars control chars); CnlDocument text hashes + report-cnl.2's audit
-  `.txt` views cover exactly the assembled bytes.
+  smt_query.grammar literal-LF `<nl>` convention; bnf 0.6 lacks postfix repetition →
+  right-recursive lowering, <assertions> pattern); render assembles exactly those bytes;
+  parse demands the exact frame (missing terminal LF = repairable parse error) and
+  whitespace variation is NONE — parser language = grammar language, stray whitespace a
+  repairable parse error; stored
+  per-rule texts line-break-free — LF and CR (lexicon surfaces whitespace-folded §4.2,
+  fixed terminals carry none, escape payload bars control chars); CnlDocument text hashes +
+  report-cnl.2's audit `.txt` views cover exactly the assembled bytes, and cnl-ast validate
+  RECOMPUTES the hashes from the stored texts (executable invariant).
 - Record strategy: record exp.m3_cnl into a scratch root whose cassette store starts newly
   created + EMPTY; census `route.single_cnl/**` vs the run's model-attempt ledger both
   directions; identity-agreement vs the existing cassettes decides — agree ⇒ M2 cassettes
@@ -200,18 +204,24 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   absolute rhs and keeps `..`). Core: validate_registries extends the schemas/prompts
   is_safe_relative_path finding (UnsafePath) to corpus.path + experiment.expected_outcomes.
   CLI: ONE I/O resolver RETURNING CAPTURED BYTES (lexical check → canonicalize root +
-  existing candidate → candidate strictly under root → open ONCE → regular-file check on the
-  opened handle's metadata → read from that same handle; success = the bytes, so no consumer
-  ever reopens a checked pathname — the check/open race closes structurally; a failed
+  existing candidate → candidate strictly under root → pre-open stat filter (regular files
+  only; keeps a contained FIFO from blocking the open) → open ONCE (`O_NONBLOCK` unix) →
+  authoritative regular-file re-check on the opened handle's metadata → read from that
+  handle; success = one typed {canonical path + bytes} value — input-snapshot.1's
+  ResolvedFile shape — so RESOLVER consumers never reopen a checked pathname; the constraint
+  pathname reread + runtime child reopen persist BY DESIGN until constraint-staging +
+  constraint-snapshot land, cassette.rs's drift-check covering them meanwhile; a failed
   resolve lands the diagnostic and yields no bytes; residual canonicalize→open window =
-  concurrent same-UID path replacement, ruled outside the threat model,
-  constraint-snapshot's stance for its staging dir) applied to every
-  registry-data-controlled read — registry_check.rs
+  concurrent repo-tree path replacement mid-resolve — any rename-capable principal, not
+  merely same-UID — ruled outside the threat model: the registry tree is the operator's own
+  working copy, a weaker invariant than constraint-staging's owned dir, stated as such)
+  applied to every registry-data-controlled read — registry_check.rs
   expected_outcomes ref loads + schema/prompt byte reads, run.rs corpus entry.path (×2 call
   sites), expected_outcomes (×2), record-path template/constraint reads; fixed-name reads
   (CORPORA_FILE, LEXICON_FILE, …) are code constants, out of scope. Tests: absolute / `..` /
   in-repo symlink→outside (`#[cfg(unix)]`) / valid nested file accepted / non-regular
-  rejected via the opened handle's metadata — across registry check + run. Gate: full gates
+  rejected via the opened handle's metadata, FIFO included without blocking (`#[cfg(unix)]`)
+  — across registry check + run. Gate: full gates
   + registry check green on the
   committed tree.
 - [ ] input-snapshot.1: read-once input layer, fresh module
@@ -228,8 +238,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   resolve; capturing them later at record setup would breach the freeze) (M1
   reads none of those in-run; its stable test fixture ships NO reference file —
   ungated capture breaks the M1 suite). Registry-data-controlled paths load through
-  path-confine's byte-returning resolver (the captured bytes ARE its single-open read — no
-  reopen between check and capture); fixed-name files join as today (the two LEXICON_FILE
+  path-confine's byte-returning resolver (its typed {canonical path + bytes} success IS the
+  snapshot row's source — no reopen between check and capture); fixed-name files join as
+  today (the two LEXICON_FILE
   sites are
   exclusive dispatch arms — one read per run already; snapshotting it single-sources, not a
   reread fix). Per-entry corpus slots hold bytes OR the read-failure payload;
@@ -365,8 +376,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   CnlDocument (grammar refs + per-rule text + text-hash members per the plan header) +
   Canonical emit/read (sorted-key slots, optional members omit-None) + validate (nonempty
   rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance),
-  Id grammar, per-rule canonical-text members LF-free (§10 document frame — document bytes
-  reassemble as LF-terminated lines), interval bound coherence mirroring ir.rs, §10 escape
+  Id grammar, per-rule canonical-text members line-break-free — LF AND CR, matching
+  report.rs's line-break validation (§10 document frame) — + per-language text-hash members
+  RECOMPUTED equal from the stored per-rule texts under the frame assembly, hash ==
+  hash_bytes(concat(rule_text + LF)) — the frame an executable invariant, never a
+  convention, interval bound coherence mirroring ir.rs, §10 escape
   payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
   SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed lexicon view
@@ -384,6 +398,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   BNF (smt_query.grammar dialect, `;` comments): document = (rule <nl>)+ — §10 document
   frame, <nl> the dialect's literal-LF terminal = the uniform rule terminator, last rule
   included (canonical separator + terminal-newline policy pinned, past bare cardinality);
+  bnf 0.6 has no postfix repetition → committed form = the right-recursive lowering,
+  smt_query.grammar's <assertions> pattern: <document> ::= <rule> <nl> | <rule> <nl>
+  <document>;
   rule = context 患者には、
   action deontic-tail / optional certainty paren / [根拠 …] rule basis / ただし-exceptions
   (each sentence = ONE concept-or-escape slot + its OWN [根拠 …] bracket, §10 per-sentence
@@ -438,8 +455,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   document frame (exactly one LF terminates each rule, the last included), single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
   unterminated bracket, empty bracket, exception sentence missing its bracket, empty
-  document, missing terminal LF / stray blank line between rules,
-  connective/negated-concept/interval inside an
+  document, missing terminal LF / stray blank line between rules / CRLF + lone-CR line
+  breaks / stray whitespace (§10: whitespace variation NONE — parser language = grammar
+  language, so differential agreement stays total; stray whitespace = repairable parse
+  error), connective/negated-concept/interval inside an
   exception sentence); differential accept/reject agreement vs the Earley
   oracle over this unit's corpus.
 - [ ] cnl-render: cnl_render.rs — render_ja/render_en canonical text (modality pair → the
@@ -451,7 +470,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   the text hashes lock); missing-pair
   lookup = Err, fail-closed — §10 totality + accept-total make it unreachable from accepted
   IR) +
-  canonical-fixpoint spot tests (bounded-variation inputs re-render canonical) + 3 M1-document
+  canonical-fixpoint spot tests (bounded-variation inputs — synonym tails, unsorted basis —
+  re-render canonical) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
   control shape).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
@@ -638,13 +658,20 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] subproc-runner.2: runner hardening (the M2-deferred codex-rejected fixes + drain cap,
   once, shared): bounded stdout/stderr capture with an explicit truncation state, checked
   deadline arithmetic (Instant+budget overflow), post-grace detached-drain cap/reap; PLUS
-  the ruled compatibility decision — the solver FAILS CLOSED on incomplete stdout: adopting
-  the runner core's EOF state, a clean solver exit without stdout EOF within the drain
-  grace mints a capture-incomplete RunOutcome routed down the existing solver-failure
-  diagnostic path, never Completed{verdict} over a partial snapshot (leading_verdict over
-  truncated bytes reads a phantom verdict) — a deliberate behavior CHANGE closing
-  subproc-runner.1's preserved asymmetry; deterministic tests through the injectable seam
-  drive both runners' EOF-absent clean exits.
+  the ruled compatibility decision — the solver FAILS CLOSED on incomplete stdout capture,
+  complete = stdout EOF within the drain grace AND un-truncated by the new cap (EOF alone
+  is insufficient once a cap can drop bytes before EOF; the model keeps its documented
+  whole-output Completed invariant under the same conjunction): the completeness gate
+  covers EVERY verdict-parsed fate — Completed AND ExitFailure alike, since verdict.rs
+  parses the leading verdict token over exit-1 replies too (z3's verdict-then-retrieval-
+  error shape), so a truncated exit-1 prefix could otherwise mint a phantom verdict;
+  incomplete capture mints a capture-incomplete RunOutcome — verdict None,
+  SolverExecutionFailure-class diagnostic, NO Q2 — never a verdict over a partial
+  snapshot, while complete exit-1 replies keep parsing as today — a deliberate behavior
+  CHANGE closing subproc-runner.1's preserved asymmetry; deterministic tests through the
+  injectable seam drive both runners' EOF-absent clean exits PLUS a consumer-level
+  assemble_result test (capture-incomplete run → verdict None + execution-failure
+  diagnostic + no Q2).
 - [ ] route-single-cnl.3: single_cnl_fill + execute_routes SingleCnl arm (head reuse → fill →
   bridge + assemble tail into the per-group compile/verify loop via the shape's named stage
   handles — route-stage-handles' representation) + landing
@@ -697,7 +724,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   report-tail lands
   audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt (§10 keying — a multi-route experiment accepts
   the same document several times; body = the document's canonical bytes verbatim, §10
-  LF-terminated frame; write_under + byte read-back, report_en.md pattern; text
+  LF-terminated frame; write_under + byte read-back whose re-hash must equal the
+  stored/report text hash (independent frame check), report_en.md pattern; text
   hashes into report.json) + M1/M2 report byte-pin re-bless sweep (deliberate,
   bless-from-observed).
 - [ ] report-cnl.3: md renderers — findings quote rules as CNL beside quoted spans (JA body
