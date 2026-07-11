@@ -146,7 +146,7 @@ assembling the full harness before the first end-to-end result.
 | --- | --- | --- |
 | M1 scaffold | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 test sources via `route.direct_smt` versus one IR-mediated route; scored on validity/acceptance/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
-| M3 ClinicalCNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual ClinicalCNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from any accepted IR, round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
+| M3 ClinicalCNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual ClinicalCNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from guarded-route accepted IR (off-corpus M1: typed omission, §7.2), round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
 | M4 route field + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered) plus invented ablations (compact record DSL, labeled-slot CNL) versus `single_cnl`; direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment; LP explanation lane (Prolog/s(CASP) fixture queries, CNL-verbalized proofs). | `ckc run --experiment exp.m4_routes` / `exp.m4_compare` / `exp.m4_coverage` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
@@ -596,8 +596,9 @@ normative rule id via §10's origin map (a (pipeline, document) whose accepted I
 predicate rejects at `from_ir` — a guard-less route, the M1 route off its locked corpus —
 carries no CNL entries: omitted under one typed `cnl_inexpressible_ir` diagnostic (§7.4),
 never an assembly failure), and a `findings_owner_pipeline_id` field naming the
-findings-view owner (findings and documented no-conflict results quote their rules as CNL
-beside the quoted source spans from the owner pipeline's entry alone, owner-labeled —
+findings-view owner (findings and documented no-conflict results quote their rules as CNL —
+single-backtick inline code spans, the normative delimiter; code-span-inert = no literal
+backtick, no line break, validated at report shape — beside the quoted source spans from the owner pipeline's entry alone, owner-labeled —
 normative rule ids are route-local positional identities, never cross-route alignment keys:
 a same-numbered id under another route may hold different content, so cross-route CNL
 comparison requires an explicit alignment map, out of scope through M3, and non-owner
@@ -634,7 +635,8 @@ identical test sources: model routes from M2, layered-minus-direct from M4), rou
 from M2), surface quality (round-trip identity rate, surface tokens per accepted rule —
 surface tokens = the committed ClinicalCNL JA lexer's token count over the accepted
 document's stored canonical JA rule texts, deterministic and runtime-free: a model-runtime
-token count would pin a tokenizer identity and count into every cassette; from
+token count would bind the metric to a versioned runtime-tokenizer replay dependency,
+tokenizer identity + counts separately attested; from
 M3), translation faithfulness (share of a route's accepted documents whose IR content equals
 the deterministic reference derivation over identical inputs under the §10 faithfulness
 projection, binding region provenance excluded — conflict-quality verdicts
@@ -660,7 +662,7 @@ false_positive_conflict false_negative_conflict metamorphic_instability
 
 M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
 `repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`,
-`cnl_unregistered_concept`);
+`cnl_unregistered_concept`, `cnl_inexpressible_ir`);
 M4 adds invented-DSL route codes and the claim-completeness code
 (`normative_region_unclaimed`, §11); M5 adds loop/budget/surface codes
 (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
@@ -1032,7 +1034,11 @@ Committed direction:
   row). Concept citation forms mint no new field: an action target renders as the concept
   row's representative surface (`surfaces[0]`, JA) and its EN gloss (`gloss_en` — one EN
   form serves context and citation); synonym surfaces (`surfaces[1..]`) stay §8
-  source-match vocabulary, never CNL terminals.
+  source-match vocabulary, never CNL terminals. EN negation mints no field either: the EN
+  negated atom is a fixed-negator composition over the same `gloss_en` (the negator is a
+  fixed inventory terminal; exact wording decided with the other EN fixed terminals at the
+  grammar emitter), while JA negation stays lexical (`negated_ja` — morphological, not
+  composable).
   Typed slot roles (the CNL slot-legality classification — lexicon data like every other
   linguistic form): every concept row carries a nonempty validated role set over
   `population` / `condition` / `action_target` — `population` and `condition` mutually
@@ -1105,13 +1111,18 @@ Committed direction:
   the bridge image — accepted IR stays partition-normal), the v1 register.
   `single_ir_accept` and `from_ir` both call the one predicate — the acceptance and
   renderer domains sit one function apart — definitional drift structurally excluded,
-  behavioral agreement law-tested below — so audit rendering is defined over accepted IR
+  behavioral agreement law-tested below — so audit rendering is defined over guarded-route
+  accepted IR + locked-corpus M1 (off-corpus M1: the §7.2 typed omission)
   and a missing-row render error is a fail-closed instrument path, barred from accepted
-  artifacts by lexicon integrity (pair coverage, render-surface totality) + the predicate. Lexicon
+  artifacts by lexicon integrity (pair coverage, render-surface totality), the zero-finding
+  view gate (the §10 typed role view refuses construction on any lint finding — every CNL
+  module consumes the view, so lint-owned role-scoped surfaces gate like hard errors), and
+  the predicate. Lexicon
   integrity checks: reserved-token collisions (a surface containing a connective/punctuation
   terminal or a backtick — §7.2 validation renders rule text inside Markdown code spans, so
   every surface stays code-span-inert; escape payloads never reach report surfaces — the
-  escape is terminal at acceptance and rendered rule text is registered vocabulary only),
+  escape is terminal at acceptance and accepted/report-rendered rule text is registered
+  vocabulary only; pre-accept escapes render + round-trip off the report surface),
   missing surface fields (role-scoped: a context-role concept needs its
   adnominal / negated-adnominal / EN-gloss forms, an `action_target`-role concept its
   target citation forms — `surfaces[0]`, already row-required, plus `gloss_en`),
@@ -1126,7 +1137,11 @@ Committed direction:
   NegatedConcept(row), ActionNoun(row), Tail(direction, strength), Certainty(value),
   QuantityVar(var), Unit(literal) (deliberately var-free: the per-var interval production
   pairs each var's surface with its own row's unit terminal, so rows sharing a unit
-  literal stay unambiguous) — same-token occurrences deduplicate into one token-table
+  literal stay unambiguous), plus Fixed(terminal) and Digit(char) as their own categories
+  (a lexicon literal equal to a fixed terminal or a digit token is a cross-category hard
+  error — equality escapes the proper-prefix rule; escape payloads and basis-bracket id
+  content stay delimiter-scoped at the lexer, outside the collision domain, though the
+  grammar spells them as open/char-alternation productions) — same-token occurrences deduplicate into one token-table
   entry (a multi-role concept's surface parses in every slot its roles admit; same-pair
   tail synonyms and shared units collapse; cross-row, cross-value, and cross-category
   duplicates reject), per-language proper-prefix overlaps
@@ -1282,8 +1297,8 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   `cnl_unregistered_concept` terminal, `repair_limit_exceeded` on exhaustion. `exp.m3_cnl` binds `[direct_smt (baseline), single_ir,
   single_cnl]` over the locked M1 inputs — the §9 measurement record extended by one route,
   scored by the same reference.
-- Audit artifacts, route-independent: any accepted ClinicalIR — the M1 deterministic pipeline's
-  included — renders to `audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt` (keyed by pipeline AND
+- Audit artifacts, route-independent: every CNL-expressible accepted ClinicalIR — the M1
+  deterministic pipeline's included — renders to `audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt` (keyed by pipeline AND
   document: a multi-route experiment accepts the same document several times, so views stay
   separately auditable; non-IR routes land none; an accepted IR the predicate rejects at
   `from_ir` — reachable only on a guard-less route, the M1 route off its locked corpus —
@@ -1322,8 +1337,12 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   reject — payload = the lexicon-entry proposal, quoted surface + atom position),
   `cnl_inexpressible_ir` (report-stage: an accepted ClinicalIR the expressibility predicate
   rejects at `from_ir` on a route without the acceptance guard — payload names the predicate
-  class and the (pipeline, document) key, refs empty; the audit-view omission fallback above
-  — an honest expressibility boundary, never a model failure, never an instrument bug).
+  class and the (pipeline, document) key, refs empty; record outcome `unsupported` — §4.4
+  schema-valid construction outside implemented semantics, the stage-event outcome then
+  derived per §4.4's severity order; lands in the report diagnostics summary + report-stage
+  event, excluded from RouteTaxonomy (fill/accept failure classes only); the audit-view
+  omission fallback above — an honest expressibility boundary, never a model failure, never
+  an instrument bug).
 - §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
   `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows; and the
   translation-faithfulness family — `ir_faithfulness_rate`: the share of a route's accepted
@@ -1380,8 +1399,9 @@ locked M1 inputs with raw rows before deltas; the determinism laws hold as prope
 every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric);
 faithfulness rows emit beside the surface rows (measured, never gated — the weak baseline may
 honestly read low or not_applicable; the golden path reads 1.0); audit views render
-deterministically for every route including M1's, and finding/no-conflict Markdown quotes
-owner-route CNL only; the golden-cassette reproduce-M1 gate passes; recorded model I/O
+deterministically for every IR-bearing acceptance — single_ir + single_cnl in the recorded
+run, M1's via its re-blessed golden run, direct_smt lands no IR hence none — and
+finding/no-conflict Markdown quotes owner-route CNL only; the golden-cassette reproduce-M1 gate passes; recorded model I/O
 replays byte-stably; grammar/lexicon exports carry drift guards; §0 vocabulary holds.
 
 ## §11 M4 — Route field: variation and comparison (requirements; elaborate at M3 acceptance)

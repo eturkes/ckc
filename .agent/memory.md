@@ -564,14 +564,34 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   the deduplicated table; the old exact-duplicate rule would have rejected
   cnl-grammar.1's own multi-role oracle lexicon). surface_tokens = committed JA lexer
   count over stored canonical per-rule texts, Σtokens/Σrules per route (model-runtime
-  tokenizer REJECTED — would pin tokenizer identity+count into every cassette).
+  tokenizer REJECTED — would bind the metric to a versioned runtime-tokenizer replay
+  dependency, identity+counts separately attested).
   CNL-inexpressible accepted IR at report time (guard-less route = M1 off the locked
   corpus) → omit that (pipeline, document)'s CNL entries + audit files under ONE typed
   cnl_inexpressible_ir diagnostic (codes-cnl variant, report-stage only, no FillReject
   arm), never assembly failure — locked corpus renders all routes (the positive
-  control). Backtick = reserved surface char (lint): §7.2 renders rule text in md code
-  spans; escape payloads need no bar — terminal at accept, rendered rule text
-  registered-only. Grammar terminals = whole-surface string literals
+  control). Backtick = reserved surface char (lint): §7.2 renders rule text in
+  single-backtick md code spans (normative delimiter); escape payloads need no bar —
+  terminal at accept, accepted/report-rendered rule text registered-only (pre-accept
+  escapes DO render + round-trip). Codex follow-up pins: §10 typed VIEW constructor = the
+  lint gate (zero-finding precondition, every CNL module consumes the view → lint-dirty
+  lexicon produces no CNL anywhere — closes the lint-owned-surface render hole); EN
+  negation field-less (fixed-negator composition over gloss_en; JA lexical negated_ja);
+  exception slot adnominal-only (§10 positive register); per-quantity-row interval
+  productions = the sole unit↔var binding (grammar + parser both enforce; swapped-unit
+  reject, shared-unit accept); Fixed(terminal)+Digit(char) join the collision domain
+  (equality escapes the prefix rule), basis-bracket ids + escape payloads
+  delimiter-scoped outside it; certainty_pool's value-blind reject relaxes to same-value
+  dedupe; CNL metric applicability explicit (accepted single_cnl fills carry the three
+  fields atomically, partial = instrument error, zero-accepted → NA rows);
+  cnl_inexpressible_ir outcome=unsupported, computed before run.rs's report-tail summary
+  snapshot (today pre-assembly + hardcoded Ok event) → report summary + stage event,
+  RouteTaxonomy-excluded, payload {predicate_class, pipeline_id, document_id}
+  first-failing-check; report §4.4 provenance widens to consumed CNL/IR+segments
+  artifacts; universal-render claims qualified guarded-route/locked-corpus (M1 audit
+  evidence = its re-blessed golden run; direct_smt no IR → no views); runtime-tokenizer
+  rationale = versioned replay dependency, not 'every cassette'. Grammar terminals =
+  whole-surface string literals
   (ASCII-digit + basis-id-char alternation) + EXACTLY ONE open lexical production per
   language — the escape's free quoted surface, inexpressible as finite literals; emitter
   escape mode Committed(open) vs OracleBound(enumerated) since bnf parses literals only —
