@@ -1017,95 +1017,108 @@ Committed direction:
   lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
   terminals too); two EN slots have no adjacent fixed terminal to supply their leading
   separator — the deontic tail (after the bare target gloss or the escape's closing
-  quote) and the unit (after the numeral) — and carry it themselves by emitter
-  composition: the emitted terminal is the space plus the surface
-  (` is strongly recommended`, ` years`); the raw lexicon field carries no edge spaces
-  (the EN shape lint's token form enforces the edges; internal single spaces stay data),
-  and the token inventory, prefix lint, and
-  parser tables all carry the composed forms — while surface- and payload-internal
+  quote) and the unit (after the numeral) — and carry it themselves as composed tokens,
+  the space plus the surface (` is strongly recommended`, ` years`), composed exactly once
+  by the lexicon's surface projection and taken verbatim by lint, grammar emitter, and
+  parser alike (token-inventory bullet below); the raw lexicon field carries no edge spaces
+  (the EN shape lint's token form enforces the edges; internal single spaces stay data)
+  — while surface- and payload-internal
   spaces stay data (`adult status`);
   bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both
   languages.
 - Token inventory (the shared terminal layer; lexicon-cnl.2's typed inventory module
   transcribes this bullet verbatim — lint, grammar emitter, and parser all consume that one
   module, and the committed grammar bytes remain the final authority). Main-mode fixed
-  terminals, exact bytes including each side's owned space:
+  terminals, exact bytes including each side's owned space; `␣` stands for U+0020 in every
+  byte cell and inline token of this bullet, spelled visibly because CommonMark strips one
+  edge space when rendering inline code — the typed module decodes `␣` to a real space, and
+  the fenced skeleton below keeps real spaces (fences render exactly):
 
-| Role | JA | EN |
-| --- | --- | --- |
-| context opener | — (a rule starts at its first atom) | `for patients ` |
-| atom frame (positive concept, exception concept, interval, escape) | — (bare concatenation; の rows below) | `with ` |
-| negated atom frame | — (lexical `negated_ja`) | `without ` (replaces `with `) |
-| conjunction | `かつ` | ` and ` |
-| disjunction | `、または` | `; or ` |
-| context close | `患者には、` | `, ` |
-| patient-adjacent link (interval/escape atoms only) | `の` | — (the frame is position-invariant) |
-| action link (JA target-first, EN noun-first) | `の` (same token, second grammar position) | ` of ` |
-| bound markers ge / le / lt / gt | `以上` / `以下` / `未満` / `超` (after the unit) | ` at least ` / ` at most ` / ` less than ` / ` more than ` (before the numeral; leading + trailing spaces owned) |
-| certainty parens | `(` `)` (ASCII, abutting) | ` (` `)` (space-led open) |
-| sentence terminator | `。` | `.` |
-| basis open | `[根拠 ` | ` [basis ` |
-| basis close | `]` | `]` |
-| exception opener | `ただし、` | ` exception: patients ` |
-| exception close | `患者を除く。` | `.` (the terminator token) |
-| escape open | `未登録概念「` | `unregistered concept "` |
-| escape close | `」` | `"` |
-| rule terminator | LF | LF |
+  | Role | JA | EN |
+  | --- | --- | --- |
+  | context opener | — (a rule starts at its first atom) | `for␣patients␣` |
+  | atom frame (positive concept, exception concept, interval, escape) | — (bare concatenation; の rows below) | `with␣` |
+  | negated atom frame | — (lexical `negated_ja`) | `without␣` (replaces `with␣`) |
+  | conjunction | `かつ` | `␣and␣` |
+  | disjunction | `、または` | `;␣or␣` |
+  | context close | `患者には、` | `,␣` |
+  | patient-adjacent link (interval/escape atoms only) | `の` | — (the frame is position-invariant) |
+  | quantity link (var-surface to bound) | `が` | — (word order carries it: var-surface, bound words, numeral, unit) |
+  | action link (JA target-first, EN noun-first) | `の` (same token, second grammar position) | `␣of␣` |
+  | bound markers ge / le / lt / gt | `以上` / `以下` / `未満` / `超` (after the unit) | `␣at␣least␣` / `␣at␣most␣` / `␣less␣than␣` / `␣more␣than␣` (before the numeral) |
+  | certainty parens | `(` `)` (ASCII, abutting) | `␣(` `)` |
+  | sentence terminator | `。` | `.` |
+  | basis open | `[根拠␣` | `␣[basis␣` |
+  | basis close | `]` | `]` |
+  | exception opener | `ただし、` | `␣exception:␣patients␣` |
+  | exception close | `患者を除く。` | `.` (the terminator token) |
+  | escape open | `未登録概念「` | `unregistered␣concept␣"` |
+  | escape close | `」` | `"` |
+  | rule terminator | LF | LF |
 
   Digits `0`–`9` are single-char tokens in both languages under the leading-zero-free
   numeral register: a numeral is `0` or a nonzero digit followed by any digits — canonical
   decimal, so zero-led runs (`018`) sit outside BOTH languages (grammar production and
   parser alike), the numeral's sole grammar-over-parser divergence stays the parser's
-  0..=i64::MAX value bound, no third over-approximation class arises, and no undeclared
-  parse-normalization variation joins the declared set (modality synonyms, basis-ref
-  order); render writes the value's decimal form, trivially fixpoint. Mode-scoped content
-  stays outside the main token table and the collision/prefix domain: the escape payload is
-  a free scan to the closing delimiter under the payload contract, and basis-bracket
-  internals are Id-grammar refs separated by single ASCII spaces — the bracket's own
-  separator, so the main tables keep no bare-space token. Lexicon-token categories join the
-  main mode from the typed role view — Concept (adnominal/negated/citation), ActionNoun,
-  Tail, Certainty, QuantityVar, Unit — and the VIEW serves the EN tail and unit forms
-  space-led-composed (` is strongly recommended`, ` years`): one composition point, with
-  emitter, lint, and parser consuming view output verbatim, never re-composing. Prefix
+  0..=i64::MAX value bound, no third over-approximation class arises, and numerals add no
+  parse-normalization variation to the declared set (the bounded-variation clause in the
+  canonical-text bullet below is the single enumeration); render writes the value's decimal
+  form, trivially fixpoint. Mode-scoped CONTENT stays outside the main token table and the
+  collision/prefix domain — the open/close delimiters themselves are main-inventory tokens
+  above: the escape payload is a free scan to the closing delimiter under the payload
+  contract, and basis-bracket internals are Id-grammar refs separated by single ASCII
+  spaces — the bracket's own separator, so the main tables keep no bare-space token.
+  Lexicon-token categories join the main mode from the lexicon's surface PROJECTION —
+  Concept (adnominal/negated/citation), ActionNoun, Tail, Certainty, QuantityVar, Unit —
+  which composes the EN tail and unit forms space-led (`␣is␣strongly␣recommended`,
+  `␣years`) exactly once: the lint consumes the projection pre-validation, the
+  zero-finding typed role view exposes the same projection to every other consumer
+  (grammar emitter, parser, renderer), and nobody downstream re-composes — so lint⇄view
+  construction is acyclic. Prefix
   audit over this inventory (re-verified mechanically at impl with the lexicon tokens):
   every near-pair diverges before either string ends — `以上`/`以下` (2nd scalar),
-  `未満`/`未登録概念「` (2nd), `患者には、`/`患者を除く。` (3rd), ` and `/` at least `
-  (3rd), ` at least `/` at most ` (5th), `with `/`without ` (5th) — and no committed
+  `未満`/`未登録概念「` (2nd), `患者には、`/`患者を除く。` (3rd), `␣and␣`/`␣at␣least␣`
+  (3rd), `␣at␣least␣`/`␣at␣most␣` (5th), `with␣`/`without␣` (5th) — and no committed
   lexicon surface starts with a fixed terminal or a digit (the lint owns that thereafter).
   Schematic grammar skeleton — factoring and slot order normative, bytes the committed
-  grammar's; `⟨…⟩` = lexicon alternations served by the role view, quoted strings = the
-  inventory above:
+  grammar's; each language's grammar is self-contained (EN re-defines the frame
+  nonterminals over EN terminals, never importing JA definitions); `⟨…⟩` = lexicon
+  alternations served by the role view, quoted strings = the inventory above with real
+  spaces:
 
-```text
-JA:
-  <document>     ::= <rule> <nl> | <rule> <nl> <document>
-  <rule>         ::= <disjuncts> "患者には、" <target> "の" ⟨action-noun⟩ ⟨tail⟩
-                     <cert-opt> "。" <basis> <exceptions>
-  <disjuncts>    ::= <conjunct-mid> "、または" <disjuncts> | <conjunct-adj>
-  <conjunct-mid> ::= <atom-mid> "かつ" <conjunct-mid> | <atom-mid>
-  <conjunct-adj> ::= <atom-mid> "かつ" <conjunct-adj> | <atom-adj>
-  <atom-mid>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> | <escape>
-  <atom-adj>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> "の" | <escape> "の"
-  <interval>     ::= ⟨var-surface⟩ "が" <numeral> ⟨unit⟩ ("以上"|"以下"|"未満"|"超")
-  <numeral>      ::= "0" | <nonzero> <digit-rest>
-  <digit-rest>   ::= "" | <digit> <digit-rest>
-  <target>       ::= ⟨citation⟩ | <escape>
-  <escape>       ::= "未登録概念「" <payload> "」"        ; payload = the open production
-  <cert-opt>     ::= "" | "(" ⟨certainty⟩ ")"
-  <basis>        ::= "[根拠 " <id-list> "]"
-  <id-list>      ::= <basis-id> | <basis-id> " " <id-list>
-  <exceptions>   ::= "" | <exception> <exceptions>
-  <exception>    ::= "ただし、" <exc-atom> "患者を除く。" <basis>
-  <exc-atom>     ::= ⟨adnominal⟩ | <escape> "の"
-EN mirrors the frame with its own terminals and one position-invariant atom nonterminal:
-  <rule>         ::= "for patients " <disjuncts> ", " ⟨action-noun⟩ " of " <target> ⟨tail⟩
-                     <cert-opt> "." <basis> <exceptions>
-  <atom>         ::= "with " ⟨gloss⟩ | "without " ⟨gloss⟩ | "with " <interval> | "with " <escape>
-  <interval>     ::= ⟨var-surface⟩ (" at least "|" at most "|" less than "|" more than ")
-                     <numeral> ⟨unit⟩
-  <exception>    ::= " exception: patients " <exc-atom> "." <basis>
-  <exc-atom>     ::= "with " ⟨gloss⟩ | "with " <escape>
-```
+  ```text
+  JA:
+    <document>     ::= <rule> <nl> | <rule> <nl> <document>
+    <rule>         ::= <disjuncts> "患者には、" <target> "の" ⟨action-noun⟩ ⟨tail⟩
+                       <cert-opt> "。" <basis> <exceptions>
+    <disjuncts>    ::= <conjunct-mid> "、または" <disjuncts> | <conjunct-adj>
+    <conjunct-mid> ::= <atom-mid> "かつ" <conjunct-mid> | <atom-mid>
+    <conjunct-adj> ::= <atom-mid> "かつ" <conjunct-adj> | <atom-adj>
+    <atom-mid>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> | <escape>
+    <atom-adj>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> "の" | <escape> "の"
+    <interval>     ::= <ivl-row-1> | … | <ivl-row-n>   ; one production per quantity row
+    <ivl-row-k>    ::= ⟨var-surface-k⟩ "が" <numeral> ⟨unit-k⟩ <bound>  ; the row's OWN unit
+    <bound>        ::= "以上" | "以下" | "未満" | "超"
+    <numeral>      ::= "0" | <nonzero> <digit-rest>
+    <digit-rest>   ::= "" | <digit> <digit-rest>
+    <target>       ::= ⟨citation⟩ | <escape>
+    <escape>       ::= "未登録概念「" <payload> "」"      ; payload = the open production
+    <cert-opt>     ::= "" | "(" ⟨certainty⟩ ")"
+    <basis>        ::= "[根拠 " <id-list> "]"
+    <id-list>      ::= <basis-id> | <basis-id> " " <id-list>
+    <exceptions>   ::= "" | <exception> <exceptions>
+    <exception>    ::= "ただし、" <exc-atom> "患者を除く。" <basis>
+    <exc-atom>     ::= ⟨adnominal⟩ | <escape> "の"
+  EN (own complete grammar: the same frame nonterminal names re-defined over EN terminals,
+  one position-invariant atom nonterminal; deltas shown):
+    <rule>         ::= "for patients " <disjuncts> ", " ⟨action-noun⟩ " of " <target> ⟨tail⟩
+                       <cert-opt> "." <basis> <exceptions>
+    <atom>         ::= "with " ⟨gloss⟩ | "without " ⟨gloss⟩ | "with " <interval> | "with " <escape>
+    <ivl-row-k>    ::= ⟨var-surface-k⟩ <bound-words> <numeral> ⟨unit-k⟩
+    <bound-words>  ::= " at least " | " at most " | " less than " | " more than "
+    <exception>    ::= " exception: patients " <exc-atom> "." <basis>
+    <exc-atom>     ::= "with " ⟨gloss⟩ | "with " <escape>
+  ```
 
 - Exception register (v1, deliberately narrower than the context DNF): each exception sentence
   carries exactly one concept slot — a positive registered concept (adnominal surface) or the
@@ -1376,7 +1389,9 @@ EN mirrors the frame with its own terminals and one position-invariant atom nont
   Quoted-surface contract (v1, one payload shared by both languages): nonempty, at most 80
   Unicode scalar values, single line — control characters and the quote delimiters `「` `」`
   `"` are excluded, and there is no escape mechanism (out-of-contract text is a plain parse
-  error, never an alias) — normalized under the §4.2 JA semantic policy, so canonical fixpoint
+  error, never an alias) — and must arrive already a §4.2 JA-semantic-policy fixpoint: a
+  non-fixpoint payload is a payload-contract parse error inside the declared open-escape
+  class (parse never rewrites payload bytes), so canonical fixpoint
   and cross-language agreement hold; the parser enforces the contract while the grammar keeps
   one open production per language (notation decided at the grammar emitter). The
   escape parses and round-trips like any atom and always fails accept with
@@ -1401,7 +1416,11 @@ EN mirrors the frame with its own terminals and one position-invariant atom nont
   re-hashes its read-back against them. Line breaks (LF and CR both) cannot occur inside a
   rule: lexicon surfaces are whitespace-folded (§4.2), fixed terminals carry none, and the
   escape payload contract bars control characters. Parse accepts declared bounded variation
-  inside a rule (modality synonyms, basis-ref order — whitespace variation: none; the
+  inside a rule, and this clause is its single enumeration: lexicon synonym alternations —
+  modality tails and certainty surfaces, the first row per (direction, strength) pair / per
+  value canonical (the committed certainty table is 1:1 today; the contract admits synonym
+  rows) — and basis-ref presentation, order AND duplicates, collapsing to the
+  sorted-deduplicated set (whitespace variation: none; the
   parser's language equals the grammar's, keeping differential parser-vs-oracle agreement
   total, and stray whitespace is a repairable parse error); the document frame is exact — a
   missing terminal LF is a repairable parse error; accept re-renders, so every accepted
@@ -1421,7 +1440,8 @@ canonical bytes, recomputed identically on both sides). AST validity is
 two-layered, structural first (lexicon-free, the grammar-image shape up to parse
 normalization): nonempty rules and
 basis brackets — every bracket sorted + deduplicated (set semantics: parse normalizes the
-admitted basis-order variation, from_ir emits sorted) — nonempty context DNF — the outer
+admitted basis-ref presentation variation — order and duplicates — from_ir emits
+sorted-deduplicated) — nonempty context DNF — the outer
 disjunction AND every conjunction (the
 grammar writes neither empty) — interval atoms carrying exactly one unsigned bound
 (one of ge|gt|le|lt with a nonnegative value: the v1 register, deliberately narrower than

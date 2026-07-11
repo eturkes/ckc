@@ -375,8 +375,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (per-slot concept SURFACE sets — context slots serve adnominal_ja/negated_ja + gloss_en,
   the exception slot adnominal-only (§10 positive-only register), the target slot the
   surfaces[0]/gloss_en citation pair — + quantity-role lookup, EN tail/unit accessor
-  values space-led-composed (§10 composition point: emitter/lint/parser consume view
-  output verbatim, never re-compose) — §10 single source, no
+  values space-led-composed by the view's underlying surface PROJECTION (§10 composition
+  point — the lint consumes the projection pre-validation, keeping lint⇄view construction
+  acyclic; every other consumer takes the validated view verbatim, never re-composing) —
+  §10 single source, no
   prefix tests downstream; view construction gains lexicon-cnl.2's zero-finding
   precondition when the lint lands); load_lexicon strict extension (deny_unknown_fields holds; JA
   surfaces through StringPolicy::SemanticJa, EN surfaces through SemanticEn — §10 EN
@@ -504,9 +506,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   fixtures. The reserved-terminal + lexer-category inventory lands here as ONE typed
   module that lint, grammar emitter, and parser all consume (single source, no drift;
   transcribes §10's token-inventory bullet VERBATIM — fixed-terminal bytes with per-side
-  space ownership in both languages, digit class + leading-zero-free numeral register,
-  mode-scoped escape/basis delimiters — and takes the composed EN tail/unit forms from the
-  role view, §10's one composition point, never re-composing).
+  space ownership in both languages (the table's ␣ legend decodes to U+0020), digit class
+  + leading-zero-free numeral register, mode-scoped escape-payload/basis-id CONTENT (the
+  open/close delimiters stay main-inventory tokens) — and takes the composed EN tail/unit
+  forms from §10's surface projection (one composition point; the lint runs over the
+  projection pre-validation, the validated view re-exposes it), never re-composing).
   Wiring — the lint gates, never floats: committed-lexicon zero-findings test; the §10
   typed role VIEW constructor hard-errors on ANY finding and every CNL module reaches the
   lexicon only through the view (grammar emitter, parser, bridge, predicate, renderer,
@@ -576,11 +580,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   between tail and terminator; spacing decree — JA separator-free outside bracket
   internals (surface/payload-internal spaces = data), EN single-space separators owned by
   fixed terminals (no bare-space token — it would prefix every space-leading terminal)
-  with exactly two composed exceptions: EN tail + unit terminals emitted space-leading —
-  composed space+surface for the two slots whose leading separator no fixed terminal
-  supplies (tail follows the bare target gloss or the escape's closing quote, unit the
-  numeral — §10 decree; inventory module, lint, and parser tables
-  share the composed forms),
+  with exactly two composed exceptions: EN tail + unit terminals space-leading —
+  space+surface composed ONCE by the lexicon surface projection for the two slots whose
+  leading separator no fixed terminal supplies (tail follows the bare target gloss or the
+  escape's closing quote, unit the numeral — §10 decree; emitter, lint, and parser take
+  the projection's composed forms verbatim),
   bracket internals space-separated sorted ids;
   terminals = lexicon whole-surface
   literals in slot-specific alternations from the §10 role view (context + exception
@@ -594,9 +598,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   <digit-rest>`, right-recursive rest (length unbounded; value bound 0..=i64::MAX
   parser-enforced stays the second grammar over-approximation beside the open escape;
   zero-led runs out of the language BOTH sides — no third class, no undeclared
-  parse-normalization variation); productions transcribe §10's schematic skeleton
-  (factoring + slot order normative there; JA conjunct-mid/conjunct-adj thread the
-  patient-adjacent atom to the last atom of the last disjunct); basis-bracket id refs = the plan-header
+  parse-normalization variation); productions realize §10's schematic skeleton
+  (factoring + slot order normative there — per-language terminal substitution, EN frame
+  self-contained, dialect lowering at the emitter; JA conjunct-mid/conjunct-adj thread the
+  patient-adjacent atom to the last atom of the last disjunct; intervals = per-quantity-row
+  productions pairing each var-surface with its OWN unit); basis-bracket id refs = the plan-header
   basis-id production (leading `<lower>`, rest `<lower>|<digit>|"_"|"."|":"|"-"` —
   smt_query.grammar's `<identifier>` shape), the grammar's basis-id language == Id::new's
   exact `[a-z][a-z0-9_.:-]*` — no undeclared third over-approximation class (a bare
@@ -653,7 +659,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   repairable parse errors, outside BOTH languages per the §10 register — no third class;
   bare `0` parses to value 0), connective misuse, mid-token
   truncation, escape-payload contract
-  violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
+  violations (empty / over-80-scalars / control or quote-delimiter chars / non-SemanticJa-
+  fixpoint bytes, parse never rewriting the payload — plain parse
   errors, repairable).
 - [ ] cnl-parse.2: document parser — full slot order (context 患者には、 action deontic tail /
   certainty paren / rule basis bracket / ただし exceptions, each sentence a single
@@ -692,7 +699,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   assert), fail-closed house panic style
   (render consumes validated ASTs — an unvalidated hand-built AST = instrument bug, never
   silent bytes)) +
-  canonical-fixpoint spot tests (bounded-variation inputs — synonym tails, unsorted basis
+  canonical-fixpoint spot tests (bounded-variation inputs — synonym tails,
+  unsorted/duplicate-ref basis
   surface (parse-side normalization) —
   re-render canonical) + one should_panic pin (render on a shape-invalid hand-built AST —
   the assert fires before any lexicon lookup) + 3 M1-document

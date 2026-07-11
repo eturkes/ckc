@@ -664,11 +664,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   first-tail-bearing = canonical meets the worked は禁忌である; spacing-decree hole
   closed in the §10 decree (wiring lands with the cnl-grammar/parse/lint units): EN
   deontic tail (after bare target gloss or escape close-quote) + unit (after numeral) =
-  the two slots whose leading separator no fixed terminal supplies → emitter composes
-  the single leading space into the terminal (` is strongly recommended`, ` years`) —
-  the sole exceptions to fixed-terminal space ownership; raw fields edge-space-free
-  (internal spaces = data),
-  inventory/prefix-lint/parser tables all to carry composed forms; trailing-の lint rule
+  the two slots whose leading separator no fixed terminal supplies → the lexicon surface
+  PROJECTION composes the single leading space into the token (` is strongly recommended`,
+  ` years`) — the sole exceptions to fixed-terminal space ownership; raw fields
+  edge-space-free (internal spaces = data),
+  emitter/lint/parser all take the projection's composed forms verbatim; trailing-の lint rule
   on adnominal/negated forms (prefix + reserved rules both miss 妊娠中の); projected full
   inventory hand-audited pairwise prefix-free at plan time (re-verify mechanically at
   impl). Terminal layer pinned (2026-07-12; §10 token-inventory bullet = authority, do not
@@ -678,15 +678,25 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   committed lexicon bytes: ASCII `:` certainty labels, ASCII parens both languages);
   digits = single-char tokens under a LEADING-ZERO-FREE numeral register (`0` | nonzero-led
   run — zero-led runs outside BOTH languages, so grammar-over-parser classes stay exactly
-  the declared two and parse-normalization variation stays the declared set; grammar oracle
-  `0`/`05` cases at cnl-grammar.1, parser battery at cnl-parse.1); mode-scoped content
+  the declared two and the declared parse-variation set is now SINGLE-SOURCED in §10's
+  canonical-text clause: lexicon synonym alternations (modality tails + certainty
+  surfaces, first row canonical) + basis-ref presentation (order AND duplicates →
+  sorted-deduplicated set); escape payload must arrive SemanticJa-fixpoint, non-fixpoint =
+  payload-contract parse error (parse never rewrites payload bytes); grammar oracle
+  `0`/`05` cases at cnl-grammar.1, parser battery at cnl-parse.1); mode-scoped CONTENT
   (escape payload scan, basis-bracket single-space id separators) outside the main token
-  table — no bare-space main-mode token; composition point = the typed role view serves EN
-  tail/unit space-led-composed, every consumer takes view output verbatim
-  (lexicon-cnl-shape accessors); schematic grammar skeleton in §10 — factoring + slot
-  order normative (JA two-atom-nonterminal DNF threading pins patient-adjacency to the
-  last atom of the last disjunct; EN one position-invariant atom), committed grammar bytes
-  final; lexicon-cnl.2's typed module transcribes the table verbatim.
+  table — open/close delimiters stay main-inventory tokens, no bare-space main-mode token;
+  composition point = the lexicon surface PROJECTION composes EN tail/unit space-led
+  exactly once — lint consumes it pre-validation (lint⇄view acyclic), the zero-finding
+  role view re-exposes it, every downstream consumer verbatim (lexicon-cnl-shape
+  accessors); table spells U+0020 as ␣ (CommonMark strips code-span edge spaces when
+  RENDERING — source bytes + the module decode ␣; fenced skeleton keeps real spaces);
+  schematic grammar skeleton in §10 — factoring + slot order normative, per-language
+  grammars self-contained (JA two-atom-nonterminal DNF threading pins patient-adjacency to
+  the last atom of the last disjunct; EN one position-invariant atom; intervals =
+  per-quantity-row productions, var paired with its OWN unit — cross-product would readmit
+  the swapped-unit forms the oracle rejects), committed grammar bytes final;
+  lexicon-cnl.2's typed module transcribes the table verbatim.
   FillReject grows Parse
   (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
   = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
