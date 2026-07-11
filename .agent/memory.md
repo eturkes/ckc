@@ -420,8 +420,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   per §5 = document_id + grammar id/hash refs + rules
   (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks
   canonical bytes beside the AST, report.json cites those hashes); parser mints NO ids —
-  bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters
-  mirroring normalize.rs's mints EXACTLY — §8.6 reserves `<doc>.rule.<k>` for norm-layer
+  bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters in
+  normalize.rs's id forms + document-local scope; bind ORDER = the pinned §10 traversal,
+  normalize scans mentions instead — §8.6 reserves `<doc>.rule.<k>` for norm-layer
   rule ids, rules.rs's mint; one ClinicalStatement per
   context-disjunct; population-vs-condition partition by the lexicon's typed slot roles
   (§10; ruling: explicit validated roles FIELD over a prefix-derived index — concept rows
@@ -443,15 +444,18 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
   bundle-unique ids + (D1∨D2)∧¬E distribution; worked 2×2 pinned in cnl-bridge: stmt.0
   owns exc.0/exc.1, stmt.1 owns exc.2/exc.3, clone content + basis duplicated per
-  statement; clause region_ids = its own sentence's basis
+  statement — the test carries an enumerated bind.<k>→concept oracle + a trailing
+  1-disjunct rule (rule.2→origin 1; counters document-continuous, a per-rule reset passes
+  the bare 2×2); clause region_ids = its own sentence's basis
   bracket VERBATIM — §10 per-sentence basis brackets, one on the recommendation sentence +
   one per exception sentence (a single rule-global bracket leaves multi-exception
   provenance unreconstructible + falsifies per-clause region_ids, which sit INSIDE the §10
   faithfulness projection; source-order mapping rejected — ambiguous under clone
   expansion/reorder)); one
   Exact TerminologyBinding per DISTINCT referenced concept
-  at first reference in POST-SPLIT emission order (statement-major, emitted atom order — a
-  later-disjunct-only concept mints late), system = lexicon.system, region_ids = the citing
+  at first reference in POST-SPLIT emission order (statement-major; per statement population,
+  condition, action target, exceptions in emitted order — a later-disjunct-only concept
+  mints late), system = lexicon.system, region_ids = the citing
   rules' basis regions (union over brackets); Action::new derives key; basis = region ids
   per sentence,
   source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
@@ -466,7 +470,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rule index, pure fn mirroring derive_norm_ir's statement-enumerate mint, non-core —
   report cnl_rules keys per-rule {ja,en} text by normative rule id via it (accepted doc:
   a split duplicates one rule's text under several ids; from_ir doc: identity), findings
-  quote per carrying pipeline, pipeline-labeled; round-trip laws (ACCEPTED escape-free ASTs,
+  quote per carrying pipeline, pipeline-labeled (entry-less rule id renders NO CNL —
+  SPEC-stated fallback; validate pins inner-id/document-key agreement); round-trip laws (ACCEPTED escape-free ASTs,
   to_ir Err on escapes):
   from_ir = single-disjunct projection — clause region_ids verbatim on its exception
   sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
@@ -478,6 +483,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   labeled COVER: clauses may share a region),
   to_ir∘from_ir == id on
   bridge-image IR = to_ir's image over accepted ASTs).
+  Findings owner: the §7.1 view (trace finding mint + report results, no-conflict included)
+  = the FIRST bundle-bearing pipeline in experiment binding order (single_ir — the landed
+  lineage/claims rule); single_cnl's reused m1.compile mints query/finding ids byte-equal
+  single_ir's ⇒ owner SELECTION (GroupTrace mark, is_baseline pattern, route-single-cnl.3)
+  over route-qualified payload ids (those rewrite §7.2 id forms + re-bless M1/M2 pins);
+  non-owner groups stay trace-DAG nodes + RouteRun metrics only.
   Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
   EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
   plumbing (pipeline_step_ids [Id; 8], MODEL_FILL/DIRECT_VERIFY/COMPILE=4/VERIFY=5/TRACE/

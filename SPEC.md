@@ -593,9 +593,16 @@ rules, assertion names, core), documented no-conflict results, a diagnostics sum
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
 weighted ranking; from M3, per-document CNL audit views and per-rule CNL text keyed by
 normative rule id via §10's origin map (findings quote their rules as CNL beside the quoted
-source spans, labeled per carrying pipeline); from M4, ablations; from M5,
+source spans, labeled per carrying pipeline; a rule id carried by no pipeline's entry —
+its document unaccepted or CNL-inexpressible under every route — renders without CNL); from
+M4, ablations; from M5,
 attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
+A multi-route run keeps exactly one findings view: the first compiled (bundle-bearing) pipeline
+in experiment binding order feeds the findings body, the documented no-conflict results, and
+the report's verifier-result identity, keeping payload query and finding ids route-unprefixed;
+every other compiled route lands route-namespaced artifacts feeding audit views, metrics, and
+ledgers only.
 From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
 publication-designated runs export a manuscript bundle — figure-ready CSV/JSON metric tables,
 corpus/permission summaries, replay instructions, limitations derived from typed
@@ -963,8 +970,9 @@ Committed direction:
   exception sentences: stmt.0 owns exc.0, exc.1 and stmt.1 owns exc.2, exc.3, sentence
   order within each statement, clone content + provenance duplicated per statement),
   `bind.<k>` at first reference in the same
-  post-split emission order (statement-major, emitted atom order — a concept exclusive to a
-  later disjunct mints after the earlier disjunct's atoms), clause region_ids = its own sentence's basis
+  post-split emission order (statement-major; within a statement population atoms, then
+  condition atoms, then the action target, then exception clauses, each in emitted order — a
+  concept exclusive to a later disjunct mints after the earlier disjunct's atoms), clause region_ids = its own sentence's basis
   refs verbatim (per-sentence brackets; clones share their sentence's basis), and statement
   source_segment_ids derive region→segment (the segments artifact) over the union of the
   rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every

@@ -48,7 +48,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   and hash-locks canonical bytes beside the AST (§10); report.json cites the artifact's
   hashes. Parser mints NO ids; bridge derives them.
 - Bridge determinism: one ClinicalStatement per context-disjunct (ids `stmt.<k>`/`exc.<k>`/
-  `bind.<k>` document-order counters mirroring normalize.rs's mints EXACTLY — §8.6 reserves
+  `bind.<k>` document-order counters in normalize.rs's id forms + document-local
+  counter scope (bind ORDER = the pinned traversal below; normalize scans mentions instead) —
+  §8.6 reserves
   `<doc>.rule.<k>` for norm-layer rule ids; disjunct split appends statements in document
   order); population-vs-condition partition by the lexicon's typed slot roles (§10: every
   concept row a validated nonempty role set over population|condition|action_target —
@@ -76,8 +78,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-atom interval-free clauses via ¬(E1∨…)=¬E1∧… and for nothing wider — a
   conjunctive exception needs De Morgan ¬A∨¬B, and it ignores negated/interval exception
   atoms); bindings = one Exact-status TerminologyBinding per distinct referenced
-  concept, minted at first reference in POST-SPLIT emission order — statement-major, emitted
-  atom order; a concept exclusive to a later disjunct mints after the earlier disjunct's
+  concept, minted at first reference in POST-SPLIT emission order — statement-major; per statement
+  population atoms, condition atoms, action target, then exception clauses, each in emitted
+  order; a concept exclusive to a later disjunct mints after the earlier disjunct's
   atoms (matches M1's first-mention scan order on
   the locked corpus; divergence = measured ir_match miss, never asserted), system =
   lexicon.system, code = concept id, region_ids = the citing rules' basis regions (union
@@ -109,6 +112,23 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   exception-owned regions render only on exception sentences; closure pulls each cited
   segment's remaining regions into the rule bracket) — (== id exactly on bridge-normal
   docs); to_ir∘from_ir == id on bridge-image IR (the image of accepted ASTs).
+- Findings owner — M3 = the first run with TWO compiled routes, and the landed §7.1 identity
+  scheme is structurally single-view: compile mints bare `q.<gsuf>.pair<n>.<kind>` query ids,
+  trace mints `finding.<gid>.<seq>` from every compiled+results group, assemble_report errors
+  on a duplicate query id (M2's direct route dodges all three only via compiled: None +
+  run-minted `<gid>.overlap` ids) — single_cnl reusing m1.compile/m1.verify would mint ids
+  byte-equal single_ir's ⇒ trace canonical-set + DuplicateResult failures. Ruling: owner
+  SELECTION over id qualification — the §7.1 view (trace finding mint + report results input,
+  no-conflict results included) consumes ONE compiled view, the first bundle-bearing pipeline
+  in experiment binding order (single_ir; = the landed lineage/claims rule, the all_docs
+  bundle sort); payload ids stay unprefixed, M1/M2 finding/report bytes + §7.2 id forms
+  untouched. Non-owner compiled routes' groups land route-namespaced in the trace DAG
+  (census/replay/audit; per-route metrics via RouteRun) and stay OUT of the finding mint +
+  report results (GroupTrace owner mark, is_baseline pattern; wired at route-single-cnl.3).
+  cnl_rules quoting unaffected — rule ids document-scoped, every pipeline's entry quotes.
+  Route-qualified payload ids REJECTED: rewrites the §7.2 finding-id form + re-blesses every
+  M1/M2 report/trace pin for a per-route findings matrix no M3 consumer reads (M4 ablation
+  scope).
 - CNL expressibility = ONE executable predicate, never a hand-maintained rejection list per
   consumer: check_cnl_expressible(clinical, lexicon (role + tail view), segments
   (segment_id → region_ids keyed view — id uniqueness by construction)) -> Result<(),
@@ -485,8 +505,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   expansion test (two disjuncts × two exception sentences, distinct per-sentence brackets,
   a second-disjunct-only concept — pins stmt/exc ids + clause ownership (both sentences
   cloned per statement, content + basis duplicated), clause region_ids verbatim per
-  sentence, per-statement source_segment_ids over the bracket union, bind.<k>
-  first-reference post-split order, rule_origins = both rule ids → index 0). Read scope:
+  sentence, per-statement source_segment_ids over the bracket union, the COMPLETE enumerated
+  bind.<k> → concept oracle (§10 traversal — population, condition, action target,
+  exceptions; the second-disjunct-only concept mints after stmt.0's full walk; a bare order
+  assertion admits divergent deterministic impls), rule_origins = both rule ids → index 0;
+  the fixture appends a trailing single-disjunct rule (own exception sentence) pinning
+  cumulative offsets — rule.2 → index 1, stmt.2/exc.4, bind counters document-continuous —
+  a per-rule counter reset passes the bare 2×2). Read scope:
   ir.rs shapes + the §10 lexicon role view
   (lexicon.rs post-extract — BOTH directions consume it: to_ir partitions by it, from_ir
   validates placement against it) + rules.rs
@@ -584,7 +609,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   handles — route-stage-handles' representation) + landing
   (cnl_document + clinical_ir + bundle wrappers route-namespaced; bundle input_hashes cite
   cnl_document + accepted cassette; check TraceNodeKind coverage at impl) + §4.6 events (fill
-  + bridge; clock discipline — compose prompts outside timed intervals) + landing-gate test.
+  + bridge; clock discipline — compose prompts outside timed intervals) + landing-gate test
+  + findings-owner selection (plan-header bullet — this unit lands the second compiled+results
+  route, the shared tails break without it): GroupTrace owner mark set by execute_routes,
+  trace finding-mint + report-tail results filtered to owner groups (single_ir), single_cnl
+  groups stay landed trace-DAG nodes; owner test = the two-compiled-route run lands trace +
+  report green, findings/results byte-equal the owner-only view.
   The .1d3a-analog run.rs unit — event/landing PIN battery stays OUT (next unit).
 - [ ] route-single-cnl.4: golden CNL cassettes ×3 (hand-authored canonical JA CNL bodies for
   the M1 docs) + reproduce-M1 gate (single_cnl verdicts == reference through the locked tail,
@@ -615,8 +645,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] report-cnl.1: Report shape — cnl_documents keyed (pipeline, document) per §10 ({ja,en}
   text hashes) + cnl_rules (same key, inner map normative rule id → {ja,en} strings — §10
   origin-map keying; a split legitimately duplicates one rule's text under several ids)
-  omit-empty members + validate rules (sorted ids, line-break-free
-  strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing
+  omit-empty members + validate rules (sorted ids, inner rule ids prefixed by their outer
+  document key — `<doc>.rule.` agreement, line-break-free strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing
   half).
 - [ ] report-cnl.2: population + audit views — assemble_report CNL inputs (single_cnl route:
   the accepted CnlDocument's own text/hashes — audit honesty; other routes incl. M1: from_ir
