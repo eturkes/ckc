@@ -37,11 +37,18 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   signed bounds), CnlConceptRef {Registered(Id)|Unregistered(surface)} — §10 admits
   the escape in EVERY concept slot incl. action target — CnlContext {any: Vec<Vec<CnlAtom>>}
   flat two-level DNF. AST validity two-layered, STRUCTURAL first (lexicon-free grammar-image
-  shapes — §10's law quantifier): outer DNF + every conjunction nonempty + interval atoms
-  exactly one unsigned bound among ge|gt|le|lt, value nonnegative — §5/ir.rs coherence
-  admits the signed + two-sided shapes the grammar cannot write, so ir.rs-mirrored validity
-  would bless unrenderable ASTs; cnl-ast enforces ahead of the lexicon-scoped layer,
-  cnl-render asserts fail-closed. CnlException {concept: CnlConceptRef, basis: nonempty region refs —
+  shapes up to parse normalization — §10's law quantifier; round-trip equality over the
+  semantic AST, frame members recomputed both sides): outer DNF + every conjunction
+  nonempty + per-bracket basis sorted+deduplicated (set semantics — parse normalizes
+  surface order, from_ir emits sorted) + interval atoms
+  exactly one unsigned bound among ge|gt|le|lt, value nonnegative — §5 coherence
+  (IrBundle::validate/bundle.rs; ir.rs owns the shape only)
+  admits the signed + two-sided shapes the grammar cannot write, so coherence-mirrored
+  validity would bless unrenderable ASTs; cnl-ast enforces ahead of the lexicon-scoped
+  layer (SHAPE vs FRAME sublayers — frame members = render's own output, checked on
+  stored documents), cnl-render asserts the SHAPE sublayer fail-closed; acceptance runs
+  the lexicon-scoped layer post-parse (negative-occurrence bar its sole parse-unenforced
+  clause). CnlException {concept: CnlConceptRef, basis: nonempty region refs —
   the sentence's own bracket} (§10 single-concept register — a sentence list, disjunctive
   across entries; no DNF/negation/interval inside an entry; per-sentence basis brackets keep
   per-clause provenance reconstructible — a rule-global bracket cannot say which exception
@@ -392,19 +399,24 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] cnl-ast: cnl.rs type family — CnlAtom/CnlConceptRef/CnlContext/CnlException/CnlRule/
   CnlDocument (grammar refs + per-rule text + text-hash members per the plan header) +
   Canonical emit/read (sorted-key slots, optional members omit-None) + STRUCTURAL validate,
-  lexicon-free + checked BEFORE the lexicon-scoped layer (nonempty
-  rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance),
+  lexicon-free + checked BEFORE the lexicon-scoped layer (two sublayers — SHAPE,
+  render-asserted: nonempty
+  rules, nonempty basis per bracket — rule + each exception (§10 per-sentence provenance) —
+  every bracket sorted + deduplicated (set semantics; parse/from_ir supply sorted),
   nonempty context DNF — outer any AND every conjunction,
-  Id grammar, per-rule canonical-text members line-break-free — LF AND CR, matching
-  report.rs's line-break validation (§10 document frame) — + per-language text-hash members
-  RECOMPUTED equal from the stored per-rule texts under the frame assembly, hash ==
-  hash_bytes(concat(rule_text + LF)) — the frame an executable invariant, never a
-  convention, interval atoms the §10 v1 register — exactly one bound among ge|gt|le|lt,
-  value nonnegative (plan-header ruling: NOT ir.rs coherence, which admits the signed +
+  Id grammar, interval atoms the §10 v1 register — exactly one bound among ge|gt|le|lt,
+  value nonnegative (plan-header ruling: NOT §5 coherence — IrBundle::validate/bundle.rs;
+  ir.rs owns the shape only, disclaiming coherence — which admits the signed +
   two-sided shapes the grammar cannot write), §10 escape
   payload contract —
   nonempty ≤80 scalars, single line, control/quote-delimiter chars excluded,
-  SemanticJa-normal fixpoint; + lexicon-scoped validity vs a passed lexicon view
+  SemanticJa-normal fixpoint; FRAME, stored-document integrity — render's own
+  output, checked on stored documents, never render-asserted: per-rule canonical-text
+  members line-break-free — LF AND CR, matching
+  report.rs's line-break validation (§10 document frame) — + per-language text-hash members
+  RECOMPUTED equal from the stored per-rule texts under the frame assembly, hash ==
+  hash_bytes(concat(rule_text + LF)) — the frame an executable invariant, never a
+  convention; + lexicon-scoped validity vs a passed lexicon view
   (pairs/ids/roles): modality
   pair tail-backed, concept/action refs resolved, interval vars resolving to quantity rows
   (+ dangling-var rejection case), slot roles admit every Registered ref's position
@@ -413,9 +425,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   admitted in every concept slot per §10 — per-slot escape-accept positives beside the
   rejections), negated/exception concept refs
   interval-free (§10 negative-occurrence bar) — makes §10's valid-AST quantifier
-  well-defined) + structural rejection battery, one hand-built direct case each — empty
-  outer DNF, empty conjunction, signed bound, two-sided interval, boundless, same-side
-  ge+gt / le+lt doubles — + all-None/populated byte pins
+  well-defined) + structural rejection battery — empty outer DNF, empty conjunction,
+  unsorted + duplicate-ref basis, and the interval predicate as an exhaustive truth
+  table: 16 bound-presence masks × per-bound values {-1,0,1}, valid iff exactly one
+  bound present ∧ value ≥ 0 (expectation table shared with cnl-expressible's IR-side
+  battery — cross-side faithfulness by construction; subsumes signed / two-sided /
+  boundless / same-side doubles) — + one mixed structurally-and-lexicon-invalid case
+  pinning layer precedence (the structural class reports) + all-None/populated byte pins
   + round-trip tests. Fresh module, no run.rs contact.
 - [ ] cnl-grammar.1: cnl_grammar.rs emitter — clinical_cnl_grammar(lexicon, lang) -> Vec<u8>
   BNF (smt_query.grammar dialect, `;` comments): document = (rule <nl>)+ — §10 document
@@ -436,7 +452,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   concept slots = context-role surfaces, action target = action_target-role surfaces —
   wrong-slot vocabulary unparseable)
   + fixed terminals from lexicon-cnl.2's inventory module (emitter hard-errors on
-  a lint-dirty lexicon); interval numerals = ASCII-digit literal alternation; escape quoted-surface content
+  a lint-dirty lexicon); interval numerals = ASCII-digit literal alternation (unbounded
+  repetition — value bound 0..=i64::MAX parser-enforced, the second grammar
+  over-approximation beside the open escape); escape quoted-surface content
   = the single open production (plan header — emitter escape mode Committed|OracleBound;
   payload contract per §10, parser-enforced — the production stays open).
   Oracle tests in-crate (bnf workspace dev-dep added to ckc-cli, OracleBound grammars): §10
@@ -469,7 +487,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   alternations), かつ binds tighter than 、または;
   rejection battery: bare off-lexicon surface = parse error (≠ escaped accept), wrong-slot
   registered surface (e.g. an action_target-only concept as a context atom), malformed
-  interval bounds, connective misuse, mid-token truncation, escape-payload contract
+  interval bounds, numeral overflow boundary (i64::MAX parses, i64::MAX+1 = repairable
+  parse error — §10's second over-approximation class), connective misuse, mid-token
+  truncation, escape-payload contract
   violations (empty / over-80-scalars / control or quote-delimiter chars — plain parse
   errors, repairable).
 - [ ] cnl-parse.2: document parser — full slot order (context 患者には、 action deontic tail /
@@ -482,22 +502,30 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   breaks / stray whitespace (§10: whitespace variation NONE — parser language = grammar
   language, so differential agreement stays total; stray whitespace = repairable parse
   error), connective/negated-concept/interval inside an
-  exception sentence); differential accept/reject agreement vs the Earley
+  exception sentence); parser normalizes per-bracket basis sorted+deduplicated at AST build
+  (§10 basis-order surface variation collapses at parse — set semantics; + a normalization
+  pin: unsorted/duplicate-ref surface parses to the sorted-deduplicated AST); differential
+  accept/reject agreement vs the Earley
   oracle over this unit's corpus.
 - [ ] cnl-render: cnl_render.rs — render_ja/render_en canonical text (modality pair → the
-  pair's canonical tail — the first tail-bearing row per pair — per language, basis sorted
-  per bracket (rule + per-exception),
+  pair's canonical tail — the first tail-bearing row per pair — per language, basis emitted
+  as stored — sorted+deduplicated by SHAPE validity, parse/from_ir normalize; render
+  asserts, never re-sorts (rule + per-exception brackets),
   certainty optional
   paren, stored DNF order preserved — canonicalization never reorders semantics; document
   assembly = each rule's rendered line + one LF, last included (§10 frame — the exact bytes
   the text hashes lock); missing-pair
   lookup = Err, fail-closed — §10 totality + accept-total make it unreachable from accepted
-  IR; structural-validity breaches — empty DNF/conjunction, non-register interval — have
-  NO surface: render ASSERTS cnl-ast's structural layer, fail-closed house panic style
+  IR; SHAPE breaches never leave parse/from_ir — the grammar writes no empty
+  DNF/conjunction or non-register interval, parse normalizes basis order: render ASSERTS
+  cnl-ast's structural SHAPE sublayer (frame members = render's own output, outside the
+  assert), fail-closed house panic style
   (render consumes validated ASTs — an unvalidated hand-built AST = instrument bug, never
   silent bytes)) +
-  canonical-fixpoint spot tests (bounded-variation inputs — synonym tails, unsorted basis —
-  re-render canonical) + 3 M1-document
+  canonical-fixpoint spot tests (bounded-variation inputs — synonym tails, unsorted basis
+  surface (parse-side normalization) —
+  re-render canonical) + one should_panic pin (render on a shape-invalid hand-built AST —
+  the assert fires before any lexicon lookup) + 3 M1-document
   byte pins from hand-built ASTs (§10 worked example, guideline_b contraindication tail,
   control shape).
 - [ ] cnl-expressible: cnl_bridge.rs seeded with the shared §10 expressibility layer —
@@ -548,8 +576,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   boundary residuals, and IrBundle::validate rejects empty support — the shared region
   bundle-valid, validate never checks cross-segment disjointness; the predicate owns both
   fail-closed over its raw view). Tests: per-class rejection battery naming the variant
-  (interval class: one case per sub-shape — signed / two-sided / boundless / ge+gt /
-  le+lt) + boundary accepts + a
+  (interval class: the exhaustive 16-bound-presence-mask × per-bound {-1,0,1} truth table —
+  valid iff exactly one bound present ∧ value ≥ 0; expectation table shared with cnl-ast's
+  AST-side battery, cross-side faithfulness by construction) + boundary accepts + a
   locked-corpus positive control (the 3 M1-derived ClinicalIr + their segments pass — the
   report-cnl.2 audit-render domain — derived in-test from the committed corpus; land ONE
   shared derivation helper, expressible-law reuses it). Fresh-module seed, no run.rs
@@ -608,13 +637,18 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   (lexicon.rs post-extract — BOTH directions consume it: to_ir partitions by it, from_ir
   validates placement against it) + rules.rs
   derive_norm_ir contract — run.rs stays closed.
-- [ ] cnl-laws: depth-bounded AST enumeration harness (all atom kinds × ≤2 disjuncts × ≤2
+- [ ] cnl-laws: depth-bounded AST enumeration harness (all atom kinds — interval atoms
+  across all four bound kinds, register values — × 1–2 disjuncts × 1–2
   conjuncts × all tail-backed modality pairs × certainty on/off × ≤2 exceptions × 1–2 basis
-  refs per bracket (rule + per-exception) × 1–2 rules per document (§10 LF frame under the
-  laws); + one unbacked-pair render-Err assertion) →
+  refs per bracket (rule + per-exception, emitted sorted) × 1–2 rules per document (§10 LF
+  frame under the
+  laws; documents built through the shared frame assembly, semantic-projection equality
+  total); + one unbacked-pair render-Err assertion) →
   render→parse identity both languages + cross-language agreement + canonical fixpoint +
   single-parse (take(2) Earley differential over a bounded sample, OracleBound escape) + the
-  two bridge round-trip laws over the escape-free slice + a to_ir-Err-on-escape pin + a
+  two bridge round-trip laws over the escape-free slice under the segment-fixture axis
+  (fixtures supply the §10 bridge preconditions — the SPEC's ACCEPTED-quantifier domain) +
+  a to_ir-Err-on-escape pin + a
   from_ir-Err pin (exception brackets blanketing every cited segment's closure → empty rule
   bracket) + a wrong-slot from_ir-Err pin (an atom bucket its role contradicts) + an
   uncited-segment from_ir-Err pin (an exception clause citing a grounded region outside
@@ -692,6 +726,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   decoding constraint) + resolve-rejection additions + registry check green. run.rs read
   scope: resolve/consts + manifest want-set + prompt-composer regions only.
 - [ ] route-single-cnl.2: single_cnl_accept closure — parse (Parse reject, repairable) →
+  AST validate (structural = debug-assert — parse output shape-valid by construction;
+  lexicon-scoped ENFORCED, its sole parse-unenforced clause = the §10 negative-occurrence
+  bar (token tables already guarantee tails/refs/vars/roles) → repairable reject carrying
+  the §10 complement-interval repair) →
   escape scan over context + exception + action-target slots (Unregistered terminal) →
   grounding (every bracket's basis regions ⊆ regions — rule + per-exception — each cited
   region anchored in exactly ONE segment + derived segments' region sets unshared
@@ -700,7 +738,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   segments span the bracket union, the containment class bites IR-side only), derived
   segments
   ⊆ segments; Grounding terminal) → re-render + re-parse round-trip (Instrument on mismatch)
-  → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / both
+  → Ok(CnlDocument); battery mirrors single_ir_accept's (valid / parse-repair-recover / a
+  negative-occurrence reject — interval-carrying concept in an exception slot, the reject
+  naming the complement-interval repair / both
   terminals / instrument / empty-grounding panic). run.rs read scope: accept-closure region +
   cnl modules.
 - [ ] subproc-runner.1: behavior-locked extraction — ONE shared subprocess runner (home

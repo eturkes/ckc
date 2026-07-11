@@ -435,11 +435,19 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
   {Registered|Unregistered} it reaches EVERY concept slot incl. action target, §10; CnlContext
   flat two-level DNF; AST validity two-layered — STRUCTURAL first, lexicon-free grammar-image
-  shapes: outer DNF + every conjunction nonempty, Interval (ir.rs QuantityInterval's SHAPE —
-  four optional signed bounds) exactly one unsigned bound among ge|gt|le|lt, value nonneg —
-  §5/ir.rs coherence admits signed/two-sided shapes the grammar cannot write, ir.rs-mirrored
-  validity would bless unrenderable ASTs; cnl-ast enforces ahead of the lexicon-scoped layer,
-  cnl-render asserts fail-closed; CnlException {concept: CnlConceptRef, basis: nonempty region refs —
+  shapes up to parse normalization: rules + per-bracket basis nonempty, every bracket
+  sorted+deduplicated (set semantics — parse/from_ir supply sorted), outer DNF + every
+  conjunction nonempty, Interval (ir.rs QuantityInterval's SHAPE —
+  four optional signed bounds) exactly one unsigned bound among ge|gt|le|lt, value nonneg,
+  escape payload in contract —
+  §5 coherence (IrBundle::validate/bundle.rs — ir.rs owns shape only) admits signed/two-sided
+  shapes the grammar cannot write, coherence-mirrored
+  validity would bless unrenderable ASTs; SHAPE vs FRAME sublayers split — render asserts
+  SHAPE only (frame = stored-doc integrity, render's own output); cnl-ast enforces ahead of
+  the lexicon-scoped layer; acceptance runs lexicon-scoped post-parse (negative-occurrence
+  bar its sole parse-unenforced clause); numerals parser-bounded 0..=i64::MAX (2nd grammar
+  over-approximation beside the escape); interval batteries = shared 16-mask×{-1,0,1}
+  truth table both sides; CnlException {concept: CnlConceptRef, basis: nonempty region refs —
   its sentence's own bracket} single-slot; CnlDocument payload
   per §5 = document_id + grammar id/hash refs + rules
   (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks

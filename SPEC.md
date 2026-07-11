@@ -1161,20 +1161,34 @@ Committed direction:
 
 ```text
 Single parse: every parser-accepted string yields exactly one AST; the runtime grammar
-over-approximates the parser (open escape production, payload contract parser-enforced) —
+over-approximates the parser in exactly two classes — the open escape production (payload
+contract parser-enforced) and unbounded numerals (value bound 0..=i64::MAX
+parser-enforced) —
 grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
 over the parser-accepted language.
-Round trip: parse(render(ast)) == ast for every valid AST, both languages. AST validity is
-two-layered, structural first (lexicon-free, the grammar-image shape): nonempty rules and
-basis brackets, nonempty context DNF — the outer disjunction AND every conjunction (the
-grammar writes neither empty) — and interval atoms carrying exactly one unsigned bound
+Round trip: parse(render(ast)) == ast for every valid AST, both languages — equality over
+the semantic AST (document-frame members — per-rule texts, text hashes — are derived
+canonical bytes, recomputed identically on both sides). AST validity is
+two-layered, structural first (lexicon-free, the grammar-image shape up to parse
+normalization): nonempty rules and
+basis brackets — every bracket sorted + deduplicated (set semantics: parse normalizes the
+admitted basis-order variation, from_ir emits sorted) — nonempty context DNF — the outer
+disjunction AND every conjunction (the
+grammar writes neither empty) — interval atoms carrying exactly one unsigned bound
 (one of ge|gt|le|lt with a nonnegative value: the v1 register, deliberately narrower than
 §5 interval coherence, which admits the signed and two-sided shapes the grammar has no
-surface for); then lexicon-scoped: modality pairs tail-backed, concept/action refs
-resolved, slot roles admitting every atom and target position. A structurally invalid AST
-has no rendering, so render asserts the structural layer fail-closed.
+surface for) — and escape payloads in contract (nonempty ≤80 scalars, single line,
+control/quote-delimiter chars excluded, SemanticJa-normal); then lexicon-scoped: modality
+pairs tail-backed, concept/action refs resolved, interval vars resolving to quantity rows,
+slot roles admitting every atom and target position, negated/exception concept refs
+interval-free — the negative-occurrence bar, the sole lexicon-scoped clause the
+lexicon-projected token tables leave open; acceptance enforces it post-parse. A
+structurally invalid AST
+has no rendering, so render asserts the structural SHAPE sublayer fail-closed (frame
+members are render's own output, validated on stored documents).
 Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
-Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast.
+Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast,
+over the same valid-AST domain.
 Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
 bridge preconditions: cited regions anchored, closure-functional segments, nonempty
 remainder — exception containment by construction, source segments derive from the bracket
