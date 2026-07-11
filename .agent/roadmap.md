@@ -188,9 +188,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   apart, definitional drift structurally excluded, behavioral agreement law-tested.
 - Grammar terminals = whole-surface string literals (ASCII digits as literal alternation;
   basis-id refs = Id's exact §4.1 grammar `[a-z][a-z0-9_.:-]*`, pinned to the
-  smt_query.grammar <identifier> production: <basis-id> ::= <lower> <basis-id-rest>,
-  <basis-id-rest> ::= "" | <basis-id-char> <basis-id-rest>, <basis-id-char> ::= <lower> |
-  <digit> | "_" | "." | ":" | "-" — NEVER a bare one-or-more-basis-chars production, which
+  smt_query.grammar `<identifier>` production: `<basis-id> ::= <lower> <basis-id-rest>`,
+  `<basis-id-rest> ::= "" | <basis-id-char> <basis-id-rest>`,
+  `<basis-id-char> ::= <lower> | <digit> | "_" | "." | ":" | "-"` — NEVER a bare
+  one-or-more-basis-chars production, which
   additionally admits `1r`/`.r`/`:r`/`-r`/`_r` that Id::new rejects (an undeclared THIRD
   grammar-over-approximation class beside §10's declared two), and NEVER the broader
   identifier_ascii policy, which admits `/`) — portable to LLM constraint mechanisms +
@@ -521,8 +522,8 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   interval numerals = ASCII-digit literal alternation (unbounded
   repetition — value bound 0..=i64::MAX parser-enforced, the second grammar
   over-approximation beside the open escape); basis-bracket id refs = the plan-header
-  basis-id production (leading <lower>, rest <lower>|<digit>|"_"|"."|":"|"-" —
-  smt_query.grammar's <identifier> shape), the grammar's basis-id language == Id::new's
+  basis-id production (leading `<lower>`, rest `<lower>|<digit>|"_"|"."|":"|"-"` —
+  smt_query.grammar's `<identifier>` shape), the grammar's basis-id language == Id::new's
   exact `[a-z][a-z0-9_.:-]*` — no undeclared third over-approximation class (a bare
   one-or-more-basis-chars production would admit `1r`/`.r`/`:r`/`-r`/`_r`,
   Id::new-rejected); escape quoted-surface content
@@ -532,10 +533,11 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   worked examples full-match both languages, trailing-garbage reject, wrong-slot-surface
   reject, a multi-role surface parsing in EACH of its slots (synthetic
   {condition,action_target} lexicon — committed rows are singleton-role), swapped-unit
-  reject + shared-unit-literal accept (two rows, one unit), basis-id production membership —
-  one-letter id + representative composite ids (digits/`_`/`.`/`:`/`-` in rest position)
-  accept, leading digit `1r` / leading punctuation `.r`/`:r`/`-r`/`_r` / uppercase /
-  slash-bearing ids reject — per-production coverage BOTH
+  reject + shared-unit-literal accept (two rows, one unit), basis-id production membership
+  over the SHARED basis-id corpus (one fixture, this unit + cnl-parse.2 — both sides of
+  language equality): accept one-letter id + composite ids covering every rest-char
+  category (digit/`_`/`.`/`:`/`-`), reject leading digit `1r` / leading punctuation
+  `.r`/`:r`/`-r`/`_r` / uppercase / slash-bearing ids — per-production coverage BOTH
   languages incl. negated/escape/interval/multi-rule, take(2) single-parse spot asserts. ckc-smt emit.rs's two
   bnf API pitfalls apply — copy its working pattern (a fresh derivation from bnf docs re-hits them).
 - [ ] cnl-grammar.1b (gated: model runtime): runtime grammar feasibility smoke — env wrapper
@@ -574,7 +576,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   document frame (exactly one LF terminates each rule, the last included), single
   deterministic pass (no backtracking); malformed battery (duplicate/missing slots,
   unterminated bracket, empty bracket, out-of-grammar basis id — leading digit/punctuation
-  `1r`/`.r`/`:r`/`-r`/`_r`, uppercase, slash-bearing — repairable parse errors (Id::new the
+  `1r`/`.r`/`:r`/`-r`/`_r`, uppercase, slash-bearing — repairable parse errors, + the
+  shared basis-id corpus's accept vectors (cnl-grammar.1's fixture: one-letter id +
+  every-rest-char-category composite ids) embedded in well-formed sentences parse, ASTs
+  carrying those ids — valid-id under-acceptance excluded (Id::new the
   id gate: parser basis-id language == the pinned production, differential agreement
   total), exception sentence missing its bracket, empty
   document, missing terminal LF / stray blank line between rules / CRLF + lone-CR line

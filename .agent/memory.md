@@ -609,10 +609,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rationale = versioned replay dependency, not 'every cassette'. Grammar terminals =
   whole-surface string literals
   (ASCII-digit alternation; basis-id refs = Id's exact §4.1 `[a-z][a-z0-9_.:-]*` pinned as
-  smt_query.grammar's <identifier> production — leading <lower> then rest-char class, never
-  bare one-or-more-chars (admits `1r`/`.r`/`:r`/`-r`/`_r`, Id::new-rejected = an undeclared
-  3rd over-approximation class) nor identifier_ascii (admits `/`); oracle battery accepts
-  one-letter + composite ids, rejects leading digit/punctuation, uppercase, slash) +
+  smt_query.grammar's `<identifier>` production — leading `<lower>` then rest-char class,
+  never bare one-or-more-chars (admits `1r`/`.r`/`:r`/`-r`/`_r`, Id::new-rejected = an
+  undeclared 3rd over-approximation class) nor identifier_ascii (admits `/`); SHARED
+  basis-id corpus, grammar oracle + parser both sides: accept one-letter +
+  every-rest-char-category composite ids, reject leading digit/punctuation, uppercase,
+  slash) +
   EXACTLY ONE open lexical production per
   language — the escape's free quoted surface, inexpressible as finite literals; emitter
   escape mode Committed(open) vs OracleBound(enumerated) since bnf parses literals only —
