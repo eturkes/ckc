@@ -441,7 +441,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   exception sentence → one
   single-atom ExceptionClause PER SPLIT STATEMENT (positive interval-free Concept — §10
   register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
-  bundle-unique ids + (D1∨D2)∧¬E distribution; clause region_ids = its own sentence's basis
+  bundle-unique ids + (D1∨D2)∧¬E distribution; worked 2×2 pinned in cnl-bridge: stmt.0
+  owns exc.0/exc.1, stmt.1 owns exc.2/exc.3, clone content + basis duplicated per
+  statement; clause region_ids = its own sentence's basis
   bracket VERBATIM — §10 per-sentence basis brackets, one on the recommendation sentence +
   one per exception sentence (a single rule-global bracket leaves multi-exception
   provenance unreconstructible + falsifies per-clause region_ids, which sit INSIDE the §10
@@ -460,7 +462,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
   only + bundle validate rejects empty support — predicate owns it fail-closed) +
   shared-region artifacts (bundle-valid — validate never checks segment-region
-  disjointness); round-trip laws (ACCEPTED escape-free ASTs,
+  disjointness); origin map rule_origins(CnlDocument) → `<doc>.rule.<k>` → originating
+  rule index, pure fn mirroring derive_norm_ir's statement-enumerate mint, non-core —
+  report cnl_rules keys per-rule {ja,en} text by normative rule id via it (accepted doc:
+  a split duplicates one rule's text under several ids; from_ir doc: identity), findings
+  quote per carrying pipeline, pipeline-labeled; round-trip laws (ACCEPTED escape-free ASTs,
   to_ir Err on escapes):
   from_ir = single-disjunct projection — clause region_ids verbatim on its exception
   sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus

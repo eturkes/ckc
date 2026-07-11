@@ -591,8 +591,9 @@ joins it as a deterministic Japanese rendering of the same canonical content. Co
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
-weighted ranking; from M3, per-document CNL audit views and per-rule CNL text (§10 — findings
-quote their rules as CNL beside the quoted source spans); from M4, ablations; from M5,
+weighted ranking; from M3, per-document CNL audit views and per-rule CNL text keyed by
+normative rule id via §10's origin map (findings quote their rules as CNL beside the quoted
+source spans, labeled per carrying pipeline); from M4, ablations; from M5,
 attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
 From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
@@ -958,7 +959,10 @@ Committed direction:
   mapping AST → ClinicalIR; a multi-disjunct rule splits into one statement per disjunct,
   each cloning every exception entry under a fresh id ((D1 ∨ D2) ∧ ¬E =
   (D1 ∧ ¬E) ∨ (D2 ∧ ¬E), and exception ids are bundle-unique) — `exc.<k>` counts emitted
-  clauses statement-major then sentence order, `bind.<k>` at first reference in the same
+  clauses statement-major then sentence order (worked 2 × 2 — two context disjuncts × two
+  exception sentences: stmt.0 owns exc.0, exc.1 and stmt.1 owns exc.2, exc.3, sentence
+  order within each statement, clone content + provenance duplicated per statement),
+  `bind.<k>` at first reference in the same
   post-split emission order (statement-major, emitted atom order — a concept exclusive to a
   later disjunct mints after the earlier disjunct's atoms), clause region_ids = its own sentence's basis
   refs verbatim (per-sentence brackets; clones share their sentence's basis), and statement
@@ -966,7 +970,11 @@ Committed direction:
   rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
   cited region anchored in exactly one segment, the derived segments' region sets unshared
   (closure-functional), exception-owned regions a proper subset of the closure (nonempty
-  remainder); basis refs are the only
+  remainder). The bridge also derives the normative-rule origin map —
+  `<document_id>.rule.<k>` → originating CNL rule index, a pure function of the document
+  (rule k = the k-th post-split statement, mirroring the §8.6 derivation-order mint), so a
+  multi-disjunct rule originates several rule ids that legitimately share its text —
+  non-core, consumed by §7.2's per-rule CNL text. Basis refs are the only
   generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
   removes the §9 generated-Id instability class from the emission surface.
 - Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`

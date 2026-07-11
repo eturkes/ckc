@@ -65,7 +65,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   single-atom ExceptionClause PER SPLIT STATEMENT — a multi-disjunct rule clones its
   exception list into every emitted statement ((D1∨D2)∧¬E = (D1∧¬E)∨(D2∧¬E); bundle
   validation demands globally unique exception ids), `exc.<k>` counting emitted clauses
-  statement-major then sentence order, clause region_ids = its own sentence's basis bracket
+  statement-major then sentence order (worked 2×2: two disjuncts × two exception sentences →
+  stmt.0 owns exc.0/exc.1, stmt.1 owns exc.2/exc.3 — sentence order within statement, clone
+  content + basis duplicated per statement), clause region_ids = its own sentence's basis bracket
   verbatim (per-sentence brackets; clones share their sentence's basis) — (positive
   interval-free `Concept` — the §10 register + negative-occurrence bar; the locked rules.rs
   lowering negates ONLY positive Concept atoms into the rule's single conjunct and NEVER
@@ -87,7 +89,12 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   segments artifact (ClinicalSegment.region_ids reverse map — m3.bridge stage inputs therefore
   [cnl_document, segments]; bridge preconditions, acceptance-enforced both sides: cited
   regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), nonempty remainder). Round-trip laws, precise (ACCEPTED escape-free
+  (closure-functional), nonempty remainder). Origin map: rule_origins(&CnlDocument) →
+  `<doc>.rule.<k>` → originating rule index, pure fn (rule k = the k-th post-split
+  statement, mirrors rules.rs derive_norm_ir's statement-enumerate mint) — non-core, ONE
+  helper over accepted docs AND from_ir output (single-disjunct → identity); the report's
+  per-rule CNL text consumes it; several rule ids legitimately share one rule's text.
+  Round-trip laws, precise (ACCEPTED escape-free
   ASTs — single_cnl_accept's closure; to_ir = Err on any
   escape occurrence): from_ir = one single-disjunct CNL rule per statement (projection, no
   regrouping; each clause's region_ids render verbatim on its exception sentence, the rule
@@ -474,7 +481,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   to_ir∘from_ir == id on bridge-image IR) + worked-example content test
   (parse(§10 JA) bridges to the §8.6 rule content) + a synthetic-lexicon partition spot
   test (a condition-role quantity's interval lands under condition, a multi-role concept
-  lands by its context role). Read scope: ir.rs shapes + the §10 lexicon role view
+  lands by its context role) + rule_origins (plan-header origin map) + the pinned 2×2
+  expansion test (two disjuncts × two exception sentences, distinct per-sentence brackets,
+  a second-disjunct-only concept — pins stmt/exc ids + clause ownership (both sentences
+  cloned per statement, content + basis duplicated), clause region_ids verbatim per
+  sentence, per-statement source_segment_ids over the bracket union, bind.<k>
+  first-reference post-split order, rule_origins = both rule ids → index 0). Read scope:
+  ir.rs shapes + the §10 lexicon role view
   (lexicon.rs post-extract — BOTH directions consume it: to_ir partitions by it, from_ir
   validates placement against it) + rules.rs
   derive_norm_ir contract — run.rs stays closed.
@@ -600,18 +613,26 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   signatures, run.rs fill-tail region, metrics.rs row assembly — the §7.3 family text names
   the rationale.
 - [ ] report-cnl.1: Report shape — cnl_documents keyed (pipeline, document) per §10 ({ja,en}
-  text hashes) + cnl_rules ({ja,en} strings, same key) omit-empty members + validate rules (sorted ids, line-break-free
+  text hashes) + cnl_rules (same key, inner map normative rule id → {ja,en} strings — §10
+  origin-map keying; a split legitimately duplicates one rule's text under several ids)
+  omit-empty members + validate rules (sorted ids, line-break-free
   strings, code-span-inert) + populated fixture + byte pins; M1 bytes byte-identical (plumbing
   half).
 - [ ] report-cnl.2: population + audit views — assemble_report CNL inputs (single_cnl route:
   the accepted CnlDocument's own text/hashes — audit honesty; other routes incl. M1: from_ir
-  + render over accepted ClinicalIr) + run.rs report-tail lands
+  + render over accepted ClinicalIr; cnl_rules per (pipeline, document) = rule_origins over
+  that route's CnlDocument → per-rule-id {ja,en} text, ONE lookup path — accepted doc: the
+  split duplicates text under each derived rule id; from_ir doc: identity origins) + run.rs
+  report-tail lands
   audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt (§10 keying — a multi-route experiment accepts
   the same document several times; write_under + byte read-back, report_en.md pattern; text
   hashes into report.json) + M1/M2 report byte-pin re-bless sweep (deliberate,
   bless-from-observed).
 - [ ] report-cnl.3: md renderers — findings quote rules as CNL beside quoted spans (JA body
-  quotes JA CNL, EN body EN CNL; Labels) + rendered-body const re-bless (Z3_VERSION-normalize
+  quotes JA CNL, EN body EN CNL; Labels; lookup = finding rule_id → every cnl_rules entry
+  carrying it, quoted per carrying pipeline, pipeline-labeled — deterministic over
+  report.json alone, divergent surfaces render side by side; a rule id no entry carries
+  renders nothing, omit-empty md) + rendered-body const re-bless (Z3_VERSION-normalize
   pattern) + emission-order/validate coupling tests.
 - [ ] canon-props: canon-layer generated-case harness (standing AGENTS.md-preferred
   hardening, never an M3 entry gate; sits after M3's last canonical-shape change —
