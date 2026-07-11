@@ -505,16 +505,21 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   m3.bridge stage
   inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
   cited regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), basis ownership KIND-aware (17th-review correction — the shared
-  segment view = segment_id → (kind, region_ids); R/E = cited Recommendation/Exception
-  segments' region unions, X = exception brackets'/clauses' union; laws: cited kinds
-  Recommendation|Exception only, R nonempty == the nonempty remainder, X == E ⇒ closure −
-  X == R — the locked rules.rs tail walks cited Recommendation segments' full region sets
-  then appends clause region_ids, so kind-blind topology admitted silent provenance
-  corruption: Evidence-owned basis vanishing, Recommendation-owned exception region
-  doubled, partially-covered Exception segment's remainder dropped; RULE: a shared
+  (closure-functional), basis ownership KIND-aware PER STATEMENT (17th-review correction — the
+  shared segment view = segment_id → (kind, region_ids); R/E = cited
+  Recommendation/Exception segments' region unions, X = exception brackets'/clauses'
+  union, all per statement; laws: cited kinds Recommendation|Exception only, R nonempty,
+  primitives X ⊆ closure ∧ X ∩ R == ∅ ∧ E ⊆ X ⇒ X == E ∧ closure − X == R (remainder
+  aliases R on accepted inputs only) — the locked rules.rs tail walks cited
+  Recommendation segments' full region sets then appends clause region_ids, so kind-blind
+  topology admitted silent provenance corruption: Evidence-owned clause-uncited basis
+  vanishing, Recommendation-owned exception region emitted ≥2× (walk + each citing
+  clause), partially-covered Exception segment's remainder dropped; RULE: a shared
   view/normal form over a locked consumer's inputs must carry every field that consumer
-  branches on — derive laws from its actual filter, never topology alone), exception regions
+  branches on — derive laws from its actual filter, never topology alone; per-X-quantified
+  laws (per statement here) need a fixture where the per-X and document-global readings
+  DISAGREE, and every predicted first-error class must be replayed against the pinned
+  check order — the 17th-review codex follow-up caught both), exception regions
   closure-contained (ExceptionRegionOutsideStatementClosure — CNL-side by construction,
   derived segments span the bracket union; IR-side a clause citing a grounded region of an
   UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER —

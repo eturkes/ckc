@@ -992,20 +992,24 @@ Committed direction:
   source_segment_ids derive region→segment (the segments artifact) over the union of the
   rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
   cited region anchored in exactly one segment, the derived segments' region sets unshared
-  (closure-functional), and basis ownership KIND-aware over the derived segments — writing
+  (closure-functional), and basis ownership KIND-aware over the derived segments, PER
+  STATEMENT (each statement's own citations + clauses — coverage never pools across
+  statements) — writing
   R = the cited Recommendation segments' region union, E = the cited Exception segments',
   X = the exception brackets'/clauses' union: every cited segment's kind Recommendation or
-  Exception, R nonempty, and X == E (jointly with containment; the in-closure breach
-  directions are an exception bracket citing a Recommendation-owned region and a cited
-  Exception segment carrying a region absent from every exception bracket). With
-  closure-functionality and containment these force full closure − X == R, so the
+  Exception, R nonempty, and the two in-closure ownership primitives — X ∩ R == ∅ (no
+  exception bracket cites a Recommendation-owned region) and E ⊆ X (no cited Exception
+  segment carries a region absent from every exception bracket). With containment
+  (X ⊆ closure, the pre-existing class) the primitives derive X == E, and
+  closure-functionality (giving R ∩ E == ∅) then forces full closure − X == R, so the
   normalized rule bracket is exactly the Recommendation-kind closure. The ownership laws
   exist because the locked compile tail is kind-sensitive — norm-rule provenance = cited
   Recommendation segments' full region sets, then each clause's region_ids in clause
   order — so kind-blind citation would silently corrupt provenance: a non-normative cited
-  segment's regions (Evidence/Cq/Definition/table-row/Metadata) vanish from it, a
-  Recommendation-owned exception region lands twice (recommendation walk + clause
-  append), and a clause-uncovered Exception-segment region is dropped from the rule
+  segment's clause-uncited regions (Evidence/Cq/Definition/table-row/Metadata — clause
+  appends are kind-blind, so clause-cited ones still land) vanish from it, a
+  Recommendation-owned exception region lands at least twice (recommendation walk + each
+  citing clause), and a clause-uncovered Exception-segment region is dropped from the rule
   bracket the normal form would widen it into. Exception containment holds by
   construction on this side — the closure derives from the
   bracket union — and is the predicate's closure-containment class on the IR side, where
@@ -1110,12 +1114,14 @@ Committed direction:
   (R empty ⇔ the wholly-exception-owned empty rule bracket under the ownership laws,
   closure − X == R; covers empty source_segment_ids), statements citing a segment of
   non-normative kind (neither Recommendation nor Exception — the compile tail's
-  provenance walk would silently drop its regions), exception regions
-  Recommendation-owned (a clause citing a region a cited Recommendation segment owns —
-  the tail would emit it twice), cited Exception segments not clause-covered (a region of
-  a cited Exception segment absent from every clause — X == E's other direction, a region
+  provenance walk would silently drop its clause-uncited regions), exception regions
+  Recommendation-owned (X ∩ R ≠ ∅ — a clause citing a region a cited Recommendation segment owns —
+  the tail would emit it at least twice), cited Exception segments not clause-covered (a region of
+  a cited Exception segment absent from every clause — the E ⊄ X direction, a region
   the normal form would widen into a rule bracket the tail never reads Exception segments
-  into), statements with an exception region outside
+  into; the clause set scoped per statement — statements sharing an Exception segment
+  each cover it with their OWN clauses, pooled coverage passes only a document-global
+  checker), statements with an exception region outside
   their segment closure (a clause citing a grounded region of an UNCITED segment —
   membership, grounding, kind, R-nonemptiness, and both ownership directions all pass
   (the region's segment is uncited, so neither sees it — containment stays non-redundant
@@ -1127,8 +1133,10 @@ Committed direction:
   a proper subset of the closure — the pair co-occurs on an exception union blanketing the
   closure with uncited excess, R-empty preceding containment as the predicate's
   single reported variant, the blanketing fixture citing Exception-kind segments only — a
-  cited Recommendation segment would keep R nonempty and report Recommendation-owned
-  instead; the pinned first-failing-check order over the topology classes runs
+  cited Recommendation segment would keep R nonempty yet still report containment while
+  the uncited excess remains (containment precedes the ownership pair);
+  Recommendation-owned surfaces only once the blanket is trimmed to the closure; the
+  pinned first-failing-check order over the topology classes runs
   closure-functionality, non-normative kind, R-empty, containment, Recommendation-owned,
   clause-uncovered — containment ahead of the two ownership-mismatch directions so
   out-of-closure excess names containment, and the ownership pair is checked over the
