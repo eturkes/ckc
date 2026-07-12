@@ -24,7 +24,7 @@ fieldless_enum! {
     /// spelling (§4.4); [`smt_token`](SmtLogic::smt_token) yields the
     /// uppercase standard token `(set-logic …)` lines print. M1's set:
     /// `QF_LRA` for context queries (Bool constants + linear-real interval
-    /// atoms), `QF_UF` for deontic polarity queries; M3 adds difference
+    /// atoms), `QF_UF` for deontic polarity queries; M4 adds difference
     /// logic, and anything richer stays behind declared target profiles
     /// (otherwise `unsupported_fragment`).
     SmtLogic {

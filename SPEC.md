@@ -143,7 +143,7 @@ any wider build, and each milestone's evidence is the next milestone's input.
 | M1 scaffold (landed) | Deterministic layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify → trace → report; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. Doubles as baseline control and reference-derivation instrument. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC (landed) | Experiment 1's minimal pair: a weak local model (laptop CPU, constrained decoding, recorded I/O) translates the M1 test sources via `route.direct_smt` versus `route.single_ir`; scored on validity/acceptance/verdict-accuracy/stability raw rows; bilingual research report. Landed the multi-route harness: recorded model adapter, cassettes, repair loop, metrics, baseline-delta table. | `ckc run --experiment exp.m2_multihop` + §9 |
 | M3 route comparison | The smallest decisive experiment on the strongest open question: ClinicalCNL v1 slice (§10.4 — JA-only, closed lexicon) as `route.single_cnl`, compared against the landed §9 pair on identical locked inputs under the neutral contract (§10.1–§10.2), with the faithfulness, round-trip, and resource instruments and the run explorer (§10.5). | `ckc run --experiment exp.m3_cnl` + §10.5 |
-| M4 selection + widening | §11 promotion review over M1–M3 evidence: either promote a composition toward product architecture (canonicalize, migrate, set retirement gates) or run the single next-most-decisive widening experiment from the §11.3 route field; repeat until selection. Deferred instruments land on evidence demand: M4 conflict kinds, component store, model-free coverage, claim completeness, corpus growth, LP lane (§11.4). | `ckc run --experiment exp.m4_*` + §11 |
+| M4 selection + widening | §11 promotion review over M1–M3 evidence CHOOSES the next experiment; selection itself (canonicalize, migrate, set retirement gates) waits for the §11.2 trigger — two corpus generations — so M4 typically builds the growth set plus the most decisive widening or deconfounding route first, repeating until the trigger is satisfiable. Deferred instruments land on evidence demand: M4 conflict kinds, component store, model-free coverage, claim completeness, k>1 sampling, LP lane (§11.4). | `ckc run --experiment exp.m4_*` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora (experiment 3): finding classification (severity, bilingual review questions), weighted minimal-correction-set revision targeting, cvc5 cross-check on blocking/major findings, Lean per-finding proof anchor, human review records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
@@ -206,13 +206,14 @@ Model calls run only inside recorded route stages; every derivation below an acc
 ```
 
 Role assignments (the 2026-07-12 reset's classification; every element carries exactly one
-role, and a role change is a §11 promotion/retirement event recorded here):
+PRIMARY role — dual-role rows state both explicitly — and a role change is a §11
+promotion/retirement event recorded here):
 
 | Element | Role |
 | --- | --- |
 | Test sources, lexicon, `corpus/reference` expected outcomes | Harness: benchmark inputs + oracle annotations — intended semantics fixed at corpus authoring (acceptance-reviewed per §0, origin-independent), never derived from any route's output. |
 | extract + segment stages; SourceDocumentGraph, spans, anchors, regions; ClinicalSegments | Harness: shared source grounding — every route consumes the graph + segments and cites region ids. |
-| Model adapter, cassettes, `model_fill` stage core, `prompts`/`schemas` registries | Harness: route invocation, recording, resource accounting. |
+| Model adapter, cassettes, `model_fill` stage core, `prompts`/`schemas` registries | Harness: route invocation, recording, resource accounting (the registry FILES + validation are harness infrastructure; each schema/prompt ENTRY is route-owned candidate material, §0). |
 | Trace, report, metrics, replay, registry check, experiment binding | Harness: evaluation contract, provenance, experiment ledger. |
 | §6 conflict semantics + verdict categories | Harness: the shared task-outcome semantics every route is scored on. |
 | Z3 | Harness verdict executor (§6) and candidate product backend. |
@@ -220,7 +221,7 @@ role, and a role change is a §11 promotion/retirement event recorded here):
 | NormIR, FormalIR | Route-internal deterministic compiler passes (the shared compile-tail library); no route is obliged to produce them. |
 | SMT-LIB artifacts | Generated target. |
 | `pipe.layered_ckcir_to_smt` (M1) | Baseline/legacy control + reference-derivation instrument. |
-| `route.direct_smt` | Weak baseline control (landed). |
+| `route.direct_smt` | Weak baseline control (landed; declared §10.1 nonconformances: group-grain emission, no source citation — mints no claims). |
 | `route.single_ir` | Candidate route: structured-IR emission (landed). |
 | ClinicalCNL grammar/AST/bridge | Candidate representation, high priority (§10.4 slice at M3). |
 | Prolog-family LP lane, cvc5, Lean | Candidate backends: registered, evidence-triggered (§6 LP profile, §13.2). |
@@ -443,7 +444,7 @@ unit of the thesis.
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
-| `CnlDocument` (M3) | Canonical ClinicalCNL text (v1 slice: JA; EN mirror = §11.3 promotion scope) + the CNL AST it parses to, over an IRBundle's ClinicalIR content: grammar id + hash, per-rule AST + canonical text, text hash; §10.4 text↔AST inverse laws, AST→ClinicalIR bridge. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
+| `CnlDocument` (M3) | Canonical ClinicalCNL text (v1 slice: JA; EN mirror = §11.3 promotion scope) + the CNL AST it parses to, over an IRBundle's ClinicalIR content: grammar id + hash, per-rule AST + canonical text, text hash; §10.4 text↔AST inverse laws, AST→ClinicalIR bridge. Not a new IR layer — at slice scope a restricted source language mapping into ClinicalIR; the bidirectional second-concrete-syntax design is §11.3 promotion scope. |
 
 IR layers in one `IRBundle` per document:
 
@@ -600,7 +601,12 @@ Intent: every claim is a path through artifacts; every miss is a typed data.
 `trace_bundle.json` holds the derivation DAG (source → extraction → segment → normalization → IR
 → compile → verify → report nodes with operation-labeled edges) and claim-evidence rows (finding
 → region ids → rule ids → assertion ids → verdict → report ref). `lineage_index.json` is its
-query index; `ckc trace` resolves a finding to the full chain in both directions. M4 adds
+query index; `ckc trace` resolves a finding to the full chain in both directions. From M2,
+model-fill and route-native artifacts (cassettes, SMT bodies, CNL documents, pre-bundle
+ClinicalIR) sit off-DAG by reviewed design — visible through §4.6 events, wrapper producers,
+and the wrapper input-hash chain — so trace completeness measures the deterministic
+derivation DAG, and the probabilistic boundary is followed via events + wrappers, not `ckc
+trace` traversal. M4 adds
 component-reuse and compactness exports plus deterministic path visualizations: `trace_graph.dot`
 (sorted nodes/edges) and per-finding Mermaid blocks in `report_en.md`, rendering the chain from
 Japanese source text span to solver verdict and the convergence of documents onto shared mapping
@@ -616,13 +622,15 @@ joins it as a deterministic Japanese rendering of the same canonical content. Co
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
-weighted ranking; from M3, per-document CNL audit artifacts for CNL-route accepted documents —
-the stored canonical text (§10.4); each route's own accepted surface is its audit artifact, and
-cross-route CNL rendering of accepted IR is promotion-phase scope (§11.3); from M4, ablations;
+weighted ranking; from M3, per-document CNL audit artifacts (the stored canonical text, §10.4) land in the run
+layout under the route namespace and surface through the explorer — `report.json` itself gains
+only metric rows and the owner field; each route's own accepted surface is its audit artifact,
+and cross-route CNL rendering of accepted IR is promotion-phase scope (§11.3); from M4, ablations;
 from M5, attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
-A multi-route run keeps exactly one findings view: the first compiled (bundle-bearing) pipeline
-in experiment binding order feeds the findings body, the documented no-conflict results, and
+A multi-route run keeps exactly one findings view: the OWNER — the first pipeline in
+experiment binding order that lands at least one compiled group for the run (the §10.1
+wording, byte-identical here) — feeds the findings body, the documented no-conflict results, and
 the report's verifier-result identity — `findings_owner_pipeline_id` records that pipeline
 canonically, present whenever the run lands a findings view — keeping payload query and
 finding ids route-unprefixed;
@@ -648,23 +656,36 @@ shapes: `not_applicable` where the shape is absent, and a shape-applicable-but-m
 is a fail-closed instrument error, never a silent omission.
 
 Primary families: compilation (schema/compile/parse/solver pass rates), conflict quality
-(precision/recall and conflict-task accuracy over test source expectations), route quality
-(schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
-from M2), resource (recorded calls, repairs, model wall-clock, accepted-emission byte size —
-byte size over the accepted artifact's stored surface, deterministic and runtime-free; from
-M3), determinism (hash stability), trace completeness, and baseline delta (per-metric
-route-versus-baseline deltas over identical test sources: model routes from M2,
+(precision/recall and conflict-task accuracy over test source expectations — the neutral
+scorer compares verdict + conflict kind; the landed M2 accuracy metric additionally requires
+exact unsat-core set equality in the shared M1-era assertion-id convention, so M3's metrics
+unit splits it: verdict + kind = primary, core match = alignment-caveated diagnostic), task
+completion (share of an experiment's benchmark groups a route carries end-to-end to a scored
+verdict — fixed denominator per experiment binding, required-but-unattempted units count
+failed; from M3), resource (recorded calls, repairs, accepted-emission byte size per benchmark
+unit over the accepted artifact's stored surface — deterministic and runtime-free; model
+wall-clock is a record-time report row, environment-bound and not reconstructable from
+committed cassettes, so never a locked-comparison row; from M3), determinism (hash stability),
+trace completeness (over the deterministic derivation DAG, §7.1), and baseline delta
+(per-metric route-versus-baseline deltas over identical test sources: model routes from M2,
 layered-minus-direct from M4).
 
-Diagnostic families: translation faithfulness (share of a route's accepted IR-landing
-documents whose ClinicalIR equals the deterministic reference derivation over identical inputs
-under the declared faithfulness projection — provenance-grain fields excluded, §10.4; verdicts
-saturate on small corpora while faithfulness still separates routes, `docs/poc-archive.md`;
-from M3), surface quality (round-trip identity rate over accepted CNL documents; from M3),
-reuse (component reuse rate, duplicate rate), compactness (component count, mapping-set size
-versus coverage, reuse degree, MDL proxies), convergence (normalized hash agreement across
-variants), model-free coverage (share of fresh-document semantics produced deterministically
-from accepted mappings, with zero application-phase model calls; from M4), claim completeness
+Diagnostic families: route quality (schema-valid rate, acceptance rate, repair count,
+recorded-call counts; from M2 — acceptance DEPTH is route-owned closure semantics, §10.1, so
+cross-route acceptance comparison is shape evidence, never a ranking; k-sample convergence is
+a deferred §11.4 instrument — the landed runner enforces `model_sample_count: 1`), translation
+faithfulness (share of a route's accepted IR-landing documents whose ClinicalIR equals the
+deterministic reference derivation over identical inputs under the declared faithfulness
+projection — provenance-grain fields excluded, §10.4; verdicts saturate on small corpora while
+faithfulness still separates routes, `docs/poc-archive.md`; both IR-landing routes target the
+shared id/slot conventions, so the metric measures translation-plus-convention agreement —
+within-shape evidence only; from M3), instrument invariants (round-trip identity over accepted
+CNL documents is acceptance-enforced — expected exactly 1.0, and any recorded violation
+INVALIDATES the run as an instrument failure rather than scoring the route; from M3), reuse
+(component reuse rate, duplicate rate), compactness (component count, mapping-set size versus
+coverage, reuse degree, MDL proxies), convergence (normalized hash agreement across variants),
+model-free coverage (share of fresh-document semantics produced deterministically from
+accepted mappings, with zero application-phase model calls; from M4), claim completeness
 (share of normative-candidate source regions claimed by an accepted rule or covered by a typed
 residual, §11.4; from M4), and loop outcomes (from M5).
 
@@ -924,17 +945,26 @@ A candidate route is a registered pipeline (§8.4 entries) satisfying:
   cassettes, seeds, repair loop, §7.4 reject taxonomy); every stage below an accepted
   artifact is deterministic.
 - Outputs, mandatory: per-group VerifierResults in §6 categories (or a typed §7.4 failure);
-  per-document acceptance status with diagnostics; §4.6 events with resource counters; §9
+  per-emission-unit acceptance status with diagnostics — each route DECLARES its emission
+  grain (per document: `single_ir`, `single_cnl`; per group-role: `direct_smt`'s landed
+  two-fills-per-group shape), and task-completion denominators come from the experiment
+  binding, never from the route's attempt count; §4.6 events with resource counters; §9
   manifest identity fields (model, runtime, constraint, prompt hashes). Outputs, optional —
   diagnostic evidence: an IRBundle (enables faithfulness, audit views, findings ownership),
-  route-native accepted artifacts (CNL document, SMT text).
+  route-native accepted artifacts (CNL document, SMT text). Source citation is mandatory for
+  claim-minting routes (regions cited, §4.5-checked); a route landing no claims
+  (`direct_smt`: compiled none, mints no claims) is a DECLARED legacy-control nonconformance
+  — exempt from grounding checks, `not_applicable` on their metrics, named in any claim that
+  compares against it.
 - Scoring interface: conflict-task outcomes land through the shared §6 verdict semantics —
   IR-landing routes through the shared compile → verify tail, formal-target routes through
   direct verification of their emitted queries. A non-SMT reasoning backend joins by mapping
   its verdicts into §6 categories behind §11's backend evidence bar.
-- Findings ownership (multi-route runs, §7.2): exactly one findings view — the first
-  bundle-bearing pipeline in experiment binding order; every other compiled route lands
-  route-namespaced artifacts feeding audit views, metrics, and ledgers.
+- Findings ownership (multi-route runs, §7.2): exactly one findings view — the OWNER = the
+  first pipeline in experiment binding order that lands at least one compiled group for the
+  run (partial failure falls through to the next; the §7.2 wording, byte-identical); every
+  other compiled route lands route-namespaced artifacts feeding audit views, metrics, and
+  ledgers.
 - Fairness controls: one experiment binds all compared routes over identical locked inputs,
   seeds, budgets, model identity, and reference; §7.3 raw rows emit before any delta or
   ranking; repair budgets identical across routes.
@@ -944,12 +974,18 @@ A candidate route is a registered pipeline (§8.4 entries) satisfying:
 - Oracle provenance (anti-circularity): expected outcomes (`corpus/reference/*.yaml`) are
   intended semantics fixed at corpus authoring (acceptance-reviewed per §0's
   proposer-independence) — never derived from any route's output. The M1 pipeline is a
-  control that reproduces them deterministically, not their source. Expected unsat cores compare as sets of rule-derived assertion ids under the
-  shared id convention; a route whose accepted semantics split rules differently scores on
-  verdict + conflict kind, its core comparison downgraded to diagnostic evidence.
+  control that reproduces them deterministically, not their source. Honesty note: the
+  expected verdict + conflict kind are the neutral oracle content; expected unsat cores are
+  recorded in the shared M1-era assertion-id convention (representation-coupled — the
+  reference core ids track the M1 rule-id scheme), and the LANDED M2 accuracy metric still
+  requires exact core set equality, so M3's metrics unit splits the scorer — verdict + kind
+  primary, core match an alignment-caveated diagnostic — before any ranking cites it.
 - Primary basis (ranks routes): representation-neutral task outcomes and costs — conflict-task
-  accuracy, acceptance/validity rates, k-sample stability, failure-taxonomy shares, resource
-  rows (§7.3 primary families).
+  accuracy (verdict + kind), task completion over the experiment's fixed benchmark units,
+  resource rows (§7.3 primary families). Acceptance/validity/repair rates and failure-taxonomy
+  counts are route-quality DIAGNOSTICS (§7.3 — acceptance depth is route-owned); k-sample
+  stability needs k>1 sampling, a deferred §11.4 instrument, so M3 reliability evidence =
+  acceptance behavior, repairs, and failure taxonomy, named as such.
 - Diagnostic basis (explains; never ranks across shapes): translation faithfulness versus the
   reference derivation — the reference derivation is M1 normalize's deterministic output, so
   faithfulness measures agreement-with-the-instrument and inherits M1's normalization
@@ -965,6 +1001,20 @@ A candidate route is a registered pipeline (§8.4 entries) satisfying:
   is three documents with saturated verdicts — faithfulness and failure taxonomy carry the
   discrimination (archived-PoC prior), any beats/does-not-beat claim cites BOTH §7.3
   families, and corpus growth (metamorphic + indirect variants) is §11.4 scope.
+  (4) Task shape + information envelope differ by design across the landed pair:
+  `direct_smt` receives both group documents plus the query role and authors the comparison
+  query itself, while IR/CNL routes translate documents independently (segment/region ids +
+  vocabulary in view) and the harness evaluates — part of the §10.3 composition axis,
+  declared rather than controlled at M3; cross-route claims name it. (5) M3 is a
+  DEVELOPMENT-SET measurement: prompts, constraints, and the CNL lexicon/grammar are authored
+  and refined against the same three documents later scored (M2 precedent); record-time
+  revisions are ledgered (roadmap `record-cnl`), and out-of-sample discrimination arrives
+  only with the §11.4 growth set — which §11.2 requires before any selection.
+- Scope honesty (fixed target semantics): every M3 route formalizes into the shared CKC
+  target semantics — lexicon concept codes, actions, interval vars, §6 verdict categories.
+  M3 therefore compares emission surfaces, constraint mechanisms, and route compositions
+  UNDER a fixed ontology; ontology and backend choice are separate registered axes (§10.3)
+  behind their own §11 gates.
 - Inspectability evidence: each route's own accepted surface is its audit artifact (CNL text,
   IR JSON, SMT text), inspected side-by-side in the explorer (§10.5) beside quoted source
   spans; human judgment on this axis is recorded in the §11 promotion review, never scored
@@ -972,14 +1022,16 @@ A candidate route is a registered pipeline (§8.4 entries) satisfying:
 
 ### §10.3 Candidate matrix
 
-Experimental axes, independently measurable; a new route declares its coordinates:
+Experimental axes, independently measurable; a new route declares its coordinates in its
+§11.3 row (this SPEC is the coordinate/status ledger until a typed registry field lands,
+§11.2):
 
 | Axis | Points (landed / M3 / registered §11.3) |
 | --- | --- |
 | Emission surface | SMT text (landed) / JSON-IR (landed) / CNL prose (M3) / record DSL, slotted CNL (registered) |
 | Constraint mechanism | BNF grammar mask (landed) / JSON-Schema (landed) / crossed surface×mechanism controls (registered) |
 | Hop count + composition | single constrained hop (landed, M3) / stacked, hop-chain, free-reason + constrained-commit (registered) |
-| Normalization strategy | model-normalized emission (all model routes) / deterministic lexicon normalization (M1 control) |
+| Normalization strategy | where normalization happens: model-side (constrained emission is already canonical-shaped) / deterministic post-parse (CNL bridge role-partition + id mint; M1 lexicon normalization) — mixed points recorded per route |
 | Reasoning backend | Z3 SMT (landed) / Prolog-family LP lane, cvc5, Lean (registered; §6, §13.2) |
 
 Standing evidence: M2 locked measurement — the §9 minimal pair over locked M1 inputs
@@ -994,11 +1046,18 @@ cost. CNL research base (git-resident `docs/cnl-*.md`): no surveyed system offer
 deterministic CNL parse ⇄ verbalize ⇄ executable formal target; no deterministic
 Japanese-parsing CNL exists; no published system wires a CNL grammar into LLM constrained
 decoding; constrained decoding into canonical CNL then deterministic mapping to logic beats
-decoding formal syntax directly (Shin et al. 2021, in `docs/cnl-landscape.md`).
+decoding formal syntax directly (Shin et al. 2021, in `docs/cnl-landscape.md` — a TRANSFER
+prior: few-shot semantic parsing with large pretrained EN models over an English-like CNL;
+direction, not direct support for a weak-local JA clinical setting).
 
-Unresolved — what M3 can change: whether grammar-constrained CNL prose matches or beats
-JSON-IR on acceptance and faithfulness while adding an audit surface a clinician can read.
-That evidence justifies, redirects, or retires the CNL product bet (§11).
+Unresolved — what M3 can change: whether grammar-constrained CNL prose matches JSON-IR on
+task outcomes and within-shape faithfulness while adding an audit surface a clinician could
+read (operator-level inspection at M3; a clinician inspection protocol is promotion-phase
+scope, §11.1). That evidence justifies, redirects, or retires the CNL product bet (§11).
+Priority rationale: M3 builds the CNL point first because it is the sole candidate whose
+distinguishing value — a human-auditable emission surface — no archived prior measures, and
+it separates the surface×mechanism confound; `route.reason_ir` carries the strongest measured
+prior and stands next (§11.3) if M3 evidence is indecisive on emission-surface grounds.
 
 ### §10.4 ClinicalCNL v1 slice (the M3 candidate)
 
@@ -1007,8 +1066,11 @@ canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians; parse and
 mutual inverses over a CNL AST; a deterministic bridge maps the AST into ClinicalIR. The v1
 slice is the smallest version able to earn comparison evidence: Japanese only, closed lexicon
 (no escape production — bare off-lexicon text is a repairable parse error), parse → bridge →
-ClinicalIR only (no from-IR rendering). EN mirror, escape, and cross-route audit rendering are
-§11.3 promotion scope. Grammar-constrained emission and canonical rendering both land inside
+ClinicalIR only (no from-IR rendering). At slice scope ClinicalCNL is therefore a RESTRICTED
+SOURCE LANGUAGE deterministically mapping into ClinicalIR — the bidirectional
+"second concrete syntax" (from-IR rendering with an expressibility predicate over the image)
+is the §11.3 promotion-phase design, and prose here claims only the one-way slice. EN mirror,
+escape, and cross-route audit rendering are §11.3 promotion scope. Grammar-constrained emission and canonical rendering both land inside
 the grammar language, so open-Japanese parsing (zero anaphora, attachment, scope) is designed
 out rather than solved. Named to mirror ClinicalIR; ids: grammar file
 `schemas/clinical_cnl_ja.grammar`, registry schema id `schema.clinical_cnl`,
@@ -1051,7 +1113,8 @@ lesson). Slots, JA canonical shapes:
   0..=i64::MAX — the grammar's SOLE declared over-approximation class. Punctuation `、` `。`
   plus ASCII brackets/parens; JA text is separator-free outside bracket internals (bracket
   ids space-separated, sorted); whitespace variation NONE — parser language == grammar
-  language; stray whitespace is a repairable parse error. Document frame: canonical document
+  language up to the single declared numeral over-approximation above; stray whitespace is a
+  repairable parse error. Document frame: canonical document
   bytes = one LF-terminated line per rule, LF the uniform terminator, last rule included, no
   other inter-rule bytes; stored per-rule texts are line-break-free.
 - Lexicon (JA slice; `corpus/lexicon/ja_core.yaml` extends, all new fields optional at load
@@ -1093,7 +1156,9 @@ lesson). Slots, JA canonical shapes:
   then lexicon-scoped against the role view (refs resolve, slot roles admit positions,
   modality pair tail-backed, interval vars resolve, negative-occurrence bar). The parser
   and the model mint no ids.
-- Bridge `to_ir(&CnlDocument, &segments) -> ClinicalIR`, deterministic: one ClinicalStatement
+- Bridge `to_ir` over a declared bridge context — accepted document, validated role view (+
+  lexicon identity for `system`), source document graph, segments — returning ClinicalIR,
+  deterministic: one ClinicalStatement
   per context-disjunct in document order; atoms partition into population/condition by the
   role view (never by id-namespace convention); ids `stmt.<k>`/`exc.<k>`/`bind.<k>` —
   document-order counters in `normalize.rs`'s id forms, document-local scope; each exception
@@ -1105,16 +1170,23 @@ lesson). Slots, JA canonical shapes:
   concept, minted at first reference in post-split emission order (statement-major; per
   statement population, condition, action target, then exception clauses), system =
   lexicon.system, code = concept id, region_ids = the sorted union of the citing emitted
-  statements' cited regions (provenance at the producer's grain, §5); statement
-  source_region_ids = its rule's brackets' union (rule bracket + its clauses');
-  source_segment_ids derive region→segment via the segments artifact. Preconditions,
+  statements' cited regions (provenance at the producer's grain, §5); statement grounding is
+  SEGMENT-grain — the landed ClinicalStatement carries source_segment_ids only, derived
+  region→segment via the segments artifact from its rule's brackets' union (rule bracket +
+  its clauses'), while the bracket REGION grain persists on ExceptionClause region_ids and
+  TerminologyBinding region_ids (deliberately lossy at statement level, matching the
+  single_ir emission shape — fair comparison preserved). Preconditions,
   reject-checked at acceptance: every cited region resolves in the document graph
   (grounding: absent → `ai_hallucinated_source`, terminal) and anchors in exactly one
   segment (else a repairable schema reject naming the region).
 - Acceptance (`single_cnl_accept`, the §9 accept-closure pattern): UTF-8 → parse (grammar
   language, parse errors repairable `ai_schema_violation`) → structural + lexicon-scoped
   validation (same code) → instrument self-check: re-render the parsed AST and re-parse;
-  disagreement = `cnl_round_trip_mismatch`, terminal (§7.4) — the stored document carries
+  disagreement = `cnl_round_trip_mismatch`, terminal (§7.4), carried by a new terminal
+  `FillReject::Instrument` variant (`model_fill.rs`, cli-side — the DiagnosticCode append
+  stays the sole ckc-core touch); the recorded M3 run must contain ZERO instrument rejects
+  (an acceptance-m3 gate), so instrument failures never read as candidate failures — the
+  stored document carries
   the CANONICAL re-rendered text + hash (the raw emission stays in the cassette) → `to_ir`
   + grounding → accepted CnlDocument + ClinicalIR.
 - Route `pipe.m3_single_cnl`, mirroring `pipe.m2_single_ir`'s shape: `m1.extract` →
@@ -1149,17 +1221,22 @@ lesson). Slots, JA canonical shapes:
   HTML view over a completed run — per document × route the chain source spans → route-native
   accepted artifacts (CNL text / IR JSON / SMT) → verdicts, plus findings, metrics raw rows,
   and the delta table; embedded canonical data, committed hash-pinned viewer assets, zero
-  network, zero servers; a view-only derived artifact (§4.4 `view_only`, renderer identity
-  embedded) computed FROM attested run bytes, outside the attested output set — replay
-  untouched. Exists because side-by-side inspection of unlike representations is promotion
-  evidence (§10.2) the file tree serves poorly.
+  network, zero servers; a view-only derived artifact (§4.4 `view_only` posture, renderer
+  identity embedded) computed FROM attested run bytes, outside the attested output set —
+  replay untouched; beside the HTML it writes `<path>.manifest.json` (run-manifest hash,
+  renderer identity, html hash) binding the view to its run, since promotion review cites
+  what a human inspected. Exists because side-by-side inspection of unlike representations
+  is promotion evidence (§10.2) the file tree serves poorly.
 - Acceptance themes (roadmap unit `acceptance-m3` finalizes): all three routes execute over
-  identical locked inputs; recorded model I/O replays byte-stably; round-trip identity 1.0
-  over accepted CNL documents; faithfulness rows emit for both IR-landing routes (measured,
-  never gated); expected conflict/no-conflict outcomes hold per reference for accepted
-  translations; M1/M2 pins stay byte-identical except the scheduled lexicon-hash and
-  report/metrics re-blesses; the explorer renders every route's chain; grammar/lexicon drift
-  guards green; §0 vocabulary throughout; tag `accept/m3`.
+  identical locked inputs; recorded model I/O replays byte-stably; ZERO instrument rejects
+  (`cnl_round_trip_mismatch`) in the recorded run — the round-trip invariant holds by
+  construction over accepted documents, so it is checked, never scored; faithfulness rows
+  emit for both IR-landing routes (measured, never gated); expected conflict/no-conflict
+  outcomes hold per reference for accepted translations; M1/M2 pins stay byte-identical
+  except the scheduled lexicon-hash and report/metrics re-blesses; the explorer renders
+  every route's chain; grammar/lexicon drift guards green; §0 vocabulary throughout; the
+  promotion-evidence summary lands as a standalone markdown committed with the acceptance
+  commit, citing run id + manifest hashes; tag `accept/m3`.
 - The decision this evidence feeds (§11): promote CNL investment (EN mirror, escape, from-IR
   rendering, findings quoting), hold candidate status pending the registered deconfounder,
   or retire it to the catalogue with its evidence.
@@ -1181,13 +1258,13 @@ the user:
 
 | Criterion | Evidence source |
 | --- | --- |
-| Semantic fidelity | Conflict-task accuracy (primary) + faithfulness diagnostics over locked runs. |
+| Semantic fidelity | Conflict-task accuracy (primary) + within-shape faithfulness diagnostics over locked runs. |
 | Clinically relevant coverage | Corpus breadth handled: growth-set variants, claim completeness at scale (§11.4). |
-| Reliability + failure transparency | Acceptance rate, k-sample stability, typed failure-taxonomy shares (§7.4); silent failure classes disqualify. |
+| Reliability + failure transparency | Acceptance rate, typed failure-taxonomy counts (§7.4), k-sample stability once the §11.4 instrument lands (k=1 through M3); silent failure classes disqualify. |
 | Source-grounded inspectability | Grounding checks + recorded human inspection of the candidate's audit surface (explorer, §10.5). |
 | Provenance + replay quality | Replay match rate, cassette completeness, manifest attestation coverage. |
 | Implementation + conceptual complexity | Module/LOC/spec-surface counts, declared over-approximation classes, re-bless surface. |
-| Model + runtime cost | §7.3 resource rows: recorded calls, repairs, wall-clock, emission bytes. |
+| Model + runtime cost | §7.3 resource rows: recorded calls, repairs, emission bytes (locked); record-time wall-clock (environment-bound, informative). |
 | Performance + scalability | Runtime per document; constraint-compile and lexicon-growth cost curves. |
 | Maintainability + extensibility | Measured cost of adding a concept, rule, language, or backend on a real extension. |
 
@@ -1195,14 +1272,20 @@ the user:
 
 - Selection trigger: a candidate dominates or acceptably trades off §11.1 across ≥2 corpus
   generations (the locked M1 set plus one growth set), with no unresolved §10.2 confound
-  that a bounded experiment could remove.
+  that a bounded experiment could remove. Through M3 only ONE corpus generation exists and
+  the growth-set/coverage/extension instruments are §11.4 build-items — so M4's opening
+  review can only CHOOSE the next experiment (typically: build the growth set + the most
+  decisive widening or deconfounding route); selection waits until this trigger is
+  satisfiable.
 - Canonicalization: the selected composition's modules become the compiler core; the harness
   (corpus, acceptance, evaluation, replay, ledger) persists as its standing benchmark and
   regression instrument; §15 gates keep governing claims. This repository evolves in place
   into the compiler — no rewrite-from-scratch.
 - Baseline reproducibility: losing and retired routes stay replayable from committed
   cassettes + locked manifests at their acceptance tags (`accept/m<n>`); registry entries
-  persist with status, never deleted.
+  persist with a status marker, never deleted (a typed registry status field lands with the
+  first selection/retirement event; until then this section plus §3's role table are the
+  candidate-status ledger).
 - Retirement gate: a candidate layer or backend retires when dominated on every §11.1
   criterion it uniquely served across two corpus generations, or when its unique evidence is
   absorbed by a successor; retirement = registry status + §3 role-table update, design text
@@ -1220,7 +1303,7 @@ the user:
 | `route.stacked_ir` | Model fills a stack of existing IR forms (e.g. PICO → rule rows); deterministic compile. |
 | `route.ir_hop_chain` | Chain of adjacent, deliberately similar IR dialects — do short hops tame non-determinism better than one leap? |
 | `route.ckc_layered` | Model fills CKC layers stage by stage (segment → statement → rule), each constrained. |
-| `route.ckc_rec_dsl` | Compact line-oriented record DSL; the CNL's token-compactness ablation (PoC prior: stable wrong-polarity failure — assess both §7.3 families). |
+| `route.ckc_rec_dsl` | Compact line-oriented record DSL (covers the DecisionTable/DMN-style record alternative); the CNL's token-compactness ablation (PoC prior: stable wrong-polarity failure — assess both §7.3 families). |
 | `route.slot_cnl` | Labeled-slot CNL (FRET/BRIDGE-Wiz style) — the readability-versus-emission midpoint. |
 
 Design dimensions recorded per candidate: token compactness, constraint strength, semantic
@@ -1261,6 +1344,9 @@ posture: demand-sliced constraint subsetting before any grammar-opening amendmen
   calibrated against set A/B references, load-bearing from M6.
 - LP explanation lane per the §6 LP profile; `registry/methods.yaml` seeded from the
   compendium (§14).
+- k-sample stability instrument: k>1 sampling support in the runner (the landed runner
+  enforces `model_sample_count: 1`) + the pairwise convergence metric over complete route
+  draws — reliability evidence beyond acceptance/repair/taxonomy waits on it.
 - Locked-measurement evaluator identity: the run manifest freezes test source, reference,
   lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
   semantics in M5).
@@ -1277,16 +1363,18 @@ rights holder, source URL + snapshot hash, as-of date, and the specific permissi
 acquisition, internal processing/mining, derivative authoring, committing derived rows, and
 redistribution (`PermissionRecord` + `G-SOURCE-PERMISSION`), never inherited across resources
 or versions. License compatibility answers permission alone — never compliance: the
-obligations permission carries (notice retention, attribution, corresponding-source
-conveyance) land in the evidence row and are recorded and met per resource. Copyleft as a
-class is never a rejection ground; judge exact version, combination direction, resulting-work
-license, and obligations (GPL-2.0-only stays GPLv3-incompatible; AGPL-3.0 combines but adds
-network obligations). Standing verdicts: Attempto-family LGPL source (APE, AceRules, Codeco)
-is direct-port-compatible with attribution — technical-fit verdicts stand, no port planned;
-Clex is license-compatible as an EN-side candidate-mining seed behind its evidence row
-(upstream commit 20960a5c header grant + COMLEX/LDC derivation), content import rejected on
-row-level fit alone; SNOMED CT / MedDRA/J / LOINC stay gated by their own fee/terms grants
-(§13.1). Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
+obligations permission carries (notice retention, attribution, license-text and
+corresponding-source conveyance, per reuse mode) land in the evidence row and are recorded
+and met per resource. Copyleft as a class is never a rejection ground; judge exact version,
+combination direction, resulting-work license, and obligations (GPL-2.0-only stays
+GPLv3-incompatible; AGPL-3.0 combines but adds network obligations). Standing verdicts:
+Attempto-family LGPL source (APE, AceRules, Codeco) is GPLv3-compatible for direct porting
+subject to resource- and reuse-mode-specific LGPL compliance recorded in its row — technical-
+fit verdicts stand, no port planned; Clex is PROVISIONALLY license-compatible as an EN-side
+candidate-mining seed (upstream commit 20960a5c header grant + COMLEX/LDC derivation
+statement; its evidence row must still establish the publisher's derivation authority before
+any mining), content import rejected on row-level fit alone; SNOMED CT / MedDRA/J / LOINC
+stay gated by their own fee/terms grants (§13.1). Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
 architecture and decree-authored forms; rejected: direct Clex content import, Ulex precedence
 shadowing (collisions are hard gates here, never precedence).
 

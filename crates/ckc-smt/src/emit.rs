@@ -125,7 +125,7 @@ pub fn compile<'a>(
 
 /// SPEC §6 M1 declared profile over context atoms: concept and negated-
 /// concept Bool constants plus QF_LRA quantity intervals — every atom kind
-/// the M1 type accepts, exhaustively matched so an M3 variant (slot
+/// the M1 type accepts, exhaustively matched so an M4 variant (slot
 /// equality, temporal interval) forces a profile decision here.
 fn in_m1_profile(atom: &ContextAtom) -> bool {
     match atom {

@@ -220,10 +220,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   candidates the NORM (route bundle hash == M1's) → select by identity ids, keep the hash as a conjunct
   check (`GroupTrace.member_bundles` ∧ `input_hashes`); fixture axis = candidates differing in id while
   EQUAL in content. Ordering corollary (M3-plan codex): even DIFFERING candidates
-  under-discriminate when the contract's pick coincides with a plausible wrong strategy's pick — the
-  findings owner sorting first in cnl_rules key order lets a scan-all/first-match renderer pass without
-  reading findings_owner_pipeline_id → arrange the fixture so wrong strategies land a DIFFERENT
-  candidate (non-owner sorts first).
+  under-discriminate when the contract's pick coincides with a plausible wrong strategy's pick — e.g.
+  an owner entry sorting FIRST in a keyed map lets a scan-all/first-match consumer pass without ever
+  reading the owner field → arrange the fixture so wrong strategies land a DIFFERENT candidate
+  (non-owner sorts first).
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
@@ -342,7 +342,7 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 - Schema↔canonical coupling (maintenance): the oracle validates `canonical_payload_bytes(ir)` parsed as
   JSON against the emitted schema, so any §4.3 canonical-encoding change (key rename, integer formatting,
   union shape, a new field) silently breaks good-instance validation unless `schema.rs` tracks it —
-  `schema_accepts_canonical_clinical_ir` is that guard (later-milestone ClinicalStatement additions — M3 CNL bridge fields, M4 distinguishing/temporal — must extend both).
+  `schema_accepts_canonical_clinical_ir` is that guard (later-milestone ClinicalStatement additions — M4 distinguishing/temporal; the M3 CNL slice adds NO ClinicalStatement fields — must extend both).
   Non-obvious anchor: canonical integers are STRING-quoted (`emit_int`→`emit_string`), so interval bounds
   are schema `string`+INT_PATTERN (a bare JSON number is rejected), not `number`.
 - Registry model surface (§14): `schemas.yaml` (`SchemaEntry`=id/path/schema_hash/target_kind) +
@@ -430,11 +430,12 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   escape, findings CNL quoting, lexicon accretion) are §11.3 promotion-gated scope, no longer
   committed. Surviving decisions: name ClinicalCNL + id forms (clinical_cnl_ja.grammar,
   schema.clinical_cnl, route.single_cnl); GF adoption deferral (until JA parse of non-CKC
-  text or >2 languages); expected outcomes = human-authored oracle annotations, never
-  route-derived; faithfulness-vs-M1-reference = diagnostic only (agreement-with-instrument);
+  text or >2 languages); expected outcomes = intended semantics fixed at corpus
+  authoring (acceptance-reviewed), never route-derived; faithfulness-vs-M1-reference = diagnostic only (agreement-with-instrument);
   probabilistic-step-at-one-boundary invariant. The pre-reset §10 elaboration, 40-unit M3
   plan, and this file's former M3-plan bullet are git-resident at `ecc19d3` (SPEC §14
-  retrieval note) — mine them when a deferred capability is promoted, never re-derive; the
+  retrieval note) — mine them whenever a pre-reset design is consumed (deferred-capability
+  promotion, restored units like route-stage-handles/verify-eof), never re-derive; the
   reset commit's roadmap carries forward the still-live implementation pins (authored JA
   lexicon table, prefix audit, bnf facts, bridge oracle, findings-owner ruling).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
