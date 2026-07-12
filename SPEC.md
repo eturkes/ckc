@@ -1713,80 +1713,113 @@ stability without faithfulness is the stability of a wrong answer.
   A's vocabulary, M5 drives drafting inside the §12 loop — lexicon entries are a declared
   editable surface there — M6 makes it load-bearing on the real corpus). Selection stays
   demand-scoped: candidates enter as the run ledger's `cnl_unregistered_concept` payloads
-  (quoted surface + atom position — the §10 proposal artifact) plus
-  `normative_region_unclaimed` residuals; an M6 corpus-slice batch is the same stream
+  (quoted surface + atom position — the §10 proposal artifact);
+  `normative_region_unclaimed` residuals join only through a typed decomposition pass — a
+  residual may equally mark a non-lexical omission (skipped rule, modality, mapping
+  failure), so it never enters raw, only as extracted proposal objects {surface, language,
+  atom position, spans, provenance}; an M6 corpus-slice batch is the same stream
   aggregated over the slice's runs — importing a terminology wholesale as lexicon rows
   stays barred (§10: never a precomputed corpus-wide lexicon; terminologies supply
-  candidate VALUES, never row inventories). Stages, each a ledgered artifact under the §12
-  attempt discipline: (1) cluster — SemanticJa-normalized surface keys dedup recurring
-  proposals, carrying occurrence counts, atom positions, source spans; (2) triage — alias
-  vs new-concept vs out-of-scope: an alias joins an existing row's `surfaces[]`
+  candidate VALUES, never row inventories). Stages, each a ledgered pipeline artifact (M4
+  lands them as plain recorded precursors; M5 wraps them in §12's attempt discipline):
+  (1) cluster — SemanticJa-normalized surface keys group recurring proposals, carrying
+  occurrence counts, atom positions, source spans (grouping only — one normalized surface
+  may carry several senses, each resolving separately); (2) triage — alias / new-concept /
+  ambiguous-split / defer / out-of-scope: an alias joins an existing row's `surfaces[]`
   (source-match synonym, no new concept — the recurring terminology-mapping decision), a
-  new concept gets namespace + id; model-drafted, council-converged from M5 (§12
-  mapping-gap pattern); (3) draft — a recorded model call or agent session authors the
-  FULL row against the §10 authoring contracts: roles, `surfaces[]`,
+  new concept gets namespace + id, an ambiguous surface splits per sense; model-drafted,
+  council-converged from M5 (§12 mapping-gap pattern); (3) draft — a recorded model call
+  or agent session authors the FULL row against the §10 authoring contracts: roles, `surfaces[]`,
   `adnominal_ja`/`negated_ja` (decree forms: 非-prefix / verb flip / copula flip,
   trailing-の bar), `gloss_en` (shape contract), quantity rows for interval-bearing
   concepts, external code candidates from the seed resources below; (4) gates — the §10
   deterministic stack verbatim, so machine-authored entries pass or die by it: loader
-  integrity hard errors, the full lint (reserved tokens, trailing-の, EN shape,
-  proper-prefix overlap vs the WHOLE standing inventory), grammar re-emit under the drift
-  guard, the determinism laws as property tests, and the KB-stability gate below — a gate
-  reject names its offense and loops to redraft, spending model budget, never review
-  budget; (5) review — the scarce resource, so the surface is optimized: per-entry cards
-  render the drafted row as CNL usage sentences in both languages (review in the audit
-  language, never YAML) beside the lint/collision report, provenance, and code candidates;
-  typed reviewer roles (§13.3) from M6, user review before; (6) bless — the entry joins
-  the committed lexicon, grammar re-emitted, hash pins re-blessed (the standing
-  machinery); rejected surfaces enter a ledgered reject list so recurrence reads as
-  signal, never re-work. Surface-stability law: lexer-visible surfaces cited by any
-  accepted document are FROZEN — growth is append-only, a surface edit is a KB migration
-  event (every citing accepted document re-renders + re-hashes; dependent locked
-  measurements stale-mark per §13.1 drift) — so collision resolution always burdens the
-  NEW entry (author around the standing inventory, e.g. a clause-form variant shifting the
-  divergence point early), never re-authors committed vocabulary. v1 keeps the strong
-  pairwise prefix-freedom lint and authors around it (the ACE decree posture: determinism
-  over fluency); if real-slice collision rates price author-around too high, the M6
-  elaboration may refine the lint toward the weaker sufficient condition (a prefix pair is
-  unsafe only when the longer token's residual bytes can spell a valid token-stream
-  continuation of the shorter — follow-set-aware, decidable over the finite inventory +
-  grammar), a measured decision. KB-stability gate, the law made executable: after any
-  lexicon growth the accepted KB round-trips unchanged under the grown inventory — every
-  accepted document's canonical bytes re-parse to the stored AST and re-render
-  byte-identical — defense in depth beneath the lint and the invariant any future lint
-  refinement must keep. Schema growth stays additive-optional (the M3 loader pattern):
+  integrity hard errors, the full lint (§10 verbatim: reserved tokens, trailing-の, EN
+  shape, role-scoped surface totality, proper-prefix overlap over §10's deduplicated
+  main-mode semantic-token projection — Fixed/Digit categories included, delimiter-scoped
+  content excluded), grammar re-emit under the drift guard, the determinism laws as
+  property tests, and the stability gate below — a gate reject names its offense and loops
+  to redraft, spending model budget, never review budget; (5) review — the scarce
+  resource, so the surface is optimized: per-entry cards render the drafted row as CNL
+  usage sentences in both languages (review in the audit language, never YAML) beside the
+  lint/collision report, provenance, and code candidates; user review through M6 (typed
+  reviewer-role records arrive with §13.3 — M6 elaboration may pull that schema forward
+  explicitly); (6) bless — the entry joins the committed lexicon, grammar re-emitted, hash
+  pins re-blessed (the standing machinery); rejected surfaces enter a versioned reject
+  ledger — keyed surface + reason + inventory hash, explicit reopen triggers (new sense,
+  new evidence, changed permissions) — so recurrence reads as signal, not blind re-work.
+  Row-stability law: rows cited by any accepted document are FROZEN in both their
+  lexer-visible surfaces AND their semantic fields (roles, quantity links, tails, codes) —
+  growth is append-only, an edit to either is a KB migration event: it emits a typed
+  lexicon-migration record and marks dependent locked measurements non-current while their
+  historical validity under the old lexicon identity persists, never silently re-blessed
+  (the §13.1 drift posture extended to lexicon identity; that record + dependency walk
+  land with this pipeline — today's `source_drift.json` covers source hashes only) — so
+  collision resolution always burdens the NEW entry (author around the standing inventory,
+  e.g. a clause-form variant shifting the divergence point early), never re-authors
+  committed vocabulary. v1 keeps the strong pairwise prefix-freedom lint and authors
+  around it (the ACE decree posture: determinism over fluency); if real-slice collision
+  rates price author-around too high, the M6 elaboration may refine the lint to the exact
+  safety condition — a prefix pair (s, l = s·r) stays admissible iff no byte spelling of a
+  valid post-s token-stream continuation begins with r (prefix-intersection emptiness,
+  Bytes(cont(s)) ∩ rΣ* = ∅; decidable over the finite inventory + grammar; token-level
+  FOLLOW sets are only a conservative approximation, and a naive residual-tokenizes test
+  is too weak: tokens a, ab + follower bc mis-lex bytes abc to ab·⊥ though residual b
+  spells no stream) — a measured decision. Canonical-surface stability gate, the law's
+  surface half made executable: after any lexicon growth, every committed accepted
+  CnlDocument — population = accepted fills in committed cassettes/goldens plus any
+  accepted-KB store, keyed document × lexicon hash; deterministically re-derived audit
+  views and non-accepted attempts carry no stability obligation; the law binds FORWARD
+  from the accept/m3 inventory as baseline (M3's genesis re-blesses are baseline-setting,
+  not migrations); M6 lands the concrete `accepted_kb_manifest` — re-parses to its stored
+  AST, re-renders byte-identical, and re-passes §10 lexicon-scoped validity under the
+  grown inventory. Surface/segmentation stability only — defense in depth beneath the lint
+  and the invariant any future lint refinement must keep; semantic-field stability rides
+  the migration record above. Schema growth stays additive-optional (the M3 loader pattern):
   provenance / review-status / external-code fields join as optional members, committed
   bytes undisturbed; storage may shard per domain at M6 — one merged validated table at
   load, the §10 gates over the merge. Seed resources supply candidate values — synonym
   surfaces, gloss/citation bases (always re-authored under the contracts; mined data never
-  verbatim-trusted), and the external codes that become §13.1 TerminologyBinding systems —
-  each behind `PermissionRecord` + `G-SOURCE-PERMISSION` at adoption: MEDIS masters
-  (病名/HOT/JLAC, §13.1's first systems — registration-gated, version-pinned) for JA
-  surfaces + codes; mined JA clinical surface dictionaries (MANBYO-class;
-  research/non-commercial licenses → internal candidate mining only) for synonym breadth;
-  bilingual term dictionaries (LSD-class, 医学会用語辞典-class) plus MeSH/UMLS-class EN
-  sources for `gloss_en` candidates; SNOMED CT (Japan a non-member territory —
-  fee-bearing affiliate license), MedDRA/J, LOINC stay registry-listed until licensing
-  evidence (§13.1). ACE precedent, adopted vs rejected: adopted — the Clex/Ulex
+  verbatim-trusted), and the external codes that become §13.1 TerminologyBinding systems.
+  Named families are roles, NOT cleared rights: MEDIS masters (病名/HOT; JLAC-family lab
+  codes) for JA surfaces + codes; mined JA clinical surface dictionaries (MANBYO-class)
+  for synonym breadth; bilingual term dictionaries (LSD-class, 医学会用語辞典-class) plus
+  MeSH/UMLS-class EN sources for `gloss_en` candidates; SNOMED CT / MedDRA/J / LOINC per
+  §13.1 (registry-listed until licensing evidence). No license class is asserted here —
+  terms differ materially inside any family and drift over time — so each resource enters
+  only behind a per-resource, per-version evidence row recorded BEFORE acquisition or
+  mining (adoption-time gating is too late where acquisition itself is restricted):
+  rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
+  acquisition, internal processing/mining, derivative authoring, committing derived rows,
+  and redistribution — `PermissionRecord` + `G-SOURCE-PERMISSION`, never inherited across
+  resources or versions. ACE precedent, adopted vs rejected: adopted — the Clex/Ulex
   architecture (committed common core + per-corpus user accretion; Clex itself is
   COMLEX-derived, the seed-from-existing-resource precedent this table follows) and
-  decree-authored forms; rejected — Clex CONTENT (~100k general-English word-form entries
-  with inflectional morphology serving an agreeing parser: CKC rows are bilingual clinical
-  concept rows rendered as authored whole-surface terminals, morphology-free by design —
-  the EN mirror deliberately invariant — so nothing transfers, and GPL-3.0 would
-  copyleft-encumber committed derived data) and Ulex precedence-shadowing (a shadowing
-  entry silently changes accepted renders; collisions are §10 hard gates here). Grammar
-  scale posture: the emitted grammar grows linearly with the lexicon (per-surface terminal
-  alternations, per-quantity-row productions); constraint-compile + tokenizer-audit cost
-  is re-measured at every slice bless (the §10 record-time audit becomes a standing gate),
-  and the fallback is pinned — concept slots reopen as free productions (the escape's
-  mechanism), joining the DECLARED grammar-over-parser classes with membership enforced
-  wholly at acceptance: the parser stays the language authority, every determinism law
-  unchanged, correctness invariant (acceptance owns it on every route) — closed-vocabulary
-  decoding is an emission-reliability optimization, and the reopened near-miss aliasing
-  pressure is measured like any §11 ablation. Pipeline metrics, raw rows first: entries
-  per attempt, gate-reject + redraft rates, review-overturn rate, alias-vs-new ratio,
-  reject-recurrence.
+  decree-authored forms; rejected — direct Clex content import (poor row-level fit: ~100k
+  general-English word-form entries with inflectional morphology serving an agreeing
+  parser, vs CKC's morphology-free bilingual whole-surface concept rows — the EN mirror
+  deliberately invariant — plus unresolved GPL-3.0 derivative-work obligations for
+  committed derived rows; no content transfer planned) and Ulex precedence-shadowing (a
+  shadowing entry can change how standing surface text is interpreted; collisions are §10
+  hard gates here, never precedence). Grammar scale posture: the emitted grammar grows
+  linearly with the lexicon (per-surface terminal alternations, per-quantity-row
+  productions); constraint-compile + tokenizer-audit cost is re-measured at every slice
+  bless (the §10 record-time audit becomes a standing gate), and the pinned no-amendment
+  fallback is demand-sliced constraint subsetting: the route's decoding constraint
+  compiles over the demand slice's vocabulary subset plus the escape production (which
+  stays the sole open lexical production) — a SUBSET of the parser language, so committed
+  grammar, parser, declared over-approximation classes, and every determinism law stand
+  untouched while constraint cost tracks slice size, not lexicon size; an off-slice
+  registered concept surfaces as an escape occurrence whose §7.4 reject widens the slice
+  for the re-run (operational loop, correctness untouched — acceptance owns it on every
+  route). Opening concept slots as unquoted free productions is NOT a fallback but a §10
+  amendment candidate — it would add a third over-approximation class, dethrone the
+  escape as sole open production, and (JA carrying no delimiters outside the escape)
+  strand the lexer without a deterministic atom boundary; if slice subsetting proves
+  insufficient at M6, that amendment reaches the user with its full §10 consequence set
+  (parser language, AST mapping, token modes, determinism proofs), evidence first.
+  Pipeline metrics, raw rows first: entries per attempt, gate-reject + redraft rates,
+  review-overturn rate, alias-vs-new ratio, reject-recurrence.
 - LP explanation lane per the §6 LP profile: NormIR → Prolog-family emission, SWI-Prolog and
   s(CASP) as recorded subprocess adapters, fixture-context queries, proof trees verbalized
   through the CNL lexicon so explanations speak the audit language; lane separation and
@@ -1915,8 +1948,8 @@ Stage III CDS-backend target visible behind gates.
   TerminologyBinding requirements; version-pinned snapshots; JLAC10/11 laboratory codes registered
   next; license-encumbered vocabularies (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until
   licensing evidence exists; the same snapshots double as seed resources for §11's lexicon
-  accretion pipeline (candidate synonym surfaces, gloss bases, external codes — adoption behind
-  `G-SOURCE-PERMISSION` like any source family).
+  accretion pipeline (candidate synonym surfaces, gloss bases, external codes — per-resource,
+  per-version evidence rows behind `G-SOURCE-PERMISSION` BEFORE acquisition or mining, §11).
 - Drift: source hash changes emit `source_drift.json` and mark dependent scores stale.
 - Boundary: the committed schemas exported since M2 govern any cross-language boundary; the
   Rust-vs-Python adapter decision per §3 is made and recorded here.
