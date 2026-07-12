@@ -801,6 +801,18 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY and
   fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
   retry impl is not.
+- M3 elaboration CLOSED (2026-07-12): the user-directed gap-hunt series (18 external reviews +
+  composition/terminal/lexicon-data/§11-accretion/license sessions) ended on an independent
+  full-plan verification pass — SPEC anchors present (§5 CnlDocument row, §7.2 owner
+  field+fallback, §7.4 cnl codes, §4.4 unsupported), unit order inversion-free, stage kind =
+  free-form Id (sole-core-touch claim holds; TraceNodeKind CLI-side), tokenization determinism
+  re-proved (pairwise prefix-freedom ⇒ ≤1 token match per position ⇒ maximal munch
+  deterministic + complete), lexicon-cnl-data's banked JA+EN prefix audit re-derived from
+  scratch (holds; 投与しないこと source-match-only keeps 投与 steal-free) — ZERO logic gaps.
+  Unpinned remainder is deliberate + in-unit (escape open-notation at cnl-grammar.1 behind the
+  1b stop-the-line probe; two confirm-at-impl mechanicals); §11–§13 thinness = the staged
+  elaborate-at-acceptance design, out of M3 units' reach. Verdict: proceed to spawn-retry —
+  a further elaboration prompt should cite this bullet instead of re-running the sweep.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
