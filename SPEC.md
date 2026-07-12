@@ -209,6 +209,10 @@ Model calls run only inside recorded route stages; every derivation below an acc
 — parse, bridge, compile, verify, render — is deterministic.
 ```
 
+License: GPL-3.0-or-later, Copyright (C) 2026 Emir Turkes — the whole tree (code, spec,
+registries, project-authored corpus) conveys under LICENSE's terms; §11 carries the
+copyleft-source rationale and the per-resource evidence-row discipline.
+
 Repository layout (target state; built up by the M1 units):
 
 ```text
@@ -450,8 +454,9 @@ and certainty phrases (エビデンスの確実性:中 → `moderate`) feeding `
 Versioned by content hash in every manifest. Binding statuses: `exact`/`synonym` satisfy concept
 demands (after representative normalization); `ambiguous` emits
 `Ambiguity(terminology_ambiguous)` and `unmapped` emits `Residual(terminology_unmapped)` when one
-concept is required. External terminologies (MEDIS standard code tables first: license-clean, MHLW-designated)
-join at M6 as additional systems behind the same TerminologyBinding requirements.
+concept is required. External terminologies (MEDIS standard code tables first: MHLW-designated; permissions
+evidence-gated per §11) join at M6 as additional systems behind the same TerminologyBinding
+requirements.
 
 Semantic policy invariants:
 
@@ -1792,20 +1797,27 @@ stability without faithfulness is the stability of a wrong answer.
   rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
   acquisition, internal processing/mining, derivative authoring, committing derived rows,
   and redistribution — `PermissionRecord` + `G-SOURCE-PERMISSION`, never inherited across
-  resources or versions. CKC itself is GPL-3.0-or-later (relicensed 2026-07-12 from
-  Apache-2.0 — LICENSE + workspace Cargo.toml — precisely so copyleft-licensed sources
-  clear): for a GPL-3.0-compatible resource, the evidence row's derivative-authoring,
-  committed-row, and redistribution permissions are settled by license compatibility;
-  the per-resource row is still recorded — compatibility answers the copyleft dimension,
-  not identity, version, or acquisition-terms attestation. ACE precedent, adopted vs
+  resources or versions. CKC itself is GPL-3.0-or-later (relicensed 2026-07-12 from an
+  Apache-2.0-with-LLVM-exception text, LICENSE + workspace Cargo.toml): the point is a
+  uniform governing license, never prior impossibility — Apache-2.0 could host committed
+  GPL-derived rows only with the combined work's governing license diverging from the
+  declared one. For a GPL-3.0-compatible resource, derivative authoring, committed rows,
+  and redistribution become license-permitted with no further grant to seek; the
+  obligations that permission carries (notice retention, attribution, corresponding-source
+  conveyance) land in the per-resource evidence row and are recorded + met per resource.
+  Compatibility answers permission alone — never compliance, identity, version, or
+  acquisition-terms attestation, which stay row-attested. ACE precedent, adopted vs
   rejected: adopted — the Clex/Ulex architecture (committed common core + per-corpus user
   accretion; Clex itself is COMLEX-derived, the seed-from-existing-resource precedent
   this table follows) and decree-authored forms; rejected — direct Clex content import,
-  on row-level fit alone (the former GPL-3.0 derivative-work ground dissolved with the
-  relicense; Clex — GPL-3.0, verified upstream 2026-07-12 — is now commit-compatible and
-  stays available as an EN-side candidate-mining seed behind its evidence row should
-  demand materialize): ~100k general-English word-form entries with inflectional
-  morphology serving an agreeing parser, no clinical specialization, vs CKC's
+  on row-level fit alone (the former copyleft derivative-work ground dissolved with the
+  relicense: Clex's data-file header grants GPL-3.0-or-later — verified at upstream commit
+  20960a5c, 2026-07-12; the header supersedes hosting-side GPL-3.0 classification — and
+  names its COMLEX/LDC derivation, so Clex is license-compatible and stays available as an
+  EN-side candidate-mining seed should demand materialize, behind an evidence row pinning
+  that commit, that grant, and the publisher's LDC-derivation authority it rests on):
+  ~100k general-English word-form entries with inflectional morphology serving an agreeing
+  parser, general-purpose with no documented clinical specialization, vs CKC's
   morphology-free bilingual whole-surface concept rows — the EN mirror deliberately
   invariant — so no content transfer planned; and Ulex precedence-shadowing (a
   shadowing entry can change how standing surface text is interpreted; collisions are §10
@@ -1934,8 +1946,8 @@ Stage III CDS-backend target visible behind gates.
   `G-SOURCE-PERMISSION`.
 - Source families: Minds-style guideline HTML/PDF (full text treated internal-only with
   offsets/hashes/derived labels exportable; spans quoted in reports only where permitted),
-  J-STAGE/JATS XML, and PMDA e-PI XML (license-clean structured sections — 禁忌/効能/用法 — and
-  the future cross-source counterpart). Licensed textbook EPUB/PDF joins as a
+  J-STAGE/JATS XML, and PMDA e-PI XML (structured sections — 禁忌/効能/用法 — and the future
+  cross-source counterpart; permissions evidence-gated per §11). Licensed textbook EPUB/PDF joins as a
   `restricted_internal_only` family when rights evidence exists — corpus expansion, not M6
   acceptance; textbooks need the permission machinery, not new schema.
   `registry/source_processors.yaml` declares per-family adapters, processing stages, permission behavior,

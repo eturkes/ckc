@@ -5,9 +5,13 @@ members = ["crates/ckc-cli", "crates/ckc-core", "crates/ckc-smt"]
 
 [workspace.package]
 edition = "2024"
-# GPL-3.0-or-later (2026-07-12, was Apache-2.0): clears copyleft-licensed
-# lexical resources (Clex-class, GPL-3.0) for committed derived rows — SPEC §11.
+# GPL-3.0-or-later (2026-07-12; prior LICENSE text = Apache-2.0 WITH LLVM-exception,
+# manifest said Apache-2.0): uniform copyleft posture so GPL-family lexical resources
+# (Clex-class) commit without a mixed-license split — SPEC §11.
+# publish = false: crate archives omit the LICENSE text (GPL §4 conveyance requires it);
+# flip only with per-crate license files + a conscious conveyance decision.
 license = "GPL-3.0-or-later"
+publish = false
 
 # Single source of truth for external dependency versions; exact resolved
 # versions live in Cargo.lock (SPEC §1).

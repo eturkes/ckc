@@ -23,13 +23,17 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `global`-marketplace plugins = xml, smt2 (dolmen), alloy, egglog. Audited gaps: TLA+, ASP/Clingo,
   categorical-CQL have no standalone LSP; Isabelle = marketplace gap plugin at adoption; Python
   solidlsp-covered (add at adoption). Registry-YAML-only compendium families carry no LSP.
-- License = GPL-3.0-or-later (user-directed relicense 2026-07-12; was Apache-2.0; LICENSE +
-  workspace Cargo.toml + SPEC §3/§11). Copyleft is NOT a rejection axis for deps/resources/tools
-  anymore — GPL/LGPL-compatible sources clear the derivative/commit/redistribute dimensions by
-  compatibility (per-resource evidence rows still recorded, §11). Clex content stays rejected on
-  row-level FIT alone; fee/terms-gated vocabularies (SNOMED/MedDRA/LOINC) + unlicensed/closed
-  repos (ACE-in-GF, RACE) stay gated — their grants, not ours. Counter the permissive-license
-  training bias: never reject a candidate on copyleft grounds.
+- License = GPL-3.0-or-later (SPEC §3/§11 carry posture + Clex verdict). Durable rule: judge a
+  copyleft candidate on exact license VERSION + combination direction + resulting-work license +
+  obligations (notice/attribution/corresponding-source — compatibility grants permission, never
+  compliance; obligations land in §11 evidence rows) — admit on that analysis fitting, reject only
+  on it failing, with "copyleft" as a class never the ground (counter the permissive-license
+  training bias; GPL-2.0-only stays GPLv3-incompatible, AGPL-3.0 combines but adds network
+  obligations). LGPL/GPL Attempto-family SOURCE (APE, AceRules, Codeco — headers LGPL-3.0-or-later)
+  is now direct-port/adapt-compatible with attribution: docs' clean-room posture was
+  license-contamination mitigation, retired; their technical-fit verdicts stand. No-public-grant
+  repos (ACE-in-GF; RACE = hosted service, no public source located) + fee/terms-gated
+  vocabularies (SNOMED/MedDRA/LOINC) stay gated by THEIR terms regardless of ours.
 
 ## Lessons
 
