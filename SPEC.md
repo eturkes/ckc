@@ -7,79 +7,74 @@ one place, sections sized for selective loading.
 
 ## §0 Mission, thesis, posture
 
-CKC is a clinical knowledge compiler: a headless research harness that translates clinical text
-in any language (public Japanese guideline corpora through M7) into compact, reusable,
-source-grounded IR components, surfaced as a clinician-auditable controlled natural language
-(ClinicalCNL, §10 — prose a clinician reads and audits; parse and render are mutual inverses
-over the CNL AST, a deterministic bridge maps it to and from the IR under §10's laws, so a
-reviewed, accepted CNL document is the locked knowledge base); compiles them
-deterministically to machine-evaluable targets (SMT-LIB first; a Prolog-family
-execution/explanation lane joins per §11, proof assistants such as Lean 4 per §13); and surfaces
-contradictions and documented no-conflict results with end-to-end machine-checkable evidence.
-The probabilistic step is confined to one boundary — source text into a route's constrained
-emission surface; every layer below an accepted artifact is a deterministic compiler.
+CKC = Clinical Knowledge Compiler, built evidence-first (architecture reset 2026-07-12): this
+repository is FIRST a rigorous, representation-neutral research harness that fairly compares
+candidate approaches to formalizing clinical knowledge — structured IRs, controlled natural
+languages, direct formal targets, layered transformations, alternative reasoning engines — and
+SECOND, once harness evidence selects an approach or composition (§11), the source of the
+clinical knowledge compiler that evidence defines: a headless compiler translating clinical
+text in any language (public Japanese guideline corpora through M7) into compact, reusable,
+source-grounded components, compiled deterministically to machine-evaluable targets (SMT-LIB
+first), surfacing contradictions and documented no-conflict results with end-to-end
+machine-checkable evidence.
 
-Thesis under test, as three initial experiments, ordered by dependency — each consumes its
-predecessors' machinery. §2 schedules them, §7.3 defines the metrics. The layered component IR
-is the instrument, not a hypothesis: layering is a route variable inside experiment 1, reuse
-generalization is what experiment 2's coverage measures, and the layered-versus-direct payoff
-lands as M4's architecture ablation (§11):
+Standing invariant, every candidate: the probabilistic step is confined to one boundary —
+source text into a route's constrained emission surface; every layer below an accepted
+artifact is a deterministic compiler.
 
-1. Multi-hop translation (models in the loop): does translation through multiple small model
-   calls between specific intermediate representations beat direct one-leap emission into a
-   machine-evaluable formal target, and which route configuration is best? Reliability is
-   hypothesized to depend on the IR configuration the route targets: staged,
-   grammar-constrained, short-hop routes — layered and hop-chain forms included — tame model
-   non-determinism on the §7.3 route-quality and conflict-quality families. Tested at M2
-   (minimal pair); ClinicalCNL (§10) lands as the flagship invented form at M3; the
-   configuration ranking widens over existing and invented forms at M4; experiment 2's protocol
-   extends the configuration search at M5.
+Harness/route split (§3's role table assigns every element exactly one role): the shared
+harness owns only the concerns common to every candidate — source corpus, benchmark cases and
+their intended semantics; source grounding and provenance; route invocation and resource
+accounting; standardized outcomes, evidence, and diagnostics; evaluation, metrics, replay, and
+the experiment ledger. Each candidate route owns its representations, transformations,
+prompts, schemas, grammars, compiler passes, and reasoning engines. Representation choice, hop
+count, constraint mechanism, normalization strategy, and backend stay independently measurable
+(§10.3); representation-neutral task outcomes are the primary comparison basis and
+route-specific structural checks are diagnostic evidence (§10.2). Landed M1/M2 behavior is the
+reproducible baseline and control. ClinicalCNL (§10.4) holds high-priority candidate status on
+the standing priors — under the same §11 promotion bar as every other approach.
+
+Thesis under test, as three experiments ordered by dependency:
+
+1. Translation reliability (models in the loop): which constrained emission surface and route
+   composition most reliably translates clinical text into accepted, machine-evaluable
+   semantics? M2 landed the minimal pair (direct SMT versus single-hop JSON-IR); M3 adds the
+   ClinicalCNL slice plus the faithfulness instrument; M4 selects or widens on the evidence.
 2. Deterministic mapping by optimization (models at development time only): an optimization
    protocol designs and maintains a deterministic mapping — a compact accepted expert system
-   with minimized surface area, authored by AI agents where hand-encoding once made expert
-   systems prohibitive — that covers fresh documents with zero runtime model calls. The
-   objective: maximize coverage and reuse, minimize mapping-set size. Coverage tested at M4;
-   the bounded autonomous protocol — declared surfaces, immutable evaluator, every attempt
-   ledgered and replayable, from lexicon repair up to search over the IR-combination space —
-   lands at M5.
-3. Revision surfacing (the compiler applied): once a corpus is compiled into the target
-   mathematical representation, does the result highlight guidelines and companion sources in
-   need of revision? Seeded at M1 (one synthetic contradiction, one documented no-conflict result);
-   answered on real public corpora at M6–M7, where findings become source-grounded,
-   human-reviewed revision candidates.
+   authored by AI agents — that covers fresh documents with zero runtime model calls;
+   maximize coverage and reuse, minimize mapping-set size. Coverage instrument from M4; the
+   bounded autonomous protocol at M5. Behind it sits an asymptotic ideal — ever more minimal
+   accepted mapping and axiom sets representing ever more clinical knowledge — orienting the
+   compactness objective (`G-MDL`) while staying outside every report's claims.
+3. Revision surfacing (the compiler applied): once a corpus is compiled, does the result
+   highlight guidelines and companion sources in need of revision? Seeded at M1 (one
+   synthetic contradiction, one documented no-conflict result); answered on real public
+   corpora at M6–M7. Flagship (M6 era): cross-source conflict surfacing — a guideline
+   recommendation versus a PMDA drug-labeling contraindication — traced from Japanese source
+   text spans through accepted semantics and named assertions to solver cores, replayable
+   from content hashes alone.
 
-Documented no-conflict results are first-class outcomes for all three experiments.
+Documented no-conflict results are first-class outcomes for all three experiments — including
+"no invented representation beats the existing field" (§11).
 
-Stage arc: the plan realizes CKC in three stages, each gated by its predecessor. Stage I —
-research instrument (M1–M5): prove experiments 1–2 on synthetic corpora; "machine-evaluable"
-means compiled to solver-checked formal targets; locked Stage I measurements anchor a methods
-manuscript. Stage II — guideline auditor (M6–M7): experiment 3 answered at full strength —
-static analysis of real public corpora surfacing source-grounded revision candidates for
-guideline authors, human-reviewed and rendered bilingual; Stage I is the auditor's validity
-argument (measured translation reliability, deterministic coverage with zero runtime model
-calls), and the auditor's human-reviewed findings anchor a second manuscript. Stage III — CDS
-backend (§13.4, requirements-only): the compiler's runtime target — accepted knowledge evaluated
-over patient contexts; machine evaluation extends to runtime evaluation; every capability sits
-behind §15 gates.
+Stage arc: Stage I — research harness (M1–M5): fair comparison on synthetic corpora; locked
+Stage I measurements anchor a methods manuscript; the §11 selection decision closes the stage.
+Stage II — guideline auditor (M6–M7): the selected architecture runs real public corpora,
+surfacing source-grounded revision candidates, human-reviewed and rendered bilingual; Stage I
+is the auditor's validity argument, and the auditor's findings anchor a second manuscript.
+Stage III — CDS backend (§13.4, requirements-only): every capability sits behind §15 gates.
 
-ideal demonstration (M6 era, experiment 3's flagship): cross-source conflict surfacing over
-real public corpora — e.g. a guideline recommendation versus a PMDA drug labeling
-contraindication — traced from Japanese source text spans through IR and named SMT assertions to
-solver cores, replayable from content hashes alone. Behind it sits an asymptotic ideal: ever
-more minimal accepted mapping and axiom sets representing ever more clinical knowledge — a
-single global axiom in the unreachable limit — which orients experiment 2's compactness
-objective and optimization protocol (`G-MDL`) while staying outside every report's claims.
-
-Research position: every output is research evidence. Accepted
-semantics come from acceptance (schema validity, source linkage, canonical bytes, applicable
-compiler/verifier checks, trace, replay, evidence criteria) — independent of proposer identity.
-AI, retrieval, agents, and humans all propose; acceptance decides. Reports describe results with this
-vocabulary: `research harness`, `candidate`, `review candidate`, `formalization-QA`,
+Research position: every output is research evidence. Accepted semantics come from acceptance
+(schema validity, source linkage, canonical bytes, applicable compiler/verifier checks, trace,
+replay, evidence criteria) — independent of proposer identity. AI, retrieval, agents, and
+humans all propose; acceptance decides. Reports describe results with this vocabulary:
+`research harness`, `candidate`, `review candidate`, `formalization-QA`,
 `text-quality analysis`, `source-grounded`, `schema-valid`, `verifier-checked`, `replayable`,
 `requires human review`, `locked measurement`, `synthetic test source measurement`,
-`raw benchmark output`, `documented no-conflict result`. Clinical, patient-care, CDS-runtime, SaMD,
-deployment, and regulatory claims sit behind the gates in §15 and enter reports only after their
-gates pass.
+`raw benchmark output`, `documented no-conflict result`. Clinical, patient-care, CDS-runtime,
+SaMD, deployment, and regulatory claims sit behind the gates in §15 and enter reports only
+after their gates pass.
 
 Claim tiers:
 
@@ -139,17 +134,18 @@ names only stable public standards.
 
 ## §2 Build plan
 
-Intent: prove the thesis through vertical slices, each ending in a runnable artifact, instead of
-assembling the full harness before the first end-to-end result.
+Intent: prove the thesis through vertical slices, each ending in a runnable artifact; from M3,
+evidence-first — the smallest experiment able to change the architectural decision precedes
+any wider build, and each milestone's evidence is the next milestone's input.
 
 | Stage | Deliverable | Proof |
 | --- | --- | --- |
-| M1 scaffold | Layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
-| M2 multi-hop PoC | Experiment 1's minimal pair: a weak local model (laptop CPU, grammar-constrained, recorded I/O) translates the M1 test sources via `route.direct_smt` versus one IR-mediated route; scored on validity/acceptance/verdict-accuracy/stability raw rows; research report in English and Japanese. | `ckc run --experiment exp.m2_multihop` + §9 |
-| M3 ClinicalCNL | Experiment 1's flagship invented form and the product's knowledge surface: bilingual ClinicalCNL (JA primary, EN mirror) — deterministic parse to ClinicalIR, canonical render from guarded-route accepted IR (off-corpus M1: typed omission, §7.2), round-trip laws property-tested, per-document audit views; `route.single_cnl` scored against the §9 pair on the M2 harness over locked M1 inputs. | `ckc run --experiment exp.m3_cnl` + §10 |
-| M4 route field + comparison | Route axis widened over existing IR forms (stacked, hop-chain, CKC-layered) plus invented ablations (compact record DSL, labeled-slot CNL) versus `single_cnl`; direct-formalization ablation pipeline; reuse/compactness/hash-convergence/conflict-detection metrics; metamorphic variant test sources; ranked comparison report; model-free coverage experiment; LP explanation lane (Prolog/s(CASP) fixture queries, CNL-verbalized proofs). | `ckc run --experiment exp.m4_routes` / `exp.m4_compare` / `exp.m4_coverage` + §11 |
+| M1 scaffold (landed) | Deterministic layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify → trace → report; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. Doubles as baseline control and reference-derivation instrument. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
+| M2 multi-hop PoC (landed) | Experiment 1's minimal pair: a weak local model (laptop CPU, constrained decoding, recorded I/O) translates the M1 test sources via `route.direct_smt` versus `route.single_ir`; scored on validity/acceptance/verdict-accuracy/stability raw rows; bilingual research report. Landed the multi-route harness: recorded model adapter, cassettes, repair loop, metrics, baseline-delta table. | `ckc run --experiment exp.m2_multihop` + §9 |
+| M3 route comparison | The smallest decisive experiment on the strongest open question: ClinicalCNL v1 slice (§10.4 — JA-only, closed lexicon) as `route.single_cnl`, compared against the landed §9 pair on identical locked inputs under the neutral contract (§10.1–§10.2), with the faithfulness, round-trip, and resource instruments and the run explorer (§10.5). | `ckc run --experiment exp.m3_cnl` + §10.5 |
+| M4 selection + widening | §11 promotion review over M1–M3 evidence: either promote a composition toward product architecture (canonicalize, migrate, set retirement gates) or run the single next-most-decisive widening experiment from the §11.3 route field; repeat until selection. Deferred instruments land on evidence demand: M4 conflict kinds, component store, model-free coverage, claim completeness, corpus growth, LP lane (§11.4). | `ckc run --experiment exp.m4_*` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
-| M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment, deeper DSL capabilities. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
+| M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora (experiment 3): finding classification (severity, bilingual review questions), weighted minimal-correction-set revision targeting, cvc5 cross-check on blocking/major findings, Lean per-finding proof anchor, human review records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
 
 Scope note: M1–M5 are the current PoC horizon (Stage I); M6–M7 stay in this file as compact
@@ -188,7 +184,7 @@ Crates:
 | --- | --- |
 | `ckc-core` | IDs, hashes, exact fractions, string policies, canonical bytes, artifact wrappers, enums, source linkage types, IR, plans/manifests, registry types, validation. |
 | `ckc-smt` | FormalIR → SMT-LIB emission, solver-query planning, assertion-to-source maps, solver invocation, solver-result parsing. |
-| `ckc-cli` | `ckc` binary: pipeline processing stages, runner, trace/report/replay, registry check. |
+| `ckc-cli` | `ckc` binary: pipeline processing stages, runner, trace/report/replay, registry check, CNL modules (M3). |
 
 Pipeline shape (M1–M4; later processing stages splice in without reshaping):
 
@@ -209,15 +205,39 @@ Model calls run only inside recorded route stages; every derivation below an acc
 — parse, bridge, compile, verify, render — is deterministic.
 ```
 
+Role assignments (the 2026-07-12 reset's classification; every element carries exactly one
+role, and a role change is a §11 promotion/retirement event recorded here):
+
+| Element | Role |
+| --- | --- |
+| Test sources, lexicon, `corpus/reference` expected outcomes | Harness: benchmark inputs + oracle annotations — intended semantics fixed at corpus authoring (acceptance-reviewed per §0, origin-independent), never derived from any route's output. |
+| extract + segment stages; SourceDocumentGraph, spans, anchors, regions; ClinicalSegments | Harness: shared source grounding — every route consumes the graph + segments and cites region ids. |
+| Model adapter, cassettes, `model_fill` stage core, `prompts`/`schemas` registries | Harness: route invocation, recording, resource accounting. |
+| Trace, report, metrics, replay, registry check, experiment binding | Harness: evaluation contract, provenance, experiment ledger. |
+| §6 conflict semantics + verdict categories | Harness: the shared task-outcome semantics every route is scored on. |
+| Z3 | Harness verdict executor (§6) and candidate product backend. |
+| ClinicalIR | Interchange representation: the candidate routes' common landing zone and the faithfulness-diagnostic substrate (§10.2); itself a candidate representation (`route.single_ir`). |
+| NormIR, FormalIR | Route-internal deterministic compiler passes (the shared compile-tail library); no route is obliged to produce them. |
+| SMT-LIB artifacts | Generated target. |
+| `pipe.layered_ckcir_to_smt` (M1) | Baseline/legacy control + reference-derivation instrument. |
+| `route.direct_smt` | Weak baseline control (landed). |
+| `route.single_ir` | Candidate route: structured-IR emission (landed). |
+| ClinicalCNL grammar/AST/bridge | Candidate representation, high priority (§10.4 slice at M3). |
+| Prolog-family LP lane, cvc5, Lean | Candidate backends: registered, evidence-triggered (§6 LP profile, §13.2). |
+| Attempto/ACE/APE, GF, PENG, FRET et al. | External prior art + dev-time design oracles; no build dependency (license posture §11.5). |
+| `docs/` compendium | Research archive, git-resident (§14). |
+| Dual-surface emission split; Ulex precedence shadowing | Retired designs (git history). |
+| EN mirror surface; unregistered-concept escape; from-IR audit rendering; CNL findings quoting; lexicon accretion pipeline | Deferred CNL capabilities: promotion-phase scope (§11.3), deliberately outside the M3 slice. |
+
 License: GPL-3.0-or-later, Copyright (C) 2026 Emir Turkes — the whole tree (code, spec,
-registries, project-authored corpus) conveys under LICENSE's terms; §11 carries the
+registries, project-authored corpus) conveys under LICENSE's terms; §11.5 carries the
 copyleft-source rationale and the per-resource evidence-row discipline.
 
 Repository layout (target state; built up by the M1 units):
 
 ```text
 .
-├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore   # LICENSE = GPL-3.0-or-later (§11)
+├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore   # LICENSE = GPL-3.0-or-later (§11.5)
 ├── Cargo.toml  Cargo.lock
 ├── crates/{ckc-core,ckc-smt,ckc-cli}/
 ├── corpus/{test_sources,lexicon,reference}/        # committed, license-clean
@@ -408,11 +428,11 @@ unit of the thesis.
 | Object | Requirements (M1 unless tagged) |
 | --- | --- |
 | `ClinicalSegment` | CQ, recommendation, evidence, exception, definition, table-row, or metadata segment with region refs. |
-| `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs — provenance at the producer's grain: M1 normalize grounds the mention, M3's CNL bridge mints citing statements' segment closures (§10). |
+| `TerminologyBinding` | Mention → concept binding: `system` (M1: `ckc.lex`), code, status (BindingStatus), alternatives, region refs — provenance at the producer's grain: M1 normalize grounds the mention, M3's CNL bridge mints the sorted union of the citing statements' cited regions (§10.4). |
 | `ClinicalStatement` | Normalized population, condition, action, modality, strength (`strong\|weak`), certainty (`high\|moderate\|low\|very_low`), exceptions, source refs; comparator/outcome/temporal slots optional at M1. |
 | `Action` | Action kind + target concept + distinguishing fields (M4) + normalized target key. |
 | `ContextExpr` | Finite DNF over atoms: concept predicate, negated concept predicate, quantity interval; M4 adds slot equality and temporal interval (difference-logic) atoms. |
-| `NormativeRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile per positive concept atom to negated context conjuncts (§10 keeps clauses single-concept; wider clause shapes sit outside the compile contract), their regions joining `source_region_ids`. |
+| `NormativeRule` | `rule_id, context, direction, action, strength, source_region_ids` + optional at M1 `certainty, exception_refs`; exceptions compile per positive concept atom to negated context conjuncts (§10.4 keeps clauses single-concept; wider clause shapes sit outside the compile contract), their regions joining `source_region_ids`. |
 | `FactualRule` (M4) | Context → factual consequent, strictness. |
 | `DecisionTable` (M6) | Input variables, units, rows, guards, outputs, source rows; DMN-style overlap semantics. |
 | `IRBundle` | The five layers below + reusable component records + assumptions + diagnostics + per-layer and whole-bundle structural hashes. |
@@ -423,7 +443,7 @@ unit of the thesis.
 | `RunPlan` | Experiment id, test source groups, pipeline(s), seed, budget; canonical bytes hashed into the manifest. |
 | `RunManifest` | Run plan hash, git commit, toolchain/lockfile/corpus/lexicon hashes, environment profile, solver identity, output hashes. |
 | `Report` | report.json (canonical) + report_en.md (derived view): findings, no-conflict results, diagnostics, metrics (M2+), wording per §0. |
-| `CnlDocument` (M3) | Canonical ClinicalCNL text (JA primary, EN mirror) + the CNL AST it parses to, over an IRBundle's ClinicalIR content: grammar id + hash, per-rule AST + canonical text, text hash; §10 text↔AST inverse laws, AST↔ClinicalIR bridge. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
+| `CnlDocument` (M3) | Canonical ClinicalCNL text (v1 slice: JA; EN mirror = §11.3 promotion scope) + the CNL AST it parses to, over an IRBundle's ClinicalIR content: grammar id + hash, per-rule AST + canonical text, text hash; §10.4 text↔AST inverse laws, AST→ClinicalIR bridge. Not a new IR layer — ClinicalIR's second concrete syntax beside canonical JSON. |
 
 IR layers in one `IRBundle` per document:
 
@@ -455,7 +475,7 @@ Versioned by content hash in every manifest. Binding statuses: `exact`/`synonym`
 demands (after representative normalization); `ambiguous` emits
 `Ambiguity(terminology_ambiguous)` and `unmapped` emits `Residual(terminology_unmapped)` when one
 concept is required. External terminologies (MEDIS standard code tables first: MHLW-designated; permissions
-evidence-gated per §11) join at M6 as additional systems behind the same TerminologyBinding
+evidence-gated per §11.5) join at M6 as additional systems behind the same TerminologyBinding
 requirements.
 
 Semantic policy invariants:
@@ -562,8 +582,8 @@ negation-as-failure guarding labeled exception predicates (the PROLEG pattern; �
 exceptions stay separate labeled payloads: the SMT lane expands them to negated context
 conjuncts, the LP lane keeps them as NAF guards).
 Engines: SWI-Prolog and s(CASP) join as recorded subprocess adapters (the Z3 pattern);
-s(CASP) proof trees verbalize through CNL lexicon templates so justifications read as §10
-audit prose.
+s(CASP) proof trees verbalize through CNL lexicon templates so justifications read as §10.4
+CNL prose (a from-IR rendering consumer — §11.3 promotion scope precedes this lane).
 Lane separation: the SMT lane remains the conflict oracle — LP verdicts never replace §6
 SMT verdicts absent an explicit §13.2 richer-rule-semantics adoption; differential tests
 cover only shared fragments (context satisfaction over finite fixture contexts, exception
@@ -596,21 +616,10 @@ joins it as a deterministic Japanese rendering of the same canonical content. Co
 lexicon hashes, findings (each with conflict kind, rules, regions, quoted spans under permission
 rules, assertion names, core), documented no-conflict results, a diagnostics summary (code-keyed
 failure-taxonomy summary), solver identity, replay status; from M2, raw metric rows before any
-weighted ranking; from M3, per-document CNL audit views, per-rule CNL text keyed by
-normative rule id via §10's origin map (a (pipeline, document) whose accepted IR the §10
-predicate rejects at `from_ir` — a guard-less route, the M1 route off its locked corpus —
-carries no CNL entries: omitted under one typed `cnl_inexpressible_ir` diagnostic (§7.4),
-never an assembly failure), and a `findings_owner_pipeline_id` field naming the
-findings-view owner (findings and documented no-conflict results quote their rules as CNL —
-single-backtick inline code spans, the normative delimiter; code-span-inert = no literal
-backtick, no line break, validated at report shape — beside the quoted source spans from the owner pipeline's entry alone, owner-labeled —
-normative rule ids are route-local positional identities, never cross-route alignment keys:
-a same-numbered id under another route may hold different content, so cross-route CNL
-comparison requires an explicit alignment map, out of scope through M3, and non-owner
-entries feed audit views only; a rule id the owner's entry does not carry — the owner's
-view CNL-inexpressible — renders without CNL); from
-M4, ablations; from M5,
-attempt-ledger summaries; from M6, matrix coverage.
+weighted ranking; from M3, per-document CNL audit artifacts for CNL-route accepted documents —
+the stored canonical text (§10.4); each route's own accepted surface is its audit artifact, and
+cross-route CNL rendering of accepted IR is promotion-phase scope (§11.3); from M4, ablations;
+from M5, attempt-ledger summaries; from M6, matrix coverage.
 Finding ids form `finding.<group_id>.<sequence_number>` with sequence numbers in source-then-hash order (§4.1).
 A multi-route run keeps exactly one findings view: the first compiled (bundle-bearing) pipeline
 in experiment binding order feeds the findings body, the documented no-conflict results, and
@@ -618,7 +627,9 @@ the report's verifier-result identity — `findings_owner_pipeline_id` records t
 canonically, present whenever the run lands a findings view — keeping payload query and
 finding ids route-unprefixed;
 every other compiled route lands route-namespaced artifacts feeding audit views, metrics, and
-ledgers only.
+ledgers only. Normative rule ids are route-local positional identities, never cross-route
+alignment keys — a same-numbered id under another route may hold different content, so
+cross-route rule comparison requires an explicit alignment map (out of scope through M3).
 From M7, findings carry `severity` (§4.4) and a bilingual suggested review question. From M5,
 publication-designated runs export a manuscript bundle — figure-ready CSV/JSON metric tables,
 corpus/permission summaries, replay instructions, limitations derived from typed
@@ -629,27 +640,33 @@ Report wording stays within the §0 vocabulary.
 ### §7.3 Metrics (M2 onward)
 
 Metric values are exact fractions; unavailable values are omitted with a diagnostic; zero
-denominators emit `not_applicable` per metric schema. Raw rows always accompany rankings. Core
-metric families: reuse (component reuse rate, duplicate rate), compactness (component count,
-mapping-set size versus coverage, reuse degree, MDL proxies), convergence (normalized hash
-agreement across variants), compilation (schema/compile/parse/solver pass rates), conflict
-quality (precision/recall and conflict-task accuracy over test source expectations), trace
-completeness, determinism (hash stability), baseline delta (per-metric route-versus-baseline deltas over
-identical test sources: model routes from M2, layered-minus-direct from M4), route quality
+denominators emit `not_applicable` per metric schema. Raw rows always accompany rankings.
+Two classes (§10.2): PRIMARY metrics are representation-neutral — defined over task outcomes
+and resource use, computable for every contract-conforming route — and rank routes; DIAGNOSTIC
+metrics presuppose a route shape (IR-landing, CNL-landing, layered) and never rank across
+shapes: `not_applicable` where the shape is absent, and a shape-applicable-but-missing value
+is a fail-closed instrument error, never a silent omission.
+
+Primary families: compilation (schema/compile/parse/solver pass rates), conflict quality
+(precision/recall and conflict-task accuracy over test source expectations), route quality
 (schema-valid rate, acceptance rate, repair count, recorded-call counts, k-sample convergence;
-from M2), surface quality (round-trip identity rate, surface tokens per accepted rule —
-surface tokens = the committed ClinicalCNL JA lexer's token count over the accepted
-document's stored canonical JA rule texts, deterministic and runtime-free: a model-runtime
-token count would bind the metric to a versioned runtime-tokenizer replay dependency,
-tokenizer identity + counts separately attested; from
-M3), translation faithfulness (share of a route's accepted documents whose IR content equals
-the deterministic reference derivation over identical inputs under the §10 faithfulness
-projection, binding region provenance excluded — conflict-quality verdicts
-saturate while faithfulness still separates routes, `docs/poc-archive.md`; from M3),
-model-free coverage (share of fresh-document semantics produced deterministically from
-accepted mappings, with zero application phase model calls; from M4), claim completeness (share
-of normative-candidate source regions claimed by an accepted rule or covered by a typed
-residual, §11; from M4), and loop outcomes (from M5).
+from M2), resource (recorded calls, repairs, model wall-clock, accepted-emission byte size —
+byte size over the accepted artifact's stored surface, deterministic and runtime-free; from
+M3), determinism (hash stability), trace completeness, and baseline delta (per-metric
+route-versus-baseline deltas over identical test sources: model routes from M2,
+layered-minus-direct from M4).
+
+Diagnostic families: translation faithfulness (share of a route's accepted IR-landing
+documents whose ClinicalIR equals the deterministic reference derivation over identical inputs
+under the declared faithfulness projection — provenance-grain fields excluded, §10.4; verdicts
+saturate on small corpora while faithfulness still separates routes, `docs/poc-archive.md`;
+from M3), surface quality (round-trip identity rate over accepted CNL documents; from M3),
+reuse (component reuse rate, duplicate rate), compactness (component count, mapping-set size
+versus coverage, reuse degree, MDL proxies), convergence (normalized hash agreement across
+variants), model-free coverage (share of fresh-document semantics produced deterministically
+from accepted mappings, with zero application-phase model calls; from M4), claim completeness
+(share of normative-candidate source regions claimed by an accepted rule or covered by a typed
+residual, §11.4; from M4), and loop outcomes (from M5).
 
 ### §7.4 Diagnostics
 
@@ -666,12 +683,13 @@ false_positive_conflict false_negative_conflict metamorphic_instability
 ```
 
 M2 adds model-route codes (`ai_schema_violation`, `ai_hallucinated_source`,
-`repair_limit_exceeded`); M3 adds CNL codes (`cnl_parse_error`, `cnl_round_trip_mismatch`,
-`cnl_unregistered_concept`, `cnl_inexpressible_ir`);
-M4 adds invented-DSL route codes and the claim-completeness code
-(`normative_region_unclaimed`, §11); M5 adds loop/budget/surface codes
-(`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift codes; each
-is defined in its milestone section at elaboration time.
+`repair_limit_exceeded`); CNL parse and validation rejects reuse `ai_schema_violation` (the §9
+repairable convention, §10.4). M3 adds `cnl_round_trip_mismatch` (accept-time re-render
+disagreement: fail-closed terminal instrument error, outcome `invalid`); the deferred escape
+design carries `cnl_unregistered_concept` (§11.3). M4 adds invented-DSL route codes and the
+claim-completeness code (`normative_region_unclaimed`, §11.4); M5 adds loop/budget/surface
+codes (`unauthorized_surface_edit`, `budget_exhausted`); M6 adds source/permission/drift
+codes; each is defined in its milestone section at elaboration time.
 
 ## §8 M1 — Scaffold
 
@@ -830,7 +848,11 @@ measurement`. The control group's Q1 is unsat (`age >= 18` vs `age < 18`), closi
 `documented_no_conflict_result`. `ckc trace` walks the chain from 「妊娠中の患者には…投与しないこと」 to
 the core and back.
 
-## §9 M2 — Multi-hop translation PoC (requirements; elaborate at M1 acceptance)
+## §9 M2 — Multi-hop translation PoC (landed)
+
+Status: landed — locked measurement `exp.m2_multihop`, tag `accept/m2`; the requirements
+below are the faithful M2 record, and its mechanics (recorded adapter, cassettes, repair
+loop, acceptance closures, metrics) are the harness machinery §10 routes reuse.
 
 Intent: experiment 1's minimal pair on this laptop. Establish as a locked measurement that a
 weak local model translating clinical Japanese directly into a machine-evaluable formal target
@@ -879,1014 +901,394 @@ Acceptance themes (finalized at elaboration): both routes execute over identical
 baseline-delta table; expected conflict/no-conflict outcomes hold per reference for accepted translations;
 the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
-## §10 M3 — ClinicalCNL v1 (elaborated 2026-07-07; M3 planning seeds units from this section)
+## §10 M3 — Candidate routes, neutral contract, route comparison (reset 2026-07-12)
 
-Intent: land ClinicalCNL — the clinician-auditable controlled natural language, the §0
-knowledge surface; named to mirror ClinicalIR, the layer it serializes — as experiment 1's
-flagship invented form. One content layer, two concrete syntaxes: ClinicalIR serializes as
-canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians. Parse and render are
-mutual inverses between canonical text and the CNL AST; a deterministic bridge maps that AST
-to and from a ClinicalIR projection under the round-trip laws below. A clinician audits
-controlled prose beside quoted source spans — never JSON, IR slots, SMT, or Prolog — and an
-accepted, reviewed CNL document is the locked knowledge base from which every target
-regenerates. This section is the design
-authority for M3 planning; once landed, the committed grammar files and renderer are the byte
-authority (worked text here is illustrative, the §8.6 rule).
+Intent: the design authority for fair comparison — the route contract every candidate
+satisfies, the evaluation contract that scores them, the candidate matrix, and the M3
+experiment: the ClinicalCNL v1 slice against the landed §9 pair. The pre-reset ClinicalCNL
+full design (bilingual mirror, unregistered-concept escape, from-IR audit rendering, findings
+CNL quoting, lexicon accretion) is superseded as active authority and git-resident (§14
+retrieval note); §10.4 carries its load-bearing decisions forward at slice scope, and §11.3
+holds the deferred remainder behind promotion evidence.
 
-Research base (`docs/cnl-attempto.md`, `docs/cnl-multilingual-ja.md`, `docs/cnl-landscape.md`,
-`docs/cnl-design-codex.md` — the second-opinion design): no surveyed system offers
-deterministic CNL parse ⇄ verbalize ⇄ executable formal target, no deterministic
-Japanese-parsing CNL exists, and no published system wires a CNL grammar into LLM constrained
-decoding — the gaps this milestone occupies. Direct evidence for the architecture: constrained
-decoding into a canonical CNL then deterministically mapping to logic beats decoding formal
-syntax directly (Shin et al. 2021, in cnl-landscape.md). Measured priors from the archived
-throwaway PoC (`docs/poc-archive.md` — 9-route field, weak local model, real solver): one
-constrained hop with the source sentence and full vocabulary in view beat every constrained-hop
-stack; a hand-written grammar mask closed the validity→acceptance gap wholesale; and invented
-ASCII record DSLs under that mask stably emitted the WRONG deontic direction token while
-verdicts stayed well-formed — the failure classes this CNL's design answers. Mined patterns: ACE
-interpretation-rules-by-decree + verbalize-the-canonical-form; FRET/BRIDGE-Wiz slotted prose;
-PENG single bidirectional grammar; 産業日本語/Miyata JA sentence patterns; PROLEG separate
-labeled exceptions; AceWiki/Codeco depth-bounded enumeration testing. PENS target: P5 E3 N4 S4
-D (v1 realizes the M1/M2 semantic subset; E3 completes as §11 conflict kinds land).
+### §10.1 Neutral route contract
 
-Committed direction:
+A candidate route is a registered pipeline (§8.4 entries) satisfying:
 
-- Surfaces: Japanese primary, English mirror — two concrete syntaxes over one AST (ClinicalIR
-  statement content). Both parse and both render; the canonical renders of one AST in the two
-  languages parse back to the same AST. Japanese is the corpus and clinician language; its
-  generation is deterministic by construction (no agreement morphology; 以上/以下/未満/超 are
-  lexically exact interval-endpoint markers), and its parse stays tractable because CKC parses
-  only its own controlled surface — grammar-constrained emission and canonical rendering both
-  land inside the grammar language, so open-Japanese parsing (research-grade: zero anaphora,
-  attachment, scope) is designed out rather than solved.
-- Sentence model: one rule = one sentence group — recommendation sentence + its basis
-  bracket + zero or more exception sentences, each carrying its own basis bracket
-  (per-sentence provenance: the bridge reads each exception clause's region_ids off its own
-  bracket verbatim, while the rule bracket normalizes to the segment-closed remainder — a
-  deterministic evidence cover, not authorial attribution, since the IR keeps no rule-level
-  region set; a single rule-global
-  bracket would leave multi-exception provenance unreconstructible). Fixed clause order,
-  closed connective set, no
-  pronouns, no anaphora, no definite references, no ellipsis (overt subject every sentence);
-  bare (unescaped) out-of-lexicon or unresolvable text is a parse error, never a guess
-  (fail-closed — the anti-ACE lesson; the sole registered exit is the unregistered-concept
-  escape below, which parses and fails at acceptance). Multiword concepts are single
-  lexicon terminals, never parsed compounds.
+- Inputs: identical benchmark inputs per experiment binding — locked test sources through the
+  shared extract + segment stages (`source_document_graph`, `segments`), the committed
+  lexicon, and the route's own registered constraint surfaces (schema/grammar + prompt
+  template, §14), every hash in the manifest. No route receives an input another compared
+  route is denied; prompt content is route-owned (part of the candidate), its hash recorded.
+- Model discipline: model calls only inside recorded `model_fill` stages (§9 mechanics —
+  cassettes, seeds, repair loop, §7.4 reject taxonomy); every stage below an accepted
+  artifact is deterministic.
+- Outputs, mandatory: per-group VerifierResults in §6 categories (or a typed §7.4 failure);
+  per-document acceptance status with diagnostics; §4.6 events with resource counters; §9
+  manifest identity fields (model, runtime, constraint, prompt hashes). Outputs, optional —
+  diagnostic evidence: an IRBundle (enables faithfulness, audit views, findings ownership),
+  route-native accepted artifacts (CNL document, SMT text).
+- Scoring interface: conflict-task outcomes land through the shared §6 verdict semantics —
+  IR-landing routes through the shared compile → verify tail, formal-target routes through
+  direct verification of their emitted queries. A non-SMT reasoning backend joins by mapping
+  its verdicts into §6 categories behind §11's backend evidence bar.
+- Findings ownership (multi-route runs, §7.2): exactly one findings view — the first
+  bundle-bearing pipeline in experiment binding order; every other compiled route lands
+  route-namespaced artifacts feeding audit views, metrics, and ledgers.
+- Fairness controls: one experiment binds all compared routes over identical locked inputs,
+  seeds, budgets, model identity, and reference; §7.3 raw rows emit before any delta or
+  ranking; repair budgets identical across routes.
 
-| Slot | JA canonical shape | EN canonical shape | AST target |
-| --- | --- | --- | --- |
-| context | `<dnf>患者には、` | `for patients <dnf>,` | population/condition DNF |
-| action | `<target>の<action-noun>` (例 `抗菌薬Aの投与`) | `<action-noun> of <target>` | Action kind + target |
-| deontic tail | `を強く推奨する` / `を提案する` / `を推奨しない` / `は禁忌である` … | `is strongly recommended` / `is suggested` / `is not recommended` / `is contraindicated` … | (direction, strength) via the §5 lexicon modality table |
-| certainty | `(エビデンスの確実性:中)`, optional | `(certainty: moderate)`, optional | certainty |
-| exception | `ただし、<exception-atom>患者を除く。[根拠 <id> …]` per entry | `exception: patients <exception-atom>. [basis <id> …]` per entry | one single-concept ExceptionClause per entry per split statement (disjunct splits clone entries under fresh ids, each clone keeping its sentence's basis) — separate labeled payload (PROLEG pattern); the entry's own bracket = the clause's region_ids; `<exception-atom>` = positive registered concept or escape incl. its composition glue (EN `with`, escape's patient-adjacent の) |
-| basis | `[根拠 <id> …]` after each sentence, sorted per bracket, ≥1 ref | `[basis <id> …]` after each sentence, sorted per bracket, ≥1 ref | rule bracket = the rule sentence's region refs (normal form: the segment-closed remainder); exception brackets = per-clause region refs; statement source segments derive from their union |
+### §10.2 Evaluation contract
 
-- DNF prose: conjuncts join with `かつ`/`and`; disjunct groups join with `、または`/`; or`;
-  precedence by decree (`かつ` binds tighter), no nesting beyond flat two-level DNF — each
-  disjunct maps to one ClinicalStatement's flat population/condition sets (multi-disjunct
-  rules split into statements, the bridge law; DNF `ContextExpr` is the §5 norm layer's;
-  the bridge partitions a disjunct's atoms into those sets by the lexicon slot-role view —
-  a concept atom by its row's context role, an interval atom by its quantity row's context
-  role, never by id-namespace convention — the typed-slot-roles paragraph below).
-  Atoms: concept (lexicon adnominal surface), negated concept
-  (lexicon negated-adnominal surface), quantity interval (`<var-surface>が<n><unit><bound>`,
-  `<n>` an ASCII-digit leading-zero-free canonical decimal — token-inventory bullet), and
-  the unregistered-concept escape (own bullet below). Punctuation: `、` `。`
-  plus ASCII brackets/parens — width-folding ambiguity is
-  kept out of the surface by construction.
-- Surface composition (concrete-syntax decree; the committed grammars pin the bytes, this
-  bullet pins shapes and wording): composition is plain concatenation of whole-surface
-  terminals — fluency is a lexicon-authoring concern, never a grammar property (the ACE
-  lesson: composition rules by decree). JA: adnominal and negated-adnominal surfaces
-  compose directly in every position — mid-chain (before かつ/、または) and
-  patient-adjacent (the last atom of the last disjunct, before 患者には、; the exception
-  concept slot, before 患者を除く。) — while interval and escape atoms take the fixed
-  linking terminal の exactly patient-adjacent (年齢が18歳未満の患者には、 /
-  ただし、未登録概念「…」の患者を除く。) and compose bare elsewhere
-  (成人かつ年齢が18歳以上、または…): the JA grammar (cnl-grammar.1) carries mid vs
-  patient-adjacent atom alternations (two nonterminals), so a stray or missing の is a
-  parse error like any other byte. Interval bound markers: JA `以上`/`以下`/`未満`/`超` ↔ ge/le/lt/gt after the
-  unit (`18歳以上`); EN `at least`/`at most`/`less than`/`more than` ↔ ge/le/lt/gt before
-  the numeral (`at least 18 years`); units render invariant (`years`), so `at least 1
-  years` is accepted mirror stiltedness — numeral agreement deliberately unhandled,
-  one-form determinism over fluency. EN atoms are position-invariant under one
-  prepositional frame — a positive concept atom and the exception concept slot render
-  `with <gloss_en>`, a negated atom `without <gloss_en>` (the fixed negator replaces
-  `with`, never stacks), an interval atom `with <quantity-surface> <bound> <n> <unit>`,
-  the escape atom `with unregistered concept "<payload>"`; the action target stays the
-  bare `gloss_en` (or bare escape) after `of` — one gloss serves every position because
-  the frame glue lives in fixed terminals, which is what keeps EN negation field-less.
-  `gloss_en` authoring contract: a lowercase-ASCII article-free noun phrase naming the
-  condition/entity (`sepsis`, `severe renal impairment`, `adult status`, `antibiotic-a`)
-  that reads after `with`/`without`/`of`; the reserved-token and prefix-overlap lints
-  (lexicon-cnl.2) bar glosses containing connective/punctuation terminals (hyphenate:
-  `head-and-neck injury`) or prefixing another lexer-visible token, and the EN-value
-  shape lint (same unit) enforces the normalized form — ASCII-only lowercase
-  word/digit/hyphen tokens, single-space-separated, `:` admitted for certainty labels,
-  leading article (a/an/the) rejected on `gloss_en` — because SemanticEn lowercases ASCII
-  yet never rejects non-ASCII, the shape needs its own lint. The adnominal contract: a
-  prenominal form reading directly before 患者 (成人, 敗血症のある); mid-chain
-  composition (before かつ/、または) is decree-uniform concatenation — unambiguous in
-  every atom order, and clause-form adnominals read stilted there (敗血症のあるかつ…, the
-  guideline_b golden shape), an accepted controlled-language cost: fluency stays
-  unclaimed off the patient-adjacent slot, and cnl-laws permutes conjunct atom order.
-  Interval-carrying context concepts author negated forms too — the tokens must parse for
-  acceptance to reject their use repairably with the complement-interval repair (the
-  negative-occurrence bar is acceptance-enforced, never a token-table gap). The
-  negated-adnominal contract mirrors the adnominal one (a prenominal negation reading
-  directly before 患者), under one authoring law the prefix lint makes structural: no
-  lexer-visible surface may extend another as a proper prefix, so suffix negations of
-  bare-noun positives (成人 → 成人でない) are excluded by construction — bare-noun
-  positives negate by 非-prefix (非成人, 非小児), verb-form adnominals flip the verb
-  (敗血症のある → 敗血症のない), copula-state forms flip the copula (妊娠中である →
-  妊娠中でない); every authored positive/negated pair diverges before either string
-  ends. Adnominals also avoid a trailing の (妊娠中である, never 妊娠中の): a
-  surface-final の reads as the fixed linking terminal — visually ambiguous
-  patient-adjacent and dangling mid-chain (妊娠中のかつ…); the lexicon lint enforces this
-  as its own rule (surface-final の on adnominal/negated forms = finding), since neither
-  the prefix rule nor the reserved-token class catches it. Certainty
-  parenthetical = `(` + the certainty row's surface + `)` — the committed JA surfaces
-  already carry the label (`エビデンスの確実性:中`) and `surface_en` mirrors that form
-  (`certainty: moderate`) — placed between the deontic tail and the sentence terminator in
-  both languages. Spacing: JA composition inserts no separator bytes outside bracket
-  internals — 。 abuts its basis bracket and the next sentence (surface- and
-  payload-internal spaces stay data; SemanticJa and the escape contract admit internal
-  normalized spaces); EN inter-terminal separators are exactly one space, owned by the
-  fixed terminals with exactly two composed lexicon-slot exceptions below — frame and
-  connective terminals carry their delimiting spaces
-  (`with `, `without `, ` and `, `; or `, ` of `, ` [basis `; exact inventory pinned in the
-  token-inventory bullet below, committed grammar bytes the final authority), which is also
-  what keeps the fixed inventory prefix-free under its own
-  lint (`with` vs `without` collide only space-less; the prefix rule runs over fixed
-  terminals too); two EN slots have no adjacent fixed terminal to supply their leading
-  separator — the deontic tail (after the bare target gloss or the escape's closing
-  quote) and the unit (after the numeral) — and carry it themselves as composed tokens,
-  the space plus the surface (` is strongly recommended`, ` years`), composed exactly once
-  by the lexicon's surface projection and taken verbatim by lint, grammar emitter, and
-  parser alike (token-inventory bullet below); the raw lexicon field carries no edge spaces
-  (the EN shape lint's token form enforces the edges; internal single spaces stay data)
-  — while surface- and payload-internal
-  spaces stay data (`adult status`);
-  bracket internals = `[根拠 `/`[basis ` + space-separated sorted ids + `]`, both
-  languages.
-- Token inventory (the shared terminal layer; lexicon-cnl.2's typed inventory module
-  transcribes this bullet verbatim — lint, grammar emitter, and parser all consume that one
-  module, and the committed grammar bytes remain the final authority). Main-mode fixed
-  terminals, exact bytes including each side's owned space; `␣` stands for U+0020 in every
-  byte cell and inline token of this bullet, spelled visibly because CommonMark strips one
-  edge space when rendering inline code — the typed module decodes `␣` to a real space, and
-  the fenced skeleton below keeps real spaces (fences render exactly):
+- Oracle provenance (anti-circularity): expected outcomes (`corpus/reference/*.yaml`) are
+  intended semantics fixed at corpus authoring (acceptance-reviewed per §0's
+  proposer-independence) — never derived from any route's output. The M1 pipeline is a
+  control that reproduces them deterministically, not their source. Expected unsat cores compare as sets of rule-derived assertion ids under the
+  shared id convention; a route whose accepted semantics split rules differently scores on
+  verdict + conflict kind, its core comparison downgraded to diagnostic evidence.
+- Primary basis (ranks routes): representation-neutral task outcomes and costs — conflict-task
+  accuracy, acceptance/validity rates, k-sample stability, failure-taxonomy shares, resource
+  rows (§7.3 primary families).
+- Diagnostic basis (explains; never ranks across shapes): translation faithfulness versus the
+  reference derivation — the reference derivation is M1 normalize's deterministic output, so
+  faithfulness measures agreement-with-the-instrument and inherits M1's normalization
+  conventions by construction, which is exactly why it stays diagnostic — plus round-trip
+  identity, structural checks, and audit-surface inspection.
+- Known confounds, declared: (1) representation and constraint mechanism are partially
+  conflated in the landed pair (`direct_smt` grammar-constrained, `single_ir`
+  JSON-Schema-constrained); `single_cnl` (grammar-constrained prose) adds the point
+  separating surface class from constraint mechanism, and a grammar-constrained JSON-IR
+  control is the registered deconfounder if M3 evidence stays ambiguous (§11.3).
+  (2) Prompt content necessarily differs per route — prompts are candidate-owned; hashes
+  recorded; prompt-tuning effort SHOULD stay comparable and is reported. (3) The M3 corpus
+  is three documents with saturated verdicts — faithfulness and failure taxonomy carry the
+  discrimination (archived-PoC prior), any beats/does-not-beat claim cites BOTH §7.3
+  families, and corpus growth (metamorphic + indirect variants) is §11.4 scope.
+- Inspectability evidence: each route's own accepted surface is its audit artifact (CNL text,
+  IR JSON, SMT text), inspected side-by-side in the explorer (§10.5) beside quoted source
+  spans; human judgment on this axis is recorded in the §11 promotion review, never scored
+  as a metric.
 
-  | Role | JA | EN |
-  | --- | --- | --- |
-  | context opener | — (a rule starts at its first atom) | `for␣patients␣` |
-  | atom frame (positive concept, exception concept, interval, escape) | — (bare concatenation; の rows below) | `with␣` |
-  | negated atom frame | — (lexical `negated_ja`) | `without␣` (replaces `with␣`) |
-  | conjunction | `かつ` | `␣and␣` |
-  | disjunction | `、または` | `;␣or␣` |
-  | context close | `患者には、` | `,␣` |
-  | patient-adjacent link (interval/escape atoms only) | `の` | — (the frame is position-invariant) |
-  | quantity link (var-surface to bound) | `が` | — (word order carries it: var-surface, bound words, numeral, unit) |
-  | action link (JA target-first, EN noun-first) | `の` (same token, second grammar position) | `␣of␣` |
-  | bound markers ge / le / lt / gt | `以上` / `以下` / `未満` / `超` (after the unit) | `␣at␣least␣` / `␣at␣most␣` / `␣less␣than␣` / `␣more␣than␣` (before the numeral) |
-  | certainty parens | `(` `)` (ASCII, abutting) | `␣(` `)` |
-  | sentence terminator | `。` | `.` |
-  | basis open | `[根拠␣` | `␣[basis␣` |
-  | basis close | `]` | `]` |
-  | exception opener | `ただし、` | `␣exception:␣patients␣` |
-  | exception close | `患者を除く。` | `.` (the terminator token) |
-  | escape open | `未登録概念「` | `unregistered␣concept␣"` |
-  | escape close | `」` | `"` |
-  | rule terminator | LF | LF |
+### §10.3 Candidate matrix
 
-  Digits `0`–`9` are single-char tokens in both languages under the leading-zero-free
-  numeral register: a numeral is `0` or a nonzero digit followed by any digits — canonical
-  decimal, so zero-led runs (`018`) sit outside BOTH languages (grammar production and
-  parser alike), the numeral's sole grammar-over-parser divergence stays the parser's
-  0..=i64::MAX value bound, no third over-approximation class arises, and numerals add no
-  parse-normalization variation to the declared set (the bounded-variation clause in the
-  canonical-text bullet below is the single enumeration); render writes the value's decimal
-  form, trivially fixpoint. Mode-scoped CONTENT stays outside the main token table and the
-  collision/prefix domain — the open/close delimiters themselves are main-inventory tokens
-  above: the escape payload is a free scan to the closing delimiter under the payload
-  contract, and basis-bracket internals are Id-grammar refs separated by single ASCII
-  spaces — the bracket's own separator, so the main tables keep no bare-space token.
-  Lexicon-token categories join the main mode from the lexicon's surface PROJECTION —
-  Concept (adnominal/negated/citation), ActionNoun, Tail, Certainty, QuantityVar, Unit —
-  which composes the EN tail and unit forms space-led (`␣is␣strongly␣recommended`,
-  `␣years`) exactly once: the lint consumes the projection pre-validation, the
-  zero-finding typed role view exposes the same projection to every other consumer
-  (grammar emitter, parser, renderer), and nobody downstream re-composes — so lint⇄view
-  construction is acyclic. Prefix
-  audit over this inventory (re-verified mechanically at impl with the lexicon tokens):
-  every near-pair diverges before either string ends — `以上`/`以下` (2nd scalar),
-  `未満`/`未登録概念「` (2nd), `患者には、`/`患者を除く。` (3rd), `␣and␣`/`␣at␣least␣`
-  (3rd), `␣at␣least␣`/`␣at␣most␣` (5th), `with␣`/`without␣` (5th) — and no committed
-  lexicon surface starts with a fixed terminal or a digit (the lint owns that thereafter).
-  Schematic grammar skeleton — factoring and slot order normative, bytes the committed
-  grammar's; each language's grammar is self-contained (EN re-defines the frame
-  nonterminals over EN terminals, never importing JA definitions); `⟨…⟩` = lexicon
-  alternations served by the role view, quoted strings = the inventory above with real
-  spaces:
+Experimental axes, independently measurable; a new route declares its coordinates:
 
-  ```text
-  JA:
-    <document>     ::= <rule> <nl> | <rule> <nl> <document>
-    <rule>         ::= <disjuncts> "患者には、" <target> "の" ⟨action-noun⟩ ⟨tail⟩
-                       <cert-opt> "。" <basis> <exceptions>
-    <disjuncts>    ::= <conjunct-mid> "、または" <disjuncts> | <conjunct-adj>
-    <conjunct-mid> ::= <atom-mid> "かつ" <conjunct-mid> | <atom-mid>
-    <conjunct-adj> ::= <atom-mid> "かつ" <conjunct-adj> | <atom-adj>
-    <atom-mid>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> | <escape>
-    <atom-adj>     ::= ⟨adnominal⟩ | ⟨negated⟩ | <interval> "の" | <escape> "の"
-    <interval>     ::= <ivl-row-1> | … | <ivl-row-n>   ; one production per quantity row
-    <ivl-row-k>    ::= ⟨var-surface-k⟩ "が" <numeral> ⟨unit-k⟩ <bound>  ; the row's OWN unit
-    <bound>        ::= "以上" | "以下" | "未満" | "超"
-    <numeral>      ::= "0" | <nonzero> <digit-rest>
-    <digit-rest>   ::= "" | <digit> <digit-rest>
-    <target>       ::= ⟨citation⟩ | <escape>
-    <escape>       ::= "未登録概念「" <payload> "」"      ; payload = the open production
-    <cert-opt>     ::= "" | "(" ⟨certainty⟩ ")"
-    <basis>        ::= "[根拠 " <id-list> "]"
-    <id-list>      ::= <basis-id> | <basis-id> " " <id-list>
-    <exceptions>   ::= "" | <exception> <exceptions>
-    <exception>    ::= "ただし、" <exc-atom> "患者を除く。" <basis>
-    <exc-atom>     ::= ⟨adnominal⟩ | <escape> "の"
-  EN (own complete grammar: the same frame nonterminal names re-defined over EN terminals,
-  one position-invariant atom nonterminal; deltas shown):
-    <rule>         ::= "for patients " <disjuncts> ", " ⟨action-noun⟩ " of " <target> ⟨tail⟩
-                       <cert-opt> "." <basis> <exceptions>
-    <atom>         ::= "with " ⟨gloss⟩ | "without " ⟨gloss⟩ | "with " <interval> | "with " <escape>
-    <ivl-row-k>    ::= ⟨var-surface-k⟩ <bound-words> <numeral> ⟨unit-k⟩
-    <bound-words>  ::= " at least " | " at most " | " less than " | " more than "
-    <exception>    ::= " exception: patients " <exc-atom> "." <basis>
-    <exc-atom>     ::= "with " ⟨gloss⟩ | "with " <escape>
-  ```
-
-- Exception register (v1, deliberately narrower than the context DNF): each exception sentence
-  carries exactly one concept slot — a positive registered concept (adnominal surface) or the
-  escape — no connectives, no negated-concept atoms, no quantity intervals. Multiple exception
-  sentences per rule remain available and read disjunctively (any listed exception exempts).
-  Soundness anchor: §5 compiles exceptions to negated context conjuncts inside the rule's one
-  conjunction, negating exactly the clause's positive concept atoms — sound because
-  ¬(E1 ∨ … ∨ En) = ¬E1 ∧ … ∧ ¬En when every Ei is a single atom, while a conjunctive
-  exception `A ∧ B` would need the De Morgan disjunction ¬A ∨ ¬B the locked tail never
-  builds, and negated/interval exception atoms sit outside its negation domain entirely.
-  Negative-occurrence bar (same v1 register): interval-carrying lexicon entries (成人, 小児)
-  are excluded from the exception slot AND from context negated-concept atoms at acceptance
-  (repairable; the repair is the complement context interval — 「ただし、成人患者を除く。」 →
-  context 年齢が18歳未満): the locked tail interval-lowers positive Concept occurrences only,
-  every negative occurrence staying a bare Bool literal with no axiom linking it to the Real
-  interval variable, so a rule excluding 成人 would overlap-check as an unlinked Bool against
-  another rule's 年齢が18歳以上 — spurious overlaps, missed disjointness. A
-  conjunctive, negated, or interval exemption is authored as context refinement instead (the
-  context DNF already admits negated concepts and intervals) — noting the provenance trade:
-  the locked tail joins exception regions into rule source_region_ids only through
-  ExceptionClause region_ids, so a context-authored exemption keeps statement-level segment
-  linkage but adds no rule-level regions, and transcribing a SOURCE exception segment
-  therefore uses the exception sentence; widening the exception register
-  is an explicit lowering change (M4+ candidate), never a silent grammar widening over the
-  unchanged compile tail.
-- Ids: the parser and the model mint no ids — the bridge derives statement/exception/binding
-  ids deterministically from document order as `stmt.<k>`/`exc.<k>`/`bind.<k>` document-local
-  counters, mirroring the deterministic M1 derivation exactly (§8.6 reserves
-  `<document_id>.rule.<k>` for norm-layer rule ids) when
-  mapping AST → ClinicalIR; a multi-disjunct rule splits into one statement per disjunct,
-  each cloning every exception entry under a fresh id ((D1 ∨ D2) ∧ ¬E =
-  (D1 ∧ ¬E) ∨ (D2 ∧ ¬E), and exception ids are bundle-unique) — `exc.<k>` counts emitted
-  clauses statement-major then sentence order (worked 2 × 2 — two context disjuncts × two
-  exception sentences: stmt.0 owns exc.0, exc.1 and stmt.1 owns exc.2, exc.3, sentence
-  order within each statement, clone content + provenance duplicated per statement),
-  `bind.<k>` at first reference in the same
-  post-split emission order (statement-major; within a statement population atoms, then
-  condition atoms, then the action target, then exception clauses, each in emitted order — a
-  concept exclusive to a later disjunct mints after the earlier disjunct's atoms), clause region_ids = its own sentence's basis
-  refs verbatim (per-sentence brackets; clones share their sentence's basis), and statement
-  source_segment_ids derive region→segment (the segments artifact) over the union of the
-  rule's and its exceptions' basis refs — bridge preconditions, acceptance-enforced: every
-  cited region anchored in exactly one segment, the derived segments' region sets unshared
-  (closure-functional), and basis ownership KIND-aware over the derived segments, PER
-  STATEMENT (each statement's own citations + clauses — coverage never pools across
-  statements) — writing
-  R = the cited Recommendation segments' region union, E = the cited Exception segments',
-  X = the exception brackets'/clauses' union: every cited segment's kind Recommendation or
-  Exception, R nonempty, and the two in-closure ownership primitives — X ∩ R == ∅ (no
-  exception bracket cites a Recommendation-owned region) and E ⊆ X (no cited Exception
-  segment carries a region absent from every exception bracket). With containment
-  (X ⊆ closure, the pre-existing class) the primitives derive X == E, and
-  closure-functionality (giving R ∩ E == ∅) then forces full closure − X == R, so the
-  normalized rule bracket is exactly the Recommendation-kind closure. The ownership laws
-  exist because the locked compile tail is kind-sensitive — norm-rule provenance = cited
-  Recommendation segments' full region sets, then each clause's region_ids in clause
-  order — so kind-blind citation would silently corrupt provenance: a non-normative cited
-  segment's clause-uncited regions (Evidence/Cq/Definition/table-row/Metadata — clause
-  appends are kind-blind, so clause-cited ones still land) vanish from it, a
-  Recommendation-owned exception region lands at least twice (recommendation walk + each
-  citing clause), and a clause-uncovered Exception-segment region is dropped from the rule
-  bracket the normal form would widen it into. Exception containment holds by
-  construction on this side — the closure derives from the
-  bracket union — and is the predicate's closure-containment class on the IR side, where
-  authored source_segment_ids can uncite an exception's segment. Binding region_ids = the
-  union over the citing emitted statements of each
-  statement's segment closure (its source segments' full region sets — the closure the
-  statement's rendered brackets jointly cover: the rule bracket carries it minus the
-  exception-owned regions — under the ownership laws exactly the Recommendation-kind
-  closure, the split the locked compile tail consumes — exception sentences the rest),
-  never the authored brackets —
-  statement-grain provenance, coarser than M1's §5 mention grounding (the §5 field is
-  producer-graded): the closure is invariant under bracket normalization, keeping
-  `to_ir(from_ir(ir)) == ir` exact — a bracket-union binding breaks the law whenever the
-  citing statements' brackets jointly under-cover the closure union (minimal case: an
-  exception-free rule citing one region of a two-region Recommendation segment re-bridges
-  wider). The bridge also derives the normative-rule origin map —
-  `<document_id>.rule.<k>` → originating CNL rule index, a pure function of the document
-  (rule k = the k-th post-split statement, mirroring the §8.6 derivation-order mint), so a
-  multi-disjunct rule originates several rule ids that legitimately share its text —
-  non-core, consumed by §7.2's per-rule CNL text. Basis refs are the only
-  generated references, grounded by the §9 scaffold (`ai_hallucinated_source` on a miss). This
-  removes the §9 generated-Id instability class from the emission surface.
-- Grammar and lexicon: `schemas/clinical_cnl_ja.grammar` + `schemas/clinical_cnl_en.grammar`
-  (id forms follow the `ClinicalIR ↔ clinical_ir` precedent; singular registry schema id
-  `schema.clinical_cnl`), emitter-backed from
-  the lexicon (bless + drift guard + hash pin — the M2 `schemas/` pattern); the
-  `registry/schemas.yaml` entry binds the JA grammar — the route's decoding constraint,
-  consumed exactly as §9 consumes the IR schema — while the EN grammar stays committed,
-  drift-guarded, and hash-pinned with no route binding (its own non-route entry only if the
-  coverage check demands one — the route's singular id stays JA-bound). Every linguistic
-  form lives in lexicon DATA and the grammar stays purely concatenative: concept entries
-  gain adnominal / negated-adnominal / EN-gloss surfaces plus a validated slot-role set
-  (typed slot roles, below); action
-  kinds gain JA/EN noun forms (`noun_ja`/`noun_en` — a required nonempty pair on every
-  action row: integrity, never luck, keeps the `<target>の<noun_ja>` / `<noun_en> of
-  <target>` render surface total); the modality table gains canonical deontic-tail fields
-  (`tail_ja`/`tail_en` — CNL tails are grammatical phrases distinct from the §8 source-match
-  surfaces: 「を強く推奨する」 carries particle + strength adverb; rows carrying tails parse
-  as tail synonyms, the first tail-bearing row per `(direction, strength)` pair is the
-  canonical render row — pinned against this section's worked renders — and tail-less rows
-  stay source-match-only); certainty phrases as committed, every row gaining a required
-  nonempty EN surface (`surface_en`; the first row per value stays the canonical render
-  row). Concept citation forms mint no new field: an action target renders as the concept
-  row's representative surface (`surfaces[0]`, JA) and its EN gloss (`gloss_en` — one EN
-  form serves context and citation); synonym surfaces (`surfaces[1..]`) stay §8
-  source-match vocabulary, never CNL terminals. EN negation mints no field either: the EN
-  negated atom is a fixed-negator composition over the same `gloss_en` (the negator is the
-  fixed inventory terminal `without`, replacing the positive frame's `with` — the surface
-  composition decree above; the emitter stays the byte authority), while JA negation stays
-  lexical (`negated_ja` — morphological, not composable).
-  Typed slot roles (the CNL slot-legality classification — lexicon data like every other
-  linguistic form): every concept row carries a nonempty validated role set over
-  `population` / `condition` / `action_target` — `population` and `condition` mutually
-  exclusive per row (the bridge partition stays a function of the concept; a dual-use
-  classifier is a lexicon-review decision, never emission-time freedom), `action_target`
-  free to combine with either (multi-role is deliberate — e.g. a drug concept as action
-  target and, separately authored, as an on-drug condition atom) — and every quantity row
-  carries exactly one context role (`population` | `condition`) placing its interval atoms
-  under the bridge partition. The loader exposes ONE typed role view that every CNL
-  consumer reads — grammar emitter, AST validation, parser slot legality, bridge partition,
-  acceptance wrong-slot checks — so no CNL module tests id prefixes: the M1 id namespaces
-  (`pop.`/`cond.`/`drug.`) demote to naming convention, pinned by a lexicon data test —
-  `pop.*` → population, `cond.*` → condition, `drug.abx_a` → action_target, `q.age_years`
-  → population — so the frozen M1 normalize partition and the role-driven bridge agree
-  over the locked corpus, and a future concept namespace never silently falls through to
-  `condition`. Roles live in lexicon data and the CNL layer only: the committed ClinicalIR
-  schema's enums stay role-agnostic and byte-frozen — slot legality belongs to the bridge
-  and the acceptance closures, and a per-slot schema re-derivation would re-bless
-  committed §9-pinned schema bytes. The
-  grammar emitter derives slot-specific terminal alternations from the view — context
-  concept and negated-concept atoms enumerate context-role (population|condition)
-  surfaces, the action-target slot enumerates `action_target`-role surfaces,
-  exception-sentence concepts enumerate context-role surfaces — so wrong-slot vocabulary
-  is unparseable, not merely invalid; the escape stays admitted in every concept slot (it
-  names no lexicon row and carries no role).
-  Modality totality: the lexicon pair set stays the corpus register — no artificial rows for
-  the full §5 Direction × Strength domain; instead every IR-landing route guarantees
-  lexicon-backed pairs at acceptance (M1 derives pairs from lexicon rows by construction;
-  single_cnl's grammar admits only lexicon deontic tails; single_ir acceptance rejects every
-  CNL-inexpressible shape as a repairable schema violation naming the offense — one per
-  predicate class below — mirroring the off-lexicon id check). CNL expressibility is ONE
-  executable predicate, never a hand-maintained rejection list per consumer:
-  `check_cnl_expressible(clinical, lexicon (role + tail view), segments (segment_id →
-  (kind, region_ids) map — id uniqueness by construction; the basis-ownership classes
-  read the kind)) -> Result<(),
-  CnlExpressibilityError>`, home the bridge module (it shares the segment-closure
-  computation `from_ir`'s rule bracket takes its exception-owned remainder from and
-  `to_ir`'s binding region_ids consume whole), defined over grounded, lexicon-valid
-  ClinicalIR (vocabulary membership + grounding are the acceptance stages ahead of it);
-  its error taxonomy carries one variant per CNL-inexpressible class — a
-  `(direction, strength)` pair without a tail-bearing lexicon row, empty statement sets,
-  statements with empty population+condition, quantity intervals without exactly one
-  unsigned bound (signed / two-sided / boundless / same-side ge+gt or le+lt doubles —
-  only `var` is schema-required over four independent optional bound fields; §5 bundle
-  coherence catches boundless + doubled shapes only terminally at bundle time, the
-  predicate rejects all four repairably at acceptance), exception clauses that are not
-  exactly one positive concept atom (structural class — multi-atom, atomless,
-  negated-concept, or quantity-interval shapes), negative occurrences of
-  interval-carrying entries — context negated-concept atoms or the sole exception
-  concept of a structurally valid clause (disjoint from the structural class),
-  exception clauses with empty region_ids, statements citing no Recommendation segment
-  (R empty ⇔ the wholly-exception-owned empty rule bracket under the ownership laws,
-  closure − X == R; covers empty source_segment_ids), statements citing a segment of
-  non-normative kind (neither Recommendation nor Exception — the compile tail's
-  provenance walk would silently drop its clause-uncited regions), exception regions
-  Recommendation-owned (X ∩ R ≠ ∅ — a clause citing a region a cited Recommendation segment owns —
-  the tail would emit it at least twice), cited Exception segments not clause-covered (a region of
-  a cited Exception segment absent from every clause — the E ⊄ X direction, a region
-  the normal form would widen into a rule bracket the tail never reads Exception segments
-  into; the clause set scoped per statement — statements sharing an Exception segment
-  each cover it with their OWN clauses, pooled coverage passes only a document-global
-  checker), statements with an exception region outside
-  their segment closure (a clause citing a grounded region of an UNCITED segment —
-  membership, grounding, kind, R-nonemptiness, and both ownership directions all pass
-  (the region's segment is uncited, so neither sees it — containment stays non-redundant
-  under the ownership laws), yet from_ir would render
-  the region only on its exception sentence and the re-bridge would derive a wider
-  segment set — a provenance-unfaithful render; bridge-image IR contains by construction,
-  so the identity law never holds the shape and the predicate rejects it at
-  acceptance/from_ir; jointly with the R-empty class this enforces exception-owned as
-  a proper subset of the closure — the pair co-occurs on an exception union blanketing the
-  closure with uncited excess, R-empty preceding containment as the predicate's
-  single reported variant, the blanketing fixture citing Exception-kind segments only — a
-  cited Recommendation segment would keep R nonempty yet still report containment while
-  the uncited excess remains (containment precedes the ownership pair);
-  Recommendation-owned surfaces only once the blanket is trimmed to the closure; the
-  pinned first-failing-check order over the topology classes runs
-  closure-functionality, non-normative kind, R-empty, containment, Recommendation-owned,
-  clause-uncovered — containment ahead of the two ownership-mismatch directions so
-  out-of-closure excess names containment, and the ownership pair is checked over the
-  in-closure residue, disjoint from containment by construction), statements whose cited segments carry
-  no region or share a region with another segment (closure-nonfunctional — breaks segment
-  recovery from region-level basis; the empty-region segment is synthetic-only — the
-  segmenter mints only from grounded spans and bundle validation rejects empty segment
-  support — while the shared region is bundle-valid, no cross-segment disjointness check;
-  the predicate owns both fail-closed over its raw view), and wrong-slot vocabulary — population atoms whose concept
-  or quantity role is not `population`, condition atoms not `condition`-role, action
-  targets not `action_target`-role, exception concepts outside the context roles
-  (lexicon-MEMBER ids in slots no role admits pass the membership check yet sit outside
-  the bridge image — accepted IR stays partition-normal), the v1 register.
-  `single_ir_accept` and `from_ir` both call the one predicate — the acceptance and
-  renderer domains sit one function apart — definitional drift structurally excluded,
-  behavioral agreement law-tested below — so audit rendering is defined over guarded-route
-  accepted IR + locked-corpus M1 (off-corpus M1: the §7.2 typed omission)
-  and a missing-row render error is a fail-closed instrument path, barred from accepted
-  artifacts by lexicon integrity (pair coverage, render-surface totality), the zero-finding
-  view gate (the §10 typed role view refuses construction on any lint finding — every CNL
-  module consumes the view, so lint-owned role-scoped surfaces gate like hard errors), and
-  the predicate. Lexicon
-  integrity checks: reserved-token collisions (a surface containing a connective/punctuation
-  terminal or a backtick — §7.2 validation renders rule text inside Markdown code spans, so
-  every surface stays code-span-inert; escape payloads never reach report surfaces — the
-  escape is terminal at acceptance and accepted/report-rendered rule text is registered
-  vocabulary only; pre-accept escapes render + round-trip off the report surface),
-  missing surface fields (role-scoped: a context-role concept needs its
-  adnominal / negated-adnominal / EN-gloss forms, an `action_target`-role concept its
-  target citation forms — `surfaces[0]`, already row-required, plus `gloss_en`),
-  render-surface totality (every action row carries the nonempty `noun_ja`/`noun_en` pair,
-  every certainty row a nonempty `surface_en`: a membership-valid action kind or certainty
-  value never reaches `from_ir` without its bilingual render surface), per-language
-  duplicate-literal rejection by semantic token over the lexer-visible surfaces (concept
-  adnominal/negated forms and `action_target`-role citation forms, action nouns, tails,
-  certainty phrases, quantity surfaces/units): a literal is a hard error exactly when its
-  occurrences denote two distinct tokens — Concept(row) (one row's citation and adnominal
-  forms collapse; which slot admits which form is grammar/parser business),
-  NegatedConcept(row), ActionNoun(row), Tail(direction, strength), Certainty(value),
-  QuantityVar(var), Unit(literal) (deliberately var-free: the per-var interval production
-  pairs each var's surface with its own row's unit terminal, so rows sharing a unit
-  literal stay unambiguous), plus Fixed(terminal) and Digit(char) as their own categories
-  (a lexicon literal equal to a fixed terminal or a digit token is a cross-category hard
-  error — equality escapes the proper-prefix rule; escape payloads and basis-bracket id
-  content stay delimiter-scoped at the lexer, outside the collision domain, though the
-  grammar spells them as open/char-alternation productions) — same-token occurrences deduplicate into one token-table
-  entry (a multi-role concept's surface parses in every slot its roles admit; same-pair
-  tail synonyms and shared units collapse; cross-row, cross-value, and cross-category
-  duplicates reject), per-language proper-prefix overlaps
-  rejected across the finite longest-match token inventory — that deduplicated token table
-  plus the fixed grammar terminals and digit tokens, same- and cross-category; escape payload =
-  delimiter-scanned free content, outside the inventory (a prefix-free inventory keeps
-  maximal-munch tokenization agreeing with the grammar's intended segmentation — the failure
-  mode is a longer token stolen from another category), `implies_action`
-  resolving to an action entry, `tail_ja`/`tail_en` present together or absent together (a
-  row is tail-bearing iff both — per-language tail-bearing would let canonical-row selection
-  diverge between languages or leave one language's pair coverage partial), every
-  `(direction, strength)` pair present carrying ≥1
-  tail-bearing row, certainty-table render totality — every §5 `Certainty` value carries a
-  row, first row per value = canonical render row (a closed 4-value enum; a gap would leave
-  `from_ir`'s certainty parenthetical surface-less on in-domain IR; the committed table is
-  already total), concept intervals CNL-representable (v1: one unsigned bound), slot-role
-  integrity — every concept row a nonempty deduped set of known roles with
-  `population`/`condition` mutually exclusive, every quantity row exactly one context role
-  agreeing with the context role of each interval-carrying concept using its var — and
-  quantity-table integrity — unique `var_id`, the quantity var set EQUAL to the set of
-  interval variables concepts use (exactly one row per used var, zero orphan rows: an
-  orphan quantity row would emit grammar-parseable interval vocabulary outside the
-  committed schema's concept-derived interval-var enum and `off_lexicon_ids`' universe —
-  parseable yet unacceptable by construction), nonempty normalized surfaces and units in
-  both languages.
-- Unregistered-concept escape (off-lexicon posture): wherever the grammar demands a lexicon
-  concept surface (context atom, exception concept, action target; action kinds stay a
-  small closed class — extending them is lexicon review, not emission), one escape
-  production is admitted — JA
-  `未登録概念「<surface>」`, EN `unregistered concept "<surface>"`, free quoted surface — so
-  constrained decoding is never forced to alias an off-lexicon source concept to the nearest
-  registered terminal (silent substitution — the exact failure class the fail-closed design
-  exists to prevent, and the one a fully closed grammar would otherwise manufacture).
-  Quoted-surface contract (v1, one payload shared by both languages): nonempty, at most 80
-  Unicode scalar values, single line — control characters and the quote delimiters `「` `」`
-  `"` are excluded, and there is no escape mechanism (out-of-contract text is a plain parse
-  error, never an alias) — and must arrive already a §4.2 JA-semantic-policy fixpoint: a
-  non-fixpoint payload is a payload-contract parse error inside the declared open-escape
-  class (parse never rewrites payload bytes), so canonical fixpoint
-  and cross-language agreement hold; the parser enforces the contract while the grammar keeps
-  one open production per language (notation decided at the grammar emitter). The
-  escape parses and round-trips like any atom and always fails accept with
-  `cnl_unregistered_concept`, terminal for the run: repair prompts never mint or steer concept
-  identity — resolving a gap is a lexicon-review decision, not a retry. Occurrence discipline:
-  accept's escape scan walks the whole document in the bridge's bind-mint traversal order
-  (rule-major; within a rule context disjunct-major then conjunct order, action target,
-  exception sentences in order) and reports ALL occurrences — one terminal reject per attempt,
-  its payload the nonempty occurrence vector (each occurrence {surface, rule index, slot
-  (context | action_target | exception), path (disjunct + conjunct | exception index)}) plus
-  the emission language; a singular payload would collapse multi-escape documents to
-  first-found. That vector is the lexicon-entry proposal SEED, deliberately not the full §11
-  proposal object: the decomposition pass derives {language, position, provenance} from seed +
-  run-ledger row (route, document, attempt, cassette key) and span evidence from cited
-  segments at triage — the seed itself claims no spans, escape surfaces being model-chosen,
-  not source-anchored. Over the locked M1
-  inputs any occurrence is instrument signal (vocabulary covered by construction); from M4 the
-  §11 accretion loop consumes it — propose → lint → review → accepted entries join the
-  lexicon, grammar re-emitted under the drift guard — so vocabulary growth stays amortized,
-  ledgered data accretion inside the single probabilistic boundary, never a precomputed
-  corpus-wide lexicon.
-- Canonical text: render emits exactly one text per AST per language (stored ContextExpr order
-  preserved — §4.3 ordered arrays; canonicalization never reorders semantics). Document bytes
-  are pinned past rule cardinality: each rule renders as one line terminated by exactly one
-  LF — the uniform rule terminator, the last rule included, no other inter-rule bytes — so
-  the grammars carry document = (rule <nl>)+ (the smt_query.grammar literal-LF `<nl>`
-  convention; the bnf dialect lacks postfix repetition, so the committed form is the
-  right-recursive lowering — smt_query.grammar's <assertions> pattern), document text = the
-  stored per-rule texts each plus one LF, and the per-language text hashes and the audit
-  `.txt` views cover exactly those assembled bytes — an executable invariant: validate
-  recomputes the hashes from the stored texts under the frame, and the audit writer
-  re-hashes its read-back against them. Line breaks (LF and CR both) cannot occur inside a
-  rule: lexicon surfaces are whitespace-folded (§4.2), fixed terminals carry none, and the
-  escape payload contract bars control characters. Parse accepts declared bounded variation
-  inside a rule, and this clause is its single enumeration: lexicon synonym alternations —
-  modality tails and certainty surfaces, the first row per (direction, strength) pair / per
-  value canonical (the committed certainty table is 1:1 today; the contract admits synonym
-  rows) — and basis-ref presentation, order AND duplicates, collapsing to the
-  sorted-deduplicated set (whitespace variation: none; the
-  parser's language equals the grammar's, keeping differential parser-vs-oracle agreement
-  total, and stray whitespace is a repairable parse error); the document frame is exact — a
-  missing terminal LF is a repairable parse error; accept re-renders, so every accepted
-  `CnlDocument` is canonical bytes, hash-locked beside its AST content hash.
-- Determinism laws (the M3 contract, property-tested):
-
-```text
-Single parse: every parser-accepted string yields exactly one AST; the runtime grammar
-over-approximates the parser in exactly two classes — the open escape production (payload
-contract parser-enforced) and unbounded leading-zero-free numerals (value bound 0..=i64::MAX
-parser-enforced; zero-led digit runs sit outside BOTH languages — never a third class) —
-grammar-emitted, parser-rejected strings are repairable parse errors, and these laws quantify
-over the parser-accepted language.
-Round trip: parse(render(ast)) == ast for every valid AST, both languages — equality over
-the semantic AST (document-frame members — per-rule texts, text hashes — are derived
-canonical bytes, recomputed identically on both sides). AST validity is
-two-layered, structural first (lexicon-free, the grammar-image shape up to parse
-normalization): nonempty rules and
-basis brackets — every bracket sorted + deduplicated (set semantics: parse normalizes the
-admitted basis-ref presentation variation — order and duplicates — from_ir emits
-sorted-deduplicated) — nonempty context DNF — the outer
-disjunction AND every conjunction (the
-grammar writes neither empty) — interval atoms carrying exactly one unsigned bound
-(one of ge|gt|le|lt with a nonnegative value: the v1 register, deliberately narrower than
-§5 interval coherence, which admits the signed and two-sided shapes the grammar has no
-surface for) — and escape payloads in contract (nonempty ≤80 scalars, single line,
-control/quote-delimiter chars excluded, SemanticJa-normal); then lexicon-scoped: modality
-pairs tail-backed, concept/action refs resolved, interval vars resolving to quantity rows,
-slot roles admitting every atom and target position, negated/exception concept refs
-interval-free — the negative-occurrence bar, the sole lexicon-scoped clause the
-lexicon-projected token tables leave open; acceptance enforces it post-parse. A
-structurally invalid AST
-has no rendering, so render asserts the structural SHAPE sublayer fail-closed (frame
-members are render's own output, validated on stored documents).
-Canonical fixpoint: render(parse(t)) == t exactly when t is canonical.
-Cross-language agreement: parse_en(render_en(ast)) == parse_ja(render_ja(ast)) == ast,
-over the same valid-AST domain.
-Bridge round trip (over ACCEPTED escape-free ASTs — single_cnl_accept's closure supplies the
-bridge preconditions: cited regions anchored, closure-functional segments, normative-kind
-cited segments with a nonempty Recommendation closure, exception brackets owning exactly
-the Exception-kind closure — exception containment by construction, source segments derive
-from the bracket union; to_ir is Err on any escape occurrence — acceptance
-is already terminal there): from_ir(to_ir(ast)) == the bridge normal form of ast — disjunct
-split, per-statement atom canonicalization (population before condition, §4.3 set order,
-byte-identical duplicates collapsed; the partition + set emission are lossy exactly there),
-basis refs segment-closed and exception-owned-split (a labeled cover, not a partition —
-clauses may share a region; from_ir renders each clause's own
-region_ids verbatim on its exception sentence and the segment-closed remainder — every cited
-segment's full region set minus the exception-owned regions — on the rule bracket; from_ir's
-sole Err source is `check_cnl_expressible` at entry — the shared taxonomy: empty clause
-region sets, no cited Recommendation segment (the empty rule bracket), non-normative cited
-segment kinds, exception-ownership mismatches (a Recommendation-owned clause region, a
-clause-uncovered Exception segment), an exception region outside the statement closure (the
-re-bridge would derive wider), atom / action-target / interval placement contradicting
-the §10 role view (wrong-slot IR is
-CNL-inexpressible, any rendering re-parses into a different partition), and the remaining
-classes — past a passing check the projection constructs no Err, a residual failure a
-fail-closed instrument bug (house panic style) — the one predicate
-serves from_ir and single_ir_accept, single_cnl_accept's grounding rejecting each
-CNL-reachable mirror, containment CNL-unreachable by construction) — identity
-exactly on bridge-normal documents; to_ir(from_ir(ir)) == ir exactly for bridge-image IR
-(the image of accepted ASTs; exact including binding region_ids — closure-derived, invariant
-under bracket normalization).
-Render totality: acceptance admits exactly the CNL-expressible ClinicalIR domain — the domain
-`check_cnl_expressible` accepts (tail-backed
-modality pairs, ≥1 statement each with a nonempty context, single-unsigned-bound quantity
-intervals, single-concept interval-free exception clauses each carrying nonempty
-region_ids inside the statement's segment closure, negated atoms over interval-free
-entries, slot-role-conformant atom and target placement, cited segments region-bearing,
-unshared, and normative-kind (Recommendation | Exception), ≥1 cited Recommendation segment
-(the nonempty rule bracket under the exception-owned split), exception clauses owning
-exactly the Exception-kind closure — v1) — so render is defined
-for every accepted ClinicalIR on every guarded route:
-single_cnl by grammar + acceptance, single_ir by the accept-total closure, M1 over its locked
-corpus by derivation + lexicon integrity + the corpus render audit (derivation mints positive
-concept atoms only and each locked exception segment matches exactly one concept; a document
-deriving a wider clause sits outside the locked M1 contract — arbitrary M1-route inputs carry
-no totality claim — and surfaces as from_ir's typed Err: the report omits that
-(pipeline, document) CNL entry under cnl_inexpressible_ir (§7.4), never an assembly failure).
-Expressibility agreement (render totality, executable): over canonical (ClinicalIr, lexicon,
-regions, segments) tuples passing vocabulary membership and grounding — membership ONLY,
-role/tail legality stays inside the predicate, keeping every variant reachable in-domain —
-single_ir acceptance over the value's canonical bytes succeeds ⇔ from_ir succeeds — both
-call the one predicate, from_ir Err-free past it — property-tested over a bounded IR
-enumeration: bridge-image positives (to_ir over enumerated accepted ASTs) + the locked
-corpus's derived IR + per-class mutations landing in every `CnlExpressibilityError` variant
-while staying in-domain; the Ok side must also render in both languages.
-Audit honesty: audit views render only from accepted artifacts, never from raw model output.
-```
-
-- `route.single_cnl` — the flagship route, mirroring `route.single_ir`'s stage shape: scaffold
-  assemble → model fill (CNL text under the JA grammar constraint) → accept = parse + lexicon
-  membership + grounding → bridge (AST → ClinicalIR + derived exact-status
-  TerminologyBindings) → the unchanged M1 compile/verify tail. Repair loop per §9 mechanics:
-  `cnl_parse_error` repairable under derived seeds, `ai_hallucinated_source` and
-  `cnl_unregistered_concept` terminal, `repair_limit_exceeded` on exhaustion. `exp.m3_cnl` binds `[direct_smt (baseline), single_ir,
-  single_cnl]` over the locked M1 inputs — the §9 measurement record extended by one route,
-  scored by the same reference.
-- Audit artifacts, route-independent: every CNL-expressible accepted ClinicalIR — the M1
-  deterministic pipeline's included — renders to `audit/<pipeline-id>/<doc-id>.cnl.{ja,en}.txt` (keyed by pipeline AND
-  document: a multi-route experiment accepts the same document several times, so views stay
-  separately auditable; non-IR routes land none; an accepted IR the predicate rejects at
-  `from_ir` — reachable only on a guard-less route, the M1 route off its locked corpus —
-  omits exactly that (pipeline, document) entry, audit `.txt` and report CNL members alike,
-  under one typed `cnl_inexpressible_ir` diagnostic (§7.4) — report assembly never fails on
-  it, and a finding rule id without an owner entry already follows §7.2's omit-the-quote
-  fallback); `report.json` carries the CNL text
-  hashes and per-rule CNL strings under the same (pipeline, document) key; report_{en,ja}.md
-  quote each finding's and documented no-conflict result's rules as CNL beside the quoted
-  source spans from the findings-owner pipeline's entry alone (§7.2
-  `findings_owner_pipeline_id`; positional rule ids never align routes — every route's
-  views remain in the audit surfaces). The clinician-facing rule restatements are
-  owner-route CNL from M3 on wherever the owner's entry carries the rule; an owner-entry
-  miss omits the quote (§7.2).
-- Emission-target posture (honest framing): the CNL is the committed audit surface by design;
-  WHICH surface the weak model emits most reliably is the §11 measured question. Recorded
-  hypothesis: a Japanese-capable weak model emits grammar-constrained Japanese CNL more
-  reliably than JSON — controlled prose sits near its pretraining distribution and the grammar
-  only keeps it on the rails (Shin et al. 2021; the KGQA CNL result; the cnl-landscape.md
-  evidence table). The archived PoC pins the two risks this bet must clear
-  (docs/poc-archive.md): grammar-masked ASCII record DSLs saturated validity yet stably
-  emitted the wrong direction token — every conflict pair missed as same-direction — and
-  verbose forms degenerately looped at grammar repetition points until the token budget
-  truncated them. ClinicalCNL answers the first by carrying direction as the source register's
-  own deontic phrases (lexicon modality surfaces, not abstract tokens) — the §11 ablation
-  measures whether that works — and the second is watched directly: the record-time constraint
-  audit probes DNF/exception repetition points for degeneration, and
-  `surface_tokens_per_accepted_rule` plus the §9 truncation diagnostic expose it in recorded
-  runs. If a §11 ablation (compact record DSL) wins emission instead, the CNL stays
-  the audit surface via render-from-accepted-IR and the probabilistic step retargets — the
-  architecture is invariant to that outcome.
-- §7.4 M3 codes, each pinned to its one §4.4 Outcome (the §7.4 map for these four):
-  `cnl_parse_error` (repairable, outcome `invalid`; reason in payload, empty refs — mirrors
-  `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code,
-  outcome `invalid`:
-  an accepted AST whose canonical render fails to re-parse identically — grammar/lexicon
-  drift, never a model failure), `cnl_unregistered_concept` (terminal, outcome `unsupported` —
-  grammar-valid honest signal naming vocabulary outside implemented semantics, mirroring
-  `cnl_inexpressible_ir` and deliberately unlike single_ir's off-lexicon `invalid`, whose ids
-  violate that route's declared vocabulary enum while the escape violates nothing; the
-  escape-production
-  reject — payload = the occurrence-vector proposal seed above),
-  `cnl_inexpressible_ir` (report-stage: an accepted ClinicalIR the expressibility predicate
-  rejects at `from_ir` on a route without the acceptance guard — payload names the predicate
-  class and the (pipeline, document) key, refs empty; record outcome `unsupported` — §4.4
-  schema-valid construction outside implemented semantics, the stage-event outcome then
-  derived per §4.4's severity order; lands in the report diagnostics summary + report-stage
-  event, excluded from RouteTaxonomy (fill/accept failure classes only); the audit-view
-  omission fallback above — an honest expressibility boundary, never a model failure, never
-  an instrument bug).
-- §7.3 additions: the surface-quality family — `round_trip_identity_rate`,
-  `surface_tokens_per_accepted_rule` — beside the §9 route-quality rows; and the
-  translation-faithfulness family — `ir_faithfulness_rate`: the share of a route's accepted
-  documents whose ClinicalIR equals the deterministic M1 derivation recomputed over the run's
-  own landed extract/segment artifacts, under the faithfulness projection — binding
-  `region_ids` excluded, all else exact, ids included: CNL carries per-sentence basis refs
-  (rule + exception brackets — exception provenance therefore reconstructs exactly), never
-  mention-level regions — the bridge mints segment-closure binding regions, M1 mention-level
-  ones — so binding region provenance is the §5 field divergent by construction, the sole
-  exclusion; the remaining binding fields can also diverge off the locked corpus
-  (canonical-label CNL mints one Exact binding per distinct concept, M1 one per (segment,
-  candidate set) with surface-derived status) — measured misses, never
-  asserted (single_ir compares its accepted fill,
-  single_cnl its bridged IR; direct_smt lands no IR → not_applicable). Exact-reproduction rate,
-  strict by design (§11 may grade partial faithfulness); rationale: verdict-level conflict
-  metrics saturate while faithfulness still separates routes, and round-trip identity alone
-  certifies the SURFACE, never the translation (docs/poc-archive.md — grammar-masked routes
-  held 100% round-trip-stable emission over 50% wrong verdicts). The golden-cassette
-  reproduce-M1 path pins this rate at 1.0.
-- Validation program (sophistication over example count): depth-bounded AST enumeration →
-  render → parse == identity with a single-parse assertion (the Codeco method);
-  malformed-input battery (bare off-lexicon surface = parse error vs escaped = accept-time
-  reject, wrong-slot registered surfaces, dangling refs, duplicate slots, bad bounds,
-  connective misuse); an early runtime feasibility probe — the constraint mechanism compiles
-  the emitted JA grammar and demonstrates one bounded constrained emission — immediately after
-  the grammar emitter, before parser/bridge investment (multibyte whole-surface terminals and
-  the open escape production are the risk it retires); tokenizer audit of every grammar
-  terminal against the runtime constraint mechanism (§9 truncation lesson); canonical-render
-  byte pins for the three M1 documents;
-  reproduce-M1 gate — golden CNL cassettes for the M1 sources parse, bridge, and reproduce the
-  M1 verdicts through the locked tail; lexicon lint gates.
-
-Worked example (illustrative; the committed grammar pins the bytes).
-`test_source.m1_guideline_a` accepted content renders canonically as:
-
-```text
-成人かつ敗血症のある患者には、抗菌薬Aの投与を強く推奨する。[根拠 r.2]ただし、重度腎機能障害のある患者を除く。[根拠 r.3]
-```
-
-```text
-for patients with adult status and with sepsis, administration of antibiotic-a is strongly recommended. [basis r.2] exception: patients with severe renal impairment. [basis r.3]
-```
-
-Both parse to the §8.6 rule content — atoms `pop.adult` (lexicon interval semantics
-`age >= 18`) and `cond.sepsis`, action `act.administer`/`drug.abx_a`, direction `for`, strength
-`strong`, certainty absent (parenthetical omitted), one labeled exception
-(`cond.renal_severe`), rule basis `r.2` and exception basis `r.3` (the clause's own
-region_ids; statement source segments derive from their union) — and the bridge feeds the unchanged §6/§8
-compile → verify chain to the same verdicts. `test_source.m1_guideline_b` renders the
-contraindication tail: 「…抗菌薬Aの投与は禁忌である。」
-
-Acceptance themes (finalized at M3 planning): `exp.m3_cnl` executes all three routes over the
-locked M1 inputs with raw rows before deltas; the determinism laws hold as property tests;
-every accepted document round-trips (rate 1.0 on accepted docs, emitted as a metric);
-faithfulness rows emit beside the surface rows (measured, never gated — the weak baseline may
-honestly read low or not_applicable; the golden path reads 1.0); audit views render
-deterministically for every IR-bearing acceptance — single_ir + single_cnl in the recorded
-run, M1's via its re-blessed golden run, direct_smt lands no IR hence none — and
-finding/no-conflict Markdown quotes owner-route CNL only; the golden-cassette reproduce-M1 gate passes; recorded model I/O
-replays byte-stably; grammar/lexicon exports carry drift guards; §0 vocabulary holds.
-
-## §11 M4 — Route field: variation and comparison (requirements; elaborate at M3 acceptance)
-
-Intent: widen experiment 1 across the full route axis — existing IR forms, the §10 CNL, and
-further invented forms — and take experiment 2's measurements with the full evaluator; the
-layered-versus-direct architecture ablation quantifies reuse and convergence on a corpus
-designed to exercise them. The §10 emission-surface question settles here: prose CNL versus
-compact record DSL versus JSON-IR as the weak model's target, over identical locked inputs. A
-documented no-conflict result — no invented form beats the existing-IR field — stays a
-first-class outcome.
-
-Committed direction:
-
-- Routes extending §9/§10 (concrete existing-IR schemas picked at elaboration from `docs/`,
-  registered as §8.4 candidate entries):
-
-| Route | Shape |
+| Axis | Points (landed / M3 / registered §11.3) |
 | --- | --- |
-| `route.stacked_ir` | Model fills a stack of existing IR forms (e.g. PICO framework → rule rows); deterministic compile. |
-| `route.ir_hop_chain` | Model translates across a chain of adjacent, deliberately similar IR dialects — several small constrained hops, each a minimal semantic delta — testing whether short hops tame model non-determinism better than one long jump. |
-| `route.ckc_layered` | Model fills CKC layers stage by stage (segment → statement → rule), each grammar-constrained; the §6 compiler takes over. |
-| `route.ckc_rec_dsl` | Model emits a compact line-oriented record DSL (id-forward, minimal terminal set; `docs/cnl-design-codex.md` carries the sketch); deterministic parse → IR. The CNL's token-compactness ablation. |
-| `route.slot_cnl` | Labeled-slot CNL variant (BRIDGE-Wiz/FRET-style explicit slot lines) — the readability-versus-emission midpoint between `single_cnl` and `ckc_rec_dsl`. |
-| `route.reason_ir` | Unconstrained free-text reasoning stage → constrained single-IR commit; only the commit is accepted/bridged. The constraint-placement axis: reasoning room BEFORE the grammar, versus more constrained hops. Archived-PoC prior: the sole form to beat single-IR faithfulness, on indirect surfaces (0.70→0.90 exact-IR match, verdicts saturated at 1.0 for both), at a sampling-variance cost on the free stage. |
+| Emission surface | SMT text (landed) / JSON-IR (landed) / CNL prose (M3) / record DSL, slotted CNL (registered) |
+| Constraint mechanism | BNF grammar mask (landed) / JSON-Schema (landed) / crossed surface×mechanism controls (registered) |
+| Hop count + composition | single constrained hop (landed, M3) / stacked, hop-chain, free-reason + constrained-commit (registered) |
+| Normalization strategy | model-normalized emission (all model routes) / deterministic lexicon normalization (M1 control) |
+| Reasoning backend | Z3 SMT (landed) / Prolog-family LP lane, cvc5, Lean (registered; §6, §13.2) |
 
-Archived-PoC priors for this field (docs/poc-archive.md; throwaway harness, so priors, not
-locked measurements): constrained-hop stacking hurt weak-model verdict accuracy (every
-multi-stage failure at the final typing stage); the grammar mask closed the validity→acceptance
-gap that JSON-Schema constraint cannot (var/op/value coupling); compact beat verbose under
-token budgets (verbose forms loop at repetition points and truncate); a JSON-IR landing beat
-the invented-DSL landing on the final typing hop; and the invented-DSL conflict miss was a
-stable direction-polarity collapse — assess every candidate against BOTH §7.3 families (route
-quality AND conflict quality) before any beats/does-not-beat claim, since grammar-driven
-stability without faithfulness is the stability of a wrong answer.
+Standing evidence: M2 locked measurement — the §9 minimal pair over locked M1 inputs
+(`accept/m2`). Archived-PoC priors (`docs/poc-archive.md`; throwaway harness, so priors, not
+locked measurements): one constrained hop with source + full vocabulary in view beat every
+constrained-hop stack; a grammar mask closed the validity→acceptance gap JSON-Schema cannot
+(cross-field coupling); compact surfaces beat verbose under token budgets (verbose forms loop
+at repetition points and truncate); invented ASCII record DSLs stably emitted the WRONG deontic
+polarity while staying well-formed; free-reason + constrained-commit was the sole form to beat
+single-IR faithfulness (0.70→0.90, verdicts saturated at 1.0 for both) at a sampling-variance
+cost. CNL research base (git-resident `docs/cnl-*.md`): no surveyed system offers
+deterministic CNL parse ⇄ verbalize ⇄ executable formal target; no deterministic
+Japanese-parsing CNL exists; no published system wires a CNL grammar into LLM constrained
+decoding; constrained decoding into canonical CNL then deterministic mapping to logic beats
+decoding formal syntax directly (Shin et al. 2021, in `docs/cnl-landscape.md`).
 
-- Every route registers its schemas/grammars and a deterministic bridge into the §6 profile,
-  keeping conflict-task scoring identical across routes; all §9–§11 routes run `exp.m4_routes`
-  under one locked-measurement identity, and §7.3 route-quality, baseline-delta, conflict-task
-  accuracy, k-sample convergence, and §10 surface-quality metrics emit as raw rows before
-  ranking. Invented candidates run singular and layered — stacked and hop-chain compositions
-  over invented and existing dialects — with design dimensions recorded per candidate: token
-  compactness, grammar constraint strength, semantic distance per hop, constraint placement
-  (free-reasoning versus constrained stages), layer composability
-  (the §12 search-space seed coordinates). Baseline deltas measure against both
-  `route.direct_smt` and the best existing-IR route.
-- `pipe.direct_rule_to_smt` (`exp.m4_compare`, the deterministic architecture-ablation
-  baseline): extract → segment → direct phrase-normalization → FormalIR → SMT, bypassing shared
-  ClinicalIR/NormIR component reuse; unused processing stages emit pass-through artifacts (outcome `ok`,
-  payload marker `not_applicable`) under the same artifact wrapper rules.
-- Test source growth: 4–6 additional synthetic documents sharing populations/actions/conditions
-  across documents (reuse pressure), plus deterministic metamorphic variants of M1 documents
-  (punctuation, kana/kanji, section order) committed as test-source variants with declared
-  provenance, plus indirect-rendering variants — semantic indirection with unchanged reference
-  semantics: registered-concept synonyms, oblique deontic phrasing, convention terms whose
-  numeric semantics live in the lexicon, negated phrasing — the axis that dents faithfulness
-  while surface-metamorphic variants leave verdicts intact (docs/poc-archive.md), plus
-  threshold-conflict and factual-conflict cases for the M4 conflict kinds.
-- Component store: run-scoped index of reusable components keyed by normalized structural hash;
-  layered pipeline records hits/misses; `component_reuse_graph.json` and
-  `compactness_front.json` join the trace exports — the front doubles as the
-  mapping-minimization view (experiment 2's optimization objective, measured
-  deterministically here).
-- Path visualizations per §7.1 (per-finding chain; cross-document component convergence).
-- Metrics per §7.3 over both pipelines and every route; the per-metric layered-minus-direct
-  deltas are the staged pipeline's §7.3 baseline-delta measurement; `candidate_diff.json` compares segment,
-  binding, rule, assertion, verdict, and metric levels; `ranking.csv` + `score_breakdown.json`
-  with raw rows.
-- Locked-measurement record: the run manifest freezes the M4 evaluator identity — test source,
-  reference, lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
-  semantics in M5).
-- M4 conflict kinds (§6 table) implemented: `numeric_threshold_empty_intersection`,
+Unresolved — what M3 can change: whether grammar-constrained CNL prose matches or beats
+JSON-IR on acceptance and faithfulness while adding an audit surface a clinician can read.
+That evidence justifies, redirects, or retires the CNL product bet (§11).
+
+### §10.4 ClinicalCNL v1 slice (the M3 candidate)
+
+One content layer, two concrete syntaxes is the design idea: ClinicalIR serializes as
+canonical JSON (§4.3) for machines and as ClinicalCNL for clinicians; parse and render are
+mutual inverses over a CNL AST; a deterministic bridge maps the AST into ClinicalIR. The v1
+slice is the smallest version able to earn comparison evidence: Japanese only, closed lexicon
+(no escape production — bare off-lexicon text is a repairable parse error), parse → bridge →
+ClinicalIR only (no from-IR rendering). EN mirror, escape, and cross-route audit rendering are
+§11.3 promotion scope. Grammar-constrained emission and canonical rendering both land inside
+the grammar language, so open-Japanese parsing (zero anaphora, attachment, scope) is designed
+out rather than solved. Named to mirror ClinicalIR; ids: grammar file
+`schemas/clinical_cnl_ja.grammar`, registry schema id `schema.clinical_cnl`,
+`route.single_cnl`.
+
+Sentence model: one rule = one sentence group — a recommendation sentence with its basis
+bracket, plus zero or more exception sentences, each with its own basis bracket (per-sentence
+provenance: the bridge reads each exception clause's region_ids off its own bracket; a single
+rule-global bracket would leave multi-exception provenance unreconstructible). Fixed clause
+order, closed connective set, no pronouns, no anaphora, no ellipsis; multiword concepts are
+single lexicon terminals, never parsed compounds; fail-closed throughout (the anti-ACE
+lesson). Slots, JA canonical shapes:
+
+| Slot | JA canonical shape | AST target |
+| --- | --- | --- |
+| context | `<dnf>患者には、` | population/condition DNF |
+| action | `<target>の<action-noun>` (e.g. `抗菌薬Aの投与`) | Action kind + target |
+| deontic tail | `を強く推奨する` / `は禁忌である` … (lexicon `tail_ja`) | (direction, strength) |
+| certainty | `(<certainty-surface>)`, optional | certainty |
+| exception | `ただし、<concept>患者を除く。[根拠 <id> …]` per entry | one single-concept ExceptionClause per entry per split statement |
+| basis | `[根拠 <id> …]` after each sentence, ids sorted per bracket, ≥1 ref | rule/exception source regions |
+
+- DNF prose: conjuncts join with `かつ`; disjunct groups join with `、または`; `かつ` binds
+  tighter by decree; flat two-level DNF only — each disjunct maps to one ClinicalStatement.
+  Atoms: concept (lexicon adnominal surface), negated concept (lexicon negated-adnominal
+  surface), quantity interval (`<var-surface>が<n><unit><bound>`). Exception register stays
+  single positive interval-free concept per sentence (§5 NormativeRule compiles exceptions
+  per positive concept atom; wider clause shapes sit outside the compile contract).
+  Negative-occurrence bar: interval-carrying concepts are barred from negated positions and
+  exception slots (their complement is not one interval; the repair names the
+  complement-interval rewrite).
+- Composition decree (concrete syntax; committed grammar pins the bytes): plain concatenation
+  of whole-surface terminals — fluency is a lexicon-authoring concern, never a grammar
+  property. Adnominal/negated surfaces compose bare in every position; interval atoms take
+  the fixed linking terminal `の` exactly patient-adjacent (`年齢が18歳未満の患者には、`)
+  and compose bare mid-chain — the grammar carries mid versus patient-adjacent atom
+  alternations, so a stray or missing `の` is a parse error. Interval bound markers after
+  the unit: `以上`/`以下`/`未満`/`超` ↔ ge/le/lt/gt. Numerals: ASCII digits,
+  leading-zero-free canonical decimals (`0` alone admits a leading zero), parser-bounded
+  0..=i64::MAX — the grammar's SOLE declared over-approximation class. Punctuation `、` `。`
+  plus ASCII brackets/parens; JA text is separator-free outside bracket internals (bracket
+  ids space-separated, sorted); whitespace variation NONE — parser language == grammar
+  language; stray whitespace is a repairable parse error. Document frame: canonical document
+  bytes = one LF-terminated line per rule, LF the uniform terminator, last rule included, no
+  other inter-rule bytes; stored per-rule texts are line-break-free.
+- Lexicon (JA slice; `corpus/lexicon/ja_core.yaml` extends, all new fields optional at load
+  so committed bytes stay green): concepts gain `adnominal_ja`, `negated_ja` (prenominal
+  negation, prefix-clean against its positive: 非-prefix nouns / verb flip / copula flip;
+  trailing `の` barred), and typed slot `roles` — nonempty set over
+  `population|condition|action_target`, population/condition mutually exclusive per row,
+  action_target free to combine; actions gain `noun_ja`; modality rows gain optional
+  `tail_ja` with ≥1 tail-bearing row per present (direction,strength) pair, first
+  tail-bearing row canonical; certainty renders its committed `surfaces[0]`; a NEW quantity
+  table maps interval vars — `{var_id, role (population|condition), surface_ja, unit_ja}`,
+  var set == the interval vars concepts use, exactly one row per var. ONE typed role view is
+  the single source every CNL module reads (grammar slot alternations, AST validation,
+  parser slot legality, bridge partition); integrity + lint gate view construction:
+  hard-errors (refs resolve, role sets legal, quantity/var agreement, render totality,
+  per-language duplicate-literal rejection by semantic token) plus lint (reserved-terminal
+  collisions, trailing-`の`, pairwise proper-prefix-freedom across ALL lexer-visible tokens
+  — fixed terminals and digits included — the maximal-munch determinism guard). Synonym
+  `surfaces[1..]` stay source-match-only, never CNL terminals. `normalize.rs`'s frozen M1
+  prefix partition stays untouched; a test pins committed-corpus role agreement.
+- Grammar: emitted from the validated lexicon view by `clinical_cnl_grammar(lexicon)` —
+  whole-surface string literals in slot-specific alternations (wrong-slot vocabulary is
+  unparseable), per-quantity-row interval productions pairing each var's surface with its
+  own unit terminal, basis-id production == Id's exact `[a-z][a-z0-9_.:-]*` grammar (the
+  `smt_query.grammar` identifier shape), document production = the right-recursive
+  `(rule <nl>)+` lowering. Committed + hash-pinned + drift-guarded (`schema.rs` pattern);
+  registry entry `schema.clinical_cnl` is the route's decoding constraint. No open lexical
+  productions.
+- CNL AST (own type family, not ClinicalIr): CnlAtom `Concept(Id) | ConceptNegated(Id) |
+  Interval{var, exactly one unsigned bound among ge|gt|le|lt, value ≥ 0}`; CnlContext
+  `{any: Vec<Vec<CnlAtom>>}`; CnlException `{concept: Id, basis: nonempty sorted region
+  refs}`; CnlRule `{context, action target + kind, direction+strength, certainty?, basis,
+  exceptions}`; CnlDocument per the §5 row (document_id, grammar id+hash, per-rule AST +
+  canonical JA text, text hash — acceptance re-renders and hash-locks canonical bytes).
+  Validity two-layered, STRUCTURAL first (lexicon-free: nonempty rules/DNF/brackets,
+  brackets sorted+deduplicated — set semantics, parse normalizes surface order — Id grammar,
+  the interval register; §5 IrBundle coherence admits signed/two-sided interval shapes the
+  grammar cannot write, so coherence-mirrored validity would bless unrenderable ASTs),
+  then lexicon-scoped against the role view (refs resolve, slot roles admit positions,
+  modality pair tail-backed, interval vars resolve, negative-occurrence bar). The parser
+  and the model mint no ids.
+- Bridge `to_ir(&CnlDocument, &segments) -> ClinicalIR`, deterministic: one ClinicalStatement
+  per context-disjunct in document order; atoms partition into population/condition by the
+  role view (never by id-namespace convention); ids `stmt.<k>`/`exc.<k>`/`bind.<k>` —
+  document-order counters in `normalize.rs`'s id forms, document-local scope; each exception
+  sentence yields one single-atom ExceptionClause PER split statement — a multi-disjunct
+  rule clones its exception list into every emitted statement ((D1∨D2)∧¬E = (D1∧¬E)∨(D2∧¬E);
+  bundle validation demands globally unique exception ids), `exc.<k>` counting emitted
+  clauses statement-major then sentence order, each clause's region_ids = its own sentence's
+  basis bracket verbatim; one Exact-status TerminologyBinding per distinct referenced
+  concept, minted at first reference in post-split emission order (statement-major; per
+  statement population, condition, action target, then exception clauses), system =
+  lexicon.system, code = concept id, region_ids = the sorted union of the citing emitted
+  statements' cited regions (provenance at the producer's grain, §5); statement
+  source_region_ids = its rule's brackets' union (rule bracket + its clauses');
+  source_segment_ids derive region→segment via the segments artifact. Preconditions,
+  reject-checked at acceptance: every cited region resolves in the document graph
+  (grounding: absent → `ai_hallucinated_source`, terminal) and anchors in exactly one
+  segment (else a repairable schema reject naming the region).
+- Acceptance (`single_cnl_accept`, the §9 accept-closure pattern): UTF-8 → parse (grammar
+  language, parse errors repairable `ai_schema_violation`) → structural + lexicon-scoped
+  validation (same code) → instrument self-check: re-render the parsed AST and re-parse;
+  disagreement = `cnl_round_trip_mismatch`, terminal (§7.4) — the stored document carries
+  the CANONICAL re-rendered text + hash (the raw emission stays in the cassette) → `to_ir`
+  + grounding → accepted CnlDocument + ClinicalIR.
+- Route `pipe.m3_single_cnl`, mirroring `pipe.m2_single_ir`'s shape: `m1.extract` →
+  `m1.segment` → `m3.model_fill_cnl` (nondeterministic, output `cnl_document`) →
+  `m3.bridge` (deterministic, `[cnl_document, segments]` → `clinical_ir`; recomputes `to_ir`
+  from the accepted document — determinism makes it the accept-time result, asserted by
+  hash) → `m2.assemble` → `m1.compile` → `m1.verify`. Provenance chain: `cnl_document`
+  {origin `ai_generated`, `accepted_evidence_status`, inputs [graph, segments, cassette]} →
+  `clinical_ir` {`deterministic_compiler`, `mechanical_evidence_status`, inputs
+  [cnl_document, segments]} → `ir_bundle`; trace reuses the landed assemble/compile/verify
+  node kinds — fill and bridge artifacts stay off-DAG per the landed §9 precedent, visible
+  through §4.6 events, wrapper producers, and the input-hash chain.
+- Determinism laws (property-tested; bounded deterministic enumeration, no new deps):
+  parse∘render == id over valid ASTs; render∘parse == id over canonical documents; text-hash
+  members recompute from stored texts under the frame assembly; `to_ir` is a pure function
+  of (accepted document, segments); lexer segmentation is deterministic and complete over
+  in-language input (pairwise prefix-freedom ⇒ maximal munch unique) — guarded by the
+  lexicon lint, since the bnf Earley oracle proves membership only.
+- Faithfulness projection (the §7.3 definition): compare accepted ClinicalIR against the
+  reference derivation with provenance-grain fields excluded — TerminologyBinding
+  `region_ids` and statement source region/segment fields — every remaining field, ids
+  included, compared exactly on canonical bytes; the projection is pinned in metric code and
+  named in the report.
+
+### §10.5 M3 experiment: `exp.m3_cnl`
+
+- Binding: `[pipe.m2_direct_smt (baseline), pipe.m2_single_ir, pipe.m3_single_cnl]` over the
+  locked M1 test source groups, seed, budgets, and reference (§9 values); one run, one
+  manifest, raw rows before deltas.
+- New instruments: faithfulness + round-trip + emission-size rows (§7.3); the explorer.
+- Explorer (`ckc explore runs/<run-id> --out <path>.html`): one deterministic self-contained
+  HTML view over a completed run — per document × route the chain source spans → route-native
+  accepted artifacts (CNL text / IR JSON / SMT) → verdicts, plus findings, metrics raw rows,
+  and the delta table; embedded canonical data, committed hash-pinned viewer assets, zero
+  network, zero servers; a view-only derived artifact (§4.4 `view_only`, renderer identity
+  embedded) computed FROM attested run bytes, outside the attested output set — replay
+  untouched. Exists because side-by-side inspection of unlike representations is promotion
+  evidence (§10.2) the file tree serves poorly.
+- Acceptance themes (roadmap unit `acceptance-m3` finalizes): all three routes execute over
+  identical locked inputs; recorded model I/O replays byte-stably; round-trip identity 1.0
+  over accepted CNL documents; faithfulness rows emit for both IR-landing routes (measured,
+  never gated); expected conflict/no-conflict outcomes hold per reference for accepted
+  translations; M1/M2 pins stay byte-identical except the scheduled lexicon-hash and
+  report/metrics re-blesses; the explorer renders every route's chain; grammar/lexicon drift
+  guards green; §0 vocabulary throughout; tag `accept/m3`.
+- The decision this evidence feeds (§11): promote CNL investment (EN mirror, escape, from-IR
+  rendering, findings quoting), hold candidate status pending the registered deconfounder,
+  or retire it to the catalogue with its evidence.
+
+## §11 M4 — Promotion, selection, and the route field
+
+Intent: turn harness evidence into the architecture decision. M4 opens with a promotion
+review over M1–M3 evidence and either selects the product composition or runs the single
+next-most-decisive widening experiment; this section also carries the registered route field,
+the deferred instruments, and the external-resource licensing discipline.
+
+### §11.1 Promotion criteria
+
+A candidate (route, representation, backend, or composition) is promoted toward product
+architecture only through a review scoring EVERY criterion, evidence cited by run id or
+commit; no criterion auto-scores into a single ranking — raw rows plus adversarial review
+judgment (AGENTS.md criteria), landing as a SPEC amendment + registry status change through
+the user:
+
+| Criterion | Evidence source |
+| --- | --- |
+| Semantic fidelity | Conflict-task accuracy (primary) + faithfulness diagnostics over locked runs. |
+| Clinically relevant coverage | Corpus breadth handled: growth-set variants, claim completeness at scale (§11.4). |
+| Reliability + failure transparency | Acceptance rate, k-sample stability, typed failure-taxonomy shares (§7.4); silent failure classes disqualify. |
+| Source-grounded inspectability | Grounding checks + recorded human inspection of the candidate's audit surface (explorer, §10.5). |
+| Provenance + replay quality | Replay match rate, cassette completeness, manifest attestation coverage. |
+| Implementation + conceptual complexity | Module/LOC/spec-surface counts, declared over-approximation classes, re-bless surface. |
+| Model + runtime cost | §7.3 resource rows: recorded calls, repairs, wall-clock, emission bytes. |
+| Performance + scalability | Runtime per document; constraint-compile and lexicon-growth cost curves. |
+| Maintainability + extensibility | Measured cost of adding a concept, rule, language, or backend on a real extension. |
+
+### §11.2 Selection, migration, retirement
+
+- Selection trigger: a candidate dominates or acceptably trades off §11.1 across ≥2 corpus
+  generations (the locked M1 set plus one growth set), with no unresolved §10.2 confound
+  that a bounded experiment could remove.
+- Canonicalization: the selected composition's modules become the compiler core; the harness
+  (corpus, acceptance, evaluation, replay, ledger) persists as its standing benchmark and
+  regression instrument; §15 gates keep governing claims. This repository evolves in place
+  into the compiler — no rewrite-from-scratch.
+- Baseline reproducibility: losing and retired routes stay replayable from committed
+  cassettes + locked manifests at their acceptance tags (`accept/m<n>`); registry entries
+  persist with status, never deleted.
+- Retirement gate: a candidate layer or backend retires when dominated on every §11.1
+  criterion it uniquely served across two corpus generations, or when its unique evidence is
+  absorbed by a successor; retirement = registry status + §3 role-table update, design text
+  git-resident.
+- Migration gate: moving a capability between harness and route (either direction) requires
+  demonstrating the invariant it protects still holds — in particular, anything entering the
+  harness must remain representation-neutral (§10.1).
+
+### §11.3 Route field (registered candidates; each builds only on evidence demand)
+
+| Route | Shape / hypothesis |
+| --- | --- |
+| `route.grammar_ir` | Grammar-constrained JSON-IR emission — the §10.2 deconfounder isolating constraint mechanism from surface class. |
+| `route.reason_ir` | Unconstrained free-text reasoning stage → constrained single-IR commit; only the commit is accepted. Archived-PoC prior: the sole form to beat single-IR faithfulness (0.70→0.90) at a sampling-variance cost. |
+| `route.stacked_ir` | Model fills a stack of existing IR forms (e.g. PICO → rule rows); deterministic compile. |
+| `route.ir_hop_chain` | Chain of adjacent, deliberately similar IR dialects — do short hops tame non-determinism better than one leap? |
+| `route.ckc_layered` | Model fills CKC layers stage by stage (segment → statement → rule), each constrained. |
+| `route.ckc_rec_dsl` | Compact line-oriented record DSL; the CNL's token-compactness ablation (PoC prior: stable wrong-polarity failure — assess both §7.3 families). |
+| `route.slot_cnl` | Labeled-slot CNL (FRET/BRIDGE-Wiz style) — the readability-versus-emission midpoint. |
+
+Design dimensions recorded per candidate: token compactness, constraint strength, semantic
+distance per hop, constraint placement, layer composability (the §12 search-space
+coordinates). Baseline deltas measure against both `route.direct_smt` and the best standing
+route.
+
+Deferred ClinicalCNL capabilities (promotion-phase; the pre-reset design at the §14 retrieval
+commit is the seed — mine it, never re-derive): EN mirror surface (two concrete syntaxes, one
+AST, cross-language parse agreement); unregistered-concept escape (sole open lexical
+production, payload contract, `cnl_unregistered_concept` proposal stream feeding lexicon
+growth); from-IR audit rendering (render accepted IR from ANY route as CNL: `from_ir` with
+round-trip laws, segment-closure region provenance, expressibility predicate); findings CNL
+quoting via the rule-origin map; lexicon accretion pipeline (cluster → triage → draft →
+deterministic gates → human review → bless; row-stability law: rows cited by accepted
+documents freeze, growth is append-only, edits are typed migration events; grammar-scale
+posture: demand-sliced constraint subsetting before any grammar-opening amendment).
+
+### §11.4 Deferred instruments (build on evidence demand)
+
+- M4 conflict kinds (§6 table): `numeric_threshold_empty_intersection`,
   `strict_factual_contradiction`, `terminology_incoherence`, `condition_unsatisfiable`,
-  `exception_resolved_conflict`; ambiguous/unmapped binding paths exercised by test sources.
-- Deterministic ablations reported alongside metrics: `exceptions_off`,
-  `terminology_source_linkage_off`.
-- Model-free coverage experiment (`exp.m4_coverage`, experiment 2): test source set A builds mappings
-  and accepted entries join the lexicon/component store (`cnl_unregistered_concept` payloads =
-  the standing proposal stream, §10); test source set B (fresh documents sharing
-  components) then runs `runtime_ai: false` (§8.1). Metrics: model-free coverage of B,
-  accuracy versus reference, mapping-set size versus coverage on the compactness front, and
-  application phase model-call count (zero) against a model-per-document baseline. Application phase path
-  graphs (§7.1) contain zero model nodes — the runtime removal made visible.
-- Lexicon accretion pipeline — the machinery behind "accepted entries join the lexicon"
-  above and the path from the M3 locked-corpus lexicon to clinical scale (§10's escape
-  bullet names this loop; milestone grading: M4 lands the mechanics small-scale over set
-  A's vocabulary, M5 drives drafting inside the §12 loop — lexicon entries are a declared
-  editable surface there — M6 makes it load-bearing on the real corpus). Selection stays
-  demand-scoped: candidates enter as the run ledger's `cnl_unregistered_concept` payloads
-  (quoted surface + atom position — the §10 proposal artifact);
-  `normative_region_unclaimed` residuals join only through a typed decomposition pass — a
-  residual may equally mark a non-lexical omission (skipped rule, modality, mapping
-  failure), so it never enters raw, only as extracted proposal objects {surface, language,
-  atom position, spans, provenance}; an M6 corpus-slice batch is the same stream
-  aggregated over the slice's runs — importing a terminology wholesale as lexicon rows
-  stays barred (§10: never a precomputed corpus-wide lexicon; terminologies supply
-  candidate VALUES, never row inventories). Stages, each a ledgered pipeline artifact (M4
-  lands them as plain recorded precursors; M5 wraps them in §12's attempt discipline):
-  (1) cluster — SemanticJa-normalized surface keys group recurring proposals, carrying
-  occurrence counts, atom positions, source spans (grouping only — one normalized surface
-  may carry several senses, each resolving separately); (2) triage — alias / new-concept /
-  ambiguous-split / defer / out-of-scope: an alias joins an existing row's `surfaces[]`
-  (source-match synonym, no new concept — the recurring terminology-mapping decision), a
-  new concept gets namespace + id, an ambiguous surface splits per sense; model-drafted,
-  council-converged from M5 (§12 mapping-gap pattern); (3) draft — a recorded model call
-  or agent session authors the FULL row against the §10 authoring contracts: roles, `surfaces[]`,
-  `adnominal_ja`/`negated_ja` (decree forms: 非-prefix / verb flip / copula flip,
-  trailing-の bar), `gloss_en` (shape contract), quantity rows for interval-bearing
-  concepts, external code candidates from the seed resources below; (4) gates — the §10
-  deterministic stack verbatim, so machine-authored entries pass or die by it: loader
-  integrity hard errors, the full lint (§10 verbatim: reserved tokens, trailing-の, EN
-  shape, role-scoped surface totality, proper-prefix overlap over §10's deduplicated
-  main-mode semantic-token projection — Fixed/Digit categories included, delimiter-scoped
-  content excluded), grammar re-emit under the drift guard, the determinism laws as
-  property tests, and the stability gate below — a gate reject names its offense and loops
-  to redraft, spending model budget, never review budget; (5) review — the scarce
-  resource, so the surface is optimized: per-entry cards render the drafted row as CNL
-  usage sentences in both languages (review in the audit language, never YAML) beside the
-  lint/collision report, provenance, and code candidates; user review through M6 (typed
-  reviewer-role records arrive with §13.3 — M6 elaboration may pull that schema forward
-  explicitly); (6) bless — the entry joins the committed lexicon, grammar re-emitted, hash
-  pins re-blessed (the standing machinery); rejected surfaces enter a versioned reject
-  ledger — keyed surface + reason + inventory hash, explicit reopen triggers (new sense,
-  new evidence, changed permissions) — so recurrence reads as signal, not blind re-work.
-  Row-stability law: rows cited by any accepted document are FROZEN in both their
-  lexer-visible surfaces AND their semantic fields (roles, quantity links, tails, codes) —
-  growth is append-only, an edit to either is a KB migration event: it emits a typed
-  lexicon-migration record and marks dependent locked measurements non-current while their
-  historical validity under the old lexicon identity persists, never silently re-blessed
-  (the §13.1 drift posture extended to lexicon identity; that record + dependency walk
-  land with this pipeline — today's `source_drift.json` covers source hashes only) — so
-  collision resolution always burdens the NEW entry (author around the standing inventory,
-  e.g. a clause-form variant shifting the divergence point early), never re-authors
-  committed vocabulary. v1 keeps the strong pairwise prefix-freedom lint and authors
-  around it (the ACE decree posture: determinism over fluency); if real-slice collision
-  rates price author-around too high, the M6 elaboration may refine the lint to the exact
-  safety condition — a prefix pair (s, l = s·r) stays admissible iff no byte spelling of a
-  valid post-s token-stream continuation begins with r (prefix-intersection emptiness,
-  Bytes(cont(s)) ∩ rΣ* = ∅; decidable over the finite inventory + grammar; token-level
-  FOLLOW sets are only a conservative approximation, and a naive residual-tokenizes test
-  is too weak: tokens a, ab + follower bc mis-lex bytes abc to ab·⊥ though residual b
-  spells no stream) — a measured decision. Canonical-surface stability gate, the law's
-  surface half made executable: after any lexicon growth, every committed accepted
-  CnlDocument — population = accepted fills in committed cassettes/goldens plus any
-  accepted-KB store, keyed document × lexicon hash; deterministically re-derived audit
-  views and non-accepted attempts carry no stability obligation; the law binds FORWARD
-  from the accept/m3 inventory as baseline (M3's genesis re-blesses are baseline-setting,
-  not migrations); M6 lands the concrete `accepted_kb_manifest` — re-parses to its stored
-  AST, re-renders byte-identical, and re-passes §10 lexicon-scoped validity under the
-  grown inventory. Surface/segmentation stability only — defense in depth beneath the lint
-  and the invariant any future lint refinement must keep; semantic-field stability rides
-  the migration record above. Schema growth stays additive-optional (the M3 loader pattern):
-  provenance / review-status / external-code fields join as optional members, committed
-  bytes undisturbed; storage may shard per domain at M6 — one merged validated table at
-  load, the §10 gates over the merge. Seed resources supply candidate values — synonym
-  surfaces, gloss/citation bases (always re-authored under the contracts; mined data never
-  verbatim-trusted), and the external codes that become §13.1 TerminologyBinding systems.
-  Named families are roles, NOT cleared rights: MEDIS masters (病名/HOT; JLAC-family lab
-  codes) for JA surfaces + codes; mined JA clinical surface dictionaries (MANBYO-class)
-  for synonym breadth; bilingual term dictionaries (LSD-class, 医学会用語辞典-class) plus
-  MeSH/UMLS-class EN sources for `gloss_en` candidates; SNOMED CT / MedDRA/J / LOINC per
-  §13.1 (registry-listed until licensing evidence). No license class is asserted here —
-  terms differ materially inside any family and drift over time — so each resource enters
-  only behind a per-resource, per-version evidence row recorded BEFORE acquisition or
-  mining (adoption-time gating is too late where acquisition itself is restricted):
-  rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
-  acquisition, internal processing/mining, derivative authoring, committing derived rows,
-  and redistribution — `PermissionRecord` + `G-SOURCE-PERMISSION`, never inherited across
-  resources or versions. CKC itself is GPL-3.0-or-later (relicensed 2026-07-12 from an
-  Apache-2.0-with-LLVM-exception text, LICENSE + workspace Cargo.toml): the point is a
-  uniform governing license, never prior impossibility — Apache-2.0 could host committed
-  GPL-derived rows only with the combined work's governing license diverging from the
-  declared one. For a GPL-3.0-compatible resource, derivative authoring, committed rows,
-  and redistribution become license-permitted with no further grant to seek; the
-  obligations that permission carries (notice retention, attribution, corresponding-source
-  conveyance) land in the per-resource evidence row and are recorded + met per resource.
-  Compatibility answers permission alone — never compliance, identity, version, or
-  acquisition-terms attestation, which stay row-attested. ACE precedent, adopted vs
-  rejected: adopted — the Clex/Ulex architecture (committed common core + per-corpus user
-  accretion; Clex itself is COMLEX-derived, the seed-from-existing-resource precedent
-  this table follows) and decree-authored forms; rejected — direct Clex content import,
-  on row-level fit alone (the former copyleft derivative-work ground dissolved with the
-  relicense: Clex's data-file header grants GPL-3.0-or-later — verified at upstream commit
-  20960a5c, 2026-07-12; the header supersedes hosting-side GPL-3.0 classification — and
-  names its COMLEX/LDC derivation, so Clex is license-compatible and stays available as an
-  EN-side candidate-mining seed should demand materialize, behind an evidence row pinning
-  that commit, that grant, and the publisher's LDC-derivation authority it rests on):
-  ~100k general-English word-form entries with inflectional morphology serving an agreeing
-  parser, general-purpose with no documented clinical specialization, vs CKC's
-  morphology-free bilingual whole-surface concept rows — the EN mirror deliberately
-  invariant — so no content transfer planned; and Ulex precedence-shadowing (a
-  shadowing entry can change how standing surface text is interpreted; collisions are §10
-  hard gates here, never precedence). Grammar scale posture: the emitted grammar grows
-  linearly with the lexicon (per-surface terminal alternations, per-quantity-row
-  productions); constraint-compile + tokenizer-audit cost is re-measured at every slice
-  bless (the §10 record-time audit becomes a standing gate), and the pinned no-amendment
-  fallback is demand-sliced constraint subsetting: the route's decoding constraint
-  compiles over the demand slice's vocabulary subset plus the escape production (which
-  stays the sole open lexical production) — a SUBSET of the parser language, so committed
-  grammar, parser, declared over-approximation classes, and every determinism law stand
-  untouched while constraint cost tracks slice size, not lexicon size; an off-slice
-  registered concept surfaces as an escape occurrence whose §7.4 reject widens the slice
-  for the re-run (operational loop, correctness untouched — acceptance owns it on every
-  route). Opening concept slots as unquoted free productions is NOT a fallback but a §10
-  amendment candidate — it would add a third over-approximation class, dethrone the
-  escape as sole open production, and (JA carrying no delimiters outside the escape)
-  strand the lexer without a deterministic atom boundary; if slice subsetting proves
-  insufficient at M6, that amendment reaches the user with its full §10 consequence set
-  (parser language, AST mapping, token modes, determinism proofs), evidence first.
-  Pipeline metrics, raw rows first: entries per attempt, gate-reject + redraft rates,
-  review-overturn rate, alias-vs-new ratio, reject-recurrence.
-- LP explanation lane per the §6 LP profile: NormIR → Prolog-family emission, SWI-Prolog and
-  s(CASP) as recorded subprocess adapters, fixture-context queries, proof trees verbalized
-  through the CNL lexicon so explanations speak the audit language; lane separation and
-  `G-RULE-EVAL` boundary per §6.
-- Informalization round-trip metamorphic, concrete via the CNL: accepted IR → canonical CNL →
-  route re-parse → normalized-hash compare, reported as a route-stability metric.
-- Claim-completeness instrument (route-independent; the recall converse of §9 grounding, which
-  checks emitted→source only): a recorded classifier pass enumerates the SourceDocumentGraph's
-  regions deterministically and labels each normative-candidate or non-normative; every
-  normative-candidate region ends claimed — referenced from an accepted rule's brackets
-  (rule or exception sentence) — or
-  covered by a typed residual; unclaimed candidates emit `normative_region_unclaimed`
-  (residual-class, §7.4). This narrows the silent-loss surface from "model skipped a
-  recommendation" to "classifier mislabeled a region" — a simpler, independently k-sampled
-  judgment riding the same recorded model boundary. Calibrated here against set A/B references
-  (flag rate versus known reference misses — measured false-flag and miss rates); load-bearing
-  from M6, where real documents carry no reference (§13.1). Metric: claim completeness (§7.3).
-- `registry/methods.yaml` seeded from the `docs/` compendium (§14).
-- Wording: route results are locked measurements (s0/s1 raw rows); runtime reference fidelity
-  claims sit behind `G-RUNTIME-REFERENCE`.
+  `exception_resolved_conflict`; the Q0 self-check and raw-Q1 exception-stripped view (§6).
+- Corpus growth set: 4–6 synthetic documents sharing populations/actions/conditions (reuse
+  pressure), deterministic metamorphic variants (punctuation, kana/kanji, section order),
+  indirect-rendering variants (synonyms, oblique deontics, convention terms, negated
+  phrasing — the axis that dents faithfulness while verdicts stay intact), threshold- and
+  factual-conflict cases.
+- Component store + reuse/compactness/convergence exports (`component_reuse_graph.json`,
+  `compactness_front.json`); `pipe.direct_rule_to_smt`, the deterministic
+  architecture-ablation baseline (layered-minus-direct delta); path visualizations (§7.1).
+- Model-free coverage experiment (`exp.m4_coverage`, experiment 2's measurement): set A
+  builds mappings, set B runs `runtime_ai: false`; coverage, accuracy versus reference,
+  mapping-set size, zero application-phase model calls.
+- Claim-completeness instrument: a recorded classifier labels every SourceDocumentGraph
+  region normative-candidate or not; every normative-candidate region ends claimed by an
+  accepted rule or covered by a typed residual (`normative_region_unclaimed`, §7.4);
+  calibrated against set A/B references, load-bearing from M6.
+- LP explanation lane per the §6 LP profile; `registry/methods.yaml` seeded from the
+  compendium (§14).
+- Locked-measurement evaluator identity: the run manifest freezes test source, reference,
+  lexicon, and metric-code hashes (`evaluator_lock.json` extends this identity with full
+  semantics in M5).
+- Informalization round-trip metamorphic (accepted IR → canonical CNL → route re-parse →
+  normalized-hash compare) once from-IR rendering exists.
 
-Acceptance overview (finalized when M4's roadmap units are authored): all registered routes and
-both deterministic pipelines run over all test source groups; at least two invented candidates
-(§10 `single_cnl` plus one of `ckc_rec_dsl`/`slot_cnl`) rank against the existing-IR field with
-raw rows visible; metrics emit exact-fraction raw rows; hash-convergence asserts identical
-component hashes across metamorphic variants for the layered pipeline; recorded model I/O
-replays byte-stably; path and reuse visualizations emit with deterministic bytes; expected
-conflict/no-conflict outcomes hold per reference; LP-lane fixture queries replay with verdicts
-lane-labeled; replay holds for both pipelines; `candidate_diff.json` is complete; the coverage
-report emits with raw rows first; the claim-completeness instrument calibrates against set A/B
-references (false-flag and miss rates reported).
+### §11.5 External resources: licensing + evidence rows
+
+CKC is GPL-3.0-or-later (LICENSE; relicensed 2026-07-12 from an Apache-2.0 WITH
+LLVM-exception text for a uniform governing license — the prior mixed posture was a cost,
+never an impossibility). External resources (terminologies, lexicons, corpora, tools) enter
+only behind a per-resource, per-version evidence row recorded BEFORE acquisition or mining:
+rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
+acquisition, internal processing/mining, derivative authoring, committing derived rows, and
+redistribution (`PermissionRecord` + `G-SOURCE-PERMISSION`), never inherited across resources
+or versions. License compatibility answers permission alone — never compliance: the
+obligations permission carries (notice retention, attribution, corresponding-source
+conveyance) land in the evidence row and are recorded and met per resource. Copyleft as a
+class is never a rejection ground; judge exact version, combination direction, resulting-work
+license, and obligations (GPL-2.0-only stays GPLv3-incompatible; AGPL-3.0 combines but adds
+network obligations). Standing verdicts: Attempto-family LGPL source (APE, AceRules, Codeco)
+is direct-port-compatible with attribution — technical-fit verdicts stand, no port planned;
+Clex is license-compatible as an EN-side candidate-mining seed behind its evidence row
+(upstream commit 20960a5c header grant + COMLEX/LDC derivation), content import rejected on
+row-level fit alone; SNOMED CT / MedDRA/J / LOINC stay gated by their own fee/terms grants
+(§13.1). Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
+architecture and decree-authored forms; rejected: direct Clex content import, Ulex precedence
+shadowing (collisions are hard gates here, never precedence).
 
 ## §12 M5 — Autonomous optimization PoC (requirements; elaborate at M4 acceptance)
 
@@ -1976,16 +1378,16 @@ Stage III CDS-backend target visible behind gates.
   UCUM-compatible conversion tables; raw Japanese unit strings preserved; threshold conflicts
   compare unit-normalized values only); reference segment/statement labels for at least one real
   test source; extractor promotion claims trigger `G-EXTRACTOR-ADAPTER`.
-- Completeness: the §11 claim-completeness instrument is load-bearing here — real corpus slices
+- Completeness: the §11.4 claim-completeness instrument is load-bearing here — real corpus slices
   carry reference labels for at most a few sources, so every normative-candidate region must
   end claimed or typed-residual (`normative_region_unclaimed`); a skipped recommendation is a
   visible diagnostic, never a silent loss.
 - Terminology: MEDIS standard code tables (病名/HOT) as the first external systems behind the
   TerminologyBinding requirements; version-pinned snapshots; JLAC10/11 laboratory codes registered
   next; license-encumbered vocabularies (SNOMED CT, MedDRA/J, LOINC) stay registry-listed until
-  licensing evidence exists; the same snapshots double as seed resources for §11's lexicon
+  licensing evidence exists; the same snapshots double as seed resources for the §11.3 lexicon
   accretion pipeline (candidate synonym surfaces, gloss bases, external codes — per-resource,
-  per-version evidence rows behind `G-SOURCE-PERMISSION` BEFORE acquisition or mining, §11).
+  per-version evidence rows behind `G-SOURCE-PERMISSION` BEFORE acquisition or mining, §11.5).
 - Drift: source hash changes emit `source_drift.json` and mark dependent scores stale.
 - Boundary: the committed schemas exported since M2 govern any cross-language boundary; the
   Rust-vs-Python adapter decision per §3 is made and recorded here.
@@ -2040,8 +1442,8 @@ Committed direction:
   statistics in reports; human-reviewed-corpus claims trigger `G-REFERENCE-CORPUS`.
 - `report.html`: one self-contained deterministic bilingual review artifact per run — embedded
   canonical report/trace data plus committed content-hashed viewer assets; Japanese spans
-  primary, English glosses linked per span; corpus overview, rule browser (rules quoted as §10
-  CNL, Japanese primary), finding list with
+  primary, English glosses linked per span; corpus overview, rule browser (rules quoted in the promoted audit surface — §10.4 CNL if
+  promoted per §11, Japanese primary), finding list with
   filters, finding detail with formal evidence and revision candidates, metrics; renderer
   identity recorded; zero servers, zero network, zero external toolchain in the build path.
 - Auditor manuscript bundle: extends the §7.2 bundle with finding/human review tables and
@@ -2071,7 +1473,7 @@ Registry files are data, validated by `ckc registry check`, growing per mileston
 grammar constraints) and generalizes the `experiments` binding from a single pipeline to a
 pipeline set with a `baseline_pipeline` (the §7.3 delta baseline), so one experiment binds both
 route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3
-extends `schemas|prompts` with CNL grammar and prompt entries (§10); M4 adds `methods`, the
+extends `schemas|prompts` with CNL grammar and prompt entries (§10.4); M4 adds `methods`, the
 method-universe catalogue seeded from the
 compendium (families, aliases, candidate roles, adapter status
 `v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata),
@@ -2085,6 +1487,10 @@ research artifact is committed under `docs/`, then retired once distilled into t
 Every `docs/…` citation in this spec resolves at commit `e8b5cf6` (the M3-planning state;
 census `git ls-tree e8b5cf6 docs/`, read `git show e8b5cf6:docs/<file>`, search
 `git grep <pat> e8b5cf6 -- docs/`); a future retirement records its own commit here.
+The pre-reset ClinicalCNL full design and M3 plan (superseded 2026-07-12) resolve at commit
+`ecc19d3` (`git show ecc19d3:SPEC.md` §10, `git show ecc19d3:.agent/roadmap.md`,
+`git show ecc19d3:.agent/memory.md`) — mine them when a §11.3 deferred capability is
+promoted, never re-derive.
 Registry-seeding and elaboration units mine it through read-only subagents and
 cite `file §section` in registry notes; main sessions keep their own context lean.
 

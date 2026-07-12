@@ -227,8 +227,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 - Model-runtime adapter (§9, `ckc-cli/src/model.rs`, mirrors `ckc-smt` Z3Adapter; DONE .1/.2a/.2b).
   Live facts beyond code/git: `pub mod model` — a pre-consumer skeleton must be pub or clippy `--lib
   -D warnings` flags dead_code (no-cfg-test lib build; recurs for cassette/route fns). MIRRORS not
-  reuses Z3's subprocess machinery — the shared cross-crate runner is SCHEDULED (M3
-  subproc-runner.1 behavior-locked extraction + .2 hardening; the mirrors stay duplicated until it
+  reuses Z3's subprocess machinery — the shared cross-crate runner is BACKLOGGED (2026-07-12 reset: subproc-runner.1
+  behavior-locked extraction + .2 hardening; the mirrors stay duplicated until it
   lands): .2 absorbs the codex-REJECTED `Instant+budget` overflow-panic fix (rejected Z3-mirrored,
   non-realistic, fix-both-not-one) AND the cap/reap of the
   STILL-unbounded post-grace detached drain (a descendant holding stdout open appends to its Vec forever;
@@ -244,7 +244,7 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   Q2); .1 preserves the asymmetry
   through adapters (behavior-locked), .2 closes it solver-side — a deliberate change, never
   "stays consistent"; the ETXTBSY
-  vacuous-window half is discharged earlier by M3 spawn-retry (fs-dependent tests → injectable
+  vacuous-window half is discharged by backlog spawn-retry (fs-dependent tests → injectable
   spawn op + injectable clock/sleeper, wall-clock-free deterministic retry tests — no real
   SPAWN_BUSY_GRACE consumed). `Completed{bytes}`
   duplicates `stdout_bytes` on clean exit; PARTIAL capture on Timeout/ExitFailure/SpawnFailure diverges;
@@ -364,7 +364,7 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   CLI read-guard — LEXICAL only (rejects absolute + `.`/`..`), so a committed repo-local SYMLINK pointing
   outside the tree passes and `std::fs::read` follows it — and
   corpus.path + expected_outcomes lack even the LEXICAL check (review-reproduced: absolute
-  /tmp paths pass `registry check` AND a full run) → fix SCHEDULED as M3 unit path-confine: lexical findings in
+  /tmp paths pass `registry check` AND a full run) → fix BACKLOGGED (2026-07-12 reset: path-confine): lexical findings in
   core + ONE single-open BYTE-RETURNING canonicalize/containment resolver across every
   registry-data-controlled read (pre-open stat filter + `O_NONBLOCK` open + fstat re-check —
   a contained FIFO must not block the open; success = typed {canonical path + bytes}, no
@@ -412,414 +412,31 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   per-stage total artifact); only commands materialize a standalone TotalOperationResult (value/
   residual/ambiguity/incoherence buckets stay empty until typed placeholders exist). GUARDRAIL: per-stage totals stay EventRecords
   alone — a standalone TotalOperationResult there is inert + redundant until then (M2+ may
-  revisit). Enhancement (AGENTS.md-preferred; since scheduled into M3: canon-props): tests are example/byte-pin only →
+  revisit). Enhancement (AGENTS.md-preferred; backlogged as canon-props): tests are example/byte-pin only →
   property-based/fuzzing for the canon layer (round-trip identity, reject noncanonical
   mutations) + StringPolicy idempotence.
 - M2 reviewed (plan 2a4f03d .. accept/m2 b2e010b, 201 commits; fixes in 5ec33f7). Durable: the six
   §9 theme verdicts rest on acceptance-m2's LOCAL driver run (evidence-runs-local design,
   independently codex-re-verified). OPEN user items: SPEC §8.4
   "processing stage component(s)" prose + candidates.yaml wording (SPEC-level vocabulary call);
-  `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (since
-  scheduled into M3: canon-props); shared cross-crate subprocess runner + registry symlink guard
-  (both since scheduled into M3: subproc-runner.1/.2, path-confine).
-- CNL-first architecture (user directive 2026-07-07, set in the Codex-continued cnl-ir-research
-  session — rollout `~/../debian/.codex/sessions/2026/07/07/rollout-2026-07-07T11-09-50-*.jsonl`;
-  SPEC amended same day = design authority, read SPEC not this bullet for semantics): clinician-
-  auditable CNL = the product's knowledge surface; probabilistic step confined to source→emission
-  surface; accepted+reviewed CNL doc = locked KB; audit views render from accepted IR only, any
-  route. MILESTONE RENUMBER M3↔M4: §10 = M3 ClinicalCNL v1 (full design, elaboration-depth —
-  next session plans units from it), §11 = M4 route field + comparison (absorbs old-§10 content +
-  invented ablations + §6 LP profile lane); every old-M3 feature (M4 conflict kinds, FactualRule,
-  distinguishing fields, temporal atoms, component store, coverage, methods.yaml) renumbered M4 →
-  trust SPEC's current numbering over pre-2026-07-07 prose/git text. Research corpus:
-  `docs/cnl-{attempto,multilingual-ja,landscape,design-codex}.md` (Codex design = second opinion;
-  its dual-surface split — compact DSL emission + generation-only prose — was REJECTED for the
-  single-surface CNL bet, kept as §11 ablations). Name SETTLED (user, 2026-07-07): **ClinicalCNL**
-  (mirrors ClinicalIR); id forms follow the ClinicalIR↔clinical_ir precedent — grammar files
-  `schemas/clinical_cnl_{ja,en}.grammar`, registry schema id `schema.clinical_cnl`;
-  `route.single_cnl` stays (parallel to single_ir). GF adoption deferred until JA parse of
-  non-CKC text or >2 languages (docs/cnl-multilingual-ja.md §5 verdict).
-- M3 plan (ClinicalCNL v1; gate MET at planning — runtime identity probe clean, contract-
-  conformant). Durable decisions beyond the roadmap lines (which collapse at M3 review):
-  module home = ckc-cli FRESH modules (lexicon.rs — lexicon-extract's behavior-locked move
-  of the Lexicon family out of normalize.rs, the CNL modules' neutral dependency point —
-  plus cnl.rs/cnl_grammar.rs/cnl_parse.rs/cnl_render.rs/cnl_bridge.rs) —
-  Canonical-outside-core proven by report.rs; ckc-core IR shapes + committed clinical_ir.schema.json untouched (ClinicalStatement
-  already carries certainty/exceptions/source refs; CNL's sole core touch = DiagnosticCode
-  fieldless_enum append — path-confine separately extends core's validate_registries). CNL AST = own family, NOT ClinicalIr (CnlAtom
-  Concept|ConceptNegated|Interval|Unregistered — escape is a variant, and via CnlConceptRef
-  {Registered|Unregistered} it reaches EVERY concept slot incl. action target, §10; CnlContext
-  flat two-level DNF; AST validity two-layered — STRUCTURAL first, lexicon-free grammar-image
-  shapes up to parse normalization: rules + per-bracket basis nonempty, every bracket
-  sorted+deduplicated (set semantics — parse/from_ir supply sorted), outer DNF + every
-  conjunction nonempty, Interval (ir.rs QuantityInterval's SHAPE —
-  four optional signed bounds) exactly one unsigned bound among ge|gt|le|lt, value nonneg,
-  escape payload in contract —
-  §5 coherence (IrBundle::validate/bundle.rs — ir.rs owns shape only) admits signed/two-sided
-  shapes the grammar cannot write, coherence-mirrored
-  validity would bless unrenderable ASTs; SHAPE vs FRAME sublayers split — render asserts
-  SHAPE only (frame = stored-doc integrity, render's own output); cnl-ast enforces ahead of
-  the lexicon-scoped layer; acceptance runs lexicon-scoped post-parse (negative-occurrence
-  bar its sole parse-unenforced clause); numerals parser-bounded 0..=i64::MAX (2nd grammar
-  over-approximation beside the escape); interval batteries = shared 16-mask×{-1,0,1}
-  truth table both sides; CnlException {concept: CnlConceptRef, basis: nonempty region refs —
-  its sentence's own bracket} single-slot; CnlDocument payload
-  per §5 = document_id + grammar id/hash refs + rules
-  (AST + per-rule canonical text ja/en) + text hashes — accept re-renders + hash-locks
-  canonical bytes beside the AST, report.json cites those hashes); parser mints NO ids —
-  bridge derives them (ids `stmt.<k>`/`exc.<k>`/`bind.<k>`, document-order counters in
-  normalize.rs's id forms + document-local scope; bind ORDER = the pinned §10 traversal,
-  normalize scans mentions instead — §8.6 reserves `<doc>.rule.<k>` for norm-layer
-  rule ids, rules.rs's mint; one ClinicalStatement per
-  context-disjunct; population-vs-condition partition by the lexicon's typed slot roles
-  (§10; ruling: explicit validated roles FIELD over a prefix-derived index — concept rows
-  a nonempty role set over population|condition|action_target, population/condition
-  mutually exclusive per row, action_target free to combine (multi-role deliberate);
-  quantity rows exactly one context role placing interval atoms, quantity var set ==
-  concept-interval var set (orphan rows hard-error: grammar-visible vocabulary outside
-  the committed schema's concept-derived enum — parseable yet unacceptable); ONE typed role view
-  consumed by every CNL module — grammar slot alternations, cnl-ast validate, parser slot
-  legality, bridge partition (from_ir Err on wrong-slot IR — CNL-inexpressible, re-parses
-  into a different partition), accept wrong-slot rejects — no prefix tests in CNL modules,
-  a future namespace never silently falls through to condition; normalize.rs's frozen M1
-  prefix partition stays, locked-corpus agreement pinned by the M1 role data test —
-  pop.*→population, cond.*→condition, drug.abx_a→action_target, q.age_years→population;
-  the committed IR schema's enums stay role-agnostic — slot legality is acceptance's, a
-  per-slot schema re-derivation would re-bless committed schema bytes + §9 pins);
-  exception sentence → one
-  single-atom ExceptionClause PER SPLIT STATEMENT (positive interval-free Concept — §10
-  register; a multi-disjunct rule clones entries under fresh statement-major exc ids —
-  bundle-unique ids + (D1∨D2)∧¬E distribution; worked 2×2 pinned in cnl-bridge: stmt.0
-  owns exc.0/exc.1, stmt.1 owns exc.2/exc.3, clone content + basis duplicated per
-  statement — the test carries an enumerated bind.<k>→concept oracle + a trailing
-  1-disjunct rule (rule.2→origin 1; counters document-continuous, a per-rule reset passes
-  the bare 2×2); clause region_ids = its own sentence's basis
-  bracket VERBATIM — §10 per-sentence basis brackets, one on the recommendation sentence +
-  one per exception sentence (a single rule-global bracket leaves multi-exception
-  provenance unreconstructible + falsifies per-clause region_ids, which sit INSIDE the §10
-  faithfulness projection; source-order mapping rejected — ambiguous under clone
-  expansion/reorder)); one
-  Exact TerminologyBinding per DISTINCT referenced concept
-  at first reference in POST-SPLIT emission order (statement-major; per statement population,
-  condition, action target, exceptions in emitted order — a later-disjunct-only concept
-  mints late), system = lexicon.system, region_ids = union of the citing emitted
-  statements' segment CLOSURES (source segments' full region sets — the closure the
-  rendered brackets jointly cover, rule bracket = it minus exception-owned; invariant under
-  bracket normalization, keeps to_ir∘from_ir exact — an authored-bracket union breaks the
-  law when the citing statements' brackets jointly under-cover the closure union; minimal
-  case = the pinned EXCEPTION-FREE partial-segment law case (two-region Recommendation
-  segment), re-bridges wider — §5 region
-  refs producer-graded: mention-grain M1, closure-grain bridge, SPEC §5 row + ir.rs
-  TerminologyBinding doc); Action::new derives key;
-  basis = region ids per sentence,
-  source_segment_ids derived region→segment over their UNION via the SEGMENTS artifact —
-  m3.bridge stage
-  inputs [cnl_document, segments]; bridge preconditions acceptance-enforced BOTH sides —
-  cited regions anchored in exactly one segment, derived segments' region sets unshared
-  (closure-functional), basis ownership KIND-aware PER STATEMENT (17th-review correction — the
-  shared segment view = segment_id → (kind, region_ids); R/E = cited
-  Recommendation/Exception segments' region unions, X = exception brackets'/clauses'
-  union, all per statement; laws: cited kinds Recommendation|Exception only, R nonempty,
-  primitives X ⊆ closure ∧ X ∩ R == ∅ ∧ E ⊆ X ⇒ X == E ∧ closure − X == R (remainder
-  aliases R on accepted inputs only) — the locked rules.rs tail walks cited
-  Recommendation segments' full region sets then appends clause region_ids, so kind-blind
-  topology admitted silent provenance corruption: Evidence-owned clause-uncited basis
-  vanishing, Recommendation-owned exception region emitted ≥2× (walk + each citing
-  clause), partially-covered Exception segment's remainder dropped; RULE: a shared
-  view/normal form over a locked consumer's inputs must carry every field that consumer
-  branches on — derive laws from its actual filter, never topology alone; per-X-quantified
-  laws (per statement here) need a fixture where the per-X and document-global readings
-  DISAGREE, and every predicted first-error class must be replayed against the pinned
-  check order — the 17th-review codex follow-up caught both), exception regions
-  closure-contained (ExceptionRegionOutsideStatementClosure — CNL-side by construction,
-  derived segments span the bracket union; IR-side a clause citing a grounded region of an
-  UNCITED segment passes grounding + remainder yet re-bridges source segments WIDER —
-  provenance-unfaithful, predicate-rejected, the identity law's image domain never
-  holding the shape; pinned class order closure-functionality, non-normative kind, R-empty
-  (wholly-owned), containment, Recommendation-owned, clause-uncovered); accept-total also
-  rejects region-less cited segments (synthetic-only: segmenter mints from grounded spans
-  only + bundle validate rejects empty support — predicate owns it fail-closed) +
-  shared-region artifacts (bundle-valid — validate never checks segment-region
-  disjointness); origin map rule_origins(CnlDocument) → `<doc>.rule.<k>` → originating
-  rule index, pure fn mirroring derive_norm_ir's statement-enumerate mint, non-core —
-  report cnl_rules keys per-rule {ja,en} text by normative rule id via it (accepted doc:
-  a split duplicates one rule's text under several ids; from_ir doc: identity), finding/no-conflict
-  md quotes the findings_owner_pipeline_id pipeline's entry ALONE, owner-labeled (rule ids
-  route-local POSITIONAL, never cross-route alignment keys — a non-owner same-numbered id
-  may be different content; owner-entry-less rule id renders NO CNL — SPEC-stated fallback;
-  validate pins inner-id/document-key agreement + findings/no-conflict ⇒ owner-field
-  presence; all-route entries stay audit-only); round-trip laws (ACCEPTED escape-free ASTs,
-  to_ir Err on escapes):
-  from_ir = single-disjunct projection — clause region_ids verbatim on its exception
-  sentence, rule bracket = segment-closed remainder (cited segments' FULL region sets minus
-  exception-owned — deterministic evidence cover, NOT authorial attribution, the IR keeps
-  no rule-level region set; from_ir's sole Err source = the shared expressibility predicate
-  at entry, projection Err-free past it, acceptance-rejected both sides) ⇒
-  from_ir∘to_ir == bridge normal form (disjunct split + atom canonicalization — population
-  before condition, set order, dedup — + exception-owned segment-closed basis split, a
-  labeled COVER: clauses may share a region),
-  to_ir∘from_ir == id on
-  bridge-image IR = to_ir's image over accepted ASTs — exact incl. closure-derived binding
-  region_ids).
-  Findings owner: the §7.1 view (trace finding mint + report results, no-conflict included)
-  = the FIRST bundle-bearing pipeline in experiment binding order (single_ir — the landed
-  lineage/claims rule); single_cnl's reused m1.compile mints query/finding ids byte-equal
-  single_ir's ⇒ owner SELECTION (GroupTrace mark, is_baseline pattern, route-single-cnl.3)
-  over route-qualified payload ids (those rewrite §7.2 id forms + re-bless M1/M2 pins);
-  non-owner groups stay trace-DAG nodes + RouteRun metrics only. The report names the
-  owner canonically — findings_owner_pipeline_id (report-cnl.1 shape, .2 population riding
-  the deliberate re-bless, .3 owner-scoped md lookup); cross-route CNL side-by-side needs
-  an explicit alignment map (M4 ablation scope), never positional rule-id equality.
-  Registry schema id = singular schema.clinical_cnl (JA grammar = the decoding constraint;
-  EN grammar committed + drift-guarded, no route binding). run.rs's positional stage
-  plumbing (pipeline_step_ids [Id; 8], MODEL_FILL/DIRECT_VERIFY/COMPILE=4/VERIFY=5/TRACE/
-  REPORT index consts, UNUSED_STAGE padding) is retired by route-stage-handles BEFORE route
-  wiring — per-shape named StageHandle {kind, step_id} fields validated at resolve — so the
-  7-stage pipe adds a RouteStages::SingleCnl variant, never an [Id; 9] widening (off-by-one +
-  provenance risk). Lexicon EN surfaces normalize under StringPolicy::SemanticEn (ASCII-lowercase —
-  §10 EN canon), JA under SemanticJa. Render-surface totality = integrity data rules
-  (every action row a required noun_ja/noun_en pair, every certainty row a required
-  surface_en — the stronger every-row form over canonical-row-only: JA certainty phrases
-  are all CNL-visible already, and same-value duplicate EN literals collapse under the
-  semantic-token rule); target citation form = the concept row's existing surfaces[0]
-  (JA) + gloss_en (EN), no new field — synonym surfaces[1..] source-match-only, never CNL
-  terminals. Duplicate terminals reject by SEMANTIC TOKEN, never literal equality (a
-  literal errs only when occurrences denote two distinct tokens; citation==adnominal on
-  one row, multi-role slot reuse, same-pair tail synonyms, cross-row unit literals all
-  deduplicate — units mint var-FREE tokens because the per-var interval production pairs
-  each var's surface with its own row's unit terminal; the prefix-overlap lint runs over
-  the deduplicated table; the old exact-duplicate rule would have rejected
-  cnl-grammar.1's own multi-role oracle lexicon). surface_tokens = committed JA lexer
-  count over stored canonical per-rule texts, Σtokens/Σrules per route (model-runtime
-  tokenizer REJECTED — would bind the metric to a versioned runtime-tokenizer replay
-  dependency, identity+counts separately attested).
-  CNL-inexpressible accepted IR at report time (guard-less route = M1 off the locked
-  corpus) → omit that (pipeline, document)'s CNL entries + audit files under ONE typed
-  cnl_inexpressible_ir diagnostic (codes-cnl variant, report-stage only, no FillReject
-  arm), never assembly failure — locked corpus renders all routes (the positive
-  control). Backtick = reserved surface char (lint): §7.2 renders rule text in
-  single-backtick md code spans (normative delimiter); escape payloads need no bar —
-  terminal at accept, accepted/report-rendered rule text registered-only (pre-accept
-  escapes DO render + round-trip). Codex follow-up pins: §10 typed VIEW constructor = the
-  lint gate (zero-finding precondition, every CNL module consumes the view → lint-dirty
-  lexicon produces no CNL anywhere — closes the lint-owned-surface render hole); EN
-  negation field-less (fixed-negator composition over gloss_en; JA lexical negated_ja);
-  exception slot adnominal-only (§10 positive register); per-quantity-row interval
-  productions = the sole unit↔var binding (grammar + parser both enforce; swapped-unit
-  reject, shared-unit accept); Fixed(terminal)+Digit(char) join the collision domain
-  (equality escapes the prefix rule), basis-bracket ids + escape payloads
-  delimiter-scoped outside it; certainty_pool's value-blind reject relaxes to same-value
-  dedupe; CNL metric applicability explicit (accepted single_cnl fills carry the three
-  fields atomically, partial = instrument error, zero-accepted → NA rows);
-  cnl_inexpressible_ir outcome=unsupported, computed before run.rs's report-tail summary
-  snapshot (today pre-assembly + hardcoded Ok event) → report summary + stage event,
-  RouteTaxonomy-excluded, payload {predicate_class, pipeline_id, document_id}
-  first-failing-check; report §4.4 provenance widens to consumed CNL/IR+segments
-  artifacts; universal-render claims qualified guarded-route/locked-corpus (M1 audit
-  evidence = its re-blessed golden run; direct_smt no IR → no views); runtime-tokenizer
-  rationale = versioned replay dependency, not 'every cassette'. Grammar terminals =
-  whole-surface string literals
-  (ASCII-digit alternation; basis-id refs = Id's exact §4.1 `[a-z][a-z0-9_.:-]*` pinned as
-  smt_query.grammar's `<identifier>` production — leading `<lower>` then rest-char class,
-  never bare one-or-more-chars (admits `1r`/`.r`/`:r`/`-r`/`_r`, Id::new-rejected = an
-  undeclared 3rd over-approximation class) nor identifier_ascii (admits `/`); SHARED
-  basis-id corpus, grammar oracle + parser both sides: accept one-letter +
-  every-rest-char-category composite ids, reject leading digit/punctuation, uppercase,
-  slash) +
-  EXACTLY ONE open lexical production per
-  language — the escape's free quoted surface, inexpressible as finite literals; emitter
-  escape mode Committed(open) vs OracleBound(enumerated) since bnf parses literals only —
-  LLM-constraint-portable + bnf-atomic; bnf 0.6
-  verified unicode-capable (byte-offset whole-terminal matching); its Earley oracle proves
-  language MEMBERSHIP (superset — explores all segmentations) → lexer segmentation determinism
-  guarded by the lexicon proper-prefix lint (same- AND cross-category over the finite token
-  inventory — lexicon surfaces + fixed terminals + digits; escape payload delimiter-scanned,
-  outside it) instead; single-parse asserts =
-  `parse_input().take(2)`, never full counts (ambiguous blowup). Document frame pinned past
-  bare rule cardinality (§10 canonical-text bullet): canonical document bytes = one
-  LF-terminated line per rule — LF the uniform terminator, last rule included, no other
-  inter-rule bytes; grammar document = (rule <nl>)+ both languages (smt_query.grammar
-  literal-LF `<nl>` convention; bnf 0.6 lacks postfix repetition → right-recursive lowering,
-  <assertions> pattern); stored per-rule texts line-break-free — LF AND CR (surfaces
-  whitespace-folded §4.2, fixed terminals none, escape payload control-barred); text hashes
-  + audit .txt views = exactly the assembled bytes, cnl-ast validate RECOMPUTES the hashes
-  from the stored texts + report-cnl.2 re-hashes its audit read-back (executable invariant);
-  whitespace variation NONE — parser language = grammar language (differential
-  parser-vs-oracle agreement stays total), stray whitespace/CRLF/lone-CR = repairable parse
-  errors; parse demands the exact frame (missing terminal LF =
-  repairable parse error). §10 surface-composition decree (2026-07-12; SPEC bullet =
-  authority, do not re-derive): JA interval/escape atoms take fixed の exactly
-  patient-adjacent, bare mid-chain (two JA atom nonterminals; stray/missing の = parse
-  error); EN position-invariant prepositional frame over gloss_en — with / without (fixed
-  negator REPLACES with) / bare after of — chosen because ONE gloss + ONE negator +
-  concatenative grammar cannot do copula variation (old worked-EN was unproducible;
-  re-pinned "with adult status and with sepsis"); EN fixed terminals carry their
-  delimiting spaces (keeps with/without prefix-free under the inventory lint);
-  clause-form adnominal mid-chain stiltedness + invariant unit_en (at least 1 years)
-  accepted — fluency unclaimed off the patient-adjacent slot; interval-carrying context
-  concepts author negated forms so the negative-occurrence bar rejects at ACCEPTANCE with
-  the complement-interval repair (token tables stay total). 19th-review adds: EN-value
-  shape lint at lexicon-cnl.2 (SemanticEn never rejects non-ASCII), hand-oracled
-  four-bound fixtures parse + render sides (identity/differential laws pass a
-  consistently swapped bound table), certainty-present byte pin at cnl-render, conjunct
-  atom-order permutation axis at cnl-laws. Lexicon DATA pinned in the roadmap line (unit =
-  transcription + bless, zero in-session design; committed ja_core = 6 concepts, 7 modality
-  rows over SIX pairs, 4 certainty rows, corpus per §8.2 — guideline_b realizes
-  cond.pregnancy as a CONTEXT atom): negated-adnominal decree law — the prefix lint bars
-  suffix negations of bare-noun positives (成人でない extends 成人 → lint-reject), so
-  非-prefix (非成人/非小児) / verb flip (のある→のない) / copula flip (である→でない);
-  adnominals bar trailing の (妊娠中の ✗ — reads as the fixed linking terminal, hangs
-  mid-chain) → cond.pregnancy = 妊娠中である/妊娠中でない; (contraindicate,strong) tail
-  rides the 禁忌 row ONLY — 投与しないこと deliberately tail-less (surface embeds the
-  action verb; ActionNoun 投与 would prefix-collide with a 投与-led tail) so
-  first-tail-bearing = canonical meets the worked は禁忌である; spacing-decree hole
-  closed in the §10 decree (wiring lands with the cnl-grammar/parse/lint units): EN
-  deontic tail (after bare target gloss or escape close-quote) + unit (after numeral) =
-  the two slots whose leading separator no fixed terminal supplies → the lexicon surface
-  PROJECTION composes the single leading space into the token (` is strongly recommended`,
-  ` years`) — the sole exceptions to fixed-terminal space ownership; raw fields
-  edge-space-free (internal spaces = data),
-  emitter/lint/parser all take the projection's composed forms verbatim; trailing-の lint rule
-  on adnominal/negated forms (prefix + reserved rules both miss 妊娠中の); projected full
-  inventory hand-audited pairwise prefix-free at plan time (re-verify mechanically at
-  impl). Terminal layer pinned (2026-07-12; §10 token-inventory bullet = authority, do not
-  re-derive): full fixed-terminal byte table both languages with per-side space ownership
-  (context/exception openers + closers, connectives, links, bound markers, parens,
-  terminators, basis/escape delimiters — every worked junction re-derived against §8.6 +
-  committed lexicon bytes: ASCII `:` certainty labels, ASCII parens both languages);
-  digits = single-char tokens under a LEADING-ZERO-FREE numeral register (`0` | nonzero-led
-  run — zero-led runs outside BOTH languages, so grammar-over-parser classes stay exactly
-  the declared two and the declared parse-variation set is now SINGLE-SOURCED in §10's
-  canonical-text clause: lexicon synonym alternations (modality tails + certainty
-  surfaces, first row canonical) + basis-ref presentation (order AND duplicates →
-  sorted-deduplicated set); escape payload must arrive SemanticJa-fixpoint, non-fixpoint =
-  payload-contract parse error (parse never rewrites payload bytes); grammar oracle
-  `0`/`05` cases at cnl-grammar.1, parser battery at cnl-parse.1); mode-scoped CONTENT
-  (escape payload scan, basis-bracket single-space id separators) outside the main token
-  table — open/close delimiters stay main-inventory tokens, no bare-space main-mode token;
-  composition point = the lexicon surface PROJECTION composes EN tail/unit space-led
-  exactly once — lint consumes it pre-validation (lint⇄view acyclic), the zero-finding
-  role view re-exposes it, every downstream consumer verbatim (lexicon-cnl-shape
-  accessors); table spells U+0020 as ␣ (CommonMark strips code-span edge spaces when
-  RENDERING — source bytes + the module decode ␣; fenced skeleton keeps real spaces);
-  schematic grammar skeleton in §10 — factoring + slot order normative, per-language
-  grammars self-contained (JA two-atom-nonterminal DNF threading pins patient-adjacency to
-  the last atom of the last disjunct; EN one position-invariant atom; intervals =
-  per-quantity-row productions, var paired with its OWN unit — cross-product would readmit
-  the swapped-unit forms the oracle rejects), committed grammar bytes final;
-  lexicon-cnl.2's typed module transcribes the table verbatim.
-  FillReject grows Parse
-  (repairable → cnl_parse_error) / Unregistered (terminal → cnl_unregistered_concept, payload
-  = lexicon-entry proposal) / Instrument (terminal fail-closed → cnl_round_trip_mismatch,
-  spends no repair). Record strategy: scratch-root record from a newly created EMPTY cassette
-  store; census route.single_cnl/** one-to-one against the run's attempted CassetteKey
-  {route, source, seed} ledger (unique keys + equality in both directions); identity-agreement
-  vs existing M2 cassettes decides — agree ⇒ M2 cassettes stand (no re-bless), drift ⇒ full
-  re-record + M2 recorded_run re-bless fallback; after agreement + replay verification,
-  replace the committed route.single_cnl subtree, never merge (keys disjoint from M2's).
-  Deliberate re-bless costs scheduled in units: ja_core.yaml
-  growth → lexicon_hash value pins (lexicon-cnl-data); report CNL population → M1/M2 report +
-  rendered-body pins (report-cnl.2/.3). Surface-quality metric rows gate on observations
-  carrying the new FillObservation fields → M2 replay rows byte-unchanged (metrics-cnl proves).
-  Archive-mined additions (user-directed 1M dig, 2026-07-07; measured priors distilled into
-  docs/poc-archive.md — SPEC §10/§11/§7.3 cite it, sessions read the SPEC text not the doc):
-  §7.3 gains the translation-faithfulness family + M3 unit metrics-faithful
-  (ir_faithfulness_rate = accepted IR content-hash == in-run deterministic reference
-  recompute; verdict metrics saturate + round-trip certifies only the surface, so an
-  accepted-but-mistranslated doc is otherwise invisible until M4); record-cnl.1 probes grammar
-  repetition points for degeneration loops (archived prior: verbose grammar-masked forms loop
-  + truncate); §11 seeded with route.reason_ir (free-reasoning stage → constrained commit —
-  the constraint-placement axis; sole archived form to beat single-IR faithfulness) +
-  indirect-rendering test-source variants (semantic indirection dents faithfulness where
-  surface-metamorphic variants leave verdicts intact). Census lens for record-cnl.3/
-  acceptance-m3: the archived conflict-killer signature = stable same-direction misses on
-  conflict groups (well-formed wrong deontic token) — check the M3 recorded census against it
-  before attributing verdict deltas to the CNL surface. Archived lineages live IN-REPO
-  (history refs, zero working-tree presence): branch archive/poc-m2-3-4 + tag
-  accept/m2-3-4-poc (the PoC), branches archive/spec01..03 (pre-restart spec lineages, mined
-  empty for CNL/DSL), and at `e8b5cf6` docs/charters/ (genesis prompt + its three charter
-  executions) + docs/poc-archive/*.json (M5 oblique canonical reports, the never-doc-synced
-  evidence) — scratch copies outside the repo are dispensable.
-  §10 + the unit lines hold the normative text; evidence behind the calls:
-  bridge ids MUST mint stmt/exc/bind counters mirroring normalize.rs (§8.6's <doc>.rule.<k> =
-  norm-layer rule ids only); faithfulness = §10 projection excluding binding region_ids
-  because CNL carries sentence-basis (rule + exception brackets — exception provenance DOES
-  reconstruct) and bridge bindings mint segment CLOSURES, never mention-region
-  provenance (M1 binds adult→r.2 only
-  while guideline A's statement basis = r.2 r.3 — exact-hash ir_match would zero on its own
-  goldens; the one BY-CONSTRUCTION divergence — binding status/cardinality diverge only off
-  the locked corpus, bridge one canonical-label Exact per concept vs M1 per (segment,
-  candidate set) surface-derived = measured misses, golden 1.0 pin certifies the corpus
-  miss-free); modality CNL tails ≠ source-match surfaces (を強く推奨する = particle + strength
-  adverb; the worked contraindication tail は禁忌である rides the 禁忌 row — the SECOND
-  ja_core row for its pair — so canonical selection = first TAIL-BEARING row via explicit
-  tail_ja/tail_en fields, never first-listed file order);
-  run.rs accept battery pins EMPTY ClinicalIr = accepted, schema IntervalBound admits
-  negatives, IrBundle::validate admits two-sided intervals + empty population+condition,
-  ExceptionClause admits arbitrary
-  atom vectors, off_lexicon_ids checks lexicon MEMBERSHIP never slot placement (wrong-slot
-  lexicon-valid ids — a drug concept in population, a population concept as action
-  target — pass today; the committed schema carries zero minItems) → CNL expressibility =
-  ONE executable predicate check_cnl_expressible(clinical, lexicon role+tail view, segments
-  segment_id→(kind, region_ids) keyed view) -> Result<(), CnlExpressibilityError>, home
-  cnl_bridge.rs
-  (cnl-expressible seeds it; ONE segment-closure helper serves the predicate, from_ir's
-  rule bracket (its exception-owned remainder), and to_ir's binding region_ids (whole
-  closure)), defined over grounded
-  membership-valid IR (role/tail legality predicate-owned, variants in-domain-reachable) —
-  ruling: one shared fn over two hand-maintained mirrored lists;
-  single_ir_accept (accept-total wires each variant → repairable Schema naming the offense,
-  census-flip-gated) + from_ir (entry check = sole Err source, projection Err-free past it
-  — residual failure = fail-closed panic) BOTH call it; §10 law acceptance ⇔ from_ir,
-  expressible-law harness (bridge-image + locked-corpus positives, per-class grounded
-  mutations, Ok side renders both languages); exception register = single positive
-  INTERVAL-FREE registered concept per sentence (grammar also admits the escape there —
-  accept rejects it terminal), disjunctive across sentences, BECAUSE the locked rules.rs
-  lowering
-  negates ONLY positive Concept atoms into the rule's one conjunct (ConceptNegated/Interval
-  exception atoms silently ignored — its hand-case test pins an exception Interval
-  contributing nothing) and NEVER interval-lowers a negative occurrence — the same hand-case
-  pins context pop.adult → Interval(age≥18) beside exception pop.adult → bare ¬Bool in ONE
-  conjunct, and emit keeps Bool/Real symbol pools disjoint with no linking axioms →
-  interval-carrying entries barred from ALL negative slots (exception concept, context
-  ConceptNegated) at acceptance, repair = the complement context interval: sound for
-  single-atom interval-free clauses (¬(E1∨…)=¬E1∧…) and for nothing wider
-  (a conjunctive exception needs De Morgan ¬A∨¬B — a different, wider rule); full exception
-  DNF would demand its own pre-bridge exception-lowering unit (De Morgan + interval-bound
-  complementation + bounded DNF distribution + expansion guard) — deliberately NOT M3, and a
-  conjunctive/negated/interval exemption is expressible as context refinement (context DNF
-  admits negated concepts + intervals; trade: exception regions reach rule source_region_ids
-  only via ExceptionClause.region_ids, so context-authored exemptions keep segment linkage,
-  lose rule-region provenance → a SOURCE exception transcribes as the exception sentence);
-  normalize's attach_exception CAN conjoin >1 Exact|Synonym-bound
-  concept into one clause (all positive; the locked corpus realizes exactly one) → from_ir
-  fails closed on wider clauses, accept-total rejects them on single_ir (M1 totality =
-  locked-corpus-scoped, corpus render audit; arbitrary M1-route inputs carry no claim); §10 laws quantify over the parser-accepted
-  language (runtime grammar = repairable superset — the open escape production admits payloads
-  the parser rejects); audit views need (pipeline, document) keying because exp.m3_cnl accepts
-  the same document on two routes. ETXTBSY fact behind spawn-retry: BOTH outcomes observed
-  across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY and
-  fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
-  retry impl is not.
-- M3 elaboration status (2026-07-12): the gap-hunt series' verification pass + its codex
-  review (11 findings, all accepted + pinned same-day — occurrence-vector escape payload,
-  §7.4 outcome map for the four cnl codes, single_cnl three-wrapper provenance chain +
-  no-new-TraceNodeKind pin, predicate TOTAL check order + multi-breach fixtures, wrapper
-  posture table, surface_tokens countable stream, faithfulness applicability invariant,
-  ir.rs M3→M4 comment fixes, this bullet's own de-absolutizing) leaves no KNOWN gap; the
-  claim is bounded by that audit, never a decree — a further elaboration prompt reviews the
-  fix commit + hunts fresh instead of re-running held checks. DOUBLE-verified holds (mine +
-  codex independent): SPEC anchors (§5 CnlDocument row, §7.2 owner field+fallback, §7.4 cnl
-  codes, §4.4 unsupported), unit order inversion-free, stage kind = free-form Id
-  (sole-core-touch claim holds as scoped), prefix audit over the full pinned inventory (53 JA
-  + 49 EN literals, zero proper-prefix collisions; 投与しないこと source-match-only keeps
-  投与 steal-free). Tokenization claim, stated precisely: over the validated deduplicated
-  main-mode inventory, prefix-freedom ⇒ ≤1 literal matches at any position ⇒ greedy scan of
-  in-language input is the unique tokenization; out-of-language input rejects (parse error) —
-  no completeness-over-arbitrary-input claim; delimiter modes (escape payload, basis
-  internals) argued separately. Sole open in-unit decision: escape open-production notation
-  (cnl-grammar.1, 1b stop-the-line probe). §11–§13 thinness = staged
-  elaborate-at-acceptance design, out of M3 units' reach.
+  `run_oracle.rs` test-oracle naming; property-based/fuzzing for the canon layer (backlog
+  canon-props); shared cross-crate subprocess runner + registry symlink guard (backlog
+  subproc-runner.1/.2, path-confine — all backlogged at the 2026-07-12 reset).
+- Architecture reset (user directive 2026-07-12; supersedes the 2026-07-07 CNL-first
+  directive; SPEC rewritten same day = design authority — read SPEC §0/§3/§10/§11, never this
+  bullet, for semantics): CKC = representation-neutral research harness FIRST; ClinicalCNL =
+  high-priority CANDIDATE under the same §11 promotion bar as every route. Its former
+  product-surface commitments (audit views on every route, from-IR rendering, EN mirror,
+  escape, findings CNL quoting, lexicon accretion) are §11.3 promotion-gated scope, no longer
+  committed. Surviving decisions: name ClinicalCNL + id forms (clinical_cnl_ja.grammar,
+  schema.clinical_cnl, route.single_cnl); GF adoption deferral (until JA parse of non-CKC
+  text or >2 languages); expected outcomes = human-authored oracle annotations, never
+  route-derived; faithfulness-vs-M1-reference = diagnostic only (agreement-with-instrument);
+  probabilistic-step-at-one-boundary invariant. The pre-reset §10 elaboration, 40-unit M3
+  plan, and this file's former M3-plan bullet are git-resident at `ecc19d3` (SPEC §14
+  retrieval note) — mine them when a deferred capability is promoted, never re-derive; the
+  reset commit's roadmap carries forward the still-live implementation pins (authored JA
+  lexicon table, prefix audit, bnf facts, bridge oracle, findings-owner ruling).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
@@ -870,11 +487,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   independently re-read experiments+reference; resolve/corpus/record-setup reads
   reopen paths too) was LOW-SEV-deferred as benign on static committed files — WRONG,
   review-reproduced (corpora.yaml mutated between resolution and manifest assembly ⇒ `ok`
-  run whose manifest attests bytes the execution never used) → SCHEDULED as M3
-  input-snapshot.1–.3 (read-once ResolvedFile/InputSnapshot, every phase consumes the
+  run whose manifest attests bytes the execution never used) → BACKLOGGED (2026-07-12 reset:
+  input-snapshot.1–.3 — read-once ResolvedFile/InputSnapshot, every phase consumes the
   snapshot). Constraint-path variant: the runtime child reopens the pathname mid-call, so
   no parent-side reread (ConstraintDrift included) GUARANTEES catching a transient A→B→A
-  rewrite → M3 constraint-snapshot stages frozen bytes; reread-verify is never the fix for
+  rewrite → backlog constraint-snapshot stages frozen bytes; reread-verify is never the fix for
   a path another process reopens.
 - Live-body const-pin pattern (run-m2.1e-C2; recurs at every future live pin): a full-body
   `report_en/ja.md` const pin over a REAL run must NORMALIZE the solver version (z3 `--version` is

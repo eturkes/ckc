@@ -843,8 +843,9 @@ impl CanonRead for ContextExpr {
 /// SPEC §5 terminology binding: one mention bound to a concept of `system`
 /// (M1: `ckc.lex`). `alternatives` carries the competing codes of an
 /// `ambiguous` binding (§4.3 set); `region_ids` carry provenance at the
-/// producer's grain (§4.3 set): normalize grounds the mention, §10's CNL
-/// bridge mints the citing statements' segment closures. System, code, and
+/// producer's grain (§4.3 set): normalize grounds the mention, §10.4's CNL
+/// bridge mints the sorted union of the citing statements' cited regions.
+/// System, code, and
 /// alternatives are terminology vocabulary — verbatim in structural bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TerminologyBinding {
@@ -910,7 +911,7 @@ impl Structural for TerminologyBinding {
 /// One exception clause of a [`ClinicalStatement`]: the exception's own
 /// (positive) condition atoms plus its source_linkage. stage-normalize.2 compiles
 /// each clause's positive `Concept` atoms into negated conjuncts of the rule
-/// context — per atom; SPEC §10's register keeps clauses single-concept, wider
+/// context — per atom; SPEC §10.4's register keeps clauses single-concept, wider
 /// shapes sit outside the compile contract — the clause regions
 /// joining `source_region_ids` (§5); [`NormativeRule::exception_refs`] cite
 /// `exception_id`s for trace.
