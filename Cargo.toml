@@ -5,7 +5,9 @@ members = ["crates/ckc-cli", "crates/ckc-core", "crates/ckc-smt"]
 
 [workspace.package]
 edition = "2024"
-license = "Apache-2.0"
+# GPL-3.0-or-later (2026-07-12, was Apache-2.0): clears copyleft-licensed
+# lexical resources (Clex-class, GPL-3.0) for committed derived rows — SPEC §11.
+license = "GPL-3.0-or-later"
 
 # Single source of truth for external dependency versions; exact resolved
 # versions live in Cargo.lock (SPEC §1).

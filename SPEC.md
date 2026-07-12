@@ -213,7 +213,7 @@ Repository layout (target state; built up by the M1 units):
 
 ```text
 .
-├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore
+├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore   # LICENSE = GPL-3.0-or-later (§11)
 ├── Cargo.toml  Cargo.lock
 ├── crates/{ckc-core,ckc-smt,ckc-cli}/
 ├── corpus/{test_sources,lexicon,reference}/        # committed, license-clean
@@ -1792,14 +1792,22 @@ stability without faithfulness is the stability of a wrong answer.
   rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
   acquisition, internal processing/mining, derivative authoring, committing derived rows,
   and redistribution — `PermissionRecord` + `G-SOURCE-PERMISSION`, never inherited across
-  resources or versions. ACE precedent, adopted vs rejected: adopted — the Clex/Ulex
-  architecture (committed common core + per-corpus user accretion; Clex itself is
-  COMLEX-derived, the seed-from-existing-resource precedent this table follows) and
-  decree-authored forms; rejected — direct Clex content import (poor row-level fit: ~100k
-  general-English word-form entries with inflectional morphology serving an agreeing
-  parser, vs CKC's morphology-free bilingual whole-surface concept rows — the EN mirror
-  deliberately invariant — plus unresolved GPL-3.0 derivative-work obligations for
-  committed derived rows; no content transfer planned) and Ulex precedence-shadowing (a
+  resources or versions. CKC itself is GPL-3.0-or-later (relicensed 2026-07-12 from
+  Apache-2.0 — LICENSE + workspace Cargo.toml — precisely so copyleft-licensed sources
+  clear): for a GPL-3.0-compatible resource, the evidence row's derivative-authoring,
+  committed-row, and redistribution permissions are settled by license compatibility;
+  the per-resource row is still recorded — compatibility answers the copyleft dimension,
+  not identity, version, or acquisition-terms attestation. ACE precedent, adopted vs
+  rejected: adopted — the Clex/Ulex architecture (committed common core + per-corpus user
+  accretion; Clex itself is COMLEX-derived, the seed-from-existing-resource precedent
+  this table follows) and decree-authored forms; rejected — direct Clex content import,
+  on row-level fit alone (the former GPL-3.0 derivative-work ground dissolved with the
+  relicense; Clex — GPL-3.0, verified upstream 2026-07-12 — is now commit-compatible and
+  stays available as an EN-side candidate-mining seed behind its evidence row should
+  demand materialize): ~100k general-English word-form entries with inflectional
+  morphology serving an agreeing parser, no clinical specialization, vs CKC's
+  morphology-free bilingual whole-surface concept rows — the EN mirror deliberately
+  invariant — so no content transfer planned; and Ulex precedence-shadowing (a
   shadowing entry can change how standing surface text is interpreted; collisions are §10
   hard gates here, never precedence). Grammar scale posture: the emitted grammar grows
   linearly with the lexicon (per-surface terminal alternations, per-quantity-row

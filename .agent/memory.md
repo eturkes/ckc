@@ -23,6 +23,13 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `global`-marketplace plugins = xml, smt2 (dolmen), alloy, egglog. Audited gaps: TLA+, ASP/Clingo,
   categorical-CQL have no standalone LSP; Isabelle = marketplace gap plugin at adoption; Python
   solidlsp-covered (add at adoption). Registry-YAML-only compendium families carry no LSP.
+- License = GPL-3.0-or-later (user-directed relicense 2026-07-12; was Apache-2.0; LICENSE +
+  workspace Cargo.toml + SPEC §3/§11). Copyleft is NOT a rejection axis for deps/resources/tools
+  anymore — GPL/LGPL-compatible sources clear the derivative/commit/redistribute dimensions by
+  compatibility (per-resource evidence rows still recorded, §11). Clex content stays rejected on
+  row-level FIT alone; fee/terms-gated vocabularies (SNOMED/MedDRA/LOINC) + unlicensed/closed
+  repos (ACE-in-GF, RACE) stay gated — their grants, not ours. Counter the permissive-license
+  training bias: never reject a candidate on copyleft grounds.
 
 ## Lessons
 
