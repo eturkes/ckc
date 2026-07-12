@@ -780,7 +780,13 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   grounded spans, an all-ungrounded row leaves
   boundary residuals, and IrBundle::validate rejects empty support — the shared region
   bundle-valid, validate never checks cross-segment disjointness; the predicate owns both
-  fail-closed over its raw view). Tests: per-class rejection battery naming the variant
+  fail-closed over its raw view). Check order TOTAL + pinned (predicate_class = the first
+  breach — codes-cnl consumes it; the topology sub-order above covers only its six):
+  tail-unbacked pair, empty statements array, then per statement in document order — empty
+  population+condition, interval register (population atoms then condition, stored §4.3
+  order), wrong-slot placement, negative occurrence, exception-clause structure, empty
+  clause region_ids — then the topology six; a later class never reports while an earlier
+  breach holds. Tests: per-class rejection battery naming the variant
   (interval class: the exhaustive 16-bound-presence-mask × per-bound {-1,0,1} truth table —
   valid iff exactly one bound present ∧ value ≥ 0; expectation table shared with cnl-ast's
   AST-side battery, cross-side faithfulness by construction; ownership classes
@@ -925,7 +931,10 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   cnl-laws' distributed-Exception-cover axis case via
   to_ir (the partial-Recommendation-citation case collapses through to_ir to the
   full-citation IR — its discrimination lives in cnl-laws' normal-form law, not
-  here)). Assert per
+  here)) + ≥2 cross-class multi-breach fixtures pinning cnl-expressible's TOTAL check
+  order (tail-unbacked beside wrong-slot → names tail-unbacked; wrong-slot beside a
+  topology breach → names wrong-slot — single-class mutations alone force no cross-class
+  precedence). Assert per
   case, three ways: single_ir_accept over canonical bytes ⇔ check_cnl_expressible ⇔
   from_ir — Ok together or rejecting the SAME class — and on the Ok side from_ir's AST
   renders both languages (§10 render totality end-to-end). Bounds CI-sane. Read scope:
@@ -935,15 +944,21 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   CnlInexpressibleIr (fieldless_enum append; CnlInexpressibleIr = report-stage only,
   report-cnl.2 lands it on a guard-less route's from_ir reject — record outcome
   unsupported (§4.4), canonical payload map {predicate_class, pipeline_id, document_id},
-  predicate_class = the FIRST failing check under the predicate's pinned order (the order
-  expressible-law already forces), stable spelling = the CnlExpressibilityError variant
+  predicate_class = the FIRST failing check under cnl-expressible's pinned TOTAL order
+  (expressible-law's multi-breach fixtures pin it — single-class mutations alone force
+  only per-class reachability), stable spelling = the CnlExpressibilityError variant
   name; NO FillReject arm, EXCLUDED from RouteTaxonomy — route-single-cnl.6 wires the
-  fill/accept cnl codes only) + FillReject +Parse(String) (repairable → cnl_parse_error) /
-  +Unregistered{surface, position} (terminal → cnl_unregistered_concept; payload = the
-  lexicon-entry proposal) / +Instrument(String) (terminal fail-closed →
-  cnl_round_trip_mismatch, spends no repair) + model_fill.rs mapping + stage tests (repair
-  recovery / both terminals / instrument path). Codes carry payload, empty refs
-  (DiagnosticRecord convention).
+  fill/accept cnl codes only) + FillReject +Parse(String) (repairable → cnl_parse_error,
+  outcome Invalid — the landed ai_schema_violation convention) /
+  +Unregistered{occurrences} (nonempty vec of §10 occurrence records {surface, rule,
+  slot, path}, ALL occurrences in bridge bind-mint traversal order — a singular payload
+  would collapse multi-escape documents to first-found; terminal → ONE
+  cnl_unregistered_concept, outcome Unsupported per §10's code bullet, payload = the
+  occurrence-vector proposal seed + emission language) / +Instrument(String) (terminal
+  fail-closed → cnl_round_trip_mismatch, outcome Invalid, spends no repair) +
+  model_fill.rs mapping + stage tests (repair
+  recovery / both terminals incl. a two-occurrence vector pin / instrument path). Codes
+  carry payload, empty refs (DiagnosticRecord convention).
 - [ ] route-stage-handles: behavior-locked rework (widening the
   positional array for the bridge stage compounds off-by-one + provenance risk) — retire
   run.rs's positional stage plumbing (Resolved.pipeline_step_ids [Id; 8] UNUSED_STAGE-padded;
@@ -982,7 +997,9 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   lexicon-scoped ENFORCED, its sole parse-unenforced clause = the §10 negative-occurrence
   bar (token tables already guarantee tails/refs/vars/roles) → repairable reject carrying
   the §10 complement-interval repair) →
-  escape scan over context + exception + action-target slots (Unregistered terminal) →
+  escape scan over context + exception + action-target slots (full-document traversal in
+  the bridge's bind-mint order collecting ALL occurrences — §10 occurrence vector, never
+  first-found; Unregistered terminal) →
   grounding (every bracket's basis regions ⊆ regions — rule + per-exception — each cited
   region anchored in exactly ONE segment + derived segments' region sets unshared
   (closure-functional; orphan/shared reject) + the §10 basis-ownership laws over the
@@ -1040,8 +1057,20 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
 - [ ] route-single-cnl.3: single_cnl_fill + execute_routes SingleCnl arm (head reuse → fill →
   bridge + assemble tail into the per-group compile/verify loop via the shape's named stage
   handles — route-stage-handles' representation) + landing
-  (cnl_document + clinical_ir + bundle wrappers route-namespaced; bundle input_hashes cite
-  cnl_document + accepted cassette; check TraceNodeKind coverage at impl) + §4.6 events (fill
+  (three wrappers route-namespaced under §4.4 immediate-consumption input_hashes:
+  cnl_document {AiGenerated, AcceptedEvidenceStatus, inputs [graph, segments,
+  accepted-cassette hash]} — the smt_query accepted-model-output posture — → clinical_ir
+  {DeterministicCompiler, MechanicalEvidenceStatus, inputs [cnl_document, segments]} —
+  the bridge stage's declared inputs, AI lineage riding the chain — → ir_bundle mirroring
+  single_ir's landed assemble tail {DeterministicCompiler, MechanicalEvidenceStatus,
+  inputs [graph, segments, clinical_ir]}; the cassette hash attests at the cnl_document
+  hop, replacing single_ir's bundle-cites-cassette stand-in (there the fill lands no
+  artifact); trace DAG PINNED — no new TraceNodeKind/TraceOperation: fill + bridge
+  artifacts stay off-DAG like every landed fill artifact (single_ir's wrapper-less fill,
+  direct's smt_query wrappers), the IrBundle node arrives via reused m2.assemble
+  (operation assemble), bridge visibility = its §4.6 event + the clinical_ir wrapper's
+  producer + the input-hash chain; new-node-kind alternative rejected — rank/census
+  re-bless churn for provenance the chain already carries) + §4.6 events (fill
   + bridge; clock discipline — compose prompts outside timed intervals) + landing-gate test
   + findings-owner selection (plan-header bullet — this unit lands the second compiled+results
   route, the shared tails break without it): GroupTrace owner mark set by execute_routes,
@@ -1056,12 +1085,17 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   layout, event input_hashes pinned independently — the .1d4b lesson: pins split from wiring
   AND from cassette authoring).
 - [ ] route-single-cnl.6: rejection cassettes (parse-error → derived-seed repair → recover /
-  unregistered-concept terminal / hallucinated-basis terminal / exhaustion) + §7.4 ledger pins
+  unregistered-concept terminal — multi-escape fixture: two occurrences in distinct slots,
+  full §10 vector + traversal order pinned / hallucinated-basis terminal / exhaustion) +
+  §7.4 ledger pins
   + RouteTaxonomy cnl-code wiring + taxonomy pins.
 - [ ] metrics-cnl: FillObservation optional CNL fields (round_trip_ok, surface_tokens,
   accepted_rules; surface_tokens = the committed JA lexer's (cnl-parse.1 token layer)
   token count summed over the accepted CnlDocument's stored canonical JA per-rule texts —
-  the hash-locked bytes, LF frame outside the count; deterministic + runtime-free per
+  the hash-locked bytes, LF frame outside the count; countable stream pinned: every
+  main-mode token (lexicon / fixed / digit) = 1, each basis-bracket id ref = 1 (bracket
+  open/close are main-mode tokens, id-separator spaces uncounted; escape payloads
+  unreachable — accepted documents are escape-free); deterministic + runtime-free per
   §7.3 — a model-runtime tokenizer count REJECTED, it would bind the metric to a
   versioned runtime-tokenizer replay dependency, identity+counts separately attested;
   accepted_rules = the document's rule count) +
@@ -1085,10 +1119,15 @@ Cross-unit decisions (durable copy in memory's M3-plan bullet):
   corpus, canonical-label Exact per distinct concept vs M1's per-(segment, candidate set)
   surface-derived mints = measured misses), all else
   exact incl. stmt/bind/exc ids (single_ir: accepted fill; single_cnl: bridged IR; direct_smt
-  lands no IR → field None, row not_applicable). Golden path pins projection-match 1.0
+  lands no IR → field None, row not_applicable). Applicability ATOMIC, mirroring
+  metrics-cnl's invariant: ir_match present ⇔ accepted fill on an IR-landing model route —
+  absent on rejects + non-IR routes, any other pattern = fail-closed instrument error (a
+  silent None on an accepted IR-bearing fill would drop the row's denominator unnoticed).
+  Golden path pins projection-match 1.0
   (certifies the corpus miss-free). Rows gate on observations carrying the field (M2 replay rows
   byte-unchanged, omit-None); deltas ride the existing route-delta loop. Tests: match /
-  mismatch / None-NA + golden-path 1.0 + M2-replay byte-pin. Read scope: normalize/derive fn
+  mismatch / None-NA + applicability-violation instrument error + golden-path 1.0 +
+  M2-replay byte-pin. Read scope: normalize/derive fn
   signatures, run.rs fill-tail region, metrics.rs row assembly — the §7.3 family text names
   the rationale.
 - [ ] report-cnl.1: Report shape — cnl_documents keyed (pipeline, document) per §10 ({ja,en}

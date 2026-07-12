@@ -1401,8 +1401,18 @@ Committed direction:
   one open production per language (notation decided at the grammar emitter). The
   escape parses and round-trips like any atom and always fails accept with
   `cnl_unregistered_concept`, terminal for the run: repair prompts never mint or steer concept
-  identity — resolving a gap is a lexicon-review decision, not a retry. Its payload (quoted
-  surface + atom position) is exactly the lexicon-entry proposal artifact: over the locked M1
+  identity — resolving a gap is a lexicon-review decision, not a retry. Occurrence discipline:
+  accept's escape scan walks the whole document in the bridge's bind-mint traversal order
+  (rule-major; within a rule context disjunct-major then conjunct order, action target,
+  exception sentences in order) and reports ALL occurrences — one terminal reject per attempt,
+  its payload the nonempty occurrence vector (each occurrence {surface, rule index, slot
+  (context | action_target | exception), path (disjunct + conjunct | exception index)}) plus
+  the emission language; a singular payload would collapse multi-escape documents to
+  first-found. That vector is the lexicon-entry proposal SEED, deliberately not the full §11
+  proposal object: the decomposition pass derives {language, position, provenance} from seed +
+  run-ledger row (route, document, attempt, cassette key) and span evidence from cited
+  segments at triage — the seed itself claims no spans, escape surfaces being model-chosen,
+  not source-anchored. Over the locked M1
   inputs any occurrence is instrument signal (vocabulary covered by construction); from M4 the
   §11 accretion loop consumes it — propose → lint → review → accepted entries join the
   lexicon, grammar re-emitted under the drift guard — so vocabulary growth stays amortized,
@@ -1557,11 +1567,17 @@ Audit honesty: audit views render only from accepted artifacts, never from raw m
   runs. If a §11 ablation (compact record DSL) wins emission instead, the CNL stays
   the audit surface via render-from-accepted-IR and the probabilistic step retargets — the
   architecture is invariant to that outcome.
-- §7.4 M3 codes: `cnl_parse_error` (repairable; reason in payload, empty refs — mirrors
-  `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code:
+- §7.4 M3 codes, each pinned to its one §4.4 Outcome (the §7.4 map for these four):
+  `cnl_parse_error` (repairable, outcome `invalid`; reason in payload, empty refs — mirrors
+  `ai_schema_violation` conventions), `cnl_round_trip_mismatch` (fail-closed instrument code,
+  outcome `invalid`:
   an accepted AST whose canonical render fails to re-parse identically — grammar/lexicon
-  drift, never a model failure), `cnl_unregistered_concept` (terminal; the escape-production
-  reject — payload = the lexicon-entry proposal, quoted surface + atom position),
+  drift, never a model failure), `cnl_unregistered_concept` (terminal, outcome `unsupported` —
+  grammar-valid honest signal naming vocabulary outside implemented semantics, mirroring
+  `cnl_inexpressible_ir` and deliberately unlike single_ir's off-lexicon `invalid`, whose ids
+  violate that route's declared vocabulary enum while the escape violates nothing; the
+  escape-production
+  reject — payload = the occurrence-vector proposal seed above),
   `cnl_inexpressible_ir` (report-stage: an accepted ClinicalIR the expressibility predicate
   rejects at `from_ir` on a route without the acceptance guard — payload names the predicate
   class and the (pipeline, document) key, refs empty; record outcome `unsupported` — §4.4

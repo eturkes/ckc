@@ -801,18 +801,25 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   across filesystems — the spawn_piped ETXTBSY tests pass where the fs yields ETXTBSY and
   fail where it doesn't (overlayfs among the latter) — fs-dependence is the defect, the
   retry impl is not.
-- M3 elaboration CLOSED (2026-07-12): the user-directed gap-hunt series (18 external reviews +
-  composition/terminal/lexicon-data/§11-accretion/license sessions) ended on an independent
-  full-plan verification pass — SPEC anchors present (§5 CnlDocument row, §7.2 owner
-  field+fallback, §7.4 cnl codes, §4.4 unsupported), unit order inversion-free, stage kind =
-  free-form Id (sole-core-touch claim holds; TraceNodeKind CLI-side), tokenization determinism
-  re-proved (pairwise prefix-freedom ⇒ ≤1 token match per position ⇒ maximal munch
-  deterministic + complete), lexicon-cnl-data's banked JA+EN prefix audit re-derived from
-  scratch (holds; 投与しないこと source-match-only keeps 投与 steal-free) — ZERO logic gaps.
-  Unpinned remainder is deliberate + in-unit (escape open-notation at cnl-grammar.1 behind the
-  1b stop-the-line probe; two confirm-at-impl mechanicals); §11–§13 thinness = the staged
-  elaborate-at-acceptance design, out of M3 units' reach. Verdict: proceed to spawn-retry —
-  a further elaboration prompt should cite this bullet instead of re-running the sweep.
+- M3 elaboration status (2026-07-12): the gap-hunt series' verification pass + its codex
+  review (11 findings, all accepted + pinned same-day — occurrence-vector escape payload,
+  §7.4 outcome map for the four cnl codes, single_cnl three-wrapper provenance chain +
+  no-new-TraceNodeKind pin, predicate TOTAL check order + multi-breach fixtures, wrapper
+  posture table, surface_tokens countable stream, faithfulness applicability invariant,
+  ir.rs M3→M4 comment fixes, this bullet's own de-absolutizing) leaves no KNOWN gap; the
+  claim is bounded by that audit, never a decree — a further elaboration prompt reviews the
+  fix commit + hunts fresh instead of re-running held checks. DOUBLE-verified holds (mine +
+  codex independent): SPEC anchors (§5 CnlDocument row, §7.2 owner field+fallback, §7.4 cnl
+  codes, §4.4 unsupported), unit order inversion-free, stage kind = free-form Id
+  (sole-core-touch claim holds as scoped), prefix audit over the full pinned inventory (53 JA
+  + 49 EN literals, zero proper-prefix collisions; 投与しないこと source-match-only keeps
+  投与 steal-free). Tokenization claim, stated precisely: over the validated deduplicated
+  main-mode inventory, prefix-freedom ⇒ ≤1 literal matches at any position ⇒ greedy scan of
+  in-language input is the unique tokenization; out-of-language input rejects (parse error) —
+  no completeness-over-arbitrary-input claim; delimiter modes (escape payload, basis
+  internals) argued separately. Sole open in-unit decision: escape open-production notation
+  (cnl-grammar.1, 1b stop-the-line probe). §11–§13 thinness = staged
+  elaborate-at-acceptance design, out of M3 units' reach.
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)

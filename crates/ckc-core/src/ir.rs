@@ -758,7 +758,7 @@ impl CanonRead for QuantityInterval {
 }
 
 /// SPEC §5 context atom, a §4.3 tagged union: concept predicate, negated
-/// concept predicate, or quantity interval (M3 adds slot equality and
+/// concept predicate, or quantity interval (M4 adds slot equality and
 /// temporal atoms). Concept ids and interval variables are lexicon
 /// vocabulary, so atoms have no [`Structural`] impl — enclosing components
 /// embed their canonical bytes.
@@ -966,7 +966,7 @@ impl Structural for ExceptionClause {
 /// population and condition as atom sets, the action, deontic modality
 /// ([`Direction`]), strength, optional certainty, exception clauses in
 /// document order, and the source segments it normalizes (§4.3 set).
-/// Comparator/outcome/temporal slots stay M3. An independently hashable
+/// Comparator/outcome/temporal slots stay M4. An independently hashable
 /// component.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClinicalStatement {
