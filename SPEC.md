@@ -18,6 +18,21 @@ source-grounded components, compiled deterministically to machine-evaluable targ
 first), surfacing contradictions and documented no-conflict results with end-to-end
 machine-checkable evidence.
 
+Product push (user directive 2026-07-13; the third directive in the 2026-07-07 CNL-first →
+2026-07-12 reset sequence — conservation intact, nothing deleted): time constraints move
+ClinicalCNL authoring and its compiler into committed build scope NOW, hosted on an in-tree fork
+of the Attempto Parsing Engine (APE; Prolog under SWI-Prolog, AceRules-adapted rule generation)
+compiling ClinicalCNL text to a clinical Prolog knowledge base — the LP lane pulls forward from
+registered (§11.3) to build scope, English ACE-profile surface first (the JA-primary surface
+stays the mission target; its full pre-reset design is mined per §14, never re-derived). The
+landed Rust harness stays the verification and evidence instrument; Z3 stays the conflict
+oracle (SMT cross-check of the APE line arrives with the deferred IR bridge, §10.6). The
+§10.1–§10.3/§10.5 comparison machinery and the Rust CNL lane defer as conserved instruments
+(§11.2). Honesty rule for reports: the APE line is a user-directed product bet, not an
+evidence-selected route — no report may describe it as selected by harness evidence until the
+deferred comparison runs; the §10.6 optimization loop (experiment 2's informal precursor) is
+development machinery, never a locked measurement.
+
 Standing invariant, every candidate: the probabilistic step is confined to one boundary —
 source text into a route's constrained emission surface; every layer below an accepted
 artifact is a deterministic compiler.
@@ -142,8 +157,8 @@ any wider build, and each milestone's evidence is the next milestone's input.
 | --- | --- | --- |
 | M1 scaffold (landed) | Deterministic layered pipeline end-to-end on synthetic Japanese test sources: extract → segment → normalize → assemble → compile → verify → trace → report; one deontic contradiction found, one no-conflict result documented, full trace, deterministic replay. Pure Rust. Doubles as baseline control and reference-derivation instrument. | `ckc run --experiment exp.m1_scaffold` + §8 checklist |
 | M2 multi-hop PoC (landed) | Experiment 1's minimal pair: a weak local model (laptop CPU, constrained decoding, recorded I/O) translates the M1 test sources via `route.direct_smt` versus `route.single_ir`; scored on validity/acceptance/verdict-accuracy/stability raw rows; bilingual research report. Landed the multi-route harness: recorded model adapter, cassettes, repair loop, metrics, baseline-delta table. | `ckc run --experiment exp.m2_multihop` + §9 |
-| M3 route comparison | The smallest decisive experiment on the strongest open question: ClinicalCNL v1 slice (§10.4 — JA-only, closed lexicon) as `route.single_cnl`, compared against the landed §9 pair on identical locked inputs under the neutral contract (§10.1–§10.2), with the faithfulness, round-trip, and resource instruments and the run explorer (§10.5). | `ckc run --experiment exp.m3_cnl` + §10.5 |
-| M4 selection + widening | §11 promotion review over M1–M3 evidence CHOOSES the next experiment; selection itself (canonicalize, migrate, set retirement gates) waits for the §11.2 trigger — two corpus generations — so M4 typically builds the growth set plus the most decisive widening or deconfounding route first, repeating until the trigger is satisfiable. Deferred instruments land on evidence demand: M4 conflict kinds, component store, model-free coverage, claim completeness, k>1 sampling, LP lane (§11.4). | `ckc run --experiment exp.m4_*` + §11 |
+| M3 ClinicalCNL product line + loop framework | User-directed product push (§0, §10.6): vendored APE fork building + testing green under SWI-Prolog; ClinicalCNL v1 as a fail-closed ACE profile (EN surface) over a demand-authored clinical ulex; AceRules-adapted DRS → clinical Prolog KB mapping with labeled exception overrides and per-sentence provenance; Prolog-side conflict/no-conflict queries re-deriving the M1 docA×docB thread; locked synthetic conformance corpus + one-command runner; `/cnl-optimize` + `/loop` round framework for open-ended improvement. | Conformance runner green over the committed corpus + §10.6 round protocol; first loop rounds ledgered |
+| M4 selection + widening | Absorbs the deferred §10.5 comparison when evidence demand schedules it (§0 push note). §11 promotion review over M1–M3 evidence CHOOSES the next experiment; selection itself (canonicalize, migrate, set retirement gates) waits for the §11.2 trigger — two corpus generations — so M4 typically builds the growth set plus the most decisive widening or deconfounding route first, repeating until the trigger is satisfiable. Deferred instruments land on evidence demand: M4 conflict kinds, component store, model-free coverage, claim completeness, k>1 sampling, LP lane (§11.4). | `ckc run --experiment exp.m4_*` + §11 |
 | M5 optimization PoC | Bounded autonomous-optimization loop (§12) over declared surfaces against a fixed evaluator, optimizing translation reliability, reuse, and coverage; append-only ledger; driver-independent — local driver for acceptance, Claude-agent driver defined (experiment 2's optimization protocol). | `ckc research loop --experiment exp.m5_loop` + §12 |
 | M6 sources + expansion | Public corpus ingestion (fetch/cache, permission records, real Minds/J-STAGE HTML+PDF extraction, tables and DecisionTable IR, MEDIS-anchored terminology, e-PI XML source family, drift checks), then registry-guided expansion: retrieval, richer rule semantics, additional solvers/targets, corpus scale, experiment-matrix expansion, the cross-source flagship experiment. | §13.1 requirements elaborated at M5 acceptance; §13.2 per candidate |
 | M7 auditor product | Reviewer-facing audit over M6 corpora (experiment 3): finding classification (severity, bilingual review questions), weighted minimal-correction-set revision targeting, cvc5 cross-check on blocking/major findings, Lean per-finding proof anchor, human review records, self-contained bilingual `report.html`, auditor manuscript bundle. | `ckc run --experiment exp.m7_audit` + §13.3 |
@@ -171,6 +186,9 @@ processing stage boundary a validated, content-addressed artifact.
 
 Stack: a Rust workspace (edition 2024) implements everything through M5; external engines (Z3,
 the M2 local-model runtime) join as recorded subprocess adapters rather than language bindings.
+The §10.6 product line (2026-07-13) adds the one non-Rust build home: the APE fork under
+SWI-Prolog at `clinicalcnl/` — a user-directed second toolchain ahead of comparative evidence
+(§0 honesty note).
 M6's elaboration decides per extraction/NLP adapter whether to stay Rust or admit a `uv`-managed
 Python adapter layer joined only through canonical artifacts and exported JSON Schema; the
 decision criteria are determinism, lockability, test source-tested quality, and maintenance cost,
@@ -223,12 +241,14 @@ promotion/retirement event recorded here):
 | `pipe.layered_ckcir_to_smt` (M1) | Baseline/legacy control + reference-derivation instrument. |
 | `route.direct_smt` | Weak baseline control (landed; declared §10.1 nonconformances: group-grain emission, no source citation — mints no claims). |
 | `route.single_ir` | Candidate route: structured-IR emission (landed). |
-| ClinicalCNL grammar/AST/bridge | Candidate representation, high priority (§10.4 slice at M3). |
-| Prolog-family LP lane, cvc5, Lean | Candidate backends: registered, evidence-triggered (§6 LP profile, §13.2). |
-| Attempto/ACE/APE, GF, PENG, FRET et al. | External prior art + dev-time design oracles; no build dependency (license posture §11.5). |
+| ClinicalCNL | Committed product surface (§10.6: EN ACE profile on the APE fork); the Rust grammar/AST/bridge lane (§10.4) defers with the comparison. |
+| Prolog-family LP lane (SWI-Prolog + APE fork, §10.6) | Product-line host + generated target + execution/explanation backend (build scope 2026-07-13, user-directed, §0). |
+| cvc5, Lean | Candidate backends: registered, evidence-triggered (§13.2). |
+| APE + AceRules (Attempto family) | Forked product-line host at `clinicalcnl/` (§10.6; §11.5 evidence rows land with the fork commit). |
+| GF, PENG, FRET et al. | External prior art + dev-time design oracles; no build dependency (license posture §11.5). |
 | `docs/` compendium | Research archive, git-resident (§14). |
 | Dual-surface emission split; Ulex precedence shadowing | Retired designs (git history). |
-| EN mirror surface; unregistered-concept escape; from-IR audit rendering; CNL findings quoting; lexicon accretion pipeline | Deferred CNL capabilities: promotion-phase scope (§11.3), deliberately outside the M3 slice. |
+| EN mirror surface; unregistered-concept escape; from-IR audit rendering; CNL findings quoting; lexicon accretion pipeline | Deferred CNL capabilities of the Rust §10.4 lane: promotion-phase scope (§11.3); the §10.6 APE line has its own EN-first surface + in-lane accretion rounds. |
 
 License: GPL-3.0-or-later, Copyright (C) 2026 Emir Turkes — the whole tree (code, spec,
 registries, project-authored corpus) conveys under LICENSE's terms; §11.5 carries the
@@ -241,6 +261,7 @@ Repository layout (target state; built up by the M1 units):
 ├── SPEC.md  AGENTS.md  CLAUDE.md  LICENSE  .gitignore   # LICENSE = GPL-3.0-or-later (§11.5)
 ├── Cargo.toml  Cargo.lock
 ├── crates/{ckc-core,ckc-smt,ckc-cli}/
+├── clinicalcnl/                            # §10.6 APE fork + clinical profile/mapping/corpus (Prolog)
 ├── corpus/{test_sources,lexicon,reference}/        # committed, license-clean
 ├── registry/                              # corpora.yaml candidates.yaml experiments.yaml at M1;
 │                                          # grows per milestone (§14)
@@ -922,7 +943,12 @@ Acceptance themes (finalized at elaboration): both routes execute over identical
 baseline-delta table; expected conflict/no-conflict outcomes hold per reference for accepted translations;
 the bilingual report renders deterministically from `report.json`; §0 vocabulary holds.
 
-## §10 M3 — Candidate routes, neutral contract, route comparison (reset 2026-07-12)
+## §10 M3 — Candidate routes, neutral contract, route comparison (reset 2026-07-12; push 2026-07-13)
+
+2026-07-13 product push (§0): `exp.m3_cnl`, the §10.1–§10.3 contracts, and §10.4-as-route defer
+as conserved instruments — unscheduled until evidence demand (§11.2 conservation). §10.4's
+semantic content (sentence model, slot shapes, interval semantics, provenance grain) is mined
+design authority for the §10.6 profile and any later JA surface. M3's build scope = §10.6.
 
 Intent: the design authority for fair comparison — the route contract every candidate
 satisfies, the evaluation contract that scores them, the candidate matrix, and the M3
@@ -1241,6 +1267,52 @@ lesson). Slots, JA canonical shapes:
   rendering, findings quoting), hold candidate status pending the registered deconfounder,
   or retire it to the catalogue with its evidence.
 
+### §10.6 ClinicalCNL product line (APE fork) + optimization loop (user directive 2026-07-13)
+
+Build scope for M3 as rescoped (§0 product push; the roadmap carries the unit plan).
+
+- Host: in-tree fork of the Attempto Parsing Engine (APE) with AceRules-adapted rule
+  generation, at `clinicalcnl/` (upstream layout preserved; clinical additions under
+  `clinicalcnl/clinical/`), running under SWI-Prolog. Upstream identity (repo, commit,
+  LGPL-3.0-or-later headers verified first-hand) plus attribution/notice obligations land as
+  §11.5 evidence rows in the fork commit; `docs/cnl-attempto.md` (at `e8b5cf6`, §14) carries
+  the harvested upstream pointers.
+- Surface: ClinicalCNL v1 = a fail-closed PROFILE of ACE, English surface now (JA-primary
+  remains the mission surface; the §10.4/`ecc19d3` design is mined when scheduled). The
+  pre-reset sentence model transplants: one rule = one recommendation sentence + basis + zero
+  or more LABELED exception sentences each with its own basis; fixed clause order; closed
+  connectives (and/or DNF); no pronouns, anaphora, ellipsis, or definite references.
+  Unknown-word guessing is disabled: bare out-of-lexicon text is a parse error, never a guess.
+  A profile checker over APE's parse output rejects anything outside the registered patterns,
+  naming the sentence and construct.
+- Lexicon: APE function words + a demand-authored clinical ulex whose entry ids mirror the
+  committed lexicon concept ids (IR-bridge alignment). Never a precomputed corpus-wide import;
+  Clex stays a candidate-mining seed behind its §11.5 row.
+- Compile: CNL text → APE parse (DRS) → deterministic mapping → clinical Prolog KB:
+  recommendation/contraindication predicates carrying action, target, and modality
+  direction + strength; population/condition guards; interval guards (EN bound markers
+  at least / at most / less than / more than ↔ ge/le/lt/gt); labeled exception overrides
+  (PROLEG pattern via AceRules semantics); and document-id + sentence-index provenance on
+  every clause group. Determinism law: an accepted document re-emits a byte-identical KB.
+- Verdicts: Prolog-side conflict/no-conflict queries mirror §6's verdict categories; the M1
+  docA×docB contradiction + control no-conflict pair re-derive in-lane as the standing
+  conformance thread. SMT/Z3 cross-check arrives with the deferred IR bridge (roadmap
+  backlog): claims about APE-line results beyond conformance wait for it or name its absence.
+- Conformance corpus (synthetic only, user pick): authored ClinicalCNL documents expressing
+  synthetic clinical scenarios, locked behind ONE runner command (upstream fork suite +
+  profile battery + mapping battery + conflict queries + corpus round-trip). Every committed
+  document is standalone evidence; the runner is the loop's round gate.
+- Optimization loop (experiment 2's informal, human-paced precursor; §12's bounded protocol
+  supersedes it when scheduled): Claude Code `/loop` drives `/cnl-optimize` rounds — protocol
+  authority is `.claude/commands/cnl-optimize.md` (round law: ONE smallest-valuable increment
+  per round, closing as a green scoped commit `cnl-opt (R<n>)` or a banked
+  `.agent/cnl-queue.md` entry — both standalone value, tree never dirty; categories = coverage
+  growth, ulex accretion, generalization under frozen corpus (`G-MDL`), profile widening,
+  mapping deepening, hardening — the pre-reset accretion stages adapted; context ceiling +
+  stop discipline included). Rounds are self-gating, never self-reviewing: human review
+  batches ride `/codex-review`; requirement-level changes bank as major queue items for
+  roadmap sessions. Loop work is development machinery — never a locked measurement.
+
 ## §11 M4 — Promotion, selection, and the route field
 
 Intent: turn harness evidence into the architecture decision. M4 opens with a promotion
@@ -1295,6 +1367,11 @@ the user:
   harness must remain representation-neutral (§10.1).
 
 ### §11.3 Route field (registered candidates; each builds only on evidence demand)
+
+Status (2026-07-13, §0 push): the Prolog-family LP lane hosts the §10.6 product line — build
+scope now, as generated target plus execution/explanation backend; `route.single_cnl` as a
+model-filled comparison route defers with `exp.m3_cnl`. Rows below keep their registered
+status (coordinates for the deferred comparison), unchanged.
 
 | Route | Shape / hypothesis |
 | --- | --- |
@@ -1560,8 +1637,8 @@ Registry files are data, validated by `ckc registry check`, growing per mileston
 `corpora|candidates|experiments`; M2 adds `prompts|schemas` (the schema export feeds M2's
 grammar constraints) and generalizes the `experiments` binding from a single pipeline to a
 pipeline set with a `baseline_pipeline` (the §7.3 delta baseline), so one experiment binds both
-route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3
-extends `schemas|prompts` with CNL grammar and prompt entries (§10.4); M4 adds `methods`, the
+route pipelines over identical locked inputs while the M1 single-pipeline form stays valid; M3 as rescoped (2026-07-13, §10.6) adds no Rust registry entries — the CNL grammar/prompt
+registry extension defers with the Rust CNL lane; M4 adds `methods`, the
 method-universe catalogue seeded from the
 compendium (families, aliases, candidate roles, adapter status
 `v_required|v_optional|registered_backlog|gate_only`, benchmark tags, compatibility metadata),

@@ -438,6 +438,24 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   promotion, restored units like route-stage-handles/verify-eof), never re-derive; the
   reset commit's roadmap carries forward the still-live implementation pins (authored JA
   lexicon table, prefix audit, bnf facts, bridge oracle, findings-owner ruling).
+- Product push (user directive 2026-07-13; third direction change 2026-07-07 CNL-first →
+  2026-07-12 reset → this; conservation intact): ClinicalCNL + compiler = committed build
+  scope NOW on in-tree APE fork (`clinicalcnl/`, Prolog under SWI-Prolog — 9.2.9 confirmed on
+  dev machine; EN ACE profile first, JA stays mission-primary, mined from ecc19d3); target =
+  clinical Prolog KB (AceRules-adapted, PROLEG-style labeled exceptions); conflict queries
+  in-lane; Z3 cross-check deferred behind IR-bridge backlog item; doc supply SYNTHETIC-ONLY
+  (user pick); comparison machinery + Rust CNL lane → backlog, full specs
+  `git show 9b23c93:.agent/roadmap.md`; SPEC §0 honesty rule: APE line = user-directed bet,
+  never described "evidence-selected". Open-ended improvement = Claude Code /loop (NOT /goal
+  — /goal is end-state+judge shaped) driving /cnl-optimize rounds (protocol authority
+  `.claude/commands/cnl-optimize.md`; `.claude/loop.md` = bare-/loop pointer, two-phase: OPEN
+  milestone units first via session-prompt flow then stop, /cnl-optimize rounds once
+  loop-framework DONE): each round ONE increment → green commit `cnl-opt (R<n>)` or queue
+  bank (`.agent/cnl-queue.md`), tree never dirty, continuous integration ruled over shelving,
+  review batches via /codex-review never per-round; user-side enable =
+  skillOverrides.loop:"on" (user edits settings themselves — agent read attempt was denied);
+  autoCompact off → round protocol stops at 80% context. Engine-agnostic rule unchanged (LLM
+  engines only; SWI-Prolog/APE nameable like Z3).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
