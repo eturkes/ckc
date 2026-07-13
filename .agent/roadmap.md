@@ -57,18 +57,18 @@ Cross-unit decisions:
 - [ ] ape-vendor: fetch APE + an AceRules SUBSET into the fork tree (upstream layout, strip
   `.git`). Verified facts (probed + first-hand-checked 2026-07-13; re-probe at fetch): APE =
   `github.com/Attempto/APE`, HEAD `5f4d5354a45fb772763bf1a9543f508f15b28982` (default branch;
-  core version 6.7-131003, code 2008-2013, HEAD maintained through 2024) → `clinicalcnl/` ROOT
+  core code 2008-2013, HEAD maintained through 2024) → `clinicalcnl/` ROOT
   (it is THE fork we build/patch); AceRules = `github.com/tkuhn/AceRules` →
   `clinicalcnl/vendor/acerules/`, engine-source subset ONLY (`engine/` = the DRS→rule mapping we
   adapt + `LICENSE.txt`/`README.md` for attribution), EXCLUDING `dependencies/` (bundled
   `lparse-1.1.2.tar.gz` + `smodels-2.34.tar.gz` = GPLv2-only ASP solvers — incompatible-direction
-  AND unneeded: our Prolog conflict queries replace ASP solving) + `docker/`/`webapp/`/`webclient/`;
-  record excluded paths. Both upstream roots collide on `.gitignore`/`LICENSE.txt`/`README.md` →
-  the subdir placement + `CKC_FORK.md` naming resolve it. License = LGPL-3.0-or-later per PER-FILE
+  AND unneeded: our Prolog conflict queries replace ASP solving) + `docker/`/`webapp/`/`webclient/` (deployment/UI, outside the engine subset) + top-level `.gitignore` (repo metadata);
+  record excluded paths. Files common to both roots that ARE placed (`LICENSE.txt`/`README.md`) land in different dirs →
+  subdir placement + `CKC_FORK.md` naming keep them distinct (AceRules `.gitignore` excluded, no clash). License = LGPL-3.0-or-later per PER-FILE
   SOURCE HEADERS ("either version 3 of the License, or (at your option) any later version" —
   verified in `ape.pl` + `engine/acerules_processor.pl`); `LICENSE.txt` carries the LGPLv3 TEXT
-  but the headers are the operative grant, so GitHub's NOASSERTION metadata is accurate (not
-  "wrong"). §11.5 SEQUENCING (reconciles "row recorded BEFORE acquisition" with post-fetch
+  but the headers are the operative grant, so GitHub's NOASSERTION is non-authoritative detector metadata (it neither
+  establishes nor contradicts the header grant). §11.5 SEQUENCING (reconciles "row recorded BEFORE acquisition" with post-fetch
   attestation): remote header preflight → draft row {rights holder, source URL, permissions,
   target commit} → fetch the pinned commit → verify headers first-hand + compute snapshot hash →
   finalize row + land the tree atomically in ONE commit. Deliver: (1) APE at root + AceRules
@@ -84,16 +84,16 @@ Cross-unit decisions:
   candidate-mining seed) — its test-suite role is ape-build's. NO Prolog execution — `swipl
   --version` only (functional confirmation is ape-build's).
   FAST-PATH (next session — recipe supersedes discovery; prose above = rationale; spec is self-contained, skip re-reading planning commits):
-  - Pins (deterministic): APE `5f4d5354a45fb772763bf1a9543f508f15b28982`, AceRules `5b7afb7bdfbce56027997307f9b798af53551223`. Clone each + `git checkout <pin>` → `git rev-parse HEAD HEAD^{tree}` CONFIRMS commit+tree (APE tree `ac239d2…`, AceRules tree `1cebf98…`) → place via `git archive HEAD <paths> | (cd <dest> && tar -x)` (no `.git`): APE whole repo → `clinicalcnl/`; AceRules `engine LICENSE.txt README.md` → `clinicalcnl/vendor/acerules/`. Nothing-dropped = `git status --porcelain clinicalcnl | wc -l` == placed count (NOT per-file check-ignore).
+  - Pins (deterministic): APE `5f4d5354a45fb772763bf1a9543f508f15b28982`, AceRules `5b7afb7bdfbce56027997307f9b798af53551223`. Clone each + `git checkout <pin>` → `git rev-parse HEAD HEAD^{tree}` CONFIRMS commit+tree (APE tree `ac239d2…`, AceRules tree `1cebf98…`) → place via `git archive HEAD <paths> | (cd <dest> && tar -x)` (no `.git`): APE whole repo → `clinicalcnl/`; AceRules `engine LICENSE.txt README.md` → `clinicalcnl/vendor/acerules/`. Nothing-dropped = PER-SOURCE manifest match `find <dest> -type f | wc -l` == `git -C <clone> ls-tree -r --name-only <pin> -- <paths> | wc -l` (an untracked dir COLLAPSES to a single `?? clinicalcnl/` line, so `git status --porcelain clinicalcnl | wc -l` = 1, NOT the file count); then a plain `git status --porcelain` clean outside the intended add.
   - VERIFY grants via NARROW reads ONLY — never whole-file (`LICENSE.txt` 41.8K ea, `ape.pl` 21.6K): `clinicalcnl/ape.pl` L1-25 + `…/acerules/engine/acerules_processor.pl` L1-13 = per-file grant ("…either version 3 … or (at your option) any later version") → LGPL-3.0-or-later; each `LICENSE.txt` first ~15 lines = "GNU LESSER GENERAL PUBLIC LICENSE / Version 3" spot-check.
-  - CKC_FORK.md APE version = `pack.pl` `version('6.7.180715')`, HEAD 2024-04-21; AceRules HEAD 2024-11-01, © 2008-2012 Tobias Kuhn (L60 "6.7-131003" = older CHANGES entry — use pack.pl).
-  - SPEC §11.5 edit = narrow-read L1447-1456 ("Standing verdicts:" sentence): drop "no port planned" + note APE+AceRules vendored into `clinicalcnl/`; insert the 2 per-repo evidence bullets (facts above) before "Adopted ACE precedents:".
-  - Marksman-clean SPEC.md + CKC_FORK.md → ONE atomic commit `clinicalcnl+spec (M3.ape-vendor): …` → close: `.agent/context.sh`, collapse this unit to a `- [x]` stub, milestone stays IN-PROGRESS.
+  - CKC_FORK.md APE version = SWI-pack version `6.7.180715` (`pack.pl`) + release `6.7-180714` (`CHANGES.md`); APE HEAD 2024-04-21, AceRules HEAD 2024-11-01, © 2008-2012 Tobias Kuhn. (`6.7-131003` = an OLD changelog/README-transcript entry, NOT the current version — never record it as core.)
+  - SPEC §11.5 edit = narrow-read L1433-1456 (evidence-row SCHEMA at L1435-1446 + the "Standing verdicts:" sentence). Edit A: "…technical-fit verdicts stand, no port planned" → APE + the AceRules ENGINE SUBSET now vendored into `clinicalcnl/` (rows below), Codeco unvendored (no port planned). Edit B: insert 2 per-repo evidence bullets (facts above) before "Adopted ACE precedents:", each conforming to the row schema — rights holder, source URL, commit + `HEAD^{tree}`, as-of date, the 5 permission modes (acquire / process-mine / author-derivative / commit-derived / redistribute), operative LGPL-3.0-or-later HEADER grant, reuse-mode obligations met (notices + LICENSE-text + corresponding-source = the vendored subtree). Phrase the grant as the upstream-DECLARED project license with notices retained, NOT a per-blob rights audit.
+  - Close (context + roadmap closure land INSIDE the one commit, NOT after): run `.agent/context.sh` → in roadmap.md record usage + collapse this unit to a `- [x]` stub + fill the M3 header `plan PENDING → f76e1fa` (the product-push `(M3 plan)` commit that set the current APE-fork scope; `git log --grep 'M3 plan): product push'` confirms — NOT `tail -1` of all `(M3 plan)`, which returns the pre-push series), milestone stays IN-PROGRESS → Marksman-clean SPEC.md + CKC_FORK.md → ONE atomic commit `clinicalcnl+spec (M3.ape-vendor): …` staging {vendor tree, `CKC_FORK.md`, SPEC §11.5 edit, roadmap closure}.
 - [ ] ape-build: build the vendored APE + prove it runs under SWI-Prolog 9.2.9 (the functional
   env-gate lands HERE; record what built/loaded/parsed in the commit). Load/build entry (verified
   — APE has NO `load.pl`): `ape.pl` = the Prolog load entry; `Makefile` + `run.sh` + `pack.pl` =
   build/run/SWI-pack scaffolding; `README.md` = build steps — read them post-fetch. Compat: core
-  6.7-131003 (2008-2013), HEAD maintained through 2024 → SWI 9.2.9 compatibility UNKNOWN, determine
+  code 2008-2013, HEAD maintained through 2024 → SWI 9.2.9 compatibility UNKNOWN, determine
   here; patch only where wiring/compat demands, each edit `% CKC:`, layout else untouched.
   UPSTREAM-SUITE REALITY (verified — a zero shell exit does NOT mean green): the driver
   `tests/test_everything.sh` has no fail-fast, OVERWRITES version-controlled baselines in
