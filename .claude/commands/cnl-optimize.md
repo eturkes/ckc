@@ -7,8 +7,8 @@ development machinery, never a locked measurement (SPEC §0 honesty rule).
 
 ## Preconditions (check functionally, don't assume)
 
-- `.agent/roadmap.md`: M3 `loop-framework` unit DONE. Not DONE → STOP and report; if invoked
-  via /loop, `.claude/loop.md`'s phase rule applies instead.
+- `.agent/roadmap.md`: M3 `loop-framework` unit DONE. Not DONE → STOP and report (milestone
+  units run through the normal /session-prompt workflow, never through rounds).
 - `git status` clean. Dirty → STOP and report (never build a round on top of WIP).
 - Conformance runner green BEFORE picking (baseline honesty; runner command lives beside the
   corpus under `clinicalcnl/clinical/`). Red baseline ⇒ this round IS fixing it (category f),
@@ -52,10 +52,13 @@ development machinery, never a locked measurement (SPEC §0 honesty rule).
 
 ## Sizing + context ceiling
 
-A round is SMALL: one entry, one pattern, one mapping, one doc. Pick needs more than ~15% of
-the window remaining → bank a split instead. At >80% total context usage: do not pick;
-compact any in-flight state into the queue, commit, and if running under /loop stop it
-(ScheduleWakeup stop:true) telling the user to relaunch in a fresh session.
+A round is SMALL: one entry, one pattern, one mapping, one doc — window size never changes
+round sizing (small rounds ARE the standalone-value guarantee). Pick needs more than ~15% of
+the window remaining → bank a split instead. All round state lives in git + the queue, so
+compaction between rounds is safe by design (loop sessions run 1M-context with autoCompact
+on, user-managed). Fallback when autoCompact is off: at >80% total context usage do not
+pick — compact in-flight state into the queue, commit, and stop the loop (ScheduleWakeup
+stop:true) telling the user to relaunch fresh.
 
 ## Review discipline
 

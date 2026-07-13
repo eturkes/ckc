@@ -448,14 +448,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `git show 9b23c93:.agent/roadmap.md`; SPEC §0 honesty rule: APE line = user-directed bet,
   never described "evidence-selected". Open-ended improvement = Claude Code /loop (NOT /goal
   — /goal is end-state+judge shaped) driving /cnl-optimize rounds (protocol authority
-  `.claude/commands/cnl-optimize.md`; `.claude/loop.md` = bare-/loop pointer, two-phase: OPEN
-  milestone units first via session-prompt flow then stop, /cnl-optimize rounds once
-  loop-framework DONE): each round ONE increment → green commit `cnl-opt (R<n>)` or queue
+  `.claude/commands/cnl-optimize.md`; `.claude/loop.md` = bare-/loop pointer, ROUNDS-ONLY
+  (user 2026-07-13: milestone units ALWAYS via normal /session-prompt sessions, never loop
+  iterations): each round ONE increment → green commit `cnl-opt (R<n>)` or queue
   bank (`.agent/cnl-queue.md`), tree never dirty, continuous integration ruled over shelving,
   review batches via /codex-review never per-round; user-side enable =
   skillOverrides.loop:"on" (user edits settings themselves — agent read attempt was denied);
-  autoCompact off → round protocol stops at 80% context. Engine-agnostic rule unchanged (LLM
-  engines only; SWI-Prolog/APE nameable like Z3).
+  loop sessions = 1M window + autoCompact ON (user-managed at loop time); round state lives
+  in git+queue so between-round compaction is safe by design; 80% stop rule = fallback for
+  autoCompact-off sessions. Engine-agnostic rule unchanged (LLM engines only; SWI-Prolog/APE
+  nameable like Z3).
 - §4.6 event IS the stage's total result (above) → a stage that LANDS artifacts inside a loop must emit
   its one event on EVERY path once anything has landed; an infra-error EARLY-RETURN (copied from a
   single-artifact fill's event-less `CassetteError` abort — safe there, it lands nothing pre-event)
