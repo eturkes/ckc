@@ -20,7 +20,8 @@ may pull in.
 
 Scope = SPEC §10.6 (2026-07-13 product push = design authority; §0 honesty note). Deliverable:
 vendored APE fork building green under SWI-Prolog (9.2.9 confirmed on the dev machine
-2026-07-13; environment gate — re-confirm functionally per unit), ClinicalCNL v1 as a
+2026-07-13; environment gate — re-confirm functionally in ape-build + later Prolog-running
+units; ape-vendor = `swipl --version` only, no Prolog execution), ClinicalCNL v1 as a
 fail-closed ACE profile (EN surface) over a demand-authored clinical ulex, AceRules-adapted
 DRS → clinical-Prolog-KB mapping (labeled exception overrides, per-sentence provenance,
 byte-identical re-emission), Prolog-side conflict/no-conflict queries re-deriving the M1
@@ -30,14 +31,17 @@ anywhere); engine-agnostic rule unchanged (it targets LLM inference engines — 
 are nameable solver/host tooling like Z3). No unit needs the model runtime (no gated units).
 
 Cross-unit decisions:
-- Layout: `clinicalcnl/` = fork root preserving upstream layout (diffability + GPL
-  corresponding-source clarity); clinical additions ONLY under `clinicalcnl/clinical/`
-  (profile checker, mapping, queries, ulex, corpus, runner) so fork-vs-ours stays auditable;
-  upstream files edited only where wiring demands, each edit commented `% CKC:`.
-- Licensing (SPEC §11.5): APE + AceRules evidence rows land in the ape-vendor commit; rows
-  live IN §11.5 prose (extend the "Standing verdicts" APE/AceRules sentence — no registry
-  file), verify license headers first-hand in fetched source (never memory), notices/
-  attribution retained in-tree. Clex: NO import (9997607 row posture; candidate-mining seed).
+- Layout: three zones keep fork-vs-vendored-vs-ours auditable — `clinicalcnl/` root = the APE
+  fork (upstream layout preserved: diffability + GPL corresponding-source clarity);
+  `clinicalcnl/vendor/acerules/` = the AceRules adaptation-source subset (see ape-vendor);
+  `clinicalcnl/clinical/` = CKC clinical additions ONLY (profile checker, mapping, queries,
+  ulex, corpus, runner). Upstream files edited only where wiring demands, each edit commented
+  `% CKC:`. Fork provenance = `clinicalcnl/CKC_FORK.md` (distinct name — APE's own `README.md`
+  sits at the root; the two upstream roots also collide on `.gitignore`/`LICENSE.txt`).
+- Licensing (SPEC §11.5): APE + AceRules evidence rows land in the ape-vendor commit as §11.5
+  PROSE (extend the "Standing verdicts" sentence — no registry file); ape-vendor owns the
+  acquisition-record schema + first-hand header verification. Clex: NO import (9997607 posture;
+  candidate-mining seed) — its upstream-test-suite role is handled in ape-build.
 - Fail-closed profile: unknown-word guessing disabled/rejected; profile checker validates APE
   parse output against registered sentence patterns, rejects naming sentence + construct
   (anti-ACE lesson: bare out-of-lexicon text = parse error, never a guess). EN interval
@@ -50,30 +54,57 @@ Cross-unit decisions:
   round-trip; THE loop round gate. Milestone acceptance = runner green over the locked corpus
   + a ledgered manual dry-run round (loop-framework).
 
-- [ ] ape-vendor: fetch APE + AceRules at pinned HEADs into `clinicalcnl/` (upstream layout,
-  strip `.git`; clinical additions land only later under `clinicalcnl/clinical/`). Pointers
-  (salvaged from `docs/cnl-attempto.md` @ e8b5cf6 — no re-mine needed): APE =
-  `github.com/Attempto/APE` (2013-era DCG "6.7-131003"; LGPL-3.0 per its `LICENSE.txt` —
-  GitHub shows NOASSERTION, the file is truth); AceRules = `github.com/tkuhn/AceRules`
-  (LGPL-3.0), vendored as DRS-map adaptation base. No upstream tag/commit pinned → pin
-  latest-at-fetch, record each `git rev-parse HEAD` in the commit (APE HEAD probed 2026-07-13
-  = 5f4d5354a45fb772763bf1a9543f508f15b28982; re-probe at fetch). Deliver: (1) both trees
-  in-tree; (2) LGPL headers verified FIRST-HAND (`LICENSE.txt` + ≥1 representative source
-  header per repo — never memory for grants); (3) §11.5 evidence rows = extend the "Standing
-  verdicts" APE/AceRules prose (rows live in §11.5 prose, not a registry file) with the
-  concrete acquisition record (repo, exact commit, snapshot hash, as-of date, header grant
-  verified, obligations-met note: notices + license text retained in-tree, corresponding
-  source = full vendored tree, provenance README) and drop the stale "no port planned" clause;
-  (4) fork provenance README under `clinicalcnl/` (upstream repo, commit, license, layout, what
-  CKC adds). Clex NOT vendored (9997607 posture; candidate-mining seed only). NO Prolog run
-  beyond `swipl --version` — loading/testing is ape-build's job.
-- [ ] ape-build: build the vendored APE + run its upstream test suite green under SWI-Prolog
-  9.2.9 (record suite counts in the commit). Load entry + test invocation = read from APE's own
-  README/Makefile/`load.pl` post-fetch (the doc carries NO build/test/compat instructions);
-  known test files = `tests/test_drace.pl`, `examples/paraphrase_roundtrip.pl`. 2013-era code
-  under modern SWI-Prolog → breakage expected; patch only where wiring/compat demands, each edit
-  commented `% CKC:`, upstream layout otherwise untouched. Green upstream suite + recorded counts
-  = acceptance. (Unbounded-debug half, isolated so a fresh window absorbs the build churn.)
+- [ ] ape-vendor: fetch APE + an AceRules SUBSET into the fork tree (upstream layout, strip
+  `.git`). Verified facts (probed + first-hand-checked 2026-07-13; re-probe at fetch): APE =
+  `github.com/Attempto/APE`, HEAD `5f4d5354a45fb772763bf1a9543f508f15b28982` (default branch;
+  core version 6.7-131003, code 2008-2013, HEAD maintained through 2024) → `clinicalcnl/` ROOT
+  (it is THE fork we build/patch); AceRules = `github.com/tkuhn/AceRules` →
+  `clinicalcnl/vendor/acerules/`, engine-source subset ONLY (`engine/` = the DRS→rule mapping we
+  adapt + `LICENSE.txt`/`README.md` for attribution), EXCLUDING `dependencies/` (bundled
+  `lparse-1.1.2.tar.gz` + `smodels-2.34.tar.gz` = GPLv2-only ASP solvers — incompatible-direction
+  AND unneeded: our Prolog conflict queries replace ASP solving) + `docker/`/`webapp/`/`webclient/`;
+  record excluded paths. Both upstream roots collide on `.gitignore`/`LICENSE.txt`/`README.md` →
+  the subdir placement + `CKC_FORK.md` naming resolve it. License = LGPL-3.0-or-later per PER-FILE
+  SOURCE HEADERS ("either version 3 of the License, or (at your option) any later version" —
+  verified in `ape.pl` + `engine/acerules_processor.pl`); `LICENSE.txt` carries the LGPLv3 TEXT
+  but the headers are the operative grant, so GitHub's NOASSERTION metadata is accurate (not
+  "wrong"). §11.5 SEQUENCING (reconciles "row recorded BEFORE acquisition" with post-fetch
+  attestation): remote header preflight → draft row {rights holder, source URL, permissions,
+  target commit} → fetch the pinned commit → verify headers first-hand + compute snapshot hash →
+  finalize row + land the tree atomically in ONE commit. Deliver: (1) APE at root + AceRules
+  subset at `vendor/acerules/`; (2) headers verified FIRST-HAND (`LICENSE.txt` +
+  `ape.pl`/`engine/acerules_processor.pl` — never memory for grants); (3) §11.5 evidence rows =
+  extend the "Standing verdicts" APE/AceRules prose (rows in §11.5 PROSE, not a registry file)
+  per repo — repo, exact commit, snapshot hash = `git rev-parse HEAD` (commit) + `HEAD^{tree}`
+  (tree SHA, recorded PRE-strip), as-of date, LGPL-3.0-or-later grant + operative-header note,
+  obligations met (notices + LICENSE text retained, corresponding source = the vendored subtree,
+  provenance file), AceRules excluded-paths note — and DROP the stale "no port planned" clause;
+  (4) provenance `clinicalcnl/CKC_FORK.md` (per-repo: upstream repo, commit, license, what/why
+  vendored, AceRules inclusion boundary, what CKC adds). Clex NOT vendored (9997607 posture;
+  candidate-mining seed) — its test-suite role is ape-build's. NO Prolog execution — `swipl
+  --version` only (functional confirmation is ape-build's).
+- [ ] ape-build: build the vendored APE + prove it runs under SWI-Prolog 9.2.9 (the functional
+  env-gate lands HERE; record what built/loaded/parsed in the commit). Load/build entry (verified
+  — APE has NO `load.pl`): `ape.pl` = the Prolog load entry; `Makefile` + `run.sh` + `pack.pl` =
+  build/run/SWI-pack scaffolding; `README.md` = build steps — read them post-fetch. Compat: core
+  6.7-131003 (2008-2013), HEAD maintained through 2024 → SWI 9.2.9 compatibility UNKNOWN, determine
+  here; patch only where wiring/compat demands, each edit `% CKC:`, layout else untouched.
+  UPSTREAM-SUITE REALITY (verified — a zero shell exit does NOT mean green): the driver
+  `tests/test_everything.sh` has no fail-fast, OVERWRITES version-controlled baselines in
+  `testruns/` (pass = `git diff` on outputs empty modulo random ids, NOT exit code), and needs TWO
+  external MUTABLE fetches — Clex (`tests/downloader.pl ensure_clex` ← `Clex/master`, the larger
+  lexicon) + the acetexts regression set (`download_acetexts` ← attempto.ifi.uzh.ch);
+  `examples/paraphrase_roundtrip.pl` prints pass/fail but exits 0 either way (weak smoke, not a
+  gate). ACCEPTANCE (fail-closed, Clex-free, reproducible): (a) APE builds + `ape.pl` loads clean
+  under SWI 9.2.9; (b) a smoke parse of a sentence in APE's built-in lexicon (a small one ships;
+  the suite needs a LARGER one) returns a DRS — asserted on the DRS shape, not a zero exit; (c) any
+  upstream test that runs Clex-FREE (the DRS→X direction — `test_drace`/`test_owlswrl`/`test_drs_to_x`
+  take DRS input; confirm at build) gated fail-closed = preserve baselines, diff outputs, scan
+  failure markers, per-component status + counts. DEFERRED (do NOT claim as the gate): the text→DRS
+  regression (`rtest.bash`) + anything needing Clex/acetexts — if later run, wrap fail-closed AND pin
+  the test-only Clex/acetexts fetches under §11.5 (Clex GPL-3.0 = compatible for test-only use, still
+  needs its own row + pin; 9997607 blocks content IMPORT into the product, not test tooling).
+  (Unbounded-debug half, isolated so a fresh window absorbs the build churn.)
 - [ ] cnl-ulex: clinical ulex seed — the M1/M2 semantic inventory re-expressed EN (adult /
   child / sepsis / severe renal impairment / pregnancy; antibiotic A target; administer
   action; age-years quantity with unit years), entry ids mirroring committed lexicon concept
@@ -127,8 +158,8 @@ Cross-unit decisions:
   check on corpus.path + expected_outcomes in validate_registries); input-snapshot.1–.3 +
   constraint-snapshot (read-once input layer; manifest attests resolution-time bytes;
   staged frozen constraints); subproc-runner.1/.2 remainder (shared cross-crate subprocess
-  runner extraction + model.rs-side drain-cap parity — memory's model-runtime bullet
-  carries the rulings).
+  runner extraction + model.rs-side drain-cap parity — the model-runtime rulings live in
+  the archived `## Runtime` (`git show e388ee4:.agent/memory.md`)).
 - Replay-attestation deepening (codex 2026-07-12): replay compares output payload hashes
   only — extend to the manifest's deterministic identity/input projection + cassette
   prompt/constraint-hash cross-check against the current route; wrapper provenance bytes
