@@ -111,16 +111,16 @@ roadmap unit names; wider loading is reserved for spec-maintenance sessions.
 
 Unit discipline:
 
-- One roadmap unit = one conceptual deliverable + one gate command, finishable and committable in
-  a single 200K context window with margin. Calibrate from neighbouring units' `NN%` annotations
+- One roadmap unit = one conceptual deliverable + one gate command, finishable and committable within
+  the ~200K-token aim (a soft target inside the standing 1M window). Calibrate from neighbouring units' `NN%` annotations
   and the sizing lessons in memory; pre-split units that stack a crate foundation, a
   writer-inverse, a recursive type family, or an algorithm plus a second authored artifact.
 - Build exactly the unit's deliverable; choose the simplest implementation that passes the gate.
   Record genuine future needs as roadmap candidates for the unit that will consume them.
 - Every Rust unit runs `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, and
   its gate before staging.
-- A projected unit overrun is a stop-and-report: recovery (restore to the last commit, re-scope
-  the roadmap) is always user-initiated.
+- Overshooting the ~200K aim is fine — land the unit; a projected run at the 1M window itself is a
+  stop-and-report, its recovery (restore to the last commit, re-scope the roadmap) always user-initiated.
 
 Working style:
 

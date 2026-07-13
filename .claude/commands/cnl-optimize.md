@@ -55,8 +55,7 @@ development machinery, never a locked measurement (SPEC §0 honesty rule).
 A round is SMALL: one entry, one pattern, one mapping, one doc — window size never changes
 round sizing (small rounds ARE the standalone-value guarantee). Pick needs more than ~15% of
 the window remaining → bank a split instead. All round state lives in git + the queue, so
-compaction between rounds is safe by design (loop sessions run 1M-context with autoCompact
-on, user-managed). Fallback when autoCompact is off: at >80% total context usage do not
+compaction between rounds is safe by design (loop sessions add autoCompact on atop the standing 1M window, user-managed). Fallback when autoCompact is off: at >80% total context usage do not
 pick — compact in-flight state into the queue, commit, and stop the loop (ScheduleWakeup
 stop:true) telling the user to relaunch fresh.
 
@@ -64,8 +63,7 @@ stop:true) telling the user to relaunch fresh.
 
 Start the loop as `/loop /cnl-optimize` — one round per iteration. (Bare `/loop` with no
 prompt falls back to Claude Code's built-in maintenance prompt, NOT this protocol — there is
-deliberately no `.claude/loop.md`.) Loop runtime is user-managed: 1M-context session,
-autoCompact ON, skillOverrides.loop:"on". After a closed round (landed or banked): reschedule
+deliberately no `.claude/loop.md`.) Loop runtime is user-managed: autoCompact ON, skillOverrides.loop:"on" (the 1M window is standing). After a closed round (landed or banked): reschedule
 self-paced (1200–1800s; nothing external is polled, shorter is waste). On a failed
 precondition or the ceiling fallback: report precisely why, then stop the loop
 (ScheduleWakeup stop:true). Milestone units are never loop material — they run through the

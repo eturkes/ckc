@@ -38,7 +38,7 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 ## Lessons
 
 - Unit sizing rules (per-incident case studies in git — `git show 6e413f0^:.agent/memory.md`). Target:
-  one conceptual deliverable + one gate, finishable AND committable in one window with margin; prefer
+  one conceptual deliverable + one gate, finishable AND committable within the ~200K aim (soft; the 1M window is headroom); prefer
   more, smaller units. PLAN-TIME obligations (a violation is a planning bug): resolve semantic decisions
   INTO the roadmap line (>~2 left open = re-scope); research + pin any new external dependency (exact
   version + features) in the line; pre-split multi-deliverable stacks BEFORE scheduling (mid-session
@@ -130,11 +130,9 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   in prose (that is planning); its banked content is prose only — the redo session itself writes every
   line of implementation code. Retired wip artifacts remain in git history as provenance only. Any wip
   scratch file a session does create gets deleted before that session's closing commit. RESPEC-SESSION
-  CLOSE (run-m2.1 respec 3b1066a): a respec whose seam confirmation reads span multiple modules has
-  already spent the implementation margin → commit the respec, re-score the first half against the window
-  REMAINING, and
-  implement only on a clear fit; the default close is the respec commit itself (the session-prompt
-  clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
+  CLOSE (run-m2.1 respec 3b1066a): the 1M window absorbs a respec's seam-confirmation reads → commit the respec, then implement the
+  first half same-session; close at the respec commit only when that first half alone still projects
+  well past the ~200K aim (the session-prompt clause mirrors this). A banked respec line pre-pays the next session's derivation ONLY if it carries
   the confirmed facts (caller counts, helper signatures, fixture slots, exact reasons) — bank those at
   respec time while they are in-window, AND cap the READ list to the minimal COMPLETE apply-anchor set —
   EVERY edit site listed, the enumerated SOURCES (the mirror fn, the type modules) EXCLUDED: a respec that
@@ -144,8 +142,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   its first implement attempt DESPITE a fully-pinned respec — its READ-FIRST relisted the mirror + shape
   modules whose every field the respec already enumerated → reverted, re-scoped to the edit set: the
   replace span, the adjacent verify-tail edits, and the call-site regions incl. their docs (sources out).
-- Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed a 200K
-  window during READING, ZERO code written → nothing to salvage). A 'one deliverable + one gate' unit
+- Read-cost is a unit-sizing axis distinct from deliverable count (route-single-ir.2 overflowed the ~200K
+  aim during READING, ZERO code written → nothing to salvage). A 'one deliverable + one gate' unit
   still overflows when its test/bless/fixture scaffolding needs byte-exact shapes — signatures,
   sorted-field orders, enum variants, harness helpers, `Resolved`-style stamp structs — assembled across
   many modules; a deterministic-REPRODUCTION gate reads the WHOLE upstream type + helper set. Detect at
@@ -214,8 +212,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bank (`.agent/cnl-queue.md`), tree never dirty, continuous integration ruled over shelving,
   review batches via /codex-review never per-round; user-side enable =
   skillOverrides.loop:"on" (user edits settings themselves — agent read attempt was denied);
-  loop sessions = 1M window + autoCompact ON (user-managed at loop time); round state lives
-  in git+queue so between-round compaction is safe by design; 80% stop rule = fallback for
+  loop sessions add autoCompact ON (user-managed at loop time) atop the standing 1M window; round state lives
+  in git+queue so between-round compaction is safe by design; the 80%-of-1M stop rule = fallback for
   autoCompact-off sessions. Engine-agnostic rule unchanged (LLM engines only; SWI-Prolog/APE
   nameable like Z3).
 - RESPEC-COMPLETENESS: when a unit must CONSTRUCT a type, bank its CONSTRUCTOR + a mirror call site,
