@@ -34,11 +34,10 @@ Cross-unit decisions:
   corresponding-source clarity); clinical additions ONLY under `clinicalcnl/clinical/`
   (profile checker, mapping, queries, ulex, corpus, runner) so fork-vs-ours stays auditable;
   upstream files edited only where wiring demands, each edit commented `% CKC:`.
-- Licensing (SPEC §11.5): APE + AceRules evidence rows land IN the ape-fork commit — pin
-  upstream repo + commit + license headers verified first-hand in the fetched source (mine
-  `git show e8b5cf6:docs/cnl-attempto.md` via read-only subagent for upstream pointers; never
-  trust memory for grants); notices/attribution retained in-tree. Clex: NO import (9997607
-  row posture stands; candidate-mining seed only).
+- Licensing (SPEC §11.5): APE + AceRules evidence rows land in the ape-vendor commit; rows
+  live IN §11.5 prose (extend the "Standing verdicts" APE/AceRules sentence — no registry
+  file), verify license headers first-hand in fetched source (never memory), notices/
+  attribution retained in-tree. Clex: NO import (9997607 row posture; candidate-mining seed).
 - Fail-closed profile: unknown-word guessing disabled/rejected; profile checker validates APE
   parse output against registered sentence patterns, rejects naming sentence + construct
   (anti-ACE lesson: bare out-of-lexicon text = parse error, never a guess). EN interval
@@ -51,10 +50,30 @@ Cross-unit decisions:
   round-trip; THE loop round gate. Milestone acceptance = runner green over the locked corpus
   + a ledgered manual dry-run round (loop-framework).
 
-- [ ] ape-fork: vendor APE (+ AceRules source as adaptation base) at pinned upstream commits
-  into `clinicalcnl/` (upstream layout, licenses/notices retained); builds + upstream test
-  suite green under SWI-Prolog (record suite counts in the unit commit); SPEC §11.5 evidence
-  rows (repo, commit, header grant, obligations-met note) + fork provenance README.
+- [ ] ape-vendor: fetch APE + AceRules at pinned HEADs into `clinicalcnl/` (upstream layout,
+  strip `.git`; clinical additions land only later under `clinicalcnl/clinical/`). Pointers
+  (salvaged from `docs/cnl-attempto.md` @ e8b5cf6 — no re-mine needed): APE =
+  `github.com/Attempto/APE` (2013-era DCG "6.7-131003"; LGPL-3.0 per its `LICENSE.txt` —
+  GitHub shows NOASSERTION, the file is truth); AceRules = `github.com/tkuhn/AceRules`
+  (LGPL-3.0), vendored as DRS-map adaptation base. No upstream tag/commit pinned → pin
+  latest-at-fetch, record each `git rev-parse HEAD` in the commit (APE HEAD probed 2026-07-13
+  = 5f4d5354a45fb772763bf1a9543f508f15b28982; re-probe at fetch). Deliver: (1) both trees
+  in-tree; (2) LGPL headers verified FIRST-HAND (`LICENSE.txt` + ≥1 representative source
+  header per repo — never memory for grants); (3) §11.5 evidence rows = extend the "Standing
+  verdicts" APE/AceRules prose (rows live in §11.5 prose, not a registry file) with the
+  concrete acquisition record (repo, exact commit, snapshot hash, as-of date, header grant
+  verified, obligations-met note: notices + license text retained in-tree, corresponding
+  source = full vendored tree, provenance README) and drop the stale "no port planned" clause;
+  (4) fork provenance README under `clinicalcnl/` (upstream repo, commit, license, layout, what
+  CKC adds). Clex NOT vendored (9997607 posture; candidate-mining seed only). NO Prolog run
+  beyond `swipl --version` — loading/testing is ape-build's job.
+- [ ] ape-build: build the vendored APE + run its upstream test suite green under SWI-Prolog
+  9.2.9 (record suite counts in the commit). Load entry + test invocation = read from APE's own
+  README/Makefile/`load.pl` post-fetch (the doc carries NO build/test/compat instructions);
+  known test files = `tests/test_drace.pl`, `examples/paraphrase_roundtrip.pl`. 2013-era code
+  under modern SWI-Prolog → breakage expected; patch only where wiring/compat demands, each edit
+  commented `% CKC:`, upstream layout otherwise untouched. Green upstream suite + recorded counts
+  = acceptance. (Unbounded-debug half, isolated so a fresh window absorbs the build churn.)
 - [ ] cnl-ulex: clinical ulex seed — the M1/M2 semantic inventory re-expressed EN (adult /
   child / sepsis / severe renal impairment / pregnancy; antibiotic A target; administer
   action; age-years quantity with unit years), entry ids mirroring committed lexicon concept
