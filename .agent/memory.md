@@ -226,6 +226,8 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   would've passed the pin; single_ir alone proved it) → a test that only half-proves its claim is a
   fake success criterion.
 
+- Vendoring/fetch units (ape-vendor; ape-build's Clex/acetexts): verify an LGPL grant via the per-file source HEADER (`ape.pl`/`*_processor.pl` first ~25 L = the operative grant) + a `LICENSE.txt` TITLE spot-check (first ~15 L). Bank in the unit spec so execution needs ~zero rediscovery: exact pins + `HEAD^{tree}` hashes (confirm-not-rediscover), narrow-read ranges, placement via `git archive HEAD <paths>|tar -x`. Whole-file `LICENSE.txt` (41.8K ea) / big-source reads = the ~100K overflow that sank ape-vendor's first attempt.
+
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
 M3 = Prolog under `clinicalcnl/`, Rust tree untouched → the deep M1/M2 Rust lessons are DORMANT,

@@ -83,6 +83,12 @@ Cross-unit decisions:
   vendored, AceRules inclusion boundary, what CKC adds). Clex NOT vendored (9997607 posture;
   candidate-mining seed) — its test-suite role is ape-build's. NO Prolog execution — `swipl
   --version` only (functional confirmation is ape-build's).
+  FAST-PATH (next session — recipe supersedes discovery; prose above = rationale; spec is self-contained, skip re-reading planning commits):
+  - Pins (deterministic): APE `5f4d5354a45fb772763bf1a9543f508f15b28982`, AceRules `5b7afb7bdfbce56027997307f9b798af53551223`. Clone each + `git checkout <pin>` → `git rev-parse HEAD HEAD^{tree}` CONFIRMS commit+tree (APE tree `ac239d2…`, AceRules tree `1cebf98…`) → place via `git archive HEAD <paths> | (cd <dest> && tar -x)` (no `.git`): APE whole repo → `clinicalcnl/`; AceRules `engine LICENSE.txt README.md` → `clinicalcnl/vendor/acerules/`. Nothing-dropped = `git status --porcelain clinicalcnl | wc -l` == placed count (NOT per-file check-ignore).
+  - VERIFY grants via NARROW reads ONLY — never whole-file (`LICENSE.txt` 41.8K ea, `ape.pl` 21.6K): `clinicalcnl/ape.pl` L1-25 + `…/acerules/engine/acerules_processor.pl` L1-13 = per-file grant ("…either version 3 … or (at your option) any later version") → LGPL-3.0-or-later; each `LICENSE.txt` first ~15 lines = "GNU LESSER GENERAL PUBLIC LICENSE / Version 3" spot-check.
+  - CKC_FORK.md APE version = `pack.pl` `version('6.7.180715')`, HEAD 2024-04-21; AceRules HEAD 2024-11-01, © 2008-2012 Tobias Kuhn (L60 "6.7-131003" = older CHANGES entry — use pack.pl).
+  - SPEC §11.5 edit = narrow-read L1447-1456 ("Standing verdicts:" sentence): drop "no port planned" + note APE+AceRules vendored into `clinicalcnl/`; insert the 2 per-repo evidence bullets (facts above) before "Adopted ACE precedents:".
+  - Marksman-clean SPEC.md + CKC_FORK.md → ONE atomic commit `clinicalcnl+spec (M3.ape-vendor): …` → close: `.agent/context.sh`, collapse this unit to a `- [x]` stub, milestone stays IN-PROGRESS.
 - [ ] ape-build: build the vendored APE + prove it runs under SWI-Prolog 9.2.9 (the functional
   env-gate lands HERE; record what built/loaded/parsed in the commit). Load/build entry (verified
   — APE has NO `load.pl`): `ape.pl` = the Prolog load entry; `Makefile` + `run.sh` + `pack.pl` =
