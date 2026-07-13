@@ -448,9 +448,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `git show 9b23c93:.agent/roadmap.md`; SPEC §0 honesty rule: APE line = user-directed bet,
   never described "evidence-selected". Open-ended improvement = Claude Code /loop (NOT /goal
   — /goal is end-state+judge shaped) driving /cnl-optimize rounds (protocol authority
-  `.claude/commands/cnl-optimize.md`; `.claude/loop.md` = bare-/loop pointer, ROUNDS-ONLY
-  (user 2026-07-13: milestone units ALWAYS via normal /session-prompt sessions, never loop
-  iterations): each round ONE increment → green commit `cnl-opt (R<n>)` or queue
+  `.claude/commands/cnl-optimize.md`; SINGLE FILE by user consolidation 2026-07-13:
+  `.claude/loop.md` deleted, loop-mode rules live in cnl-optimize.md's Running-under-/loop
+  section — start as `/loop /cnl-optimize`, NEVER bare `/loop` (no loop.md ⇒ bare /loop falls
+  back to Claude Code's built-in generic maintenance prompt, not this protocol); ROUNDS-ONLY
+  (milestone units ALWAYS via normal /session-prompt sessions, never loop iterations): each round ONE increment → green commit `cnl-opt (R<n>)` or queue
   bank (`.agent/cnl-queue.md`), tree never dirty, continuous integration ruled over shelving,
   review batches via /codex-review never per-round; user-side enable =
   skillOverrides.loop:"on" (user edits settings themselves — agent read attempt was denied);

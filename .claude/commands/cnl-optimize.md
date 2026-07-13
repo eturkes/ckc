@@ -31,7 +31,7 @@ development machinery, never a locked measurement (SPEC §0 honesty rule).
      (what, where, why blocked, next action), commit `cnl-opt (R<n>): bank — <item>`.
      Banking is success, not failure.
    `<n>` = last ledger round + 1. Rounds never leave the tree dirty, never stack unfinished
-   work, never push.
+   work, never push, never touch settings files, never start initiatives outside the round.
 
 ## Categories (pre-reset accretion stages adapted: cluster → triage → draft → gate → bless)
 
@@ -59,6 +59,17 @@ compaction between rounds is safe by design (loop sessions run 1M-context with a
 on, user-managed). Fallback when autoCompact is off: at >80% total context usage do not
 pick — compact in-flight state into the queue, commit, and stop the loop (ScheduleWakeup
 stop:true) telling the user to relaunch fresh.
+
+## Running under /loop
+
+Start the loop as `/loop /cnl-optimize` — one round per iteration. (Bare `/loop` with no
+prompt falls back to Claude Code's built-in maintenance prompt, NOT this protocol — there is
+deliberately no `.claude/loop.md`.) Loop runtime is user-managed: 1M-context session,
+autoCompact ON, skillOverrides.loop:"on". After a closed round (landed or banked): reschedule
+self-paced (1200–1800s; nothing external is polled, shorter is waste). On a failed
+precondition or the ceiling fallback: report precisely why, then stop the loop
+(ScheduleWakeup stop:true). Milestone units are never loop material — they run through the
+normal /session-prompt workflow in their own sessions.
 
 ## Review discipline
 

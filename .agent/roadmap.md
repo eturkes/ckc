@@ -89,11 +89,11 @@ Cross-unit decisions:
   multi-exception coverage); ONE-command conformance runner wired (upstream + profile +
   mapping + queries + corpus round-trip); corpus locked (runner green = acceptance core).
 - [ ] loop-framework: protocol validation — `.claude/commands/cnl-optimize.md` +
-  `.claude/loop.md` + `.agent/cnl-queue.md` stub landed at planning (this plan's commit);
-  this unit extends the queue from conformance-seed leftovers + generalization candidates,
-  runs ONE manual end-to-end round (pick → land green commit `cnl-opt (R1)` → ledger entry),
-  fixes protocol frictions found, confirms bare `/loop` drives it. Closes the milestone; user
-  enables /loop (skillOverrides.loop:"on").
+  `.agent/cnl-queue.md` stub landed at planning; this unit extends the queue from
+  conformance-seed leftovers + generalization candidates, runs ONE manual end-to-end round
+  (pick → land green commit `cnl-opt (R1)` → ledger entry), fixes protocol frictions found,
+  confirms `/loop /cnl-optimize` drives it. Closes the milestone; user enables /loop
+  (skillOverrides.loop:"on").
 
 ## Backlog — NOT a milestone (unscheduled; schedule by trigger; full pre-reset unit specs at `git show ecc19d3:.agent/roadmap.md`)
 
