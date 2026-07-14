@@ -329,18 +329,18 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   KB.md carries the design calls downstream must honor (LP-lane NAF exceptions vs the SMT lane's
   in-context negation; population=subject with adult/child as an age interval; doc-qualified
   stmt/bind/exc ids for flat-KB collision safety; `source` completeness as a map-emit obligation).
-- ClinicalCNL KB writer (M3.kb-writer; AUTHORITY = `clinical/KB.md` §Canonical emission). Emitter
-  `kb_bytes/2`/`write_kb/2` in `clinical/kb_kernel.pl`; gate `clinical/kb_writer_tests.pl`
-  (`run_tests(kb_writer)`, 10 tests). Canonical bytes = one `write_term(F,[quoted(true),numbervars(false)])`
-  term per line + `.\n`, the LINE STRINGS `sort/2`-byte-sorted (functor-first, then args — NOT arity-first
-  standard-order-of-TERMS; the hand-authored byte-pins lock this distinction), single trailing newline;
-  side-effect-free (caller validates). Confirmed swipl 9.2.9 rendering (map-emit reuses it — skip
-  re-probe): rationals `NrD` (`1r2`), basis strings `"..."` (flag double_quotes=string), region lists
-  `[0,1]`, `none` bare, dotted/colon atoms quoted (`'test_source.…rule.0'`, `'act.administer:drug.abx_a'`);
-  every fact is a compound so lines end `).` (no float-vs-fullstop reparse hazard); output is a loadable
-  fact file (round-trips to the same fact set). Test blend: 2+ hand-sorted byte-pins as the format oracle
-  (validate the byte-sort algorithm) + sortedness/round-trip/order-invariance PROPERTIES over all
-  examples (cover the harder cases without fragile manual transcription).
+- ClinicalCNL KB writer (M3.kb-writer; AUTHORITY = `clinical/KB.md` §Canonical emission — read it: the
+  byte-format + every pinned `write_term/3` knob live there). Emitter `kb_bytes/2`/`write_kb/2`; gate
+  `clinical/kb_writer_tests.pl` (`run_tests(kb_writer)`). Hard-won by codex review — the durable lesson
+  for ANY Prolog serializer here (map-emit reuses it): a `write_term/3` at flag defaults is NOT
+  canonical; ambient flags move the bytes (`rational_syntax=natural`→`1/2`; `character_escapes=false`→a
+  raw newline splitting a note; `op/3` on a functor→infix; sink encoding→different octets). Pin them —
+  opts `ignore_ops(true), character_escapes(true), character_escapes_unicode(true), quote_non_ascii(false),
+  quoted(true)` + a local `rational_syntax=compatibility` bind + `write_kb` forces the stream to `utf8`
+  (wire = UTF-8/LF/no-BOM). Design rulings: canonical order = byte-sort of the emitted LINE STRINGS
+  (functor bytes first), deliberately NOT `sort/2`-over-terms (arity-first) — hand-pins lock it; a KB is
+  a SET (`sort/2` dedups identical facts, intended); round-trip is total ONLY because the validator now
+  rejects lone-surrogate text (else a valid KB fails to reparse).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

@@ -142,21 +142,31 @@ intersection × exception expansion); it never patient-evaluates.
 
 ## Canonical emission (kb-writer)
 
-`kb_bytes(+Facts, -Bytes)` serializes a KB fact list to canonical bytes; `write_kb(+Stream, +Facts)`
-writes them to a stream. The form (SPEC §6 "emitted deterministically"; the byte-order sort mirrors
-the SMT lane's "declarations sorted by symbol bytes" and the canonical-JSON byte convention):
+`kb_bytes(+Facts, -Bytes)` serializes a KB fact list to the canonical text (a string); `write_kb(+Stream,
++Facts)` writes its **UTF-8** octets. The form (SPEC §6 "emitted deterministically"; the byte-order
+sort mirrors the SMT lane's "declarations sorted by symbol bytes" and the canonical-JSON byte
+convention) is a function of the fact SET alone — no ambient flag, operator table, or stream encoding
+can move a byte:
 
 - One fact per line, each the fact written as a QUOTED, re-readable Prolog term terminated by `.` then
-  a newline — a dedicated `write_term/3` with `quoted(true)`, never the bare `write`/`print` defaults
-  (whose spacing / operator rendering drift with ambient flags). Every fact is a compound
-  `functor(...)`, so a line always ends `).` — no float-vs-fullstop reparse ambiguity. Exact bounds
-  render `NrD` (`18`, `1r2`), never a float.
-- Lines byte-sorted (standard order over the emitted line strings = code order), so input order and
-  duplicate lines are irrelevant — a KB set has exactly one byte form. The whole ends in one newline.
+  LF. `write_term/3` pins every flag-sensitive knob: `quoted(true)`, `ignore_ops(true)` (functorial
+  notation even where a functor like `rule` is a user operator; lists still print `[..]`),
+  `character_escapes(true)` + `character_escapes_unicode(true)` (a note's control chars escape — never a
+  raw line break), `quote_non_ascii(false)` (printable non-ASCII goes literally onto the UTF-8 wire);
+  and `kb_bytes/2` binds `rational_syntax=compatibility`, so exact bounds render `NrD` (`18`, `1r2`),
+  never `1/2` or a float. Every fact is a compound `functor(...)`, so a line always ends `).` — no
+  float-vs-fullstop reparse ambiguity.
+- Lines byte-sorted (standard order over the emitted line strings = code order), so input order is
+  irrelevant. A KB is a **set** of facts: `sort/2` de-duplicates, so repeated identical facts collapse
+  to one line (distinct facts never do). A non-empty KB ends in one LF; the empty KB emits `""`.
+- **Wire**: UTF-8, LF, no BOM. `write_kb/2` pins the stream to `utf8`, so the octets are independent of
+  how the caller opened it. The output is a loadable Prolog fact file that round-trips to the same fact
+  set under a standard reader (`double_quotes=string`, `character_escapes=true` — the SWI defaults). The
+  round-trip is total over valid KBs: the validator rejects lone-surrogate text (the one text
+  `write_term` cannot re-read).
 
-The output is itself a loadable Prolog fact file (round-trips: reparse → the same fact set). The
-writer is side-effect-free and does NOT validate — the caller runs `valid_kb/1`. `map-emit` byte-pins
-the emitter's output over whole documents.
+`kb_bytes/2` is pure and does NOT validate — the caller runs `valid_kb/1`; `write_kb/2`'s only effect
+is the stream write. `map-emit` will byte-pin the emitter's output over whole documents.
 
 ## Validators, examples, gate
 
@@ -175,7 +185,9 @@ the emitter's output over whole documents.
 - `clinical/kb_writer_tests.pl` — the kb-writer gate: hand-authored byte-sorted normative bytes over
   every `valid` example (a `writer_golden/2` per example, coverage-checked against the example set) +
   the canonical-form properties over all of them (byte-sorted lines, faithful round-trip, input-order
-  invariance, single trailing newline) + focused rational / empty / singleton / non-list-error tests.
+  invariance, single trailing newline) + focused rational / empty / singleton / non-list tests + a
+  hardening battery (escape round-trip, non-ASCII round-trip, negative + rational bounds, operator-atom
+  robustness under a declared `op/3`, UTF-8 `write_kb/2` octets, set-semantic dedup, surrogate rejection).
 
 Gate: `swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'`
 Writer gate: `swipl -q -g "consult('clinical/kb_writer_tests.pl'),(run_tests(kb_writer)->halt(0);halt(1))" -t 'halt(1)'`

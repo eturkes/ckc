@@ -6,7 +6,7 @@
 %
 % A "KB" here is a LIST of ground fact terms (never asserted): kb-writer (kb_bytes/2, write_kb/2
 % below) emits such a list to canonical bytes, map-* produce it, conflict-* consume it. Validation
-% and emission are both side-effect-free.
+% and kb_bytes/2 are pure; write_kb/2's only effect is its explicit stream write.
 %
 %   Gate: swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'
 %   Writer gate: swipl -q -g "consult('clinical/kb_writer_tests.pl'),(run_tests(kb_writer)->halt(0);halt(1))" -t 'halt(1)'
@@ -89,6 +89,7 @@ direction_group(contraindicate, contraindicating).
 % The counter is document-continuous (map-emit never resets it per rule).
 valid_id(Id, Kind) :-
     atom(Id),
+    scalar_text(Id),                     % no lone surrogate — would not re-read from canonical bytes
     atomic_list_concat(Parts, '.', Id),
     split_last_two(Parts, DocParts, KindAtom, CounterAtom),
     DocParts \== [],
@@ -110,6 +111,15 @@ canonical_digits([D0,D1|Ds]) :- D0 >= 0'1, D0 =< 0'9, all_digits([D1|Ds]). % mul
 digit(D) :- D >= 0'0, D =< 0'9.
 all_digits([]).
 all_digits([D|Ds]) :- digit(D), all_digits(Ds).
+
+% scalar_text(+Atomic) — the atom/string carries only Unicode scalar values (no lone surrogate,
+% U+D800..U+DFFF). write_term emits a surrogate as `\uXXXX`, which the reader rejects ("Illegal
+% character code"), so a valid KB's free text (ids, source basis) must be scalar to round-trip from
+% the canonical bytes. ACE-sourced text is ASCII, so this always holds in practice; the guard makes
+% the round-trip guarantee total rather than merely typical.
+scalar_text(X) :-
+    ( atom(X) -> atom_codes(X, Cs) ; string(X) -> string_codes(X, Cs) ; Cs = [] ),
+    \+ ( member(C, Cs), C >= 0xD800, C =< 0xDFFF ).
 
 % split_last_two(+List, -Init, -Penult, -Last) — deterministic last-two split (List has >= 2).
 split_last_two(List, Init, Penult, Last) :-
@@ -324,7 +334,7 @@ valid_source(I, D, Regions, Basis) :-
     is_list(Regions), Regions = [_|_],
     forall(member(Reg, Regions), (integer(Reg), Reg >= 0)),
     strictly_ascending(Regions),
-    ( Basis == none ; string(Basis) ).
+    ( Basis == none ; ( string(Basis), scalar_text(Basis) ) ).
 
 % Region indices form a canonical set: at least one, strictly ascending (hence unique) — so one
 % provenance has exactly one byte form for kb-writer to pin.
@@ -373,36 +383,56 @@ satisfies_bound(V, B, open,   upper) :- V <  B.
 
 % ==========================================================================================
 % Canonical emission (kb-writer). A KB fact list -> canonical bytes: one fact per line, each the
-% fact written as a QUOTED, re-readable Prolog term terminated by `.`, the lines byte-sorted so
-% input order and duplicate lines are irrelevant, the whole ending in a single newline. Determinism
-% is by construction — a dedicated write_term/3 with explicit options (never the bare write/print
-% defaults, whose spacing/quoting/operator rendering drift with ambient flags) plus a total byte
-% sort over the emitted line strings. SPEC §6: the LP program is "emitted deterministically"; the
-% byte-order sort mirrors the SMT lane's "declarations sorted by symbol bytes" and the canonical-JSON
-% byte convention. The output is itself a loadable Prolog fact file (round-trips to the same fact
-% set). map-emit byte-pins the emitter's output over whole documents.
+% fact written as a QUOTED, re-readable Prolog term terminated by `.`, the lines byte-sorted so input
+% order and duplicate lines are irrelevant, a non-empty KB ending in one newline (the empty KB emits
+% ""). Determinism is by construction — a dedicated write_term/3 with EVERY flag-sensitive knob pinned
+% (see fact_line/2; never the bare write/print defaults) plus a total byte sort over the emitted line
+% strings. SPEC §6: the LP program is "emitted deterministically"; the byte-order sort mirrors the SMT
+% lane's "declarations sorted by symbol bytes" and the canonical-JSON byte convention. The wire form
+% is UTF-8/LF/no-BOM (write_kb/2); the output is a loadable Prolog fact file that round-trips to the
+% same fact SET under a standard reader (double_quotes=string, character_escapes=true — the SWI
+% defaults). map-emit will byte-pin the emitter's output over whole documents.
 % ==========================================================================================
 
 %% kb_bytes(+Facts, -Bytes) is det.
-% Bytes (a string) is the canonical serialization of the KB fact list Facts. Emits any list of
-% ground fact terms; the caller validates (valid_kb/1) — the writer does NOT (separation of
-% concerns). Lines are byte-sorted and de-duplicated, so a KB set has exactly one byte form.
+% Bytes is the canonical serialization of the KB fact list Facts as a text string; its wire form is
+% UTF-8 (write_kb/2). Pure and total over any list of ground fact terms — the caller validates
+% (valid_kb/1), the writer does NOT (separation of concerns). Lines are byte-sorted and de-duplicated,
+% so a KB, being a SET of facts, has exactly one byte form (repeated identical facts collapse to one
+% line). rational_syntax is bound to compatibility across the render so exact bounds print `NrD`
+% regardless of the ambient reader flag.
 kb_bytes(Facts, Bytes) :-
     must_be(list, Facts),
-    maplist(fact_line, Facts, Lines),
+    current_prolog_flag(rational_syntax, RS0),
+    setup_call_cleanup(set_prolog_flag(rational_syntax, compatibility),
+                       maplist(fact_line, Facts, Lines),
+                       set_prolog_flag(rational_syntax, RS0)),
     sort(Lines, Sorted),                 % standard order over strings = code (byte) order
     with_output_to(string(Bytes), maplist(write, Sorted)).
 
-% fact_line(+Fact, -Line): the fact as `<quoted-term>.\n`. write_term/3 options pinned explicitly —
-% quoted(true) keeps atoms/strings re-readable, numbervars(false) is inert here (facts are ground)
-% but fixes intent against flag drift. Every fact is a compound functor(...), so the line always
-% ends `).` — never a bare number before `.`, so no float-vs-fullstop ambiguity on reparse.
+% fact_line(+Fact, -Line): the fact as `<quoted-term>.\n`. Every write_term/3 knob that could drift
+% with an ambient flag is pinned, so the bytes are a function of the fact alone: quoted(true) keeps
+% atoms/strings re-readable; ignore_ops(true) forces functorial notation (a user `op/3` on a functor
+% like `rule` can never turn `rule(a,b)` into `a rule b`, and lists still print `[..]`);
+% character_escapes(true) + character_escapes_unicode(true) pin the escape spelling of control / quote
+% / backslash chars (so a note's newline is escaped, never a raw line break); quote_non_ascii(false)
+% emits printable non-ASCII literally onto the UTF-8 wire; numbervars(false) is inert here (ground).
+% Every fact is a compound functor(...), so the line ends `).` — no float-vs-fullstop reparse hazard.
 fact_line(Fact, Line) :-
-    with_output_to(string(Body), write_term(Fact, [quoted(true), numbervars(false)])),
+    with_output_to(string(Body),
+        write_term(Fact, [ quoted(true), numbervars(false), ignore_ops(true),
+                           character_escapes(true), character_escapes_unicode(true),
+                           quote_non_ascii(false) ])),
     string_concat(Body, ".\n", Line).
 
 %% write_kb(+Stream, +Facts) is det.
-% Write the canonical bytes to Stream (map-emit's file sink).
+% Write the canonical bytes to Stream (map-emit's file sink). The canonical wire form is UTF-8 with LF
+% terminators and no BOM, so write_kb/2 pins the stream encoding to utf8 (restoring it after) — the
+% octets are then identical however the caller opened the stream. kb_bytes/2 is pure; the only side
+% effect here is the explicit stream write.
 write_kb(Stream, Facts) :-
     kb_bytes(Facts, Bytes),
-    write(Stream, Bytes).
+    stream_property(Stream, encoding(Enc0)),
+    setup_call_cleanup(set_stream(Stream, encoding(utf8)),
+                       write(Stream, Bytes),
+                       set_stream(Stream, encoding(Enc0))).
