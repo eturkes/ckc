@@ -238,6 +238,15 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 - Greenfield/speculative-milestone sizing (M3 APE-fork plan; corrected by codex 2026-07-13): MEASURED ANCHORS above are Rust read-cost-calibrated → they DON'T transfer to a no-existing-code milestone (nothing to byte-pin; external-discovery read replaces type-family read). Hard-splitting known multi-deliverable bundles + pre-declaring respec seams (`[half-A]` | `[half-B]` at the first-external-read boundary) are NECESSARY but NOT SUFFICIENT — the 13-unit expansion still shipped most discovery-heavy units seamless, its fresh-session/~200K/zero-rediscovery claim unsupported; sufficiency = EVERY discovery-heavy unit carries a concrete forward seam + a bounded read list, and parser-hosted work pins surface-feasibility goldens BEFORE decomposition.
 - Vendoring/fetch units: verify EACH source's OWN operative grant via its per-file source HEADER (APE `ape.pl` / AceRules `*_processor.pl` first ~25 L = the LGPL-3.0-or-later grant; do NOT assume that grant extends to ape-build's Clex/acetexts — each carries + needs its own). Add a `LICENSE.txt` TITLE spot-check (first ~15 L). Bank in the unit spec so execution needs ~zero rediscovery: exact pins + `HEAD^{tree}` hashes (confirm-not-rediscover), narrow-read ranges, placement via `git archive HEAD <paths>|tar -x`. Whole-file `LICENSE.txt` / big-source reads are the rediscovery cost these units must avoid — narrow-read the header, never the license body. EXEC-TIME COROLLARY (ape-vendor → codex-review 2026-07-14): re-probe banked "first-hand-checked" facts at fetch — BUT the re-probe itself can OVERSHOOT. ape-vendor fixed the owlswrl path (`prolog/utils/owlswrl/` NOT `prolog/owlswrl/`, correct) yet WRONGLY promoted author Tobias Kuhn to an APE © holder: a © HOLDER claim needs the actual `Copyright` NOTICE, never an `@author` tag (APE © of record = Attempto/UZH + Kaljurand; Kuhn holds none; codex-review caught it). Also — a "per-file grant" claim is false where headerless data/fixtures exist (APE 82/132 files carry it, AceRules 45/46); a `HEAD^{tree}` SHA on a SUBSET vendor is the FULL upstream root tree (label full-tree vs selection distinctly). WHOLE-REPO VENDORING PULLS IN BUNDLED THIRD-PARTY SUB-CONTENT → embedded lexicons/corpora/fixtures/copied-modules are INDEPENDENT provenance boundaries the umbrella grant doesn't cover (APE bundles a reduced Clex; `tests/acetexts.pl` = a user-submitted corpus with ~2558 submitter-IP fields; an example derived from a third-party draft). Verify byte-identity via `diff -r` placed-tree-vs-upstream-checkout at the pin. Never commit build products: the vendored APE `.gitignore` already ignores ape-build's `ape.exe` (`/ape.exe` `/ape-*.zip` `/packages`).
 - Banked-empirical-fact discipline (M3 plan redo → codex 2026-07-13): a dynamic-workflow-"verified" plan still shipped ≥5 falsified load-bearing claims (AceRules engine-loads (hardcoded `../ape/prolog/`), universal capitalized-token→`named(_)` rule, "DRS byte-identical" regression gloss, platypus 1:1 isomorphism, parseable candidate EN renderings) → bank each empirical fact WITH its exact probe command + input, and adversarially re-probe load-bearing facts before granting FAST-PATH status. Decision (user-delegated 2026-07-13): codex verdict on 3bb4a38 accepted in full (sole pushback: `It is recommended that S` DOES parse → `should(…)`); APE bet HELD; order = ape-vendor → ape-build → empirical downstream REPLAN against the in-tree `ape.exe` (roadmap REPLAN unit = the operative spec).
+- Reject-test-per-validator-rule (M3.kb-contract): authoring ONE isolated-defect example PER validator
+  rule — each carrying its expected violation FUNCTOR, the test asserting that functor is AMONG the
+  returned errors — caught a `kb_violation` clause that SILENTLY passed. A collect-all-violations
+  validator whose duplicate/negation check has an UNBOUND key in the clause head
+  (`count_matches(direction(R,_),…)` with `R` free) vacuously no-ops (the `ground_key` guard fails on
+  the free var) → a KB with a duplicate validated CLEAN. Fix: bind the counting/NAF key via `member/2`
+  BEFORE counting. A generic "invalid ⇒ validation fails" assertion would have MISSED it (another defect
+  in the same example masks the silent one); the per-rule expected-functor assertion is what localizes a
+  silently-passing rule → prove each rule FIRES with a minimal example that trips ONLY that rule.
 
 ## Runtime
 
@@ -310,6 +319,18 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   `clinical_ulex.pl` must match. SPEC §10.6 "no pronouns/anaphora" refined by SURFACE.md §Anaphora
   (frame `It` + antecedent-bound `the patient` only) — a SPEC-wording reconciliation flagged to the
   user.
+- ClinicalCNL KB contract (M3.kb-contract; AUTHORITY = `clinical/KB.md` — read it, skip re-deriving the
+  term family, as SURFACE.md is for the surface). `clinical/kb_kernel.pl` = validators (`valid_kb/1`,
+  `kb_errors/2` precise violation terms, `valid_id/2`, `action_key/3`, `derivable/3` PROLEG NAF) + the
+  OWNED closed vocabulary the ulex registry mirrors + coverage-checks. `clinical/goldens/kb_examples.pl`
+  `kb_example(Name,Validity,Facts)`: valid {doc_a,doc_b,control,multi} = `kb-writer`'s byte-pin source;
+  27 invalid each isolate ONE defect. Gate `run_tests(kb_kernel)` — pure Prolog, NO APE dep, fast (no
+  ape.exe). Non-obvious design calls downstream must honor: exceptions are LP-lane NAF guards, NOT the
+  in-context negated conjuncts the SMT lane uses (docA renal = exc.0, never an in-guard neg); population
+  = the subject (`pop.patient` v1), the adult/child demographic = an age `interval` not a `pop.adult`
+  concept; ids are doc-qualified `<doc>.<kind>.<k>` (stmt/bind/exc too, not just rule) so a flat
+  multi-doc conflict KB never collides; `source` completeness = a map-emit obligation (the kernel
+  validates shape+ref only when a `source` is present).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
