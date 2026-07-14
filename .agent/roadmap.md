@@ -19,172 +19,314 @@ may pull in.
 ## M3 ClinicalCNL product line (APE fork) + loop framework — scope f76e1fa — plan 3bb4a38 — replan PENDING
 
 Scope = SPEC §10.6 (2026-07-13 product push = design authority; §0 honesty note). Deliverable:
-vendored APE fork building green under SWI-Prolog (9.2.9 confirmed on the dev machine
-2026-07-13; environment gate — re-confirm functionally in ape-build + later Prolog-running
-units; ape-vendor = `swipl --version` only, no Prolog execution), ClinicalCNL v1 as a
-fail-closed ACE profile (EN surface) over a demand-authored clinical ulex, a DIRECT
-DRS → clinical-Prolog-KB mapping (AceRules = bounded differential only; labeled exception
-overrides, per-sentence provenance, byte-identical re-emission), Prolog-side conflict/no-conflict queries re-deriving the M1
+vendored APE fork building green under SWI-Prolog (9.2.9; environment gate — every
+Prolog-running unit re-confirms functionally via its own consult/run; smoke =
+`sh clinicalcnl/clinical/ape_build_smoke.sh`), ClinicalCNL v1 as a fail-closed ACE profile
+(EN surface) over a demand-authored clinical ulex, a DIRECT DRS → clinical-Prolog-KB mapping
+(AceRules = bounded differential only; labeled exception overrides, per-sentence provenance,
+byte-identical re-emission), Prolog-side conflict/no-conflict queries re-deriving the M1
 docA×docB thread in-lane, a locked synthetic conformance corpus behind ONE runner command, and
-the /cnl-optimize + /loop round framework. Rust tree untouched this milestone (no re-bless
-anywhere); engine-agnostic rule unchanged (it targets LLM inference engines — SWI-Prolog/APE
-are nameable solver/host tooling like Z3). No unit needs the model runtime (no gated units).
-
-2026-07-13 codex verdict on 3bb4a38 (accepted in the review session; recording = user-delegated
-decision, this follow-up commit): the 13-unit downstream design is SUPERSEDED — replan required
-(REPLAN unit below); ape-vendor + ape-build STAND (the review itself rebuilt APE @ pin under
-9.2.9 + reproduced the regression) and execute FIRST — the replan then designs the
-surface/framing sub-language empirically against the in-tree built `ape.exe`. APE bet HELD
-(user-directed; review validated build/licensing/runtime — it falsified only banked
-surface+mapping design facts, corrected in place below). Superseded unit text =
-`git show 3bb4a38:.agent/roadmap.md`; raw codex findings = review-session transcript a5ea24af
-(2026-07-13; its /tmp scratch clones+`ape.exe` are volatile — rebuild in-tree, never depend).
+the /cnl-optimize + /loop round framework. Rust tree untouched this milestone; engine-agnostic
+rule unchanged (SWI-Prolog/APE are nameable solver/host tooling like Z3). No unit needs the
+model runtime. History: the 13-unit downstream design was superseded 2026-07-13 (codex-accepted;
+text at `git show 3bb4a38:.agent/roadmap.md`); the REPLAN unit executed 2026-07-14 probed the
+in-tree `ape.exe` substrate directly — decomposition below rests on §L·probe + decisions D1-D10.
 
 Cross-unit decisions:
 - Layout: three zones keep fork-vs-vendored-vs-ours auditable — `clinicalcnl/` root = the APE
   fork (upstream layout preserved: diffability + GPL corresponding-source clarity);
   `clinicalcnl/vendor/acerules/` = the AceRules adaptation-source subset (see ape-vendor);
-  `clinicalcnl/clinical/` = CKC clinical additions ONLY (profile checker, mapping, queries,
-  ulex, corpus, runner). Upstream files edited only where wiring demands, each edit commented
-  `% CKC (<date>):`. Fork provenance = `clinicalcnl/CKC_FORK.md` (distinct name — APE's own `README.md`
-  sits at the root; the two upstream roots also collide on `.gitignore`/`LICENSE.txt`).
+  `clinicalcnl/clinical/` = CKC clinical additions ONLY (gate, profile, mapping, conflict,
+  ulex, corpus, goldens, runner). Upstream files edited only where wiring demands, each edit
+  commented `% CKC (<date>):`. Fork provenance = `clinicalcnl/CKC_FORK.md` (distinct name — APE's
+  own `README.md` sits at the root; the two upstream roots also collide on `.gitignore`/`LICENSE.txt`).
 - Licensing (SPEC §11.5): APE + AceRules evidence rows land in the ape-vendor commit as §11.5
   PROSE (extend the "Standing verdicts" sentence — no registry file); ape-vendor owns the
   acquisition-record schema + first-hand header verification. Clex: VENDORED in-tree (full
-  lexicon, GPL-3.0-or-later, `vendor/clex/`, §11.5 row) — ape-build wires it drop-in + the
+  lexicon, GPL-3.0-or-later, `vendor/clex/`, §11.5 row) — ape-build wired it drop-in; the
   upstream suite uses the in-tree copy (no live download); also a clinical-term mining seed.
-- Fail-closed profile (CORRECTED 2026-07-13 — DRS-only checking is INSUFFICIENT: APE irreversibly
-  erases surface facts — comments vanish, `n:Flarble` → ordinary `object(…,'Flarble',…)` NOT
-  `named(_)`, `005`/`5` normalize identically, pronouns/definites resolve by silent referent
-  merging, `named/1` can nest inside conditions): fail-closed = a RAW-TEXT gate BEFORE APE
-  (canonical token/framing grammar; reject every noncanonical token class incl. inline
-  `n:`/`v:`/`a:`/`p:` prefixes + capitalized content tokens) + APE message/syntax-output inspection
-  + a RECURSIVE full-DRS scan (unregistered `named(_)` at any depth) + a mutation property battery
-  (comments, prefixes, casing, variables, numeral spellings, quotations, contractions, pronouns,
-  definites, ellipsis). Precise capitalization fact: an UNPREFIXED capitalized OOV token in
-  proper-name position → `named(_)` + warning; a prefixed one bypasses `named(_)` entirely → the
-  prefix ban is enforceable ONLY at the raw gate. Guessing OFF (`-noclex -ulexfile`; `-guess`
-  default off) still rejects lowercase OOV; a clean parse alone never proves lexical closure. The
-  profile checker still validates the DRS against registered sentence patterns, rejects naming the
-  sentence + construct. EN interval markers at least / at most / less than / more than ↔
-  ge/le/lt/gt (→ APE `object` CountOp geq/leq/less/greater) — hand-oracled battery, expected values
-  hand-written, never derived from the mapping under test.
+- Fail-closed (design FINAL, probe-grounded): TWO layers. (1) RAW gate BEFORE APE = WHITELIST —
+  framing grammar + per-sentence registered-pattern token templates; any non-matching document
+  or sentence rejects. The whitelist subsumes the token bans: inline `n:`/`v:`/`a:`/`p:`
+  prefixes, unregistered capitalized tokens (else silent `named(_)` + mere warning, p6),
+  pronouns beyond the pattern-anchored frame "It", `or`/`every`/quantifier surfaces, decimals,
+  leading zeros, spaced multiword terms, comments, quotations. APE irreversibly erases surface
+  facts (prefix tokens, numeral spellings, comments, silent anaphora merges) → the raw gate is
+  the ONLY enforcement point for surface bans. (2) DRS profile AFTER APE = defense-in-depth:
+  zero-message law (every registered pattern parses warning-free → ANY message rejects),
+  frame-op↔keyword consistency (D1), recursive `named(_)`-vs-registry scan, guard/action shape
+  whitelist, canonical-DRS equality vs the pattern's golden. Guessing stays off
+  (noclex+ulextext); lowercase OOV hard-errors (p6); a clean parse alone never proves lexical
+  closure — the two gates do.
 - Determinism: same accepted document → byte-identical KB text (canonical clause order +
-  emission); provenance = {document id, sentence index} carried on every emitted clause group.
-- Conformance runner: ONE command (plunit driver script under `clinicalcnl/clinical/`) =
-  upstream fork suite + profile battery + mapping battery + conflict queries + corpus
-  round-trip; THE loop round gate. Milestone acceptance = runner green over the locked corpus
-  + a ledgered manual dry-run round (loop-framework). The upstream-suite leg's Clex gate is
-  RESOLVED — full Clex vendored in-tree (`vendor/clex/`, §11.5 row); the runner uses the in-tree
-  copy (no live download, no Clex-free respec). The corpus gains a
-  case MANIFEST (ordered document pairs + expected category/kind/participating_rules/evidence)
-  beside per-document round-trip.
-- Reading legend (banked-once shared pins; the units below cite by tag — read these, skip
-  rediscovery). §L·spec (design authority; section-anchor + distinctive-string, ≈line drifts): §5
-  domain IR (`NormativeRule`/`Action`; `ContextExpr` = DNF over concept | negated-concept |
-  "quantity interval" atoms, ≈L456); §6 conflict + LP profile ("rules-as-data" ≈L597; byte-emission
-  "Emission is deterministic" ≈L578; lane-separation "LP verdicts never replace" ≈L609); §8.6 worked
-  thread (≈L826); §10.4 sentence model / DNF / markers = shape reference (the APE profile REPLACES
-  the bespoke grammar; full EN slot table `ecc19d3:SPEC.md` L923-944); §10.6 product line ("Compile"
+  dedicated emitter); provenance = {document id, sentence index} on every emitted clause group.
+  Per-sentence APE invocation (D2): DRS SID is always 1; the sentence index comes from the raw
+  layer's block counter; TID stays APE-native.
+- Conformance runner: ONE command (plunit driver under `clinicalcnl/clinical/`) = surface
+  goldens + gate/profile batteries + mapping/oracle batteries + conflict + corpus round-trip +
+  attack-surface negative + upstream-suite leg; THE /loop round gate. Milestone acceptance =
+  runner green over the locked corpus + a ledgered manual R1 round (loop-framework).
+- Replan-resolved design decisions (2026-07-14, each grounded in §L·probe):
+  D1 modality/strength: direction lives in the ACE frame; strength lives in the raw-layer rule
+  header's modality keyword. Frames (surface → DRS op): "it is recommended that S" →
+  `should` (for); "it is admissible that S" → `may` (permit); "it is not recommended that S" →
+  `-[should]` (against); "it is not possible that S" → `-[can]` (contraindicate). Keyword →
+  (required op, direction, strength): recommend→(should,for,strong), suggest→(should,for,weak),
+  may-consider→(may,permit,weak), not-recommend→(-should,against,strong),
+  not-suggest→(-should,against,weak), contraindicate→(-can,contraindicate,strong). Aux forms
+  (should/may/cannot) parse but stay UNREGISTERED → gate-rejected (one canonical surface per
+  direction). 1:1 decode = keyword→pair total+injective + op-mismatch reject battery.
+  D2 per-sentence APE invocation — kills cross-sentence silent referent merging structurally (p7).
+  D3 lexical surfaces: conditions = countable nouns, guard conjunct "the patient has a <cond>";
+  drugs = registered `pn_sg` proper names, action "the patient takes <Drug>"; v1 action verb =
+  takes → `act.administer`; population = "a patient" introduced by the first guard conjunct,
+  every later mention = definite "the patient" (within-sentence anaphora with antecedent =
+  warning-free); mass nouns excluded v1 (ACE demands a determiner on mass, p6).
+  D4 DNF: or-guards REJECTED (p7: `v()` + broken then-part anaphora + warning); disjunction =
+  one rule sentence per disjunct, grouped under one rule id by the raw layer → stmt.k per
+  disjunct (bridge-oracle numbering preserved).
+  D5 in-guard negated-concept DEFERRED from the v1 surface ("does not have" parses clean, p7 →
+  reject-battery member); all negative context via labeled exceptions (NAF); §5 IR keeps
+  negated-concept — a profile-scope restriction, no SPEC change.
+  D6 exceptions: raw-layer labeled blocks bound to rule ids; ACE body = self-contained
+  'A patient has a <cond>.' (single concept, interval-free); mapper compiles the PROLEG NAF guard.
+  D7 certainty: optional raw-header field {high|moderate|low|very_low} → KB fact; never in ACE.
+  D8 back-reference: the no-reference arm — per-sentence isolation; within-sentence definites
+  require an in-sentence antecedent (anaphor warning = reject via the zero-message law).
+  D9 interval surface: "the patient has an age of <marker> <INT> years"; markers at least→geq /
+  at most→leq / less than→less / more than→greater; exactly/bare-eq = reject members (single-bound
+  law, 16-mask battery); geq/greater land top-level, leq/less/exactly land in NESTED sublists
+  (guard walker flattens one level).
+  D10 conflict arithmetic: exact-rational bound algebra (SWI native rationals), open/closed
+  bounds distinct (geq 18 vs greater 18) — integer FD INSUFFICIENT (18<X<19 empty over FD,
+  nonempty over Q), no clp library dependency; DNF disjunct-pair enumeration + concept polarity
+  + exception expansion.
+- §L·probe (2026-07-14 empirical ledger; substrate = in-tree APE under swipl 9.2.9. RECIPE —
+  raw DRS: from `clinicalcnl/` run `swipl -g "consult(get_ape_results),
+  ace_to_drs:acetext_to_drs('<ACE>',_,_,Drs,Msgs), …" -t halt` (root `get_ape_results.pl` sets
+  the search path; guess=off default); fileless noclex+ulex: prepend `clex:set_clex_switch(off),
+  ulex:add_lexicon_entries([<entries>])`; product seam: `get_ape_results([text='…', noclex=on,
+  ulextext='<entries>', solo=drs], CT, C)` → success CT=text/plain + serialized numbervar'd DRS
+  (THE golden byte format), failure CT=text/xml `<messages>` (fail-closed discriminator). Probe
+  ulex: noun_sg patient(human)/sepsis/pregnancy/'severe-renal-impairment'/age/year +
+  noun_pl(years,year) + pn_sg('Abx-A') + tv_finsg takes/has + tv_infpl take/have):
+  p1 frames: recommended→should, admissible→may, possible→can, necessary→must; "not <same>" →
+  `-drs([],[op(…)])` for all four; "It is false that it is recommended" ≡ "It is not
+  recommended". REJECTED as not-ACE: suggested / permitted / obligatory / prohibited /
+  "strongly recommended" / "must not".
+  p2 aux: should/may/must + should-not/may-not parse with subject HOISTED outside the op box;
+  inside If-then aux ≡ frame (identical DRS modulo TIDs) — frames registered, aux rejected (D1).
+  p3 rule shape: If-then → `=>(drs(guard), drs([],[OP(drs(action))]))`; then-part definites
+  resolve INTO guard referents (take(A,…) reuses guard A).
+  p4 thread parses CLEAN, zero messages: docA-core 'If a patient has a sepsis and the patient
+  has an age of at least 18 years then it is recommended that the patient takes Abx-A.' →
+  =>(…,[should(take(A,named('Abx-A')))]); docB (+ pregnancy conjunct, "it is not possible
+  that") → -[can]; control ("less than 18") → -[can] with nested [relation(of),object(year,less,18)].
+  p5 intervals: "has an age of at least 18 years" clean; markers→CountOp per D9; bare "18
+  years"→eq, "exactly"→exactly (nested); bare number without unit noun + "years old" REJECT;
+  "the age of a patient is …" parses but anaphor-WARNS → rejected surface (D8/D9 form wins).
+  p6 lexicon: lowercase OOV under noclex → hard error message(error,word,…,'Use the prefix n:,
+  v:, a: or p:.'); capitalized OOV → `named('X')` + warning 'Undefined word. Interpreted as a
+  singular proper name.' = THE hole (raw gate + registry close it); registered pn_sg →
+  `named()` ZERO warnings (registry membership = the authoritative discriminator); bare mass
+  rejects, "some <mass>" parses (→ D3 countable-only); hyphenated lemmas = single tokens.
+  p7 hazards (reject-battery evidence): or-guard → `v(drs,drs)` + then-part anaphora BREAKS
+  (fresh referent + warning); two-sentence text: 'The patient' silently merges to the
+  sentence-1 referent, ZERO warning (→ D2); pronoun 'he' silently resolves, ZERO warning;
+  'Every patient takes Abx-A.' → the SAME => DRS shape as If-then (surface restrictions are
+  enforceable only raw-side); bare-then (no frame) parses; in-guard "does not have" → clean
+  `-drs` inside the guard (→ D5).
+  Every row reproduces from the RECIPE + the quoted sentence; goldens re-capture them in-tree.
+- Reading legend (banked-once shared pins; units cite by tag — read these, skip rediscovery).
+  §L·spec (design authority; section-anchor + distinctive-string, ≈line drifts): §5 domain IR
+  (`NormativeRule`/`Action`; `ContextExpr` = DNF over concept | negated-concept | "quantity
+  interval" atoms, ≈L456); §6 conflict + LP profile ("rules-as-data" ≈L597; byte-emission
+  "Emission is deterministic" ≈L578; lane-separation "LP verdicts never replace" ≈L609); §8.6
+  worked thread (≈L826); §10.4 sentence model = shape reference (the APE profile REPLACES the
+  bespoke grammar; full EN slot table `ecc19d3:SPEC.md` L923-944); §10.6 product line ("Compile"
   ≈L1291, determinism ≈L1296, "IR bridge" deferral ≈L1299). §L·ids (concept inventory — mirror
-  `corpus/lexicon/ja_core.yaml` EXACTLY; EN surfaces demand-authored): `pop.adult`/`pop.child` are
-  INTERVAL-CARRYING → in the norm layer they collapse to their interval atom (`age>=18`/`age<18`),
-  NOT a concept atom (§8.6 docA carries the interval, no `pop.adult` atom) → rendered via the
-  interval slot ("age at least 18 years"); `cond.sepsis`, `cond.renal_severe`, `cond.pregnancy`;
-  `drug.abx_a`; `act.administer`; `q.age_years` (var; EN surface "age", unit "years"). Modality →
-  (direction,strength): recommend→for/strong, suggest→for/weak, may-consider→permit/weak,
-  not-recommend→against/strong, not-suggest→against/weak, contraindicate/禁忌→contraindicate/strong
-  (禁忌 implies `act.administer`, no explicit verb). Certainty {high|moderate|low|very_low} =
-  proof-visible annotation, NOT consumed by conflict logic. §L·drs (APE reality — a finder built +
-  ran APE @ pin under SWI 9.2.9): DRS = `drs(Referents, Conditions)`, each condition `Cond-SID/TID`
-  (native {sentence,token} provenance); rule = `=>(guard-drs, DEONTIC(action-drs))`; deontic ops
-  `should`(recommend) / `must`(obligation) / `may`(permit) / `-drs([],[can(drs(…))])`(contraindicate
-  — the negation WRAPS an embedded can-DRS; NO "must not"; 禁忌 = "cannot") / `-drs([],[should(…)])`
-  (against-direction) / `~`(NAF); STRENGTH (strong/weak) is ABSENT from the operators → per-modality
-  surface+DRS marker pairs w/ 1:1 decode tests are a replan design obligation; interval guards on `object(Ref,Lemma,_,Unit,CountOp,N)`,
-  CountOp ∈ {geq,leq,less,greater,exactly,eq} (leq/less/exactly emit NESTED condition sublists);
-  `is_wellformed.pl` = the profile allowlist base; first-parse-wins determinism ≠ unique reading →
-  pin a canonical tree/DRS per registered pattern + reject multi-reading inputs; byte-identical KB
-  must canonicalize referent var-names → `stmt.k`/`bind.k`. CAPITALIZED-OOV: see the corrected
-  Fail-closed decision (unprefixed proper-name-position → `named(_)`; prefixed → ordinary `object`,
-  raw gate owns the ban). API = `get_ape_results/2,3`
-  (module `ape`). Fail-closed signal = non-empty `<message>` XML or `drs([],[])`, never exit code.
-  §L·acerules (AceRules reality, CORRECTED 2026-07-13 — `court` is pure SWI-Prolog, ASP severable:
-  only `stable_interpreter` shells to smodels (stable-mode-only, unused) → `dependencies/` excluded;
-  engine load FIRST needs source-relative rewiring of its hardcoded `../ape/prolog/` APE path to the
-  nested layout — ape-build owns it): `generate_rules/3` (`engine/acerules_processor.pl`) takes
-  `InputCodes` = RAW TEXT it reparses via APE, dropping SID/TID provenance — NOT a DRS→rule seam →
-  the clinical DRS→KB mapper is built DIRECT; AceRules native rule = triple `(Label,Head,Body)`, no
-  deontic force (direction/strength purpose-built). Defeat = `court` (`Label: <ACE>.` +
-  `L1 overrides L2.` → `priority_handler.pl`; retains `can`/`must` as modal terms). F1 (revised):
-  emit SPEC's NAF-guarded PROLEG; `court` = a BOUNDED differential only, via a purpose-built
-  ISOMORPHIC paired oracle + an exhaustive fact-presence truth table — platypus = 4 rules +
-  2 priorities, and naive-NAF genuinely DIVERGES from `court` on it (both NAF guards fail → no
-  `mammal`; `court` derives `mammal`) → NOT a 1:1 oracle. F3: `court` RESOLVES, never REPORTS
-  conflicts → conflict-queries builds detection fresh, querying rule records/contexts directly
-  (the clinical KB never contains court priorities). §L·lp (Prolog KB shape, §6 LP
-  profile): rules-as-data facts `rule/population/condition/action/direction/strength/certainty/
-  exception/source` over a fixed kernel; exceptions = NAF-guarded labeled predicates (PROLEG); action
-  key `<kind>:<target>`. §L·conflict (§6 verdict machinery): direction groups
-  positive{for,require,permit} / against{against,avoid} / contraindicating{contraindicate,avoid};
-  eligible = same normalized action ∧ one direction positive while the other against/contraindicating;
-  M1 kind `deontic_direction_conflict`; verdicts `semantic_contradiction` / `semantic_no_conflict`
-  (+ `documented_no_conflict_result`); LP evidence labels = `participating_rules`, lane=lp,
-  solver_status=not_run — SMT vocabulary (`unsat_core` etc.) stays out of the LP lane (§6
-  separation). §L·thread (§8.6 docA×docB — the standing conformance thread):
-  docA `test_source.m1_guideline_a.rule.0` = {action `act.administer:drug.abx_a`, context cond.sepsis
-  ∧ ¬cond.renal_severe ∧ age>=18, for/strong, exc.0}; docB `…guideline_b.rule.0` = {cond.sepsis ∧
-  age>=18 ∧ cond.pregnancy, contraindicate, same action-key → eligible}; control `…m1_control` =
-  {cond.sepsis ∧ age<18, contraindicate → age disjoint → no-conflict}. Verdict: overlap sat, deontic
-  unsat, core `[a.…guideline_a.rule.0, a.…guideline_b.rule.0]`, `deontic_direction_conflict`; control
-  documents no-conflict. §8.2 groups + `corpus/reference/m1_expected.yaml`. EN renderings
-  (CORRECTED 2026-07-13): the previously banked candidates are NOT valid ACE — probed rejections:
-  `For patients …` openings, `[basis …]` brackets, `exception:` prefixes, the passive "…is strongly
-  recommended", spaced multiword terms, capitalized content tokens → surface OPEN, the replan
-  designs it empirically; confirmed seed frame: `It is recommended that <S>.` → `should(…)`.
-  §L·pins (transplant sources): bridge oracle `6406066:.agent/roadmap.md`
-  L56-59 (+ `ecc19d3:.agent/roadmap.md` L850-861); interval 16-mask battery `6406066:.agent/
-  roadmap.md` L54-55 (fixture `ecc19d3:.agent/roadmap.md` L652-656); harvested APE/AceRules upstream
-  report `git show e8b5cf6:docs/cnl-attempto.md`.
+  `corpus/lexicon/ja_core.yaml` EXACTLY; EN surfaces = D3/D9): `pop.adult`/`pop.child` are
+  INTERVAL-CARRYING → collapse to their interval atom (`age>=18`/`age<18`), NOT a concept atom;
+  `cond.sepsis`, `cond.renal_severe`, `cond.pregnancy`; `drug.abx_a`; `act.administer`;
+  `q.age_years` (var; surface "age"/"years"). Modality → (direction,strength) table lives in D1;
+  certainty {high|moderate|low|very_low} = proof-visible annotation, NOT consumed by conflict
+  logic. §L·drs (APE parse reality — §L·probe-confirmed 2026-07-14): DRS = `drs(Referents,
+  Conditions)`, each condition `Cond-SID/TID`; rule + ops + interval shapes = p1-p5;
+  `object(Ref,Lemma,_,Unit,CountOp,N)`, CountOp ∈ {geq,leq,less,greater,exactly,eq};
+  `prolog/utils/is_wellformed.pl` = profile allowlist base; first-parse-wins determinism ≠
+  unique reading → goldens pin ONE canonical DRS per registered pattern; API =
+  `get_ape_results/2,3` (module `ape`); fail-closed signal = text/xml `<messages>` / non-empty
+  Msgs / `drs([],[])`, never exit code. §L·acerules (AceRules reality, corrected 2026-07-13 —
+  `court` is pure SWI-Prolog, ASP severable: only `stable_interpreter` shells to smodels
+  (stable-mode-only, unused) → `dependencies/` excluded; engine `ape_location` rewired in
+  ape-build): `generate_rules/3` (`engine/acerules_processor.pl`) takes `InputCodes` = RAW TEXT
+  it reparses via APE, dropping SID/TID provenance — NOT a DRS→rule seam → the clinical DRS→KB
+  mapper is DIRECT; AceRules native rule = triple `(Label,Head,Body)`, no deontic force
+  (direction/strength purpose-built). Defeat = `court` (`Label: <ACE>.` + `L1 overrides L2.` →
+  `parser/priority_handler.pl`). `court` RESOLVES, never REPORTS conflicts → conflict detection
+  is built fresh (the clinical KB never contains court priorities); platypus = 4 rules + 2
+  priorities where naive-NAF genuinely DIVERGES from `court` → NOT a 1:1 oracle, use the
+  purpose-built isomorphic pair + truth table (court-differential unit). §L·lp (Prolog KB
+  shape, §6 LP profile): rules-as-data facts `rule/population/condition/action/direction/
+  strength/certainty/exception/source` over a fixed kernel; exceptions = NAF-guarded labeled
+  predicates (PROLEG); action key `<kind>:<target>`. §L·conflict (§6 verdict machinery):
+  direction groups positive{for,require,permit} / against{against,avoid} /
+  contraindicating{contraindicate,avoid}; eligible = same normalized action ∧ one direction
+  positive while the other against/contraindicating; M1 kind `deontic_direction_conflict`;
+  verdicts `semantic_contradiction` / `semantic_no_conflict` (+ `documented_no_conflict_result`);
+  LP evidence labels = `participating_rules`, lane=lp, solver_status=not_run — SMT vocabulary
+  (`unsat_core` etc.) stays out of the LP lane (§6 separation). §L·thread (§8.6 docA×docB — the
+  standing conformance thread): docA `test_source.m1_guideline_a.rule.0` = {action
+  `act.administer:drug.abx_a`, context cond.sepsis ∧ ¬cond.renal_severe ∧ age>=18, for/strong,
+  exc.0}; docB `…guideline_b.rule.0` = {cond.sepsis ∧ age>=18 ∧ cond.pregnancy, contraindicate,
+  same action-key → eligible}; control `…m1_control` = {cond.sepsis ∧ age<18, contraindicate →
+  age disjoint → no-conflict}. Verdict: overlap sat, deontic unsat, core
+  `[a.…guideline_a.rule.0, a.…guideline_b.rule.0]`, `deontic_direction_conflict`; control
+  documents no-conflict. §8.2 groups + `corpus/reference/m1_expected.yaml`. Confirmed EN
+  renderings = p4 (docA's ¬renal_severe enters via exc.0, not an in-guard negation — D5/D6).
+  §L·pins (transplant sources): bridge oracle `6406066:.agent/roadmap.md` L56-59
+  (+ `ecc19d3:.agent/roadmap.md` L850-861); interval 16-mask battery `6406066:.agent/roadmap.md`
+  L54-55 (fixture `ecc19d3:.agent/roadmap.md` L652-656); harvested APE/AceRules upstream report
+  `git show e8b5cf6:docs/cnl-attempto.md`.
 
 - [x] ape-vendor: APE @5f4d535 → `clinicalcnl/` (132) + AceRules engine subset @5b7afb7 → `clinicalcnl/vendor/acerules/` (158) + full Clex @20960a5 → `clinicalcnl/vendor/clex/` (3) (`.git`-stripped, byte-identical to upstream; trees `ac239d2`/`1cebf98`(full-root)/`210d7ea`); grants verified first-hand (APE+AceRules LGPL-3.0-or-later, Clex GPL-3.0-or-later); §11.5 permissive regime + per-resource rows + `CKC_FORK.md`; swipl 9.2.9. 44% 436K/1M — `a400dd1` + codex-review remediation (permissive §11.5; corrected holders/claims per H1/H2/M1/M2; Clex pulled in)
-- [x] ape-build: `make install` → full-vocab `ape.exe` (1.3M) under swipl 9.2.9, 0 err/warn; `get_ape_results` (module `ape`, `prolog/ape.pl`) loads + `ace_to_drs:acetext_to_drs/5` returns `drs(Refs,Conds)` should()-DRS on the clinical frame `It is recommended that a patient takes a drug.`. Full Clex wired DRY via `prolog/lexicon/clex.pl` `clex_file/1` → source-relative `../../vendor/clex/clex_lexicon.pl` (loader redirect — NO 3.2M blob copy, vendored blobs stay pristine); ape.exe rebuilt full-vocab. AceRules `ape_location` rewired to the nested layout (`% CKC (2026-07-14):` in `vendor/acerules/engine/parameters.pl` `../../../prolog/` + `acerules_processor.pl` source-relative resolve), engine loads clean + court nixon courteous-override smoke (guess=on — vendored Attempto Clex lacks `quaker`, republican/pacifist present, so guess=off cannot byte-match the older-Clex `output/nixon`; assert the `It is false that Nixon is a` override). Reproducible fail-closed gate `clinicalcnl/clinical/ape_build_smoke.sh` (5 checks). ACCEPTANCE (a)(b)(d) met; (c) upstream drace regression DEFERRED (optional, finder-confirmed in ape-vendor, not the real gate) — its remaining wiring (upstream-suite `consult(clex:clex_lexicon)` loads `tests/clex_lexicon.pl`, the ABSENT downloaded full Clex, bypasses `clex_file/1`) + `testruns/` baseline reproduction belong to conformance-seed's runner. 76% 757K/1M — real total (context.sh sums real API input, NOT inflated), over the 200K soft aim (permitted): ~270K stored conversation + redacted extended-thinking (Opus max-effort — 64 blocks, 0 chars persisted in the `.jsonl`) + ~50K fixed overhead = genuine 1M-wall occupancy absent from the transcript. The earlier session-prompt-CLAUDE.md-re-injection guess was falsified 2026-07-14 (`.jsonl` forensics — see memory Lessons)
-- [ ] REPLAN — downstream respec (PLANNING-mode session; UNBLOCKED — ape-build delivered the
-  full-vocab in-tree `ape.exe` probe substrate + `clinicalcnl/clinical/ape_build_smoke.sh` gate). The superseded 13-unit expansion (cnl-ulex,
-  cnl-profile.1/.2a/.2b, drs-map.1a/.1b/.2, conflict-queries, conformance-seed.a/.b,
-  loop-framework) lives at `git show 3bb4a38:.agent/roadmap.md` — MINE it (much survives:
-  interval battery, bridge oracle, dep shape, acceptance patterns), redo the decomposition on the
-  corrected foundations; unit count unconstrained (13 was an underestimate — codex: expand around
-  surface framing, raw-profile enforcement, KB contract/kernel, exception mapping, context solver,
-  verdict adapter, runner packaging). METHOD: design the surface/framing sub-language EMPIRICALLY
-  against the built `ape.exe` FIRST (byte-pinned raw-text→DRS goldens per construct), then
-  re-derive units; every banked empirical fact carries its probe command; adversarially re-probe
-  load-bearing facts before granting any FAST-PATH; every discovery-heavy unit gets a concrete
-  forward seam + bounded read list. FOUNDATIONS (all precede any ulex/profile/map unit):
-  (1) surface/framing grammar — exact raw document grammar (framing, metadata, exception labels,
-  basis brackets) + genuinely-parseable ACE rule bodies + raw→DRS goldens (§L·thread rejections;
-  seed frame `It is recommended that <S>.` → `should(…)`);
-  (2) kb-contract/kernel — exact predicate signatures/arities, ground-term grammar, exception
-  argument binding, safety invariants, execution semantics, canonical examples, plunit interface
-  tests;
-  (3) fail-closed raw-text gate + mutation property battery (per the corrected Fail-closed
-  decision above).
-  BOUND DESIGN DECISIONS (accepted codex findings 2026-07-13): direct DRS→KB mapper + isomorphic
-  purpose-built court differential w/ exhaustive fact-presence truth table (§L·acerules);
-  per-modality-pair surface+DRS markers w/ 1:1 decode tests (§L·drs); conflict = rational interval
-  arithmetic (CLP(Q) or exact rationals — `clpfd` is INTEGER FD, `X#>18,X#<19` wrongly closes ⇒
-  breaks §6 QF_LRA semantics) + DNF disjunct-pair enumeration + concept polarity + exception
-  expansion + open/closed-bound properties, querying rule records/contexts directly; conformance
-  case manifest + Clex ownership-or-respec (runner decision above); loop-framework bootstrap fix
-  (explicit one-time bootstrap state OR split protocol-validation from R1; ledger line staged
-  INSIDE the round commit — `.claude/commands/cnl-optimize.md` edit). OWNERS to assign or
-  explicitly defer: negated-concept surface (canonical construction + fixtures, or excluded w/ §5
-  coverage note), certainty (one exact optional surface or defer/remove), back-reference
-  (parseable no-reference construction or a formal §10.6 respec — reaches user), ambiguity policy
-  (canonical parse per pattern; reject multi-reading inputs), vendored attack surface (entry-point
-  inventory; disable/exclude unused HTTP/webservice/stable-mode surfaces + negative invocation
-  test; AGENTS.md security bullet), oracle scope (KB-level only — facts, exception ids, sentence
-  indices, bytes; ClinicalIR ids stay behind the backlog IR bridge).
+- [x] ape-build: `make install` → full-vocab `ape.exe` (1.3M) under swipl 9.2.9, 0 err/warn; `get_ape_results` (module `ape`, `prolog/ape.pl`) loads + `ace_to_drs:acetext_to_drs/5` returns `drs(Refs,Conds)` should()-DRS on the clinical frame `It is recommended that a patient takes a drug.`. Full Clex wired DRY via `prolog/lexicon/clex.pl` `clex_file/1` → source-relative `../../vendor/clex/clex_lexicon.pl` (loader redirect — NO 3.2M blob copy, vendored blobs stay pristine); ape.exe rebuilt full-vocab. AceRules `ape_location` rewired to the nested layout (`% CKC (2026-07-14):` in `vendor/acerules/engine/parameters.pl` `../../../prolog/` + `acerules_processor.pl` source-relative resolve), engine loads clean + court nixon courteous-override smoke (guess=on — vendored Attempto Clex lacks `quaker`, republican/pacifist present, so guess=off cannot byte-match the older-Clex `output/nixon`; assert the `It is false that Nixon is a` override). Reproducible fail-closed gate `clinicalcnl/clinical/ape_build_smoke.sh` (5 checks). ACCEPTANCE (a)(b)(d) met; (c) upstream drace regression DEFERRED (optional, finder-confirmed in ape-vendor, not the real gate) — its remaining wiring (upstream-suite `consult(clex:clex_lexicon)` loads `tests/clex_lexicon.pl`, the ABSENT downloaded full Clex, bypasses `clex_file/1`) + `testruns/` baseline reproduction belong to the upstream-suite unit. 76% 757K/1M — real total (context.sh sums real API input, NOT inflated), over the 200K soft aim (permitted): ~270K stored conversation + redacted extended-thinking (Opus max-effort — 64 blocks, 0 chars persisted in the `.jsonl`) + ~50K fixed overhead = genuine 1M-wall occupancy absent from the transcript. The earlier session-prompt-CLAUDE.md-re-injection guess was falsified 2026-07-14 (`.jsonl` forensics — see memory Lessons)
+- [ ] surface-goldens: authoritative v1 surface+framing spec `clinicalcnl/clinical/SURFACE.md`
+  (D1-D10 tables; framing block grammar — document header w/ doc id; rule blocks {id k,
+  modality keyword, optional certainty, optional basis string} + ONE ACE sentence; exception
+  blocks {id k, rule ref} + ONE ACE sentence; exact line syntax = this unit's call, semantics
+  fixed by the D-decisions) + a 2-line SPEC §10.6 pointer to it + `clinical/goldens/`
+  per-construct fixtures {ACE sentence, ulextext, expected bytes} with expectations captured
+  OBSERVED via the §L·probe product seam, never hand-written (accepts: 4 frames, p4 thread
+  rules, 4 interval markers, exception body; rejects: p1-rejected frames, p5 rejected interval
+  surfaces, p6 OOV classes — expected = exact text/xml message bytes) + plunit replayer
+  `clinical/surface_goldens.pl` re-running each golden byte-exact in-process. Gate: goldens
+  plunit green. Seam if oversized: [SURFACE.md + accept goldens] | [reject goldens]. Reads:
+  §L·probe recipe only (shapes banked; option names pinned).
+- [ ] kb-contract: `clinical/KB.md` kernel contract (rules-as-data fact family per §L·lp —
+  exact signatures/arities = this unit's call; ground-term grammar: ids `stmt.k`/`bind.k`/
+  `exc.k` document-continuous, action key `<kind>:<target>`; interval atom shape (var, bound
+  value, open|closed, dir); PROLEG NAF exception-guard shape; safety invariants (every stmt
+  var bound by population/condition atoms); execution semantics = SLD+NAF derivability queries
+  the conflict layer consumes) + `clinical/kb_kernel.pl` term validators + plunit validator
+  accept/reject over hand-written NORMATIVE examples. Gate: plunit. Seam: [KB.md] |
+  [validators]. Reads: §L·lp/§L·conflict + §L·spec §5-§6 anchors.
+- [ ] kb-writer: canonical KB writer in `kb_kernel.pl` — define+commit the canonical clause
+  order (byte-sorted, §6 "Emission is deterministic"-consistent) + a dedicated deterministic
+  emitter (never bare write_term defaults) + byte-pinned writer tests (hand-written normative
+  bytes over kb-contract's examples; input-order shuffle → identical bytes). Gate: byte
+  plunit. Reads: kb-contract outputs only.
+- [ ] ulex: `clinical/clinical_ulex.pl` mirroring §L·ids EXACTLY (cond.sepsis→noun_sg(sepsis,
+  sepsis,neutr); cond.renal_severe→noun_sg('severe-renal-impairment',…); cond.pregnancy→
+  noun_sg; drug.abx_a→pn_sg('Abx-A','Abx-A',neutr); act.administer→tv_finsg(takes,take)+
+  tv_infpl(take,take); q.age_years→noun_sg(age)+noun_sg(year)+noun_pl(years,year); patient→
+  noun_sg(patient,patient,human); have→tv_finsg(has,have)+tv_infpl(have,have); pop.adult/
+  pop.child = interval atoms, NO lexical entry) + bidirectional id↔surface registry
+  `clinical/registry.pl` (raw gate + mapper consume; holds the pn allowlist + D1 keyword
+  table) + integrity checker (dup/malformed/unknown-id/uncovered-concept rejects) + one-golden
+  APE parse smoke under ulextext = this file's bytes. Gate: plunit. Reads: SURFACE.md; ulex
+  entry templates banked (ulex.pl `lexicon_template/1`).
+- [ ] raw-gate: `clinical/raw_gate.pl` — DCG over raw document bytes: framing parse (blocks,
+  ids, keywords, certainty, basis) + per-sentence registered-pattern token templates
+  (registry-driven WHITELIST per the Fail-closed decision; capitalized token legal iff
+  pattern-anchored or ∈ pn registry) + output = ordered {sentence idx, ACE sentence, block
+  context} for per-sentence APE dispatch (D2); rejects name {sentence idx, token, construct}.
+  + accept battery (thread docs + interval/exception/certainty variants). Gate: plunit accept
+  + core rejects. Reads: SURFACE.md + registry.pl.
+- [ ] raw-gate-battery: full mutation reject battery over raw_gate — one mutant class per
+  banked hazard: capitalized-OOV, `n:`-prefix, pronoun, or-guard, every-surface, bare-then,
+  does-not (D5), cross-sentence definite, no-antecedent definite, decimal, leading zero,
+  spaced multiword, unregistered modality keyword, dup rule id, dangling exception ref,
+  exactly/eq marker, missing header, ACE comment, quotation. Gate: plunit all-reject naming
+  sentence+construct. Reads: raw_gate.pl + SURFACE.md.
+- [ ] profile-drs: `clinical/profile_check.pl` post-APE DRS checker: zero-message law;
+  frame-op↔keyword map (D1, both directions); recursive `named(_)` scan vs pn registry;
+  guard-shape whitelist (conjuncts {concept-have, interval-of} + one-level sublist flatten;
+  reject `-drs`/`v()`/unknown functors/extra ops); action shape
+  predicate(take,GuardRef,named(RegisteredDrug)); canonical-DRS equality vs the registered
+  pattern's golden (first-parse-wins ambiguity kill). + accept battery over the goldens. Gate:
+  plunit. Reads: `prolog/utils/is_wellformed.pl` + `vendor/acerules/engine/drs_checker.pl`
+  (bounded 2-file template read) + goldens.
+- [ ] profile-battery: full DRS-side reject coverage for profile_check — p7 DRS shapes (`v()`,
+  fresh-referent then-part, bare-then, in-guard `-drs`, unregistered named, warning-bearing
+  parses, op/keyword mismatch per modality, malformed interval sublists, non-golden DRS
+  variants). Gate: plunit all-reject. Reads: profile_check.pl + goldens.
+- [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
+  via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
+  one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via
+  registry; direction/strength via D1 (keyword+op); certainty; provenance {doc id, raw
+  sentence idx} per clause group. Output = kb_kernel-validated TERMS (bytes = map-emit). Gate:
+  plunit hand-oracled terms over the thread rules + 4 interval markers + a 2-disjunct rule.
+  Seam: [concepts/action/modality] | [intervals + disjunct grouping]. Reads: kb_kernel.pl +
+  registry.pl + goldens.
+- [ ] map-emit: whole-document canonical emission — map-core terms → kb-writer; referent
+  canonicalization → `stmt.k`/`bind.k`; byte-pins from OBSERVED emitter output over the thread
+  docs; determinism gates (re-run identical; guard-conjunct/DRS-input reorder identical;
+  goldens re-emit == pinned). Gate: byte plunit.
+- [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
+  on their rule's statements (exc.k stmt-major, document-continuous counters; D6
+  self-contained bodies; clause region_ids = own block's basis verbatim) + bridge-oracle
+  transplant (§L·pins: 2-disjunct rule × 2 exceptions → stmt.0{exc.0,exc.1}/stmt.1{exc.2,
+  exc.3} + trailing 1-disjunct rule → rule.2/stmt.2/exc.4 catching per-rule counter resets;
+  enumerated bind.k→concept map). Gate: oracle plunit + emission re-pin. Reads: map-emit
+  modules + §L·pins blobs.
+- [ ] court-differential: purpose-built ISOMORPHIC differential vs AceRules `court` — clinical
+  pair (recommend rule + contraindicate exception) ↔ republican/pacifist structure; exhaustive
+  fact-presence truth table (all subsets of participating facts); per row assert clinical-KB
+  derivability == court verdict where semantics coincide + DOCUMENT divergences (naive-NAF vs
+  courteous — §L·acerules; platypus divergence = known). Gate: differential plunit. Reads:
+  `vendor/acerules/engine/testcases/court/*` + `parser/priority_handler.pl` (bounded; court
+  smoke recipe in memory Runtime).
+- [ ] interval-algebra: `clinical/intervals.pl` exact-rational bound algebra (D10): bound =
+  (value, open|closed, dir); intersection/emptiness over SWI native rationals; 16-mask
+  validity battery transplant (§L·pins: 16 bound-presence masks × per-bound values {-1,0,1},
+  valid iff exactly one bound present ∧ value ≥ 0 — expectations hand-written) + open/closed
+  boundary properties (geq 18 vs greater 18 vs less 19 adjacency). Gate: plunit hand-oracled.
+  Reads: kb-contract interval shape only.
+- [ ] conflict-core: `clinical/conflict.pl` — eligibility (same action key ∧ §L·conflict
+  direction groups) + context overlap: DNF disjunct-pair enumeration × concept polarity ×
+  interval intersection (intervals.pl) × exception expansion (exceptions join their statement
+  as negated concepts). Gate: plunit hand-oracled pair battery (overlap/disjoint/polarity/
+  exception cases). Reads: intervals.pl + kb_kernel.pl + map outputs.
+- [ ] conflict-verdict: verdict layer — records {category semantic_contradiction |
+  semantic_no_conflict (+ documented_no_conflict_result), kind deontic_direction_conflict,
+  participating_rules set `a.<source>.rule.k`, evidence {document_id, sentence_index},
+  lane=lp, solver_status=not_run}; thread battery: docA×docB → contradiction w/ core set;
+  docA×control → no-conflict (age-disjoint); field shapes mirror
+  `corpus/reference/m1_expected.yaml`. Gate: plunit. Reads: conflict.pl + m1_expected.yaml.
+- [ ] attack-surface: vendored entry-point inventory (APE webservice/server modules, AceRules
+  stable-mode smodels shell, any HTTP surface) → prove non-reachability from the clinical
+  pipeline (negative plunit: those modules absent from the gate/profile/map/conflict consult
+  closure) + `CKC_FORK.md` security section (AGENTS.md bullet: vendored network surfaces stay
+  dark, never invoked). Gate: negative plunit. Small.
+- [ ] upstream-suite: wire the fork's OWN suite to in-tree Clex — point the `tests/`
+  `consult(clex:clex_lexicon)` resolution at `vendor/clex/` (source-relative `% CKC:` shim;
+  banked GAP: the suite expects a downloaded `tests/clex_lexicon.pl`, bypassing `clex_file/1`)
+  + reproduce the `testruns/` baseline (3733 cases, 0 NEW mismatches — finder-confirmed in
+  ape-vendor). Gate: suite runs + baseline comparison clean (git-diff-gated, not exit code).
+  Seam: [consult shim] | [baseline run+compare]. Reads: `tests/` harness entry + `testruns/`
+  layout (bounded).
+- [ ] corpus-lock: `clinical/corpus/` v1 — docA/docB/control as raw ClinicalCNL documents (ids
+  `test_source.m1_guideline_a`/`.b`/`m1_control`, groups `group.m1_conflict`/
+  `group.m1_no_conflict`) + ≥2 fresh docs (an interval-boundary adjacency pair; the
+  2×2+trailing multi-exception doc hosting the bridge oracle) + case MANIFEST (ordered
+  document pairs; expected category/kind/participating_rules/evidence HAND-AUTHORED at
+  authoring time, never route-derived — §0 honesty; oracle scope = KB-level ONLY: facts,
+  exception ids, sentence indices, bytes — ClinicalIR ids stay behind the backlog IR bridge)
+  + committed expected KB bytes + drift guard (gate→APE→profile→map→emit == committed bytes
+  per doc). Gate: round-trip + manifest plunit. Seam: [thread docs + manifest] | [fresh docs].
+- [ ] runner: ONE command `clinical/run_conformance.sh` → plunit driver aggregating surface
+  goldens + raw-gate(+battery) + profile(+battery) + map batteries/oracles +
+  court-differential + intervals + conflict + verdicts + corpus round-trip&manifest +
+  attack-surface negative + upstream-suite leg. Runner = milestone acceptance core + the
+  /loop round gate (cnl-optimize.md points at it). Gate: runner green over the locked corpus.
+  Reads: prior units' plunit entry points only.
+- [ ] loop-framework: bootstrap fix + protocol validation — edit
+  `.claude/commands/cnl-optimize.md` (explicit one-time R1 bootstrap state; ledger line staged
+  INSIDE the round commit; queue-bank rules re-checked; round gate = run_conformance.sh), then
+  execute ONE manual dry-run round R1 (pick a small increment, land `cnl-opt (R1)` green,
+  ledger line) → milestone IMPLEMENTED. Gate: R1 commit green + ledgered; user then enables
+  skillOverrides.loop.
 
 ## Backlog — NOT a milestone (unscheduled; schedule by trigger; full pre-reset unit specs at `git show ecc19d3:.agent/roadmap.md`)
 

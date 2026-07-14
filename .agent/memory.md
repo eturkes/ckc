@@ -261,13 +261,22 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   (`absolute_file_name('<dir>/../../vendor/clex/clex_lexicon', _, [file_type(prolog)])`) so ape.exe (baked
   at qsave) + AceRules (runtime) load the ONE vendored full Clex — no blob copy; the vendored
   clex/reduced-clex/acetexts blobs stay pristine + Read-denied (`.claude/settings.json`). GAP for
-  conformance-seed: the upstream suite (`tests/test_*.pl`) does `:- consult(clex:clex_lexicon)` = load
+  the upstream-suite unit: the upstream suite (`tests/test_*.pl`) does `:- consult(clex:clex_lexicon)` = load
   source `clex_lexicon.pl` (resolved in `tests/`) into module `clex`, i.e. `tests/clex_lexicon.pl` — the
   FULL Clex that `tests/downloader.pl` `ensure_clex` fetched, ABSENT in-tree (download-on-demand), BYPASSING
   `clex_file/1`. So the suite errors on missing Clex until the runner points that consult at the vendored
   full Clex (`vendor/clex/`); the `testruns/` baseline reproduction (deferred acceptance (c), finder-confirmed
-  in ape-vendor: 3733 cases, 0 NEW mismatches) is conformance-seed's runner concern. Load Clex once (one path
+  in ape-vendor: 3733 cases, 0 NEW mismatches) is the upstream-suite unit's concern. Load Clex once (one path
   into module `clex`).
+- APE probe recipe (M3 replan; the FACTS live in roadmap §L·probe — never re-derive them): from
+  `clinicalcnl/` (root `get_ape_results.pl`, NOT `prolog/`): raw DRS = `swipl -g
+  "consult(get_ape_results), ace_to_drs:acetext_to_drs('<ACE>',_,_,Drs,Msgs), …" -t halt`
+  (guess=off default; print via copy_term+numbervars+writeq). Fileless noclex+ulex = prepend
+  `clex:set_clex_switch(off), ulex:add_lexicon_entries([noun_sg(…),…])` (legal templates =
+  `prolog/lexicon/ulex.pl` `lexicon_template/1`; no ulex file needed). Product seam =
+  `get_ape_results([text='…', noclex=on, ulextext='<entries text>', solo=drs], CT, C)` →
+  success CT=text/plain + numbervar'd serialized DRS (golden byte format); failure CT=text/xml
+  `<messages>` (fail-closed discriminator).
 - Vendored Attempto Clex lacks `quaker` (has `republican`/`pacifist`); the AceRules `output/nixon`
   baseline predates its removal → guess=off cannot byte-match. Court smoke = `read_file_to_codes(
   '.../vendor/acerules/engine/testcases/court/input/nixon', Codes, [])`,
