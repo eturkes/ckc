@@ -376,21 +376,32 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   the first of SURFACE.md's 3 fail-closed layers). API = gate_document(+Doc(atom|string|codes), -Result):
   Result = ok(doc(DocId, Sentences)) | reject(Rejects). Sentences (doc order) = sentence(Idx, Ace, Ctx) —
   Idx 0-based raw sentence ordinal (per-sentence APE-dispatch index + provenance sentence_index; advances
-  per content line incl. rejected ones), Ace the VERBATIM ACE atom, Ctx = rule(K,Keyword,DisjIdx,Cert,Basis)
-  | exception(K,RuleK,Cert,Basis) (Cert/Basis default `none`; DisjIdx 0.. within a rule → stmt.k, D4).
+  by content-line count on every block path, accept or reject), Ace the VERBATIM ACE atom, Ctx = rule(K,Keyword,DisjIdx,Cert,Basis)
+  | exception(K,RuleK,Cert,Basis) (Cert an atom / Basis the parsed STRING when present, both default the atom
+  `none` — KB.md `string|none`, so `basis "none"` stays distinct from absent; DisjIdx 0.. within a rule → stmt.k, D4).
   Rejects = reject(Idx,Token,Construct) (Idx -1 for document/whitespace-level). Two DCG stages: framing (byte
   DCG → blank-separated paragraphs, then a header DCG over the header line) + per-sentence registered-pattern
   templates over space-split tokens; the sentence grammar DERIVES frames/surfaces from the registry
   (reg_frame/reg_concept/pn_allow/the 4 markers), only closed frame/function/marker words are literals
   (fixed_word/1 + the legal_lexeme/1 diagnostic lexicon). NON-OBVIOUS: raw_gate NEVER runs APE (pure Prolog,
   fast like kb_kernel/ulex) — the accept battery instead cross-checks each emitted Ace BYTE-IDENTICAL against
-  the frozen surface_cases oracle (APE-validated in surface-goldens), proving the gate emits an APE-parseable
-  v1 surface without ape.exe (reuse this oracle-cross-check pattern for any downstream gate that would else
-  need APE). Also does the D1 frame-op↔keyword cross-check (op_mismatch). Whitespace discipline: LF only,
+  the frozen surface_cases oracle (APE-validated in surface-goldens), proving every distinct v1 corpus surface
+  it emits is APE-parseable without ape.exe — fixture-scoped evidence, NOT a whole-language proof (reuse this
+  oracle-cross-check pattern for any downstream gate that would else need APE). Also does the D1 frame-op↔keyword cross-check (op_mismatch). Whitespace discipline: LF only,
   single space between tokens; CR/tab rejected up front. CONFIRMED (probed at close): every raw-gate-battery
   hazard already rejects under this gate — does-not→unregistered_token(does), exactly→unregistered_token,
   bare-eq/bare-then/first-conjunct-`the patient`→malformed_sentence, leading-zero→bad_number, quotation→
-  unregistered_token — so raw-gate-battery is PURE test-authoring against raw_gate, no gate extension.
+  unregistered_token — so raw-gate-battery is PURE test-authoring against raw_gate, no gate extension. But that
+  probe was PARTIAL: the "every raw-gate-battery hazard already rejects" claim over-generalised — dup-rule-id +
+  dangling-exception-ref (both battery-listed) were actually ACCEPTED (codex-review caught it). LESSON: never
+  assert "every X rejects" from a partial probe — run each banked hazard. Hardening closed them + added: NUMBER
+  AGREEMENT (empirical) — APE parses `1 year`/`18 years`, rejects `1 years`/`2 year` (product-seam probe →
+  text/plain vs text/xml), so the interval grammar takes the singular quantity noun for value 1 else plural
+  (year(s)/age/patient/has/takes now registry-DERIVED; mismatch → malformed_sentence); the gate is TOTAL over
+  any term (bad input → reject(bad_input), never throws — closes the memberchk-WILDCARD / type_error class);
+  Basis = parsed STRING or atom none; document-level id integrity (duplicate_rule_id/duplicate_exception_id/
+  dangling_exception). Gate GREEN 35/35; raw-gate-battery's dup-id / dangling-exc / number-agreement / bad-input
+  hazards now already reject.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

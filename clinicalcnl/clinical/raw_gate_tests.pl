@@ -2,13 +2,18 @@
 %
 %   accept — thread docs (§8.6 docA/docB/control) + the 4 direction frames + the 4 v1 interval
 %     markers + the strength-sharing keywords + a 2-disjunct rule + certainty/basis variants each
-%     parse to the expected sentence(Idx, Ace, Ctx) list. Every accepted ACE is cross-checked
-%     BYTE-IDENTICAL against the frozen surface_cases oracle (itself APE-validated in surface-goldens),
-%     so the gate is proven to emit exactly an APE-parseable v1 surface WITHOUT running APE.
-%   core rejects — one document per whitelist hazard (unregistered lexeme, the p6 capitalised OOV,
-%     a `n:` prefix, or-guard, every, decimal, op-mismatch, bad keyword/certainty, duplicate field,
-%     structural, CRLF, multi-line exception). The EXHAUSTIVE per-hazard mutation matrix is the
-%     separate raw-gate-battery unit; here each reject is asserted as the sole diagnosis term.
+%     parse to the expected sentence(Idx, Ace, Ctx) list. Each accepted ACE that maps to a v1 golden
+%     is cross-checked BYTE-IDENTICAL against the frozen surface_cases oracle (itself APE-validated in
+%     surface-goldens), so every distinct v1 surface the gate emits here is a proven APE-parseable
+%     surface WITHOUT running APE. (The finite goldens pin the corpus surfaces; they do not claim the
+%     whole grammar's language is APE-parseable — the number-agreement rejects below pin one seam
+%     where the two accept sets must coincide.)
+%   core rejects — one document per whitelist / framing / document-integrity hazard (unregistered
+%     lexeme, the p6 capitalised OOV, a `n:` prefix, or-guard, every, decimal, number-agreement
+%     mismatch, op-mismatch, bad keyword/certainty, duplicate field, bad input / doc-id, structural,
+%     CRLF, multi-line exception, duplicate rule/exception id, dangling exception ref). The EXHAUSTIVE
+%     per-hazard mutation matrix is the separate raw-gate-battery unit; here each reject is the sole
+%     diagnosis term.
 %
 %   Gate: swipl -q -g "consult('clinical/raw_gate_tests.pl'),(run_tests(raw_gate)->halt(0);halt(1))" -t 'halt(1)'
 
@@ -21,16 +26,16 @@
    atomic_list_concat([D, '/raw_gate.pl'], G), use_module(G),
    atomic_list_concat([D, '/goldens/surface_cases.pl'], SC), use_module(SC).
 
-% oracle(+Id, -Ace) — the frozen surface_cases ACE for a golden id (the accept cross-check target).
-oracle(Id, Ace) :- surface_cases:surface_case(Id, _, Ace).
+% oracle(+Id, -Ace) — the frozen v1 surface_cases ACE for a golden id (the accept cross-check target).
+oracle(Id, Ace) :- surface_cases:surface_case(Id, v1, Ace).
 
 % mini(+HeaderRest, +AceLine, -Doc) — a minimal one-rule document around a single sentence, for the
 % reject probes (`document d` + one block); HeaderRest e.g. 'rule 0 recommend'.
 mini(Header, Ace, Doc) :- atomic_list_concat(['document d\n\n', Header, '\n', Ace, '\n'], Doc).
 
 % ==========================================================================================
-% Raw documents (hand-authored). Every ACE line is typed verbatim; the accept tests cross-check
-% each emitted ACE against the oracle, so a transcription drift fails loud.
+% Raw documents (hand-authored). Every ACE line is typed verbatim; the accept tests cross-check each
+% oracle-backed ACE against the frozen oracle, so a transcription drift fails loud.
 % ==========================================================================================
 
 doc_raw(doc_a,
@@ -99,12 +104,14 @@ rule 3 recommend
 If a patient has an age of less than 18 years then it is recommended that the patient takes Abx-A.
 ').
 
+% A 2-disjunct rule: the two disjuncts share rule id 0 (→ stmt.0 / stmt.1, D4). The second is the
+% interval surface (an oracle-backed golden) so both disjuncts cross-check against the oracle.
 doc_raw(doc_disj,
 'document test_disj
 
 rule 0 recommend
 If a patient has a sepsis then it is recommended that the patient takes Abx-A.
-If a patient has a pregnancy then it is recommended that the patient takes Abx-A.
+If a patient has an age of at least 18 years then it is recommended that the patient takes Abx-A.
 ').
 
 doc_raw(doc_cert,
@@ -126,21 +133,21 @@ test(accept_doc_a) :-
     R = ok(doc(Id, [sentence(0, A0, C0), sentence(1, A1, C1)])),
     assertion(Id == 'test_source.m1_guideline_a'),
     oracle(thread_doc_a, E0),   assertion(A0 == E0),
-    assertion(C0 == rule(0, recommend, 0, high, 'guideline A RCT')),
+    assertion(C0 == rule(0, recommend, 0, high, "guideline A RCT")),
     oracle(exception_body, E1), assertion(A1 == E1),
-    assertion(C1 == exception(0, 0, none, 'renal safety exclusion')).
+    assertion(C1 == exception(0, 0, none, "renal safety exclusion")).
 
 test(accept_doc_b) :-
     doc_raw(doc_b, Doc), raw_gate:gate_document(Doc, R),
     R = ok(doc('test_source.m1_guideline_b', [sentence(0, A, C)])),
     oracle(thread_doc_b, E), assertion(A == E),
-    assertion(C == rule(0, contraindicate, 0, moderate, 'guideline B safety')).
+    assertion(C == rule(0, contraindicate, 0, moderate, "guideline B safety")).
 
 test(accept_doc_control) :-
     doc_raw(doc_control, Doc), raw_gate:gate_document(Doc, R),
     R = ok(doc('test_source.m1_control', [sentence(0, A, C)])),
     oracle(thread_control, E), assertion(A == E),
-    assertion(C == rule(0, contraindicate, 0, none, 'control doc')).
+    assertion(C == rule(0, contraindicate, 0, none, "control doc")).
 
 % ---- accept: the 4 direction frames, each op agreeing with its keyword (D1) --------------------
 test(accept_frames) :-
@@ -160,11 +167,13 @@ test(accept_shared_phrases) :-
                    sentence(1, A1, rule(1, 'not-suggest', 0, none, none))])),
     oracle(frame_recommend, A0), oracle(frame_not_recommend, A1).
 
-% ---- accept: the 4 v1 interval markers --------------------------------------------------------
+% ---- accept: the 4 v1 interval markers (context bound: 4 single-disjunct rules) ----------------
 test(accept_intervals) :-
     doc_raw(doc_intervals, Doc), raw_gate:gate_document(Doc, R),
-    R = ok(doc(_, [ sentence(0, A0, _), sentence(1, A1, _),
-                    sentence(2, A2, _), sentence(3, A3, _) ])),
+    R = ok(doc(_, [ sentence(0, A0, rule(0, recommend, 0, none, none)),
+                    sentence(1, A1, rule(1, recommend, 0, none, none)),
+                    sentence(2, A2, rule(2, recommend, 0, none, none)),
+                    sentence(3, A3, rule(3, recommend, 0, none, none)) ])),
     oracle(iv_at_least, A0), oracle(iv_more_than, A1),
     oracle(iv_at_most, A2),  oracle(iv_less_than, A3).
 
@@ -173,14 +182,14 @@ test(accept_disjunction) :-
     doc_raw(doc_disj, Doc), raw_gate:gate_document(Doc, R),
     R = ok(doc(_, [ sentence(0, A0, rule(0, recommend, 0, none, none)),
                     sentence(1, A1, rule(0, recommend, 1, none, none)) ])),
-    oracle(frame_recommend, A0),
-    assertion(A1 == 'If a patient has a pregnancy then it is recommended that the patient takes Abx-A.').
+    oracle(frame_recommend, A0), oracle(iv_at_least, A1).
 
-% ---- accept: certainty (D7) + basis field carry into the context ------------------------------
+% ---- accept: certainty (D7) + basis field carry into the context (basis is a string, KB.md) ----
 test(accept_certainty_fields) :-
     doc_raw(doc_cert, Doc), raw_gate:gate_document(Doc, R),
-    R = ok(doc(_, [ sentence(0, _, rule(0, recommend, 0, very_low, none)),
-                    sentence(1, _, rule(1, recommend, 0, low, 'graded low')) ])).
+    R = ok(doc(_, [ sentence(0, A0, rule(0, recommend, 0, very_low, none)),
+                    sentence(1, A1, rule(1, recommend, 0, low, "graded low")) ])),
+    oracle(frame_recommend, A0), oracle(frame_recommend, A1).
 
 % ---- reject: whitelist token hazards (each the sole diagnosis) ---------------------------------
 test(reject_unregistered_noun) :-
@@ -212,6 +221,16 @@ test(reject_decimal_interval) :-
     mini('rule 0 recommend', 'If a patient has an age of at least 18.5 years then it is recommended that the patient takes Abx-A.', Doc),
     raw_gate:gate_document(Doc, R),
     assertion(R == reject([reject(0, '18.5', bad_number)])).
+
+% number agreement: APE parses `1 year` / `18 years` but rejects `1 years` / `2 year` — the gate's
+% accept set must coincide, so a value-noun mismatch is a structural (malformed) reject.
+test(reject_number_agreement) :-
+    mini('rule 0 recommend', 'If a patient has an age of at least 1 years then it is recommended that the patient takes Abx-A.', D1),
+    raw_gate:gate_document(D1, R1),
+    assertion(R1 == reject([reject(0, '', malformed_sentence)])),
+    mini('rule 0 recommend', 'If a patient has an age of at least 2 year then it is recommended that the patient takes Abx-A.', D2),
+    raw_gate:gate_document(D2, R2),
+    assertion(R2 == reject([reject(0, '', malformed_sentence)])).
 
 test(reject_op_mismatch) :-            % keyword recommend (should) vs the -can frame (D1 cross-check)
     mini('rule 0 recommend', 'If a patient has a sepsis then it is not possible that the patient takes Abx-A.', Doc),
@@ -254,10 +273,42 @@ test(reject_carriage_return) :-
     raw_gate:gate_document(Doc, R),
     assertion(R == reject([reject(-1, '', carriage_return)])).
 
-test(reject_multi_line_exception) :-
-    Doc = 'document d\n\nexception 0 rule 0\nA patient has a sepsis.\nA patient has a pregnancy.\n',
+test(reject_multi_line_exception) :-   % rule 0 present so the exc ref resolves — isolates the shape
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0\nA patient has a sepsis.\nA patient has a pregnancy.\n',
     raw_gate:gate_document(Doc, R),
-    assertion(R == reject([reject(0, '', multi_line_exception)])).
+    assertion(R == reject([reject(1, '', multi_line_exception)])).
+
+% ---- reject: document-level id integrity (unique rule/exc ids, resolvable exception refs) -------
+test(reject_duplicate_rule_id) :-
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nrule 0 recommend\nIf a patient has a pregnancy then it is recommended that the patient takes Abx-A.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(1, 0, duplicate_rule_id)])).
+
+test(reject_duplicate_exception_id) :-
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0\nA patient has a pregnancy.\n\nexception 0 rule 0\nA patient has a severe-renal-impairment.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(2, 0, duplicate_exception_id)])).
+
+test(reject_dangling_exception) :-
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 9\nA patient has a pregnancy.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(1, 9, dangling_exception)])).
+
+% ---- reject: input shape + doc-id well-formedness (the gate is total over any term) -------------
+test(reject_bad_input_number) :-
+    raw_gate:gate_document(123, R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_compound) :-
+    raw_gate:gate_document(foo(bar), R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_nonground_list) :-
+    raw_gate:gate_document([_], R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_atom_list) :-
+    raw_gate:gate_document([foo], R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_out_of_range) :-
+    raw_gate:gate_document([1114112], R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_doc_id) :-
+    Doc = 'document a..b\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(-1, '', bad_document_header)])).
 
 % ---- totality: the gate never throws + always yields ok/reject (fail-closed) -------------------
 test(total_on_empty) :-

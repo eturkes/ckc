@@ -256,17 +256,19 @@ Cross-unit decisions:
   (byte-identical to the surface_cases oracle), Ctx = rule(K,Keyword,DisjIdx,Cert,Basis) |
   exception(K,RuleK,Cert,Basis); reject output reject([reject(Idx,Token,Construct)…]); fail-closed +
   total, NEVER runs APE (pure Prolog, fast). Gate `clinical/raw_gate_tests.pl` run_tests(raw_gate)
-  GREEN 25/25 — 8 accept cross-checked byte-identical vs the surface_cases oracle (docA rule+exc /
-  docB / control + 4 direction frames + 4 v1 markers + strength-sharing keywords + 2-disjunct stmt.0/1
-  + certainty/basis), 15 core rejects each the sole diagnosis, 2 totality; 0 warn/err loads, sibling
-  gates unregressed. All raw-gate-battery hazards (does-not/exactly/bare-eq/bare-then/first-conj-the-
-  patient/leading-zero/quotation) confirmed already-rejecting → that unit = pure test-authoring. 17% 166K/1M
+  GREEN 35/35 — 8 accept ALL cross-checked byte-identical vs the surface_cases oracle, 25 core rejects each
+  the sole diagnosis, 2 totality; 0 warn/err loads, sibling gates unregressed. Codex-review hardening: number
+  agreement (APE `1 year`/`18 years`; gate rejects `1 years`/`2 year`; year(s)/age/patient/has/takes registry-
+  DERIVED), total over any term (reject(bad_input), no throw/wildcard), Basis = string|none (KB.md), doc-id
+  validated to kb_kernel `<doc>` prefix, document-level id integrity (duplicate_rule_id/duplicate_exception_id/
+  dangling_exception), Idx advances per content line on every block path. 17% 166K/1M
 - [ ] raw-gate-battery: full mutation reject battery over raw_gate — one mutant class per
   banked hazard: capitalized-OOV, `n:`-prefix, pronoun, or-guard, every-surface, bare-then,
   does-not (D5), cross-sentence definite, no-antecedent definite, decimal, leading zero,
-  spaced multiword, unregistered modality keyword, dup rule id, dangling exception ref,
-  exactly/eq marker, missing header, ACE comment, quotation. Gate: plunit all-reject naming
-  sentence+construct. Reads: raw_gate.pl + SURFACE.md.
+  spaced multiword, unregistered modality keyword, dup rule id, dup exception id, dangling exception ref,
+  number-agreement mismatch, bad input, bad doc-id, exactly/eq marker, missing header, ACE comment, quotation.
+  Gate: plunit all-reject naming sentence+construct. Reads: raw_gate.pl + SURFACE.md. (All these already reject
+  under the hardened gate — pure test-authoring.)
 - [ ] profile-drs: `clinical/profile_check.pl` post-APE DRS checker: zero-message law;
   frame-op↔keyword map (D1, both directions); recursive `named(_)` scan vs pn registry;
   guard-shape whitelist (conjuncts {concept-have, interval-of} + one-level sublist flatten;

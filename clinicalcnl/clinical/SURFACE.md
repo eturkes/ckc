@@ -146,8 +146,10 @@ SPEC §10.6 already delegates surface authority to this file; this section is th
 
 ## Intervals (`D8`/`D9`)
 
-Interval guard surface: `<patient-ref> has an age of <marker> <INT> years`. The count operator and
-its DRS placement vary by marker; the guard walker (`map-core`) flattens the one-level nesting.
+Interval guard surface: `<patient-ref> has an age of <marker> <INT> <year-noun>`, where the quantity noun
+agrees with the value — APE parses `1 year` and `18 years` but rejects `1 years` / `2 year`, so the raw gate
+takes the singular noun for value 1 and the plural otherwise (a mismatch is a `malformed_sentence` reject). The
+count operator and its DRS placement vary by marker; the guard walker (`map-core`) flattens the one-level nesting.
 
 | marker         | CountOp   | placement            | v1  | golden        |
 | -------------- | --------- | -------------------- | --- | ------------- |
