@@ -37,17 +37,17 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 
 ## Lessons
 
-- context.sh = the TRUE window total (last assistant `input+cache_creation+cache_read` = real API-input
-  sum), authoritative for the 1M wall — do NOT discount a high reading as 'inflated'. It runs FAR above
-  the stored/visible conversation: redacted extended-thinking (Opus max-effort — thinking persists as
-  0-char placeholders in the `.jsonl`, full text sent to the API + counted) + ~50K fixed overhead
-  (sys-prompt/tools/CLAUDE.md) + injected reminders = real occupancy absent from the transcript. MEASURED
-  (M3.ape-build, which FALSIFIED the earlier session-prompt-CLAUDE.md-re-injection guess): 757K total =
-  ~270K stored conversation (1.2MB `.jsonl`, all-strings ~1M chars) + ~440K redacted-thinking/overhead →
-  total ≈ 2.8× the stored conversation; CLAUDE.md content markers count ~2× (boundary-injected + stripped
-  on write), never per-turn. SIZING: at max effort the stored-conversation ceiling for the ~200K aim is
-  ~70-90K — a big total over a small `.jsonl` is EXPECTED, not a measurement bug. RECIPE: `jq`
-  `.message.usage` over `$HOME/.claude/projects/<proj>/<sid>.jsonl` for peak + input/cache breakdown.
+- context.sh = real occupancy, never 'inflated': it sums the last assistant turn's true API tokens
+  (input+cache+output) = the authoritative headroom signal against the 1M wall; a high reading is REAL, not
+  an accounting artifact. MEASURED (M3.ape-build, which FALSIFIED the earlier
+  session-prompt-CLAUDE.md-re-injection guess via `.jsonl` forensics): last-turn API input 757K, far above
+  the ~270K-token stored `.jsonl` (1.2MB). The gap = prior-turn redacted extended-thinking (0-char
+  placeholders in the `.jsonl`, full text billed as cached input) + fixed sys-prompt/tools/CLAUDE.md
+  overhead — real, absent from the transcript. Only 757K is measured; the ~270K/gap split is estimated, and
+  their ratio is NOT a reusable multiplier (thinking volume swings with task + effort — one case, no
+  distribution). SIZE by watching context.sh directly, not a stored-`.jsonl` proxy. RECIPE: `jq`
+  `.message.usage` over `$HOME/.claude/projects/<proj>/<sid>.jsonl` for the input/cache/output breakdown.
+  (General Claude-Code window-accounting mechanics → global CLAUDE.md.)
 - Unit sizing rules (per-incident case studies in git — `git show 6e413f0^:.agent/memory.md`). Target:
   one conceptual deliverable + one gate, finishable AND committable within the ~200K aim (soft; the 1M window is headroom); prefer
   more, smaller units. PLAN-TIME obligations (a violation is a planning bug): resolve semantic decisions
@@ -242,11 +242,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 ## Runtime
 
 - APE build (M3.ape-build): `cd clinicalcnl && make install` — step 1 compiles `prolog/parser/*.fit`
-  → `.plp` (gitignored by `prolog/parser/.gitignore`); step 2 `qsave_program('ape.exe', [goal(ape),
-  toplevel(halt)])` loading root `ape.pl` (there is NO `load.pl`). Full-vocab `ape.exe` ≈1.3M, ~1.3s;
-  gitignored (`/ape.exe`). Reproducible fail-closed gate = `sh clinicalcnl/clinical/ape_build_smoke.sh`
-  (5 checks: swipl-9.x, build, get_ape_results+acetext_to_drs shape, ape.exe -solo drs, AceRules court
-  override).
+  → `.plp` (gitignored); step 2 `qsave_program('ape.exe', [goal(ape), toplevel(halt)])` loading root
+  `ape.pl` (there is NO `load.pl`); the `install` target rebuilds unconditionally, ape.exe ~1.3s, gitignored
+  (`/ape.exe`). Reproducible fail-closed gate = `sh clinicalcnl/clinical/ape_build_smoke.sh` (the script
+  enumerates + fail-closes its checks).
 - APE programmatic seam = `get_ape_results/2,3` (module `ape`, `prolog/ape.pl`; reexported by
   `get_ape_results.pl`, which also asserts the `ape` file_search_path) — what downstream calls, NOT the
   interactive `runape.pl`. RAW DRS term (not serialized XML) = `ace_to_drs:acetext_to_drs/5`
@@ -260,23 +259,24 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   DRS toward `drs([],[])`.
 - Full-Clex wiring (DRY, blobs pristine): `prolog/lexicon/clex.pl` `clex_file/1` redirected source-relative
   (`absolute_file_name('<dir>/../../vendor/clex/clex_lexicon', _, [file_type(prolog)])`) so ape.exe (baked
-  at qsave) + AceRules (runtime) load the ONE vendored full Clex (3.2M) — no 3.2M copy, the vendored
+  at qsave) + AceRules (runtime) load the ONE vendored full Clex — no blob copy; the vendored
   clex/reduced-clex/acetexts blobs stay pristine + Read-denied (`.claude/settings.json`). GAP for
-  conformance-seed: the upstream test suite hardcodes `:- consult(clex:clex_lexicon)` (the reduced
-  `prolog/lexicon/clex_lexicon.pl`, which BYPASSES `clex_file/1`) → the upstream-suite leg still loads
-  reduced vocab; its full-Clex wiring + the `testruns/` baseline reproduction (deferred acceptance (c),
-  finder-confirmed in ape-vendor: 3733 cases, 0 NEW mismatches) belong to conformance-seed's runner
-  (loading clex.pl AND direct-consulting reduced in one process would double-load the subset → keep one
-  path).
+  conformance-seed: the upstream suite (`tests/test_*.pl`) does `:- consult(clex:clex_lexicon)` = load
+  source `clex_lexicon.pl` (resolved in `tests/`) into module `clex`, i.e. `tests/clex_lexicon.pl` — the
+  FULL Clex that `tests/downloader.pl` `ensure_clex` fetched, ABSENT in-tree (download-on-demand), BYPASSING
+  `clex_file/1`. So the suite errors on missing Clex until the runner points that consult at the vendored
+  full Clex (`vendor/clex/`); the `testruns/` baseline reproduction (deferred acceptance (c), finder-confirmed
+  in ape-vendor: 3733 cases, 0 NEW mismatches) is conformance-seed's runner concern. Load Clex once (one path
+  into module `clex`).
 - Vendored Attempto Clex lacks `quaker` (has `republican`/`pacifist`); the AceRules `output/nixon`
   baseline predates its removal → guess=off cannot byte-match. Court smoke = `read_file_to_codes(
   '.../vendor/acerules/engine/testcases/court/input/nixon', Codes, [])`,
   `acerules_processor:generate_output(Codes, court, [guess=on], _R,_A,_T,[AT|_])` (AT = ATOM), assert
-  `sub_atom(AT,_,_,_,'It is false that Nixon is a')` (the Republican-Rule-overrides-Quaker-Rule result).
+  `sub_atom(AT,_,_,_,'It is false that Nixon is a pacifist.')` (the Republican-Rule-overrides-Quaker-Rule result).
 - AceRules `ape_location` (`vendor/acerules/engine/parameters.pl` value + `acerules_processor.pl`
-  assertion) rewired `% CKC:` to the nested layout, source-relative (`prolog_load_context` +
-  `atom_concat`) → the engine's `ape('...')` search path (generate_drs/tokenizer/ulex/drs_to_ascii/…
-  sites) resolves from ANY cwd; loading it warning-free confirms the rewire.
+  assertion) rewired (`% CKC (2026-07-14):`) to the nested layout, source-relative (`prolog_load_context` +
+  `atom_concat`; idempotent retractall+asserta) → the engine's `ape('...')` search path
+  (generate_drs/tokenizer/ulex/drs_to_ascii/… sites) resolves from ANY cwd; loading it warning-free confirms the rewire.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

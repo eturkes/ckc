@@ -5,7 +5,8 @@ Attempto Parsing Engine (APE), an engine-source subset of AceRules, and the full
 and holds CKC's own clinical additions. Licensing evidence rows live in SPEC §11.5; this file is
 the per-repo corresponding-source provenance record — a voluntary compliance aid (no GPL/LGPL
 provision mandates it) that fixes the exact snapshots. Vendored trees were placed via
-`git archive` (upstream `.git` stripped); each is byte-identical to upstream at its pin.
+`git archive` (upstream `.git` stripped); each was byte-identical to upstream at its pin as placed — the
+only subsequent deviations are the three dated `% CKC (2026-07-14):` wiring edits recorded below.
 
 ## Four zones (fork-vs-vendored-vs-ours auditable)
 
@@ -19,13 +20,15 @@ provision mandates it) that fixes the exact snapshots. Vendored trees were place
   conflict queries, ulex, corpus, conformance runner) — populated by later M3 units. Present:
   `ape_build_smoke.sh` (M3.ape-build reproducible build-and-run gate).
 
-Upstream files are edited only to wire in CKC demands; each such edit carries a `CKC:` marker in
-the file's native comment syntax + date + one-line reason (GPL §5 modification notice). CKC edits so
-far (M3.ape-build, all `% CKC:`): (1) `prolog/lexicon/clex.pl` — `clex_file/1` redirected
-source-relative to the vendored full Clex (`../../vendor/clex/clex_lexicon.pl`) so `ape.exe` (baked at
-qsave) and the AceRules engine (runtime) load the full ACE vocabulary from one source (upstream
-otherwise downloaded it via the now-dead-404 `ensure_clex`); the reduced bundled `clex_lexicon.pl`
-stays byte-pristine but unloaded. (2) `vendor/acerules/engine/parameters.pl` and
+Upstream files are edited only to wire in CKC demands; each such edit carries a `% CKC (<date>):`
+marker in the file's native comment syntax + one-line reason (GPLv3 §5(a) modified-source notice — the
+date satisfies the marking rule; audit the tree with `rg 'CKC \('`). CKC edits so far (M3.ape-build, all
+`% CKC (2026-07-14):`): (1) `prolog/lexicon/clex.pl` — `clex_file/1` redirected source-relative to the
+vendored full Clex (`../../vendor/clex/clex_lexicon.pl`) so `ape.exe` (baked at qsave) and the AceRules
+engine (runtime) load the full ACE vocabulary from one source. Upstream `make install` baked the reduced
+bundled `clex_lexicon.pl` via `clex_file/1` (the full lexicon was a manual drop-in per Clex's README; the
+test suite fetched its own copy via `tests/downloader.pl` `ensure_clex`); that reduced file stays
+byte-pristine but unloaded. (2) `vendor/acerules/engine/parameters.pl` and
 (3) `vendor/acerules/engine/acerules_processor.pl` — `ape_location` repointed from `../ape/prolog/` to
 the nested `../../../prolog/` layout and resolved source-relative (cwd-independent), so the engine's
 `ape(...)` file_search_path finds APE from any working directory.
@@ -100,23 +103,24 @@ the nested `../../../prolog/` layout and resolved source-relative (cwd-independe
 - What / why: the large ACE English lexicon. Per Clex's README it is the intended drop-in
   replacement for APE's reduced `prolog/lexicon/clex_lexicon.pl`; ape-build wires `clex.pl`'s
   `clex_file/1` to load it (source-relative loader redirect — no blob copy) and rebuilds `ape.exe`,
-  giving APE/CKC full English vocabulary from one in-tree source — superseding APE's live-download
-  `ensure_clex`. The reduced bundled `clex_lexicon.pl` stays byte-pristine but unloaded; the upstream
-  regression suite direct-consults that reduced file (bypasses `clex_file/1`), so its full-vocab
-  wiring is conformance-seed's runner concern.
+  giving APE/CKC full English vocabulary from one in-tree source (upstream `make install` baked the
+  reduced bundled copy instead). The reduced bundled `clex_lexicon.pl` stays byte-pristine but unloaded;
+  the upstream regression suite instead does `:- consult(clex:clex_lexicon)` — loading `tests/clex_lexicon.pl`
+  (the full Clex that `tests/downloader.pl` `ensure_clex` fetches, ABSENT in-tree) into module `clex`,
+  bypassing `clex_file/1`. Pointing that consult at the vendored full Clex is conformance-seed's runner concern.
 
 ## License obligations (met, per reuse mode)
 
-APE + AceRules grant LGPL-3.0-or-later; Clex grants GPL-3.0-or-later. For the current reuse mode
-— **pristine-source redistribution** — obligations are met: every upstream notice + `LICENSE(.txt)`
-is retained unchanged, and the corresponding source for each is its vendored subtree (APE at the
-root, AceRules at `vendor/acerules/`, Clex at `vendor/clex/`). Modified-source, object-code, and
-combined-work duties (GPL §5 modification notices + dates; LGPL §4 combined-work notices,
-relinkability / corresponding source) attach when first exercised. Modified-source is now exercised:
-M3.ape-build's three wiring edits (`prolog/lexicon/clex.pl`, `vendor/acerules/engine/parameters.pl`,
-`vendor/acerules/engine/acerules_processor.pl`) each carry a dated `% CKC (2026-07-14):` notice (GPL §5
-/ LGPL §4 modified-source notice met). Object-code duties stay unexercised in-repo — the built
-`ape.exe` is gitignored, not distributed here.
+APE + AceRules grant LGPL-3.0-or-later; Clex grants GPL-3.0-or-later. The current reuse mode is
+**source redistribution** — every upstream notice + `LICENSE(.txt)` is retained unchanged, and the
+corresponding source for each is its vendored subtree (APE at the root, AceRules at `vendor/acerules/`,
+Clex at `vendor/clex/`), now including the three modified upstream files below (all else byte-pristine).
+Modified-source duties are exercised: M3.ape-build's three wiring edits (`prolog/lexicon/clex.pl`,
+`vendor/acerules/engine/parameters.pl`, `vendor/acerules/engine/acerules_processor.pl`) each carry a
+dated `% CKC (2026-07-14):` notice — the GPLv3 §5(a) "state you changed it + give a date" marking rule
+(LGPLv3 incorporates GPLv3's terms), met. Object-code and combined-work duties (LGPLv3 §4 combined-work
+notices, relinkability / corresponding source) stay unexercised in-repo — the built `ape.exe` is
+gitignored, not distributed here.
 CKC's own additions convey under CKC's LICENSE (GPL-3.0-or-later), compatible with the
 LGPL-3.0-or-later and GPL-3.0-or-later inputs. This file is a voluntary provenance/compliance aid,
 not itself a license-mandated artifact.
