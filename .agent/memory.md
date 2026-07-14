@@ -261,6 +261,15 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   WILDCARD (a nonground fact spuriously covers/duplicates every id + suppresses its own uncovered) → judge
   malformed over the RAW list, run coverage/unknown/dup over an `include(ground)` subset, fail-close a
   non-list to `[not_a_list]`. Diagnoses are a deduped (kind,value) set → drift must change a VALUE to trip.
+- Reject-battery template (M3.raw-gate-battery; profile-battery / conflict / court-differential mirror it):
+  a `banked_hazard/1` CLOSED SET + `covers_every_banked_hazard` / `no_unbanked_class` meta-tests bind the mutant
+  matrix to it, so a missing hazard OR a typo'd class atom fails the gate (self-verifying coverage), plus ≥1
+  accept CONTROL proving the base is valid so each reject is the mutation's doing, not a broken base (anti-
+  vacuity). A battery's hazard set is NOT just the roadmap unit line — SURFACE.md §Modality assigned the
+  op-mismatch battery HERE though the line omitted it → read SURFACE.md for a battery unit's FULL hazard set.
+  Ran every hazard (no assumed construct, per the raw-gate partial-probe lesson): all 24 classes reject exactly
+  as the gate emits, confirming raw-gate's hardening closed the earlier dup-id/dangling gaps. Constructs are
+  code-derivable from raw_gate.pl (not banked). `raw_gate_battery_tests.pl` run_tests(raw_gate_battery) 48/48.
 
 ## Runtime
 

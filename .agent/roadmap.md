@@ -262,13 +262,20 @@ Cross-unit decisions:
   DERIVED), total over any term (reject(bad_input), no throw/wildcard), Basis = string|none (KB.md), doc-id
   validated to kb_kernel `<doc>` prefix, document-level id integrity (duplicate_rule_id/duplicate_exception_id/
   dangling_exception), Idx advances per content line on every block path. 17% 166K/1M
-- [ ] raw-gate-battery: full mutation reject battery over raw_gate — one mutant class per
-  banked hazard: capitalized-OOV, `n:`-prefix, pronoun, or-guard, every-surface, bare-then,
-  does-not (D5), cross-sentence definite, no-antecedent definite, decimal, leading zero,
-  spaced multiword, unregistered modality keyword, dup rule id, dup exception id, dangling exception ref,
-  number-agreement mismatch, bad input, bad doc-id, exactly/eq marker, missing header, ACE comment, quotation.
-  Gate: plunit all-reject naming sentence+construct. Reads: raw_gate.pl + SURFACE.md. (All these already reject
-  under the hardened gate — pure test-authoring.)
+- [x] raw-gate-battery: `clinical/raw_gate_battery_tests.pl` = the exhaustive per-hazard mutation
+  matrix over raw_gate:gate_document/2 (raw_gate_tests.pl keeps one sole-diagnosis reject per hazard as
+  part of the gate; this is the systematic matrix). `banked_hazard/1` closes the hazard set = the roadmap's
+  23 + op_mismatch (SURFACE.md §Modality assigns the op-mismatch reject battery HERE; the unit line omitted
+  it) = 24 classes; each case is a single-locus mutation of a proven-valid base asserting the exact
+  reject(Idx, Token, Construct). Constructs OBSERVED by running each (never assumed): capital-OOV →
+  unregistered_capital; prefix/pronoun/or/every/does-not/spaced-multiword/exactly/`#`-comment/quotation →
+  unregistered_token; bare-then/no-antecedent-definite/cross-sentence-definite/number-agreement/bare-eq →
+  malformed_sentence; decimal/leading-zero-interval → bad_number; leading-zero-block-id/missing-header →
+  bad_header; unregistered-keyword → bad_keyword; op-mismatch → op_mismatch; bad-doc-id → bad_document_header;
+  bad-input → bad_input; dup/dangling → duplicate_rule_id/duplicate_exception_id/dangling_exception. Gate
+  run_tests(raw_gate_battery) GREEN 48/48 = 3 accept controls (each base valid ⇒ anti-vacuity) + 43 all-reject
+  cases + covers_every_banked_hazard / no_unbanked_class self-checks; 0 warn/err loads, raw_gate suite
+  unregressed (83/83 combined). Pure test-authoring — no raw_gate.pl change. 13% 133K/1M
 - [ ] profile-drs: `clinical/profile_check.pl` post-APE DRS checker: zero-message law;
   frame-op↔keyword map (D1, both directions); recursive `named(_)` scan vs pn registry;
   guard-shape whitelist (conjuncts {concept-have, interval-of} + one-level sublist flatten;
