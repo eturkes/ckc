@@ -148,38 +148,9 @@ Cross-unit decisions:
   report `git show e8b5cf6:docs/cnl-attempto.md`.
 
 - [x] ape-vendor: APE @5f4d535 → `clinicalcnl/` (132) + AceRules engine subset @5b7afb7 → `clinicalcnl/vendor/acerules/` (158) + full Clex @20960a5 → `clinicalcnl/vendor/clex/` (3) (`.git`-stripped, byte-identical to upstream; trees `ac239d2`/`1cebf98`(full-root)/`210d7ea`); grants verified first-hand (APE+AceRules LGPL-3.0-or-later, Clex GPL-3.0-or-later); §11.5 permissive regime + per-resource rows + `CKC_FORK.md`; swipl 9.2.9. 44% 436K/1M — `a400dd1` + codex-review remediation (permissive §11.5; corrected holders/claims per H1/H2/M1/M2; Clex pulled in)
-- [ ] ape-build: build the vendored APE + prove it runs under SWI-Prolog 9.2.9 (functional
-  env-gate lands HERE). EMPIRICALLY DE-RISKED (a finder built + ran APE @ pin under 9.2.9): `make
-  install` → `ape.exe`, 0 errors/0 warnings; the regenerated drace report matched the upstream
-  baseline byte-for-byte INCLUDING its existing failures (3733 cases, 0 NEW mismatches; the
-  baseline itself carries FAIL/ZERO/non-identical-equivalent rows — never cite it as a lossless
-  DRS round-trip proof) — ZERO code changes needed. So this is a build-and-confirm unit, not
-  a compat-debug gamble; patch only if the vendored (`.git`-stripped) tree diverges, each edit
-  `% CKC:`. READ (post-vendor): `README.md` (SWI packs clib/sgml/http) + `Makefile` (2 steps —
-  compile `prolog/parser/*.fit`→`.plp`, then `qsave_program('ape.exe')`; APE has NO `load.pl`); the
-  programmatic driver seam = `get_ape_results/2,3` (module `ape`, `prolog/ape.pl`) — what
-  cnl-profile/drs-map call, NOT the interactive `runape.pl`. FAIL-CLOSED signal (bank into memory
-  `## Runtime` for downstream): a parse error returns non-empty `<message …>` XML or collapses the
-  DRS to `drs([],[])`, never a nonzero exit. UPSTREAM-SUITE REALITY (corrected): NO Clex-free
-  subset — every upstream test consults `tests/acetexts.pl` (committed) + the full Clex
-  (now vendored in-tree at `vendor/clex/clex_lexicon.pl` — copy drop-in over
-  `prolog/lexicon/clex_lexicon.pl` + recompile, NO live `ensure_clex` download; `download_acetexts`
-  is dead-404 but acetexts is committed); the driver OVERWRITES version-controlled `testruns/` baselines → honest green =
-  `git diff --quiet testruns/` + zero mismatch codes, NOT exit code. ACCEPTANCE (fail-closed,
-  reproducible): (a) `make install` clean + `get_ape_results` loads under 9.2.9; (b) a smoke parse
-  of a clinical-shape sentence (built-in lexicon or a stub ulex) returns a well-formed
-  `drs(Referents, Conditions)` — asserted on DRS shape, not exit code; (c) OPTIONALLY the
-  Clex-gated upstream regression as an "APE still parses" smoke — pin the EXACT driver command +
-  the baseline files it rewrites, gate = `git diff` clean on those baselines + zero NEW mismatch
-  codes (drivers differ; zero exit ≠ green; the full Clex is now vendored in-tree —
-  GPL-3.0-or-later, §11.5 row — wired drop-in for full-vocabulary APE + a reproducible regression); (d) AceRules
-  engine WIRING: rewire its hardcoded `../ape/prolog/` APE path to the nested layout
-  (source-relative, `% CKC:` edits) → engine loads warning/error-free + a callable `court` smoke
-  (nixon testcase). The real fail-closed corpus gate is conformance-seed's synthetic batteries
-  (upstream has none Clex-free). Pre-declared respec seam if it overruns: `[make install +
-  get_ape_results loads]` | `[smoke DRS + upstream-suite smoke + acerules wiring]`. Dep: ape-vendor.
-- [ ] REPLAN — downstream respec (PLANNING-mode session; BLOCKED on ape-build, which delivers the
-  in-tree `ape.exe` probe substrate). The superseded 13-unit expansion (cnl-ulex,
+- [x] ape-build: `make install` → full-vocab `ape.exe` (1.3M) under swipl 9.2.9, 0 err/warn; `get_ape_results` (module `ape`, `prolog/ape.pl`) loads + `ace_to_drs:acetext_to_drs/5` returns `drs(Refs,Conds)` should()-DRS on the clinical frame `It is recommended that a patient takes a drug.`. Full Clex wired DRY via `prolog/lexicon/clex.pl` `clex_file/1` → source-relative `../../vendor/clex/clex_lexicon.pl` (loader redirect — NO 3.2M blob copy, vendored blobs stay pristine); ape.exe rebuilt full-vocab. AceRules `ape_location` rewired to the nested layout (`% CKC:` in `vendor/acerules/engine/parameters.pl` `../../../prolog/` + `acerules_processor.pl` source-relative resolve), engine loads clean + court nixon courteous-override smoke (guess=on — vendored Attempto Clex lacks `quaker`, republican/pacifist present, so guess=off cannot byte-match the older-Clex `output/nixon`; assert the `It is false that Nixon is a` override). Reproducible fail-closed gate `clinicalcnl/clinical/ape_build_smoke.sh` (5 checks). ACCEPTANCE (a)(b)(d) met; (c) upstream drace regression DEFERRED (optional, finder-confirmed in ape-vendor, not the real gate) — its remaining wiring (upstream-suite `consult(clex:clex_lexicon)` = the reduced-file path, bypasses `clex_file/1`) + `testruns/` baseline reproduction belong to conformance-seed's runner. 76% 757K/1M (session-prompt CLAUDE.md re-injection inflated the input accounting; unit work ~200K) — PENDING
+- [ ] REPLAN — downstream respec (PLANNING-mode session; UNBLOCKED — ape-build delivered the
+  full-vocab in-tree `ape.exe` probe substrate + `clinicalcnl/clinical/ape_build_smoke.sh` gate). The superseded 13-unit expansion (cnl-ulex,
   cnl-profile.1/.2a/.2b, drs-map.1a/.1b/.2, conflict-queries, conformance-seed.a/.b,
   loop-framework) lives at `git show 3bb4a38:.agent/roadmap.md` — MINE it (much survives:
   interval battery, bridge oracle, dep shape, acceptance patterns), redo the decomposition on the

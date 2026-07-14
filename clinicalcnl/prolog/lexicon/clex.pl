@@ -34,7 +34,17 @@ the executable.
 % This predicate defines the clex-file that is loaded and compiled into the executable. In order to
 % change this, you have to edit the source code and recompile.
 
-clex_file(clex_lexicon).
+% CKC (2026-07-14): load the full vendored Clex (clinicalcnl/vendor/clex/clex_lexicon.pl, GPL-3.0-or-later, SPEC
+% §11.5) for the complete ACE vocabulary. Upstream downloaded the full lexicon at build time via
+% ensure_clex (now a dead 404) and otherwise fell back to the reduced subset bundled beside this file
+% (clex_lexicon.pl); we resolve the vendored full copy instead, source-relative so it works from any
+% cwd. The file_type(prolog) probe resolves + verifies the .pl before load_files (below) bakes it into
+% the clex module. Was: clex_file(clex_lexicon).
+clex_file(ClexFile) :-
+	prolog_load_context(directory, Dir),
+	atomic_list_concat([Dir, '/../../vendor/clex/clex_lexicon'], RelBase),
+	absolute_file_name(RelBase, ClexFile, [file_type(prolog), access(read)]).
+%clex_file(clex_lexicon).
 %clex_file(clex_lexicon_small).
 %clex_file('').
 

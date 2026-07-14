@@ -20,7 +20,13 @@
 	]).
 
 :- [parameters].
-:- parameter(ape_location, APELocation), assert(user:file_search_path(ape, APELocation)).
+% CKC (2026-07-14): resolve ape_location relative to this engine source dir so APE loads regardless of cwd
+% (upstream asserted the raw cwd-relative parameter, which broke outside the engine dir).
+:- parameter(ape_location, APELocation),
+	prolog_load_context(directory, EngineDir),
+	atom_concat(EngineDir, '/', EngineDir1),
+	atom_concat(EngineDir1, APELocation, ApeDir),
+	assert(user:file_search_path(ape, ApeDir)).
 
 :- use_module(logger).
 :- use_module(utils).

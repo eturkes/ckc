@@ -228,6 +228,45 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 - Vendoring/fetch units: verify EACH source's OWN operative grant via its per-file source HEADER (APE `ape.pl` / AceRules `*_processor.pl` first ~25 L = the LGPL-3.0-or-later grant; do NOT assume that grant extends to ape-build's Clex/acetexts — each carries + needs its own). Add a `LICENSE.txt` TITLE spot-check (first ~15 L). Bank in the unit spec so execution needs ~zero rediscovery: exact pins + `HEAD^{tree}` hashes (confirm-not-rediscover), narrow-read ranges, placement via `git archive HEAD <paths>|tar -x`. Whole-file `LICENSE.txt` / big-source reads are the rediscovery cost these units must avoid — narrow-read the header, never the license body. EXEC-TIME COROLLARY (ape-vendor → codex-review 2026-07-14): re-probe banked "first-hand-checked" facts at fetch — BUT the re-probe itself can OVERSHOOT. ape-vendor fixed the owlswrl path (`prolog/utils/owlswrl/` NOT `prolog/owlswrl/`, correct) yet WRONGLY promoted author Tobias Kuhn to an APE © holder: a © HOLDER claim needs the actual `Copyright` NOTICE, never an `@author` tag (APE © of record = Attempto/UZH + Kaljurand; Kuhn holds none; codex-review caught it). Also — a "per-file grant" claim is false where headerless data/fixtures exist (APE 82/132 files carry it, AceRules 45/46); a `HEAD^{tree}` SHA on a SUBSET vendor is the FULL upstream root tree (label full-tree vs selection distinctly). WHOLE-REPO VENDORING PULLS IN BUNDLED THIRD-PARTY SUB-CONTENT → embedded lexicons/corpora/fixtures/copied-modules are INDEPENDENT provenance boundaries the umbrella grant doesn't cover (APE bundles a reduced Clex; `tests/acetexts.pl` = a user-submitted corpus with ~2558 submitter-IP fields; an example derived from a third-party draft). Verify byte-identity via `diff -r` placed-tree-vs-upstream-checkout at the pin. Never commit build products: the vendored APE `.gitignore` already ignores ape-build's `ape.exe` (`/ape.exe` `/ape-*.zip` `/packages`).
 - Banked-empirical-fact discipline (M3 plan redo → codex 2026-07-13): a dynamic-workflow-"verified" plan still shipped ≥5 falsified load-bearing claims (AceRules engine-loads (hardcoded `../ape/prolog/`), universal capitalized-token→`named(_)` rule, "DRS byte-identical" regression gloss, platypus 1:1 isomorphism, parseable candidate EN renderings) → bank each empirical fact WITH its exact probe command + input, and adversarially re-probe load-bearing facts before granting FAST-PATH status. Decision (user-delegated 2026-07-13): codex verdict on 3bb4a38 accepted in full (sole pushback: `It is recommended that S` DOES parse → `should(…)`); APE bet HELD; order = ape-vendor → ape-build → empirical downstream REPLAN against the in-tree `ape.exe` (roadmap REPLAN unit = the operative spec).
 
+## Runtime
+
+- APE build (M3.ape-build): `cd clinicalcnl && make install` — step 1 compiles `prolog/parser/*.fit`
+  → `.plp` (gitignored by `prolog/parser/.gitignore`); step 2 `qsave_program('ape.exe', [goal(ape),
+  toplevel(halt)])` loading root `ape.pl` (there is NO `load.pl`). Full-vocab `ape.exe` ≈1.3M, ~1.3s;
+  gitignored (`/ape.exe`). Reproducible fail-closed gate = `sh clinicalcnl/clinical/ape_build_smoke.sh`
+  (5 checks: swipl-9.x, build, get_ape_results+acetext_to_drs shape, ape.exe -solo drs, AceRules court
+  override).
+- APE programmatic seam = `get_ape_results/2,3` (module `ape`, `prolog/ape.pl`; reexported by
+  `get_ape_results.pl`, which also asserts the `ape` file_search_path) — what downstream calls, NOT the
+  interactive `runape.pl`. RAW DRS term (not serialized XML) = `ace_to_drs:acetext_to_drs/5`
+  (`+Text,-Sentences,-SyntaxTrees,-Drs,-Messages`, `prolog/parser/ace_to_drs.pl`); load `swipl -f
+  get_ape_results.pl` first (sets the search path). DRS = `drs(Referents,Conditions)` (both lists,
+  `Cond-SID/TID` provenance); a recommendation frame (`It is recommended that S.`) →
+  `drs([],[should(drs(...))])` (confirms the §L·thread `should()` seed; `patient`/`drug`/`take` all in
+  full Clex).
+- FAIL-CLOSED (downstream keys on THIS, never a nonzero exit): an APE parse failure returns a non-empty
+  `<message …>` XML (CLI), throws `error(ErrorCode, Text)` (AceRules `generate_output`), or collapses the
+  DRS toward `drs([],[])`.
+- Full-Clex wiring (DRY, blobs pristine): `prolog/lexicon/clex.pl` `clex_file/1` redirected source-relative
+  (`absolute_file_name('<dir>/../../vendor/clex/clex_lexicon', _, [file_type(prolog)])`) so ape.exe (baked
+  at qsave) + AceRules (runtime) load the ONE vendored full Clex (3.2M) — no 3.2M copy, the vendored
+  clex/reduced-clex/acetexts blobs stay pristine + Read-denied (`.claude/settings.json`). GAP for
+  conformance-seed: the upstream test suite hardcodes `:- consult(clex:clex_lexicon)` (the reduced
+  `prolog/lexicon/clex_lexicon.pl`, which BYPASSES `clex_file/1`) → the upstream-suite leg still loads
+  reduced vocab; its full-Clex wiring + the `testruns/` baseline reproduction (deferred acceptance (c),
+  finder-confirmed in ape-vendor: 3733 cases, 0 NEW mismatches) belong to conformance-seed's runner
+  (loading clex.pl AND direct-consulting reduced in one process would double-load the subset → keep one
+  path).
+- Vendored Attempto Clex lacks `quaker` (has `republican`/`pacifist`); the AceRules `output/nixon`
+  baseline predates its removal → guess=off cannot byte-match. Court smoke = `read_file_to_codes(
+  '.../vendor/acerules/engine/testcases/court/input/nixon', Codes, [])`,
+  `acerules_processor:generate_output(Codes, court, [guess=on], _R,_A,_T,[AT|_])` (AT = ATOM), assert
+  `sub_atom(AT,_,_,_,'It is false that Nixon is a')` (the Republican-Rule-overrides-Quaker-Rule result).
+- AceRules `ape_location` (`vendor/acerules/engine/parameters.pl` value + `acerules_processor.pl`
+  assertion) rewired `% CKC:` to the nested layout, source-relative (`prolog_load_context` +
+  `atom_concat`) → the engine's `ape('...')` search path (generate_drs/tokenizer/ulex/drs_to_ascii/…
+  sites) resolves from ANY cwd; loading it warning-free confirms the rewire.
+
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
 M3 = Prolog under `clinicalcnl/`, Rust tree untouched → the deep M1/M2 Rust lessons are DORMANT,
