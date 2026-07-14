@@ -245,13 +245,22 @@ Cross-unit decisions:
   + registry↔ulex set cross-check + one APE smoke: frame_recommend parses clean under the file's own
   bytes), 0 warn/err loads. codex-review hardened registry_errors/2 sound over nonground/improper
   input. 23% 227K/1M
-- [ ] raw-gate: `clinical/raw_gate.pl` — DCG over raw document bytes: framing parse (blocks,
-  ids, keywords, certainty, basis) + per-sentence registered-pattern token templates
-  (registry-driven WHITELIST per the Fail-closed decision; capitalized token legal iff
-  pattern-anchored or ∈ pn registry) + output = ordered {sentence idx, ACE sentence, block
-  context} for per-sentence APE dispatch (D2); rejects name {sentence idx, token, construct}.
-  + accept battery (thread docs + interval/exception/certainty variants). Gate: plunit accept
-  + core rejects. Reads: SURFACE.md + registry.pl.
+- [x] raw-gate: `clinical/raw_gate.pl` = the pre-APE WHITELIST (raw-gate-battery + profile-drs +
+  map-core consume): a two-stage DCG over raw v1 document bytes — (1) framing (blank-separated
+  paragraphs → `document <id>` + rule/exception blocks; a header DCG parses id + modality keyword +
+  certainty/basis fields under strict LF/single-space discipline), (2) per-sentence registry-driven
+  templates (the registered-pattern grammar admits ONLY registry surfaces + closed frame/function/
+  marker words, so every unregistered/`n:`-prefix/capital-OOV/`or`/`every`/decimal/malformed token
+  fails) + the D1 frame-op↔keyword cross-check. Accept output ok(doc(DocId, [sentence(Idx, Ace, Ctx)
+  …])) — Idx = 0-based raw sentence ordinal (provenance sentence_index), Ace = the verbatim ACE
+  (byte-identical to the surface_cases oracle), Ctx = rule(K,Keyword,DisjIdx,Cert,Basis) |
+  exception(K,RuleK,Cert,Basis); reject output reject([reject(Idx,Token,Construct)…]); fail-closed +
+  total, NEVER runs APE (pure Prolog, fast). Gate `clinical/raw_gate_tests.pl` run_tests(raw_gate)
+  GREEN 25/25 — 8 accept cross-checked byte-identical vs the surface_cases oracle (docA rule+exc /
+  docB / control + 4 direction frames + 4 v1 markers + strength-sharing keywords + 2-disjunct stmt.0/1
+  + certainty/basis), 15 core rejects each the sole diagnosis, 2 totality; 0 warn/err loads, sibling
+  gates unregressed. All raw-gate-battery hazards (does-not/exactly/bare-eq/bare-then/first-conj-the-
+  patient/leading-zero/quotation) confirmed already-rejecting → that unit = pure test-authoring. 17% 166K/1M
 - [ ] raw-gate-battery: full mutation reject battery over raw_gate — one mutant class per
   banked hazard: capitalized-OOV, `n:`-prefix, pronoun, or-guard, every-surface, bare-then,
   does-not (D5), cross-sentence definite, no-antecedent definite, decimal, leading zero,

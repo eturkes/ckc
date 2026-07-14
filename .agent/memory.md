@@ -372,6 +372,25 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   checker + those tables, reg_guard_verb from the ulex projection, so none needs a separate freeze. Gate
   run_tests([registry,ulex]): pure Prolog + ONE APE smoke (frame_recommend parses clean under clinical_ulex's
   own bytes).
+- ClinicalCNL raw gate (M3.raw-gate; AUTHORITY = clinical/raw_gate.pl — the WHITELIST layer BEFORE APE,
+  the first of SURFACE.md's 3 fail-closed layers). API = gate_document(+Doc(atom|string|codes), -Result):
+  Result = ok(doc(DocId, Sentences)) | reject(Rejects). Sentences (doc order) = sentence(Idx, Ace, Ctx) —
+  Idx 0-based raw sentence ordinal (per-sentence APE-dispatch index + provenance sentence_index; advances
+  per content line incl. rejected ones), Ace the VERBATIM ACE atom, Ctx = rule(K,Keyword,DisjIdx,Cert,Basis)
+  | exception(K,RuleK,Cert,Basis) (Cert/Basis default `none`; DisjIdx 0.. within a rule → stmt.k, D4).
+  Rejects = reject(Idx,Token,Construct) (Idx -1 for document/whitespace-level). Two DCG stages: framing (byte
+  DCG → blank-separated paragraphs, then a header DCG over the header line) + per-sentence registered-pattern
+  templates over space-split tokens; the sentence grammar DERIVES frames/surfaces from the registry
+  (reg_frame/reg_concept/pn_allow/the 4 markers), only closed frame/function/marker words are literals
+  (fixed_word/1 + the legal_lexeme/1 diagnostic lexicon). NON-OBVIOUS: raw_gate NEVER runs APE (pure Prolog,
+  fast like kb_kernel/ulex) — the accept battery instead cross-checks each emitted Ace BYTE-IDENTICAL against
+  the frozen surface_cases oracle (APE-validated in surface-goldens), proving the gate emits an APE-parseable
+  v1 surface without ape.exe (reuse this oracle-cross-check pattern for any downstream gate that would else
+  need APE). Also does the D1 frame-op↔keyword cross-check (op_mismatch). Whitespace discipline: LF only,
+  single space between tokens; CR/tab rejected up front. CONFIRMED (probed at close): every raw-gate-battery
+  hazard already rejects under this gate — does-not→unregistered_token(does), exactly→unregistered_token,
+  bare-eq/bare-then/first-conjunct-`the patient`→malformed_sentence, leading-zero→bad_number, quotation→
+  unregistered_token — so raw-gate-battery is PURE test-authoring against raw_gate, no gate extension.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
