@@ -1447,11 +1447,38 @@ combination direction, resulting-work license, and obligations (GPL-2.0-only sta
 GPLv3-incompatible; AGPL-3.0 combines but adds network obligations). Standing verdicts:
 Attempto-family LGPL source (APE, AceRules, Codeco) is GPLv3-compatible for direct porting
 subject to resource- and reuse-mode-specific LGPL compliance recorded in its row — technical-
-fit verdicts stand, no port planned; Clex is PROVISIONALLY license-compatible as an EN-side
+fit verdicts stand; APE and the AceRules engine subset are authorized for vendoring into
+`clinicalcnl/` (evidence rows below), Codeco unvendored (no port planned); Clex is PROVISIONALLY license-compatible as an EN-side
 candidate-mining seed (upstream commit 20960a5c header grant + COMLEX/LDC derivation
 statement; its evidence row must still establish the publisher's derivation authority before
 any mining), content import rejected on row-level fit alone; SNOMED CT / MedDRA/J / LOINC
-stay gated by their own fee/terms grants (§13.1). Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
+stay gated by their own fee/terms grants (§13.1).
+
+APE and AceRules evidence rows (per the schema above; snapshot tree SHA, first-hand header
+verification, and obligations-met attestation land with the vendored tree at COMMIT 2):
+
+- APE — holder Attempto Group / University of Zurich (core code 2008-2013; the
+  `prolog/owlswrl/` subtree names a distinct holder, Kaarel Kaljurand, per its file headers —
+  confirm first-hand at fetch). Source `github.com/Attempto/APE` @
+  `5f4d5354a45fb772763bf1a9543f508f15b28982` (= `master` HEAD, remote preflight 2026-07-14);
+  as-of 2026-07-14. Modes acquire / process-mine / author-derivative / commit-derived /
+  redistribute all authorized under the upstream-declared LGPL-3.0-or-later per-file
+  source-header grant. Obligations to meet on vendoring: retain upstream notices +
+  `LICENSE.txt`, corresponding source = the vendored `clinicalcnl/` subtree, provenance
+  `clinicalcnl/CKC_FORK.md`.
+- AceRules (engine subset) — holder Tobias Kuhn (2008-2012). Source
+  `github.com/tkuhn/AceRules` @ `5b7afb7bdfbce56027997307f9b798af53551223` (= `master` HEAD,
+  remote preflight 2026-07-14); as-of 2026-07-14. Vendored = `engine/` (the DRS-to-rule
+  mapping we adapt) + `LICENSE.txt` + `README.md`; excluded (⇒ no obligation) = `dependencies/`
+  (bundled GPL-2.0-or-later ASP solvers, unneeded — our Prolog `court` replaces ASP solving),
+  `docker/` / `webapp/` / `webclient/` (deployment/UI), top-level `.gitignore` (repo metadata).
+  Modes acquire / process-mine / author-derivative / commit-derived / redistribute all
+  authorized under the upstream-declared LGPL-3.0-or-later per-file source-header grant.
+  Obligations to meet on vendoring: retain upstream notices + `LICENSE.txt`, corresponding
+  source = the vendored `clinicalcnl/vendor/acerules/` subtree, provenance
+  `clinicalcnl/CKC_FORK.md`.
+
+Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
 architecture and decree-authored forms; rejected: direct Clex content import, Ulex precedence
 shadowing (collisions are hard gates here, never precedence).
 
