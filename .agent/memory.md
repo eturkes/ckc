@@ -321,16 +321,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   user.
 - ClinicalCNL KB contract (M3.kb-contract; AUTHORITY = `clinical/KB.md` — read it, skip re-deriving the
   term family, as SURFACE.md is for the surface). `clinical/kb_kernel.pl` = validators (`valid_kb/1`,
-  `kb_errors/2` precise violation terms, `valid_id/2`, `action_key/3`, `derivable/3` PROLEG NAF) + the
-  OWNED closed vocabulary the ulex registry mirrors + coverage-checks. `clinical/goldens/kb_examples.pl`
-  `kb_example(Name,Validity,Facts)`: valid {doc_a,doc_b,control,multi} = `kb-writer`'s byte-pin source;
-  27 invalid each isolate ONE defect. Gate `run_tests(kb_kernel)` — pure Prolog, NO APE dep, fast (no
-  ape.exe). Non-obvious design calls downstream must honor: exceptions are LP-lane NAF guards, NOT the
-  in-context negated conjuncts the SMT lane uses (docA renal = exc.0, never an in-guard neg); population
-  = the subject (`pop.patient` v1), the adult/child demographic = an age `interval` not a `pop.adult`
-  concept; ids are doc-qualified `<doc>.<kind>.<k>` (stmt/bind/exc too, not just rule) so a flat
-  multi-doc conflict KB never collides; `source` completeness = a map-emit obligation (the kernel
-  validates shape+ref only when a `source` is present).
+  `kb_errors/2` precise SOLE-violation terms, `valid_id/2`, `action_key/3`, `valid_atom/1`, `derivable/3`
+  PROLEG NAF) + the OWNED closed vocabulary the ulex registry mirrors + coverage-checks.
+  `clinical/goldens/kb_examples.pl` `kb_example(Name,Validity,Facts)`: valid {doc_a,doc_b,control,multi}
+  = `kb-writer`'s byte-pin source; invalid = one isolated-defect example per validator rule (each pins
+  its sole violation functor). Gate `run_tests(kb_kernel)` — pure Prolog, NO APE dep, fast (no ape.exe).
+  KB.md carries the design calls downstream must honor (LP-lane NAF exceptions vs the SMT lane's
+  in-context negation; population=subject with adult/child as an age interval; doc-qualified
+  stmt/bind/exc ids for flat-KB collision safety; `source` completeness as a map-emit obligation).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

@@ -9,9 +9,10 @@
 %
 %   Gate: swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'
 %
-% Downstream: registry.pl (ulex) mirrors this vocabulary as surfaces and its integrity checker
-% cross-checks coverage against kb_concept/1 etc.; kb-writer byte-pins goldens/kb_examples.pl;
-% conflict-core reuses the atom + exception structure for symbolic context overlap.
+% Downstream (roadmap-pending, not yet in-tree): registry.pl (ulex) will mirror this vocabulary as
+% surfaces + cross-check coverage against kb_concept/1 etc.; kb-writer will byte-pin
+% goldens/kb_examples.pl; conflict-core will reuse the atom + exception structure for symbolic
+% context overlap.
 
 :- module(kb_kernel,
           [ valid_kb/1,            % +Facts            — the KB is well-formed (no violations)
@@ -87,12 +88,24 @@ valid_id(Id, Kind) :-
     atomic_list_concat(Parts, '.', Id),
     split_last_two(Parts, DocParts, KindAtom, CounterAtom),
     DocParts \== [],
+    \+ member('', DocParts),             % every doc segment non-empty
     id_kind(KindAtom),
     ( var(Kind) -> Kind = KindAtom ; Kind == KindAtom ),
-    atom_number(CounterAtom, N),
-    integer(N), N >= 0.
+    canonical_counter(CounterAtom).
 
 id_kind(K) :- memberchk(K, [rule, stmt, bind, exc]).
+
+% canonical_counter(+Atom) — the counter is a canonical unsigned decimal: `0`, or a nonzero digit
+% then digits. Rejects the sign / leading-zero / radix / underscore spellings (-0, +1, 01, 0x10,
+% 1_0) that atom_number/2 silently accepts, so each logical id has exactly one textual form.
+canonical_counter(A) :-
+    atom_codes(A, Codes),
+    canonical_digits(Codes).
+canonical_digits([D])        :- !, digit(D).                               % any single digit
+canonical_digits([D0,D1|Ds]) :- D0 >= 0'1, D0 =< 0'9, all_digits([D1|Ds]). % multi: no leading zero
+digit(D) :- D >= 0'0, D =< 0'9.
+all_digits([]).
+all_digits([D|Ds]) :- digit(D), all_digits(Ds).
 
 % split_last_two(+List, -Init, -Penult, -Last) — deterministic last-two split (List has >= 2).
 split_last_two(List, Init, Penult, Last) :-
@@ -146,6 +159,13 @@ kb_errors(Facts, Errors) :-
 % not contiguously.
 :- discontiguous kb_violation/2.
 
+% ---- shape: the KB is a proper list ---------------------------------------------------------
+
+% Fail closed: a non-list / improper-list "KB" has no proper members, so every member/2 check
+% below would vacuously find nothing and certify it clean. This violation makes valid_kb/1 reject.
+kb_violation(Facts, not_a_list) :-
+    \+ is_list(Facts).
+
 % ---- shape: family membership + groundness --------------------------------------------------
 
 kb_violation(Facts, unknown_fact(F)) :-
@@ -188,12 +208,15 @@ kb_violation(Facts, unknown_strength(St))  :- member(strength(_,St),  Facts), \+
 kb_violation(Facts, unknown_certainty(C))  :- member(certainty(_,C),  Facts), \+ kb_certainty(C).
 kb_violation(Facts, unknown_population(P)) :- member(population(_,P), Facts), \+ kb_population(P).
 
+% Action key must be a ground ATOM `<kind>:<target>`. The atom/1 guards keep kb_errors total: a var
+% key falls to nonground_fact, a compound / string / number key to malformed_action_key (never a raw
+% atomic_list_concat/3 type/instantiation throw), and a string alias never validates as an atom key.
 kb_violation(Facts, malformed_action_key(K)) :-
-    member(action(_,K), Facts), \+ action_key(K, _, _).
+    member(action(_,K), Facts), ground(K), \+ ( atom(K), action_key(K, _, _) ).
 kb_violation(Facts, unknown_action_kind(Kind)) :-
-    member(action(_,K), Facts), action_key(K, Kind, _), \+ kb_action_kind(Kind).
+    member(action(_,K), Facts), atom(K), action_key(K, Kind, _), \+ kb_action_kind(Kind).
 kb_violation(Facts, unknown_action_target(T)) :-
-    member(action(_,K), Facts), action_key(K, _, T), \+ kb_action_target(T).
+    member(action(_,K), Facts), atom(K), action_key(K, _, T), \+ kb_action_target(T).
 
 % ---- context-atom well-formedness (conditions + exceptions) --------------------------------
 
@@ -254,6 +277,12 @@ kb_violation(Facts, duplicate_certainty(R))  :- member(certainty(R,_), Facts), c
 kb_violation(Facts, duplicate_bind(B))       :- member(condition(B,_,_), Facts), count_matches(condition(B,_,_), Facts, N), N > 1.
 kb_violation(Facts, duplicate_exception(X))  :- member(exception(X,_,_), Facts), count_matches(exception(X,_,_), Facts, N), N > 1.
 
+% Structural integrity: no rule/2 disjunct-pair repeats, and no statement is owned by two distinct
+% rules (each disjunct belongs to one rule; a stmt shared across docs is the very collision the
+% doc-qualified ids exist to prevent).
+kb_violation(Facts, duplicate_rule(R,S))     :- member(rule(R,S), Facts), count_matches(rule(R,S), Facts, N), N > 1.
+kb_violation(Facts, multi_owned_stmt(S))     :- member(rule(R1,S), Facts), member(rule(R2,S), Facts), R1 @< R2.
+
 declared_rule(Facts, R) :- member(rule(R,_), Facts).
 declared_stmt(Facts, S) :- member(rule(_,S), Facts).
 
@@ -266,6 +295,7 @@ count_matches(Template, Facts, N) :-
     length(Xs, N).
 
 % A template is ground-keyed when its identifying arg is bound (guards against enumerating vars).
+ground_key(rule(R,S))        :- nonvar(R), nonvar(S).
 ground_key(population(S,_))  :- nonvar(S).
 ground_key(action(S,_))      :- nonvar(S).
 ground_key(direction(R,_))   :- nonvar(R).
@@ -287,28 +317,37 @@ valid_source(I, D, Regions, Basis) :-
     ( valid_id(I, rule) ; valid_id(I, stmt) ; valid_id(I, exc) ),
     atom(D),
     id_doc(I, D),
-    is_list(Regions),
+    is_list(Regions), Regions = [_|_],
     forall(member(Reg, Regions), (integer(Reg), Reg >= 0)),
-    ( Basis == none ; atom(Basis) ; string(Basis) ).
+    strictly_ascending(Regions),
+    ( Basis == none ; string(Basis) ).
+
+% Region indices form a canonical set: at least one, strictly ascending (hence unique) — so one
+% provenance has exactly one byte form for kb-writer to pin.
+strictly_ascending([_]).
+strictly_ascending([A,B|T]) :- A < B, strictly_ascending([B|T]).
 
 % ==========================================================================================
 % Reference execution semantics (PROLEG negation-as-failure), over a synthetic FIXTURE context.
 %
-% derivable/2 pins the advice-derivability the conflict layer's differential tests share (SPEC §6:
+% derivable/3 pins the advice-derivability the conflict layer's differential tests share (SPEC §6:
 % "context satisfaction over finite fixture contexts, exception expansion equivalence"). It is a
 % CONTRACT + test reference, NOT shipped patient evaluation — that stays behind §15 G-RULE-EVAL.
 % The conflict layer builds SYMBOLIC context overlap (conflict-core) on this same atom + exception
 % structure; it never patient-evaluates.
 %
-% A fixture context Ctx is a list of ground facts about one patient:
+% A well-formed fixture context Ctx is a list of ground facts about one patient, at most one value
+% per quantity (memberchk/2 reads the first, so the caller supplies exactly one):
 %   concept(C)      — condition C holds (closed-world: absent = does not hold)
-%   quantity(Q, V)  — quantity Q has exact value V
+%   quantity(Q, V)  — quantity Q has the single exact rational value V
 % ==========================================================================================
 
 %% derivable(+StmtId, +Facts, +Ctx) is semidet.
-% StmtId's advice holds for Ctx over the KB fact list Facts: every condition atom holds AND no
-% exception fires. Facts is the same list valid_kb/1 validates (never asserted).
+% StmtId's advice holds for Ctx over the KB fact list Facts: StmtId is a declared disjunct, every
+% condition atom holds, AND no exception fires. Facts is the same list valid_kb/1 validates (never
+% asserted). The declared-disjunct guard stops derivability succeeding vacuously for an unknown id.
 derivable(StmtId, Facts, Ctx) :-
+    once(member(rule(_, StmtId), Facts)),
     forall(member(condition(_, StmtId, Atom), Facts), holds_atom(Atom, Ctx)),
     \+ exception_fires(StmtId, Facts, Ctx).
 

@@ -207,30 +207,22 @@ Cross-unit decisions:
   age of <marker> <INT> years` (D9; the-age-of-is = non-v1 anaphor); exception body = bare
   condition (D6); threads corrected (docA renal via exc.0, docB/control `-can`). 0 err/warn loads.
   37% 372K/1M
-- [x] kb-contract: `clinical/KB.md` (AUTHORITY: KB term family — read it, skip re-deriving) +
-  `clinical/kb_kernel.pl` validators + `clinical/goldens/kb_examples.pl` normative examples +
-  `clinical/kb_kernel_tests.pl` gate. Rules-as-data 9-fact family (§L·lp): `rule/2` (groups DNF
-  disjuncts) + rule-level `direction/2` `strength/2` `certainty/2`(opt); stmt-level `population/2`
-  `condition/3` (BindId+atom) `action/2`; `exception/3` (NAF-guarded, PROLEG) `source/4`
-  (doc+regions+basis). Ids = doc-qualified dotted atoms `<doc>.<kind>.<k>` (kind∈{rule,stmt,bind,
-  exc}, `k` DOCUMENT-CONTINUOUS, no per-rule reset) — extends §8.6 `rule_id` qualification to
-  stmt/bind/exc for flat multi-doc (conflict) KB safety (bare ids collide). Atoms `concept(C)` |
-  `interval(Q,Bound,Openness,Dir)` (Openness∈{open,closed} Dir∈{lower,upper}, exact-rational Bound
-  never float — D10); CountOp→(open,dir): geq→closed/lower greater→open/lower leq→closed/upper
-  less→open/upper. Action key `<kind>:<target>` (`action_key/3`). Vocabulary OWNED here
-  (`kb_concept`/`kb_action_kind`/`_target`/`kb_quantity`/`kb_population`/`kb_direction`/`_strength`/
-  `_certainty` + `direction_group/2` §L·conflict groups, avoid∈both non-positive); registry (ulex)
-  covers + cross-checks coverage. Design calls: population=subject (`pop.patient` v1; the
-  adult/child demographic = an age `interval`, NOT a `pop.adult` concept); exceptions = LP-lane
-  NAF guards NOT in-context negated conjuncts (docA renal via exc.0, an in-guard neg is the SMT
-  lane — §6 separation); `source` completeness = map-emit obligation (kernel validates shape+ref
-  when present). `derivable/3` = PROLEG NAF fixture-context reference (§15 G-RULE-EVAL-gated for
-  shipped eval; conflict-core builds symbolic overlap on the same atom/exception structure).
-  `valid_kb/1`/`kb_errors/2` = precise per-rule violation terms. Gate `run_tests(kb_kernel)` GREEN,
-  0 warn/err: accept 4 valid (doc_a/doc_b/control §8.6 thread + `multi` = 2-disjunct+trailing rule,
-  all 4 markers, certainty, 2-exc-on-one-stmt) + reject 27 isolated-defect (one per validator rule)
-  + 19 direct (id grammar, action-key split/join, direction groups, derivability open/closed
-  boundary). `kb-writer` byte-pins the `valid` set. 40% 402K/1M
+- [x] kb-contract: `clinical/KB.md` (AUTHORITY: KB term family + grammar + invariants + execution
+  semantics — read it, skip re-deriving) + `clinical/kb_kernel.pl` validators/OWNED-vocabulary/
+  `derivable/3` + `clinical/goldens/kb_examples.pl` normative examples + `clinical/kb_kernel_tests.pl`
+  plunit gate. Rules-as-data 9-fact family over doc-qualified `<doc>.<kind>.<k>` ids; the mechanical
+  detail (fact signatures, atom grammar, CountOp→(open,dir) map, closed vocabulary, direction groups,
+  safety invariants) lives in KB.md. Design calls downstream honors: population = the subject
+  (`pop.patient` v1; adult/child = an age `interval`, NOT a `pop.adult` concept); exceptions = LP-lane
+  NAF guards NOT the SMT lane's in-context negated conjuncts (docA renal via exc.0 — §6 separation);
+  ids doc-qualify stmt/bind/exc too (not just §8.6's rule_id) so a flat multi-doc conflict KB never
+  collides; `source` completeness = a map-emit obligation (kernel validates shape+ref when present);
+  `derivable/3` = PROLEG NAF fixture reference, §15 G-RULE-EVAL-gated (conflict-core builds symbolic
+  overlap on the same atom/exception structure, never patient-evaluates). Gate `run_tests(kb_kernel)`
+  GREEN, 0 warn/err — pure Prolog, no APE dep: accept the valid set (doc_a/doc_b/control §8.6 thread +
+  `multi` synthetic) + one isolated-defect reject per validator rule (each pins its SOLE violation
+  functor) + direct id-grammar / action-key / context-atom / direction-group / derivability-boundary
+  tests. `kb-writer` byte-pins the `valid` set. 40% 402K/1M
 - [ ] kb-writer: canonical KB writer in `kb_kernel.pl` — define+commit the canonical clause
   order (byte-sorted, §6 "Emission is deterministic"-consistent) + a dedicated deterministic
   emitter (never bare write_term defaults) + byte-pinned writer tests (hand-written normative

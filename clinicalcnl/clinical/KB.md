@@ -28,7 +28,7 @@ id (one DNF disjunct = one guard + action).
 | `condition(BindId, StmtId, Atom)` | bind+stmt | a context atom (the guard); each is a `bind.k` binding            |
 | `action(StmtId, ActionKey)`       | stmt      | the `<kind>:<target>` action key                                  |
 | `exception(ExcId, StmtId, Atom)`  | exc+stmt  | a labeled exception atom, NAF-guarded (PROLEG)                    |
-| `source(Id, DocId, Regions, Basis)` | any id  | provenance: doc, ordered raw-sentence indices, evidence basis     |
+| `source(Id, DocId, Regions, Basis)` | rule/stmt/exc | provenance: doc, ascending raw-sentence indices, evidence basis |
 
 ## Ids
 
@@ -36,14 +36,16 @@ Every id is a doc-qualified dotted atom `<doc>.<kind>.<k>`:
 
 - `<doc>` — the corpus test-source id (itself dotted, e.g. `test_source.m1_guideline_a`), non-empty.
 - `<kind>` — one of `rule`, `stmt`, `bind`, `exc`.
-- `<k>` — a non-negative integer, DOCUMENT-CONTINUOUS: `map-emit` runs one counter per kind across the
-  whole document and NEVER resets it per rule (a 2-disjunct rule then a trailing rule yields
-  `stmt.0`/`stmt.1` then `stmt.2`, not a reset to `stmt.0`).
+- `<k>` — a canonical non-negative decimal (`0`, or a nonzero digit then digits; no sign, leading zero,
+  radix, or underscore), so each logical id has exactly one textual form. It is DOCUMENT-CONTINUOUS:
+  `map-emit` runs one counter per kind across the whole document and NEVER resets it per rule (a
+  2-disjunct rule then a trailing rule yields `stmt.0`/`stmt.1` then `stmt.2`, not a reset to `stmt.0`).
 
 `<doc>.rule.<k>` matches SPEC §8.6's `rule_id` exactly (so `participating_rules` = `a.<doc>.rule.<k>`
 composes directly); `stmt`/`bind`/`exc` extend the same qualification so a flat KB holding several
-documents (the conflict operating mode) never collides. `valid_id(Id, Kind)` validates the shape and
-infers/checks `Kind`.
+documents (the conflict operating mode) never collides. `valid_id(Id, Kind)` validates the shape
+(non-empty doc segments, canonical counter) and infers/checks `Kind`. Counter DENSITY (0-based,
+gap-free) is a `map-emit` property, not a kernel reject — like source completeness below.
 
 ## Context atoms
 
@@ -51,8 +53,9 @@ A `condition` or `exception` payload `Atom` is one of:
 
 - `concept(ConceptId)` — a clinical condition concept holds.
 - `interval(Quantity, Bound, Openness, Dir)` — a bounded quantity constraint. `Openness` ∈
-  `{open, closed}`, `Dir` ∈ `{lower, upper}`. `Bound` is EXACT (`integer` or `n/d` rational), never a
-  float — conflict arithmetic (`D10`) needs open-vs-closed distinctions over exact rationals.
+  `{open, closed}`, `Dir` ∈ `{lower, upper}`. `Bound` is EXACT — an `integer` or a SWI rational (`NrD`
+  syntax, e.g. `1r2`), never a float; conflict arithmetic (`D10`) needs open-vs-closed distinctions over
+  exact rationals.
 
 The interval normalizes the DRS `CountOp` (`SURFACE.md` §Intervals) into `(Openness, Dir)`, which
 `map-core` computes; the KB never carries a raw `CountOp`:
@@ -100,18 +103,21 @@ eligibility check consumes (`avoid` joins BOTH non-positive groups):
 
 `valid_kb/1` succeeds iff `kb_errors/2` returns `[]`. Enforced (each a distinct violation term):
 
-- Shape — every fact is one of the nine families (`unknown_fact`) and fully ground (`nonground_fact`).
+- Shape — the KB is a proper list (`not_a_list`); every fact is one of the nine families
+  (`unknown_fact`) and fully ground (`nonground_fact`).
 - Ids — every id is a well-formed `<doc>.<kind>.<k>` of the right kind (`malformed_id`).
 - Vocabulary — direction/strength/certainty/population/concept/quantity/action-kind/action-target all
   in the closed set; action key is `<kind>:<target>` (`unknown_*`, `malformed_action_key`,
   `bad_interval_*`, `malformed_atom`).
 - Cardinality — every declared statement has EXACTLY ONE population (the subject binder) and one action;
   every declared rule has exactly one direction, one strength, at most one certainty; `bind`/`exc` ids
-  are unique (`missing_*`, `duplicate_*`).
+  are unique; each `rule/2` disjunct-pair is unique and each statement is owned by exactly one rule
+  (`missing_*`, `duplicate_*`, `multi_owned_stmt`).
 - Referential integrity — no rule-level field for an undeclared rule, no statement-level fact for an
   undeclared statement, no `source` for an undeclared subject (`dangling_*_ref`).
-- Source shape — `source/4` has an atom doc matching the subject's prefix, an ordered list of
-  non-negative sentence indices, and a basis string or `none` (`malformed_source`).
+- Source shape — `source/4`'s subject id is a `rule`/`stmt`/`exc` id, its atom doc matches that id's
+  prefix, its regions are a NON-EMPTY STRICTLY-ASCENDING list of non-negative sentence indices, and its
+  basis is a string or `none`; any breach (a malformed subject id included) is `malformed_source`.
 
 "Every statement variable is bound by population/condition atoms" is realized structurally: the
 population binds the subject, condition atoms bind the guard's concepts/quantities, and the whole KB is
@@ -122,7 +128,7 @@ reference when present).
 ## Execution semantics (PROLEG negation-as-failure)
 
 `derivable(StmtId, Facts, Ctx)` is the reference derivability: `StmtId`'s advice holds for a fixture
-context `Ctx` when every condition atom holds AND no exception fires —
+context `Ctx` when `StmtId` is a declared disjunct, every condition atom holds, AND no exception fires —
 `\+ (exception(_, StmtId, Atom), holds_atom(Atom, Ctx))`, the PROLEG NAF guard. Exceptions stay LABELED
 NAF guards here (the SMT lane instead expands them to negated context conjuncts — SPEC §6 lane
 separation). `Ctx` is a synthetic list of `concept(C)` / `quantity(Q, V)` facts about one patient
@@ -137,14 +143,15 @@ intersection × exception expansion); it never patient-evaluates.
 ## Validators, examples, gate
 
 - `clinical/kb_kernel.pl` — the vocabulary, `valid_id/2`, `action_key/3`, `valid_atom/1`, `kb_errors/2`,
-  `valid_kb/1`, `direction_group/2`, `derivable/3`. Loads warning-free; imported by `kb-writer`/`map-*`.
+  `valid_kb/1`, `direction_group/2`, `derivable/3`. Loads warning-free; will be imported by `kb-writer`/`map-*`.
 - `clinical/goldens/kb_examples.pl` — `kb_example(Name, Validity, Facts)`: the §8.6 thread
   (`doc_a`/`doc_b`/`control`) + a multi-disjunct synthetic (`multi`, all four interval markers, optional
   certainty, document-continuous counters, two exceptions on one statement) as `valid`; one
   isolated-defect example per validator rule as `invalid(Functor)`. `kb-writer` byte-pins the `valid`
   set.
-- `clinical/kb_kernel_tests.pl` — accept (valid → no errors) / reject (invalid → the expected violation
-  functor among the errors) over every example, plus direct tests of the id grammar, action-key
-  split/join, direction groups, and the derivability open/closed boundaries.
+- `clinical/kb_kernel_tests.pl` — accept (valid → no errors) / reject (invalid → EXACTLY the one
+  expected violation functor) over every example, a catalog tripwire pinning the example counts, plus
+  direct tests of the id grammar, action-key split/join, context atoms, direction groups, and the
+  derivability open/closed boundaries + declared-disjunct guard.
 
 Gate: `swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'`

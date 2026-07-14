@@ -1,8 +1,10 @@
-% Hand-written NORMATIVE KB examples (M3.kb-contract). NOT captured — authored to exercise the
-% kb_kernel validators and to model what a compiled ClinicalCNL document IS. The valid examples
-% are the §8.6 thread docs (docA/docB/control) plus one multi-disjunct synthetic; kb-writer
-% byte-pins them (it reads `kb_example(_, valid, Facts)`). Each invalid example isolates ONE defect
-% and carries the violation FUNCTOR the kb_kernel_tests reject test expects among the errors.
+% Hand-written NORMATIVE KB examples (M3.kb-contract). NOT captured — authored to exercise every
+% kb_kernel validator path. The valid examples are KERNEL-VALID fixtures: the §8.6 thread docs
+% (docA/docB/control) plus one multi-disjunct synthetic, carrying DELIBERATELY VARYING provenance
+% density (docA sources its statement + exception too, the others only their rule(s)) — map-emit
+% provenance COMPLETENESS is a downstream golden's concern, not a kernel invariant. kb-writer
+% byte-pins the valid set (it reads `kb_example(_, valid, Facts)`). Each invalid example isolates
+% ONE defect — kb_errors returns exactly the single violation whose FUNCTOR the reject test expects.
 %
 % kb_example(Name, Validity, Facts): Validity = valid | invalid(ErrorFunctor); Facts = a KB (a
 % list of ground rules-as-data fact terms, per clinical/KB.md).
@@ -117,6 +119,10 @@ kb_example(bad_atom_shape, invalid(malformed_atom),
   [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
     condition('d.bind.0','d.stmt.0', frobnitz('cond.sepsis')) ]).
+kb_example(bad_exception_atom, invalid(unknown_concept),  % exception payload validated like a condition
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    exception('d.exc.0','d.stmt.0', concept('cond.bogus')) ]).
 
 % ---- action key -----------------------------------------------------------------------------
 kb_example(bad_action_nocolon, invalid(malformed_action_key),
@@ -128,6 +134,9 @@ kb_example(bad_action_kind, invalid(unknown_action_kind),
 kb_example(bad_action_target, invalid(unknown_action_target),
   [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.bogus') ]).
+kb_example(bad_action_type, invalid(malformed_action_key),    % key a compound, not a `k:t` atom
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0', foo(bar)) ]).
 
 % ---- rule-level vocabulary ------------------------------------------------------------------
 kb_example(bad_direction, invalid(unknown_direction),
@@ -149,6 +158,14 @@ kb_example(bad_id, invalid(malformed_id),
   [ rule('d.rule.0','d.stmt.x'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.x','pop.patient'), action('d.stmt.x','act.administer:drug.abx_a'),
     condition('d.bind.0','d.stmt.x', concept('cond.sepsis')) ]).
+kb_example(bad_id_empty_doc, invalid(malformed_id),      % empty doc segment (leading dot)
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    condition('.bind.0','d.stmt.0', concept('cond.sepsis')) ]).
+kb_example(bad_id_noncanon, invalid(malformed_id),       % non-canonical counter spelling `01`
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    condition('d.bind.01','d.stmt.0', concept('cond.sepsis')) ]).
 
 % ---- cardinality + safety -------------------------------------------------------------------
 kb_example(no_population, invalid(missing_population),
@@ -177,6 +194,31 @@ kb_example(dup_bind, invalid(duplicate_bind),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
     condition('d.bind.0','d.stmt.0', concept('cond.sepsis')),
     condition('d.bind.0','d.stmt.0', concept('cond.pregnancy')) ]).
+kb_example(dup_population, invalid(duplicate_population),
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), population('d.stmt.0','pop.patient'),
+    action('d.stmt.0','act.administer:drug.abx_a') ]).
+kb_example(no_strength, invalid(missing_strength),
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a') ]).
+kb_example(dup_strength, invalid(duplicate_strength),
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for),
+    strength('d.rule.0',strong), strength('d.rule.0',weak),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a') ]).
+kb_example(dup_exception, invalid(duplicate_exception),
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    exception('d.exc.0','d.stmt.0', concept('cond.renal_severe')),
+    exception('d.exc.0','d.stmt.0', concept('cond.pregnancy')) ]).
+kb_example(dup_rule, invalid(duplicate_rule),            % same rule/2 disjunct-pair repeated
+  [ rule('d.rule.0','d.stmt.0'), rule('d.rule.0','d.stmt.0'),
+    direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a') ]).
+kb_example(multi_owned, invalid(multi_owned_stmt),       % one stmt owned by two distinct rules
+  [ rule('d.rule.0','d.stmt.0'), rule('d.rule.1','d.stmt.0'),
+    direction('d.rule.0',for), strength('d.rule.0',strong),
+    direction('d.rule.1',against), strength('d.rule.1',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a') ]).
 
 % ---- referential integrity ------------------------------------------------------------------
 kb_example(dangling_stmt, invalid(dangling_stmt_ref),
@@ -191,10 +233,18 @@ kb_example(dangling_source, invalid(dangling_source_ref),
   [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
     source('d.exc.7','d',[0],none) ]).
-kb_example(bad_source, invalid(malformed_source),
+kb_example(bad_source, invalid(malformed_source),        % regions not a list
   [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
     source('d.rule.0','d',notalist,none) ]).
+kb_example(bad_source_order, invalid(malformed_source),  % regions not strictly ascending
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    source('d.rule.0','d',[1,0],none) ]).
+kb_example(bad_source_basis, invalid(malformed_source),  % basis an atom, not a string or `none`
+  [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
+    population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
+    source('d.rule.0','d',[0],bogus_atom_basis) ]).
 
 % ---- fact shape -----------------------------------------------------------------------------
 kb_example(nonground, invalid(nonground_fact),
@@ -205,3 +255,5 @@ kb_example(alien_fact, invalid(unknown_fact),
   [ rule('d.rule.0','d.stmt.0'), direction('d.rule.0',for), strength('d.rule.0',strong),
     population('d.stmt.0','pop.patient'), action('d.stmt.0','act.administer:drug.abx_a'),
     frobnicate('d.stmt.0', foo) ]).
+% A "KB" that is not a proper list at all (fail-closed; every member/2 check would otherwise no-op).
+kb_example(not_a_list, invalid(not_a_list), foo).
