@@ -1287,7 +1287,8 @@ Build scope for M3 as rescoped (§0 product push; the roadmap carries the unit p
   naming the sentence and construct.
 - Lexicon: APE function words + a demand-authored clinical ulex whose entry ids mirror the
   committed lexicon concept ids (IR-bridge alignment). Never a precomputed corpus-wide import;
-  Clex stays a candidate-mining seed behind its §11.5 row.
+  the vendored Clex (§11.5) is APE's general lexicon + a clinical-term mining seed, never bulk-
+  imported into the clinical ulex.
 - Compile: CNL text → APE parse (DRS) → deterministic mapping → clinical Prolog KB:
   recommendation/contraindication predicates carrying action, target, and modality
   direction + strength; population/condition guards; interval guards (EN bound markers
@@ -1434,55 +1435,85 @@ posture: demand-sliced constraint subsetting before any grammar-opening amendmen
 
 CKC is GPL-3.0-or-later (LICENSE; relicensed 2026-07-12 from an Apache-2.0 WITH
 LLVM-exception text for a uniform governing license — the prior mixed posture was a cost,
-never an impossibility). External resources (terminologies, lexicons, corpora, tools) enter
-only behind a per-resource, per-version evidence row recorded BEFORE acquisition or mining:
-rights holder, source URL + snapshot hash, as-of date, and the specific permissions for
-acquisition, internal processing/mining, derivative authoring, committing derived rows, and
-redistribution (`PermissionRecord` + `G-SOURCE-PERMISSION`), never inherited across resources
-or versions. License compatibility answers permission alone — never compliance: the
-obligations permission carries (notice retention, attribution, license-text and
-corresponding-source conveyance, per reuse mode) land in the evidence row and are recorded
-and met per resource. Copyleft as a class is never a rejection ground; judge exact version,
-combination direction, resulting-work license, and obligations (GPL-2.0-only stays
-GPLv3-incompatible; AGPL-3.0 combines but adds network obligations). Standing verdicts:
-Attempto-family LGPL source (APE, AceRules, Codeco) is GPLv3-compatible for direct porting
-subject to resource- and reuse-mode-specific LGPL compliance recorded in its row — technical-
-fit verdicts stand; APE and the AceRules engine subset are now vendored into
-`clinicalcnl/` (evidence rows below), Codeco unvendored (no port planned); Clex is PROVISIONALLY license-compatible as an EN-side
-candidate-mining seed (upstream commit 20960a5c header grant + COMLEX/LDC derivation
-statement; its evidence row must still establish the publisher's derivation authority before
-any mining), content import rejected on row-level fit alone; SNOMED CT / MedDRA/J / LOINC
-stay gated by their own fee/terms grants (§13.1).
+never an impossibility). External resources (terminologies, lexicons, corpora, tools) are
+WELCOME — each enters behind a per-resource, per-version evidence row: rights holder, source
+URL + snapshot hash, as-of date, and the specific permissions for acquisition, internal
+processing/mining, derivative authoring, committing derived rows, and redistribution
+(`PermissionRecord` + `G-SOURCE-PERMISSION`), never inherited across resources or versions.
+The row is recorded before COMMITTED acquisition — tracked vendoring, redistribution, or a
+product build depending on the resource; bounded pre-adoption inspection (volatile scratch —
+clone/build/probe to establish the row's facts + viability, never committed, never depended
+on) is expressly permitted ahead of the row, and is how a row's grants get verified first-
+hand. License compatibility answers permission alone — never compliance: the obligations
+permission carries (notice retention, attribution, license-text and corresponding-source
+conveyance, per reuse mode) land in the evidence row and are recorded and met per resource.
+Copyleft as a class is never a rejection ground; judge exact version, combination direction,
+resulting-work license, and obligations (GPL-2.0-only stays GPLv3-incompatible; AGPL-3.0
+combines but adds network obligations). Standing verdicts: Attempto-family LGPL source (APE,
+AceRules, Codeco) is GPLv3-compatible for direct porting subject to resource- and reuse-mode-
+specific LGPL compliance recorded in its row — technical-fit verdicts stand; APE, the AceRules
+engine subset, and the full Clex lexicon are now vendored into `clinicalcnl/` (evidence rows
+below); Codeco is unvendored (no port planned — welcome behind its row if one is); SNOMED CT /
+MedDRA/J / LOINC enter behind their own fee/terms grants once obtained (§13.1).
 
-APE and AceRules evidence rows (per the schema above; snapshots + grants verified first-hand
-at vendoring, 2026-07-14):
+APE, AceRules, and Clex evidence rows (per the schema above; snapshots + grants verified
+first-hand at vendoring, 2026-07-14; APE was also cloned/built/probed in volatile scratch
+during 2026-07-13 planning — permitted pre-adoption inspection, never committed):
 
-- APE — holders (per per-file source headers, manifest-wide sweep): Attempto Group /
-  University of Zurich (© 2008-2013), Tobias Kuhn (© 2008-2012), and Kaarel Kaljurand
-  (© 2008-2013 and 2008-2010; sole holder on the `prolog/utils/owlswrl/` subtree + some
-  `prolog/utils/` and `tests/` files). Source `github.com/Attempto/APE` @
+- APE — © notices (per-file source headers, manifest-wide sweep): Attempto Group / University
+  of Zurich (© 2008-2013) and Kaarel Kaljurand (© 2008-2013 and 2008-2010, named on the
+  `prolog/utils/owlswrl/` subtree; `transform_anonymous.pl` there is Attempto's). Tobias Kuhn
+  and Kaljurand appear as `@author`s, but no APE © notice names Kuhn — holders of record =
+  Attempto/UZH + Kaljurand. Source `https://github.com/Attempto/APE` @
   `5f4d5354a45fb772763bf1a9543f508f15b28982`, tree `ac239d2efef730fad7240acae502a5b3ffa86a23`
-  (recorded pre-strip; = `master` HEAD, confirmed first-hand 2026-07-14); as-of 2026-07-14.
-  Modes acquire / process-mine / author-derivative / commit-derived / redistribute all under
-  the upstream-declared LGPL-3.0-or-later per-file source-header grant, verified first-hand in
-  `ape.pl` and the `prolog/utils/owlswrl/` headers. Obligations met: upstream notices +
-  `LICENSE.txt` retained, corresponding source = the vendored `clinicalcnl/` subtree,
+  (whole repo, 132 files; = `master` HEAD observed 2026-07-14); as-of 2026-07-14. Modes
+  acquire / process-mine / author-derivative / commit-derived / redistribute under
+  LGPL-3.0-or-later — project-level via `LICENSE.txt` + per-file headers (verified first-hand
+  in `ape.pl` + the `prolog/utils/owlswrl/` headers; 82/132 files carry the explicit "any
+  later version" grant, headerless data/fixtures ride the project license). Bundled sub-content
+  redistributed under APE's grant with the whole-repo vendoring: `prolog/lexicon/clex_lexicon.pl`
+  (reduced Clex, 2011 entries, loaded by default — ape-build swaps in the full Clex, row below);
+  `tests/acetexts.pl` (APE's user-submitted regression corpus, 3779 records incl. ~2558
+  submitter-IP `Author` fields, already public upstream); `examples/the_lol_policy.ace.txt`
+  (Kaljurand's rendering of J.L. De Coi's 2007 draft, attributed). Obligations met for pristine-
+  source redistribution: notices + `LICENSE.txt` retained, corresponding source = the vendored
+  `clinicalcnl/` subtree, provenance `clinicalcnl/CKC_FORK.md`; modified-source / object-code /
+  combined-work duties (GPL §5 / LGPL §4) attach when first exercised.
+- AceRules (engine subset) — © notice names Tobias Kuhn (© 2008-2012); sole ownership of every
+  selected byte is not independently established (`webservice/acerules_server.pl` is a copy of
+  the APE server naming Kaljurand; `court_interpreter/transform_naf.pl` names Marc Doerflinger
+  as author). Source `https://github.com/tkuhn/AceRules` @
+  `5b7afb7bdfbce56027997307f9b798af53551223`, tree `1cebf98b450c6ed0dc88355beec266dd18270378`
+  = full upstream root (274 files; = `master` HEAD observed 2026-07-14); vendored selection =
+  158 files (`engine/` 156 + `LICENSE.txt` + `README.md`); as-of 2026-07-14. `engine/` is
+  vendored wholesale for upstream diffability — it carries the parser/court DRS-to-rule mapping
+  CKC consumes plus `webservice/` (SOAP), `stable_interpreter/` (ASP adapters needing the
+  excluded solvers), and `testcases/`. Modes acquire / process-mine / author-derivative /
+  commit-derived / redistribute under LGPL-3.0-or-later (verified first-hand in
+  `engine/acerules_processor.pl`; 45/46 engine `.pl` carry the explicit per-file grant,
+  `parameters.pl` excepted; project-level via `LICENSE.txt`). Excluded from conveyance (no
+  distribution obligation): `dependencies/` (GPL-2.0-or-later ASP solvers lparse/smodels — our
+  Prolog `court` replaces ASP solving), `docker/` / `webapp/` / `webclient/` (deployment/UI),
+  top-level `.gitignore`. Obligations met (pristine source): notices + `LICENSE.txt` retained,
+  corresponding source = `clinicalcnl/vendor/acerules/`, provenance `clinicalcnl/CKC_FORK.md`.
+- Clex (full lexicon) — holder Attempto Group / University of Zurich (© 2008-2013), derived
+  from COMLEX (© 2005 LDC / NYU Proteus, catalog LDC98L21). Source
+  `https://github.com/Attempto/Clex` @ `20960a5ce07776cb211a8cfb25dc8c81fcdf25e2`, tree
+  `210d7ea09671309e2c39fb4fd87fc609d9fff1e7` (whole repo, 3 files; = `master` HEAD observed
+  2026-07-14); as-of 2026-07-14. Modes acquire / process-mine / author-derivative / commit-
+  derived / redistribute under the upstream-declared GPL-3.0-or-later grant, verified first-
+  hand in `clex_lexicon.pl` + `LICENSE` (GPLv3). Derivation authority: Attempto publishes Clex
+  under GPL-3.0-or-later with explicit COMLEX/LDC attribution; COMLEX (LDC98L21, NYU Proteus
+  under LDC) permits research + commercial use under minimal LDC-member restrictions — a
+  distinct framework from the GPL grant, recorded transparently; CKC's use rides Attempto's
+  published grant. GPL-3.0-or-later == CKC's LICENSE. Vendored whole → `clinicalcnl/vendor/clex/`
+  (`clex_lexicon.pl` 97527 entries + `LICENSE` + `README.md`); ape-build wires it drop-in over
+  APE's reduced lexicon (Clex's own documented replacement path). Obligations met (pristine
+  source): notice + `LICENSE` retained, corresponding source = `clinicalcnl/vendor/clex/`,
   provenance `clinicalcnl/CKC_FORK.md`.
-- AceRules (engine subset) — holder Tobias Kuhn (© 2008-2012; sole holder across the subset).
-  Source `github.com/tkuhn/AceRules` @ `5b7afb7bdfbce56027997307f9b798af53551223`, tree
-  `1cebf98b450c6ed0dc88355beec266dd18270378` (recorded pre-strip; = `master` HEAD, confirmed
-  first-hand 2026-07-14); as-of 2026-07-14. Vendored = `engine/` (the DRS-to-rule mapping we
-  adapt) + `LICENSE.txt` + `README.md`; excluded (⇒ no obligation) = `dependencies/` (bundled
-  GPL-2.0-or-later ASP solvers, unneeded — our Prolog `court` replaces ASP solving), `docker/`
-  / `webapp/` / `webclient/` (deployment/UI), top-level `.gitignore` (repo metadata). Modes
-  acquire / process-mine / author-derivative / commit-derived / redistribute all under the
-  upstream-declared LGPL-3.0-or-later per-file source-header grant, verified first-hand in
-  `engine/acerules_processor.pl`. Obligations met: upstream notices + `LICENSE.txt` retained,
-  corresponding source = the vendored `clinicalcnl/vendor/acerules/` subtree, provenance
-  `clinicalcnl/CKC_FORK.md`.
 
-Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion
-architecture and decree-authored forms; rejected: direct Clex content import, Ulex precedence
+Adopted ACE precedents: the Clex/Ulex committed-core + per-corpus accretion architecture and
+decree-authored forms (Clex itself now vendored, row above); rejected: Ulex precedence
 shadowing (collisions are hard gates here, never precedence).
 
 ## §12 M5 — Autonomous optimization PoC (requirements; elaborate at M4 acceptance)

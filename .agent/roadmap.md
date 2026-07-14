@@ -50,8 +50,9 @@ Cross-unit decisions:
   sits at the root; the two upstream roots also collide on `.gitignore`/`LICENSE.txt`).
 - Licensing (SPEC §11.5): APE + AceRules evidence rows land in the ape-vendor commit as §11.5
   PROSE (extend the "Standing verdicts" sentence — no registry file); ape-vendor owns the
-  acquisition-record schema + first-hand header verification. Clex: NO import (9997607 posture;
-  candidate-mining seed) — its upstream-test-suite role is handled in ape-build.
+  acquisition-record schema + first-hand header verification. Clex: VENDORED in-tree (full
+  lexicon, GPL-3.0-or-later, `vendor/clex/`, §11.5 row) — ape-build wires it drop-in + the
+  upstream suite uses the in-tree copy (no live download); also a clinical-term mining seed.
 - Fail-closed profile (CORRECTED 2026-07-13 — DRS-only checking is INSUFFICIENT: APE irreversibly
   erases surface facts — comments vanish, `n:Flarble` → ordinary `object(…,'Flarble',…)` NOT
   `named(_)`, `005`/`5` normalize identically, pronouns/definites resolve by silent referent
@@ -73,9 +74,9 @@ Cross-unit decisions:
 - Conformance runner: ONE command (plunit driver script under `clinicalcnl/clinical/`) =
   upstream fork suite + profile battery + mapping battery + conflict queries + corpus
   round-trip; THE loop round gate. Milestone acceptance = runner green over the locked corpus
-  + a ledgered manual dry-run round (loop-framework). OPEN (replan owns): the upstream-suite leg
-  is Clex-gated — resolve via a test-dependency unit (Clex authority, pin/hash, test-only
-  placement, exact command) OR a Clex-free respec of the §10.6 runner clause; the corpus gains a
+  + a ledgered manual dry-run round (loop-framework). The upstream-suite leg's Clex gate is
+  RESOLVED — full Clex vendored in-tree (`vendor/clex/`, §11.5 row); the runner uses the in-tree
+  copy (no live download, no Clex-free respec). The corpus gains a
   case MANIFEST (ordered document pairs + expected category/kind/participating_rules/evidence)
   beside per-document round-trip.
 - Reading legend (banked-once shared pins; the units below cite by tag — read these, skip
@@ -146,7 +147,7 @@ Cross-unit decisions:
   roadmap.md` L54-55 (fixture `ecc19d3:.agent/roadmap.md` L652-656); harvested APE/AceRules upstream
   report `git show e8b5cf6:docs/cnl-attempto.md`.
 
-- [x] ape-vendor: APE @5f4d535 → `clinicalcnl/` + AceRules engine subset @5b7afb7 → `clinicalcnl/vendor/acerules/` (`.git`-stripped, 132+158 files, tree `ac239d2`/`1cebf98`); LGPL-3.0-or-later per-file grants verified first-hand; §11.5 pre-acquisition+attestation rows + `CKC_FORK.md`; swipl 9.2.9. 44% 436K/1M (session-injection-heavy; unit work light) — hash PENDING
+- [x] ape-vendor: APE @5f4d535 → `clinicalcnl/` (132) + AceRules engine subset @5b7afb7 → `clinicalcnl/vendor/acerules/` (158) + full Clex @20960a5 → `clinicalcnl/vendor/clex/` (3) (`.git`-stripped, byte-identical to upstream; trees `ac239d2`/`1cebf98`(full-root)/`210d7ea`); grants verified first-hand (APE+AceRules LGPL-3.0-or-later, Clex GPL-3.0-or-later); §11.5 permissive regime + per-resource rows + `CKC_FORK.md`; swipl 9.2.9. 44% 436K/1M — `a400dd1` + codex-review remediation (permissive §11.5; corrected holders/claims per H1/H2/M1/M2; Clex pulled in)
 - [ ] ape-build: build the vendored APE + prove it runs under SWI-Prolog 9.2.9 (functional
   env-gate lands HERE). EMPIRICALLY DE-RISKED (a finder built + ran APE @ pin under 9.2.9): `make
   install` → `ape.exe`, 0 errors/0 warnings; the regenerated drace report matched the upstream
@@ -161,16 +162,17 @@ Cross-unit decisions:
   `## Runtime` for downstream): a parse error returns non-empty `<message …>` XML or collapses the
   DRS to `drs([],[])`, never a nonzero exit. UPSTREAM-SUITE REALITY (corrected): NO Clex-free
   subset — every upstream test consults `tests/acetexts.pl` (committed) + the full Clex
-  (`tests/downloader.pl ensure_clex` ← github, live; `download_acetexts` is dead-404 but acetexts
-  is committed); the driver OVERWRITES version-controlled `testruns/` baselines → honest green =
+  (now vendored in-tree at `vendor/clex/clex_lexicon.pl` — copy drop-in over
+  `prolog/lexicon/clex_lexicon.pl` + recompile, NO live `ensure_clex` download; `download_acetexts`
+  is dead-404 but acetexts is committed); the driver OVERWRITES version-controlled `testruns/` baselines → honest green =
   `git diff --quiet testruns/` + zero mismatch codes, NOT exit code. ACCEPTANCE (fail-closed,
   reproducible): (a) `make install` clean + `get_ape_results` loads under 9.2.9; (b) a smoke parse
   of a clinical-shape sentence (built-in lexicon or a stub ulex) returns a well-formed
   `drs(Referents, Conditions)` — asserted on DRS shape, not exit code; (c) OPTIONALLY the
   Clex-gated upstream regression as an "APE still parses" smoke — pin the EXACT driver command +
   the baseline files it rewrites, gate = `git diff` clean on those baselines + zero NEW mismatch
-  codes (drivers differ; zero exit ≠ green; Clex = GPL-3.0-or-later per its own headers, test-only,
-  own §11.5 row + pin if run; 9997607 bars only content IMPORT into the product); (d) AceRules
+  codes (drivers differ; zero exit ≠ green; the full Clex is now vendored in-tree —
+  GPL-3.0-or-later, §11.5 row — wired drop-in for full-vocabulary APE + a reproducible regression); (d) AceRules
   engine WIRING: rewire its hardcoded `../ape/prolog/` APE path to the nested layout
   (source-relative, `% CKC:` edits) → engine loads warning/error-free + a callable `court` smoke
   (nixon testcase). The real fail-closed corpus gate is conformance-seed's synthetic batteries

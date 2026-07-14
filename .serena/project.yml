@@ -124,6 +124,9 @@ ignored_paths:
 - Cargo.lock
 - corpus/test_sources
 - cassettes
+- clinicalcnl/vendor/clex/clex_lexicon.pl
+- clinicalcnl/prolog/lexicon/clex_lexicon.pl
+- clinicalcnl/tests/acetexts.pl
 
 # whether the project is in read-only mode
 # If set to true, all editing tools will be disabled and attempts to use them will result in an error

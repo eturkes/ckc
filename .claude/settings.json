@@ -11,7 +11,7 @@
       "Read(./.serena/cache/**)",
       "Read(./.serena/memories/**)",
       "Read(./.serena/project.local.yml)",
-      "Read(./.tokensave/**)"
+      "Read(./.tokensave/**)","Read(./clinicalcnl/vendor/clex/clex_lexicon.pl)","Read(./clinicalcnl/prolog/lexicon/clex_lexicon.pl)","Read(./clinicalcnl/tests/acetexts.pl)"
     ]
   }
 }
