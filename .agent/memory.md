@@ -37,6 +37,17 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 
 ## Lessons
 
+- context.sh = the TRUE window total (last assistant `input+cache_creation+cache_read` = real API-input
+  sum), authoritative for the 1M wall — do NOT discount a high reading as 'inflated'. It runs FAR above
+  the stored/visible conversation: redacted extended-thinking (Opus max-effort — thinking persists as
+  0-char placeholders in the `.jsonl`, full text sent to the API + counted) + ~50K fixed overhead
+  (sys-prompt/tools/CLAUDE.md) + injected reminders = real occupancy absent from the transcript. MEASURED
+  (M3.ape-build, which FALSIFIED the earlier session-prompt-CLAUDE.md-re-injection guess): 757K total =
+  ~270K stored conversation (1.2MB `.jsonl`, all-strings ~1M chars) + ~440K redacted-thinking/overhead →
+  total ≈ 2.8× the stored conversation; CLAUDE.md content markers count ~2× (boundary-injected + stripped
+  on write), never per-turn. SIZING: at max effort the stored-conversation ceiling for the ~200K aim is
+  ~70-90K — a big total over a small `.jsonl` is EXPECTED, not a measurement bug. RECIPE: `jq`
+  `.message.usage` over `$HOME/.claude/projects/<proj>/<sid>.jsonl` for peak + input/cache breakdown.
 - Unit sizing rules (per-incident case studies in git — `git show 6e413f0^:.agent/memory.md`). Target:
   one conceptual deliverable + one gate, finishable AND committable within the ~200K aim (soft; the 1M window is headroom); prefer
   more, smaller units. PLAN-TIME obligations (a violation is a planning bug): resolve semantic decisions
