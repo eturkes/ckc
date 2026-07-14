@@ -263,13 +263,21 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   non-list to `[not_a_list]`. Diagnoses are a deduped (kind,value) set → drift must change a VALUE to trip.
 - Reject-battery template (M3.raw-gate-battery; profile-battery / conflict / court-differential mirror it):
   a `banked_hazard/1` CLOSED SET + `covers_every_banked_hazard` / `no_unbanked_class` meta-tests bind the mutant
-  matrix to it, so a missing hazard OR a typo'd class atom fails the gate (self-verifying coverage), plus ≥1
-  accept CONTROL proving the base is valid so each reject is the mutation's doing, not a broken base (anti-
-  vacuity). A battery's hazard set is NOT just the roadmap unit line — SURFACE.md §Modality assigned the
-  op-mismatch battery HERE though the line omitted it → read SURFACE.md for a battery unit's FULL hazard set.
-  Ran every hazard (no assumed construct, per the raw-gate partial-probe lesson): all 24 classes reject exactly
-  as the gate emits, confirming raw-gate's hardening closed the earlier dup-id/dangling gaps. Constructs are
-  code-derivable from raw_gate.pl (not banked). `raw_gate_battery_tests.pl` run_tests(raw_gate_battery) 48/48.
+  matrix to it (a missing hazard OR a typo'd class atom fails the gate). ANTI-VACUITY IS PER-MUTANT, not
+  sampled: give each mutant its EXACT accepted base + a `bases_accept` forall asserting base⇒ok — a shared
+  control only proves ITS base, so a gate regression breaking a mutant's UN-controlled base (a `year_noun(1)`
+  path, `code_list/1` support) hides behind the still-red mutant (codex-review a8b60a4). GROUND COVERAGE ON THE
+  GATE'S ACTUAL EMITTED CONSTRUCTS (an independent authority — enumerate them from the gate source), not the
+  self-referential banked list: covers/no_unbanked only prove matrix≡banked, so a Construct the gate emits but
+  nobody banked stays invisible → cross-check the banked set against the full reachable-Construct set + split
+  "exhaustive over the whole gate" from "systematic over a curated subset" honestly (a dead defensive branch
+  like raw_gate's `bad_structure`, unreachable because paragraphs//1 is total over scalar codes, is excluded
+  explicitly, not silently). Store the reject/3 tuple + wrap `reject([T])` in the test so a case can only
+  express a rejection. Prefer a registry-derived Cartesian (keyword×frame-op: all mismatches reject, all
+  matches = the accepted bases) over hand-picked samples. A battery's hazard set ≠ the roadmap unit line —
+  SURFACE.md §Modality assigned op-mismatch HERE though the line omitted it → read SURFACE.md for the FULL set.
+  Run every hazard (constructs OBSERVED, never assumed; the raw-gate partial-probe lesson); Constructs are
+  code-derivable from the gate, not banked.
 
 ## Runtime
 

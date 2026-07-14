@@ -11,7 +11,9 @@
 %   core rejects — one document per whitelist / framing / document-integrity hazard (unregistered
 %     lexeme, the p6 capitalised OOV, a `n:` prefix, or-guard, every, decimal, number-agreement
 %     mismatch, op-mismatch, bad keyword/certainty, duplicate field, bad input / doc-id, structural,
-%     CRLF, multi-line exception, duplicate rule/exception id, dangling exception ref). The EXHAUSTIVE
+%     CRLF, tab, whitespace, empty document, empty block, no-period, multi-line exception, duplicate
+%     rule/exception id, dangling exception ref) — with the battery, every reachable reject Construct
+%     (bad_structure is unreachable: paragraphs//1 is total over any scalar code list). The systematic
 %     per-hazard mutation matrix is the separate raw-gate-battery unit; here each reject is the sole
 %     diagnosis term.
 %
@@ -258,6 +260,11 @@ test(reject_no_period) :-
     raw_gate:gate_document(Doc, R),
     R = reject([reject(0, _, no_period)]).
 
+test(reject_whitespace) :-             % a period-terminated line with non-single spacing → whitespace
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a  sepsis then it is recommended that the patient takes Abx-A.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(0, '', whitespace)])).
+
 test(reject_no_document_header) :-
     Doc = 'rule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n',
     raw_gate:gate_document(Doc, R),
@@ -272,6 +279,11 @@ test(reject_carriage_return) :-
     Doc = 'document d\r\n\r\nrule 0 recommend\r\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\r\n',
     raw_gate:gate_document(Doc, R),
     assertion(R == reject([reject(-1, '', carriage_return)])).
+
+test(reject_tab) :-                    % a TAB is never valid v1 whitespace — fail closed before framing
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a\tsepsis then it is recommended that the patient takes Abx-A.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(-1, '', tab)])).
 
 test(reject_multi_line_exception) :-   % rule 0 present so the exc ref resolves — isolates the shape
     Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0\nA patient has a sepsis.\nA patient has a pregnancy.\n',
@@ -311,8 +323,8 @@ test(reject_bad_doc_id) :-
     assertion(R == reject([reject(-1, '', bad_document_header)])).
 
 % ---- totality: the gate never throws + always yields ok/reject (fail-closed) -------------------
-test(total_on_empty) :-
-    raw_gate:gate_document('', R), assertion(R = reject(_)).
+test(total_on_empty) :-                % totality on empty input + the exact empty_document diagnosis
+    raw_gate:gate_document('', R), assertion(R == reject([reject(-1, '', empty_document)])).
 test(total_on_garbage) :-
     raw_gate:gate_document('!@#$ not a document at all', R), assertion(R = reject(_)).
 
