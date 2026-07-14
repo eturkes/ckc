@@ -247,6 +247,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   BEFORE counting. A generic "invalid ⇒ validation fails" assertion would have MISSED it (another defect
   in the same example masks the silent one); the per-rule expected-functor assertion is what localizes a
   silently-passing rule → prove each rule FIRES with a minimal example that trips ONLY that rule.
+- plunit clean-gate + reject-mutant discipline (M3.ulex; the coming raw-gate-battery / profile-battery /
+  court-differential / conflict units author many mutant-list reject tests). CLEAN-GATE: a test body doing
+  list surgery with select/3 leaves a CHOICEPOINT → "Test succeeded with choicepoint" warning (test passes,
+  gate NOT clean) → use selectchk/3 (or once/1). Interleaving helper clauses between one predicate's clauses
+  → "Clauses of P/N not together" LOAD warning → keep a predicate's clauses CONTIGUOUS (helpers in a block
+  below) or `:- discontiguous`. LOCALIZED one-violation mutants (the kb-contract per-rule lesson applied to
+  a fact-LIST validator, registry_errors/2): ADDITIVE mutation (cons a bogus fact) isolates unknown/duplicate
+  without tripping coverage; SUBTRACTIVE (drop a fact) isolates uncovered; mutate a REDUNDANTLY-covered
+  target (recommend's field — `for` still covered by suggest) to isolate a field-vocab reject; assert
+  `Errors == [ExactTerm]` (stronger than kb_kernel's functor-only pin, since the arg localizes the sub-rule).
 
 ## Runtime
 
@@ -341,6 +351,19 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   (functor bytes first), deliberately NOT `sort/2`-over-terms (arity-first) — hand-pins lock it; a KB is
   a SET (`sort/2` dedups identical facts, intended); round-trip is total ONLY because the validator now
   rejects lone-surrogate text (else a valid KB fails to reparse).
+- ClinicalCNL ulex + registry (M3.ulex; AUTHORITY = clinical/registry.pl + SURFACE.md §L·ids — read,
+  skip re-deriving surfaces). registry.pl = the id↔surface bridge raw-gate + map-core consume:
+  reg_concept/reg_drug/reg_action/reg_quantity/reg_population/reg_guard_verb are BIDIRECTIONAL plain
+  relations (call either way); pn_allow/1 = the drug proper-name allowlist (the named() discriminator
+  that closes p6); the D1 decode = reg_keyword/4 (keyword→op/direction/strength — strength lives ONLY
+  here, APE can't express it) + reg_frame/2 (op→ACE frame phrase). Op tokens are ATOMS
+  should/may/'-should'/'-can' (negated ops quoted). registry_errors/2 + valid_registry/0 validate
+  coverage/unknown/dup/malformed vs kb_kernel's closed vocab (data-driven lexeme_family/4). clinical_ulex.pl
+  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 emitting ulextext byte-identical to the
+  frozen surface_cases:surface_ulex/1 oracle (write_term arg flags pinned per the kb-writer serializer
+  lesson). The gate binds registry↔clinical_ulex (set cross-check expected_ulex_entry == ulex_entry) +
+  clinical_ulex↔frozen oracle (byte pin), so no layer drifts. Gate run_tests([registry,ulex]): pure Prolog +
+  ONE APE smoke (frame_recommend parses clean under clinical_ulex's own bytes).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

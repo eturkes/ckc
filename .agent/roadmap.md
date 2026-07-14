@@ -231,16 +231,19 @@ Cross-unit decisions:
   10 tests: hand-authored byte-sorted normative bytes over all 4 valid examples (docA/docB/control/multi)
   + byte-sorted / round-trip / order-invariant / single-newline properties + rational/empty/singleton/
   non-list. 0 warn/err, no kb_kernel regression. 17% 166K/1M
-- [ ] ulex: `clinical/clinical_ulex.pl` mirroring §L·ids EXACTLY (cond.sepsis→noun_sg(sepsis,
-  sepsis,neutr); cond.renal_severe→noun_sg('severe-renal-impairment',…); cond.pregnancy→
-  noun_sg; drug.abx_a→pn_sg('Abx-A','Abx-A',neutr); act.administer→tv_finsg(takes,take)+
-  tv_infpl(take,take); q.age_years→noun_sg(age)+noun_sg(year)+noun_pl(years,year); patient→
-  noun_sg(patient,patient,human); have→tv_finsg(has,have)+tv_infpl(have,have); pop.adult/
-  pop.child = interval atoms, NO lexical entry) + bidirectional id↔surface registry
-  `clinical/registry.pl` (raw gate + mapper consume; holds the pn allowlist + D1 keyword
-  table) + integrity checker (dup/malformed/unknown-id/uncovered-concept rejects) + one-golden
-  APE parse smoke under ulextext = this file's bytes. Gate: plunit. Reads: SURFACE.md; ulex
-  entry templates banked (ulex.pl `lexicon_template/1`).
+- [x] ulex: `clinical/registry.pl` = id↔surface authority (raw-gate + map-core consume — read it,
+  skip re-deriving surfaces): bidirectional reg_concept/reg_drug/reg_action/reg_quantity/
+  reg_population/reg_guard_verb facts + pn_allow/1 (drug proper-name allowlist = the named()
+  discriminator) + D1 reg_keyword/4 (keyword→op/direction/strength) + reg_frame/2 (op→ACE frame
+  phrase) + reg_op/1 + reg_v1_direction/1 vocab; integrity checker registry_errors/2 +
+  valid_registry/0 (pure over a fact list; 4 classes uncovered/unknown_id/duplicate/malformed
+  cross-checked vs kb_kernel's closed vocab, data-driven lexeme_family/4). `clinical/clinical_ulex.pl`
+  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 (ulextext bytes byte-identical to
+  the frozen surface_cases:surface_ulex/1 oracle). pop.adult/pop.child carry NO lexical entry (age
+  interval). Gate `clinical/ulex_tests.pl` run_tests([registry,ulex]) GREEN 24/24 (accept +
+  per-rule sole-violation rejects + cardinality tripwire + byte-identity + registry↔ulex set
+  cross-check + one APE smoke: frame_recommend parses clean under the file's own bytes), 0 warn/err
+  loads. 23% 227K/1M
 - [ ] raw-gate: `clinical/raw_gate.pl` — DCG over raw document bytes: framing parse (blocks,
   ids, keywords, certainty, basis) + per-sentence registered-pattern token templates
   (registry-driven WHITELIST per the Fail-closed decision; capitalized token legal iff
