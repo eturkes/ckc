@@ -329,6 +329,18 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   KB.md carries the design calls downstream must honor (LP-lane NAF exceptions vs the SMT lane's
   in-context negation; population=subject with adult/child as an age interval; doc-qualified
   stmt/bind/exc ids for flat-KB collision safety; `source` completeness as a map-emit obligation).
+- ClinicalCNL KB writer (M3.kb-writer; AUTHORITY = `clinical/KB.md` §Canonical emission). Emitter
+  `kb_bytes/2`/`write_kb/2` in `clinical/kb_kernel.pl`; gate `clinical/kb_writer_tests.pl`
+  (`run_tests(kb_writer)`, 10 tests). Canonical bytes = one `write_term(F,[quoted(true),numbervars(false)])`
+  term per line + `.\n`, the LINE STRINGS `sort/2`-byte-sorted (functor-first, then args — NOT arity-first
+  standard-order-of-TERMS; the hand-authored byte-pins lock this distinction), single trailing newline;
+  side-effect-free (caller validates). Confirmed swipl 9.2.9 rendering (map-emit reuses it — skip
+  re-probe): rationals `NrD` (`1r2`), basis strings `"..."` (flag double_quotes=string), region lists
+  `[0,1]`, `none` bare, dotted/colon atoms quoted (`'test_source.…rule.0'`, `'act.administer:drug.abx_a'`);
+  every fact is a compound so lines end `).` (no float-vs-fullstop reparse hazard); output is a loadable
+  fact file (round-trips to the same fact set). Test blend: 2+ hand-sorted byte-pins as the format oracle
+  (validate the byte-sort algorithm) + sortedness/round-trip/order-invariance PROPERTIES over all
+  examples (cover the harder cases without fragile manual transcription).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

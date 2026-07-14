@@ -140,10 +140,29 @@ behind §15 `G-RULE-EVAL`. The conflict layer (`conflict-core`) builds SYMBOLIC 
 same atom + exception structure (DNF disjunct-pair enumeration × concept polarity × interval
 intersection × exception expansion); it never patient-evaluates.
 
+## Canonical emission (kb-writer)
+
+`kb_bytes(+Facts, -Bytes)` serializes a KB fact list to canonical bytes; `write_kb(+Stream, +Facts)`
+writes them to a stream. The form (SPEC §6 "emitted deterministically"; the byte-order sort mirrors
+the SMT lane's "declarations sorted by symbol bytes" and the canonical-JSON byte convention):
+
+- One fact per line, each the fact written as a QUOTED, re-readable Prolog term terminated by `.` then
+  a newline — a dedicated `write_term/3` with `quoted(true)`, never the bare `write`/`print` defaults
+  (whose spacing / operator rendering drift with ambient flags). Every fact is a compound
+  `functor(...)`, so a line always ends `).` — no float-vs-fullstop reparse ambiguity. Exact bounds
+  render `NrD` (`18`, `1r2`), never a float.
+- Lines byte-sorted (standard order over the emitted line strings = code order), so input order and
+  duplicate lines are irrelevant — a KB set has exactly one byte form. The whole ends in one newline.
+
+The output is itself a loadable Prolog fact file (round-trips: reparse → the same fact set). The
+writer is side-effect-free and does NOT validate — the caller runs `valid_kb/1`. `map-emit` byte-pins
+the emitter's output over whole documents.
+
 ## Validators, examples, gate
 
 - `clinical/kb_kernel.pl` — the vocabulary, `valid_id/2`, `action_key/3`, `valid_atom/1`, `kb_errors/2`,
-  `valid_kb/1`, `direction_group/2`, `derivable/3`. Loads warning-free; will be imported by `kb-writer`/`map-*`.
+  `valid_kb/1`, `direction_group/2`, `derivable/3`, and the kb-writer emitter `kb_bytes/2`/`write_kb/2`.
+  Loads warning-free; imported by `map-*`.
 - `clinical/goldens/kb_examples.pl` — `kb_example(Name, Validity, Facts)`: the §8.6 thread
   (`doc_a`/`doc_b`/`control`) + a multi-disjunct synthetic (`multi`, all four interval markers, optional
   certainty, document-continuous counters, two exceptions on one statement) as `valid`; one
@@ -153,5 +172,10 @@ intersection × exception expansion); it never patient-evaluates.
   expected violation functor) over every example, a catalog tripwire pinning the example counts, plus
   direct tests of the id grammar, action-key split/join, context atoms, direction groups, and the
   derivability open/closed boundaries + declared-disjunct guard.
+- `clinical/kb_writer_tests.pl` — the kb-writer gate: hand-authored byte-sorted normative bytes over
+  every `valid` example (a `writer_golden/2` per example, coverage-checked against the example set) +
+  the canonical-form properties over all of them (byte-sorted lines, faithful round-trip, input-order
+  invariance, single trailing newline) + focused rational / empty / singleton / non-list-error tests.
 
 Gate: `swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'`
+Writer gate: `swipl -q -g "consult('clinical/kb_writer_tests.pl'),(run_tests(kb_writer)->halt(0);halt(1))" -t 'halt(1)'`

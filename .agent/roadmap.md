@@ -223,11 +223,14 @@ Cross-unit decisions:
   `multi` synthetic) + one isolated-defect reject per validator rule (each pins its SOLE violation
   functor) + direct id-grammar / action-key / context-atom / direction-group / derivability-boundary
   tests. `kb-writer` byte-pins the `valid` set. 40% 402K/1M
-- [ ] kb-writer: canonical KB writer in `kb_kernel.pl` — define+commit the canonical clause
-  order (byte-sorted, §6 "Emission is deterministic"-consistent) + a dedicated deterministic
-  emitter (never bare write_term defaults) + byte-pinned writer tests (hand-written normative
-  bytes over kb-contract's examples; input-order shuffle → identical bytes). Gate: byte
-  plunit. Reads: kb-contract outputs only.
+- [x] kb-writer: canonical KB emitter `kb_bytes/2`+`write_kb/2` in `kb_kernel.pl` (AUTHORITY:
+  `clinical/KB.md` §Canonical emission) — one QUOTED re-readable term per line + `.`, lines BYTE-sorted
+  over the emitted line strings (functor bytes then args — DISTINCT from `sort/2`-over-terms' arity-first
+  order, which the hand-pins encode to catch), single trailing newline, exact bounds `NrD` not float;
+  side-effect-free (caller validates). Gate `clinical/kb_writer_tests.pl` (`run_tests(kb_writer)`) GREEN
+  10 tests: hand-authored byte-sorted normative bytes over all 4 valid examples (docA/docB/control/multi)
+  + byte-sorted / round-trip / order-invariant / single-newline properties + rational/empty/singleton/
+  non-list. 0 warn/err, no kb_kernel regression. 17% 166K/1M
 - [ ] ulex: `clinical/clinical_ulex.pl` mirroring §L·ids EXACTLY (cond.sepsis→noun_sg(sepsis,
   sepsis,neutr); cond.renal_severe→noun_sg('severe-renal-impairment',…); cond.pregnancy→
   noun_sg; drug.abx_a→pn_sg('Abx-A','Abx-A',neutr); act.administer→tv_finsg(takes,take)+

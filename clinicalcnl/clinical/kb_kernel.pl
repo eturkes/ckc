@@ -4,14 +4,16 @@
 % safety validators the plunit gate exercises, and the PROLEG negation-as-failure reference
 % derivability the conflict layer builds on.
 %
-% A "KB" here is a LIST of ground fact terms (never asserted): kb-writer emits such a list to
-% canonical bytes, map-* produce it, conflict-* consume it. Validation is side-effect-free.
+% A "KB" here is a LIST of ground fact terms (never asserted): kb-writer (kb_bytes/2, write_kb/2
+% below) emits such a list to canonical bytes, map-* produce it, conflict-* consume it. Validation
+% and emission are both side-effect-free.
 %
 %   Gate: swipl -q -g "consult('clinical/kb_kernel_tests.pl'),(run_tests(kb_kernel)->halt(0);halt(1))" -t 'halt(1)'
+%   Writer gate: swipl -q -g "consult('clinical/kb_writer_tests.pl'),(run_tests(kb_writer)->halt(0);halt(1))" -t 'halt(1)'
 %
 % Downstream (roadmap-pending, not yet in-tree): registry.pl (ulex) will mirror this vocabulary as
-% surfaces + cross-check coverage against kb_concept/1 etc.; kb-writer will byte-pin
-% goldens/kb_examples.pl; conflict-core will reuse the atom + exception structure for symbolic
+% surfaces + cross-check coverage against kb_concept/1 etc.; map-emit will byte-pin the emitter's
+% output over whole documents; conflict-core will reuse the atom + exception structure for symbolic
 % context overlap.
 
 :- module(kb_kernel,
@@ -22,6 +24,8 @@
             valid_id/2,            % ?Id, ?Kind        — Id is a well-formed <doc>.<kind>.<k> id
             action_key/3,          % ?Key, ?Kind, ?Target — split/join a <kind>:<target> action key
             valid_atom/1,          % ?Atom             — a well-formed context atom
+            kb_bytes/2,            % +Facts, -Bytes    — canonical byte serialization (byte-sorted)
+            write_kb/2,            % +Stream, +Facts   — write canonical bytes to a stream
             kb_concept/1, kb_action_kind/1, kb_action_target/1, kb_quantity/1,
             kb_population/1, kb_direction/1, kb_strength/1, kb_certainty/1
           ]).
@@ -366,3 +370,39 @@ satisfies_bound(V, B, closed, lower) :- V >= B.
 satisfies_bound(V, B, open,   lower) :- V >  B.
 satisfies_bound(V, B, closed, upper) :- V =< B.
 satisfies_bound(V, B, open,   upper) :- V <  B.
+
+% ==========================================================================================
+% Canonical emission (kb-writer). A KB fact list -> canonical bytes: one fact per line, each the
+% fact written as a QUOTED, re-readable Prolog term terminated by `.`, the lines byte-sorted so
+% input order and duplicate lines are irrelevant, the whole ending in a single newline. Determinism
+% is by construction — a dedicated write_term/3 with explicit options (never the bare write/print
+% defaults, whose spacing/quoting/operator rendering drift with ambient flags) plus a total byte
+% sort over the emitted line strings. SPEC §6: the LP program is "emitted deterministically"; the
+% byte-order sort mirrors the SMT lane's "declarations sorted by symbol bytes" and the canonical-JSON
+% byte convention. The output is itself a loadable Prolog fact file (round-trips to the same fact
+% set). map-emit byte-pins the emitter's output over whole documents.
+% ==========================================================================================
+
+%% kb_bytes(+Facts, -Bytes) is det.
+% Bytes (a string) is the canonical serialization of the KB fact list Facts. Emits any list of
+% ground fact terms; the caller validates (valid_kb/1) — the writer does NOT (separation of
+% concerns). Lines are byte-sorted and de-duplicated, so a KB set has exactly one byte form.
+kb_bytes(Facts, Bytes) :-
+    must_be(list, Facts),
+    maplist(fact_line, Facts, Lines),
+    sort(Lines, Sorted),                 % standard order over strings = code (byte) order
+    with_output_to(string(Bytes), maplist(write, Sorted)).
+
+% fact_line(+Fact, -Line): the fact as `<quoted-term>.\n`. write_term/3 options pinned explicitly —
+% quoted(true) keeps atoms/strings re-readable, numbervars(false) is inert here (facts are ground)
+% but fixes intent against flag drift. Every fact is a compound functor(...), so the line always
+% ends `).` — never a bare number before `.`, so no float-vs-fullstop ambiguity on reparse.
+fact_line(Fact, Line) :-
+    with_output_to(string(Body), write_term(Fact, [quoted(true), numbervars(false)])),
+    string_concat(Body, ".\n", Line).
+
+%% write_kb(+Stream, +Facts) is det.
+% Write the canonical bytes to Stream (map-emit's file sink).
+write_kb(Stream, Facts) :-
+    kb_bytes(Facts, Bytes),
+    write(Stream, Bytes).
