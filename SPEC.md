@@ -1284,7 +1284,9 @@ Build scope for M3 as rescoped (§0 product push; the roadmap carries the unit p
   connectives (and/or DNF); no pronouns, anaphora, ellipsis, or definite references.
   Unknown-word guessing is disabled: bare out-of-lexicon text is a parse error, never a guess.
   A profile checker over APE's parse output rejects anything outside the registered patterns,
-  naming the sentence and construct.
+  naming the sentence and construct. The authoritative v1 surface + framing spec (product seam,
+  frame/keyword tables, guard/interval/exception surfaces, byte-pinned goldens) is
+  `clinicalcnl/clinical/SURFACE.md`, replayed byte-exact by `clinical/surface_goldens.pl`.
 - Lexicon: APE function words + a demand-authored clinical ulex whose entry ids mirror the
   committed lexicon concept ids (IR-bridge alignment). Never a precomputed corpus-wide import;
   the vendored Clex (§11.5) is APE's general lexicon + a clinical-term mining seed, never bulk-

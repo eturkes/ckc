@@ -286,6 +286,23 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   assertion) rewired (`% CKC (2026-07-14):`) to the nested layout, source-relative (`prolog_load_context` +
   `atom_concat`; idempotent retractall+asserta) → the engine's `ape('...')` search path
   (generate_drs/tokenizer/ulex/drs_to_ascii/… sites) resolves from ANY cwd; loading it warning-free confirms the rewire.
+- ClinicalCNL v1 surface (M3.surface-goldens; AUTHORITY = `clinical/SURFACE.md`; goldens
+  `clinical/goldens/`; replayer `clinical/surface_goldens.pl` `run_seam/3`+`capture/0`; gate
+  `run_tests(surface_goldens)`). Canonical product seam = `get_ape_results([text=ACE, noclex=on,
+  ulextext=U, guess=off, solo=drs], CT, Content)`; CT=text/plain+serialized-DRS = parse, CT=text/xml
+  `<messages>` = reject. Golden byte format = `serialize_term` (numbervars A/B/…, ops `- ~ => v &`
+  UNDEFINED → functional `-(...)`/`=>(...)`, `quoted(true)`) → negation prints `-(drs([],[should(drs(...))]))`,
+  NOT operator `-drs`. CORRECTS §L·probe (SURFACE.md supersedes §L·probe for surface/seam facts): under the
+  seam (guess=off) capitalized OOV → text/xml REJECT (the `named('X')`+warning behaviour is guess=on /
+  raw-layer only) → the seam is fail-closed on OOV, registry membership is the discriminator (registered
+  `pn_sg` → `named()` zero-warning; unregistered capitalised → reject). Frames are FULL ACE not telegraphic:
+  `It is recommended that S`→should, `It is admissible that S`→may, `It is not recommended that S`→`-(…should…)`,
+  `It is not possible that S`→`-(…can…)` (possible→can / necessary→must parse but non-v1). Conditions need a
+  determiner `<ref> has a <cond>` (bare `has sepsis` rejects); negated `does not have a <cond>` → clean `-drs`
+  in guard. Intervals: at-least/geq + more-than/greater + bare/eq → top-level `object`; at-most/leq +
+  less-than/less + exactly → NESTED sublist `[predicate(be,…),object(…)]` (confirms D9). `surface_ulex/1`
+  freezes §L·ids surfaces → the `ulex` unit's canonical `clinical_ulex.pl` must match it; `thread_doc_a/b/control`
+  = corpus-lock's docA/docB/control surface reference.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
