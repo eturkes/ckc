@@ -1,8 +1,10 @@
-% ClinicalCNL ulex + registry gate (M3.ulex). Two blocks: `registry` accepts the live registry
-% and rejects one isolated defect per validator rule (each a sole, exactly-pinned violation);
-% `ulex` pins clinical_ulex's ulextext byte-identical to the frozen surface_cases oracle, proves
-% the entry set equals the registry surface projection (no drift), and runs a one-golden APE parse
-% smoke driving the file's own bytes to a clean v1 parse. Source-relative + cwd-independent.
+% ClinicalCNL ulex + registry gate (M3.ulex). Two blocks: `registry` accepts the live registry,
+% content-pins the D1 modality tables (no ulex-triangle backing — modality lives in the raw header),
+% and rejects one isolated defect per validator rule (each injected defect yields exactly its one
+% diagnosis; the error set is a deduped (kind, value) set); `ulex` pins clinical_ulex's ulextext
+% identical to the frozen surface_cases oracle (codepoint-exact; ASCII -> byte-exact), proves the
+% entry set equals the registry surface projection (no drift), and runs a one-golden APE parse smoke
+% driving the file's own bytes to a clean v1 parse. Source-relative + cwd-independent.
 %
 %   Gate: swipl -q -g "consult('clinical/ulex_tests.pl'),(run_tests([registry,ulex])->halt(0);halt(1))" -t 'halt(1)'
 
@@ -102,6 +104,12 @@ test(reject_duplicate_frame) :-
     registry_facts(Base),
     registry_errors([reg_frame(should, 'it is recommended that')|Base], Errors),
     assertion(Errors == [duplicate(frame, should)]).
+% frame_op — a frame phrase keyed by an op outside the closed op vocabulary (additive; the one
+% registry_violation clause that otherwise lacked a dedicated reject).
+test(reject_unknown_frame_op) :-
+    registry_facts(Base),
+    registry_errors([reg_frame(bogusop, 'it is bogus that')|Base], Errors),
+    assertion(Errors == [unknown_id(frame_op, bogusop)]).
 
 % ---- direct lookups (bidirectional + the pn allowlist + the D1 decode) -------------------------
 test(pn_allow_abx)     :- pn_allow('Abx-A').
@@ -112,7 +120,30 @@ test(keyword_decode)   :-
     assertion(Op == '-can'), assertion(Dir == contraindicate), assertion(Str == strong).
 test(frame_lookup)     :- reg_frame('-should', P), assertion(P == 'it is not recommended that').
 
-% ---- cardinality tripwire (guards vacuous passes + accidental deletion) ------------------------
+% ---- content pins: the D1 modality tables carry semantic tuples yet have no ulex-triangle backing
+% (modality rides the raw header, not the APE ulex), so freeze them here — a rename / strength flip
+% / phrase swap keeps cardinality but changes meaning, and must trip the gate. (reg_op /
+% reg_v1_direction follow from these + the checker; reg_guard_verb is pinned by the ulex cross-check;
+% so they need no separate freeze.) --------------------------------------------------------------
+test(keyword_table_frozen) :-
+    findall(kw(K, Op, Dir, Str), reg_keyword(K, Op, Dir, Str), Got),
+    Expected = [ kw(recommend,       should,    for,            strong),
+                 kw(suggest,         should,    for,            weak),
+                 kw('may-consider',  may,       permit,         weak),
+                 kw('not-recommend', '-should', against,        strong),
+                 kw('not-suggest',   '-should', against,        weak),
+                 kw(contraindicate,  '-can',    contraindicate, strong) ],
+    sort(Got, GotS), sort(Expected, ExpS), assertion(GotS == ExpS).
+test(frame_table_frozen) :-
+    findall(fr(Op, Ph), reg_frame(Op, Ph), Got),
+    Expected = [ fr(should,    'it is recommended that'),
+                 fr(may,       'it is admissible that'),
+                 fr('-should', 'it is not recommended that'),
+                 fr('-can',    'it is not possible that') ],
+    sort(Got, GotS), sort(Expected, ExpS), assertion(GotS == ExpS).
+
+% ---- cardinality tripwire (the D1 tables are content-pinned above; this guards the lexeme families
+% + closed vocabs against vacuous passes + accidental deletion) ----------------------------------
 test(registry_cardinalities) :-
     n_solutions(reg_concept(_, _),           NC), assertion(NC == 3),
     n_solutions(reg_drug(_, _),              ND), assertion(ND == 1),
@@ -120,8 +151,6 @@ test(registry_cardinalities) :-
     n_solutions(reg_quantity(_, _, _, _, _), NQ), assertion(NQ == 1),
     n_solutions(reg_population(_, _),        NP), assertion(NP == 1),
     n_solutions(reg_guard_verb(_, _, _),     NG), assertion(NG == 1),
-    n_solutions(reg_keyword(_, _, _, _),     NK), assertion(NK == 6),
-    n_solutions(reg_frame(_, _),             NF), assertion(NF == 4),
     n_solutions(reg_op(_),                   NO), assertion(NO == 4),
     n_solutions(reg_v1_direction(_),         NV), assertion(NV == 4).
 
@@ -130,7 +159,7 @@ test(registry_cardinalities) :-
 % ==========================================================================================
 :- begin_tests(ulex).
 
-% ulex_text is byte-identical to the frozen surface_cases oracle.
+% ulex_text is identical to the frozen surface_cases oracle (codepoint-exact; ASCII -> byte-exact).
 test(ulex_text_matches_frozen) :-
     clinical_ulex:ulex_text(Text), surface_cases:surface_ulex(Frozen),
     assertion(Text == Frozen).

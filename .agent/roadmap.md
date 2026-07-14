@@ -238,12 +238,13 @@ Cross-unit decisions:
   phrase) + reg_op/1 + reg_v1_direction/1 vocab; integrity checker registry_errors/2 +
   valid_registry/0 (pure over a fact list; 4 classes uncovered/unknown_id/duplicate/malformed
   cross-checked vs kb_kernel's closed vocab, data-driven lexeme_family/4). `clinical/clinical_ulex.pl`
-  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 (ulextext bytes byte-identical to
-  the frozen surface_cases:surface_ulex/1 oracle). pop.adult/pop.child carry NO lexical entry (age
-  interval). Gate `clinical/ulex_tests.pl` run_tests([registry,ulex]) GREEN 24/24 (accept +
-  per-rule sole-violation rejects + cardinality tripwire + byte-identity + registry↔ulex set
-  cross-check + one APE smoke: frame_recommend parses clean under the file's own bytes), 0 warn/err
-  loads. 23% 227K/1M
+  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 (ulextext text-identical, ASCII→byte,
+  to the frozen surface_cases:surface_ulex/1 oracle). pop.adult/pop.child carry NO lexical entry (age
+  interval). Gate `clinical/ulex_tests.pl` run_tests([registry,ulex]) GREEN 27/27 (accept + per-rule
+  sole-violation rejects + D1 keyword/frame content pins + cardinality tripwire + ulextext text-identity
+  + registry↔ulex set cross-check + one APE smoke: frame_recommend parses clean under the file's own
+  bytes), 0 warn/err loads. codex-review hardened registry_errors/2 sound over nonground/improper
+  input. 23% 227K/1M
 - [ ] raw-gate: `clinical/raw_gate.pl` — DCG over raw document bytes: framing parse (blocks,
   ids, keywords, certainty, basis) + per-sentence registered-pattern token templates
   (registry-driven WHITELIST per the Fail-closed decision; capitalized token legal iff

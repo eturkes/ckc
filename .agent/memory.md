@@ -257,6 +257,10 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   without tripping coverage; SUBTRACTIVE (drop a fact) isolates uncovered; mutate a REDUNDANTLY-covered
   target (recommend's field — `for` still covered by suggest) to isolate a field-vocab reject; assert
   `Errors == [ExactTerm]` (stronger than kb_kernel's functor-only pin, since the arg localizes the sub-rule).
+  SOUND over arbitrary input (codex-review 6fda58d): unifying member/memberchk read an unbound term as a
+  WILDCARD (a nonground fact spuriously covers/duplicates every id + suppresses its own uncovered) → judge
+  malformed over the RAW list, run coverage/unknown/dup over an `include(ground)` subset, fail-close a
+  non-list to `[not_a_list]`. Diagnoses are a deduped (kind,value) set → drift must change a VALUE to trip.
 
 ## Runtime
 
@@ -359,11 +363,15 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   here, APE can't express it) + reg_frame/2 (op→ACE frame phrase). Op tokens are ATOMS
   should/may/'-should'/'-can' (negated ops quoted). registry_errors/2 + valid_registry/0 validate
   coverage/unknown/dup/malformed vs kb_kernel's closed vocab (data-driven lexeme_family/4). clinical_ulex.pl
-  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 emitting ulextext byte-identical to the
-  frozen surface_cases:surface_ulex/1 oracle (write_term arg flags pinned per the kb-writer serializer
-  lesson). The gate binds registry↔clinical_ulex (set cross-check expected_ulex_entry == ulex_entry) +
-  clinical_ulex↔frozen oracle (byte pin), so no layer drifts. Gate run_tests([registry,ulex]): pure Prolog +
-  ONE APE smoke (frame_recommend parses clean under clinical_ulex's own bytes).
+  = 12 explicit APE ulex entries (frozen role order) + ulex_text/1 emitting ulextext codepoint-exact (v1 is
+  ASCII → byte-exact) to the frozen surface_cases:surface_ulex/1 oracle (write_term arg flags pinned per the
+  kb-writer serializer lesson). The gate binds registry↔clinical_ulex (set cross-check expected_ulex_entry ==
+  ulex_entry) + clinical_ulex↔frozen oracle (text pin), so the lexemes + their lemmas can't drift. But the D1
+  tables (reg_keyword/reg_frame) ride the RAW HEADER, NOT the ulex → NO triangle backing → content-pinned by
+  keyword_table_frozen/frame_table_frozen (codex-review 6fda58d); reg_op/reg_v1_direction follow from the
+  checker + those tables, reg_guard_verb from the ulex projection, so none needs a separate freeze. Gate
+  run_tests([registry,ulex]): pure Prolog + ONE APE smoke (frame_recommend parses clean under clinical_ulex's
+  own bytes).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

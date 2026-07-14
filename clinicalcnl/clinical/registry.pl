@@ -10,8 +10,11 @@
 %
 % Bidirectional by construction: each reg_* fact is a plain relation (reg_concept(Id, Word) yields
 % the word from the id and the id from the word). The integrity checker (registry_errors/2, pure
-% over a fact list) proves the registry covers the whole kb_kernel vocabulary, references no unknown
-% id, is duplicate-free, and is well-formed; valid_registry/0 runs it over the live facts.
+% over a fact list) proves the registry covers the five surface-bearing kb_kernel id families
+% (concept, action_kind, action_target, quantity, population) completely, references no unknown id,
+% is duplicate-free, and is well-formed; op / direction are registry-owned closed sets and strength
+% is range-checked, while kb_certainty and the require / avoid directions sit outside v1 surface
+% scope by design. valid_registry/0 runs it over the live facts.
 %
 %   Gate: swipl -q -g "consult('clinical/ulex_tests.pl'),(run_tests([registry,ulex])->halt(0);halt(1))" -t 'halt(1)'
 
@@ -109,8 +112,11 @@ reg_v1_direction(against).
 reg_v1_direction(contraindicate).
 
 % ==========================================================================================
-% Integrity checker. Pure over a registry-fact list; valid_registry/0 folds the live facts through
-% it. Four violation classes (each a distinct functor so a reject test localizes to one rule):
+% Integrity checker. A pure function of a registry-fact list; valid_registry/0 folds the live facts
+% through it. A non-list is itself a defect; malformed is judged over the raw facts, every other
+% class over their ground subset (a nonground fact is already malformed and must not unify-pollute
+% coverage or duplicate reasoning). Four classes (each a distinct functor so a reject test localizes
+% to one rule):
 %
 %   uncovered(Kind, Id)     — a kb_kernel vocabulary id (or v1 direction / op frame) has no surface.
 %   unknown_id(Kind, Id)    — a surface fact's id / keyword field is outside the closed vocabulary.
@@ -134,19 +140,23 @@ live_reg_fact(reg_frame(O, P))             :- reg_frame(O, P).
 %% valid_registry — the live registry is well-formed (no violations).
 valid_registry :- registry_facts(Facts), registry_errors(Facts, []).
 
-%% registry_errors(+Facts, -Errors) — the sorted, de-duplicated violation terms; [] iff well-formed.
+%% registry_errors(+Facts, -Errors) — the sorted, de-duplicated diagnosis terms ([] iff well-formed).
+% A diagnosis is per-(kind, value), so two defects sharing a value collapse to one. A non-list is
+% [not_a_list]. malformed is read off the raw facts; the coverage / unknown / duplicate classes run
+% over the ground subset, so a nonground fact (already malformed) cannot unify-pollute them.
 registry_errors(Facts, Errors) :-
-    findall(E, registry_violation(Facts, E), Es),
-    sort(Es, Errors).
+    (   is_list(Facts)
+    ->  include(ground, Facts, Ground),
+        findall(malformed(F), ( member(F, Facts), \+ well_formed_reg(F) ), Ms),
+        findall(V, registry_violation(Ground, V), Vs),
+        append(Ms, Vs, All),
+        sort(All, Errors)
+    ;   Errors = [not_a_list]
+    ).
 
-% registry_violation(+Facts, -Violation) — one violation per solution, grouped by class (malformed
-% / unknown_id / uncovered / duplicate). The helpers follow, after all the clauses.
-%
-% malformed — a reg fact whose args are not all atoms (a gross shape error). Atom-guarded elsewhere
-% so a non-atom id surfaces here only, never doubly as unknown.
-registry_violation(Facts, malformed(F)) :-
-    member(F, Facts),
-    \+ well_formed_reg(F).
+% registry_violation(+Facts, -Violation) — one violation per solution; registry_errors/2 passes the
+% ground subset here and emits malformed itself, so these clauses never meet a nonground fact. The
+% helpers follow, after all the clauses.
 % unknown_id / uncovered over the lexeme families (data-driven via lexeme_family/4).
 registry_violation(Facts, unknown_id(Kind, Id)) :-
     lexeme_family(Kind, Id, Skel, Vocab),
@@ -210,6 +220,10 @@ reg_id(Facts, I) :- member(reg_action(I, _, _, _), Facts).
 reg_id(Facts, I) :- member(reg_quantity(I, _, _, _, _), Facts).
 reg_id(Facts, I) :- member(reg_population(I, _), Facts).
 
+%% reg_surface_word(+Facts, -W) — every APE-visible surface form, for duplicate / collision checks.
+% The DRS-only lemma slots (reg_action Lemma, reg_quantity UnitLemma, reg_guard_verb Lemma) are out
+% by design: they are not surfaces, and their exact content is already pinned by the ulex cross-check
+% (ulex_tests); uniqueness over the mapper's inverse keys is map-core's concern.
 reg_surface_word(Facts, W) :- member(reg_concept(_, W), Facts).
 reg_surface_word(Facts, W) :- member(reg_drug(_, W), Facts).
 reg_surface_word(Facts, W) :- member(reg_action(_, W, _, _), Facts).

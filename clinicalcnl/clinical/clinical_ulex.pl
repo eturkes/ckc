@@ -1,10 +1,14 @@
 % ClinicalCNL v1 user lexicon — the APE ulex entries + their ulextext projection (M3.ulex; SPEC
-% §10.6, SURFACE.md). These are the ONLY content words the fail-closed seam admits under noclex=on:
-% the §L·ids surfaces, as APE lexicon templates (prolog/lexicon/ulex.pl lexicon_template/1).
+% §10.6, SURFACE.md). Under noclex=on these are the registered COMMON content words the seam admits
+% (the §L·ids surfaces, as APE lexicon templates — prolog/lexicon/ulex.pl lexicon_template/1). They
+% are not the whole fail-closed boundary: a capitalised OOV token still parses as named() with an
+% "Undefined word" warning (surface_case named_hole) — that p6 hole is closed downstream by the raw
+% gate's pn_allow whitelist and the profile's zero-message law, not by this lexicon.
 %
-% ulex_text/1 emits them as the canonical ulextext atom, byte-identical to the frozen oracle
-% surface_cases:surface_ulex/1 (pinned in ulex_tests). The entry SET is cross-checked against the
-% registry surfaces there too, so this APE-lexical layer and the semantic registry cannot drift.
+% ulex_text/1 emits them as the canonical ulextext atom, identical to the frozen oracle
+% surface_cases:surface_ulex/1 (pinned in ulex_tests; codepoint-exact, and v1 surfaces are ASCII so
+% byte-exact). The entry SET is cross-checked against the registry surfaces there too, so this
+% APE-lexical layer and the semantic registry cannot drift.
 % Entry order = the frozen role order (population, conditions, age nouns, drug pn, action verb,
 % guard verb); ulex_text preserves it. APE asserts entries order-independently, but the fixed order
 % keeps the emitted bytes deterministic.
@@ -29,7 +33,8 @@ ulex_entry(tv_infpl(have, have)).
 
 %% ulex_text(-Text:atom) is det.
 % The canonical ulextext: one `functor(arg, ...).` per ulex_entry/1, in declaration order, LF-joined
-% with no trailing LF. Byte-identical to the frozen surface_cases:surface_ulex/1 oracle.
+% with no trailing LF. Identical to the frozen surface_cases:surface_ulex/1 oracle (codepoint-exact;
+% v1 surfaces are ASCII, so byte-exact).
 ulex_text(Text) :-
     findall(Line, (ulex_entry(E), entry_line(E, Line)), Lines),
     atomic_list_concat(Lines, '\n', Text).
