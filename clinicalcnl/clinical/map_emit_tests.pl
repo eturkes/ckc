@@ -37,7 +37,7 @@ golden_drs(Id, Drs) :-
 
 % doc(+Name, -DocId, -Items) — a whole-document item list (raw sentence order): each item's DRS a
 % read-back surface golden, its Ctx the exact raw-gate block context (rule/5 | exception/4) raw_gate
-% would emit. docA carries its exception block (skipped by map-emit); multi's rule labels 5 then 2 are
+% would emit. docA carries its exception block (compiled to a NAF guard by map-emit); multi's labels 5, 2 are
 % non-dense and out of order (dense ordinals follow first appearance: 5 -> rule.0, 2 -> rule.1).
 doc(doc_b, 'test_source.m1_guideline_b',
     [item(0, rule(0, contraindicate, 0, none, "guideline B pregnancy contraindication"), Db)]) :-
@@ -68,16 +68,8 @@ doc(bridge, 'test_source.map_bridge',
      item(4, rule(1, recommend, 0, none, "rule B"), B0),
      item(5, exception(2, 1, none, "renal carve-out B"), Ec)]) :-
     golden_drs(thread_doc_a, A0), golden_drs(frame_recommend, A1),
-    golden_drs(exception_body, Ea), exc_body(pregnancy, Eb),
+    golden_drs(exception_body, Ea), golden_drs(exception_pregnancy, Eb),
     golden_drs(frame_recommend, B0), golden_drs(exception_body, Ec).
-
-% exc_body(+ConceptNoun, -Drs) — a bare-condition exception body DRS (D6) for a given registered concept
-% noun, matching the OBSERVED exception_body golden shape (population object + concept object wired by
-% have). Built via a clause so its referent vars stay fresh; varies the oracle's second exception.
-exc_body(Noun, drs([A, B, C],
-    [ object(A, patient, countable, na, eq, 1)-1/2,
-      object(B, Noun, countable, na, eq, 1)-1/5,
-      predicate(C, have, A, B)-1/3 ])).
 
 % doc_golden(+Name, -Lines) — the emitter's OBSERVED canonical bytes for doc(Name, ...), split into
 % per-fact lines in byte-sorted order (captured from a run, corroborated for docB / control by

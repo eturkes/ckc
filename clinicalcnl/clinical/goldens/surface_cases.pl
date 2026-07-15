@@ -77,8 +77,11 @@ surface_case(thread_control,      v1, 'If a patient has a sepsis and the patient
 
 % --- Exception body (D6): a bare, self-contained, single-concept, interval-free condition
 %     assertion (no modality frame; strength/direction come from the parent rule header). Parses
-%     to a bare object+predicate(have) DRS. This body is docA's exc.0 (severe-renal-impairment).
+%     to a bare object+predicate(have) DRS. exception_body is docA's exc.0 (severe-renal-impairment);
+%     exception_pregnancy is a second registered concept — the map-emit bridge oracle's distinct-body
+%     exception, pinning that each cloned exc.<k> carries its OWN body's concept, not a shared one.
 surface_case(exception_body,      v1, 'A patient has a severe-renal-impairment.').
+surface_case(exception_pregnancy, v1, 'A patient has a pregnancy.').
 
 % --- Named-word hole (p6): a capitalised OOV token in the drug slot PARSES to named('Widget')
 %     + an "Undefined word" warning even under guess=off (solo=drs drops the warning -> text/plain,

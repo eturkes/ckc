@@ -322,6 +322,14 @@ test(reject_bad_input_atom_list) :-
     raw_gate:gate_document([foo], R), assertion(R == reject([reject(-1, '', bad_input)])).
 test(reject_bad_input_out_of_range) :-
     raw_gate:gate_document([1114112], R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_surrogate_list) :-   % a lone surrogate in a code list — the scalar filter fails closed
+    raw_gate:gate_document([0'd, 55296], R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_surrogate_atom) :-   % ... and equally on an atom / string (EVERY shape scalar-filtered,
+    atom_codes(A, [0'd, 55296]),           %     so a surrogate never reaches a basis valid_kb/1 would reject)
+    raw_gate:gate_document(A, R), assertion(R == reject([reject(-1, '', bad_input)])).
+test(reject_bad_input_surrogate_string) :-
+    string_codes(S, [0'd, 55296]),
+    raw_gate:gate_document(S, R), assertion(R == reject([reject(-1, '', bad_input)])).
 test(reject_bad_doc_id) :-
     Doc = 'document a..b\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n',
     raw_gate:gate_document(Doc, R),

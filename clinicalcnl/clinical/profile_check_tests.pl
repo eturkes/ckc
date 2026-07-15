@@ -39,6 +39,7 @@ golden_ctx(thread_doc_a,        rule(0, recommend,       0, none, none)).
 golden_ctx(thread_doc_b,        rule(0, contraindicate,  0, none, none)).
 golden_ctx(thread_control,      rule(0, contraindicate,  0, none, none)).
 golden_ctx(exception_body,      exception(0, 0, none, none)).
+golden_ctx(exception_pregnancy, exception(1, 0, none, none)).
 golden_ctx(guard_neg,           rule(0, recommend,       0, none, none)).
 golden_ctx(iv_exactly,          rule(0, recommend,       0, none, none)).
 golden_ctx(iv_bare,             rule(0, recommend,       0, none, none)).

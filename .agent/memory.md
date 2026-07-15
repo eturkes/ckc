@@ -584,6 +584,19 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   only. GENERAL: the raw-gate's shared header/field DCG over-generalizes across block kinds — when the KB fact
   family has no slot for a surface field a shared production admits, fail-close that field at the gate for the
   block kinds that lack it, never let a downstream EXTRACTS-mapper silently drop it.
+  CODEX-REVIEW (58d0347 follow-up): SAME class one level down — input SHAPE not field. raw_gate:to_codes
+  scalar-filtered (code_list) ONLY the list branch; atom/string bypassed it → a surrogate-bearing atom/string
+  document parsed a lone-surrogate BASIS the emitter accepts but valid_kb/1 rejects (kb_kernel:scalar_text),
+  falsifying map-emit's kb_kernel-valid-by-construction claim → a multi-shape front-door normalizer applies its
+  scalar/wellformedness filter on EVERY branch, not one (fix: code_list after atom_codes/string_codes; +3
+  surrogate reject tests, atom/string/list parity). FIXTURE DISCIPLINE: map_emit_tests's exc_body/2 HAND-BUILT
+  the bridge pregnancy body → escaped BOTH the APE-observed read-back AND the profile accept battery → captured a
+  real exception_pregnancy surface golden (surface_cases +1, capture byte-idempotent) read back via golden_drs +
+  a profile golden_ctx, so it is APE-observed + profile-checked like every other fixture; distinct renal/pregnancy
+  concepts ALSO pin each cloned exc.<k> to its OWN body (a shared concept hides clone-misassignment). REJECTED:
+  map_blocks/clone_exceptions use append-last (recursion NOT last) rather than stmt_exceptions's build-before-tail
+  form — both are head-arg-folding-safe (the quirk bites only when recursion IS the last goal), no claim
+  overreached, left as-is (KISS; O(rules) stack frames trivial on clinical docs).
 - plunit determinism-gating (M3.map-emit codex-review; every future gate asserting a `det` export reuses it):
   gate the solution-count half with `single_solution(G) :- findall(t,G,S), S==[t].` — findall is ISOLATED from
   the caller's choicepoints, so it fails on a genuinely nondet goal in EVERY context (plain / assertion / forall

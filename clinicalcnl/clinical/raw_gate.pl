@@ -53,10 +53,15 @@ gate_document(In, Result) :-
     ;   Result = reject([reject(-1, '', bad_input)])
     ).
 
-% to_codes(+In, -Codes) — In is an atom, a string, or a proper, ground list of Unicode scalar
-% codes; fails (⇒ reject(bad_input)) on any other term so the gate is total and never throws.
-to_codes(In, Codes) :- atom(In),   !, atom_codes(In, Codes).
-to_codes(In, Codes) :- string(In), !, string_codes(In, Codes).
+% to_codes(+In, -Codes) — In is an atom, a string, or a proper, ground list of Unicode SCALAR codes;
+% converts to codes and requires every code be a scalar value (integer, in range, non-surrogate). Fails
+% (⇒ reject(bad_input)) on any other term — a non-atom/string/list, OR a surrogate-bearing atom/string/
+% list — so the gate is total, never throws, and never admits a basis the KB kernel would later reject
+% as a malformed lone surrogate (kb_kernel:scalar_text): EVERY input shape is scalar-filtered, not only
+% the list path (an atom/string carrying a surrogate would else parse into a basis the emitter accepts
+% but valid_kb/1 rejects, breaking map-emit's kb_kernel-valid-by-construction guarantee).
+to_codes(In, Codes) :- atom(In),   !, atom_codes(In, Codes),   code_list(Codes).
+to_codes(In, Codes) :- string(In), !, string_codes(In, Codes), code_list(Codes).
 to_codes(In, In)    :- code_list(In).
 
 % code_list(+L) — a proper, ground list whose every element is a Unicode scalar value (integer, in
