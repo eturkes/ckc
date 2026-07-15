@@ -68,10 +68,13 @@ test(marker_less_than) :-
     conditions(Facts, [interval('q.age_years', 18, open, upper)]).
 
 % --- Bounded age range: more than one well-wired interval component in a single guard (the profile
-%     admits it — user decision 2026-07-15). Pins the == sibling-isolation: same_ref_rel/same_ref_year
-%     match an interval's companion of-relation + year object by referent IDENTITY, so each interval
-%     takes ITS OWN bound. Were that a unifying walk, interval #2's fresh vars would bind through #1
-%     and both conditions would read 18/closed/lower. The DRS is a synthetic-but-shape-faithful
+%     admits it — user decision 2026-07-15). Pins the two referent-IDENTITY (==) companion matches,
+%     each with its OWN failure mode under a unifying walk: same_ref_rel binds interval #2's of-relation
+%     by AgeRef identity — unify instead and #2 binds through #1's relation, so both conditions read
+%     18/closed/lower (only this two-interval test catches that); same_ref_year binds the bounded year
+%     object by YearRef identity — unify instead and it aliases the first (population) object → eq →
+%     countop_bound fails → extraction collapses (zero conditions, base(1,0)), already caught by every
+%     single-interval marker/thread test. The DRS is a synthetic-but-shape-faithful
 %     profile-valid guard (geq top-level + less nested, D9) mirroring the memory-verified warning-free
 %     product-seam parse; a live-APE golden for the multi-interval case is surface-goldens' to make. ---
 

@@ -354,7 +354,7 @@ Cross-unit decisions:
   direction/strength off the keyword (`reg_keyword`; DRS op IGNORED); action key via
   reg_action/reg_drug+`action_key/3`. Disjuncts stmt-major `stmt.0..n` under `rule.RuleOrd` (D4);
   stmt/bind counters DOCUMENT-CONTINUOUS threaded via `base/2` (map-emit advances across blocks);
-  rule counter = raw block ordinal. Provenance = ONE source per rule (clause group):
+  rule counter = caller-supplied RuleOrd (map_rule copies; map-emit densifies to 0-based). Provenance = ONE source per rule (clause group):
   `source(rule.k, DocId, sorted-sentence-Regions, Basis string|none)` — NO stmt-level source
   (kb_examples's varying density = kernel-test fixture, not the map oracle); certainty optional
   (`none`=absent). Output kb_kernel-valid by construction; emit order free (kb_bytes sorts). Gate
@@ -365,13 +365,16 @@ Cross-unit decisions:
   region) + 6-keyword/4-frame table + action-lemma-uniqueness gate. All pure gates unregressed, 0
   warn/err loads; additive (2 new files, no sibling edits). 20% 199K/1M
 - [ ] map-emit: whole-document driver + canonical emission — group raw-gate sentences by rule
-  ordinal, thread `base(StmtIdx,BindIdx)` across rule-blocks (`drs_map:map_rule/6`, base-threaded —
+  label + enumerate rule blocks as DENSE 0-based ordinals (KB.md density; raw_gate checks rule-label
+  UNIQUENESS only, not density/order → keep a label→dense-ordinal map for exception `rule RuleK` refs,
+  pass each as `map_rule`'s RuleOrd), thread `base(StmtIdx,BindIdx)` across rule-blocks (`drs_map:map_rule/6`, base-threaded —
   it already assigns `stmt.k`/`bind.k`) + exception-blocks (map-exc), collect facts → kb-writer
   (`kb_bytes/2`/`write_kb/2`); byte-pins from OBSERVED emitter output over the thread docs;
   determinism gates (re-run identical; fact-SET emit-order invariant [kb_bytes sorts]; goldens
-  re-emit == pinned) — NOT input-permutation invariant: bind/rule ids are positional (map-core
-  assigns bind.k in surface order, rule.k = the block ordinal), so a guard-conjunct / rule-order
-  permutation is a DISTINCT accepted document by design; canonicalize only if ever required. Gate:
+  re-emit == pinned) — NOT input-permutation invariant: bind ids positional (map-core
+  assigns bind.k in surface anchor order), rule.k = the dense document ordinal map-emit assigns
+  (map_rule copies RuleOrd), so a guard-conjunct / rule-order permutation is a DISTINCT accepted
+  document by design; canonicalize only if ever required. Gate:
   byte plunit. Reads: drs_map.pl (map_rule/6) + kb_kernel (kb_bytes) + goldens.
 - [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
   on their rule's statements (exc.k stmt-major, document-continuous counters; D6

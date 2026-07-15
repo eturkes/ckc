@@ -10,8 +10,9 @@
 % and groups a rule's disjunct sentences (D4) statement-major under one rule id.
 %
 % Ids are document-continuous (KB.md): the stmt / bind counters thread through a base/2 term the
-% caller (map-emit) advances across rule + exception blocks; the rule counter is the raw block
-% ordinal. map_rule/6 maps one rule block; map-emit is the whole-document driver (counter threading,
+% caller (map-emit) advances across rule + exception blocks; the rule counter is the caller-supplied
+% RuleOrd (map_rule copies it — map-emit densifies it to a 0-based document ordinal, since raw_gate
+% checks rule-label uniqueness only, not density). map_rule/6 maps one rule block; map-emit is the whole-document driver (counter threading,
 % referent canonicalization, kb-writer bytes, determinism gate). Output = kb_kernel-valid TERMS; the
 % bytes are kb-writer's (map-emit) — a KB is a fact SET, so emit order is free (kb_bytes/2 sorts).
 %

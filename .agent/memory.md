@@ -501,7 +501,7 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   +Disjuncts, +base(StmtIdx,BindIdx), -Facts, -base(StmtIdx',BindIdx')) maps ONE rule block; Disjuncts =
   [disj(SentIdx,Drs),...] in disjunct order (D4) → one statement stmt.k each, stmt-major, bind counter
   DOCUMENT-CONTINUOUS across statements+rules (threaded via base/2 — the caller map-emit advances it across blocks;
-  the rule counter = the raw block ordinal, NOT continuous). ASSUMES profile-validity + EXTRACTS (no re-validation,
+  the rule counter is the caller-supplied RuleOrd — map_rule COPIES it, NOT base-threaded, and map-emit densifies it to a 0-based document ordinal per the map-emit SEAM). ASSUMES profile-validity + EXTRACTS (no re-validation,
   no reject path): inverts registry surfaces to ids (registry.pl bidirectional), reads D1 direction/strength off the
   keyword (reg_keyword; the DRS op is redundant, IGNORED), action key via reg_action/reg_drug + action_key/3,
   CountOp→(openness,dir) via countop_bound geq(closed,lower)/greater(open,lower)/leq(closed,upper)/less(open,upper).
@@ -525,10 +525,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   delegates map-core's inverse-key uniqueness → gate reg_action lemma dups]. SEAM TO map-emit: map_rule/6 IS the
   map-emit interface — map-emit is the whole-DOC driver (group raw-gate sentences by rule ordinal, thread base/2
   across rule-blocks via map_rule + exception-blocks via map-exc, collect facts, kb-writer bytes via kb_bytes/write_kb,
-  byte-pin + determinism-gate). DETERMINISM SEMANTICS (map-emit spec — codex-review corrected the roadmap gate):
-  idempotent re-run + emit-order-free (kb_bytes sorts the fact SET); bind/rule ids are POSITIONAL (surface /
-  block-ordinal) → a guard-conjunct or rule-order permutation is a DISTINCT accepted document, NOT byte-invariant
-  by design (map-core is surface-order); true input-permutation invariance would need explicit canonicalization, a
+  byte-pin + determinism-gate). map-emit OWNS rule-id DENSITY: enumerate rule blocks as DENSE 0-based
+  ordinals by physical order (KB.md: density is a map-emit property, NOT a kernel/raw reject) — do NOT forward the
+  raw label, since raw_gate checks rule-label UNIQUENESS only (a lone `rule 7` → rule.7); keep a raw-label→dense-ordinal
+  map so an exception's `rule RuleK` ref resolves. DETERMINISM SEMANTICS (map-emit spec — codex-review corrected the roadmap gate):
+  idempotent re-run + emit-order-free (kb_bytes sorts the fact SET); bind ids SURFACE-POSITIONAL (map-core, anchor
+  order), rule.k = the caller-supplied RuleOrd (map_rule copies; map-emit densifies) → a guard-conjunct permutation
+  swaps bind.k + a rule-order permutation reshuffles stmt/bind/region, so either is a DISTINCT accepted document, NOT
+  byte-invariant by design (map-core is surface-order); true input-permutation invariance would need explicit canonicalization, a
   separate decision NOT currently guaranteed. Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
 - SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
   body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
