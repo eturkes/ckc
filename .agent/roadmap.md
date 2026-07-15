@@ -313,9 +313,28 @@ Cross-unit decisions:
   every_construct_has_mutant → exhaustive over the gate's rejects; NO dead branch (bad_action_referent
   reachable when the used event arg is a guard referent). Gate run_tests(profile_battery) GREEN 79 = 3 meta
   + 38 bases_accept + 38 mutants_reject, each reject OBSERVED (dumped + eyeballed, never assumed); 0 warn/err,
-  8 clinical gates unregressed. Pure test-authoring, no profile_check.pl change — codex-930f954 accept-gaps
-  (top-level leq/less placement, >1 interval, non-interval-in-sublist, unconstrained of/have args) are
-  SHAPE-per-atom ACCEPTS → routed to map-core (canonical guard shape), documented in the file header. 24% 245K/1M
+  8 clinical gates unregressed. Pure test-authoring, no profile_check.pl change. CODEX-REVIEW OVERTURNED the
+  map-core deferral (below): per SPEC §10.6 profile_check must reject anything outside the registered patterns,
+  so the accept-gaps (top-level leq/less placement, >1 interval, non-interval-in-sublist, unconstrained
+  of/have + patient-only guard + patient-only/multi-concept exception) are profile_check's to reject → new
+  profile-structure unit; F3/F4 battery fixes fold there. 24% 245K/1M
+- [ ] profile-structure: expand `profile_check/4` from SHAPE-per-atom to a full STRUCTURAL whitelist
+  (codex-review of profile-battery; SPEC §10.6 "profile checker rejects anything outside the registered
+  patterns" — the deferral to map-core/map-exc was unsound: they are mappers, not fail-closed validators, and
+  the exception case violated profile_check's OWN "concept-have condition" header). Guard = exactly 1
+  population object + ≥1 WELL-WIRED component — concept {object(_,C,eq,1) + predicate(have,Pop,C)} or interval
+  {object(age) + object(year,CountOp,N) + relation(age,of,year) + predicate(have,Pop,age)} with D9 placement
+  (geq/greater top-level, leq/less nested) + correct of/have wiring; reject patient-only guard, top-level
+  leq/less, mis-wired of/have, non-interval atom in the interval sublist. Exception = exactly 1 concept + have
+  (reject patient-only, multi-concept, empty). REWORK battery: valid_patient_rule base is now invalid
+  (patient-only guard rejects) → give disjunction_conjunct/in_guard_negation a proper-guard base; add a mutant
+  per new reject; apply F3 (mutants_reject via `=@=` against fully-spelled reject terms, not wildcard
+  unification) + F4 (honest wording: one construct-locus + hygiene-forced coordination). OPEN REQUIREMENTS Q
+  (reaches user at planning): is a multi-interval / bounded-range guard (`age >=18 and age <65`, grammar-
+  reachable via guard_rest) VALID v1? LEAN yes → accept ≥1 well-wired interval component (so ">1 interval" is
+  NOT a reject, only mis-wired/mis-placed is); if no → reject >1. Sequence BEFORE map-core (which then assumes
+  structural validity). Gate: run_tests(profile_check + profile_battery) green + new structural mutants. Reads:
+  profile_check.pl + battery + SURFACE.md §Lexicon/Intervals/Exceptions + raw_gate.pl grammar.
 - [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
   via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
   one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via

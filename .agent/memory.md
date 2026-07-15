@@ -444,16 +444,19 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   unbound var (a singleton-variable warning is the tell). (b) serialize_term/1 GLOBALLY narrows the
   `- ~ => v &` operators (op(0,...), never restored) → order any serialize-using test LAST; functional
   read-back (=>(...), -(...)) + infix `-`/`/` are unaffected regardless.
-- CODEX-REVIEW (930f954) DEFERRED BACKLOG — profile-drs whitelist is SHAPE-per-atom, NOT
-  cardinality/placement. All items defense-in-depth (raw gate rejects the surface + APE won't emit
-  them from a v1 parse; each verified NON-golden-reachable via hand DRS probes). FIXED in-unit: F4
-  negative interval bound (guard_item now `integer(INT), INT >= 0` → reject(interval_bound); was
-  integer/1 only). OPEN for the owning units (profile-battery CLOSED its portion — it confirmed all four
-  are profile_check ACCEPTS not rejects, SHAPE-per-atom by design, so it banked no mutant and routed them
-  WHOLE to map-core): guard accepts >1 interval object + top-level `leq`/`less` + non-interval atoms inside
-  the interval sublist (D8/D9 canonical = `geq`/`greater` top-level, `leq`/`less` nested) + `of`/`have` args
-  unconstrained (of→named, have→any term) → map-core (canonical guard shape); D6 exception single-concept +
-  multi-concept guard → map-exc.
+- CODEX-REVIEW of profile-battery OVERTURNED the profile-drs SHAPE-per-atom deferral. The prior framing
+  (structure/cardinality routed to map-core/map-exc as defense-in-depth, "each NON-golden-reachable") was
+  WRONG on two counts: (a) SPEC §10.6 = the profile checker rejects ANYTHING outside the registered patterns
+  → structure IS profile_check's job (map-core/map-exc are mappers, not fail-closed validators; the exception
+  case even violated profile_check's own "concept-have" header by accepting a patient-only body); (b) ">1
+  interval object" is GOLDEN-REACHABLE, not blocked — raw_gate `guard_rest --> [and], !, conjunct(later)`
+  permits chained interval conjuncts + profile_check probes `ok` on two year objects. UNDER-REJECTIONS (ALL
+  probed `ok`): top-level leq/less, patient-only guard, patient-only exception, >1 interval,
+  non-interval-in-sublist, unconstrained of/have. → new profile-structure unit (roadmap) makes profile_check
+  a full structural whitelist BEFORE map-core; the one prior in-unit fix stands (F4-neg-bound: guard_item
+  `integer(INT), INT >= 0`). NOTE multi-concept guard is VALID v1 (≥1 component, accepted), not a reject — the
+  old "multi-concept guard → map-exc" routing was itself mis-classified. Open requirements Q at planning: is a
+  bounded multi-interval guard valid v1? (lean yes → accept well-wired ≥1 interval component, don't reject >1).
 - ClinicalCNL profile battery (M3.profile-battery; AUTHORITY = clinical/profile_check_battery_tests.pl — the
   DRS-side reject battery, the post-APE mirror of raw_gate_battery_tests.pl). Pure test-authoring, no
   profile_check.pl change; 38 hand-built DRS-term mutants (real referent vars, like the crafted escapes → the
@@ -462,10 +465,11 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   NEW REUSABLE HONEST-COVERAGE TECHNIQUE (conflict / court-differential / map batteries inherit it — stronger
   than raw-gate-battery's prose-asserted completeness): the independent construct authority = THE GATE SOURCE
   PARSED AS PROLOG TERMS. source_reject_constructs/1 opens the checker file, read_term-loops it, walks each
-  clause for reject(Arg) subterms, keeps ground/atom args (comments + reject(Var) control-flow guards
-  auto-excluded) → a construct set from the SOURCE not the banked list; constructs_match_source asserts
-  banked==source, every_construct_has_mutant asserts each is covered → a future gate reject with no mutant fails
-  a self-check. MUTANT-CONSTRUCTION GOTCHAS (map-* batteries reuse — is_wellformed/1 runs BEFORE the shape
+  clause for reject(Arg) subterms, keeps NONVARIABLE args (comments + reject(Var) control-flow guards
+  auto-excluded — but a real future `reject(BoundVar)` emission would be missed by scanner AND bank alike, so
+  the self-check is not total) → a construct set from the SOURCE not the banked list; constructs_match_source
+  asserts banked==source, every_construct_has_mutant asserts each covered → a future reject with a LITERAL
+  construct fails the self-check if unbanked (codex-review F5: was mis-stated "ground/atom args"). MUTANT-CONSTRUCTION GOTCHAS (map-* batteries reuse — is_wellformed/1 runs BEFORE the shape
   checks, so a shape mutant MUST stay wellformed): a bare-atom action target (foo) fails is_argument →
   reject(not_wellformed) NOT bad_action_target → use int(5) (a valid non-named arg); a named(compound) is caught
   by the earlier named scan → unregistered_named NOT bad_action_target; a top-declared referent used only inside
@@ -475,6 +479,13 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   verify a seemingly-dead is_wellformed-gated reject BY CONSTRUCTION, never declare it dead from a shallow
   argument. OBSERVED-REJECT DISCIPLINE: dump every mutant's ACTUAL profile_check result and eyeball (swipl -g
   forall over battery_case) before trusting green — confirms none rejects on an earlier check than intended.
+  CODEX-REVIEW caveats (fold into profile-structure): (F3) mutants_reject used `Result = Reject` UNIFICATION
+  with wildcard payloads → a fabricated `guard_shape(v(foo,bar))` satisfies the pin `guard_shape(v(_,_))`;
+  echo-payload mutants (guard_shape/nested_sublist/exception_shape) never assert the offending subterm or
+  provenance → switch to `=@=` (variant) against a fully-spelled reject term (referent-var identity stays
+  free). (F4) "single-locus edit" overstates — mut_no_population/two_population/action_referent/
+  exception_interval make hygiene-FORCED coordinated multi-field edits; anti-vacuity (base⇒ok, mutant⇒reject)
+  is sound, only the minimality wording → "one construct-locus, coordinated where wellformedness requires".
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
