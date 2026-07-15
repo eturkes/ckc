@@ -344,18 +344,30 @@ Cross-unit decisions:
   sole-leftover have vs extra/duplicate), year countable/na pinned everywhere, provenance SID=1 (bad_provenance);
   +ground_rejects_exercised coverage past functor granularity + honest doc; battery → 23 constructs / 115 GREEN,
   all 8 gates unregressed; +Prolog term-walk-var false-positive lesson (nonvar+integer guard).
-- [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
-  via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
-  one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via
-  registry; direction/strength via D1 (keyword+op); certainty; provenance {doc id, raw
-  sentence idx} per clause group. Output = kb_kernel-validated TERMS (bytes = map-emit). Gate:
-  plunit hand-oracled terms over the thread rules + 4 interval markers + a 2-disjunct rule.
-  Seam: [concepts/action/modality] | [intervals + disjunct grouping]. Reads: kb_kernel.pl +
-  registry.pl + goldens.
-- [ ] map-emit: whole-document canonical emission — map-core terms → kb-writer; referent
-  canonicalization → `stmt.k`/`bind.k`; byte-pins from OBSERVED emitter output over the thread
-  docs; determinism gates (re-run identical; guard-conjunct/DRS-input reorder identical;
-  goldens re-emit == pinned). Gate: byte plunit.
+- [x] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms (AUTHORITY: interface +
+  extraction rules + provenance policy — read it, skip re-deriving). `map_rule(DocId,
+  rule_header(RuleOrd,Keyword,Cert,Basis), Disjuncts=[disj(SentIdx,Drs)], base(StmtIdx,BindIdx)0,
+  Facts, Base1)` maps ONE rule block; ASSUMES profile-validity + EXTRACTS (no reject path). Guard
+  walk: flatten_intervals lifts the leq/less one-level sublist (D9) → anchor-object surface order →
+  concept/age objects emit `condition(bind.k,…)`; interval companions matched by referent IDENTITY
+  (`==`, not a unify filter → bounded-range safe). CountOp→(openness,dir) `countop_bound`; D1
+  direction/strength off the keyword (`reg_keyword`; DRS op IGNORED); action key via
+  reg_action/reg_drug+`action_key/3`. Disjuncts stmt-major `stmt.0..n` under `rule.RuleOrd` (D4);
+  stmt/bind counters DOCUMENT-CONTINUOUS threaded via `base/2` (map-emit advances across blocks);
+  rule counter = raw block ordinal. Provenance = ONE source per rule (clause group):
+  `source(rule.k, DocId, sorted-sentence-Regions, Basis string|none)` — NO stmt-level source
+  (kb_examples's varying density = kernel-test fixture, not the map oracle); certainty optional
+  (`none`=absent). Output kb_kernel-valid by construction; emit order free (kb_bytes sorts). Gate
+  run_tests(drs_map) 8 GREEN via read-back goldens (read_term_from_atom, profile-drs pattern, no
+  live APE): 4 markers (CountOp→bound) + 3 threads (docA exc-free/docB/control full sets, valid_kb)
+  + 2-disjunct rule (grouping + Base==base(2,3) + certainty). All pure gates unregressed, 0 warn/err
+  loads; additive (2 new files, no sibling edits). 20% 199K/1M
+- [ ] map-emit: whole-document driver + canonical emission — group raw-gate sentences by rule
+  ordinal, thread `base(StmtIdx,BindIdx)` across rule-blocks (`drs_map:map_rule/6`, base-threaded —
+  it already assigns `stmt.k`/`bind.k`) + exception-blocks (map-exc), collect facts → kb-writer
+  (`kb_bytes/2`/`write_kb/2`); byte-pins from OBSERVED emitter output over the thread docs;
+  determinism gates (re-run identical; guard-conjunct/DRS-input reorder identical; goldens re-emit
+  == pinned). Gate: byte plunit. Reads: drs_map.pl (map_rule/6) + kb_kernel (kb_bytes) + goldens.
 - [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
   on their rule's statements (exc.k stmt-major, document-continuous counters; D6
   self-contained bodies; clause region_ids = own block's basis verbatim) + bridge-oracle

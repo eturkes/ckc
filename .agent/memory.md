@@ -496,6 +496,32 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   bad_action_referent LOOKS is_wellformed-dead yet IS reachable when the used event arg is a GUARD referent
   (accessible → wellformed) → verify a seemingly-dead reject BY CONSTRUCTION. OBSERVED-REJECT DISCIPLINE: dump
   every mutant's ACTUAL profile_check result and eyeball (swipl -g forall over battery_case) before trusting green.
+- ClinicalCNL DRS→KB mapper (M3.map-core; AUTHORITY = clinical/drs_map.pl — the exception-free DRS→KB term
+  stage after profile_check, pure Prolog no live APE). map_rule(+DocId, +rule_header(RuleOrd,Keyword,Cert,Basis),
+  +Disjuncts, +base(StmtIdx,BindIdx), -Facts, -base(StmtIdx',BindIdx')) maps ONE rule block; Disjuncts =
+  [disj(SentIdx,Drs),...] in disjunct order (D4) → one statement stmt.k each, stmt-major, bind counter
+  DOCUMENT-CONTINUOUS across statements+rules (threaded via base/2 — the caller map-emit advances it across blocks;
+  the rule counter = the raw block ordinal, NOT continuous). ASSUMES profile-validity + EXTRACTS (no re-validation,
+  no reject path): inverts registry surfaces to ids (registry.pl bidirectional), reads D1 direction/strength off the
+  keyword (reg_keyword; the DRS op is redundant, IGNORED), action key via reg_action/reg_drug + action_key/3,
+  CountOp→(openness,dir) via countop_bound geq(closed,lower)/greater(open,lower)/leq(closed,upper)/less(open,upper).
+  Guard walk: flatten_intervals lifts the one-level leq/less sublist (D9) inline → anchor-object surface order → each
+  concept/age OBJECT emits condition(bind.k,stmt,atom); population/year objects + of-relations + have predicates are
+  NON-anchors (skipped, guard_atom fails on them). Interval companions (relation + year object) matched by referent
+  IDENTITY (== after structural unify, like profile_check's select_rel) NOT a bound-var member/unify filter — the
+  latter binds through a SECOND interval's fresh vars (the bounded-range term-walk false-positive). DESIGN DECISIONS:
+  (1) provenance = ONE source per rule (clause group): source(rule.k, DocId, Regions, Basis), Regions = the sorted
+  disjunct sentence indices, Basis = the rule basis (string|none) — NO stmt-level source (kb_examples's VARYING
+  provenance density, incl. docA's stmt.0 source, is a KERNEL-test fixture, NOT the map oracle; map-emit will define
+  canonical bytes from the actual mapper). (2) certainty optional — the atom `none` (raw Cert/Basis default) =
+  absent. Output is kb_kernel-valid BY CONSTRUCTION (per-rule + whole-doc); emit order FREE (kb_bytes sorts) → the
+  gate compares msort-SETS + asserts valid_kb. Gate clinical/drs_map_tests.pl run_tests(drs_map) 8 GREEN via the
+  read-back-golden pattern (surface_expected through read_term_from_atom, profile-drs's technique, no ape.exe): 4
+  markers (each CountOp→bound) + 3 threads (docA exception-free/docB/control, full fact set + valid_kb) + a 2-disjunct
+  rule (D4 grouping + Base==base(2,3) counter threading + optional certainty). SEAM TO map-emit: map_rule/6 IS the
+  map-emit interface — map-emit is the whole-DOC driver (group raw-gate sentences by rule ordinal, thread base/2
+  across rule-blocks via map_rule + exception-blocks via map-exc, collect facts, kb-writer bytes via kb_bytes/write_kb,
+  byte-pin + determinism-gate). Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
 - SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
   body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
   that embeds the just-bound Sub → SWI folds the construction into the clause head and DROPS the `Sub = Term`
