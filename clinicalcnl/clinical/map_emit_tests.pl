@@ -5,10 +5,15 @@
 % block SKIPPED — map-exc compiles exceptions) plus a synthetic two-rule / two-disjunct / non-dense
 % and out-of-order-label document (dense-ordinal assignment + document-continuous base threading).
 % Each mapped KB is asserted kb_kernel-valid; docB / control are cross-checked against the normative
-% kb_examples (rule-only match); determinism is gated (re-run identical; fact-set emit order
-% irrelevant). NOT input-permutation invariant (KB.md / map-core): rule-block order is surface-
-% positional by design, so swapping two blocks reassigns rule.<Ord> and moves bytes — block_order_
-% positional pins that.
+% kb_examples (rule-only match). Determinism is gated two ways: each export yields exactly ONE
+% solution (single_solution/1 — findall-based, robust under plunit's body control-wrapping, where a
+% deterministic/1 probe misreports an ancestor choicepoint) and re-emits byte-identically, the fact
+% set emit-order-free. Grouping / counters are exercised past the easy cases: disjuncts group across
+% NON-adjacent items and sort by DisjIdx (interleaved + reversed fixture); a middle exception block is
+% base/2-transparent (rule -> exception -> rule == the exception-removed items); the empty document is
+% total. NOT input-permutation invariant (KB.md / map-core): rule-block order is surface-positional,
+% so per appearance order the same raw label owns a different rule.<Ord> (block_order_positional pins
+% the ordinals + directions, not just a byte inequality).
 %
 %   Gate: swipl -q -g "consult('clinical/map_emit_tests.pl'),(run_tests(map_emit)->halt(0);halt(1))" -t 'halt(1)'
 
@@ -119,6 +124,13 @@ same_kb(Facts, Expected) :- msort(Facts, M), msort(Expected, M).
 
 rotate1([H|T], R) :- append(T, [H], R).
 
+% single_solution(:Goal) — Goal has exactly one solution. findall collects every solution isolated
+% from any enclosing choicepoint, so this gates the solution-count half of `is det` robustly where a
+% deterministic/1 probe would misreport (plunit wraps a test body in catch/->, whose choicepoint the
+% probe observes). A residual choicepoint on the unique solution is a separate purity property the
+% code is free of but plunit cannot robustly gate, so it is verified out-of-band, not claimed here.
+single_solution(Goal) :- findall(t, Goal, Sols), Sols == [t].
+
 % multi_oracle(-Facts) — the synthetic multi document's KB, hand-authored logically grouped (the
 % byte-pin is byte-sorted, this reads as rule.0's two disjuncts then rule.1) — a reviewable,
 % independent oracle for the grouping / dense-ordinal / document-continuous-counter logic.
@@ -156,11 +168,13 @@ test(bytes_pinned, [forall(doc_golden(Name, Lines))]) :-
     ;  format(user_error, "map_emit: ~w bytes mismatch~n got:~n~w~nexpected:~n~w~n",
               [Name, Bytes, Expected]), fail ).
 
-% Every doc carries a golden and every golden a doc — nothing silently unpinned.
+% Every doc carries a golden and every golden a doc, with no duplicate doc name (a duplicate would
+% sort-merge and leave a variant silently unpinned) — nothing silently unpinned.
 test(golden_coverage) :-
     findall(N, doc(N, _, _),        Ds), sort(Ds, DS),
     findall(N, doc_golden(N, _),    Gs), sort(Gs, GS),
-    assertion(DS == GS).
+    assertion(DS == GS),
+    length(Ds, ND), length(DS, NDS), assertion(ND == NDS).
 
 % ---- each mapped whole-document KB is kb_kernel-valid by construction ----------------------------
 test(all_valid, [forall(doc(_, DocId, Items))]) :-
@@ -221,8 +235,68 @@ test(block_order_positional) :-
           item(1, rule(1, contraindicate, 0, none, none), Fp1)],
     BA = [item(0, rule(1, contraindicate, 0, none, none), Fp2),
           item(1, rule(0, recommend, 0, none, none), Fr2)],
+    % dense ordinals follow appearance: the same raw label owns a DIFFERENT rule.<Ord> per order
+    assertion(rule_ordinals(AB, [0-0, 1-1])),
+    assertion(rule_ordinals(BA, [1-0, 0-1])),
     map_document('t.ord', AB, Fab), assertion(valid_kb(Fab)), kb_bytes(Fab, Bab),
     map_document('t.ord', BA, Fba), assertion(valid_kb(Fba)), kb_bytes(Fba, Bba),
+    % rule.0 = the first-appearing block: recommend (-> for) in AB, contraindicate in BA — the real
+    % signature of positional assignment (the byte inequality alone also follows from moved regions)
+    assertion(member(direction('t.ord.rule.0', for), Fab)),
+    assertion(member(direction('t.ord.rule.0', contraindicate), Fba)),
     assertion(Bab \== Bba).
+
+% ---- each export yields exactly one solution on every fixture (the solution-count half of the
+%      doc-comment `is det`; see single_solution/1 for why findall, not deterministic/1) -----------
+test(exports_single_solution, [forall(doc(_, DocId, Items))]) :-
+    single_solution(rule_ordinals(Items, _)),
+    single_solution(map_document(DocId, Items, _)),
+    single_solution(document_bytes(DocId, Items, _)).
+
+% ---- the empty document (SURFACE `{ block }` / raw_gate admit ok(doc(Id, []))) is total + det: no
+%      blocks, no facts, empty canonical bytes --------------------------------------------------
+test(empty_document) :-
+    assertion(rule_ordinals([], [])),
+    map_document('t.empty', [], Facts),   assertion(Facts == []),
+    document_bytes('t.empty', [], Bytes), assertion(Bytes == ""),
+    single_solution(rule_ordinals([], _)),
+    single_solution(map_document('t.empty', [], _)),
+    single_solution(document_bytes('t.empty', [], _)).
+
+% ---- rule -> exception -> rule: the middle exception block consumes NO base/2 counter, so the
+%      trailing rule's stmt / bind ids are exactly as if the exception item were absent (map-exc owns
+%      exceptions; map-emit threads counters through rule blocks only) ------------------------------
+test(exception_counter_transparent) :-
+    golden_drs(thread_doc_a, R0a), golden_drs(exception_body, Ex), golden_drs(frame_recommend, R1a),
+    WithExc = [item(0, rule(0, recommend, 0, none, "r0"), R0a),
+               item(1, exception(0, 0, none, "carve-out"), Ex),
+               item(2, rule(1, recommend, 0, none, "r1"), R1a)],
+    golden_drs(thread_doc_a, R0b), golden_drs(frame_recommend, R1b),
+    NoExc =   [item(0, rule(0, recommend, 0, none, "r0"), R0b),
+               item(2, rule(1, recommend, 0, none, "r1"), R1b)],
+    map_document('t.xc', WithExc, FWith),
+    map_document('t.xc', NoExc,   FNo),
+    assertion(\+ member(exception(_, _, _), FWith)),
+    assertion(same_kb(FWith, FNo)),
+    assertion(valid_kb(FWith)).
+
+% ---- disjuncts group across NON-adjacent items and sort by DisjIdx, not appearance: rule 5's disj1
+%      (@sent 0, sepsis only) and disj0 (@sent 2, sepsis + age interval) are interleaved by rule 2 and
+%      given in reversed DisjIdx order — keysort maps stmt.0 <- disj0 (interval) and stmt.1 <- disj1 -
+test(disjunct_grouping_keysort) :-
+    golden_drs(frame_recommend, Disj1),
+    golden_drs(frame_admissible, R2),
+    golden_drs(thread_doc_a, Disj0),
+    Items = [item(0, rule(5, recommend, 1, moderate, "ks"), Disj1),
+             item(1, rule(2, recommend, 0, none, "ks2"),    R2),
+             item(2, rule(5, recommend, 0, moderate, "ks"), Disj0)],
+    map_document('t.ks', Items, Facts),
+    assertion(valid_kb(Facts)),
+    assertion(member(condition(_, 't.ks.stmt.0', interval(_, _, _, _)), Facts)),
+    assertion(\+ member(condition(_, 't.ks.stmt.1', interval(_, _, _, _)), Facts)),
+    assertion(member(rule('t.ks.rule.0', 't.ks.stmt.0'), Facts)),
+    assertion(member(rule('t.ks.rule.0', 't.ks.stmt.1'), Facts)),
+    assertion(member(rule('t.ks.rule.1', 't.ks.stmt.2'), Facts)),
+    assertion(member(source('t.ks.rule.0', _, [0, 2], _), Facts)).
 
 :- end_tests(map_emit).

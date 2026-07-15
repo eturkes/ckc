@@ -538,13 +538,32 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   reject — raw_gate checks label UNIQUENESS only, so a lone `rule 7` → rule.0). NOT input-permutation invariant
   (KB.md/map-core): bind ids surface-positional + rule.<Ord> follows appearance, so swapping two rule blocks reassigns
   rule ids + moves bytes (true permutation-invariance would need explicit canonicalization, deferred). Gate
-  clinical/map_emit_tests.pl run_tests(map_emit) 22 GREEN via the read-back-golden pattern (no ape.exe): 4 OBSERVED
+  clinical/map_emit_tests.pl run_tests(map_emit) GREEN via the read-back-golden pattern (no ape.exe): 4 OBSERVED
   byte-pins (docB/control + docA-rule-only [exception SKIPPED] + a synthetic 2-rule/2-disjunct/non-dense-out-of-order-
   label multi) reusing kb_writer's golden_bytes framing (join lines by \n + one trailing \n → string) + all_valid +
   docB/control facts == the normative kb_examples (rule-only) + multi grouped-oracle + rule_ordinals (5→0/2→1
   appearance, lone-7→0) + exception_skipped + rerun-deterministic + emit-order-invariant + block_order_positional.
   docB/control map-emit bytes are byte-IDENTICAL to kb_writer's independent goldens (same rule-only fact sets) —
-  cross-module corroboration of the observed pins. Additive: 2 new files, all 9 sibling gates unregressed, 0 warn/err.
+  cross-module corroboration of the observed pins. CODEX-REVIEW (b8db484 follow-up, GATE-ONLY — map_emit.pl
+  UNCHANGED; the exports verified genuinely det via the validated harness): +single_solution det gate (the
+  solution-count half of `is det`; see the plunit determinism-gating lesson) + empty-document totality
+  (rule_ordinals([],[]) / map_document→[] / bytes "") + exception_counter_transparent (rule→exc→rule facts ==
+  the exc-removed items → the middle exception is base/2-transparent) + disjunct_grouping_keysort (interleaved +
+  DisjIdx-reversed → stmt.0←disj0 by keysort, not appearance) + block_order_positional strengthened to pin the
+  exact ordinals + direction(rule.0) (the byte inequality alone also follows from moved provenance regions) +
+  golden_coverage no-duplicate-doc-name. Additive: 2 new files, all 9 sibling gates unregressed, 0 warn/err.
+- plunit determinism-gating (M3.map-emit codex-review; every future gate asserting a `det` export reuses it):
+  gate the solution-count half with `single_solution(G) :- findall(t,G,S), S==[t].` — findall is ISOLATED from
+  the caller's choicepoints, so it fails on a genuinely nondet goal in EVERY context (plain / assertion / forall
+  / test body). Both tempting alternatives give FALSE PASSES inside plunit: `call(G), deterministic(D)` reports
+  the ENCLOSING catch/->/*-> choicepoint plunit wraps every test body in (→ D=true on a nondet G); `call_cleanup(
+  G, D=true), D==true` BACKTRACKS into G's leftover choicepoint when `D==true` fails and self-satisfies. A
+  residual choicepoint on a UNIQUE solution (semidet-with-cp) is NOT robustly gateable in plunit → verify it
+  OUT-OF-BAND via `call(G), deterministic(D)` in a clause with NO enclosing `->`. MEASUREMENT-HARNESS RULE
+  (general, cost me two wrong harnesses): a determinism/choicepoint probe is itself fallible code → validate it
+  on known-answer CONTROLS (`true`→det; `member/2`→2 solutions/nondet) before trusting its verdict on the SUT —
+  an if-then-else around the `deterministic/1` call silently contaminates it, and `call(G)` binding a shared goal
+  term contaminates a later solution-count; only the controls exposed both.
 - SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
   body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
   that embeds the just-bound Sub → SWI folds the construction into the clause head and DROPS the `Sub = Term`
