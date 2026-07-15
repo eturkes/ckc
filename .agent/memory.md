@@ -424,15 +424,17 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   rule(_,Keyword,_,_,_) | exception(_,_,_,_) (only kind + Keyword read); Drs = acetext_to_drs term (real vars
   + `-SID/TID`); Result = ok | reject(Reason) single-cause, ordered first-violation checks (nonempty_messages
   → not_wellformed → unregistered_named → top shape → guard whitelist → op D1 → action). Gate
-  clinical/profile_check_tests.pl (run_tests(profile_check), 36 GREEN). KEY REUSABLE PATTERN (map-core
+  clinical/profile_check_tests.pl (run_tests(profile_check), 40 GREEN — +4 crafted regression probes post-review). KEY REUSABLE PATTERN (map-core
   inherits it): the gate feeds the checker DRS TERMS reconstructed from the byte-pinned surface goldens via
   read_term_from_atom(SerializedGolden, Drs, []) — a serialized DRS reads back to the SAME term (equal
   uppercase numbervar names → one shared fresh var), and golden_roundtrip PROVES it (re-serialize == golden,
   byte-exact ×17 text/plain) → any downstream DRS consumer runs pure/fast off the pinned goldens, no live APE.
   is_wellformed/1 (prolog/utils) = canonical referent-hygiene backstop, but it PASSES on every text/plain
   golden incl. nonv1 → NOT the v1 discriminator (the tight shape whitelist is). SCOPE BOUNDARIES (profile-
-  battery + map-exc must honor): (1) drug registration = the ONE top-level recursive named scan; action_outcome
-  checks target = named(_) SHAPE only (dedup, no 2nd pn_allow). (2) exception body profile = interval-free +
+  battery + map-exc must honor): (1) drug registration = the ONE top-level recursive named scan (codex-review: hardened to reject a
+  non-atom/unbound name — pn_allow(Var) else BINDS through + slips it); action_outcome checks target
+  = named(N)+atom(N) GROUND shape (codex-review F1: named(_) was a UNIFICATION → a bare referent-var
+  target slipped to ok AND mutated the input DRS; nonvar+atom closes it; still no 2nd pn_allow). (2) exception body profile = interval-free +
   op-free + concept/population-only, but D6 single-concept cardinality is NOT enforced (→ map-exc). (3)
   profile-drs's battery = accept 12 v1 + 5 nonv1 non-vacuity (guard_shape, interval_countop×2,
   nonempty_messages×2) ONLY; op_mismatch / bad_action / bad_top_shape / zero-message unregistered_named reject
@@ -442,6 +444,15 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   unbound var (a singleton-variable warning is the tell). (b) serialize_term/1 GLOBALLY narrows the
   `- ~ => v &` operators (op(0,...), never restored) → order any serialize-using test LAST; functional
   read-back (=>(...), -(...)) + infix `-`/`/` are unaffected regardless.
+- CODEX-REVIEW (930f954) DEFERRED BACKLOG — profile-drs whitelist is SHAPE-per-atom, NOT
+  cardinality/placement. All items defense-in-depth (raw gate rejects the surface + APE won't emit
+  them from a v1 parse; each verified NON-golden-reachable via hand DRS probes). FIXED in-unit: F4
+  negative interval bound (guard_item now `integer(INT), INT >= 0` → reject(interval_bound); was
+  integer/1 only). OPEN for the owning units: guard accepts >1 interval object + top-level `leq`/`less`
+  + non-interval atoms inside the interval sublist (D8/D9 canonical = `geq`/`greater` top-level,
+  `leq`/`less` nested) → map-core (canonical guard shape) + profile-battery (reject tests); `of` &
+  `have` args unconstrained (of→named, have→any term) → map-core; D6 exception single-concept +
+  multi-concept guard → map-exc.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

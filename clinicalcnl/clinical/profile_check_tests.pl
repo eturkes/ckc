@@ -55,6 +55,29 @@ nonv1_reject(iv_bare,    reject(interval_countop(eq))).
 nonv1_reject(iv_anaphor, reject(nonempty_messages)).
 nonv1_reject(named_hole, reject(nonempty_messages)).
 
+%% crafted_reject(?Label, ?Ctx, ?Drs, ?Reason) — hand-built non-golden DRS terms pinning the two
+% acceptance escapes closed after codex-review: an action target that is not a ground drug name
+% (F1 — `Target = named(_)` unified a bare referent var to ok, and an unbound / non-atom name bound
+% through pn_allow/1), and a negative interval bound (F4 — only integer/1 was checked, not the raw
+% gate's non-negativity). Targeted regression guards; the exhaustive DRS-side reject matrix stays
+% profile-battery's scope.
+crafted_reject('action target = action referent var', rule(0, recommend, 0, none, none),
+  drs([],[=>(drs([P,C,H],[object(P,patient,countable,na,eq,1)-1/3,object(C,sepsis,countable,na,eq,1)-1/6,predicate(H,have,P,C)-1/4]),
+             drs([],[should(drs([A],[predicate(A,take,P,A)-1/14]))]))]),
+  reject(bad_action_target(_))).
+crafted_reject('action target = patient referent var', rule(0, recommend, 0, none, none),
+  drs([],[=>(drs([P,C,H],[object(P,patient,countable,na,eq,1)-1/3,object(C,sepsis,countable,na,eq,1)-1/6,predicate(H,have,P,C)-1/4]),
+             drs([],[should(drs([A],[predicate(A,take,P,P)-1/14]))]))]),
+  reject(bad_action_target(_))).
+crafted_reject('action target = non-atom drug name', rule(0, recommend, 0, none, none),
+  drs([],[=>(drs([P],[object(P,patient,countable,na,eq,1)-1/3]),
+             drs([],[should(drs([A],[predicate(A,take,P,named(foo(bar)))-1/14]))]))]),
+  reject(unregistered_named(foo(bar)))).
+crafted_reject('negative interval bound', rule(0, recommend, 0, none, none),
+  drs([],[=>(drs([P,Q,U,H],[object(P,patient,countable,na,eq,1)-1/3,object(Q,age,countable,na,eq,1)-1/6,object(U,year,countable,na,geq,-18)-1/11,relation(Q,of,U)-1/7,predicate(H,have,P,Q)-1/4]),
+             drs([],[should(drs([A],[predicate(A,take,P,named('Abx-A'))-1/19]))]))]),
+  reject(interval_bound(_))).
+
 :- begin_tests(profile_check).
 
 % Accept battery: every v1 surface's canonical DRS passes under its raw-gate Ctx.
@@ -81,6 +104,11 @@ test(reject_covers_all_nonv1) :-
     findall(Id, surface_case(Id, nonv1, _), NV1s), msort(NV1s, S1),
     findall(Id, nonv1_reject(Id, _), Rejected), msort(Rejected, S2),
     assertion(S1 == S2).
+
+% Regression: each crafted non-v1 DRS rejects on its pinned path (the two post-review fixes).
+test(reject_crafted_escapes, [forall(crafted_reject(_Label, Ctx, Drs, Reason))]) :-
+    profile_check(Ctx, Drs, [], Result),
+    assertion(Result = Reason).
 
 % Reconstruction fidelity: every text/plain golden re-serializes byte-identically, so the term the
 % checker sees is APE's canonical parse, not an artefact of read-back. Runs last: serialize_term

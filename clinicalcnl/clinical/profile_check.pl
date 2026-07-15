@@ -15,7 +15,8 @@
 %     the raw-header keyword (D1) — defense-in-depth over the raw gate's surface cross-check.
 %   - a guard whitelist: population / concept / interval objects, the of-relation and have-predicate,
 %     with one level of interval sublist (D8/D9 nest leq/less bounds). It rejects in-guard negation
-%     (-drs), disjunction (v), and bare-eq / exactly interval bounds (the single-bound law).
+%     (-drs), disjunction (v), bare-eq / exactly interval bounds (the single-bound law), and a
+%     negative interval bound (v1 INTs are non-negative, per the raw gate's valid_int_atom).
 %   - the action shape predicate(_, take, <subject>, named(<registered drug>)), whose subject is the
 %     guard's population referent.
 %   - the exception body: a bare, interval-free, op-free concept-have condition (D6).
@@ -86,7 +87,10 @@ guard_outcome([C|Cs], Outcome) :-
 guard_item(List, Outcome) :- is_list(List), !, sublist_outcome(List, Outcome).
 guard_item(object(_, N, countable, na, eq, 1)-_, ok) :- eq1_noun(N), !.
 guard_item(object(_, N, countable, na, CO, INT)-_, Outcome) :- unit_noun(N), !,
-    ( v1_countop(CO), integer(INT) -> Outcome = ok ; Outcome = reject(interval_countop(CO)) ).
+    (   \+ v1_countop(CO)             -> Outcome = reject(interval_countop(CO))
+    ;   \+ ( integer(INT), INT >= 0 ) -> Outcome = reject(interval_bound(INT))
+    ;   Outcome = ok
+    ).
 guard_item(relation(_, of, _)-_, ok) :- !.
 guard_item(predicate(_, have, _, _)-_, ok) :- !.
 guard_item(Other, reject(guard_shape(Other))).
@@ -108,13 +112,14 @@ consequent_op(-(drs([], [can(A)])), '-can', A) :- !.
 % --- action shape: drs([Act],[predicate(Act, take, <subject>, named(<drug>))]); subject == the
 % guard's population referent. The drug's REGISTRATION is the recursive named scan's sole
 % responsibility (that scan already rejected any unregistered named before body_outcome runs), so
-% here the target is only checked to be a proper name — the two together give named(RegisteredDrug).
+% here the target is only checked to be a GROUND proper name (named/1 of an atom) — the two together
+% give named(RegisteredDrug); an unbound or non-atom target fails the whitelist.
 action_outcome(ActionDrs, PatRef, Outcome) :-
     (   ActionDrs = drs([Act], [predicate(Act2, Verb, SubjRef, Target)-_])
     ->  (   Act \== Act2                             -> Outcome = reject(bad_action_referent)
         ;   reg_action(_, _, _, Lemma), Verb \== Lemma -> Outcome = reject(bad_action_verb(Verb))
         ;   SubjRef \== PatRef                       -> Outcome = reject(action_subject_mismatch)
-        ;   Target = named(_)                        -> Outcome = ok
+        ;   nonvar(Target), Target = named(N), atom(N) -> Outcome = ok
         ;   Outcome = reject(bad_action_target(Target))
         )
     ;   Outcome = reject(bad_action_shape)
@@ -143,11 +148,12 @@ population_refs([], _, []).
 population_refs([object(R, N, countable, na, eq, 1)-_|Cs], N, [R|Rs]) :- !, population_refs(Cs, N, Rs).
 population_refs([_|Cs], N, Rs) :- population_refs(Cs, N, Rs).
 
-% unregistered_named(+Term, -Name) — some named(Name) anywhere in Term is off the pn allowlist.
+% unregistered_named(+Term, -Name) — some named(Name) anywhere in Term is off the pn allowlist, or
+% is not a ground atom (an unbound name would otherwise BIND through pn_allow/1 and slip the scan).
 unregistered_named(Term, Name) :-
     named_args(Term, Names),
     member(Name, Names),
-    \+ pn_allow(Name).
+    ( atom(Name) -> \+ pn_allow(Name) ; true ).
 
 % named_args(+Term, -Names) — every named/1 argument in Term, via a subterm worklist (referent vars
 % are skipped; order is irrelevant — the caller only asks whether an unregistered one exists).
