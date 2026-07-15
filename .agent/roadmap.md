@@ -364,18 +364,24 @@ Cross-unit decisions:
   sibling-isolation, mutation-proven non-vacuous) + cross-rule base-threading (nonzero Base0/ordinal/
   region) + 6-keyword/4-frame table + action-lemma-uniqueness gate. All pure gates unregressed, 0
   warn/err loads; additive (2 new files, no sibling edits). 20% 199K/1M
-- [ ] map-emit: whole-document driver + canonical emission — group raw-gate sentences by rule
-  label + enumerate rule blocks as DENSE 0-based ordinals (KB.md density; raw_gate checks rule-label
-  UNIQUENESS only, not density/order → keep a label→dense-ordinal map for exception `rule RuleK` refs,
-  pass each as `map_rule`'s RuleOrd), thread `base(StmtIdx,BindIdx)` across rule-blocks (`drs_map:map_rule/6`, base-threaded —
-  it already assigns `stmt.k`/`bind.k`) + exception-blocks (map-exc), collect facts → kb-writer
-  (`kb_bytes/2`/`write_kb/2`); byte-pins from OBSERVED emitter output over the thread docs;
-  determinism gates (re-run identical; fact-SET emit-order invariant [kb_bytes sorts]; goldens
-  re-emit == pinned) — NOT input-permutation invariant: bind ids positional (map-core
-  assigns bind.k in surface anchor order), rule.k = the dense document ordinal map-emit assigns
-  (map_rule copies RuleOrd), so a guard-conjunct / rule-order permutation is a DISTINCT accepted
-  document by design; canonicalize only if ever required. Gate:
-  byte plunit. Reads: drs_map.pl (map_rule/6) + kb_kernel (kb_bytes) + goldens.
+- [x] map-emit: `clinical/map_emit.pl` whole-document DRS→KB driver + canonical emission (AUTHORITY:
+  read it, skip re-deriving). `document_bytes(DocId, Items, Bytes)` = `map_document/3` then
+  `kb_kernel:kb_bytes/2`; `Items = [item(SentIdx, Ctx, Drs), …]` = post-profile sentences (raw ordinal +
+  raw-gate Ctx `rule(K,Kw,DisjIdx,Cert,Basis)`|`exception(K,RuleK,Cert,Basis)` + APE DRS). Groups rule
+  items by raw label, visits blocks in FIRST-APPEARANCE order under DENSE 0-based ordinals
+  (`rule_ordinals/2` = the raw-label→ord map EXPOSED for map-exc), threads `base(StmtIdx,BindIdx)` from
+  base(0,0) through `drs_map:map_rule/6` (`block_header` takes the shared Kw/Cert/Basis; `block_disjuncts`
+  keysorts by DisjIdx). RULE facts only — exception blocks are map-exc's: map-emit SKIPS exception items +
+  exposes rule_ordinals so map-exc resolves an exception's `rule RuleK`; the exc counter is SEPARATE from
+  base/2, so rule-block threading stays exact. map-emit OWNS rule-id density (lone `rule 7`→rule.0). NOT
+  input-permutation invariant (bind ids surface-positional, rule.<Ord> follows appearance → swapping blocks
+  reassigns ids + moves bytes; explicit canonicalization deferred). Gate run_tests(map_emit) 22 GREEN via
+  read-back goldens (no live APE): 4 OBSERVED byte-pins (docB/control + docA-rule-only [exception skipped] +
+  synthetic 2-rule/2-disjunct/non-dense-out-of-order-label multi) reusing kb_writer's golden_bytes framing +
+  all_valid + docB/control == normative kb_examples + multi grouped-oracle + rule_ordinals (5→0/2→1
+  appearance, lone-7→0) + exception_skipped + rerun-deterministic + emit-order-invariant + block_order_
+  positional. docB/control bytes byte-IDENTICAL to kb_writer's independent goldens. All 9 sibling gates
+  unregressed, 0 warn/err loads; additive (2 new files, no sibling edits). 20% 203K/1M
 - [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
   on their rule's statements (exc.k stmt-major, document-continuous counters; D6
   self-contained bodies; clause region_ids = own block's basis verbatim) + bridge-oracle

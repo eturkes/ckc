@@ -522,18 +522,29 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   == sibling-isolation — a unifying companion-walk aliases interval#2's fresh vars through #1, collapsing extraction;
   mutation-proven non-vacuous], cross-rule base-threading [nonzero Base0/ordinal/region — the map-emit contract],
   6-keyword/4-frame table [all D1 keywords + the may/-should unwrap branches], action-lemma-uniqueness [registry.pl
-  delegates map-core's inverse-key uniqueness → gate reg_action lemma dups]. SEAM TO map-emit: map_rule/6 IS the
-  map-emit interface — map-emit is the whole-DOC driver (group raw-gate sentences by rule ordinal, thread base/2
-  across rule-blocks via map_rule + exception-blocks via map-exc, collect facts, kb-writer bytes via kb_bytes/write_kb,
-  byte-pin + determinism-gate). map-emit OWNS rule-id DENSITY: enumerate rule blocks as DENSE 0-based
-  ordinals by physical order (KB.md: density is a map-emit property, NOT a kernel/raw reject) — do NOT forward the
-  raw label, since raw_gate checks rule-label UNIQUENESS only (a lone `rule 7` → rule.7); keep a raw-label→dense-ordinal
-  map so an exception's `rule RuleK` ref resolves. DETERMINISM SEMANTICS (map-emit spec — codex-review corrected the roadmap gate):
-  idempotent re-run + emit-order-free (kb_bytes sorts the fact SET); bind ids SURFACE-POSITIONAL (map-core, anchor
-  order), rule.k = the caller-supplied RuleOrd (map_rule copies; map-emit densifies) → a guard-conjunct permutation
-  swaps bind.k + a rule-order permutation reshuffles stmt/bind/region, so either is a DISTINCT accepted document, NOT
-  byte-invariant by design (map-core is surface-order); true input-permutation invariance would need explicit canonicalization, a
-  separate decision NOT currently guaranteed. Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
+  delegates map-core's inverse-key uniqueness → gate reg_action lemma dups]. map_rule/6 IS the map-emit seam;
+  map-emit (below) is the whole-DOC driver over it. Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
+- ClinicalCNL whole-document mapper + emission (M3.map-emit; AUTHORITY = clinical/map_emit.pl — the whole-DOC
+  driver over map-core's map_rule/6 seam, pure Prolog no live APE). document_bytes(+DocId, +Items, -Bytes) =
+  map_document/3 then kb_kernel:kb_bytes/2; Items = [item(SentIdx, Ctx, Drs), ...] = post-profile sentences (raw
+  ordinal + the raw-gate Ctx rule(K,Kw,DisjIdx,Cert,Basis)|exception(K,RuleK,Cert,Basis) + APE DRS). map_document
+  groups rule items by raw label, visits blocks in FIRST-APPEARANCE (physical) order under DENSE 0-based ordinals,
+  threads base(StmtIdx,BindIdx) from base(0,0) through map_rule/6 (block_header takes the block's shared Kw/Cert/Basis;
+  block_disjuncts keysorts disjuncts by DisjIdx). RULE FACTS ONLY — exception blocks are map-exc's: map-emit SKIPS
+  exception items (emits no exception facts) and EXPOSES rule_ordinals/2 (the raw-label→dense-ord map) so map-exc
+  resolves an exception's RuleK → the rule's dense ordinal + its statements. The exc counter is SEPARATE from base/2
+  (stmt/bind), so leaving exceptions uncompiled keeps rule-block base-threading exact → map-exc adds its OWN
+  doc-continuous exc counter. map-emit OWNS rule-id DENSITY (KB.md: density is a map-emit property, not a kernel/raw
+  reject — raw_gate checks label UNIQUENESS only, so a lone `rule 7` → rule.0). NOT input-permutation invariant
+  (KB.md/map-core): bind ids surface-positional + rule.<Ord> follows appearance, so swapping two rule blocks reassigns
+  rule ids + moves bytes (true permutation-invariance would need explicit canonicalization, deferred). Gate
+  clinical/map_emit_tests.pl run_tests(map_emit) 22 GREEN via the read-back-golden pattern (no ape.exe): 4 OBSERVED
+  byte-pins (docB/control + docA-rule-only [exception SKIPPED] + a synthetic 2-rule/2-disjunct/non-dense-out-of-order-
+  label multi) reusing kb_writer's golden_bytes framing (join lines by \n + one trailing \n → string) + all_valid +
+  docB/control facts == the normative kb_examples (rule-only) + multi grouped-oracle + rule_ordinals (5→0/2→1
+  appearance, lone-7→0) + exception_skipped + rerun-deterministic + emit-order-invariant + block_order_positional.
+  docB/control map-emit bytes are byte-IDENTICAL to kb_writer's independent goldens (same rule-only fact sets) —
+  cross-module corroboration of the observed pins. Additive: 2 new files, all 9 sibling gates unregressed, 0 warn/err.
 - SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
   body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
   that embeds the just-bound Sub → SWI folds the construction into the clause head and DROPS the `Sub = Term`
