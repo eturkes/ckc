@@ -1,19 +1,21 @@
-% ClinicalCNL whole-document mapper + emission gate (M3.map-emit). Drives map_emit:document_bytes/3
-% over whole profile-validated documents built from the byte-pinned surface goldens (read-back DRS) +
-% hand-built raw contexts — so the gate runs pure and fast with no live APE. Byte-pins the emitter's
-% OBSERVED canonical output over the §8.6 thread docs (docB, control, and docA with its exception
-% block SKIPPED — map-exc compiles exceptions) plus a synthetic two-rule / two-disjunct / non-dense
-% and out-of-order-label document (dense-ordinal assignment + document-continuous base threading).
-% Each mapped KB is asserted kb_kernel-valid; docB / control are cross-checked against the normative
-% kb_examples (rule-only match). Determinism is gated two ways: each export yields exactly ONE
-% solution (single_solution/1 — findall-based, robust under plunit's body control-wrapping, where a
+% ClinicalCNL whole-document mapper + emission gate (M3.map-emit + M3.map-exc). Drives
+% map_emit:document_bytes/3 over whole profile-validated documents built from the byte-pinned surface
+% goldens (read-back DRS) + hand-built raw contexts — so the gate runs pure and fast with no live APE.
+% Byte-pins the emitter's OBSERVED canonical output over the §8.6 thread docs (docB, control, and docA
+% with its exception block compiled to its NAF guard) plus a synthetic two-rule / two-disjunct /
+% non-dense out-of-order-label document and the §L·pins worked exception oracle (bridge). Each mapped
+% KB is asserted kb_kernel-valid; docB / control are cross-checked against the normative kb_examples
+% (rule-only match). Determinism is gated two ways: each export yields exactly ONE solution
+% (single_solution/1 — findall-based, robust under plunit's body control-wrapping, where a
 % deterministic/1 probe misreports an ancestor choicepoint) and re-emits byte-identically, the fact
 % set emit-order-free. Grouping / counters are exercised past the easy cases: disjuncts group across
-% NON-adjacent items and sort by DisjIdx (interleaved + reversed fixture); a middle exception block is
-% base/2-transparent (rule -> exception -> rule == the exception-removed items); the empty document is
-% total. NOT input-permutation invariant (KB.md / map-core): rule-block order is surface-positional,
-% so per appearance order the same raw label owns a different rule.<Ord> (block_order_positional pins
-% the ordinals + directions, not just a byte inequality).
+% NON-adjacent items and sort by DisjIdx (interleaved + reversed fixture); an exception is stmt-major
+% cloned across its rule's statements with a document-continuous exc counter (no per-rule reset), and
+% the RULE layer stays base/2-transparent (rule -> exception -> rule == the exception-removed items
+% plus only the exception + its own source); the empty document is total. NOT input-permutation
+% invariant (KB.md / map-core): rule-block order is surface-positional, so per appearance order the
+% same raw label owns a different rule.<Ord> (block_order_positional pins the ordinals + directions,
+% not just a byte inequality).
 %
 %   Gate: swipl -q -g "consult('clinical/map_emit_tests.pl'),(run_tests(map_emit)->halt(0);halt(1))" -t 'halt(1)'
 
@@ -52,6 +54,30 @@ doc(multi, 'test_source.map_multi',
      item(1, rule(5, recommend, 1, moderate, "multi first rule"), D2),
      item(2, rule(2, 'may-consider', 0, none, "multi trailing"), D3)]) :-
     golden_drs(thread_doc_a, D1), golden_drs(frame_recommend, D2), golden_drs(frame_admissible, D3).
+% bridge — the §L·pins worked exception oracle: a 2-disjunct rule (rule.0: stmt.0 sepsis+age, stmt.1
+% sepsis) carrying TWO exception blocks (renal @sent 2, pregnancy @sent 3), then a trailing 1-disjunct
+% rule (rule.1: stmt.2) carrying ONE exception (renal @sent 5). Catches the stmt-major clone + the
+% document-continuous exc counter (no per-rule reset): stmt.0{exc.0,exc.1}, stmt.1{exc.2,exc.3},
+% stmt.2{exc.4}. (The roadmap's "rule.2" is a Rust-model carryover — one rule id per disjunct; the
+% Prolog KB gives one rule id per BLOCK, so the trailing rule is the dense rule.1.)
+doc(bridge, 'test_source.map_bridge',
+    [item(0, rule(0, recommend, 0, none, "rule A"), A0),
+     item(1, rule(0, recommend, 1, none, "rule A"), A1),
+     item(2, exception(0, 0, none, "renal carve-out"), Ea),
+     item(3, exception(1, 0, none, "pregnancy carve-out"), Eb),
+     item(4, rule(1, recommend, 0, none, "rule B"), B0),
+     item(5, exception(2, 1, none, "renal carve-out B"), Ec)]) :-
+    golden_drs(thread_doc_a, A0), golden_drs(frame_recommend, A1),
+    golden_drs(exception_body, Ea), exc_body(pregnancy, Eb),
+    golden_drs(frame_recommend, B0), golden_drs(exception_body, Ec).
+
+% exc_body(+ConceptNoun, -Drs) — a bare-condition exception body DRS (D6) for a given registered concept
+% noun, matching the OBSERVED exception_body golden shape (population object + concept object wired by
+% have). Built via a clause so its referent vars stay fresh; varies the oracle's second exception.
+exc_body(Noun, drs([A, B, C],
+    [ object(A, patient, countable, na, eq, 1)-1/2,
+      object(B, Noun, countable, na, eq, 1)-1/5,
+      predicate(C, have, A, B)-1/3 ])).
 
 % doc_golden(+Name, -Lines) — the emitter's OBSERVED canonical bytes for doc(Name, ...), split into
 % per-fact lines in byte-sorted order (captured from a run, corroborated for docB / control by
@@ -83,8 +109,10 @@ doc_golden(doc_a,
 , "condition('test_source.m1_guideline_a.bind.0','test_source.m1_guideline_a.stmt.0',concept('cond.sepsis'))."
 , "condition('test_source.m1_guideline_a.bind.1','test_source.m1_guideline_a.stmt.0',interval('q.age_years',18,closed,lower))."
 , "direction('test_source.m1_guideline_a.rule.0',for)."
+, "exception('test_source.m1_guideline_a.exc.0','test_source.m1_guideline_a.stmt.0',concept('cond.renal_severe'))."
 , "population('test_source.m1_guideline_a.stmt.0','pop.patient')."
 , "rule('test_source.m1_guideline_a.rule.0','test_source.m1_guideline_a.stmt.0')."
+, "source('test_source.m1_guideline_a.exc.0','test_source.m1_guideline_a',[1],\"renal-impairment carve-out\")."
 , "source('test_source.m1_guideline_a.rule.0','test_source.m1_guideline_a',[0],\"guideline A sepsis recommendation\")."
 , "strength('test_source.m1_guideline_a.rule.0',strong)."
 ]).
@@ -109,6 +137,37 @@ doc_golden(multi,
 , "source('test_source.map_multi.rule.1','test_source.map_multi',[2],\"multi trailing\")."
 , "strength('test_source.map_multi.rule.0',strong)."
 , "strength('test_source.map_multi.rule.1',weak)."
+]).
+doc_golden(bridge,
+[ "action('test_source.map_bridge.stmt.0','act.administer:drug.abx_a')."
+, "action('test_source.map_bridge.stmt.1','act.administer:drug.abx_a')."
+, "action('test_source.map_bridge.stmt.2','act.administer:drug.abx_a')."
+, "condition('test_source.map_bridge.bind.0','test_source.map_bridge.stmt.0',concept('cond.sepsis'))."
+, "condition('test_source.map_bridge.bind.1','test_source.map_bridge.stmt.0',interval('q.age_years',18,closed,lower))."
+, "condition('test_source.map_bridge.bind.2','test_source.map_bridge.stmt.1',concept('cond.sepsis'))."
+, "condition('test_source.map_bridge.bind.3','test_source.map_bridge.stmt.2',concept('cond.sepsis'))."
+, "direction('test_source.map_bridge.rule.0',for)."
+, "direction('test_source.map_bridge.rule.1',for)."
+, "exception('test_source.map_bridge.exc.0','test_source.map_bridge.stmt.0',concept('cond.renal_severe'))."
+, "exception('test_source.map_bridge.exc.1','test_source.map_bridge.stmt.0',concept('cond.pregnancy'))."
+, "exception('test_source.map_bridge.exc.2','test_source.map_bridge.stmt.1',concept('cond.renal_severe'))."
+, "exception('test_source.map_bridge.exc.3','test_source.map_bridge.stmt.1',concept('cond.pregnancy'))."
+, "exception('test_source.map_bridge.exc.4','test_source.map_bridge.stmt.2',concept('cond.renal_severe'))."
+, "population('test_source.map_bridge.stmt.0','pop.patient')."
+, "population('test_source.map_bridge.stmt.1','pop.patient')."
+, "population('test_source.map_bridge.stmt.2','pop.patient')."
+, "rule('test_source.map_bridge.rule.0','test_source.map_bridge.stmt.0')."
+, "rule('test_source.map_bridge.rule.0','test_source.map_bridge.stmt.1')."
+, "rule('test_source.map_bridge.rule.1','test_source.map_bridge.stmt.2')."
+, "source('test_source.map_bridge.exc.0','test_source.map_bridge',[2],\"renal carve-out\")."
+, "source('test_source.map_bridge.exc.1','test_source.map_bridge',[3],\"pregnancy carve-out\")."
+, "source('test_source.map_bridge.exc.2','test_source.map_bridge',[2],\"renal carve-out\")."
+, "source('test_source.map_bridge.exc.3','test_source.map_bridge',[3],\"pregnancy carve-out\")."
+, "source('test_source.map_bridge.exc.4','test_source.map_bridge',[5],\"renal carve-out B\")."
+, "source('test_source.map_bridge.rule.0','test_source.map_bridge',[0,1],\"rule A\")."
+, "source('test_source.map_bridge.rule.1','test_source.map_bridge',[4],\"rule B\")."
+, "strength('test_source.map_bridge.rule.0',strong)."
+, "strength('test_source.map_bridge.rule.1',strong)."
 ]).
 
 % golden_bytes(+Lines, -Bytes) — the writer framing (kb_writer_tests's helper): lines joined by '\n',
@@ -203,12 +262,18 @@ test(rule_ordinals_appearance) :-
     assertion(Ord == [5-0, 2-1]),
     assertion(rule_ordinals([item(0, rule(7, recommend, 0, none, none), _)], [7-0])).
 
-% ---- docA's exception block is present in the items but produces NO exception facts (map-exc's) ---
-test(exception_skipped) :-
+% ---- docA's exception block compiles to its NAF guard on stmt.0 + a source duplicating the block's
+%      own raw region ([1]) and basis (map-exc); the mapped KB stays kb_kernel-valid ------------------
+test(exception_compiled) :-
     doc(doc_a, D, I),
     assertion(memberchk(item(_, exception(_, _, _, _), _), I)),
     map_document(D, I, Facts),
-    assertion(\+ member(exception(_, _, _), Facts)),
+    assertion(member(exception('test_source.m1_guideline_a.exc.0',
+                               'test_source.m1_guideline_a.stmt.0',
+                               concept('cond.renal_severe')), Facts)),
+    assertion(member(source('test_source.m1_guideline_a.exc.0',
+                            'test_source.m1_guideline_a', [1],
+                            "renal-impairment carve-out"), Facts)),
     valid_kb(Facts).
 
 % ---- determinism: the same document re-emits byte-identically -------------------------------------
@@ -263,9 +328,10 @@ test(empty_document) :-
     single_solution(map_document('t.empty', [], _)),
     single_solution(document_bytes('t.empty', [], _)).
 
-% ---- rule -> exception -> rule: the middle exception block consumes NO base/2 counter, so the
-%      trailing rule's stmt / bind ids are exactly as if the exception item were absent (map-exc owns
-%      exceptions; map-emit threads counters through rule blocks only) ------------------------------
+% ---- rule -> exception -> rule: the middle exception block consumes NO base/2 counter (the exc
+%      counter is separate), so the RULE layer (rule / population / condition / action / rule-source)
+%      is byte-for-byte as if the exception were absent — only the exception + its own source are added,
+%      and the trailing rule keeps its stmt / bind ids ---------------------------------------------
 test(exception_counter_transparent) :-
     golden_drs(thread_doc_a, R0a), golden_drs(exception_body, Ex), golden_drs(frame_recommend, R1a),
     WithExc = [item(0, rule(0, recommend, 0, none, "r0"), R0a),
@@ -276,9 +342,38 @@ test(exception_counter_transparent) :-
                item(2, rule(1, recommend, 0, none, "r1"), R1b)],
     map_document('t.xc', WithExc, FWith),
     map_document('t.xc', NoExc,   FNo),
-    assertion(\+ member(exception(_, _, _), FWith)),
-    assertion(same_kb(FWith, FNo)),
-    assertion(valid_kb(FWith)).
+    assertion(valid_kb(FWith)),
+    exclude(exc_layer, FWith, FWithRules),   % drop the exception + its (exc-id) source
+    assertion(same_kb(FWithRules, FNo)),     % the rule layer is untouched by the exception
+    assertion(member(exception('t.xc.exc.0', 't.xc.stmt.0', concept('cond.renal_severe')), FWith)),
+    assertion(member(source('t.xc.exc.0', 't.xc', [1], "carve-out"), FWith)),
+    assertion(member(rule('t.xc.rule.1', 't.xc.stmt.1'), FWith)).   % trailing rule keeps stmt.1
+
+% exc_layer(+Fact) — a fact contributed by exception compilation: an exception/3 or a source/4 whose id
+% is an exception id (valid_id/2 distinguishes it from rule / stmt sources).
+exc_layer(exception(_, _, _)).
+exc_layer(source(Id, _, _, _)) :- valid_id(Id, exc).
+
+% ---- the §L·pins worked exception oracle (doc bridge): the exception FACTS are stmt-major cloned with
+%      a document-continuous exc counter (no per-rule / per-statement reset), and each clone's source
+%      duplicates its exception block's own raw region + basis (distinct exc ids, shared region+basis) -
+test(bridge_exception_facts) :-
+    doc(bridge, D, I),
+    map_document(D, I, Facts),
+    assertion(valid_kb(Facts)),
+    ExcOracle = [ exception('test_source.map_bridge.exc.0', 'test_source.map_bridge.stmt.0', concept('cond.renal_severe')),
+                  exception('test_source.map_bridge.exc.1', 'test_source.map_bridge.stmt.0', concept('cond.pregnancy')),
+                  exception('test_source.map_bridge.exc.2', 'test_source.map_bridge.stmt.1', concept('cond.renal_severe')),
+                  exception('test_source.map_bridge.exc.3', 'test_source.map_bridge.stmt.1', concept('cond.pregnancy')),
+                  exception('test_source.map_bridge.exc.4', 'test_source.map_bridge.stmt.2', concept('cond.renal_severe')) ],
+    findall(E, (member(E, Facts), E = exception(_, _, _)), GotExc),
+    assertion(same_kb(GotExc, ExcOracle)),   % exactly these five, so a per-rule reset (a repeat exc.0) fails
+    SrcOracle = [ source('test_source.map_bridge.exc.0', 'test_source.map_bridge', [2], "renal carve-out"),
+                  source('test_source.map_bridge.exc.1', 'test_source.map_bridge', [3], "pregnancy carve-out"),
+                  source('test_source.map_bridge.exc.2', 'test_source.map_bridge', [2], "renal carve-out"),
+                  source('test_source.map_bridge.exc.3', 'test_source.map_bridge', [3], "pregnancy carve-out"),
+                  source('test_source.map_bridge.exc.4', 'test_source.map_bridge', [5], "renal carve-out B") ],
+    forall(member(S, SrcOracle), assertion(member(S, Facts))).
 
 % ---- disjuncts group across NON-adjacent items and sort by DisjIdx, not appearance: rule 5's disj1
 %      (@sent 0, sepsis only) and disj0 (@sent 2, sepsis + age interval) are interleaved by rule 2 and

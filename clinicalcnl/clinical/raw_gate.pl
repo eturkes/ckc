@@ -262,8 +262,15 @@ header_fields(rule(_, Kw, Fields), Cert, Basis, Errs) :-
     ( reg_keyword(Kw, _, _, _) -> KwE = [] ; KwE = [bad_keyword-Kw] ),
     field_values(Fields, Cert, Basis, FE),
     append(KwE, FE, Errs).
-header_fields(exc(_, _, Fields), Cert, Basis, Errs) :-
-    field_values(Fields, Cert, Basis, Errs).
+% Exception blocks carry basis only. A `certainty` is a rule-level surface — it keys on the rule id
+% (KB.md `certainty(RuleId, _)`; there is NO exception-certainty slot), so a certainty on an exception
+% has no KB home and rejects fail-closed (SURFACE.md exc-block = basis only; the shared field DCG would
+% otherwise silently admit it). Cert is therefore always `none` for an exception.
+header_fields(exc(_, _, Fields), none, Basis, Errs) :-
+    findall(B, member(f(basis, B), Fields), Bs),
+    basis_field(Bs, Basis, BE),
+    ( member(f(certainty, C), Fields) -> CE = [certainty_on_exception-C] ; CE = [] ),
+    append(CE, BE, Errs).
 
 field_values(Fields, Cert, Basis, Errs) :-
     findall(C, member(f(certainty, C), Fields), Cs),

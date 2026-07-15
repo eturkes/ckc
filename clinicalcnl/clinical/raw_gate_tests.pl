@@ -306,6 +306,11 @@ test(reject_dangling_exception) :-
     raw_gate:gate_document(Doc, R),
     assertion(R == reject([reject(1, 9, dangling_exception)])).
 
+test(reject_certainty_on_exception) :-   % certainty is rule-level (no KB exc-certainty slot) → fail-closed
+    Doc = 'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0 certainty moderate\nA patient has a pregnancy.\n',
+    raw_gate:gate_document(Doc, R),
+    assertion(R == reject([reject(1, moderate, certainty_on_exception)])).
+
 % ---- reject: input shape + doc-id well-formedness (the gate is total over any term) -------------
 test(reject_bad_input_number) :-
     raw_gate:gate_document(123, R), assertion(R == reject([reject(-1, '', bad_input)])).

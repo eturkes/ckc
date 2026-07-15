@@ -82,6 +82,7 @@ banked_hazard(missing_header).           % a block whose first line is not a rul
 banked_hazard(ace_comment).              % a comment token in the surface
 banked_hazard(quotation).                % a quoted term in the surface
 banked_hazard(op_mismatch).              % D1 — a frame op disagreeing with its keyword's required op
+banked_hazard(certainty_on_exception).   % a certainty field on an exception (rule-level; no KB slot)
 
 % ==========================================================================================
 % b_sent(?BaseId, ?HeaderRest, ?Ace) — the accepted one-block sentence bases a mono_case mutates. Each is
@@ -219,6 +220,14 @@ raw_case(dangling_exception, ref_rule_nine,
     'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0\nA patient has a pregnancy.\n',
     'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 9\nA patient has a pregnancy.\n',
     reject(1, 9, dangling_exception)).
+
+% ---- a certainty field on an exception header → certainty_on_exception. Certainty is a rule-level
+% surface (KB.md `certainty(RuleId, _)`; no exception-certainty slot), so a certainty on an exception
+% has no KB home and rejects fail-closed (SURFACE.md exc-block = basis only). -------------------------
+raw_case(certainty_on_exception, exc_certainty,
+    'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0\nA patient has a pregnancy.\n',
+    'document d\n\nrule 0 recommend\nIf a patient has a sepsis then it is recommended that the patient takes Abx-A.\n\nexception 0 rule 0 certainty moderate\nA patient has a pregnancy.\n',
+    reject(1, moderate, certainty_on_exception)).
 
 % ---- a block with no rule/exception header (its single line fails the header DCG) → bad_header --------
 raw_case(missing_header, headerless_block,

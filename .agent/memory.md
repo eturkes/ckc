@@ -552,6 +552,38 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   DisjIdx-reversed → stmt.0←disj0 by keysort, not appearance) + block_order_positional strengthened to pin the
   exact ordinals + direction(rule.0) (the byte inequality alone also follows from moved provenance regions) +
   golden_coverage no-duplicate-doc-name. Additive: 2 new files, all 9 sibling gates unregressed, 0 warn/err.
+- ClinicalCNL exception compilation (M3.map-exc; AUTHORITY = clinical/map_emit.pl §Exception blocks — map-exc
+  COMPLETES map-emit: map_document/3 now emits the WHOLE KB, rules + exceptions, SUPERSEDING the map-emit "SKIPS
+  exception items / RULE FACTS ONLY" claims above). exception(ExcId, StmtId, Atom) keys on the STATEMENT, so a
+  labeled exception is CLONED across every statement of its referenced rule: stmt-major, one exc.<k> per
+  (statement, exception) pair, the exc counter DOCUMENT-CONTINUOUS and NEVER reset per rule/statement. Each clone's
+  source DUPLICATES the exception block's own raw region + basis (distinct exc ids sharing region+basis). Structure:
+  map_blocks threads base(Stmt,Bind) AND a separate exc counter; per rule block it maps the rule (map_rule/6) then
+  clone_exceptions over stmt_ids (the base/2 delta S0..S1-1 → the block's stmt ids) × block_exceptions (the block's
+  exception items, appearance/SentIdx order). exception_atom extracts concept(CId) from the D6 body (the concept
+  object's noun via reg_concept, distinct from the population noun `patient`; interval-/op-free by profile) —
+  map-exc EXTRACTS, assumes profile-validity, no reject path (like map-core). Needs registry import (reg_concept)
+  + a local mk_id/4. SWI head-arg-folding safe: stmt_exceptions builds Facts=[...|Rest] BEFORE the recursive tail
+  call (matches map_conditions — the tail call stays last, opaque to folding). BRIDGE ORACLE (bridge doc, §L·pins):
+  2-disjunct rule.0 (× exceptions renal/pregnancy) → stmt.0{exc.0,exc.1}/stmt.1{exc.2,exc.3} + trailing 1-disjunct
+  rule.1 → stmt.2/exc.4 (catches per-rule counter resets). RECONCILED: the roadmap's "rule.2" for the trailing rule
+  was a Rust-model carryover (one rule id PER DISJUNCT, ecc19d3 "both rule ids → index 0"); the Prolog KB gives one
+  rule id PER BLOCK, so the trailing rule is the dense rule.1. Gate run_tests(map_emit) GREEN (map-exc extends
+  map_emit_tests.pl, same run, observed byte-pins): docA re-pinned (adds exc.0 + its source), bridge byte-pin +
+  focused exception oracle (exact 5 exc facts via same_kb → a per-rule reset repeats exc.0 and fails; source
+  region+basis duplication), exception_compiled (replaced exception_skipped), rule-layer base/2-transparency
+  (exclude exc_layer → same_kb with the exc-removed items). All 10 clinical gates unregressed, 0 warn/err.
+- Fail-closed: a certainty on an EXCEPTION is rejected (M3.map-exc; USER DECISION 2026-07-16, asked at map-exc).
+  Certainty is rule-level (KB.md certainty(RuleId,_); NO exception-certainty slot). The raw-gate header field DCG
+  is SHARED rule/exc, so it silently admitted `exception K rule K certainty CERT` → profile ignores Cert → map-exc
+  had no KB home = SILENT LOSS + broke the "profile-accepted ⟹ mappable" invariant (map-exc surfaced it — first
+  consumer of exception Cert). FIX (fail-close, not silent-drop nor KB-model): raw_gate.pl header_fields(exc)
+  rejects a certainty field → reject(Idx, Cert, certainty_on_exception), Cert forced none for exceptions;
+  SURFACE.md exc-block grammar tightened to basis-only + certainty prose scoped rule-only; banked_hazard
+  (certainty_on_exception) + mutant in raw_gate_battery, focused reject in raw_gate_tests. Exceptions carry BASIS
+  only. GENERAL: the raw-gate's shared header/field DCG over-generalizes across block kinds — when the KB fact
+  family has no slot for a surface field a shared production admits, fail-close that field at the gate for the
+  block kinds that lack it, never let a downstream EXTRACTS-mapper silently drop it.
 - plunit determinism-gating (M3.map-emit codex-review; every future gate asserting a `det` export reuses it):
   gate the solution-count half with `single_solution(G) :- findall(t,G,S), S==[t].` — findall is ISOLATED from
   the caller's choicepoints, so it fails on a genuinely nondet goal in EVERY context (plain / assertion / forall

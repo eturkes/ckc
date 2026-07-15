@@ -61,7 +61,7 @@ the block structure and field vocabulary.
     document   ::= "document" WS doc-id NL blank { block }
     block      ::= (rule-block | exc-block) NL blank
     rule-block ::= "rule" WS k WS keyword { WS field } NL ace-rule { NL ace-rule }
-    exc-block  ::= "exception" WS k WS "rule" WS k { WS field } NL ace-cond
+    exc-block  ::= "exception" WS k WS "rule" WS k { WS "basis" WS quoted-string } NL ace-cond
     field      ::= "certainty" WS cert | "basis" WS quoted-string
     ace-rule   ::= a framed rule sentence (§Modality) — one line
     ace-cond   ::= a bare condition assertion (§Exceptions) — one line
@@ -70,8 +70,10 @@ the block structure and field vocabulary.
 - `doc-id` — non-empty corpus document id (e.g. `test_source.m1_guideline_a`).
 - `k` — non-negative integer; document-continuous per the `kb-contract` `stmt.k`/`exc.k` counters.
 - `keyword` — one modality keyword (§Modality); carries direction + strength + required op.
-- `certainty` — optional, at most once; a `D7` token `{high|moderate|low|very_low}`. It is a raw
-  header field only, NEVER in the ACE sentence; carried to the KB `certainty` field.
+- `certainty` — optional on a RULE block, at most once; a `D7` token `{high|moderate|low|very_low}`. A
+  raw header field only, NEVER in the ACE sentence; carried to the KB rule-level `certainty` field. An
+  exception block admits NO certainty (certainty keys on the rule id — there is no exception-certainty
+  slot), so a certainty on an exception rejects fail-closed (`certainty_on_exception`).
 - `basis` — optional, at most once; a double-quoted evidence string. Both rule and exception blocks
   carry their own basis (SPEC §10.6: each labeled exception has its own basis). Provenance only,
   never parsed as ACE.

@@ -382,13 +382,22 @@ Cross-unit decisions:
   appearance, lone-7→0) + exception_skipped + rerun-deterministic + emit-order-invariant + block_order_
   positional. docB/control bytes byte-IDENTICAL to kb_writer's independent goldens. All 9 sibling gates
   unregressed, 0 warn/err loads; additive (2 new files, no sibling edits). 20% 203K/1M
-- [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
-  on their rule's statements (exc.k stmt-major, document-continuous counters; D6
-  self-contained bodies; clause region_ids = own block's basis verbatim) + bridge-oracle
-  transplant (§L·pins: 2-disjunct rule × 2 exceptions → stmt.0{exc.0,exc.1}/stmt.1{exc.2,
-  exc.3} + trailing 1-disjunct rule → rule.2/stmt.2/exc.4 catching per-rule counter resets;
-  enumerated bind.k→concept map). Gate: oracle plunit + emission re-pin. Reads: map-emit
-  modules + §L·pins blobs.
+- [x] map-exc: labeled exception compilation — map_emit.pl now COMPLETES the mapper (map_document/3
+  emits the whole KB, rules + exceptions; AUTHORITY = clinical/map_emit.pl §Exception blocks, memory).
+  exception(ExcId,StmtId,Atom) keys on the STATEMENT → each labeled exception CLONED across every
+  statement of its referenced rule, stmt-major, one exc.<k> per (statement,exception) pair, exc counter
+  document-continuous (NO per-rule/statement reset); each clone's source duplicates the block's own raw
+  region + basis (distinct exc ids, shared region+basis). exception_atom inverts the D6 concept object;
+  EXTRACTS (assumes profile-validity, no reject path). Bridge oracle (bridge doc): 2-disjunct rule.0 ×
+  exceptions {renal,pregnancy} → stmt.0{exc.0,exc.1}/stmt.1{exc.2,exc.3} + trailing 1-disjunct rule.1 →
+  stmt.2/exc.4 (the roadmap's "rule.2" = a Rust one-id-per-DISJUNCT carryover; the Prolog KB is
+  one-id-per-BLOCK → dense rule.1). USER DECISION (2026-07-16, asked at unit start): a certainty on an
+  EXCEPTION rejects fail-closed (rule-level field, no KB exc-certainty slot; the shared raw-gate field
+  DCG silently admitted it → profile-accepted-but-unmappable) → raw_gate rejects certainty_on_exception,
+  SURFACE.md exc-block = basis-only, +battery hazard/mutant + focused raw_gate reject. Gate run_tests
+  (map_emit) GREEN 15 (docA re-pinned with exc.0 + source, bridge byte-pin + focused exc oracle via
+  same_kb, exception_compiled, rule-layer base/2-transparency); raw_gate 38/38, raw_gate_battery +1
+  mutant. All 10 clinical gates unregressed, 0 warn/err. 22% 222K/1M
 - [ ] court-differential: purpose-built ISOMORPHIC differential vs AceRules `court` — clinical
   pair (recommend rule + contraindicate exception) ↔ republican/pacifist structure; exhaustive
   fact-presence truth table (all subsets of participating facts); per row assert clinical-KB
