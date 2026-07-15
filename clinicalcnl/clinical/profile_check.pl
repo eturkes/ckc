@@ -1,25 +1,33 @@
-% ClinicalCNL post-APE DRS profile checker — the second fail-closed layer (M3.profile-drs;
-% SPEC §10.6, SURFACE.md). The raw gate (raw_gate.pl) whitelists surfaces BEFORE APE; APE then
-% erases surface facts (prefix tokens, numeral spellings, comments, silent anaphora merges), so an
-% independent layer re-validates the DRS AFTER APE. profile_check/4 is that layer: a pure
-% structural whitelist over the APE DRS term — it reads a term, never runs a parser — fail-closed
-% on anything outside the v1 profile.
+% ClinicalCNL post-APE DRS profile checker — the second fail-closed layer (M3.profile-drs +
+% M3.profile-structure; SPEC §10.6, SURFACE.md). The raw gate (raw_gate.pl) whitelists surfaces
+% BEFORE APE; APE then erases surface facts (prefix tokens, numeral spellings, comments, silent
+% anaphora merges), so an independent layer re-validates the DRS AFTER APE. profile_check/4 is that
+% layer: a pure STRUCTURAL whitelist over the APE DRS term — it reads a term, never runs a parser —
+% fail-closed on anything outside the v1 profile.
 %
 % What it enforces (SURFACE.md + the D-decisions, roadmap §M3):
 %   - the zero-message law: an accepted v1 parse is warning-free. APE's solo seam drops warnings,
 %     so the anaphor and undefined-word `named` holes surface only here and at the raw gate.
 %   - canonical referent hygiene via APE's own is_wellformed/1 (no duplicate / undeclared
-%     referents) — the first-parse-wins canonical backstop.
+%     referents) — the first-parse-wins canonical backstop. It runs FIRST, so the structural walkers
+%     below may assume distinct, declared referents and match companion atoms by referent identity (==).
 %   - a recursive named(_) scan against the pn allowlist (the p6 `named` hole discriminator).
 %   - the rule shape drs([],[=>(guard, drs([],[op]))]), its consequent op decoded and matched to
 %     the raw-header keyword (D1) — defense-in-depth over the raw gate's surface cross-check.
-%   - a guard whitelist: population / concept / interval objects, the of-relation and have-predicate,
-%     with one level of interval sublist (D8/D9 nest leq/less bounds). It rejects in-guard negation
-%     (-drs), disjunction (v), bare-eq / exactly interval bounds (the single-bound law), and a
-%     negative interval bound (v1 INTs are non-negative, per the raw gate's valid_int_atom).
-%   - the action shape predicate(_, take, <subject>, named(<registered drug>)), whose subject is the
+%   - a STRUCTURAL guard whitelist (M3.profile-structure): exactly one population object plus one or
+%     more WELL-WIRED components. A component is a concept {object(C,eq,1), predicate(have,Pop,C)}
+%     or an interval {object(age,eq,1), object(year,CountOp,N), relation(age,of,year),
+%     predicate(have,Pop,age)} with D9 placement (geq/greater top-level, leq/less in a one-level
+%     sublist) and correct of/have wiring. A bounded age range (>=1 well-wired interval, any count)
+%     is admitted (user decision 2026-07-15). It rejects a patient-only guard, a mis-placed /
+%     mis-wired interval, a non-interval atom in the interval sublist, in-guard negation (-drs),
+%     disjunction (v), a non-v1 interval marker (exactly / bare eq), a negative interval bound, and
+%     any alien conjunct.
+%   - the action shape predicate(_, take, <subject>, named(<registered drug>)), subject == the
 %     guard's population referent.
-%   - the exception body: a bare, interval-free, op-free concept-have condition (D6).
+%   - the exception body (D6): exactly one population + one concept wired by have (single-concept,
+%     interval-free, op-free). It rejects a patient-only / multi-concept / empty body, a mis-wired
+%     have, and any alien (op / interval) atom.
 %
 % The DRS is acetext_to_drs/5's term (real referent vars + `-SID/TID` provenance); the gate
 % (profile_check_tests.pl) reconstructs it from the byte-pinned surface goldens — a serialized DRS
@@ -51,19 +59,17 @@ profile_check(Ctx, Drs, Messages, Result) :-
     ;   Result = reject(bad_top_shape)
     ).
 
-% body_outcome(+Ctx, +Drs, -Outcome) — the shape + content whitelist per Ctx kind. The head pins
+% body_outcome(+Ctx, +Drs, -Outcome) — the shape + structural whitelist per Ctx kind. The head pins
 % the top-level DRS shape (a rule's implication / an exception's bare body); a DRS that fails to
 % match the head leaves body_outcome to FAIL, so profile_check reports bad_top_shape. Outcome is
 % ok | reject(Reason).
 body_outcome(rule(_, Keyword, _, _, _),
              drs([], [ =>(drs(_, GConds), drs([], [OpCond])) ]),
              Outcome) :- !,
-    % guard_outcome + population_ref run unconditionally (both total, deterministic) so PatRef stays
-    % bound through to the action check; a failing if-condition would otherwise undo the binding.
-    guard_outcome(GConds, GO),
-    population_ref(GConds, PatRef, PO),
+    % guard_check runs unconditionally (total, deterministic) so PatRef stays bound through to the
+    % action check; a failing if-condition would otherwise undo the binding.
+    guard_check(GConds, PatRef, GO),
     (   GO = reject(_)                 -> Outcome = GO
-    ;   PO = reject(_)                 -> Outcome = PO
     ;   \+ consequent_op(OpCond, _, _) -> Outcome = reject(bad_consequent)
     ;   consequent_op(OpCond, Op, ActionDrs),
         reg_keyword(Keyword, ExpOp, _, _),
@@ -74,34 +80,156 @@ body_outcome(rule(_, Keyword, _, _, _),
 body_outcome(exception(_, _, _, _), drs(_, Conds), Outcome) :- !,
     exception_outcome(Conds, Outcome).
 
-% --- guard walker: every conjunct a whitelisted population / concept / interval atom, with a
-% single level of sublist nesting (D8/D9 place leq/less interval atoms in a nested list). ---------
-guard_outcome([], ok).
-guard_outcome([C|Cs], Outcome) :-
-    guard_item(C, IO),
-    ( IO = reject(_) -> Outcome = IO ; guard_outcome(Cs, Outcome) ).
+% ==========================================================================================
+% Structural guard whitelist. Two passes over the guard's condition list.
+%   normalize/3  — validate each interval marker + its D9 placement and flatten each one-level
+%                  interval sublist, so the wiring pass sees a flat conjunct list.
+%   wire_guard/3 — bind the sole population referent, then consume the flat conjuncts
+%                  component-by-component (each anchored by a concept / age object + its wiring),
+%                  requiring >=1 component and no leftover atom.
+% Companion atoms are matched by referent IDENTITY (==), sound because is_wellformed/1 already
+% proved the referents distinct and declared.
+% ==========================================================================================
 
-% guard_item(+Conjunct, -Outcome). A list conjunct is a one-level interval sublist; a bare atom is a
-% population / concept / quantity object, the of-relation, or the have-predicate. A `year` unit
-% object carries the interval bound (v1 markers only); every other object is an eq-1 head noun.
-guard_item(List, Outcome) :- is_list(List), !, sublist_outcome(List, Outcome).
-guard_item(object(_, N, countable, na, eq, 1)-_, ok) :- eq1_noun(N), !.
-guard_item(object(_, N, countable, na, CO, INT)-_, Outcome) :- unit_noun(N), !,
+guard_check(GConds, PatRef, Outcome) :-
+    normalize(GConds, Flat, NO),
+    ( NO = reject(_) -> Outcome = NO ; wire_guard(Flat, PatRef, Outcome) ).
+
+% --- pass 1: interval marker + D9 placement, flattening interval sublists --------------------------
+
+% normalize(+Conds, -Flat, -Outcome) — Flat (meaningful only when Outcome=ok) is Conds with each
+% valid interval sublist replaced by its atoms; Outcome names the FIRST interval / sublist defect.
+normalize([], [], ok).
+normalize([C|Cs], Flat, Outcome) :-
+    norm_item(C, Atoms, IO),
+    (   IO = reject(_)
+    ->  Flat = [], Outcome = IO
+    ;   normalize(Cs, Rest, Outcome), append(Atoms, Rest, Flat)
+    ).
+
+% norm_item(+Conjunct, -Atoms, -Outcome) — a list conjunct is a one-level interval sublist (nested
+% leq/less bound), flattened to its atoms; a top-level year object carries a top-placed bound
+% (geq/greater); every other conjunct passes through for the wiring pass.
+norm_item(List, Atoms, Outcome) :- is_list(List), !, norm_sublist(List, Atoms, Outcome).
+norm_item(object(R, N, Ct, U, CO, Num)-P, [object(R, N, Ct, U, CO, Num)-P], Outcome) :-
+    unit_noun(N), !, check_year(CO, Num, top, Outcome).
+norm_item(C, [C], ok).
+
+% norm_sublist(+List, -Atoms, -Outcome) — a nested interval bound: an of-relation + a bounded year
+% object (nested placement), flattened; any other element (incl. a deeper list) rejects.
+norm_sublist([], [], ok).
+norm_sublist([E|Es], Atoms, Outcome) :-
+    (   sublist_element(E, EAtoms, IO)
+    ->  (   IO = reject(_)
+        ->  Atoms = [], Outcome = IO
+        ;   norm_sublist(Es, Rest, Outcome), append(EAtoms, Rest, Atoms)
+        )
+    ;   Atoms = [], Outcome = reject(interval_sublist(E))
+    ).
+
+sublist_element(relation(A, of, Y)-P, [relation(A, of, Y)-P], ok) :- !.
+sublist_element(object(R, N, Ct, U, CO, Num)-P, [object(R, N, Ct, U, CO, Num)-P], Outcome) :-
+    unit_noun(N), !, check_year(CO, Num, nested, Outcome).
+
+% check_year(+CountOp, +Num, +Placement, -Outcome) — a v1 interval bound: a single-bound marker
+% (exactly / bare eq are non-v1), a non-negative integer value, and D9 placement (geq/greater must
+% be top-level, leq/less nested).
+check_year(CO, Num, Place, Outcome) :-
     (   \+ v1_countop(CO)             -> Outcome = reject(interval_countop(CO))
-    ;   \+ ( integer(INT), INT >= 0 ) -> Outcome = reject(interval_bound(INT))
+    ;   \+ ( integer(Num), Num >= 0 ) -> Outcome = reject(interval_bound(Num))
+    ;   \+ placement_ok(CO, Place)    -> Outcome = reject(interval_placement(CO))
     ;   Outcome = ok
     ).
-guard_item(relation(_, of, _)-_, ok) :- !.
-guard_item(predicate(_, have, _, _)-_, ok) :- !.
-guard_item(Other, reject(guard_shape(Other))).
 
-% sublist_outcome(+Items, -Outcome) — a one-level interval sublist: interval atoms only, no further
-% nesting.
-sublist_outcome([], ok).
-sublist_outcome([C|Cs], Outcome) :-
-    (   is_list(C) -> Outcome = reject(nested_sublist(C))
-    ;   guard_item(C, IO), ( IO = reject(_) -> Outcome = IO ; sublist_outcome(Cs, Outcome) )
+placement_ok(geq,     top).
+placement_ok(greater, top).
+placement_ok(leq,     nested).
+placement_ok(less,    nested).
+
+% --- pass 2: population + component wiring ---------------------------------------------------------
+
+% wire_guard(+Flat, -PatRef, -Outcome) — bind PatRef to the sole population referent, then consume
+% the remaining conjuncts as well-wired concept / interval components.
+wire_guard(Flat, PatRef, Outcome) :-
+    population_refs(Flat, Pops),
+    (   Pops = [PatRef]
+    ->  exclude_pop(Flat, PatRef, Pool),
+        consume_components(Pool, PatRef, 0, Outcome)
+    ;   Outcome = reject(bad_population)
     ).
+
+% population_refs(+Conds, -Refs) — the referents of every top-level population object.
+population_refs([], []).
+population_refs([object(R, N, countable, na, eq, 1)-_|Cs], [R|Rs]) :- reg_population(_, N), !,
+    population_refs(Cs, Rs).
+population_refs([_|Cs], Rs) :- population_refs(Cs, Rs).
+
+% exclude_pop(+Conds, +PatRef, -Pool) — drop the sole population object (by referent identity).
+exclude_pop([], _, []).
+exclude_pop([object(R, _, _, _, _, _)-_|Cs], PatRef, Cs) :- R == PatRef, !.
+exclude_pop([C|Cs], PatRef, [C|Pool]) :- exclude_pop(Cs, PatRef, Pool).
+
+% consume_components(+Pool, +PatRef, +N0, -Outcome) — pull a complete component out of Pool
+% (anchored by a concept / age object + its wiring) and recurse. When no anchor remains, a leftover
+% conjunct is a wiring / shape violation; otherwise at least one component is required.
+consume_components(Pool, PatRef, N0, Outcome) :-
+    (   select_anchor(Pool, Obj, Pool1)
+    ->  anchor(Obj, PatRef, Pool1, Pool2, R),
+        (   R = reject(_) -> Outcome = R
+        ;   N1 is N0 + 1, consume_components(Pool2, PatRef, N1, Outcome)
+        )
+    ;   (   Pool = [L|_] -> leftover_reject(L, Outcome)
+        ;   N0 =:= 0     -> Outcome = reject(no_guard_component)
+        ;   Outcome = ok
+        )
+    ).
+
+% select_anchor(+Pool, -Obj, -Rest) — remove the first concept object or age object.
+select_anchor([Obj|T], Obj, T) :- anchor_object(Obj), !.
+select_anchor([H|T], Obj, [H|Rest]) :- select_anchor(T, Obj, Rest).
+
+anchor_object(object(_, N, countable, na, eq, 1)-_) :- component_noun(N).
+component_noun(N) :- reg_concept(_, N), !.
+component_noun(N) :- reg_quantity(_, N, _, _, _), !.
+
+% anchor(+Object, +PatRef, +Pool, -Rest, -Outcome) — consume Object's component from Pool. A concept
+% needs its have (PatRef -> concept); an interval needs its have plus an of-relation + bounded year
+% object (age -> year). A missing / mis-wired companion is a guard_wiring violation naming Object.
+anchor(Obj, PatRef, Pool, Rest, Outcome) :- Obj = object(C, N, _, _, _, _)-_, reg_concept(_, N), !,
+    (   select_have(C, PatRef, Pool, Rest) -> Outcome = ok
+    ;   Rest = Pool, Outcome = reject(guard_wiring(Obj))
+    ).
+anchor(Obj, PatRef, Pool, Rest, Outcome) :- Obj = object(A, N, _, _, _, _)-_, reg_quantity(_, N, _, _, _), !,
+    (   select_have(A, PatRef, Pool, Pool1),
+        select_rel(A, Y, Pool1, Pool2),
+        select_year(Y, Pool2, Rest)
+    ->  Outcome = ok
+    ;   Rest = Pool, Outcome = reject(guard_wiring(Obj))
+    ).
+
+% select_have(+ObjRef, +PatRef, +Pool, -Rest) — remove predicate(_,have,PatRef,ObjRef) (subject and
+% object matched by referent identity). Fails if absent or the subject is not PatRef.
+select_have(ObjRef, PatRef, [predicate(_, have, S, O)-_|T], T) :- S == PatRef, O == ObjRef, !.
+select_have(ObjRef, PatRef, [X|T], [X|Rest]) :- select_have(ObjRef, PatRef, T, Rest).
+
+% select_rel(+AgeRef, -YearRef, +Pool, -Rest) — remove relation(AgeRef, of, YearRef) (age matched by
+% identity), binding YearRef.
+select_rel(A, Y, [relation(A2, of, Y2)-_|T], T) :- A2 == A, !, Y = Y2.
+select_rel(A, Y, [X|T], [X|Rest]) :- select_rel(A, Y, T, Rest).
+
+% select_year(+YearRef, +Pool, -Rest) — remove the bounded year object with referent YearRef.
+select_year(Y, [object(Y2, N, _, _, _, _)-_|T], T) :- Y2 == Y, unit_noun(N), !.
+select_year(Y, [X|T], [X|Rest]) :- select_year(Y, T, Rest).
+
+% leftover_reject(+Conjunct, -Outcome) — a guard conjunct left after component matching: an orphan
+% wiring piece (a have / of-relation / bounded year object with no owning component) is a wiring
+% error; anything else (disjunction, in-guard negation, an alien atom) is a guard-shape violation.
+leftover_reject(C, reject(guard_wiring(C))) :- orphan_piece(C), !.
+leftover_reject(C, reject(guard_shape(C))).
+
+orphan_piece(predicate(_, have, _, _)-_).
+orphan_piece(relation(_, of, _)-_).
+orphan_piece(object(_, N, countable, na, _, _)-_) :- unit_noun(N).
 
 % --- consequent op: normalize the then-part op condition to its token + action DRS (D1). --------
 consequent_op(should(A), should, A) :- !.
@@ -125,28 +253,45 @@ action_outcome(ActionDrs, PatRef, Outcome) :-
     ;   Outcome = reject(bad_action_shape)
     ).
 
-% --- exception body: a bare, interval-free, op-free concept-have condition (D6). ----------------
-exception_outcome([], ok).
-exception_outcome([C|Cs], Outcome) :-
-    exception_item(C, IO),
-    ( IO = reject(_) -> Outcome = IO ; exception_outcome(Cs, Outcome) ).
+% ==========================================================================================
+% Exception body (D6): exactly one population + one concept, wired by have; interval-free, op-free.
+% An alien (op / interval / relation / any non {population, concept, have}) atom is caught first, so
+% the population / concept cardinality reasons name a genuine cardinality defect. population_refs +
+% concept_refs are hoisted before the conditional so the last branch's referents stay bound.
+% ==========================================================================================
+exception_outcome(Conds, Outcome) :-
+    population_refs(Conds, Pops),
+    concept_refs(Conds, Cs),
+    (   first_exc_alien(Conds, Bad) -> Outcome = reject(exception_shape(Bad))
+    ;   Pops \= [_]                 -> Outcome = reject(bad_exception(population))
+    ;   Cs \= [_]                   -> Outcome = reject(bad_exception(concept_count))
+    ;   Pops = [PatRef], Cs = [CRef],
+        (   has_have(Conds, PatRef, CRef) -> Outcome = ok
+        ;   Outcome = reject(bad_exception(wiring))
+        )
+    ).
 
-exception_item(object(_, N, countable, na, eq, 1)-_, ok) :- concept_or_population(N), !.
-exception_item(predicate(_, have, _, _)-_, ok) :- !.
-exception_item(Other, reject(exception_shape(Other))).
+% first_exc_alien(+Conds, -Bad) — the first conjunct that is not a population object, a concept
+% object, or a have predicate (an op / interval / relation etc.).
+first_exc_alien([C|_], C) :- \+ exc_allowed(C), !.
+first_exc_alien([_|Cs], Bad) :- first_exc_alien(Cs, Bad).
 
-% --- referents + vocabulary ---------------------------------------------------------------------
+exc_allowed(object(_, N, countable, na, eq, 1)-_) :- reg_population(_, N), !.
+exc_allowed(object(_, N, countable, na, eq, 1)-_) :- reg_concept(_, N), !.
+exc_allowed(predicate(_, have, _, _)-_).
 
-% population_ref(+GConds, -PatRef, -Outcome) — bind PatRef to THE population referent (the real var,
-% so the action-subject `==` check is sound), rejecting a guard without exactly one population object.
-population_ref(GConds, PatRef, Outcome) :-
-    reg_population(_, PatNoun),
-    population_refs(GConds, PatNoun, Refs),
-    ( Refs = [PatRef] -> Outcome = ok ; Outcome = reject(bad_population) ).
+% concept_refs(+Conds, -Refs) — the referents of every concept object.
+concept_refs([], []).
+concept_refs([object(R, N, countable, na, eq, 1)-_|Cs], [R|Rs]) :- reg_concept(_, N), !, concept_refs(Cs, Rs).
+concept_refs([_|Cs], Rs) :- concept_refs(Cs, Rs).
 
-population_refs([], _, []).
-population_refs([object(R, N, countable, na, eq, 1)-_|Cs], N, [R|Rs]) :- !, population_refs(Cs, N, Rs).
-population_refs([_|Cs], N, Rs) :- population_refs(Cs, N, Rs).
+% has_have(+Conds, +PatRef, +ConceptRef) — a have predicate wiring PatRef -> ConceptRef (by identity).
+has_have([predicate(_, have, S, O)-_|_], PatRef, CRef) :- S == PatRef, O == CRef, !.
+has_have([_|Cs], PatRef, CRef) :- has_have(Cs, PatRef, CRef).
+
+% ==========================================================================================
+% The recursive named scan + vocabulary.
+% ==========================================================================================
 
 % unregistered_named(+Term, -Name) — some named(Name) anywhere in Term is off the pn allowlist, or
 % is not a ground atom (an unbound name would otherwise BIND through pn_allow/1 and slip the scan).
@@ -166,14 +311,9 @@ named_walk([T|Ts], A0, A) :-
     ;   named_walk(Ts, A0, A)
     ).
 
-% eq-1 head nouns (population subject, condition concepts, the age var noun) vs the interval unit
-% noun (year); the v1 interval markers (SURFACE.md §Intervals; exactly / bare eq are non-v1).
-eq1_noun(N) :- reg_population(_, N).
-eq1_noun(N) :- reg_concept(_, N).
-eq1_noun(N) :- reg_quantity(_, N, _, _, _).
+% unit_noun = the interval unit noun's DRS lemma (year); the v1 interval markers (SURFACE.md
+% §Intervals; exactly / bare eq are non-v1).
 unit_noun(N) :- reg_quantity(_, _, _, _, N).
-concept_or_population(N) :- reg_population(_, N).
-concept_or_population(N) :- reg_concept(_, N).
 v1_countop(geq).
 v1_countop(greater).
 v1_countop(leq).

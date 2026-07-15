@@ -444,48 +444,57 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   unbound var (a singleton-variable warning is the tell). (b) serialize_term/1 GLOBALLY narrows the
   `- ~ => v &` operators (op(0,...), never restored) → order any serialize-using test LAST; functional
   read-back (=>(...), -(...)) + infix `-`/`/` are unaffected regardless.
-- CODEX-REVIEW of profile-battery OVERTURNED the profile-drs SHAPE-per-atom deferral. The prior framing
-  (structure/cardinality routed to map-core/map-exc as defense-in-depth, "each NON-golden-reachable") was
-  WRONG on two counts: (a) SPEC §10.6 = the profile checker rejects ANYTHING outside the registered patterns
-  → structure IS profile_check's job (map-core/map-exc are mappers, not fail-closed validators; the exception
-  case even violated profile_check's own "concept-have" header by accepting a patient-only body); (b) ">1
-  interval object" is GOLDEN-REACHABLE, not blocked — raw_gate `guard_rest --> [and], !, conjunct(later)`
-  permits chained interval conjuncts + profile_check probes `ok` on two year objects. UNDER-REJECTIONS (ALL
-  probed `ok`): top-level leq/less, patient-only guard, patient-only exception, >1 interval,
-  non-interval-in-sublist, unconstrained of/have. → new profile-structure unit (roadmap) makes profile_check
-  a full structural whitelist BEFORE map-core; the one prior in-unit fix stands (F4-neg-bound: guard_item
-  `integer(INT), INT >= 0`). NOTE multi-concept guard is VALID v1 (≥1 component, accepted), not a reject — the
-  old "multi-concept guard → map-exc" routing was itself mis-classified. Open requirements Q at planning: is a
-  bounded multi-interval guard valid v1? (lean yes → accept well-wired ≥1 interval component, don't reject >1).
-- ClinicalCNL profile battery (M3.profile-battery; AUTHORITY = clinical/profile_check_battery_tests.pl — the
-  DRS-side reject battery, the post-APE mirror of raw_gate_battery_tests.pl). Pure test-authoring, no
-  profile_check.pl change; 38 hand-built DRS-term mutants (real referent vars, like the crafted escapes → the
-  checker runs pure/fast, no live APE) over 17 reject Constructs (one CLASS each), per-mutant anti-vacuity
-  (each carries its EXACT accepted base; bases_accept proves base⇒ok). Gate run_tests(profile_battery) 79 GREEN.
-  NEW REUSABLE HONEST-COVERAGE TECHNIQUE (conflict / court-differential / map batteries inherit it — stronger
-  than raw-gate-battery's prose-asserted completeness): the independent construct authority = THE GATE SOURCE
-  PARSED AS PROLOG TERMS. source_reject_constructs/1 opens the checker file, read_term-loops it, walks each
-  clause for reject(Arg) subterms, keeps NONVARIABLE args (comments + reject(Var) control-flow guards
-  auto-excluded — but a real future `reject(BoundVar)` emission would be missed by scanner AND bank alike, so
-  the self-check is not total) → a construct set from the SOURCE not the banked list; constructs_match_source
-  asserts banked==source, every_construct_has_mutant asserts each covered → a future reject with a LITERAL
-  construct fails the self-check if unbanked (codex-review F5: was mis-stated "ground/atom args"). MUTANT-CONSTRUCTION GOTCHAS (map-* batteries reuse — is_wellformed/1 runs BEFORE the shape
-  checks, so a shape mutant MUST stay wellformed): a bare-atom action target (foo) fails is_argument →
-  reject(not_wellformed) NOT bad_action_target → use int(5) (a valid non-named arg); a named(compound) is caught
-  by the earlier named scan → unregistered_named NOT bad_action_target; a top-declared referent used only inside
-  a nested modal box fails is_dom_used → keep the box's referent local. A seemingly is_wellformed-DEAD reject
-  can be LIVE: bad_action_referent (Act =\= the predicate event arg) looks forced to an unused/undeclared ref
-  (→ not_wellformed) yet IS reachable when the used event arg is a GUARD referent (accessible → wellformed) →
-  verify a seemingly-dead is_wellformed-gated reject BY CONSTRUCTION, never declare it dead from a shallow
-  argument. OBSERVED-REJECT DISCIPLINE: dump every mutant's ACTUAL profile_check result and eyeball (swipl -g
-  forall over battery_case) before trusting green — confirms none rejects on an earlier check than intended.
-  CODEX-REVIEW caveats (fold into profile-structure): (F3) mutants_reject used `Result = Reject` UNIFICATION
-  with wildcard payloads → a fabricated `guard_shape(v(foo,bar))` satisfies the pin `guard_shape(v(_,_))`;
-  echo-payload mutants (guard_shape/nested_sublist/exception_shape) never assert the offending subterm or
-  provenance → switch to `=@=` (variant) against a fully-spelled reject term (referent-var identity stays
-  free). (F4) "single-locus edit" overstates — mut_no_population/two_population/action_referent/
-  exception_interval make hygiene-FORCED coordinated multi-field edits; anti-vacuity (base⇒ok, mutant⇒reject)
-  is sound, only the minimality wording → "one construct-locus, coordinated where wellformedness requires".
+- ClinicalCNL profile checker is a full STRUCTURAL whitelist (M3.profile-structure; AUTHORITY =
+  clinical/profile_check.pl — supersedes the SHAPE-per-atom framing; codex-overturned deferral to map-core:
+  SPEC §10.6 = the profile rejects ANYTHING outside the registered patterns, so structure IS profile_check's
+  job, mappers are not validators). Guard = two passes: normalize/3 (validate each interval marker + D9
+  placement — geq/greater top-level, leq/less nested — and flatten each one-level interval sublist) then
+  wire_guard/3 (bind the sole population ref, consume flat conjuncts component-by-component, each anchored by a
+  concept/age OBJECT + its have/of wiring, matched by referent IDENTITY == since is_wellformed ran first; ≥1
+  component, no leftover). Guard rejects: bad_population, no_guard_component (patient-only), guard_wiring(Obj)
+  (missing/mis-wired have/of, orphan piece), interval_placement(CO) (leq/less top | geq/greater nested),
+  interval_sublist(E) (non-{relation,year} sublist element incl. a deeper list), guard_shape(C) (leftover
+  alien/v/-drs). ORDERING that keeps existing goldens green (profile_check_tests.pl UNCHANGED): the leftover
+  check runs BEFORE no_guard_component (so guard_neg = patient+negation stays guard_shape), and interval_countop
+  (exactly/eq) is checked BEFORE placement (so iv_exactly/iv_bare stay interval_countop). Exception body (D6):
+  exactly 1 pop + 1 concept + have; bad_exception(population|concept_count|wiring) + exception_shape for an
+  alien/op/interval atom. USER DECISION (2026-07-15): a bounded age range (>=1 well-wired interval component,
+  ANY count) is v1-admissible — profile ACCEPTS it, verified against the real warning-free product-seam parse
+  (`If a patient has an age of at least 18 years and the patient has an age of less than 65 years then …` → geq
+  top + less nested, zero msgs); NO >1-interval reject. DOWNSTREAM: conflict-core/interval-algebra must
+  intersect same-quantity (age) interval atoms WITHIN a guard before cross-guard overlap; map-core may now
+  assume structural validity.
+- ClinicalCNL profile battery (M3.profile-battery + M3.profile-structure; AUTHORITY =
+  clinical/profile_check_battery_tests.pl — the DRS-side reject battery, post-APE mirror of
+  raw_gate_battery_tests.pl). Pure test-authoring; hand-built DRS-term mutants (real referent vars → pure/fast,
+  no live APE), one CLASS per reject Construct (21), per-mutant anti-vacuity (each carries its EXACT accepted
+  base; bases_accept proves base⇒ok). Gate run_tests(profile_battery) 102 GREEN (3 meta + 49 bases_accept + 49
+  mutants_reject + accept_bounded_range). HONEST-COVERAGE TECHNIQUE (conflict/court-differential/map batteries
+  inherit it — stronger than raw-gate-battery's prose completeness): the independent construct authority = THE
+  GATE SOURCE PARSED AS PROLOG TERMS. source_reject_constructs/1 opens the checker file, read_term-loops, walks
+  each clause for reject(Arg) subterms, keeps NONVARIABLE args (comments + reject(Var) control-flow guards
+  auto-excluded — but a real future reject(BoundVar) would be missed by scanner AND bank alike, so the self-check
+  is not total); constructs_match_source asserts banked==source, every_construct_has_mutant each covered. F3
+  (applied): mutants_reject uses `Result =@= Reject` against a FULLY-SPELLED reject term (not wildcard
+  unification) — echo-payload rejects (guard_shape/interval_sublist/guard_wiring/exception_shape) pin the exact
+  offending subterm, shared with Mut so =@= holds, referent-var identity free. F4 (applied): honest wording "one
+  construct-locus, coordinated where wellformedness requires" (a mutant dropping a component's have etc. touches
+  >1 field to stay wellformed). MUTANT-CONSTRUCTION GOTCHAS (map-* batteries reuse — is_wellformed/1 runs BEFORE
+  the shape checks, so a shape mutant MUST stay wellformed): a bare-atom action target (foo) → not_wellformed not
+  bad_action_target (use int(5)); named(compound) → unregistered_named not bad_action_target; a top-declared
+  referent used only inside a nested modal box fails is_dom_used → keep the box's referent local.
+  bad_action_referent LOOKS is_wellformed-dead yet IS reachable when the used event arg is a GUARD referent
+  (accessible → wellformed) → verify a seemingly-dead reject BY CONSTRUCTION. OBSERVED-REJECT DISCIPLINE: dump
+  every mutant's ACTUAL profile_check result and eyeball (swipl -g forall over battery_case) before trusting green.
+- SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
+  body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
+  that embeds the just-bound Sub → SWI folds the construction into the clause head and DROPS the `Sub = Term`
+  goal, aliasing Sub to a fresh head var (the echo subterm returns UNBOUND; `listing` shows body `A=A`).
+  Minimal repro: `a(Mut,Op) :- Op=f(1), Mut=g(Op).` → `a(g(A),A) :- A=A`, Op unbound. FIX: route the
+  construction through a PREDICATE CALL (mk_rule/mk_exc/…), never a direct `Mut = drs(…)` unification — a call
+  is opaque to head-arg folding so the binding survives (the guard mutants build via mk_rule and were fine; only
+  the two direct-unification exception builders broke). Detect via `listing(Pred)` (body collapses to `A=A`) or
+  the OBSERVED-REJECT dump showing an unbound echo payload.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

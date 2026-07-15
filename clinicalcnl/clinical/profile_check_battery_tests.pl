@@ -1,33 +1,36 @@
-% ClinicalCNL profile-checker DRS reject battery (M3.profile-battery; SPEC §10.6, SURFACE.md).
+% ClinicalCNL profile-checker DRS reject battery (M3.profile-battery + M3.profile-structure;
+% SPEC §10.6, SURFACE.md).
 %
-% The systematic hand-mutant matrix over profile_check/4 (the post-APE DRS whitelist). profile_check_tests.pl
-% carries the accept battery (the v1 goldens) + a non-vacuity floor (the nonv1 goldens' 5 reject paths + 4
-% crafted escapes); this unit adds full DRS-side reject DEPTH: one mutant CLASS per reject Construct the
-% checker emits, each mutant a single-locus edit of a proven-accepted base asserting the exact reject.
-% The hand-built DRS terms carry real referent vars (like the crafted escapes), so the checker runs pure and
-% fast with no live APE — the p7 DRS hazards (v() disjunction, in-guard -drs, a fresh-referent then-part, a
-% bare-then top, an unregistered named, a warning-bearing parse, an op/keyword mismatch per modality,
-% malformed interval sublists) become concrete terms here.
+% The systematic hand-mutant matrix over profile_check/4 (the post-APE STRUCTURAL whitelist).
+% profile_check_tests.pl carries the accept battery (the v1 goldens) + a non-vacuity floor (the nonv1
+% goldens' reject paths + crafted escapes); this unit adds full DRS-side reject DEPTH: one mutant
+% CLASS per reject Construct the checker emits, each mutant a single-locus edit of a proven-accepted
+% base asserting the exact reject. The hand-built DRS terms carry real referent vars (like the crafted
+% escapes), so the checker runs pure and fast with no live APE — the p7 DRS hazards (v() disjunction,
+% in-guard -drs, a fresh-referent then-part, a bare-then top, an unregistered named, a warning-bearing
+% parse, an op/keyword mismatch per modality) plus the M3.profile-structure hazards (a patient-only
+% guard, a mis-placed / mis-wired interval, a non-interval atom in the interval sublist, a malformed
+% exception body) become concrete terms here.
 %
-% Anti-vacuity is PER-MUTANT, not sampled: every case carries its EXACT accepted base and bases_accept proves
-% each base maps to ok, so a reject is the mutation's doing — a base that silently stopped accepting fails
-% bases_accept rather than hiding behind a still-red mutant. Constructs are OBSERVED by running each mutant
-% (never assumed; memory: never assert a reject Construct from a partial probe).
+% Anti-vacuity is PER-MUTANT, not sampled: every case carries its EXACT accepted base and bases_accept
+% proves each base maps to ok, so a reject is the mutation's doing, not a base that silently stopped
+% accepting. Where wellformedness forces a mutant to touch more than one field (e.g. dropping a
+% component's have while keeping the DRS wellformed), the edit is one construct-locus with the
+% coordination wellformedness demands, not a literal single-field diff. Constructs are OBSERVED by
+% running each mutant (never assumed; memory: never assert a reject Construct from a partial probe).
+%
+% F3: mutants_reject asserts Result =@= Reject against a FULLY-SPELLED reject term (not a wildcard
+% unification) — the echo-payload rejects (guard_shape, interval_sublist, guard_wiring, exception_shape,
+% bad_action_target) pin the exact offending subterm, referent-var identity staying free under =@=.
 %
 % HONEST COVERAGE. profile_construct/1 is the closed set of reject Constructs the checker emits, and
-% constructs_match_source binds it to the set scanned from profile_check.pl's own reject(...) sites (parsed as
-% terms — an independent authority, not the self-referential banked list) so a gate Construct nobody banked
-% fails a self-check rather than staying invisible. every_construct_has_mutant then proves each has a mutant:
-% the battery is exhaustive over the gate's emitted reject Constructs. There is NO dead defensive branch — bad_action_referent
-% (Act =\= the predicate's event arg) is reachable when the used event arg is a guard referent (wellformed),
-% so every emitted Construct is covered.
-%
-% Out of reject scope by design (profile_check is SHAPE-per-atom, NOT cardinality/placement — memory
-% codex-930f954): the D9 canonical-guard-shape gaps codex flagged are ACCEPTS here, not rejects, so they carry
-% no profile mutant and are map-core's (the canonical guard shape owner) — a top-level leq/less interval bound
-% (v1_countop admits all four markers regardless of placement), a guard with >1 interval object, a non-interval
-% atom nested inside the interval sublist, and the unconstrained of / have conjunct args (relation(_,of,_) /
-% predicate(_,have,_,_) accept any arguments). profile-battery covers only what profile_check itself rejects.
+% constructs_match_source binds it to the set scanned from profile_check.pl's own reject(...) sites
+% (parsed as terms — an independent authority, not the self-referential banked list) so a gate Construct
+% nobody banked fails a self-check rather than staying invisible. every_construct_has_mutant then proves
+% each has a mutant: the battery is exhaustive over the gate's emitted reject Constructs. The
+% M3.profile-structure rejects (interval_placement / interval_sublist / no_guard_component / guard_wiring
+% / bad_exception) — the accept-gaps codex flagged in profile-battery, now profile_check's to reject —
+% are covered here, not deferred to map-core.
 %
 %   Gate: swipl -q -g "consult('clinical/profile_check_battery_tests.pl'),(run_tests(profile_battery)->halt(0);halt(1))" -t 'halt(1)'
 
@@ -58,15 +61,19 @@ profile_construct(bad_consequent).          % the consequent op is not should / 
 profile_construct(op_mismatch).             % D1 — the decoded op disagrees with the keyword's required op
 profile_construct(interval_countop).        % a non-v1 interval marker (exactly / bare eq)
 profile_construct(interval_bound).          % a negative interval value (v1 INTs are non-negative)
-profile_construct(guard_shape).             % a guard conjunct outside the population / concept / interval set
-profile_construct(nested_sublist).          % a list nested inside the one-level interval sublist
+profile_construct(interval_placement).      % D9 — a leq/less bound at top level, or a geq/greater bound nested
+profile_construct(interval_sublist).        % a non-interval element (incl. a deeper list) in the interval sublist
+profile_construct(guard_shape).             % a guard conjunct outside the component set (v / -drs / an alien atom)
+profile_construct(no_guard_component).      % a guard with a population but no well-wired concept / interval component
+profile_construct(guard_wiring).            % a component object with a missing / mis-wired have / of, or an orphan piece
 profile_construct(bad_population).          % a guard without exactly one population object
 profile_construct(bad_action_referent).     % the action's declared event differs from its predicate event arg
 profile_construct(bad_action_verb).         % the action verb is not the registered take lemma
 profile_construct(action_subject_mismatch). % the action subject is not the guard's population referent
 profile_construct(bad_action_target).       % the action target is not a ground named() drug
 profile_construct(bad_action_shape).        % the consequent action is not a single take-predicate DRS
-profile_construct(exception_shape).         % an exception body conjunct is not a bare concept-have
+profile_construct(exception_shape).         % an exception body conjunct is an op / interval / alien atom
+profile_construct(bad_exception).           % an exception body without exactly one population + one concept (or mis-wired)
 
 % ==========================================================================================
 % Shared DRS fragments (fresh vars per call; var sharing within a fragment is explicit — the population
@@ -105,12 +112,17 @@ consequent('-can',    A, -(drs([], [can(A)]))).
 
 mk_rule(GDom, GConds, OpCond, drs([], [ =>(drs(GDom, GConds), drs([], [OpCond])) ])).
 
+% mk_exc(+Dom, +Conds, -Drs) — a bare exception-body DRS. It is a PREDICATE CALL (not a direct
+% Mut = drs(...) unification in a mutant builder): SWI folds a last-goal head-argument construction
+% into the clause head and DROPS a preceding `Sub = Term` goal (aliasing Sub to a fresh head var,
+% so an echo subterm comes back unbound). Routing construction through a call keeps the subterm bound.
+mk_exc(Dom, Conds, drs(Dom, Conds)).
+
 % ==========================================================================================
 % Accepted bases — each proven by bases_accept. base/2 keys a mutant to its counterfactual accept.
 % ==========================================================================================
 
 base(recommend_rule,       Drs) :- valid_rule(Drs).
-base(patient_rule,         Drs) :- valid_patient_rule(Drs).
 base(interval_rule,        Drs) :- valid_interval_rule(Drs).
 base(nested_interval_rule, Drs) :- valid_nested_interval_rule(Drs).
 base(exception,            Drs) :- valid_exception(Drs).
@@ -118,14 +130,10 @@ base(exception,            Drs) :- valid_exception(Drs).
 valid_rule(Drs) :-
     sepsis_guard(P, GDom, GConds), v1_action(P, A), mk_rule(GDom, GConds, should(A), Drs).
 
-valid_patient_rule(Drs) :-
-    v1_action(P, A),
-    mk_rule([P], [object(P, patient, countable, na, eq, 1)-1/3], should(A), Drs).
-
 valid_interval_rule(Drs) :-
     interval_guard(geq, 18, P, GDom, GConds), v1_action(P, A), mk_rule(GDom, GConds, should(A), Drs).
 
-% the leq/less markers land in a one-level nested sublist (D9); the guard walker flattens one level.
+% the leq/less markers land in a one-level nested sublist (D9); normalize/3 flattens one level.
 valid_nested_interval_rule(Drs) :-
     v1_action(P, A),
     mk_rule([P, Ag, Yr, H],
@@ -134,15 +142,30 @@ valid_nested_interval_rule(Drs) :-
           [ relation(Ag, of, Yr)-1/7, object(Yr, year, countable, na, leq, 18)-1/11 ],
           predicate(H, have, P, Ag)-1/4 ], should(A), Drs).
 
+% valid_range_rule — a bounded age range (age >= 18 AND age < 65): two well-wired interval components,
+% geq top-level + less nested (D9). The exact warning-free product-seam parse (probed 2026-07-15); the
+% user decision (accept >=1 well-wired interval, any count) is realized + verified here, not a reject.
+valid_range_rule(drs([], [ =>(drs([A, B, C, D, E, F, G],
+    [ object(A, patient, countable, na, eq, 1)-1/3,
+      object(B, age,     countable, na, eq, 1)-1/6,
+      object(C, year,    countable, na, geq, 18)-1/11,
+      relation(B, of, C)-1/7,
+      predicate(D, have, A, B)-1/4,
+      object(E, age,     countable, na, eq, 1)-1/17,
+      [ relation(E, of, F)-1/18, object(F, year, countable, na, less, 65)-1/22 ],
+      predicate(G, have, A, E)-1/15 ]),
+    drs([], [should(drs([H], [predicate(H, take, A, named('Abx-A'))-1/30]))])) ])).
+
 valid_exception(drs([P, Cn, H],
     [ object(P,  patient,                    countable, na, eq, 1)-1/2,
       object(Cn, 'severe-renal-impairment',  countable, na, eq, 1)-1/5,
       predicate(H, have, P, Cn)-1/3 ])).
 
 % ==========================================================================================
-% DRS mutants: drs_mutant(?Label, ?Ctx, ?BaseId, ?Mutant, ?RejectArg) — a single-locus edit of BaseId's
-% accepted DRS producing reject(RejectArg). The reject is pinned by functor + every ground arg; the arg's
-% referent vars stay `_`. Messages are empty (the message-law mutant is a separate battery_case clause).
+% DRS mutants: drs_mutant(?Label, ?Ctx, ?BaseId, ?Mutant, ?RejectArg) — a single-construct-locus edit of
+% BaseId's accepted DRS producing reject(RejectArg). The echo-payload rejects pass the exact offending
+% subterm (shared with Mutant) so mutants_reject's =@= pins it whole; the referent vars stay free.
+% Messages are empty (the message-law mutant is a separate battery_case clause).
 % ==========================================================================================
 
 % -- pre-body checks (message / hygiene / named scan / top shape) ---------------------------------------
@@ -157,25 +180,43 @@ drs_mutant(bare_then, R, recommend_rule, Mut, bad_top_shape) :-
 drs_mutant(must_consequent, R, recommend_rule, Mut, bad_consequent) :-
     ctx_recommend(R), sepsis_guard(P, GD, GC), v1_action(P, A), mk_rule(GD, GC, must(A), Mut).
 
-% -- guard walker: intervals, shape, sublist nesting ---------------------------------------------------
+% -- guard: interval marker / bound / D9 placement / sublist -------------------------------------------
 drs_mutant(exactly_marker, R, interval_rule, Mut, interval_countop(exactly)) :-
     ctx_recommend(R), interval_guard(exactly, 18, P, GD, GC), v1_action(P, A), mk_rule(GD, GC, should(A), Mut).
 drs_mutant(negative_bound, R, interval_rule, Mut, interval_bound(-1)) :-
     ctx_recommend(R), interval_guard(geq, -1, P, GD, GC), v1_action(P, A), mk_rule(GD, GC, should(A), Mut).
-drs_mutant(alien_conjunct, R, recommend_rule, Mut, guard_shape(property(_, foo, pos)-_)) :-
-    ctx_recommend(R), mut_guard_alien(Mut).
-drs_mutant(disjunction_conjunct, R, patient_rule, Mut, guard_shape(v(_, _))) :-
-    ctx_recommend(R), mut_guard_disjunction(Mut).
-drs_mutant(in_guard_negation, R, patient_rule, Mut, guard_shape(-(_))) :-
-    ctx_recommend(R), mut_guard_negation(Mut).
-drs_mutant(deep_sublist, R, nested_interval_rule, Mut, nested_sublist([object(_, year, countable, na, leq, 18)-_])) :-
-    ctx_recommend(R), mut_nested_sublist(Mut).
+drs_mutant(leq_top_level, R, interval_rule, Mut, interval_placement(leq)) :-
+    ctx_recommend(R), interval_guard(leq, 18, P, GD, GC), v1_action(P, A), mk_rule(GD, GC, should(A), Mut).
+drs_mutant(geq_nested, R, nested_interval_rule, Mut, interval_placement(geq)) :-
+    ctx_recommend(R), mut_geq_nested(Mut).
+drs_mutant(sublist_alien, R, nested_interval_rule, Mut, interval_sublist(Elem)) :-
+    ctx_recommend(R), mut_sublist_alien(Mut, Elem).
+drs_mutant(deep_sublist, R, nested_interval_rule, Mut, interval_sublist(Elem)) :-
+    ctx_recommend(R), mut_deep_sublist(Mut, Elem).
 
-% -- population referent -------------------------------------------------------------------------------
+% -- guard: shape (an alien / disjunctive / in-guard-negated conjunct is a leftover) -------------------
+drs_mutant(alien_conjunct, R, recommend_rule, Mut, guard_shape(Conj)) :-
+    ctx_recommend(R), mut_guard_alien(Mut, Conj).
+drs_mutant(disjunction_conjunct, R, recommend_rule, Mut, guard_shape(Conj)) :-
+    ctx_recommend(R), mut_guard_disjunction(Mut, Conj).
+drs_mutant(in_guard_negation, R, recommend_rule, Mut, guard_shape(Conj)) :-
+    ctx_recommend(R), mut_guard_negation(Mut, Conj).
+
+% -- guard: population + component cardinality ----------------------------------------------------------
 drs_mutant(zero_population, R, recommend_rule, Mut, bad_population) :-
     ctx_recommend(R), mut_no_population(Mut).
 drs_mutant(two_population, R, recommend_rule, Mut, bad_population) :-
     ctx_recommend(R), mut_two_population(Mut).
+drs_mutant(patient_only, R, recommend_rule, Mut, no_guard_component) :-
+    ctx_recommend(R), mut_patient_only(Mut).
+
+% -- guard: component wiring (a missing / mis-wired have or of, naming the unwireable object) ----------
+drs_mutant(concept_missing_have, R, recommend_rule, Mut, guard_wiring(Obj)) :-
+    ctx_recommend(R), mut_concept_no_have(Mut, Obj).
+drs_mutant(age_missing_bound, R, interval_rule, Mut, guard_wiring(Obj)) :-
+    ctx_recommend(R), mut_age_no_bound(Mut, Obj).
+drs_mutant(of_miswired, R, interval_rule, Mut, guard_wiring(Obj)) :-
+    ctx_recommend(R), mut_of_miswired(Mut, Obj).
 
 % -- action shape ---------------------------------------------------------------------------------------
 drs_mutant(action_event_mismatch, R, recommend_rule, Mut, bad_action_referent) :-
@@ -192,12 +233,20 @@ drs_mutant(nonpredicate_action, R, recommend_rule, Mut, bad_action_shape) :-
     ctx_recommend(R), mut_action_shape(Mut).
 
 % -- exception body (D6) --------------------------------------------------------------------------------
-drs_mutant(exception_op, X, exception, Mut, exception_shape(should(_))) :-
-    ctx_exception(X), mut_exception_op(Mut).
-drs_mutant(exception_interval, X, exception, Mut, exception_shape(object(_, year, countable, na, geq, 18)-_)) :-
-    ctx_exception(X), mut_exception_interval(Mut).
+drs_mutant(exception_op, X, exception, Mut, exception_shape(Op)) :-
+    ctx_exception(X), mut_exception_op(Mut, Op).
+drs_mutant(exception_interval, X, exception, Mut, exception_shape(YObj)) :-
+    ctx_exception(X), mut_exception_interval(Mut, YObj).
+drs_mutant(exception_no_concept, X, exception, Mut, bad_exception(concept_count)) :-
+    ctx_exception(X), mut_exc_no_concept(Mut).
+drs_mutant(exception_multi_concept, X, exception, Mut, bad_exception(concept_count)) :-
+    ctx_exception(X), mut_exc_multi_concept(Mut).
+drs_mutant(exception_two_patient, X, exception, Mut, bad_exception(population)) :-
+    ctx_exception(X), mut_exc_two_patient(Mut).
+drs_mutant(exception_miswired, X, exception, Mut, bad_exception(wiring)) :-
+    ctx_exception(X), mut_exc_miswired(Mut).
 
-% -- mutant term builders (the single-locus edits, spelled out) -----------------------------------------
+% -- mutant term builders (the single-construct-locus edits, spelled out) -------------------------------
 
 % not_wellformed: the population referent P is used in the guard + action but dropped from the guard domain.
 mut_undeclared(Mut) :-
@@ -212,38 +261,65 @@ mut_bare_then(drs([P],
     [ object(P, patient, countable, na, eq, 1)-1/3,
       should(drs([Ev], [predicate(Ev, take, P, named('Abx-A'))-1/14])) ])).
 
-% guard_shape: an alien (non-whitelisted) conjunct; the sepsis referent S stays used so hygiene passes.
-mut_guard_alien(Mut) :-
-    v1_action(P, A),
-    mk_rule([P, S, H],
-        [ object(P, patient, countable, na, eq, 1)-1/3,
-          property(S, foo, pos)-1/6,
-          predicate(H, have, P, S)-1/4 ], should(A), Mut).
-
-% guard_shape: a disjunctive guard conjunct v(_,_) (the D4/p7 or-guard hazard).
-mut_guard_disjunction(Mut) :-
-    v1_action(P, A),
-    mk_rule([P],
-        [ object(P, patient, countable, na, eq, 1)-1/3,
-          v( drs([X], [object(X, sepsis,     countable, na, eq, 1)-1/8]),
-             drs([Y], [object(Y, pregnancy,  countable, na, eq, 1)-1/9]) ) ], should(A), Mut).
-
-% guard_shape: an in-guard negation -(drs(...)) (the D5/p7 hazard; v1 negatives enter via exceptions).
-mut_guard_negation(Mut) :-
-    v1_action(P, A),
-    mk_rule([P],
-        [ object(P, patient, countable, na, eq, 1)-1/3,
-          -( drs([S, H], [ object(S, sepsis, countable, na, eq, 1)-1/8,
-                           predicate(H, have, P, S)-1/6 ]) ) ], should(A), Mut).
-
-% nested_sublist: a list nested inside the one-level interval sublist.
-mut_nested_sublist(Mut) :-
+% interval_placement: a geq bound placed in the leq/less nested sublist (must be top-level, D9).
+mut_geq_nested(Mut) :-
     v1_action(P, A),
     mk_rule([P, Ag, Yr, H],
         [ object(P,  patient, countable, na, eq, 1)-1/3,
           object(Ag, age,     countable, na, eq, 1)-1/6,
-          [ relation(Ag, of, Yr)-1/7, [ object(Yr, year, countable, na, leq, 18)-1/11 ] ],
+          [ relation(Ag, of, Yr)-1/7, object(Yr, year, countable, na, geq, 18)-1/11 ],
           predicate(H, have, P, Ag)-1/4 ], should(A), Mut).
+
+% interval_sublist: a non-interval (concept) atom inside the interval sublist; Elem is the offending element.
+mut_sublist_alien(Mut, Elem) :-
+    v1_action(P, A),
+    Elem = object(S, sepsis, countable, na, eq, 1)-1/12,
+    mk_rule([P, Ag, Yr, H, S],
+        [ object(P,  patient, countable, na, eq, 1)-1/3,
+          object(Ag, age,     countable, na, eq, 1)-1/6,
+          [ relation(Ag, of, Yr)-1/7, object(Yr, year, countable, na, leq, 18)-1/11, Elem ],
+          predicate(H, have, P, Ag)-1/4 ], should(A), Mut).
+
+% interval_sublist: a deeper list nested inside the interval sublist; Elem is that nested list.
+mut_deep_sublist(Mut, Elem) :-
+    v1_action(P, A),
+    Elem = [ object(Yr, year, countable, na, leq, 18)-1/11 ],
+    mk_rule([P, Ag, Yr, H],
+        [ object(P,  patient, countable, na, eq, 1)-1/3,
+          object(Ag, age,     countable, na, eq, 1)-1/6,
+          [ relation(Ag, of, Yr)-1/7, Elem ],
+          predicate(H, have, P, Ag)-1/4 ], should(A), Mut).
+
+% guard_shape: an alien (non-whitelisted) property conjunct; the sepsis referent S stays used so hygiene passes.
+mut_guard_alien(Mut, Conj) :-
+    v1_action(P, A),
+    Conj = property(S, foo, pos)-1/6,
+    mk_rule([P, S, H],
+        [ object(P, patient, countable, na, eq, 1)-1/3,
+          Conj,
+          predicate(H, have, P, S)-1/4 ], should(A), Mut).
+
+% guard_shape: a disjunctive conjunct v(_,_) (the D4/p7 or-guard hazard) beside a valid sepsis component.
+mut_guard_disjunction(Mut, Conj) :-
+    v1_action(P, A),
+    Conj = v( drs([X], [object(X, pregnancy,                   countable, na, eq, 1)-1/8]),
+              drs([Y], [object(Y, 'severe-renal-impairment',   countable, na, eq, 1)-1/9]) ),
+    mk_rule([P, S, H],
+        [ object(P, patient, countable, na, eq, 1)-1/3,
+          object(S, sepsis,  countable, na, eq, 1)-1/6,
+          predicate(H, have, P, S)-1/4,
+          Conj ], should(A), Mut).
+
+% guard_shape: an in-guard negation -(drs(...)) (the D5/p7 hazard) beside a valid sepsis component.
+mut_guard_negation(Mut, Conj) :-
+    v1_action(P, A),
+    Conj = -( drs([S2, H2], [ object(S2, pregnancy, countable, na, eq, 1)-1/8,
+                             predicate(H2, have, P, S2)-1/9 ]) ),
+    mk_rule([P, S, H],
+        [ object(P, patient, countable, na, eq, 1)-1/3,
+          object(S, sepsis,  countable, na, eq, 1)-1/6,
+          predicate(H, have, P, S)-1/4,
+          Conj ], should(A), Mut).
 
 % bad_population: no population object at all (subject = the sepsis referent so hygiene passes).
 mut_no_population(Mut) :-
@@ -257,6 +333,35 @@ mut_two_population(Mut) :-
         [ object(P1, patient, countable, na, eq, 1)-1/3,
           object(P2, patient, countable, na, eq, 1)-1/5,
           predicate(H, have, P2, P1)-1/4 ], should(A), Mut).
+
+% no_guard_component: a population but no concept / interval component (the reduced patient-only guard).
+mut_patient_only(Mut) :-
+    v1_action(P, A),
+    mk_rule([P], [object(P, patient, countable, na, eq, 1)-1/3], should(A), Mut).
+
+% guard_wiring: a concept object with no have; Obj is the unwireable object.
+mut_concept_no_have(Mut, Obj) :-
+    v1_action(P, A),
+    Obj = object(S, sepsis, countable, na, eq, 1)-1/6,
+    mk_rule([P, S], [ object(P, patient, countable, na, eq, 1)-1/3, Obj ], should(A), Mut).
+
+% guard_wiring: an age object with a have but no of-relation / year object bound; Obj is the age object.
+mut_age_no_bound(Mut, Obj) :-
+    v1_action(P, A),
+    Obj = object(Ag, age, countable, na, eq, 1)-1/6,
+    mk_rule([P, Ag, H],
+        [ object(P, patient, countable, na, eq, 1)-1/3, Obj,
+          predicate(H, have, P, Ag)-1/4 ], should(A), Mut).
+
+% guard_wiring: an of-relation linking the age to itself, not to the year object; Obj is the age object.
+mut_of_miswired(Mut, Obj) :-
+    v1_action(P, A),
+    Obj = object(Ag, age, countable, na, eq, 1)-1/6,
+    mk_rule([P, Ag, Yr, H],
+        [ object(P, patient, countable, na, eq, 1)-1/3, Obj,
+          object(Yr, year, countable, na, geq, 18)-1/11,
+          relation(Ag, of, Ag)-1/7,
+          predicate(H, have, P, Ag)-1/4 ], should(A), Mut).
 
 % bad_action_referent: the action's declared event referent Ev is not the predicate's event arg (P, a guard
 % referent used here — wellformed, so this Construct is reachable, not a dead defensive branch).
@@ -277,19 +382,47 @@ mut_action_shape(Mut) :-
     sepsis_guard(_Pop, GD, GC),
     mk_rule(GD, GC, should(drs([X], [object(X, sepsis, countable, na, eq, 1)-1/14])), Mut).
 
-% exception_shape: a modal op inside an exception body.
-mut_exception_op(drs([P, Cn, H],
-    [ object(P,  patient,                   countable, na, eq, 1)-1/2,
-      object(Cn, 'severe-renal-impairment', countable, na, eq, 1)-1/5,
-      predicate(H, have, P, Cn)-1/3,
-      should(drs([X], [object(X, sepsis, countable, na, eq, 1)-1/9])) ])).
+% exception_shape: a modal op inside an exception body; Op is that op condition.
+mut_exception_op(Mut, Op) :-
+    Op = should(drs([Z], [object(Z, sepsis, countable, na, eq, 1)-1/9])),
+    mk_exc([P, Cn, H],
+        [ object(P,  patient,                   countable, na, eq, 1)-1/2,
+          object(Cn, 'severe-renal-impairment', countable, na, eq, 1)-1/5,
+          predicate(H, have, P, Cn)-1/3,
+          Op ], Mut).
 
-% exception_shape: an interval object inside an exception body.
-mut_exception_interval(drs([P, Cn, H, Yr],
-    [ object(P,  patient,                   countable, na, eq, 1)-1/2,
-      object(Cn, 'severe-renal-impairment', countable, na, eq, 1)-1/5,
-      predicate(H, have, P, Cn)-1/3,
-      object(Yr, year, countable, na, geq, 18)-1/9 ])).
+% exception_shape: an interval object inside an exception body; YObj is that year object.
+mut_exception_interval(Mut, YObj) :-
+    YObj = object(Yr, year, countable, na, geq, 18)-1/9,
+    mk_exc([P, Cn, H, Yr],
+        [ object(P,  patient,                   countable, na, eq, 1)-1/2,
+          object(Cn, 'severe-renal-impairment', countable, na, eq, 1)-1/5,
+          predicate(H, have, P, Cn)-1/3,
+          YObj ], Mut).
+
+% bad_exception(concept_count): a patient-only exception body (no concept).
+mut_exc_no_concept(drs([P], [ object(P, patient, countable, na, eq, 1)-1/2 ])).
+
+% bad_exception(concept_count): a multi-concept exception body (two concepts).
+mut_exc_multi_concept(drs([P, S, G, H1, H2],
+    [ object(P, patient,   countable, na, eq, 1)-1/2,
+      object(S, sepsis,    countable, na, eq, 1)-1/5,
+      object(G, pregnancy, countable, na, eq, 1)-1/6,
+      predicate(H1, have, P, S)-1/3,
+      predicate(H2, have, P, G)-1/4 ])).
+
+% bad_exception(population): two population objects in an exception body.
+mut_exc_two_patient(drs([P1, P2, C, H],
+    [ object(P1, patient, countable, na, eq, 1)-1/2,
+      object(P2, patient, countable, na, eq, 1)-1/3,
+      object(C,  sepsis,  countable, na, eq, 1)-1/5,
+      predicate(H, have, P1, C)-1/4 ])).
+
+% bad_exception(wiring): the have links the concept to itself, not the population to the concept.
+mut_exc_miswired(drs([P, C, H],
+    [ object(P, patient, countable, na, eq, 1)-1/2,
+      object(C, sepsis,  countable, na, eq, 1)-1/5,
+      predicate(H, have, C, C)-1/4 ])).
 
 % ==========================================================================================
 % op-mismatch (D1): the decoded consequent op MUST equal the keyword's required op. The registry-derived
@@ -372,12 +505,20 @@ test(bases_accept, [forall(battery_case(Class, Label, Ctx, Base, BMsgs, _, _, _)
     ;   format(user_error, "~N[profile_battery base] ~w/~w: base did not accept, got ~q~n",
                [Class, Label, Result]), fail ).
 
-% -- the mutation matrix: every mutant rejects with exactly its pinned Construct (functor + ground args). -----
+% -- the mutation matrix: every mutant rejects with exactly its pinned Construct (functor + ground args + the
+% echo-payload subterm, referent identity free), asserted by =@= against a fully-spelled reject term. --------
 test(mutants_reject, [forall(battery_case(Class, Label, Ctx, _, _, Mut, MMsgs, Reject))]) :-
     profile_check(Ctx, Mut, MMsgs, Result),
-    (   Result = Reject
+    (   Result =@= Reject
     ->  true
     ;   format(user_error, "~N[profile_battery] ~w/~w: expected ~q, got ~q~n",
                [Class, Label, Reject, Result]), fail ).
+
+% -- the bounded-range accept (user decision 2026-07-15): a >=1 well-wired interval guard of any count is
+% v1-admissible; the exact warning-free probed DRS is accepted, not rejected. --------------------------------
+test(accept_bounded_range) :-
+    ctx_recommend(Ctx), valid_range_rule(Drs),
+    profile_check(Ctx, Drs, [], Result),
+    assertion(Result == ok).
 
 :- end_tests(profile_battery).

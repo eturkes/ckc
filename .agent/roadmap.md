@@ -318,23 +318,26 @@ Cross-unit decisions:
   so the accept-gaps (top-level leq/less placement, >1 interval, non-interval-in-sublist, unconstrained
   of/have + patient-only guard + patient-only/multi-concept exception) are profile_check's to reject → new
   profile-structure unit; F3/F4 battery fixes fold there. 24% 245K/1M
-- [ ] profile-structure: expand `profile_check/4` from SHAPE-per-atom to a full STRUCTURAL whitelist
-  (codex-review of profile-battery; SPEC §10.6 "profile checker rejects anything outside the registered
-  patterns" — the deferral to map-core/map-exc was unsound: they are mappers, not fail-closed validators, and
-  the exception case violated profile_check's OWN "concept-have condition" header). Guard = exactly 1
-  population object + ≥1 WELL-WIRED component — concept {object(_,C,eq,1) + predicate(have,Pop,C)} or interval
-  {object(age) + object(year,CountOp,N) + relation(age,of,year) + predicate(have,Pop,age)} with D9 placement
-  (geq/greater top-level, leq/less nested) + correct of/have wiring; reject patient-only guard, top-level
-  leq/less, mis-wired of/have, non-interval atom in the interval sublist. Exception = exactly 1 concept + have
-  (reject patient-only, multi-concept, empty). REWORK battery: valid_patient_rule base is now invalid
-  (patient-only guard rejects) → give disjunction_conjunct/in_guard_negation a proper-guard base; add a mutant
-  per new reject; apply F3 (mutants_reject via `=@=` against fully-spelled reject terms, not wildcard
-  unification) + F4 (honest wording: one construct-locus + hygiene-forced coordination). OPEN REQUIREMENTS Q
-  (reaches user at planning): is a multi-interval / bounded-range guard (`age >=18 and age <65`, grammar-
-  reachable via guard_rest) VALID v1? LEAN yes → accept ≥1 well-wired interval component (so ">1 interval" is
-  NOT a reject, only mis-wired/mis-placed is); if no → reject >1. Sequence BEFORE map-core (which then assumes
-  structural validity). Gate: run_tests(profile_check + profile_battery) green + new structural mutants. Reads:
-  profile_check.pl + battery + SURFACE.md §Lexicon/Intervals/Exceptions + raw_gate.pl grammar.
+- [x] profile-structure: `profile_check/4` expanded SHAPE-per-atom → full STRUCTURAL whitelist (SPEC §10.6;
+  codex-overturned the map-core deferral — the profile rejects anything outside the registered patterns). Guard =
+  two passes: normalize/3 (interval marker + D9 placement, flatten the one-level interval sublist) + wire_guard/3
+  (sole population ref, then component-by-component consume anchored on concept/age OBJECTs + have/of wiring,
+  ==-matched post-is_wellformed; ≥1 component, no leftover). New rejects: no_guard_component (patient-only),
+  guard_wiring(Obj) (missing/mis-wired have/of, orphan), interval_placement(CO) (leq/less top | geq/greater
+  nested), interval_sublist(E) (non-{relation,year} sublist element incl. a deeper list),
+  bad_exception(population|concept_count|wiring); guard_shape / interval_countop / bad_population kept. Ordering
+  keeps goldens green (profile_check_tests.pl UNCHANGED): leftover-reject BEFORE no_guard_component (guard_neg =
+  patient+negation stays guard_shape), interval_countop (exactly/eq) BEFORE placement (iv_exactly/iv_bare).
+  Exception (D6) = exactly 1 pop + 1 concept + have. USER DECISION (2026-07-15, asked at unit start): a bounded
+  age range (≥1 well-wired interval component, ANY count) is VALID v1 → ACCEPTED, verified against the real
+  warning-free seam parse (geq top + less nested, 0 msgs); NO >1-interval reject → conflict-core / interval-algebra
+  must intersect same-quantity (age) interval atoms WITHIN a guard before cross-guard overlap. Battery reworked
+  (profile_check_battery_tests.pl): patient_rule base retired → patient_only mutant; disjunction/negation re-based
+  to recommend_rule; +mutants per new reject; F3 (mutants_reject `=@=` vs fully-spelled reject terms, echo
+  subterms pinned); F4 wording; honest coverage now 21 constructs == source scan; accept_bounded_range test on the
+  real probed bytes. Gate run_tests(profile_check) 40 + run_tests(profile_battery) 102 GREEN; all 8 clinical gates
+  unregressed, 0 warn/err. Found+fixed an SWI clause-compile quirk (memory Lessons: `Sub=Term, Mut=drs([…,Sub])`
+  last-goal head-arg fold DROPS the Sub binding → route via a predicate call mk_exc). 33% 333K/1M
 - [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
   via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
   one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via
@@ -370,8 +373,11 @@ Cross-unit decisions:
 - [ ] conflict-core: `clinical/conflict.pl` — eligibility (same action key ∧ §L·conflict
   direction groups) + context overlap: DNF disjunct-pair enumeration × concept polarity ×
   interval intersection (intervals.pl) × exception expansion (exceptions join their statement
-  as negated concepts). Gate: plunit hand-oracled pair battery (overlap/disjoint/polarity/
-  exception cases). Reads: intervals.pl + kb_kernel.pl + map outputs.
+  as negated concepts). Bounded-range guards are v1 (user 2026-07-15, profile-structure) → a
+  guard may carry >1 same-quantity (age) interval atom; intersect them WITHIN the guard to its
+  effective bound before cross-guard overlap. Gate: plunit hand-oracled pair battery
+  (overlap/disjoint/polarity/exception + a bounded-range pair). Reads: intervals.pl +
+  kb_kernel.pl + map outputs.
 - [ ] conflict-verdict: verdict layer — records {category semantic_contradiction |
   semantic_no_conflict (+ documented_no_conflict_result), kind deontic_direction_conflict,
   participating_rules set `a.<source>.rule.k`, evidence {document_id, sentence_index},
