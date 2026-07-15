@@ -450,15 +450,23 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   job, mappers are not validators). Guard = two passes: normalize/3 (validate each interval marker + D9
   placement — geq/greater top-level, leq/less nested — and flatten each one-level interval sublist) then
   wire_guard/3 (bind the sole population ref, consume flat conjuncts component-by-component, each anchored by a
-  concept/age OBJECT + its have/of wiring, matched by referent IDENTITY == since is_wellformed ran first; ≥1
-  component, no leftover). Guard rejects: bad_population, no_guard_component (patient-only), guard_wiring(Obj)
-  (missing/mis-wired have/of, orphan piece), interval_placement(CO) (leq/less top | geq/greater nested),
-  interval_sublist(E) (non-{relation,year} sublist element incl. a deeper list), guard_shape(C) (leftover
-  alien/v/-drs). ORDERING that keeps existing goldens green (profile_check_tests.pl UNCHANGED): the leftover
-  check runs BEFORE no_guard_component (so guard_neg = patient+negation stays guard_shape), and interval_countop
-  (exactly/eq) is checked BEFORE placement (so iv_exactly/iv_bare stay interval_countop). Exception body (D6):
-  exactly 1 pop + 1 concept + have; bad_exception(population|concept_count|wiring) + exception_shape for an
-  alien/op/interval atom. USER DECISION (2026-07-15): a bounded age range (>=1 well-wired interval component,
+  concept/age OBJECT + its have/of wiring, matched by referent IDENTITY == — GUARDED by a per-box
+  object-referent-uniqueness check (object_refs+all_distinct → shared_object_referent), since is_wellformed
+  proves DECLARATION uniqueness NOT object-role (codex-review: two object atoms may SHARE one referent + a
+  self-relation/have and stay wellformed → the old "== is sound because is_wellformed ran first" claim was
+  false; the uniqueness check restores it); ≥1 component, no leftover). Guard rejects: bad_population,
+  no_guard_component (patient-only), shared_object_referent (role-aliased objects), guard_wiring(Obj)
+  (missing/mis-wired have/of, orphan piece, OR a year object not countable/na — pinned everywhere → mass/kg
+  fails to wire), interval_placement(CO) (leq/less top | geq/greater nested), interval_sublist(List) (the
+  nested bound is EXACTLY [of-relation, countable/na year object] in THAT order — any other list, incl.
+  singleton/reversed/deeper, echoes whole), guard_shape(C) (leftover alien/v/-drs). Top-level check
+  bad_provenance (an atomic provenance SID≠1; D2 fixes SID=1 per SURFACE.md), after is_wellformed. ORDERING
+  that keeps existing goldens green (profile_check_tests.pl UNCHANGED): the leftover check runs BEFORE
+  no_guard_component (so guard_neg = patient+negation stays guard_shape), and interval_countop (exactly/eq) is
+  checked BEFORE placement (so iv_exactly/iv_bare stay interval_countop). Exception body (D6): EXACTLY 1 pop
+  obj + 1 concept obj + 1 have (exc_wire consumes both objects, requires the have as SOLE leftover → an
+  extra/duplicate/mis-wired have = bad_exception(wiring)); bad_exception(population|concept_count|aliased|
+  wiring) + exception_shape for an alien/op/interval atom. USER DECISION (2026-07-15): a bounded age range (>=1 well-wired interval component,
   ANY count) is v1-admissible — profile ACCEPTS it, verified against the real warning-free product-seam parse
   (`If a patient has an age of at least 18 years and the patient has an age of less than 65 years then …` → geq
   top + less nested, zero msgs); NO >1-interval reject. DOWNSTREAM: conflict-core/interval-algebra must
@@ -467,14 +475,16 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
 - ClinicalCNL profile battery (M3.profile-battery + M3.profile-structure; AUTHORITY =
   clinical/profile_check_battery_tests.pl — the DRS-side reject battery, post-APE mirror of
   raw_gate_battery_tests.pl). Pure test-authoring; hand-built DRS-term mutants (real referent vars → pure/fast,
-  no live APE), one CLASS per reject Construct (21), per-mutant anti-vacuity (each carries its EXACT accepted
-  base; bases_accept proves base⇒ok). Gate run_tests(profile_battery) 102 GREEN (3 meta + 49 bases_accept + 49
-  mutants_reject + accept_bounded_range). HONEST-COVERAGE TECHNIQUE (conflict/court-differential/map batteries
+  no live APE), one CLASS per reject Construct (23), per-mutant anti-vacuity (each carries its EXACT accepted
+  base; bases_accept proves base⇒ok). Gate run_tests(profile_battery) 115 GREEN (55 bases_accept + 55
+  mutants_reject + 4 coverage meta + accept_bounded_range). HONEST-COVERAGE TECHNIQUE (conflict/court-differential/map batteries
   inherit it — stronger than raw-gate-battery's prose completeness): the independent construct authority = THE
   GATE SOURCE PARSED AS PROLOG TERMS. source_reject_constructs/1 opens the checker file, read_term-loops, walks
   each clause for reject(Arg) subterms, keeps NONVARIABLE args (comments + reject(Var) control-flow guards
-  auto-excluded — but a real future reject(BoundVar) would be missed by scanner AND bank alike, so the self-check
-  is not total); constructs_match_source asserts banked==source, every_construct_has_mutant each covered. F3
+  auto-excluded); constructs_match_source asserts banked==source at FUNCTOR level, every_construct_has_mutant
+  each has a mutant, AND (codex-review) ground_rejects_exercised pins every GROUND source reject reason (a
+  discriminant like bad_exception(population)) to a mutant that observably returns it — so a per-functor
+  discriminant cannot go untested; only VAR-arg echo-payload rejects (guard_shape(C) etc.) stay functor-only. F3
   (applied): mutants_reject uses `Result =@= Reject` against a FULLY-SPELLED reject term (not wildcard
   unification) — echo-payload rejects (guard_shape/interval_sublist/guard_wiring/exception_shape) pin the exact
   offending subterm, shared with Mut so =@= holds, referent-var identity free. F4 (applied): honest wording "one
@@ -495,6 +505,14 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   is opaque to head-arg folding so the binding survives (the guard mutants build via mk_rule and were fine; only
   the two direct-unification exception builders broke). Detect via `listing(Pred)` (body collapses to `A=A`) or
   the OBSERVED-REJECT dump showing an unbound echo payload.
+- Prolog term-walk false-positive (bit M3.profile-structure codex-review; every map-* DRS walker beware):
+  unifying an UNBOUND var with a STRUCTURED pattern SUCCEEDS and binds the pattern's own vars → a walker clause
+  `f(_-(SID/TID), SID/TID) :- SID \== 1` recursing into a DRS's unbound REFERENT vars matches each var (SID
+  fresh-unbound, `Var \== 1` vacuously true) → a false reject on EVERY real DRS. Hidden by atom-referent unit
+  probes (my direct probe passed); surfaces only on real var-bearing terms (the harness showed the reject with
+  UNBOUND payload on every case incl. canonical accepts). FIX: guard the match clause with nonvar(T) + a TYPE
+  test on the extracted field (integer(SID), SID =\= 1) so unbound subterms fall through to the recursion. The
+  OBSERVED-REJECT dump over crafted-var terms (not atom stand-ins) is what catches it.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

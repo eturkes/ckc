@@ -70,7 +70,7 @@ crafted_reject('action target = patient referent var', rule(0, recommend, 0, non
              drs([],[should(drs([A],[predicate(A,take,P,P)-1/14]))]))]),
   reject(bad_action_target(_))).
 crafted_reject('action target = non-atom drug name', rule(0, recommend, 0, none, none),
-  drs([],[=>(drs([P],[object(P,patient,countable,na,eq,1)-1/3]),
+  drs([],[=>(drs([P,C,H],[object(P,patient,countable,na,eq,1)-1/3,object(C,sepsis,countable,na,eq,1)-1/6,predicate(H,have,P,C)-1/4]),
              drs([],[should(drs([A],[predicate(A,take,P,named(foo(bar)))-1/14]))]))]),
   reject(unregistered_named(foo(bar)))).
 crafted_reject('negative interval bound', rule(0, recommend, 0, none, none),

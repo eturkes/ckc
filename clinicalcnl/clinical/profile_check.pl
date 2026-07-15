@@ -9,8 +9,10 @@
 %   - the zero-message law: an accepted v1 parse is warning-free. APE's solo seam drops warnings,
 %     so the anaphor and undefined-word `named` holes surface only here and at the raw gate.
 %   - canonical referent hygiene via APE's own is_wellformed/1 (no duplicate / undeclared
-%     referents) — the first-parse-wins canonical backstop. It runs FIRST, so the structural walkers
-%     below may assume distinct, declared referents and match companion atoms by referent identity (==).
+%     referents) — the first-parse-wins canonical backstop. It runs FIRST, proving each DECLARED
+%     referent unique and every used referent declared — but NOT that a referent fills one object role
+%     (two object atoms may share one referent and stay well-formed), so the structural passes add a
+%     per-box object-referent-uniqueness check before matching companion atoms by identity (==).
 %   - a recursive named(_) scan against the pn allowlist (the p6 `named` hole discriminator).
 %   - the rule shape drs([],[=>(guard, drs([],[op]))]), its consequent op decoded and matched to
 %     the raw-header keyword (D1) — defense-in-depth over the raw gate's surface cross-check.
@@ -54,10 +56,16 @@
 profile_check(Ctx, Drs, Messages, Result) :-
     (   Messages \== []                 -> Result = reject(nonempty_messages)
     ;   \+ is_wellformed(Drs)           -> Result = reject(not_wellformed)
+    ;   drs_provenance_bad(Drs, Prov)   -> Result = reject(bad_provenance(Prov))
     ;   unregistered_named(Drs, Name)   -> Result = reject(unregistered_named(Name))
     ;   body_outcome(Ctx, Drs, Outcome) -> Result = Outcome
     ;   Result = reject(bad_top_shape)
     ).
+
+% drs_provenance_bad(+Term, -Bad) — the first atomic provenance label -(SID/TID) with SID \== 1. D2
+% parses one sentence at a time, so APE fixes SID = 1 (SURFACE.md); any other sentence id is off-profile.
+drs_provenance_bad(T, SID/TID) :- nonvar(T), T = -(_, SID/TID), integer(SID), SID =\= 1, !.
+drs_provenance_bad(T, Bad) :- compound(T), arg(_, T, Sub), drs_provenance_bad(Sub, Bad).
 
 % body_outcome(+Ctx, +Drs, -Outcome) — the shape + structural whitelist per Ctx kind. The head pins
 % the top-level DRS shape (a rule's implication / an exception's bare body); a DRS that fails to
@@ -87,8 +95,9 @@ body_outcome(exception(_, _, _, _), drs(_, Conds), Outcome) :- !,
 %   wire_guard/3 — bind the sole population referent, then consume the flat conjuncts
 %                  component-by-component (each anchored by a concept / age object + its wiring),
 %                  requiring >=1 component and no leftover atom.
-% Companion atoms are matched by referent IDENTITY (==), sound because is_wellformed/1 already
-% proved the referents distinct and declared.
+% Companion atoms are matched by referent IDENTITY (==); wire_guard first proves the guard's object
+% referents pairwise-distinct (is_wellformed/1 proves declarations unique, not object roles), so a
+% matched companion resolves to exactly one entity.
 % ==========================================================================================
 
 guard_check(GConds, PatRef, Outcome) :-
@@ -111,25 +120,17 @@ normalize([C|Cs], Flat, Outcome) :-
 % leq/less bound), flattened to its atoms; a top-level year object carries a top-placed bound
 % (geq/greater); every other conjunct passes through for the wiring pass.
 norm_item(List, Atoms, Outcome) :- is_list(List), !, norm_sublist(List, Atoms, Outcome).
-norm_item(object(R, N, Ct, U, CO, Num)-P, [object(R, N, Ct, U, CO, Num)-P], Outcome) :-
+norm_item(object(R, N, countable, na, CO, Num)-P, [object(R, N, countable, na, CO, Num)-P], Outcome) :-
     unit_noun(N), !, check_year(CO, Num, top, Outcome).
 norm_item(C, [C], ok).
 
-% norm_sublist(+List, -Atoms, -Outcome) — a nested interval bound: an of-relation + a bounded year
-% object (nested placement), flattened; any other element (incl. a deeper list) rejects.
-norm_sublist([], [], ok).
-norm_sublist([E|Es], Atoms, Outcome) :-
-    (   sublist_element(E, EAtoms, IO)
-    ->  (   IO = reject(_)
-        ->  Atoms = [], Outcome = IO
-        ;   norm_sublist(Es, Rest, Outcome), append(EAtoms, Rest, Atoms)
-        )
-    ;   Atoms = [], Outcome = reject(interval_sublist(E))
-    ).
-
-sublist_element(relation(A, of, Y)-P, [relation(A, of, Y)-P], ok) :- !.
-sublist_element(object(R, N, Ct, U, CO, Num)-P, [object(R, N, Ct, U, CO, Num)-P], Outcome) :-
-    unit_noun(N), !, check_year(CO, Num, nested, Outcome).
+% norm_sublist(+List, -Atoms, -Outcome) — a nested interval bound is EXACTLY an of-relation then its
+% bounded year object (that pair, that order, referent-linked, countable/na); every other list shape
+% (singleton, reversed, extra element, deeper list, alien atom) rejects, echoing the whole sublist.
+norm_sublist([ relation(A, of, Y)-PR, object(YR, N, countable, na, CO, Num)-PY ],
+             [ relation(A, of, Y)-PR, object(YR, N, countable, na, CO, Num)-PY ], Outcome) :-
+    YR == Y, unit_noun(N), !, check_year(CO, Num, nested, Outcome).
+norm_sublist(List, [], reject(interval_sublist(List))).
 
 % check_year(+CountOp, +Num, +Placement, -Outcome) — a v1 interval bound: a single-bound marker
 % (exactly / bare eq are non-v1), a non-negative integer value, and D9 placement (geq/greater must
@@ -151,11 +152,15 @@ placement_ok(less,    nested).
 % wire_guard(+Flat, -PatRef, -Outcome) — bind PatRef to the sole population referent, then consume
 % the remaining conjuncts as well-wired concept / interval components.
 wire_guard(Flat, PatRef, Outcome) :-
-    population_refs(Flat, Pops),
-    (   Pops = [PatRef]
-    ->  exclude_pop(Flat, PatRef, Pool),
-        consume_components(Pool, PatRef, 0, Outcome)
-    ;   Outcome = reject(bad_population)
+    object_refs(Flat, ORefs),
+    (   \+ all_distinct(ORefs)
+    ->  Outcome = reject(shared_object_referent)
+    ;   population_refs(Flat, Pops),
+        (   Pops = [PatRef]
+        ->  exclude_pop(Flat, PatRef, Pool),
+            consume_components(Pool, PatRef, 0, Outcome)
+        ;   Outcome = reject(bad_population)
+        )
     ).
 
 % population_refs(+Conds, -Refs) — the referents of every top-level population object.
@@ -168,6 +173,17 @@ population_refs([_|Cs], Rs) :- population_refs(Cs, Rs).
 exclude_pop([], _, []).
 exclude_pop([object(R, _, _, _, _, _)-_|Cs], PatRef, Cs) :- R == PatRef, !.
 exclude_pop([C|Cs], PatRef, [C|Pool]) :- exclude_pop(Cs, PatRef, Pool).
+
+% object_refs(+Conds, -Refs) / all_distinct(+Refs) — the referents introduced by object atoms (guard or
+% exception body, one level) and their pairwise-distinctness by identity. is_wellformed/1 proves declared
+% referents unique yet permits two object atoms to share one, so the whitelist enforces object-role
+% distinctness here before matching companion atoms by ==.
+object_refs([], []).
+object_refs([object(R, _, _, _, _, _)-_|Cs], [R|Rs]) :- !, object_refs(Cs, Rs).
+object_refs([_|Cs], Rs) :- object_refs(Cs, Rs).
+
+all_distinct([]).
+all_distinct([X|Xs]) :- \+ ( member(Y, Xs), X == Y ), all_distinct(Xs).
 
 % consume_components(+Pool, +PatRef, +N0, -Outcome) — pull a complete component out of Pool
 % (anchored by a concept / age object + its wiring) and recurse. When no anchor remains, a leftover
@@ -218,7 +234,7 @@ select_rel(A, Y, [relation(A2, of, Y2)-_|T], T) :- A2 == A, !, Y = Y2.
 select_rel(A, Y, [X|T], [X|Rest]) :- select_rel(A, Y, T, Rest).
 
 % select_year(+YearRef, +Pool, -Rest) — remove the bounded year object with referent YearRef.
-select_year(Y, [object(Y2, N, _, _, _, _)-_|T], T) :- Y2 == Y, unit_noun(N), !.
+select_year(Y, [object(Y2, N, countable, na, _, _)-_|T], T) :- Y2 == Y, unit_noun(N), !.
 select_year(Y, [X|T], [X|Rest]) :- select_year(Y, T, Rest).
 
 % leftover_reject(+Conjunct, -Outcome) — a guard conjunct left after component matching: an orphan
@@ -254,19 +270,22 @@ action_outcome(ActionDrs, PatRef, Outcome) :-
     ).
 
 % ==========================================================================================
-% Exception body (D6): exactly one population + one concept, wired by have; interval-free, op-free.
-% An alien (op / interval / relation / any non {population, concept, have}) atom is caught first, so
-% the population / concept cardinality reasons name a genuine cardinality defect. population_refs +
-% concept_refs are hoisted before the conditional so the last branch's referents stay bound.
+% Exception body (D6): EXACTLY one population object + one concept object + one have wiring them
+% (interval-free, op-free). An alien atom is caught first, then object-referent aliasing, then the
+% population / concept cardinalities; the wiring branch requires the have to be the sole leftover, so an
+% extra / duplicate / mis-wired have rejects. object_refs / population_refs / concept_refs are hoisted
+% before the conditional so the last branch's referents stay bound.
 % ==========================================================================================
 exception_outcome(Conds, Outcome) :-
+    object_refs(Conds, ORefs),
     population_refs(Conds, Pops),
     concept_refs(Conds, Cs),
     (   first_exc_alien(Conds, Bad) -> Outcome = reject(exception_shape(Bad))
+    ;   \+ all_distinct(ORefs)      -> Outcome = reject(bad_exception(aliased))
     ;   Pops \= [_]                 -> Outcome = reject(bad_exception(population))
     ;   Cs \= [_]                   -> Outcome = reject(bad_exception(concept_count))
     ;   Pops = [PatRef], Cs = [CRef],
-        (   has_have(Conds, PatRef, CRef) -> Outcome = ok
+        (   exc_wire(Conds, PatRef, CRef) -> Outcome = ok
         ;   Outcome = reject(bad_exception(wiring))
         )
     ).
@@ -285,9 +304,17 @@ concept_refs([], []).
 concept_refs([object(R, N, countable, na, eq, 1)-_|Cs], [R|Rs]) :- reg_concept(_, N), !, concept_refs(Cs, Rs).
 concept_refs([_|Cs], Rs) :- concept_refs(Cs, Rs).
 
-% has_have(+Conds, +PatRef, +ConceptRef) — a have predicate wiring PatRef -> ConceptRef (by identity).
-has_have([predicate(_, have, S, O)-_|_], PatRef, CRef) :- S == PatRef, O == CRef, !.
-has_have([_|Cs], PatRef, CRef) :- has_have(Cs, PatRef, CRef).
+% exc_wire(+Conds, +PatRef, +ConceptRef) — the body is EXACTLY the population object, the concept object,
+% and one have wiring PatRef -> ConceptRef: dropping the two objects leaves that single have and nothing
+% else, so an extra / duplicate / mis-wired have fails.
+exc_wire(Conds, PatRef, CRef) :-
+    exclude_obj(Conds, PatRef, R1),
+    exclude_obj(R1, CRef, R2),
+    R2 = [predicate(_, have, S, O)-_], S == PatRef, O == CRef.
+
+% exclude_obj(+Conds, +Ref, -Rest) — drop the first object atom with referent Ref (by identity).
+exclude_obj([C|T], Ref, T) :- C = object(R, _, _, _, _, _)-_, R == Ref, !.
+exclude_obj([C|T], Ref, [C|Rest]) :- exclude_obj(T, Ref, Rest).
 
 % ==========================================================================================
 % The recursive named scan + vocabulary.

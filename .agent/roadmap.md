@@ -337,7 +337,13 @@ Cross-unit decisions:
   subterms pinned); F4 wording; honest coverage now 21 constructs == source scan; accept_bounded_range test on the
   real probed bytes. Gate run_tests(profile_check) 40 + run_tests(profile_battery) 102 GREEN; all 8 clinical gates
   unregressed, 0 warn/err. Found+fixed an SWI clause-compile quirk (memory Lessons: `Sub=Term, Mut=drs([…,Sub])`
-  last-goal head-arg fold DROPS the Sub binding → route via a predicate call mk_exc). 33% 333K/1M
+  last-goal head-arg fold DROPS the Sub binding → route via a predicate call mk_exc). 33% 333K/1M — +
+  codex-review remediation: is_wellformed proves DECLARATION not object-ROLE uniqueness → 5 verified over-accepts
+  of role-aliased / non-canonical DRS closed — object-referent-uniqueness (shared_object_referent /
+  bad_exception(aliased)), EXACT [of-relation, countable/na year] sublist, EXACT exception body (exc_wire =
+  sole-leftover have vs extra/duplicate), year countable/na pinned everywhere, provenance SID=1 (bad_provenance);
+  +ground_rejects_exercised coverage past functor granularity + honest doc; battery → 23 constructs / 115 GREEN,
+  all 8 gates unregressed; +Prolog term-walk-var false-positive lesson (nonvar+integer guard).
 - [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
   via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
   one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via
