@@ -301,10 +301,21 @@ Cross-unit decisions:
   registration = the ONE top named scan (action checks named(_) shape only). Left to profile-battery /
   map-exc: exhaustive reject coverage, exception single-concept cardinality, the op_mismatch /
   bad_action / bad_top_shape reject paths. 0 warn/err loads, sibling gates unregressed. 24% 241K/1M
-- [ ] profile-battery: full DRS-side reject coverage for profile_check — p7 DRS shapes (`v()`,
-  fresh-referent then-part, bare-then, in-guard `-drs`, unregistered named, warning-bearing
-  parses, op/keyword mismatch per modality, malformed interval sublists, non-golden DRS
-  variants). Gate: plunit all-reject. Reads: profile_check.pl + goldens.
+- [x] profile-battery: `clinical/profile_check_battery_tests.pl` = systematic hand-mutant DRS reject matrix
+  over `profile_check/4` (pure Prolog, hand-built DRS terms with real referent vars — no live APE). One
+  mutant CLASS per reject Construct the checker emits (17), each a single-locus edit of a proven-accepted
+  base; the p7 hazards become concrete terms (v()/-drs/alien guard = guard_shape, fresh-referent subject =
+  action_subject_mismatch, bare-then top = bad_top_shape, off-allowlist named, warning parse =
+  nonempty_messages, FULL registry keyword×op Cartesian = 18 op_mismatch + 6 matched bases, nested interval
+  sublist = nested_sublist, int(5) target = bad_action_target). Per-mutant anti-vacuity (bases_accept over
+  every base). HONEST COVERAGE: profile_construct/1 closed set cross-checked against profile_check.pl's own
+  reject(...) sites (source PARSED AS TERMS = independent authority, not the self-referential banked list) +
+  every_construct_has_mutant → exhaustive over the gate's rejects; NO dead branch (bad_action_referent
+  reachable when the used event arg is a guard referent). Gate run_tests(profile_battery) GREEN 79 = 3 meta
+  + 38 bases_accept + 38 mutants_reject, each reject OBSERVED (dumped + eyeballed, never assumed); 0 warn/err,
+  8 clinical gates unregressed. Pure test-authoring, no profile_check.pl change — codex-930f954 accept-gaps
+  (top-level leq/less placement, >1 interval, non-interval-in-sublist, unconstrained of/have args) are
+  SHAPE-per-atom ACCEPTS → routed to map-core (canonical guard shape), documented in the file header. 24% 245K/1M
 - [ ] map-core: `clinical/drs_map.pl` exception-free DRS→KB terms: guard walker (concept atoms
   via registry; interval atoms from object CountOp + D9 sublist flatten; disjunct grouping =
   one sentence per disjunct under one raw rule id → stmt.k stmt-major, D4); action key via

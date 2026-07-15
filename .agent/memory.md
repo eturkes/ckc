@@ -448,11 +448,33 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   cardinality/placement. All items defense-in-depth (raw gate rejects the surface + APE won't emit
   them from a v1 parse; each verified NON-golden-reachable via hand DRS probes). FIXED in-unit: F4
   negative interval bound (guard_item now `integer(INT), INT >= 0` → reject(interval_bound); was
-  integer/1 only). OPEN for the owning units: guard accepts >1 interval object + top-level `leq`/`less`
-  + non-interval atoms inside the interval sublist (D8/D9 canonical = `geq`/`greater` top-level,
-  `leq`/`less` nested) → map-core (canonical guard shape) + profile-battery (reject tests); `of` &
-  `have` args unconstrained (of→named, have→any term) → map-core; D6 exception single-concept +
+  integer/1 only). OPEN for the owning units (profile-battery CLOSED its portion — it confirmed all four
+  are profile_check ACCEPTS not rejects, SHAPE-per-atom by design, so it banked no mutant and routed them
+  WHOLE to map-core): guard accepts >1 interval object + top-level `leq`/`less` + non-interval atoms inside
+  the interval sublist (D8/D9 canonical = `geq`/`greater` top-level, `leq`/`less` nested) + `of`/`have` args
+  unconstrained (of→named, have→any term) → map-core (canonical guard shape); D6 exception single-concept +
   multi-concept guard → map-exc.
+- ClinicalCNL profile battery (M3.profile-battery; AUTHORITY = clinical/profile_check_battery_tests.pl — the
+  DRS-side reject battery, the post-APE mirror of raw_gate_battery_tests.pl). Pure test-authoring, no
+  profile_check.pl change; 38 hand-built DRS-term mutants (real referent vars, like the crafted escapes → the
+  checker runs pure/fast, no live APE) over 17 reject Constructs (one CLASS each), per-mutant anti-vacuity
+  (each carries its EXACT accepted base; bases_accept proves base⇒ok). Gate run_tests(profile_battery) 79 GREEN.
+  NEW REUSABLE HONEST-COVERAGE TECHNIQUE (conflict / court-differential / map batteries inherit it — stronger
+  than raw-gate-battery's prose-asserted completeness): the independent construct authority = THE GATE SOURCE
+  PARSED AS PROLOG TERMS. source_reject_constructs/1 opens the checker file, read_term-loops it, walks each
+  clause for reject(Arg) subterms, keeps ground/atom args (comments + reject(Var) control-flow guards
+  auto-excluded) → a construct set from the SOURCE not the banked list; constructs_match_source asserts
+  banked==source, every_construct_has_mutant asserts each is covered → a future gate reject with no mutant fails
+  a self-check. MUTANT-CONSTRUCTION GOTCHAS (map-* batteries reuse — is_wellformed/1 runs BEFORE the shape
+  checks, so a shape mutant MUST stay wellformed): a bare-atom action target (foo) fails is_argument →
+  reject(not_wellformed) NOT bad_action_target → use int(5) (a valid non-named arg); a named(compound) is caught
+  by the earlier named scan → unregistered_named NOT bad_action_target; a top-declared referent used only inside
+  a nested modal box fails is_dom_used → keep the box's referent local. A seemingly is_wellformed-DEAD reject
+  can be LIVE: bad_action_referent (Act =\= the predicate event arg) looks forced to an unused/undeclared ref
+  (→ not_wellformed) yet IS reachable when the used event arg is a GUARD referent (accessible → wellformed) →
+  verify a seemingly-dead is_wellformed-gated reject BY CONSTRUCTION, never declare it dead from a shallow
+  argument. OBSERVED-REJECT DISCIPLINE: dump every mutant's ACTUAL profile_check result and eyeball (swipl -g
+  forall over battery_case) before trusting green — confirms none rejects on an earlier check than intended.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
