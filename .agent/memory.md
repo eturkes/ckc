@@ -419,6 +419,29 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   Basis = parsed STRING or atom none; document-level id integrity (duplicate_rule_id/duplicate_exception_id/
   dangling_exception). Gate GREEN 35/35; raw-gate-battery's dup-id / dangling-exc / number-agreement / bad-input
   hazards now already reject.
+- ClinicalCNL profile checker (M3.profile-drs; AUTHORITY = clinical/profile_check.pl — the 2nd fail-closed
+  layer, post-APE, pure Prolog no APE dep). profile_check(+Ctx, +Drs, +Messages, -Result): Ctx = raw-gate
+  rule(_,Keyword,_,_,_) | exception(_,_,_,_) (only kind + Keyword read); Drs = acetext_to_drs term (real vars
+  + `-SID/TID`); Result = ok | reject(Reason) single-cause, ordered first-violation checks (nonempty_messages
+  → not_wellformed → unregistered_named → top shape → guard whitelist → op D1 → action). Gate
+  clinical/profile_check_tests.pl (run_tests(profile_check), 36 GREEN). KEY REUSABLE PATTERN (map-core
+  inherits it): the gate feeds the checker DRS TERMS reconstructed from the byte-pinned surface goldens via
+  read_term_from_atom(SerializedGolden, Drs, []) — a serialized DRS reads back to the SAME term (equal
+  uppercase numbervar names → one shared fresh var), and golden_roundtrip PROVES it (re-serialize == golden,
+  byte-exact ×17 text/plain) → any downstream DRS consumer runs pure/fast off the pinned goldens, no live APE.
+  is_wellformed/1 (prolog/utils) = canonical referent-hygiene backstop, but it PASSES on every text/plain
+  golden incl. nonv1 → NOT the v1 discriminator (the tight shape whitelist is). SCOPE BOUNDARIES (profile-
+  battery + map-exc must honor): (1) drug registration = the ONE top-level recursive named scan; action_outcome
+  checks target = named(_) SHAPE only (dedup, no 2nd pn_allow). (2) exception body profile = interval-free +
+  op-free + concept/population-only, but D6 single-concept cardinality is NOT enforced (→ map-exc). (3)
+  profile-drs's battery = accept 12 v1 + 5 nonv1 non-vacuity (guard_shape, interval_countop×2,
+  nonempty_messages×2) ONLY; op_mismatch / bad_action / bad_top_shape / zero-message unregistered_named reject
+  paths are NOT golden-reachable → profile-battery hand-constructs them. TWO GENERAL PROLOG GOTCHAS (map-*
+  reuse): (a) if-then-else UNDOES a failed condition's bindings — a value-producing goal a LATER branch needs
+  (population_ref → PatRef) must be HOISTED before the ( ->; ) chain, else the later branch sees a fresh
+  unbound var (a singleton-variable warning is the tell). (b) serialize_term/1 GLOBALLY narrows the
+  `- ~ => v &` operators (op(0,...), never restored) → order any serialize-using test LAST; functional
+  read-back (=>(...), -(...)) + infix `-`/`/` are unaffected regardless.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

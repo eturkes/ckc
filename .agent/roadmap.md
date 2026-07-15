@@ -284,14 +284,23 @@ Cross-unit decisions:
   over gate_document/2" → "systematic over the banked hazards" (the framing/field Constructs are the core
   suite's); raw_gate_tests.pl gained tab/whitespace + exact empty_document (the real untested-anywhere gaps).
   13% 133K/1M
-- [ ] profile-drs: `clinical/profile_check.pl` post-APE DRS checker: zero-message law;
-  frame-op↔keyword map (D1, both directions); recursive `named(_)` scan vs pn registry;
-  guard-shape whitelist (conjuncts {concept-have, interval-of} + one-level sublist flatten;
-  reject `-drs`/`v()`/unknown functors/extra ops); action shape
-  predicate(take,GuardRef,named(RegisteredDrug)); canonical-DRS equality vs the registered
-  pattern's golden (first-parse-wins ambiguity kill). + accept battery over the goldens. Gate:
-  plunit. Reads: `prolog/utils/is_wellformed.pl` + `vendor/acerules/engine/drs_checker.pl`
-  (bounded 2-file template read) + goldens.
+- [x] profile-drs: `clinical/profile_check.pl` post-APE DRS whitelist (2nd fail-closed layer, pure
+  Prolog no APE dep) + `clinical/profile_check_tests.pl` gate. profile_check(+Ctx,+Drs,+Msgs,-Result)
+  → ok | reject(Reason) single-cause; Ctx = raw-gate rule(_,Keyword,_,_,_) | exception(_,_,_,_) (kind
+  + Keyword read). Ordered checks: zero-message law → is_wellformed/1 canonical hygiene (APE util;
+  backstop, passes on all text/plain incl. nonv1, NOT the discriminator) → recursive named scan vs pn
+  registry (THE drug-registration authority) → rule shape drs([],[=>(guard,drs([],[op]))]) / exception
+  bare concept-have → guard whitelist (eq-1 pop/concept/age objects + year unit object v1_countop ∈
+  {geq,greater,leq,less} + relation(of) + predicate(have), one-level interval sublist flatten; reject
+  -drs/v/alien=guard_shape, exactly/bare-eq=interval_countop, deeper=nested_sublist) → consequent
+  op↔keyword D1 (op_mismatch) → action predicate(_,take,<subject==population>,named(_)). Gate GREEN
+  36/36 via the read-back-golden pattern: DRS TERMS reconstructed from the byte-pinned surface goldens
+  via read_term_from_atom (serialized DRS reads back to the SAME term; golden_roundtrip proves fidelity
+  byte-exact ×17) → pure/fast, no live APE — accept 12 v1 + covers-all-v1 + 5 nonv1 non-vacuity
+  (guard_shape/interval_countop×2/nonempty_messages×2) + covers-all-nonv1 + roundtrip ×17. Dedup: drug
+  registration = the ONE top named scan (action checks named(_) shape only). Left to profile-battery /
+  map-exc: exhaustive reject coverage, exception single-concept cardinality, the op_mismatch /
+  bad_action / bad_top_shape reject paths. 0 warn/err loads, sibling gates unregressed. 24% 241K/1M
 - [ ] profile-battery: full DRS-side reject coverage for profile_check — p7 DRS shapes (`v()`,
   fresh-referent then-part, bare-then, in-guard `-drs`, unregistered named, warning-bearing
   parses, op/keyword mismatch per modality, malformed interval sublists, non-golden DRS
