@@ -515,13 +515,21 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   provenance density, incl. docA's stmt.0 source, is a KERNEL-test fixture, NOT the map oracle; map-emit will define
   canonical bytes from the actual mapper). (2) certainty optional — the atom `none` (raw Cert/Basis default) =
   absent. Output is kb_kernel-valid BY CONSTRUCTION (per-rule + whole-doc); emit order FREE (kb_bytes sorts) → the
-  gate compares msort-SETS + asserts valid_kb. Gate clinical/drs_map_tests.pl run_tests(drs_map) 8 GREEN via the
+  gate compares msort-SETS + asserts valid_kb. Gate clinical/drs_map_tests.pl run_tests(drs_map) 12 GREEN via the
   read-back-golden pattern (surface_expected through read_term_from_atom, profile-drs's technique, no ape.exe): 4
   markers (each CountOp→bound) + 3 threads (docA exception-free/docB/control, full fact set + valid_kb) + a 2-disjunct
-  rule (D4 grouping + Base==base(2,3) counter threading + optional certainty). SEAM TO map-emit: map_rule/6 IS the
+  rule (D4 grouping + Base==base(2,3) + optional certainty) + CODEX-REVIEW: bounded-range [2-interval guard pins the
+  == sibling-isolation — a unifying companion-walk aliases interval#2's fresh vars through #1, collapsing extraction;
+  mutation-proven non-vacuous], cross-rule base-threading [nonzero Base0/ordinal/region — the map-emit contract],
+  6-keyword/4-frame table [all D1 keywords + the may/-should unwrap branches], action-lemma-uniqueness [registry.pl
+  delegates map-core's inverse-key uniqueness → gate reg_action lemma dups]. SEAM TO map-emit: map_rule/6 IS the
   map-emit interface — map-emit is the whole-DOC driver (group raw-gate sentences by rule ordinal, thread base/2
   across rule-blocks via map_rule + exception-blocks via map-exc, collect facts, kb-writer bytes via kb_bytes/write_kb,
-  byte-pin + determinism-gate). Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
+  byte-pin + determinism-gate). DETERMINISM SEMANTICS (map-emit spec — codex-review corrected the roadmap gate):
+  idempotent re-run + emit-order-free (kb_bytes sorts the fact SET); bind/rule ids are POSITIONAL (surface /
+  block-ordinal) → a guard-conjunct or rule-order permutation is a DISTINCT accepted document, NOT byte-invariant
+  by design (map-core is surface-order); true input-permutation invariance would need explicit canonicalization, a
+  separate decision NOT currently guaranteed. Additive unit: 2 new files, no sibling edits, all pure gates unregressed.
 - SWI clause-compilation quirk (bit M3.profile-structure; ALL Prolog DRS/mutant builders here beware): a clause
   body `Sub = Term, HeadVar = f(…,Sub,…)` whose LAST goal is a DIRECT unification constructing a head argument
   that embeds the just-bound Sub → SWI folds the construction into the clause head and DROPS the `Sub = Term`

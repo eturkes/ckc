@@ -358,16 +358,21 @@ Cross-unit decisions:
   `source(rule.k, DocId, sorted-sentence-Regions, Basis string|none)` — NO stmt-level source
   (kb_examples's varying density = kernel-test fixture, not the map oracle); certainty optional
   (`none`=absent). Output kb_kernel-valid by construction; emit order free (kb_bytes sorts). Gate
-  run_tests(drs_map) 8 GREEN via read-back goldens (read_term_from_atom, profile-drs pattern, no
+  run_tests(drs_map) 12 GREEN via read-back goldens (read_term_from_atom, profile-drs pattern, no
   live APE): 4 markers (CountOp→bound) + 3 threads (docA exc-free/docB/control full sets, valid_kb)
-  + 2-disjunct rule (grouping + Base==base(2,3) + certainty). All pure gates unregressed, 0 warn/err
-  loads; additive (2 new files, no sibling edits). 20% 199K/1M
+  + 2-disjunct rule (grouping + Base==base(2,3) + certainty) + (codex-review) bounded-range (==
+  sibling-isolation, mutation-proven non-vacuous) + cross-rule base-threading (nonzero Base0/ordinal/
+  region) + 6-keyword/4-frame table + action-lemma-uniqueness gate. All pure gates unregressed, 0
+  warn/err loads; additive (2 new files, no sibling edits). 20% 199K/1M
 - [ ] map-emit: whole-document driver + canonical emission — group raw-gate sentences by rule
   ordinal, thread `base(StmtIdx,BindIdx)` across rule-blocks (`drs_map:map_rule/6`, base-threaded —
   it already assigns `stmt.k`/`bind.k`) + exception-blocks (map-exc), collect facts → kb-writer
   (`kb_bytes/2`/`write_kb/2`); byte-pins from OBSERVED emitter output over the thread docs;
-  determinism gates (re-run identical; guard-conjunct/DRS-input reorder identical; goldens re-emit
-  == pinned). Gate: byte plunit. Reads: drs_map.pl (map_rule/6) + kb_kernel (kb_bytes) + goldens.
+  determinism gates (re-run identical; fact-SET emit-order invariant [kb_bytes sorts]; goldens
+  re-emit == pinned) — NOT input-permutation invariant: bind/rule ids are positional (map-core
+  assigns bind.k in surface order, rule.k = the block ordinal), so a guard-conjunct / rule-order
+  permutation is a DISTINCT accepted document by design; canonicalize only if ever required. Gate:
+  byte plunit. Reads: drs_map.pl (map_rule/6) + kb_kernel (kb_bytes) + goldens.
 - [ ] map-exc: labeled exception compilation — exception blocks → NAF-guarded PROLEG overrides
   on their rule's statements (exc.k stmt-major, document-continuous counters; D6
   self-contained bodies; clause region_ids = own block's basis verbatim) + bridge-oracle
