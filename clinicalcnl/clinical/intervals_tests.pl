@@ -46,6 +46,43 @@ oracle_valid(Bounds, Valid) :-
     length(Bounds, N),
     ( N =:= 1, Bounds = [bound(V,_,_)], V >= 0 -> Valid = true ; Valid = false ).
 
+% ---- per-bound value + marker battery (D10 exactness + closed vocabulary, THROUGH valid_v1_interval) -
+% The 16-mask leg above spans presence/count over canonical integer bounds; this leg spans the per-bound
+% VALUE and MARKER law THROUGH valid_v1_interval, so a value regression (integer-only, dropping the
+% rational 1r2) or a marker regression (skipping valid_bound, admitting an out-of-vocabulary marker) is
+% caught differentially rather than only by valid_bound's own tests. Values span exact {-1, 0, 1r2} plus
+% a float (18.0, non-exact); markers span the four canonical plus one out-of-vocabulary each; the oracle
+% re-states the FULL single-bound law independently (exact non-negative rational + in-vocabulary marker).
+
+vm_value(-1).
+vm_value(0).
+vm_value(1r2).
+vm_value(18.0).
+
+vm_openness(open).
+vm_openness(closed).
+vm_openness(ajar).
+
+vm_dir(lower).
+vm_dir(upper).
+vm_dir(sideways).
+
+% vm_combo(-Bound): one singleton bound over value × openness × dir (4×3×3 = 36).
+vm_combo(bound(V, O, D)) :-
+    vm_value(V),
+    vm_openness(O),
+    vm_dir(D).
+
+% oracle_vm(+Bound, -Valid): the FULL single-bound law re-stated independently — an exact non-negative
+% rational value with an in-vocabulary openness + dir (no call into the module under test).
+oracle_vm(bound(V, O, D), Valid) :-
+    ( rational(V), V >= 0, vm_canon_openness(O), vm_canon_dir(D) -> Valid = true ; Valid = false ).
+
+vm_canon_openness(open).
+vm_canon_openness(closed).
+vm_canon_dir(lower).
+vm_canon_dir(upper).
+
 :- begin_tests(intervals).
 
 % ---- 16-mask validity ------------------------------------------------------------------------
@@ -76,6 +113,37 @@ test(mask_pins) :-
     \+ valid_v1_interval([bound(18, closed, lower), bound(18, open, upper)]), % two bounds (a range)
     \+ valid_v1_interval([bound(18, closed, lower), bound(20, closed, lower)]),% two lowers
     \+ valid_v1_interval([bound(18.0, closed, lower)]).                        % float value (not exact)
+
+% ---- per-bound value + marker law ------------------------------------------------------------
+
+% The value×marker generator spans 36 singletons and both verdicts occur (valid = {0,1r2} × {open,
+% closed} × {lower,upper} = 8; invalid = 28), so the differential leg below cannot pass vacuously.
+test(vm_space_shape) :-
+    findall(B, vm_combo(B), All),                          length(All, 36),
+    findall(B, (vm_combo(B), oracle_vm(B, true)),  V),     length(V, 8),
+    findall(B, (vm_combo(B), oracle_vm(B, false)), I),     length(I, 28).
+
+% valid_v1_interval/1 agrees with the independent full-law oracle on every value×marker singleton — a
+% value regression (rejecting the rational 1r2) or a marker regression (admitting ajar / sideways)
+% diverges here even though all canonical-marker mask tests still pass.
+test(vm_value_marker_law) :-
+    forall( vm_combo(Bound),
+            ( oracle_vm(Bound, Expected),
+              ( valid_v1_interval([Bound]) -> Got = true ; Got = false ),
+              ( Got == Expected
+              -> true
+              ;  format(user_error, "intervals: bound ~w expected ~w got ~w~n", [Bound, Expected, Got]),
+                 fail ) ) ).
+
+% Explicit literal pins (independent of the oracle) — a positive rational is accepted (D10), an
+% out-of-vocabulary openness / dir is rejected, a float is rejected: kills both the integer-only and
+% the marker-ignoring mutant directly.
+test(vm_pins) :-
+    valid_v1_interval([bound(1r2, closed, lower)]),      % positive rational accepted (D10)
+    valid_v1_interval([bound(3r2, open, upper)]),        % another exact rational
+    \+ valid_v1_interval([bound(0, ajar, lower)]),       % out-of-vocabulary openness rejected
+    \+ valid_v1_interval([bound(0, closed, sideways)]),  % out-of-vocabulary dir rejected
+    \+ valid_v1_interval([bound(18.0, open, upper)]).    % float rejected
 
 % ---- bounds -----------------------------------------------------------------------------------
 
@@ -194,5 +262,30 @@ test(bounded_range_guard) :-
     assertion(R == range(bound(18, closed, lower), bound(65, open, upper))),
     bounds_satisfiable([bound(18, closed, lower), bound(65, open, upper)]),         % 18 =< X < 65
     \+ bounds_satisfiable([bound(65, closed, lower), bound(18, open, upper)]).       % 65 =< X < 18 = ∅
+
+% ---- fail-closed public API ------------------------------------------------------------------
+% Every public decider validates its bound/range inputs and fails-closed on a malformed one — a
+% non-exact (float) value, an out-of-vocabulary marker, a mis-directed side, a cyclic list — never
+% throwing and never returning a verdict over garbage (defense in depth atop upstream validation).
+
+test(fail_closed_bounds) :-
+    \+ bounds_range([bound(18.0, closed, lower)], _),                              % float value
+    \+ bounds_range([bound(foo, closed, lower)], _),                               % non-numeric value
+    \+ bounds_range([bound(18, ajar, lower)], _),                                  % bad openness
+    \+ bounds_range([bound(18, closed, sideways)], _),                             % bad dir
+    \+ bounds_satisfiable([bound(foo, closed, lower)]),                            % garbage not "satisfiable"
+    \+ bounds_satisfiable([bound(foo, closed, lower), bound(5, closed, upper)]).   % no type_error, fails
+
+test(fail_closed_ranges) :-
+    \+ range_empty(range(bound(foo, closed, lower), bound(5, closed, upper))),     % no type_error over garbage
+    \+ range_empty(range(bound(18.0, open, lower), bound(19, open, upper))),       % float side rejected
+    \+ range_intersection(range(bound(foo, closed, lower), none), range(none, none), _),
+    \+ ranges_overlap(range(bound(18, closed, upper), none), range(none, none)),   % upper bound in the lower slot
+    \+ interval_bound(interval('q.age_years', 18.0, closed, lower), _, _).         % float atom rejected
+
+% A cyclic bound list terminates (is_list is cycle-safe) and fails-closed rather than diverging.
+test(fail_closed_terminates) :-
+    B = [bound(0, closed, lower)|B],
+    \+ bounds_range(B, _).
 
 :- end_tests(intervals).

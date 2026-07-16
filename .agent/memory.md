@@ -672,13 +672,26 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   a lower / lesser wins an upper, open beats closed at an equal value; [] → range(none,none) = all-Q);
   range_intersection/3 (two ranges; == folding the union of their bounds); range_empty/1 (semidet, only
   a TWO-sided range is empty: Vl>Vu, or Vl=:=Vu with either bound open; single-sided/empty never empty);
-  bounds_satisfiable/1 + ranges_overlap/2 (\+ empty). §L·thread pinned: adult geq18 ∩ child less18 = ∅
+  bounds_satisfiable/1 + ranges_overlap/2 (\+ empty). FAIL-CLOSED public API (codex-review): every
+  public pred validates its bound/range inputs (valid_bound/1 = a GROUND recognizer, semidet not the
+  nondet enumerator it was; valid_range/1 = each side none|valid_bound of that Dir) + FAILS on a
+  malformed one — float value, out-of-vocabulary marker, mis-directed side, cyclic list — never throwing
+  (killed the `foo>5` type_error) nor returning a verdict over garbage; tighten/3 = explicit lower/upper
+  branches, no catch-all folding an unknown side into upper. Real pipeline only feeds kb_kernel-valid
+  bounds → this is defense in depth. §L·thread pinned: adult geq18 ∩ child less18 = ∅
   (the age-disjoint control's no-conflict), both-adult geq18 overlaps → conflict-core/conflict-verdict
-  inherit these. Gate clinical/intervals_tests.pl run_tests(intervals) 19 GREEN, pure/fast no APE:
-  256-combo 16-mask battery vs an INDEPENDENT length+value oracle (anti-vacuity = 8-valid/248-invalid
-  shape pin + explicit literal mask pins) + hand-oracled boundary/adjacency/rational-exact/reversed/
-  single-sided + the thread cases. Float bound rejected (rational/1; `1r2` reads as a rational under the
-  default rational_syntax=compatibility). Additive: 2 new files, all 12 clinical gates green, 0 warn/err.
+  inherit these. Gate clinical/intervals_tests.pl run_tests(intervals) 25 GREEN, pure/fast no APE:
+  256-combo 16-mask PRESENCE battery vs an INDEPENDENT length+value oracle (anti-vacuity = 8-valid/
+  248-invalid shape pin + literal mask pins); a 36-combo VALUE×MARKER battery (value {-1,0,1r2,float}
+  × openness {open,closed,ajar} × dir {lower,upper,sideways}) vs an independent full-law oracle THROUGH
+  valid_v1_interval + literal value/marker pins — codex-review added it: the mask leg passed both an
+  integer-only mutant (wrongly rejects 1r2) and a marker-ignoring mutant (wrongly accepts ajar/sideways)
+  vacuously; a mutation probe now confirms the value×marker oracle DISCRIMINATES both (real=0, int-only=4,
+  marker-ignoring=10 mismatches/36); fail-closed tests (malformed inputs fail, no throw); + hand-oracled
+  boundary/adjacency/rational-exact/reversed/single-sided + the thread cases. Float bound rejected
+  (rational/1; `1r2` reads as a rational under the default rational_syntax=compatibility). Codex-review
+  follow-up modifies the 2 unit files (no longer additive); all 12 clinical gate units green (11 files;
+  ulex_tests = registry+ulex), 0 warn/err.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

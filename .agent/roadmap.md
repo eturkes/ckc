@@ -427,11 +427,17 @@ Cross-unit decisions:
   bounds_range/2 (fold to tightest lower/upper — greater wins a lower / lesser an upper, open beats
   closed at equal value; [] → range(none,none)=all-Q); range_intersection/3 (== folding the bound union);
   range_empty/1 (semidet, two-sided only: Vl>Vu or Vl=:=Vu with an open side); bounds_satisfiable/1 +
-  ranges_overlap/2. Gate clinical/intervals_tests.pl run_tests(intervals) 19 GREEN, pure/fast no APE:
-  256-combo 16-mask battery vs an INDEPENDENT length+value oracle (anti-vacuity: 8-valid/248-invalid
-  shape pin + explicit mask pins) + hand-oracled boundary/adjacency/rational-exact/reversed/single-sided
-  + the §L·thread age-disjoint control (adult geq18 ∩ child less18 = ∅) and age-overlap. Additive (2 new
-  files), all 12 clinical gates green, 0 warn/err. 17% 168K/1M
+  ranges_overlap/2. FAIL-CLOSED public API (codex-review): valid_bound/1 (a GROUND recognizer) +
+  valid_range/1 guard every public pred → a float / out-of-vocabulary-marker / mis-directed / cyclic
+  input FAILS (no throw, no verdict over garbage); real pipeline only feeds kb_kernel-valid bounds →
+  defense in depth. Gate clinical/intervals_tests.pl run_tests(intervals) 25 GREEN, pure/fast no APE:
+  the 256-combo 16-mask PRESENCE battery vs an INDEPENDENT length+value oracle (anti-vacuity: 8-valid/
+  248-invalid shape pin + mask pins) + a codex-review-added 36-combo VALUE×MARKER battery THROUGH
+  valid_v1_interval (kills an integer-only + a marker-ignoring mutant the mask leg passed vacuously;
+  mutation probe real=0/int-only=4/marker-ignoring=10 mismatches) + fail-closed tests + hand-oracled
+  boundary/adjacency/rational-exact/reversed/single-sided + the §L·thread age-disjoint control (adult
+  geq18 ∩ child less18 = ∅) and age-overlap. Codex-review hardened the 2 unit files; all 12 clinical
+  gate units green (11 files; ulex_tests = registry+ulex), 0 warn/err. 17% 168K/1M
 - [ ] conflict-core: `clinical/conflict.pl` — eligibility (same action key ∧ §L·conflict
   direction groups) + context overlap: DNF disjunct-pair enumeration × concept polarity ×
   interval intersection (intervals.pl) × exception expansion (exceptions join their statement

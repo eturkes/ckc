@@ -20,12 +20,20 @@
 % an empty result (the §L·thread control: adult `age>=18` vs child `age<18` is age-disjoint → no
 % conflict). Leaf module — no sibling dependency; the interval/4 atom shape is destructured, not read.
 %
+% Fail-closed input contract: every public predicate validates its bound/range inputs (valid_bound/1,
+% valid_range/1) and FAILS on a malformed one — a non-exact (float) value, an out-of-vocabulary
+% Openness/Dir marker, a bound on the wrong side, a cyclic bound list — never throwing and never
+% returning a verdict over garbage. Defense in depth atop the upstream raw/profile/kb_kernel validation
+% (the real pipeline only ever supplies kb_kernel-valid bounds); the algebra re-checks its own inputs
+% so a mis-wired caller fails safe rather than silently mis-deciding a conflict.
+%
 %   Gate: swipl -q -g "consult('clinical/intervals_tests.pl'),(run_tests(intervals)->halt(0);halt(1))" -t 'halt(1)'
 
 :- module(intervals,
-          [ valid_bound/1,          % ?bound(V,Openness,Dir)                  — a well-formed exact bound
+          [ valid_bound/1,          % ?bound(V,Openness,Dir)                  — a well-formed exact bound (ground)
+            valid_range/1,          % ?range(Lower,Upper)                     — a well-formed range (sides none/valid_bound)
             valid_v1_interval/1,    % +Bounds                                 — the single-bound law (16-mask)
-            interval_bound/3,       % +interval(Q,V,O,D), -Q, -bound(V,O,D)   — KB context atom -> bound
+            interval_bound/3,       % +interval(Q,V,O,D), -Q, -bound(V,O,D)   — KB context atom -> validated bound
             bounds_range/2,         % +Bounds, -range(Lower,Upper)            — intersect same-quantity bounds
             range_intersection/3,   % +R1, +R2, -R3                           — intersect two ranges
             range_empty/1,          % +range(Lower,Upper)                     — empty over Q (semidet)
@@ -36,9 +44,13 @@
 % ---- bounds -----------------------------------------------------------------------------------
 
 %% valid_bound(?Bound) is semidet.
-% A well-formed exact bound: an integer or n/d rational value (never a float — D10 needs exact
-% open/closed arithmetic), a closed-vocabulary Openness and Dir.
-valid_bound(bound(V, Openness, Dir)) :-
+% A well-formed exact bound: a GROUND bound(Value, Openness, Dir) whose Value is an integer or n/d
+% rational (never a float — D10 needs exact open/closed arithmetic) with a closed-vocabulary Openness
+% and Dir. A recognizer, not a generator: a non-ground argument fails (so it never instantiates a
+% half-specified bound), which keeps it semidet.
+valid_bound(Bound) :-
+    ground(Bound),
+    Bound = bound(V, Openness, Dir),
     rational(V),
     openness(Openness),
     dir(Dir).
@@ -49,17 +61,34 @@ openness(closed).
 dir(lower).
 dir(upper).
 
-%% interval_bound(+Atom, -Quantity, -Bound) is det.
-% Split a KB interval/4 context atom (KB.md §Context atoms) into its quantity and its bound. The
-% caller groups bounds by Quantity before intersecting — only same-quantity bounds intersect.
-interval_bound(interval(Q, V, Openness, Dir), Q, bound(V, Openness, Dir)).
+%% valid_range(?Range) is semidet.
+% A well-formed range(Lower, Upper): each side is `none` (unbounded) or a valid_bound of THAT side's
+% Dir — Lower a lower bound, Upper an upper bound. A ground recognizer; a non-ground or mis-directed
+% side fails, so the range predicates below fold and decide only over well-formed ranges.
+valid_range(range(Lower, Upper)) :-
+    ground(range(Lower, Upper)),
+    range_side(Lower, lower),
+    range_side(Upper, upper).
+
+range_side(none, _).
+range_side(bound(V, O, Dir), Dir) :-
+    valid_bound(bound(V, O, Dir)).
+
+%% interval_bound(+Atom, -Quantity, -Bound) is semidet.
+% Split a KB interval/4 context atom (KB.md §Context atoms) into its quantity and its bound, validating
+% the bound (fail-closed on a malformed atom). The caller groups bounds by Quantity before
+% intersecting — only same-quantity bounds intersect.
+interval_bound(interval(Q, V, Openness, Dir), Q, Bound) :-
+    Bound = bound(V, Openness, Dir),
+    valid_bound(Bound).
 
 %% valid_v1_interval(+Bounds) is semidet.
 % The v1 single-bound law — the interval validity battery transplanted from the CNL AST/parser side:
-% a list of bounds is a legal v1 interval atom iff EXACTLY ONE bound is present and its value is >= 0
-% (an age is non-negative). Over the four (Openness,Dir) slots {geq,greater,leq,less} this rejects the
-% empty mask, every two-or-more-bound mask (a bare range is not a single atom), a malformed slot, and a
-% negative value. The raw/profile lanes already enforce this upstream; the algebra re-checks its input.
+% a list of bounds is a legal v1 interval atom iff EXACTLY ONE bound is present, well-formed, and its
+% value is >= 0 (an age is non-negative). Over the four (Openness,Dir) slots {geq,greater,leq,less}
+% this rejects the empty mask, every two-or-more-bound mask (a bare range is not a single atom), a
+% malformed slot or value, and a negative value. The raw/profile lanes already enforce this upstream;
+% the algebra re-checks its input.
 valid_v1_interval([Bound]) :-
     valid_bound(Bound),
     Bound = bound(V, _, _),
@@ -70,10 +99,14 @@ valid_v1_interval([Bound]) :-
 % lower bound (or `none`), Upper the tightest upper bound (or `none`). An absent side is unbounded
 % (-inf / +inf) and never causes emptiness on its own — only a two-sided range can be empty.
 
-%% bounds_range(+Bounds, -Range) is det.
+%% bounds_range(+Bounds, -Range) is semidet.
 % Intersect a list of same-quantity bounds into range(Lower, Upper): the tightest lower and tightest
-% upper among them. The empty list yields range(none, none) — an unconstrained (all-Q) quantity.
+% upper among them. Validates the input first (a proper list of well-formed bounds), so a float, an
+% out-of-vocabulary marker, or a cyclic list fails-closed rather than folding garbage or diverging. The
+% empty list yields range(none, none) — an unconstrained (all-Q) quantity.
 bounds_range(Bounds, Range) :-
+    is_list(Bounds),
+    maplist(valid_bound, Bounds),
     range_fold(Bounds, range(none, none), Range).
 
 range_fold([], Range, Range).
@@ -82,18 +115,24 @@ range_fold([B|Bs], Acc0, Acc) :-
     range_fold(Bs, Acc1, Acc).
 
 % tighten(+Bound, +RangeIn, -RangeOut): fold one bound into the accumulator range, combining it with
-% the like-Dir side (the other side passes through unchanged).
+% the like-Dir side (the other side passes through unchanged). A Dir outside {lower, upper} fails — no
+% silent catch-all folds an unknown side into the upper.
 tighten(bound(V, O, Dir), range(L0, U0), range(L, U)) :-
     ( Dir == lower
     -> combine_lower(bound(V, O, lower), L0, L), U = U0
-    ;  combine_upper(bound(V, O, upper), U0, U), L = L0
+    ; Dir == upper
+    -> combine_upper(bound(V, O, upper), U0, U), L = L0
     ).
 
-%% range_intersection(+R1, +R2, -R3) is det.
-% Intersect two ranges: the tighter of the two lowers and the tighter of the two uppers. Overlaps two
-% guards' effective ranges (conflict-core) without re-deriving from raw bounds; equivalent to folding
-% the union of the two guards' bounds.
-range_intersection(range(L1, U1), range(L2, U2), range(L, U)) :-
+%% range_intersection(+R1, +R2, -R3) is semidet.
+% Intersect two ranges: the tighter of the two lowers and the tighter of the two uppers. Validates both
+% inputs (fail-closed on a malformed range). Overlaps two guards' effective ranges (conflict-core)
+% without re-deriving from raw bounds; equivalent to folding the union of the two guards' bounds.
+range_intersection(R1, R2, range(L, U)) :-
+    valid_range(R1),
+    valid_range(R2),
+    R1 = range(L1, U1),
+    R2 = range(L2, U2),
     combine_lower(L1, L2, L),
     combine_upper(U1, U2, U).
 
@@ -134,11 +173,15 @@ tighter_upper(bound(Va, Oa, upper), bound(Vb, Ob, upper), Tighter) :-
 stricter_openness(open, closed).
 
 %% range_empty(+Range) is semidet.
-% The range holds NO rational point. Only a two-sided range can be empty (an absent side is unbounded,
-% so a single-sided or empty range always holds a point). Over Q (dense): a lower value ABOVE the upper
-% value is empty; EQUAL values are empty unless BOTH bounds are closed (only then the shared point V is
-% included); strictly between (Vl < Vu) always holds a point, whatever the openness.
-range_empty(range(bound(Vl, Ol, lower), bound(Vu, Ou, upper))) :-
+% The range holds NO rational point. Validates the range first (fail-closed: a malformed range is not
+% reported empty and never throws). Only a two-sided range can be empty (an absent side is unbounded,
+% so a single-sided or unconstrained range always holds a point). Over Q (dense): a lower value ABOVE
+% the upper value is empty; EQUAL values are empty unless BOTH bounds are closed (only then the shared
+% point V is included); strictly between (Vl < Vu) always holds a point, whatever the openness.
+range_empty(range(Lower, Upper)) :-
+    valid_range(range(Lower, Upper)),
+    Lower = bound(Vl, Ol, lower),
+    Upper = bound(Vu, Ou, upper),
     ( Vl > Vu       -> true
     ; Vl =:= Vu     -> ( Ol == open -> true ; Ou == open )
     ;                  fail
@@ -146,12 +189,14 @@ range_empty(range(bound(Vl, Ol, lower), bound(Vu, Ou, upper))) :-
 
 %% bounds_satisfiable(+Bounds) is semidet.
 % The same-quantity bounds have a common rational solution (their intersection range is non-empty).
+% Fail-closed via bounds_range (a malformed bound list is unsatisfiable, not a thrown error).
 bounds_satisfiable(Bounds) :-
     bounds_range(Bounds, Range),
     \+ range_empty(Range).
 
 %% ranges_overlap(+R1, +R2) is semidet.
-% Two ranges share a rational point — conflict-core's cross-guard age-overlap test.
+% Two ranges share a rational point — conflict-core's cross-guard age-overlap test. Fail-closed via
+% range_intersection (a malformed range does not overlap, rather than throwing).
 ranges_overlap(R1, R2) :-
     range_intersection(R1, R2, R),
     \+ range_empty(R).
