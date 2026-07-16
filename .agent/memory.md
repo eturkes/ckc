@@ -657,6 +657,28 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   priorities → both suppressed; guards-only → recommend derivable) so the conflict + its resolution stay
   load-bearing; mutation-verified (empty-answerset / both-heads / dropped-against / added-contra mutants
   all caught).
+- ClinicalCNL interval algebra (M3.interval-algebra; AUTHORITY = clinical/intervals.pl header — the
+  exact-rational bound algebra conflict-core consumes; a LEAF module, no sibling deps, destructures the
+  KB interval/4 atom). The SYMBOLIC counterpart to kb_kernel's holds_atom/2 (which decides ONE patient
+  value against a bound): nothing is patient-evaluated — it intersects bounds + decides whether the
+  resulting range holds ANY point OVER Q (the rationals, dense), so open/closed + dense-order carry.
+  LOAD-BEARING (D10): `18 < X < 19` is EMPTY over the integers but NON-empty over Q (37r2) → an
+  integer/FD domain is UNSOUND for conflict overlap; plain SWI-native-rational arithmetic (exact under
+  +,-,compare), NO clp(FD)/clp(Q). API: bound(Value,Openness,Dir) [the four v1 CountOp markers
+  NORMALIZED — the module is CountOp-agnostic, reads the (Openness,Dir) the KB stores]; interval_bound/3
+  (interval/4 atom → Q + bound); valid_v1_interval/1 (the single-bound law = the 16-mask validity
+  transplant: EXACTLY one bound ∧ value ≥ 0 — a list is a v1 atom, a bounded RANGE is >1 atom);
+  bounds_range/2 (fold same-quantity bounds to range(Lower,Upper), tightest of each — greater value wins
+  a lower / lesser wins an upper, open beats closed at an equal value; [] → range(none,none) = all-Q);
+  range_intersection/3 (two ranges; == folding the union of their bounds); range_empty/1 (semidet, only
+  a TWO-sided range is empty: Vl>Vu, or Vl=:=Vu with either bound open; single-sided/empty never empty);
+  bounds_satisfiable/1 + ranges_overlap/2 (\+ empty). §L·thread pinned: adult geq18 ∩ child less18 = ∅
+  (the age-disjoint control's no-conflict), both-adult geq18 overlaps → conflict-core/conflict-verdict
+  inherit these. Gate clinical/intervals_tests.pl run_tests(intervals) 19 GREEN, pure/fast no APE:
+  256-combo 16-mask battery vs an INDEPENDENT length+value oracle (anti-vacuity = 8-valid/248-invalid
+  shape pin + explicit literal mask pins) + hand-oracled boundary/adjacency/rational-exact/reversed/
+  single-sided + the thread cases. Float bound rejected (rational/1; `1r2` reads as a rational under the
+  default rational_syntax=compatibility). Additive: 2 new files, all 12 clinical gates green, 0 warn/err.
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

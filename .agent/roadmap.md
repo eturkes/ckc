@@ -417,12 +417,21 @@ Cross-unit decisions:
   answerset + positive/negative assertions + counterfactuals; 4 mutants caught). Gate
   run_tests(court_differential) GREEN 12; all 12 clinical gates unregressed, 0
   warn/err. 21% 206K/1M
-- [ ] interval-algebra: `clinical/intervals.pl` exact-rational bound algebra (D10): bound =
-  (value, open|closed, dir); intersection/emptiness over SWI native rationals; 16-mask
-  validity battery transplant (§L·pins: 16 bound-presence masks × per-bound values {-1,0,1},
-  valid iff exactly one bound present ∧ value ≥ 0 — expectations hand-written) + open/closed
-  boundary properties (geq 18 vs greater 18 vs less 19 adjacency). Gate: plunit hand-oracled.
-  Reads: kb-contract interval shape only.
+- [x] interval-algebra: `clinical/intervals.pl` exact-rational bound algebra (D10; AUTHORITY = its
+  header) — the SYMBOLIC bound algebra conflict-core consumes (kb_kernel's holds_atom/2 does
+  point-membership; this decides whether an intersected range holds ANY point OVER Q, so open/closed +
+  dense-order carry: `18<X<19` empty over integers but NON-empty over Q → integer/FD UNSOUND for
+  overlap). Leaf module (no sibling deps, destructures interval/4), plain SWI-native-rational arithmetic,
+  no clp. API: bound(Value,Openness,Dir) [the 4 v1 markers normalized]; interval_bound/3;
+  valid_v1_interval/1 (single-bound law = the 16-mask transplant, exactly 1 bound ∧ value≥0);
+  bounds_range/2 (fold to tightest lower/upper — greater wins a lower / lesser an upper, open beats
+  closed at equal value; [] → range(none,none)=all-Q); range_intersection/3 (== folding the bound union);
+  range_empty/1 (semidet, two-sided only: Vl>Vu or Vl=:=Vu with an open side); bounds_satisfiable/1 +
+  ranges_overlap/2. Gate clinical/intervals_tests.pl run_tests(intervals) 19 GREEN, pure/fast no APE:
+  256-combo 16-mask battery vs an INDEPENDENT length+value oracle (anti-vacuity: 8-valid/248-invalid
+  shape pin + explicit mask pins) + hand-oracled boundary/adjacency/rational-exact/reversed/single-sided
+  + the §L·thread age-disjoint control (adult geq18 ∩ child less18 = ∅) and age-overlap. Additive (2 new
+  files), all 12 clinical gates green, 0 warn/err. 17% 168K/1M
 - [ ] conflict-core: `clinical/conflict.pl` — eligibility (same action key ∧ §L·conflict
   direction groups) + context overlap: DNF disjunct-pair enumeration × concept polarity ×
   interval intersection (intervals.pl) × exception expansion (exceptions join their statement
