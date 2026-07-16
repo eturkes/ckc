@@ -626,6 +626,28 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   UNBOUND payload on every case incl. canonical accepts). FIX: guard the match clause with nonvar(T) + a TYPE
   test on the extracted field (integer(SID), SID =\= 1) so unbound subterms fall through to the recursion. The
   OBSERVED-REJECT dump over crafted-var terms (not atom stand-ins) is what catches it.
+- ClinicalCNL naive-NAF vs courteous differential (M3.court-differential; AUTHORITY =
+  clinical/court_differential_tests.pl header — read it, skip re-deriving the isomorphism/seam). The
+  vendored courteous solver court_interpreter/3 (engine/court_interpreter/) is DRIVEN DIRECTLY on rule
+  terms — PURE/fast, no live APE (matches the sibling gates): just assert the `ape` search path (→
+  clinicalcnl/prolog) BEFORE use_module, because its utils/debug_output closure loads
+  ape('utils/drs_to_ascii') (a source .pl — no built .plp needed). INTERNAL RULE FORMAT (from
+  answerset_generator.pl's own doc, confirmed by =.. on generate_rules output — the `::`/`<-` in the
+  vendored output files are DISPLAY-only): a rule is the 3-tuple (Label, Head, Body) [top functor
+  `,`/2, NOT ::/<-]; a FACT is a rule with EMPTY body (_,Head,[]) [bare object(...) facts silently
+  yield an EMPTY answerset — the trap that bit my first probe]; the answerset is a list of bare HEADS;
+  a Head vs its strong-negation -Head conflict resolves via the asserted overrides/2 priority +
+  negate/2 (group([...]) vs -group([...])). Ground every court expectation against a published
+  testcases/court/output/* fixture (a term-level known-answer control reproducing output/nixon's
+  answerset + read_file_to_string substring anchors; use once/1 on sub_string/5 — unbound positions
+  backtrack → choicepoint warning). LOAD-BEARING FINDING (the conflict layer's naive-NAF choice rests
+  on it): the clinical KB's NAF exception (derivable/3) is DIRECTION-BLIND — it coincides with
+  courteous on the recommend fragment ONLY when the priority favours the AGAINST rule (nixon:
+  contra-overrides-recommend → both suppress the recommend on {c1,c2}); it DIVERGES when courteous
+  priority favours the FOR rule (reversed priority, and the 4-rule/2-priority platypus where positives
+  win over negatives → courteous concludes the positive while the NAF exception blocks). So courteous
+  is NOT a 1:1 oracle; -pacifist (a positive contraindication) is courteous-only, absent from the
+  clinical KB (its exception is a guard, never a conclusion).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 

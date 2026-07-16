@@ -398,13 +398,21 @@ Cross-unit decisions:
   (map_emit) GREEN 15 (docA re-pinned with exc.0 + source, bridge byte-pin + focused exc oracle via
   same_kb, exception_compiled, rule-layer base/2-transparency); raw_gate 38/38, raw_gate_battery +1
   mutant. All 10 clinical gates unregressed, 0 warn/err. 22% 222K/1M
-- [ ] court-differential: purpose-built ISOMORPHIC differential vs AceRules `court` — clinical
-  pair (recommend rule + contraindicate exception) ↔ republican/pacifist structure; exhaustive
-  fact-presence truth table (all subsets of participating facts); per row assert clinical-KB
-  derivability == court verdict where semantics coincide + DOCUMENT divergences (naive-NAF vs
-  courteous — §L·acerules; platypus divergence = known). Gate: differential plunit. Reads:
-  `vendor/acerules/engine/testcases/court/*` + `parser/priority_handler.pl` (bounded; court
-  smoke recipe in memory Runtime).
+- [x] court-differential: `clinical/court_differential_tests.pl` — naive-NAF vs courteous
+  differential (SPEC §6 shared-fragment; derivable/3 = synthetic-fixture reference, NOT G-RULE-EVAL
+  shipped eval). Drives the vendored courteous solver court_interpreter/3 DIRECTLY on the nixon
+  (Label,Head,Body) rule terms — PURE/fast, no live APE (only the `ape` search path, for its
+  drs_to_ascii closure); a known-answer control reproduces testcases/court/output/nixon's answerset
+  + fixture-text anchors. Isomorphism: clinical recommend rule + contraindicate exception ↔
+  republican/pacifist (quaker=recommend guard, pacifist=recommend concluded, republican=exception,
+  -pacifist=contra, Republican-overrides-Quaker=exception defeats recommend). FINDING: over the
+  exhaustive {c1,c2} truth table derivable/3 (recommend) COINCIDES with the courteous recommend
+  verdict when the priority favours the AGAINST rule (nixon dir: {no,rec,no,no}); DIVERGES when it
+  favours the FOR rule (reversed priority + the 4-rule/2-priority platypus analog → courteous
+  concludes the positive while the direction-blind NAF exception blocks) — courteous is NOT a 1:1
+  oracle. Representational gap documented: -pacifist is courteous-only (no positive clinical contra
+  conclusion). Gate run_tests(court_differential) GREEN 9; all 12 clinical gates unregressed, 0
+  warn/err. 21% 206K/1M
 - [ ] interval-algebra: `clinical/intervals.pl` exact-rational bound algebra (D10): bound =
   (value, open|closed, dir); intersection/emptiness over SWI native rationals; 16-mask
   validity battery transplant (§L·pins: 16 bound-presence masks × per-bound values {-1,0,1},
