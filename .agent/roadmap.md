@@ -438,14 +438,22 @@ Cross-unit decisions:
   boundary/adjacency/rational-exact/reversed/single-sided + the §L·thread age-disjoint control (adult
   geq18 ∩ child less18 = ∅) and age-overlap. Codex-review hardened the 2 unit files; all 12 clinical
   gate units green (11 files; ulex_tests = registry+ulex), 0 warn/err. 17% 168K/1M
-- [ ] conflict-core: `clinical/conflict.pl` — eligibility (same action key ∧ §L·conflict
-  direction groups) + context overlap: DNF disjunct-pair enumeration × concept polarity ×
-  interval intersection (intervals.pl) × exception expansion (exceptions join their statement
-  as negated concepts). Bounded-range guards are v1 (user 2026-07-15, profile-structure) → a
-  guard may carry >1 same-quantity (age) interval atom; intersect them WITHIN the guard to its
-  effective bound before cross-guard overlap. Gate: plunit hand-oracled pair battery
-  (overlap/disjoint/polarity/exception + a bounded-range pair). Reads: intervals.pl +
-  kb_kernel.pl + map outputs.
+- [x] conflict-core: `clinical/conflict.pl` symbolic conflict detection over a kb_kernel-valid flat
+  multi-doc KB (AUTHORITY = its header; memory). Two halves — ELIGIBILITY (same action key ∧
+  opposing_directions/2 over kb_kernel:direction_group: positive vs against/contraindicating, `avoid`
+  non-positive) + CONTEXT OVERLAP (contexts_overlap/3 = concept polarity Required∩Excluded=∅ with
+  exceptions as NEGATED concepts per SPEC §6 SMT-lane ∧ per-quantity interval intersection via
+  intervals.pl ranges_overlap over each guard's effective range). Concepts = independent booleans
+  orthogonal to age → overlap is a DECISION not a search; a bounded-range guard (v1) folds its
+  same-quantity atoms to an effective range first (bounds_range) then cross-guard, a within-guard
+  contradiction → empty → no overlap; DNF = all disjunct pairs, conflict if ANY eligible pair overlaps.
+  API rules_conflict/3 (semidet check), conflict_witness/5 (verdict-layer evidence), conflict_pairs/2
+  (det all pairs), + contexts_overlap/3, opposing_directions/2, same_action/3. Gate
+  clinical/conflict_tests.pl run_tests(conflict) 16 GREEN pure/fast no APE: §8.6 thread reuses kb_examples
+  (doc_a×doc_b conflict + witness/pairs, doc_a×control age-disjoint no-conflict); overlap/disjoint/polarity/
+  exception-survives/bounded-range±/same-direction/self/DNF±/multi-doc + opposing_directions & same_action
+  unit relations; compact-spec constructor fixtures proved kb_kernel-valid (anti-vacuity meta). All 13
+  clinical gate suites green (12 files), 0 warn/err; additive (2 new files). 20% 203K/1M
 - [ ] conflict-verdict: verdict layer — records {category semantic_contradiction |
   semantic_no_conflict (+ documented_no_conflict_result), kind deontic_direction_conflict,
   participating_rules set `a.<source>.rule.k`, evidence {document_id, sentence_index},

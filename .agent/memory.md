@@ -692,6 +692,38 @@ validation-pass hashes, unit-insertion ledgers) = git-only; keep just the surviv
   (rational/1; `1r2` reads as a rational under the default rational_syntax=compatibility). Codex-review
   follow-up modifies the 2 unit files (no longer additive); all 12 clinical gate units green (11 files;
   ulex_tests = registry+ulex), 0 warn/err.
+- ClinicalCNL conflict core (M3.conflict-core; AUTHORITY = clinical/conflict.pl header — the symbolic
+  conflict-detection stage over a kb_kernel-valid FLAT multi-doc KB; ASSUMES validity + DECIDES, no
+  re-validation, like map-*; pure/fast no live APE). Two INDEPENDENT halves (§L·conflict): ELIGIBILITY =
+  same action key (same_action/3) ∧ opposing directions (opposing_directions/2 = one in positive
+  {for,require,permit}, the other in against{against,avoid}/contraindicating{contraindicate,avoid} via
+  kb_kernel:direction_group/2; `avoid` is non-positive; semidet via (->;)); CONTEXT OVERLAP
+  (contexts_overlap/3) = concept polarity (Required = ∪ both guards' concepts, Excluded = ∪ both
+  statements' EXCEPTION concepts; disjoint) ∧ per-quantity interval intersection (intervals.pl
+  ranges_overlap over each guard's effective range). KEY MODEL FACT: exceptions expand to NEGATED
+  concepts here (the SMT-lane view, SPEC §6) — NOT the LP/NAF guard derivable/3 uses (same atom+exception
+  structure, opposite lane). Concepts are independent booleans ORTHOGONAL to the age quantity → a disjunct
+  pair's satisfiability is EXACTLY (no polarity clash) ∧ (every quantity range non-empty) = a DECISION, no
+  patient search. Bounded range (v1): a guard's same-quantity atoms fold to an effective range FIRST
+  (bounds_range) then cross-guard ranges_overlap — equivalent to unioning all bounds (intersection is
+  associative/commutative), and a within-guard-contradictory guard → empty effective range → no overlap
+  (ranges_overlap's \+ empty catches it; no separate guard-satisfiability check). DNF: member(rule(RA,SA))
+  × member(rule(RB,SB)) enumerates all disjunct pairs → conflict if ANY eligible pair overlaps. v1 caveat:
+  every valid KB carries ONLY act.administer:drug.abx_a, so same_action is effectively always-true (a
+  different-action KB can't be kb_kernel-valid) → tested via crafted action facts, not a whole-KB case.
+  API: rules_conflict/3 (semidet CHECK, order-independent, = once(conflict_witness)); conflict_witness/5
+  (nondet witness = the verdict layer's evidence source); conflict_pairs/2 (det, all pairs RuleA@<RuleB
+  deduped — the multi-doc operating mode); + contexts_overlap/3, opposing_directions/2, same_action/3.
+  Gate clinical/conflict_tests.pl run_tests(conflict) 16 GREEN: §8.6 thread reuses kb_examples
+  (doc_a×doc_b conflict + witness/pairs pins, doc_a×control no-conflict age-disjoint); overlap-concepts /
+  disjoint-intervals / polarity-block / exception-survives / bounded-range(overlap+disjoint) /
+  same-direction / self / DNF(any+none) / multi-doc conflict_pairs + opposing_directions & same_action
+  unit relations; fixtures built by a compact-spec constructor (disj_rule_facts) proved kb_kernel-valid
+  (anti-vacuity meta-test). CLEAN-GATE (recurs in conflict-verdict/corpus batteries): a test-helper clause
+  dispatched on a NON-first argument (spec/disj on arg 2) leaves a residual CHOICEPOINT — SWI indexes the
+  first arg only → "Test succeeded with choicepoint" though the test passes → a green cut on the matched
+  clause; a nondet witness predicate called directly in a test body needs once/1. All 13 clinical gate
+  suites green (12 files), 0 warn/err; additive (2 new files, no sibling edits).
 
 ## Archived — deep M1/M2 Rust lessons (git-resident)
 
